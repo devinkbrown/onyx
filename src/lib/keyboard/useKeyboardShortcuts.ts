@@ -19,7 +19,7 @@
  */
 
 import { onCleanup, onMount } from 'solid-js';
-import { getState } from '@/lib/store';
+import { getState, selectDeviceMemoryOwner } from '@/lib/store';
 import { closeSpotlight, useSpotlight } from '@/chat/spotlight/useSpotlight';
 import { openPreferences, preferences, setPreference } from '@/lib/prefs/preferences';
 import { toggleFollow } from '@/lib/notifications/followed';
@@ -242,15 +242,17 @@ function navigateNextUnread(): void {
 
 function toggleActiveFollow(): void {
   const state = getState();
+  const owner = selectDeviceMemoryOwner(state);
+  if (!owner) return;
   const view = state.activeView;
   if (view.kind === 'channel') {
     // Topic filters are conversation boundaries in the Time-Native Venue.
     // Match the visible follow control: U follows the selected topic when one
     // is active, otherwise it follows the room.
     const topic = state.activeChannelTopics.get(view.channel.toLowerCase()) ?? null;
-    toggleFollow(view.channel, topic);
+    toggleFollow(view.channel, topic, owner);
   } else if (view.kind === 'dm') {
-    toggleFollow(view.nick);
+    toggleFollow(view.nick, null, owner);
   }
 }
 

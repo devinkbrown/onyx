@@ -631,12 +631,7 @@ export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
 
 export function MessageView(props: MessageViewProps): JSX.Element {
   const [local] = splitProps(props, ['selfNick']);
-  const [topicReadMarkers, setTopicReadMarkers] = createSignal<readonly TopicReadMarker[]>(
-    readTopicReadLedger(),
-  );
-  onCleanup(subscribeTopicReadLedger((markers) => {
-    setTopicReadMarkers(markers);
-  }));
+  const [topicReadMarkers, setTopicReadMarkers] = createSignal<readonly TopicReadMarker[]>([]);
 
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
@@ -659,6 +654,17 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const memoryOwnerKey = createMemo(() => {
     const owner = memoryOwner();
     return owner ? deviceMemoryOwnerKey(owner) : null;
+  });
+  createEffect(() => {
+    const owner = memoryOwner();
+    if (!owner) {
+      setTopicReadMarkers([]);
+      return;
+    }
+    setTopicReadMarkers(readTopicReadLedger(owner));
+    onCleanup(subscribeTopicReadLedger((markers) => {
+      setTopicReadMarkers(markers);
+    }, owner));
   });
 
   const selfNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
@@ -751,15 +757,18 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   });
 
   const followActive = createMemo(() => {
-    followed();
+    const owner = memoryOwner();
+    if (!owner) return false;
+    followed(owner);
     const target = followTarget();
-    return target ? isFollowed(target.channel, target.topic) : false;
+    return target ? isFollowed(target.channel, target.topic, owner) : false;
   });
 
   function toggleActiveFollow(): void {
     const target = followTarget();
-    if (!target) return;
-    toggleFollow(target.channel, target.topic);
+    const owner = memoryOwner();
+    if (!target || !owner) return;
+    toggleFollow(target.channel, target.topic, owner);
   }
 
   const forumPinned = createMemo(() => {
@@ -776,14 +785,17 @@ export function MessageView(props: MessageViewProps): JSX.Element {
 
   function followTopic(topic: string): void {
     const view = activeView();
-    if (view.kind !== 'channel') return;
-    toggleFollow(view.channel, topic);
+    const owner = memoryOwner();
+    if (view.kind !== 'channel' || !owner) return;
+    toggleFollow(view.channel, topic, owner);
   }
 
   function topicFollowed(topic: string): boolean {
-    followed();
+    const owner = memoryOwner();
+    if (!owner) return false;
+    followed(owner);
     const view = activeView();
-    return view.kind === 'channel' && isFollowed(view.channel, topic);
+    return view.kind === 'channel' && isFollowed(view.channel, topic, owner);
   }
 
   // ── active target for reactions/sends ──

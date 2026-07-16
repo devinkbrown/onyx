@@ -7,6 +7,7 @@ import {
   TOPIC_READ_LEDGER_KEY,
   clearAllTopicReads,
   clearChannelTopicReads,
+  clearDeviceTopicReads,
   countUnreadByTopic,
   markAllTopicsRead,
   markTopicRead,
@@ -41,6 +42,53 @@ describe('topic read ledger', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     localStorage.clear();
+  });
+
+  it('isolates Alice and Bob cursors and same-tab publications from legacy state', () => {
+    const alice = { serverUrl: 'wss://topics.example/ws', identity: 'alice' } as const;
+    const bob = { serverUrl: 'wss://topics.example/ws', identity: 'bob' } as const;
+    const aliceListener = vi.fn();
+    const bobListener = vi.fn();
+    const stopAlice = subscribeTopicReadLedger(aliceListener, alice);
+    const stopBob = subscribeTopicReadLedger(bobListener, bob);
+
+    markTopicRead('#secret', 'roadmap', { id: 'legacy', time: at(10) });
+    markTopicRead('#secret', 'roadmap', { id: 'alice', time: at(20) }, alice);
+    markTopicRead('#secret', 'roadmap', { id: 'bob', time: at(30) }, bob);
+
+    expect(readTopicReadMarker('#secret', 'roadmap', alice)?.lastReadMessageId).toBe('alice');
+    expect(readTopicReadMarker('#secret', 'roadmap', bob)?.lastReadMessageId).toBe('bob');
+    expect(readTopicReadMarker('#secret', 'roadmap')?.lastReadMessageId).toBe('legacy');
+    expect(aliceListener).toHaveBeenCalledTimes(1);
+    expect(bobListener).toHaveBeenCalledTimes(1);
+    stopAlice();
+    stopBob();
+  });
+
+  it('lets the whole-device history wipe clear every owner scope and publish each removal', () => {
+    const alice = { serverUrl: 'wss://topics.example/ws', identity: 'alice' } as const;
+    const bob = { serverUrl: 'wss://topics.example/ws', identity: 'bob' } as const;
+    const aliceListener = vi.fn();
+    const bobListener = vi.fn();
+    const stopAlice = subscribeTopicReadLedger(aliceListener, alice);
+    const stopBob = subscribeTopicReadLedger(bobListener, bob);
+
+    markTopicRead('#secret', 'roadmap', { id: 'legacy', time: at(10) });
+    markTopicRead('#secret', 'roadmap', { id: 'alice', time: at(20) }, alice);
+    markTopicRead('#secret', 'roadmap', { id: 'bob', time: at(30) }, bob);
+    localStorage.setItem(`${TOPIC_READ_LEDGER_KEY}:unrelated`, 'keep');
+    aliceListener.mockClear();
+    bobListener.mockClear();
+
+    expect(clearDeviceTopicReads()).toBe(true);
+    expect(readTopicReadLedger()).toEqual([]);
+    expect(readTopicReadLedger(alice)).toEqual([]);
+    expect(readTopicReadLedger(bob)).toEqual([]);
+    expect(localStorage.getItem(`${TOPIC_READ_LEDGER_KEY}:unrelated`)).toBe('keep');
+    expect(aliceListener).toHaveBeenCalledWith([]);
+    expect(bobListener).toHaveBeenCalledWith([]);
+    stopAlice();
+    stopBob();
   });
 
   it('persists only normalized channel/topic read metadata', () => {

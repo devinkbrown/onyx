@@ -13,9 +13,20 @@ import { parseIRCMessage } from '@/lib/irc/parser';
 import { follow, followed, unfollow } from '@/lib/notifications/followed';
 import { TOPIC_TAG } from '@/lib/topics/topics';
 
-import { store } from './store';
+import { store, type Server } from './store';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://topics.test', identity: 'me' } as const;
+const memoryServer: Server = {
+  id: 'topic-unread',
+  name: 'Topics',
+  network: 'Topics',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: MEMORY_OWNER.identity,
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
 
 function channel(name: string): Channel {
   return {
@@ -41,6 +52,7 @@ function seedActiveChannel(selectedTopic?: string): void {
   };
   store.setState({
     ...initialState,
+    server: memoryServer,
     client: client as never,
     channels: new Map([['#general', channel('#general')]]),
     ourNick: 'me',
@@ -89,8 +101,8 @@ describe('named-conversation unread visibility', () => {
 
   it('matches topic labels case-insensitively and only follows hidden topics', () => {
     seedActiveChannel('RoadMap');
-    follow('#general', 'roadmap');
-    follow('#general', 'release');
+    follow('#general', 'roadmap', MEMORY_OWNER);
+    follow('#general', 'release', MEMORY_OWNER);
 
     feedMessage('same-topic', 'same conversation, different case', 'ROADMAP');
     expect(store.getState().channels.get('#general')?.unread).toBe(0);
@@ -126,7 +138,7 @@ describe('named-conversation unread visibility', () => {
 
   it('keeps the channel notify-level suppression for hidden conversations', () => {
     seedActiveChannel('roadmap');
-    follow('#general', 'release');
+    follow('#general', 'release', MEMORY_OWNER);
     store.setState({ channelNotify: new Map([['#general', 'none']]) });
 
     feedMessage('suppressed-hidden', 'stored without unread or notification', 'release');

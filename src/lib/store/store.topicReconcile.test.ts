@@ -6,11 +6,22 @@ import { parseIRCMessage } from '@/lib/irc/parser';
 import { markTopicRead, readTopicReadLedger } from '@/lib/topics/topicReadLedger';
 import { TOPIC_TAG } from '@/lib/topics/topics';
 
-import { _resetNamesBurstsForTests, store } from './store';
+import { _resetNamesBurstsForTests, store, type Server } from './store';
 
 const initialState = store.getInitialState();
 const ROOM = '#room';
 const BASELINE = '2026-07-16T10:00:00.000Z';
+const MEMORY_OWNER = { serverUrl: 'wss://topics.test', identity: 'me' } as const;
+const memoryServer: Server = {
+  id: 'topic-reconcile',
+  name: 'Topics',
+  network: 'Topics',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: MEMORY_OWNER.identity,
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
 
 function row(
   id: string,
@@ -55,6 +66,7 @@ function seed(messages: ChatMessage[]) {
   };
   store.setState({
     ...initialState,
+    server: memoryServer,
     client: client as never,
     connectionStatus: 'connected',
     ourNick: 'me',
@@ -106,7 +118,7 @@ describe('device-local named-conversation read reconciliation', () => {
     expect(state.totalUnreadMentions).toBe(1);
     expect(state.firstUnreadId.get(ROOM)).toBe('release-1');
     expect(client.sendRaw.mock.calls.some(([command]) => command === 'MARKREAD')).toBe(false);
-    expect(readTopicReadLedger()).toContainEqual(expect.objectContaining({
+    expect(readTopicReadLedger(MEMORY_OWNER)).toContainEqual(expect.objectContaining({
       channel: ROOM,
       topic: 'roadmap',
       lastReadMessageId: 'road-1',
@@ -123,7 +135,7 @@ describe('device-local named-conversation read reconciliation', () => {
     feed('road-live', '2026-07-16T13:00:00.000Z', 'visible update', 'ROADMAP');
     expect(store.getState().channels.get(ROOM)).toMatchObject({ unread: 1, highlights: 0 });
     expect(store.getState().firstUnreadId.get(ROOM)).toBe('release-1');
-    expect(readTopicReadLedger()).toContainEqual(expect.objectContaining({
+    expect(readTopicReadLedger(MEMORY_OWNER)).toContainEqual(expect.objectContaining({
       topic: 'roadmap',
       lastReadMessageId: 'road-live',
     }));
@@ -166,7 +178,7 @@ describe('device-local named-conversation read reconciliation', () => {
       row('release-2', '2026-07-16T14:00:00.000Z', 'Release', { highlight: true }),
     ];
     seed(messages);
-    markTopicRead(ROOM, 'roadmap', messages[2]!);
+    markTopicRead(ROOM, 'roadmap', messages[2]!, MEMORY_OWNER);
 
     store.getState()._handleMessage(parseIRCMessage(
       ':me MARKREAD #room timestamp=2026-07-16T10:30:00.000Z',
@@ -209,7 +221,7 @@ describe('device-local named-conversation read reconciliation', () => {
     expect(state.channelUnread[ROOM]).toBe(0);
     expect(state.channelMentions[ROOM]).toBe(0);
     expect(state.firstUnreadId.has(ROOM)).toBe(false);
-    expect(readTopicReadLedger()).toEqual(expect.arrayContaining([
+    expect(readTopicReadLedger(MEMORY_OWNER)).toEqual(expect.arrayContaining([
       expect.objectContaining({ topic: 'roadmap', lastReadMessageId: 'road-1' }),
       expect.objectContaining({ topic: 'release', lastReadMessageId: 'release-1' }),
     ]));

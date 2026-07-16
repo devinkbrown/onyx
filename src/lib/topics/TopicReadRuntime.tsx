@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { onCleanup, onMount } from 'solid-js';
+import { createEffect, onCleanup } from 'solid-js';
 
-import { getState } from '@/lib/store';
+import { getState, selectDeviceMemoryOwner, useStore } from '@/lib/store';
+import type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 
 import {
   MAX_TOPIC_READ_ENTRIES,
@@ -53,8 +54,8 @@ export function changedTopicReadChannels(
  * The subscriber diffs the bounded marker ledger and touches only affected
  * rooms that are currently loaded in the store; it never scans every channel.
  */
-export function startTopicReadReconciliation(): () => void {
-  let previous = readTopicReadLedger();
+export function startTopicReadReconciliation(owner?: DeviceMemoryOwner): () => void {
+  let previous = readTopicReadLedger(owner);
   return subscribeTopicReadLedger((markers) => {
     const changedChannels = changedTopicReadChannels(previous, markers);
     previous = markers.map((marker) => ({ ...marker }));
@@ -64,13 +65,19 @@ export function startTopicReadReconciliation(): () => void {
     for (const channel of changedChannels) {
       if (state.channels.has(channel)) state.reconcileChannelTopicUnread(channel);
     }
-  });
+  }, owner);
 }
 
 /** App-lifetime owner for the device-local topic-read reconciliation bridge. */
 export function TopicReadRuntime(): null {
-  onMount(() => {
-    const stop = startTopicReadReconciliation();
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
+  createEffect(() => {
+    const owner = memoryOwner();
+    if (!owner) return;
+    const stop = startTopicReadReconciliation(owner);
     onCleanup(stop);
   });
   return null;

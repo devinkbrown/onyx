@@ -7,9 +7,20 @@ import { parseIRCMessage } from '@/lib/irc/parser';
 import { follow, followed, unfollow } from '@/lib/notifications/followed';
 import { TOPIC_PROP, TOPIC_TAG } from '@/lib/topics/topics';
 
-import { _resetNamesBurstsForTests, store } from './store';
+import { _resetNamesBurstsForTests, store, type Server } from './store';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://topics.test', identity: 'me' } as const;
+const memoryServer: Server = {
+  id: 'topic-navigation',
+  name: 'Topics',
+  network: 'Topics',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: MEMORY_OWNER.identity,
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
 
 function message(id: string, topic: string | null): ChatMessage {
   return {
@@ -47,6 +58,7 @@ function seed(messages: ChatMessage[] = []) {
   };
   store.setState({
     ...initialState,
+    server: memoryServer,
     client: client as never,
     connectionStatus: 'connected',
     ourNick: 'me',
@@ -124,7 +136,7 @@ describe('openChannelConversation', () => {
 describe('follow notification destinations', () => {
   it('keeps a room-only follow pointed at the whole room for tagged messages', () => {
     seed();
-    follow('#General');
+    follow('#General', null, MEMORY_OWNER);
 
     feedTaggedMessage('room-follow', 'roadmap');
 
@@ -138,8 +150,8 @@ describe('follow notification destinations', () => {
 
   it('uses the topic destination when room and topic follows both match', () => {
     seed();
-    follow('#General');
-    follow('#General', 'roadmap');
+    follow('#General', null, MEMORY_OWNER);
+    follow('#General', 'roadmap', MEMORY_OWNER);
 
     feedTaggedMessage('topic-follow', 'RoadMap');
 

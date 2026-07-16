@@ -7,10 +7,21 @@ import { parseIRCMessage } from '@/lib/irc/parser';
 import { readTopicReadMarker } from '@/lib/topics/topicReadLedger';
 import { TOPIC_TAG } from '@/lib/topics/topics';
 
-import { store } from './store';
+import { store, type Server } from './store';
 
 const ROOM = '#room';
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://topics.test', identity: 'me' } as const;
+const memoryServer: Server = {
+  id: 'topic-live-delivery',
+  name: 'Topics',
+  network: 'Topics',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: MEMORY_OWNER.identity,
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
 
 function channel(): Channel {
   return {
@@ -39,6 +50,7 @@ function seed(options: {
   };
   store.setState({
     ...initialState,
+    server: memoryServer,
     client: client as never,
     connectionStatus: 'connected',
     ourNick: 'me',
@@ -150,7 +162,7 @@ describe('live topic delivery consistency', () => {
     });
 
     const state = store.getState();
-    expect(readTopicReadMarker(ROOM, 'roadmap')).toMatchObject({
+    expect(readTopicReadMarker(ROOM, 'roadmap', MEMORY_OWNER)).toMatchObject({
       lastReadMessageId: 'visible-roadmap',
     });
     expect(state.channels.get(ROOM)).toMatchObject({ unread: 1, highlights: 1 });

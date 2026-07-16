@@ -11,13 +11,24 @@ import { createRoot } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Channel } from '@/lib/irc/types';
 import { closePreferences, isPreferencesOpen, preferences, resetPreferences } from '@/lib/prefs/preferences';
-import { store } from '@/lib/store/store';
+import { store, type Server } from '@/lib/store/store';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { SHORTCUTS, type ShortcutGroup } from './useKeyboardShortcuts';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 const ALL_GROUPS: ShortcutGroup[] = ['Navigation', 'Chat', 'View', 'Voice & Video', 'Palette'];
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://shortcuts.test', identity: 'me' } as const;
+const memoryServer: Server = {
+  id: 'keyboard-shortcuts',
+  name: 'Shortcuts',
+  network: 'Shortcuts',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: MEMORY_OWNER.identity,
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
 
 function mountKeyboardHarness(): () => void {
   let disposeRoot: (() => void) | null = null;
@@ -42,7 +53,7 @@ function appendModalButton(): { dialog: HTMLDivElement; button: HTMLButtonElemen
 
 describe('SHORTCUTS descriptor', () => {
   beforeEach(() => {
-    store.setState(initialState, true);
+    store.setState({ ...initialState, server: memoryServer, ourNick: MEMORY_OWNER.identity }, true);
     for (const key of followed()) unfollow(key);
     localStorage.clear();
     resetPreferences();
@@ -391,9 +402,9 @@ describe('SHORTCUTS descriptor', () => {
     store.setState({ activeView: { kind: 'channel', channel: '#general' } });
 
     fireEvent.keyDown(window, { key: 'u' });
-    expect(isFollowed('#general')).toBe(true);
+    expect(isFollowed('#general', null, MEMORY_OWNER)).toBe(true);
     fireEvent.keyDown(window, { key: 'u' });
-    expect(isFollowed('#general')).toBe(false);
+    expect(isFollowed('#general', null, MEMORY_OWNER)).toBe(false);
     dispose();
   });
 
@@ -405,10 +416,10 @@ describe('SHORTCUTS descriptor', () => {
     });
 
     fireEvent.keyDown(window, { key: 'u' });
-    expect(isFollowed('#general', 'roadmap')).toBe(true);
-    expect(isFollowed('#general')).toBe(false);
+    expect(isFollowed('#general', 'roadmap', MEMORY_OWNER)).toBe(true);
+    expect(isFollowed('#general', null, MEMORY_OWNER)).toBe(false);
     fireEvent.keyDown(window, { key: 'u' });
-    expect(isFollowed('#general', 'roadmap')).toBe(false);
+    expect(isFollowed('#general', 'roadmap', MEMORY_OWNER)).toBe(false);
     dispose();
   });
 

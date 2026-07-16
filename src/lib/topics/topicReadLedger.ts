@@ -9,6 +9,7 @@
  */
 
 import { isValidTopicLabel } from './topics';
+import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 
 export const TOPIC_READ_LEDGER_KEY = 'onyx:topic-read-ledger';
 export const MAX_TOPIC_READ_ENTRIES = 256;
@@ -84,11 +85,15 @@ interface ValidRoomMessage {
   index: number;
 }
 
-const listeners = new Set<TopicReadLedgerListener>();
+const listeners = new Map<string, Set<TopicReadLedgerListener>>();
 let listeningForStorage = false;
 
 function storage(): Storage | null {
   return typeof localStorage === 'undefined' ? null : localStorage;
+}
+
+function topicStorageKey(owner?: DeviceMemoryOwner): string | null {
+  return deviceMemoryStorageKey(TOPIC_READ_LEDGER_KEY, owner);
 }
 
 function compareText(left: string, right: string): number {
@@ -196,28 +201,34 @@ function parseSerializedLedger(raw: string | null): TopicReadMarker[] {
 }
 
 /** Read and sanitize the complete device-local marker ledger. */
-export function readTopicReadLedger(): TopicReadMarker[] {
+export function readTopicReadLedger(owner?: DeviceMemoryOwner): TopicReadMarker[] {
   const store = storage();
   if (!store) return [];
+  const storageKey = topicStorageKey(owner);
+  if (!storageKey) return [];
   try {
-    return parseSerializedLedger(store.getItem(TOPIC_READ_LEDGER_KEY));
+    return parseSerializedLedger(store.getItem(storageKey));
   } catch {
     return [];
   }
 }
 
 /** Case-insensitive lookup for one channel/topic marker. */
-export function readTopicReadMarker(channel: string, topic: string): TopicReadMarker | null {
+export function readTopicReadMarker(
+  channel: string,
+  topic: string,
+  owner?: DeviceMemoryOwner,
+): TopicReadMarker | null {
   const normalizedChannel = normalizeChannel(channel);
   const normalizedTopic = normalizeTopic(topic);
   if (!normalizedChannel || !normalizedTopic) return null;
-  return readTopicReadLedger().find((marker) =>
+  return readTopicReadLedger(owner).find((marker) =>
     marker.channel === normalizedChannel && marker.topic === normalizedTopic,
   ) ?? null;
 }
 
-function publish(markers: readonly TopicReadMarker[]): void {
-  for (const listener of [...listeners]) {
+function publishScope(scope: string, markers: readonly TopicReadMarker[]): void {
+  for (const listener of [...(listeners.get(scope) ?? [])]) {
     try {
       // Give every consumer its own structural snapshot. A hostile listener
       // cannot mutate what a later listener observes or add message-like data.
@@ -228,25 +239,34 @@ function publish(markers: readonly TopicReadMarker[]): void {
   }
 }
 
-function persist(markers: readonly TopicReadMarker[]): TopicReadMarker[] {
+function publish(markers: readonly TopicReadMarker[], owner?: DeviceMemoryOwner): void {
+  const scope = topicStorageKey(owner);
+  if (scope) publishScope(scope, markers);
+}
+
+function persist(
+  markers: readonly TopicReadMarker[],
+  owner?: DeviceMemoryOwner,
+): TopicReadMarker[] {
   const next = sanitizeLedger(markers);
   const store = storage();
-  if (!store) {
-    publish([]);
+  const storageKey = topicStorageKey(owner);
+  if (!store || !storageKey) {
+    publish([], owner);
     return [];
   }
   try {
-    if (next.length === 0) store.removeItem(TOPIC_READ_LEDGER_KEY);
-    else store.setItem(TOPIC_READ_LEDGER_KEY, JSON.stringify(next));
+    if (next.length === 0) store.removeItem(storageKey);
+    else store.setItem(storageKey, JSON.stringify(next));
     // Read back the authoritative device state. Storage wrappers can fail or
     // silently decline writes; publishing an uncommitted optimistic snapshot
     // would make topic chips disagree with store/sidebar counters.
-    const committed = parseSerializedLedger(store.getItem(TOPIC_READ_LEDGER_KEY));
-    publish(committed);
+    const committed = parseSerializedLedger(store.getItem(storageKey));
+    publish(committed, owner);
     return committed;
   } catch {
-    const retained = readTopicReadLedger();
-    publish(retained);
+    const retained = readTopicReadLedger(owner);
+    publish(retained, owner);
     return retained;
   }
 }
@@ -269,14 +289,15 @@ function sameMarker(left: TopicReadMarker, right: TopicReadMarker): boolean {
  */
 export function mergeTopicReadLedger(
   value: unknown,
+  owner?: DeviceMemoryOwner,
 ): { imported: number; total: number } {
   const imported = parseTopicReadLedger(value);
   if (imported.length === 0) {
-    return { imported: 0, total: readTopicReadLedger().length };
+    return { imported: 0, total: readTopicReadLedger(owner).length };
   }
 
   const merged = new Map(
-    readTopicReadLedger().map((marker) => [markerKey(marker), marker]),
+    readTopicReadLedger(owner).map((marker) => [markerKey(marker), marker]),
   );
   for (const candidate of imported) {
     const key = markerKey(candidate);
@@ -286,7 +307,7 @@ export function mergeTopicReadLedger(
     }
   }
 
-  const committed = persist([...merged.values()]);
+  const committed = persist([...merged.values()], owner);
   const committedByKey = new Map(committed.map((marker) => [markerKey(marker), marker]));
   return {
     imported: imported.filter((marker) => {
@@ -307,6 +328,7 @@ export function markTopicRead<T extends Pick<TopicReadMessage, 'id' | 'time'>>(
   channel: string,
   topic: string,
   message: T,
+  owner?: DeviceMemoryOwner,
 ): TopicReadMarker | null {
   const normalizedChannel = normalizeChannel(channel);
   const normalizedTopic = normalizeTopic(topic);
@@ -320,14 +342,14 @@ export function markTopicRead<T extends Pick<TopicReadMessage, 'id' | 'time'>>(
     lastReadMessageId,
     lastReadAt,
   };
-  const ledger = readTopicReadLedger();
+  const ledger = readTopicReadLedger(owner);
   const key = markerKey(candidate);
   const current = ledger.find((marker) => markerKey(marker) === key);
   if (current && current.lastReadAt > candidate.lastReadAt) return current;
   if (current && current.lastReadAt === candidate.lastReadAt
     && current.lastReadMessageId === candidate.lastReadMessageId) return current;
 
-  const next = persist([candidate, ...ledger.filter((marker) => markerKey(marker) !== key)]);
+  const next = persist([candidate, ...ledger.filter((marker) => markerKey(marker) !== key)], owner);
   return next.find((marker) => markerKey(marker) === key) ?? null;
 }
 
@@ -350,9 +372,10 @@ export function markAllTopicsRead<T extends TopicReadMessage>(
   channel: string,
   messages: readonly T[],
   isSystemMessage: (message: T) => boolean,
+  owner?: DeviceMemoryOwner,
 ): TopicReadMarker[] {
   const normalizedChannel = normalizeChannel(channel);
-  if (!normalizedChannel) return readTopicReadLedger();
+  if (!normalizedChannel) return readTopicReadLedger(owner);
 
   const start = Math.max(0, messages.length - MAX_TOPIC_READ_MESSAGES);
   const latestByTopic = new Map<string, TopicReadMarker>();
@@ -370,54 +393,100 @@ export function markAllTopicsRead<T extends TopicReadMessage>(
       lastReadAt,
     });
   }
-  if (latestByTopic.size === 0) return readTopicReadLedger();
+  if (latestByTopic.size === 0) return readTopicReadLedger(owner);
 
-  const ledger = readTopicReadLedger();
+  const ledger = readTopicReadLedger(owner);
   const merged = new Map(ledger.map((marker) => [markerKey(marker), marker]));
   for (const candidate of latestByTopic.values()) {
     const key = markerKey(candidate);
     const existing = merged.get(key);
     if (!existing || existing.lastReadAt <= candidate.lastReadAt) merged.set(key, candidate);
   }
-  return persist([...merged.values()]);
+  return persist([...merged.values()], owner);
 }
 
 /** Remove all topic markers for one channel. Returns the number removed. */
-export function clearChannelTopicReads(channel: string): number {
+export function clearChannelTopicReads(channel: string, owner?: DeviceMemoryOwner): number {
   const normalizedChannel = normalizeChannel(channel);
   if (!normalizedChannel) return 0;
-  const ledger = readTopicReadLedger();
+  const ledger = readTopicReadLedger(owner);
   const next = ledger.filter((marker) => marker.channel !== normalizedChannel);
   const removed = ledger.length - next.length;
   if (removed === 0) return 0;
-  const committed = persist(next);
+  const committed = persist(next, owner);
   const remaining = committed.filter((marker) => marker.channel === normalizedChannel).length;
   return Math.max(0, ledger.filter((marker) => marker.channel === normalizedChannel).length - remaining);
 }
 
-/** Remove every device-local topic marker and report verified device state. */
-export function clearAllTopicReads(): boolean {
+/** Remove every topic marker for one account (or only the quarantined legacy scope). */
+export function clearAllTopicReads(owner?: DeviceMemoryOwner): boolean {
   const store = storage();
-  if (!store) {
-    publish([]);
+  const storageKey = topicStorageKey(owner);
+  if (!store || !storageKey) {
+    publish([], owner);
     return false;
   }
   try {
-    store.removeItem(TOPIC_READ_LEDGER_KEY);
-    const keyRemoved = store.getItem(TOPIC_READ_LEDGER_KEY) === null;
-    const retained = readTopicReadLedger();
-    publish(retained);
+    store.removeItem(storageKey);
+    const keyRemoved = store.getItem(storageKey) === null;
+    const retained = readTopicReadLedger(owner);
+    publish(retained, owner);
     return keyRemoved && retained.length === 0;
   } catch {
-    const retained = readTopicReadLedger();
-    publish(retained);
+    const retained = readTopicReadLedger(owner);
+    publish(retained, owner);
+    return false;
+  }
+}
+
+/**
+ * Remove every legacy and account-scoped topic ledger from this browser.
+ *
+ * This is reserved for the whole-device history wipe. Ordinary account UI
+ * must use `clearAllTopicReads(owner)` so one signed-in identity cannot erase
+ * another identity's read positions.
+ */
+export function clearDeviceTopicReads(): boolean {
+  const store = storage();
+  if (!store) return false;
+  const ownerPrefix = `${TOPIC_READ_LEDGER_KEY}:owner:`;
+  try {
+    const scopes: string[] = [];
+    for (let index = 0; index < store.length; index += 1) {
+      const key = store.key(index);
+      if (key === TOPIC_READ_LEDGER_KEY || key?.startsWith(ownerPrefix)) scopes.push(key);
+    }
+    for (const scope of scopes) store.removeItem(scope);
+
+    let retained = false;
+    for (let index = 0; index < store.length; index += 1) {
+      const key = store.key(index);
+      if (key === TOPIC_READ_LEDGER_KEY || key?.startsWith(ownerPrefix)) {
+        retained = true;
+        break;
+      }
+    }
+    for (const scope of scopes) {
+      publishScope(scope, parseSerializedLedger(store.getItem(scope)));
+    }
+    return !retained;
+  } catch {
     return false;
   }
 }
 
 function onStorage(event: StorageEvent): void {
-  if (event.key !== TOPIC_READ_LEDGER_KEY) return;
-  publish(parseSerializedLedger(event.newValue));
+  if (!event.key) return;
+  const scoped = listeners.get(event.key);
+  if (!scoped) return;
+  const markers = parseSerializedLedger(event.newValue);
+  for (const listener of [...scoped]) {
+    try {
+      listener(markers.map((marker) => ({ ...marker })));
+    } catch {
+      // One consumer cannot poison later subscribers.
+    }
+  }
 }
 
 function addStorageListener(): void {
@@ -433,11 +502,19 @@ function removeStorageListener(): void {
 }
 
 /** Subscribe to sanitized metadata-only local and cross-tab changes. */
-export function subscribeTopicReadLedger(listener: TopicReadLedgerListener): () => void {
-  listeners.add(listener);
+export function subscribeTopicReadLedger(
+  listener: TopicReadLedgerListener,
+  owner?: DeviceMemoryOwner,
+): () => void {
+  const scope = topicStorageKey(owner);
+  if (!scope) return () => {};
+  const scoped = listeners.get(scope) ?? new Set<TopicReadLedgerListener>();
+  scoped.add(listener);
+  listeners.set(scope, scoped);
   addStorageListener();
   return () => {
-    listeners.delete(listener);
+    scoped.delete(listener);
+    if (scoped.size === 0) listeners.delete(scope);
     removeStorageListener();
   };
 }

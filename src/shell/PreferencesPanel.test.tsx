@@ -28,16 +28,16 @@ import {
 } from '@/lib/vault/savedSearches';
 import { RETENTION_POLICY_STORAGE_KEY } from '@/lib/vault/retentionPolicy';
 import {
-  markTopicRead,
-  readTopicReadMarker,
-  readTopicReadLedger,
+  markTopicRead as markScopedTopicRead,
+  readTopicReadMarker as readScopedTopicReadMarker,
+  readTopicReadLedger as readScopedTopicReadLedger,
   TOPIC_READ_LEDGER_KEY,
 } from '@/lib/topics/topicReadLedger';
 import {
   FOLLOWED_STORAGE_KEY,
-  clearFollowed,
-  follow,
-  isFollowed,
+  clearFollowed as clearScopedFollowed,
+  follow as followScoped,
+  isFollowed as isScopedFollowed,
 } from '@/lib/notifications/followed';
 import {
   readReviewHistory as readScopedReviewHistory,
@@ -71,6 +71,36 @@ import * as portableFileSave from '@/lib/vault/portableFileSave';
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 
 const MEMORY_OWNER = { serverUrl: 'wss://preferences.example/ws', identity: 'testuser' } as const;
+const TOPIC_READ_STORAGE_KEY = deviceMemoryStorageKey(TOPIC_READ_LEDGER_KEY, MEMORY_OWNER)!;
+const FOLLOWED_OWNER_STORAGE_KEY = deviceMemoryStorageKey(FOLLOWED_STORAGE_KEY, MEMORY_OWNER)!;
+
+function markTopicRead(
+  channel: string,
+  topic: string,
+  message: Parameters<typeof markScopedTopicRead>[2],
+) {
+  return markScopedTopicRead(channel, topic, message, MEMORY_OWNER);
+}
+
+function readTopicReadMarker(channel: string, topic: string) {
+  return readScopedTopicReadMarker(channel, topic, MEMORY_OWNER);
+}
+
+function readTopicReadLedger() {
+  return readScopedTopicReadLedger(MEMORY_OWNER);
+}
+
+function clearFollowed() {
+  return clearScopedFollowed(MEMORY_OWNER);
+}
+
+function follow(target: string, topic?: string | null) {
+  return followScoped(target, topic, MEMORY_OWNER);
+}
+
+function isFollowed(target: string, topic?: string | null) {
+  return isScopedFollowed(target, topic, MEMORY_OWNER);
+}
 
 function readReviewHistory(): ReviewHistoryEntry[] {
   return readScopedReviewHistory(MEMORY_OWNER);
@@ -2155,7 +2185,7 @@ describe('PreferencesPanel', () => {
     });
     const removeItem = localStorage.removeItem.bind(localStorage);
     vi.spyOn(localStorage, 'removeItem').mockImplementation((key) => {
-      if (key === TOPIC_READ_LEDGER_KEY) throw new DOMException('blocked');
+      if (key === TOPIC_READ_STORAGE_KEY) throw new DOMException('blocked');
       removeItem(key);
     });
     renderPreferences('History & data');
@@ -2251,7 +2281,7 @@ describe('PreferencesPanel', () => {
     await waitFor(() => {
       expect(controls.getByRole('button', { name: 'Clear followed conversations' })).toHaveFocus();
     });
-    expect(localStorage.getItem(FOLLOWED_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(FOLLOWED_OWNER_STORAGE_KEY)).toBeNull();
     expect(isFollowed(target, 'private roadmap')).toBe(false);
     expect((await loadRecent(target)).map((message) => message.id)).toContain(vaultMessage.id);
     expect((await loadOutbox()).map((entry) => entry.text)).toEqual(['queued plaintext remains']);
@@ -2275,7 +2305,7 @@ describe('PreferencesPanel', () => {
     fireEvent.click(controls.getByRole('button', { name: 'Clear followed conversations' }));
     const removeItem = localStorage.removeItem.bind(localStorage);
     vi.spyOn(localStorage, 'removeItem').mockImplementation((key) => {
-      if (key === FOLLOWED_STORAGE_KEY) throw new DOMException('blocked');
+      if (key === FOLLOWED_OWNER_STORAGE_KEY) throw new DOMException('blocked');
       removeItem(key);
     });
     fireEvent.click(controls.getByRole('button', { name: 'Erase followed conversations' }));
@@ -2288,7 +2318,7 @@ describe('PreferencesPanel', () => {
       .toBeInTheDocument();
     expect(controls.getByText('1 followed conversation')).toBeInTheDocument();
     expect(isFollowed('#followed-retained', 'private topic')).toBe(true);
-    expect(localStorage.getItem(FOLLOWED_STORAGE_KEY)).not.toBeNull();
+    expect(localStorage.getItem(FOLLOWED_OWNER_STORAGE_KEY)).not.toBeNull();
   });
 
   it('discards only room and topic drafts with count re-confirmation, focus, and data isolation', async () => {
@@ -2563,7 +2593,7 @@ describe('PreferencesPanel', () => {
     markTopicRead('#room', 'roadmap', { id: 'm1', time: new Date(10) });
     const removeItem = localStorage.removeItem.bind(localStorage);
     vi.spyOn(localStorage, 'removeItem').mockImplementation((key) => {
-      if (key === TOPIC_READ_LEDGER_KEY) throw new DOMException('blocked');
+      if (key === TOPIC_READ_STORAGE_KEY) throw new DOMException('blocked');
       removeItem(key);
     });
     renderPreferences('History & data');
@@ -2572,7 +2602,7 @@ describe('PreferencesPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Erase history' }));
 
     expect(await screen.findByText('Could not clear all local history. Try again after freeing storage.')).toBeInTheDocument();
-    expect(localStorage.getItem(TOPIC_READ_LEDGER_KEY)).not.toBeNull();
+    expect(localStorage.getItem(TOPIC_READ_STORAGE_KEY)).not.toBeNull();
   });
 
   it('resets background motion and announces every completion without moving focus', async () => {

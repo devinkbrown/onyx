@@ -1450,7 +1450,14 @@ function ClearSavedSearchesControls(): JSX.Element {
 }
 
 function ClearTopicReadPositionsControls(): JSX.Element {
-  const [cursorCount, setCursorCount] = createSignal(readTopicReadLedger().length);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
+  const initialOwner = memoryOwner();
+  const [cursorCount, setCursorCount] = createSignal(
+    initialOwner ? readTopicReadLedger(initialOwner).length : 0,
+  );
   const [stagedCount, setStagedCount] = createSignal<number | null>(null);
   const [confirming, setConfirming] = createSignal(false);
   const [status, setStatus] = createSignal<{
@@ -1460,11 +1467,27 @@ function ClearTopicReadPositionsControls(): JSX.Element {
   let clearTrigger: HTMLButtonElement | undefined;
   let eraseAction: HTMLButtonElement | undefined;
 
-  onCleanup(subscribeTopicReadLedger((markers) => setCursorCount(markers.length)));
+  createEffect(() => {
+    const owner = memoryOwner();
+    setCursorCount(owner ? readTopicReadLedger(owner).length : 0);
+    setConfirming(false);
+    setStagedCount(null);
+    if (owner) {
+      onCleanup(subscribeTopicReadLedger((markers) => setCursorCount(markers.length), owner));
+    }
+  });
 
   function beginClear(trigger: HTMLButtonElement): void {
+    const owner = memoryOwner();
+    if (!owner) {
+      setStatus({
+        message: 'Could not resolve an active account or guest identity. No topic read positions were changed.',
+        failure: true,
+      });
+      return;
+    }
     clearTrigger = trigger;
-    const count = readTopicReadLedger().length;
+    const count = readTopicReadLedger(owner).length;
     setCursorCount(count);
     setStagedCount(count);
     setStatus(null);
@@ -1482,7 +1505,15 @@ function ClearTopicReadPositionsControls(): JSX.Element {
   function confirmClear(): void {
     const expected = stagedCount();
     if (expected === null) return;
-    const current = readTopicReadLedger().length;
+    const owner = memoryOwner();
+    if (!owner) {
+      setStatus({
+        message: 'Could not resolve an active account or guest identity. No topic read positions were changed.',
+        failure: true,
+      });
+      return;
+    }
+    const current = readTopicReadLedger(owner).length;
     setCursorCount(current);
     if (current !== expected) {
       setStagedCount(current);
@@ -1493,8 +1524,8 @@ function ClearTopicReadPositionsControls(): JSX.Element {
       return;
     }
 
-    const cleared = clearAllTopicReads();
-    const remaining = readTopicReadLedger().length;
+    const cleared = clearAllTopicReads(owner);
+    const remaining = readTopicReadLedger(owner).length;
     if (!cleared || remaining > 0) {
       setCursorCount(remaining > 0 ? remaining : current);
       setStagedCount(remaining > 0 ? remaining : current);
@@ -1575,7 +1606,14 @@ function ClearTopicReadPositionsControls(): JSX.Element {
 }
 
 function ClearFollowedConversationsControls(): JSX.Element {
-  const followCount = createMemo(() => followed().size);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
+  const followCount = createMemo(() => {
+    const owner = memoryOwner();
+    return owner ? followed(owner).size : 0;
+  });
   const [stagedCount, setStagedCount] = createSignal<number | null>(null);
   const [confirming, setConfirming] = createSignal(false);
   const [status, setStatus] = createSignal<{
@@ -1586,8 +1624,16 @@ function ClearFollowedConversationsControls(): JSX.Element {
   let eraseAction: HTMLButtonElement | undefined;
 
   function beginClear(trigger: HTMLButtonElement): void {
+    const owner = memoryOwner();
+    if (!owner) {
+      setStatus({
+        message: 'Could not resolve an active account or guest identity. No followed conversations were changed.',
+        failure: true,
+      });
+      return;
+    }
     clearTrigger = trigger;
-    setStagedCount(followed().size);
+    setStagedCount(followed(owner).size);
     setStatus(null);
     setConfirming(true);
     focusConnectedAfterRender(() => eraseAction);
@@ -1603,7 +1649,15 @@ function ClearFollowedConversationsControls(): JSX.Element {
   function confirmClear(): void {
     const expected = stagedCount();
     if (expected === null) return;
-    const current = followed().size;
+    const owner = memoryOwner();
+    if (!owner) {
+      setStatus({
+        message: 'Could not resolve an active account or guest identity. No followed conversations were changed.',
+        failure: true,
+      });
+      return;
+    }
+    const current = followed(owner).size;
     if (current !== expected) {
       setStagedCount(current);
       setStatus({
@@ -1613,7 +1667,7 @@ function ClearFollowedConversationsControls(): JSX.Element {
       return;
     }
 
-    const result = clearFollowed();
+    const result = clearFollowed(owner);
     if (!result.success || result.remaining > 0) {
       setStagedCount(result.remaining > 0 ? result.remaining : current);
       setStatus({

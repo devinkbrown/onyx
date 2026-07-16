@@ -3,12 +3,24 @@ import { cleanup, render } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Channel, ChatMessage } from '@/lib/irc/types';
-import { store } from '@/lib/store/store';
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
+import { store, type Server } from '@/lib/store/store';
 
 import { TopicReadRuntime, changedTopicReadChannels } from './TopicReadRuntime';
 import { TOPIC_READ_LEDGER_KEY, type TopicReadMarker } from './topicReadLedger';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://topics.test', identity: 'me' } as const;
+const memoryServer: Server = {
+  id: 'topic-runtime',
+  name: 'Topics',
+  network: 'Topics',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: MEMORY_OWNER.identity,
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
 
 function message(
   id: string,
@@ -85,6 +97,7 @@ describe('TopicReadRuntime cross-tab reconciliation', () => {
 
     store.setState({
       ...initialState,
+      server: memoryServer,
       ourNick: 'me',
       activeView: { kind: 'home' },
       channels: new Map([
@@ -114,9 +127,10 @@ describe('TopicReadRuntime cross-tab reconciliation', () => {
     }];
     const serialized = JSON.stringify(nextLedger);
     // A real storage event fires after the other tab has committed this value.
-    localStorage.setItem(TOPIC_READ_LEDGER_KEY, serialized);
+    const storageKey = deviceMemoryStorageKey(TOPIC_READ_LEDGER_KEY, MEMORY_OWNER)!;
+    localStorage.setItem(storageKey, serialized);
     window.dispatchEvent(new StorageEvent('storage', {
-      key: TOPIC_READ_LEDGER_KEY,
+      key: storageKey,
       newValue: serialized,
     }));
 

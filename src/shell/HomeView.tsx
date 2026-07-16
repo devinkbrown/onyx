@@ -269,11 +269,12 @@ export function HomeView(): JSX.Element {
 
   // "Catch up" — what you missed across every joined room + DM, ranked so
   // mentions and DMs surface and ambient chatter accumulates quietly below.
-  const catchUp = createMemo<CatchUpItem[]>(() =>
-    buildCatchUp(channels().values(), dms().values(), channelLastActivity(), {
-      followedKeys: followed(),
-    }),
-  );
+  const catchUp = createMemo<CatchUpItem[]>(() => {
+    const owner = memoryOwner();
+    return buildCatchUp(channels().values(), dms().values(), channelLastActivity(), {
+      followedKeys: owner ? followed(owner) : new Set<string>(),
+    });
+  });
   const catchUpTotals = createMemo(() => catchUpSummary(catchUp()));
   // Tiered "since you were away" digest: mentions/DMs first, followed channels
   // next, ambient chatter collapsed into a quiet tail — honouring the calm

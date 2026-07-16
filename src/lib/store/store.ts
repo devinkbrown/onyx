@@ -4731,9 +4731,12 @@ export const store = createStore<OnyxState>()(
         // currently loaded named-conversation boundaries before advancing the
         // universal MARKREAD cursor, so a later topic filter cannot resurrect
         // rows the user already consumed in the All view.
-        markAllTopicsRead(view.channel, messages, (message) =>
-          !isEligibleChannelUnread(before, key, message),
-        );
+        const memoryOwner = selectDeviceMemoryOwner(before);
+        if (memoryOwner) {
+          markAllTopicsRead(view.channel, messages, (message) =>
+            !isEligibleChannelUnread(before, key, message),
+          memoryOwner);
+        }
         set(s => {
           const activeChannelTopics = new Map(s.activeChannelTopics);
           activeChannelTopics.delete(key);
@@ -8235,15 +8238,23 @@ export const store = createStore<OnyxState>()(
               && messageTopic.trim().toLowerCase() === selectedTopic.trim().toLowerCase()
               && isEligibleChannelUnread(get(), msgKey, chatMsg)
             ) {
-              markTopicRead(msgTarget, selectedTopic, chatMsg);
+              const memoryOwner = selectDeviceMemoryOwner(get());
+              if (memoryOwner) markTopicRead(msgTarget, selectedTopic, chatMsg, memoryOwner);
               get().reconcileChannelTopicUnread(msgKey);
             }
             get().updateChannelActivity(msgTarget);
             if (effectiveHighlight) {
               get().addNotification({ type: 'mention', text: displayText, from: sender, channel: msgTarget });
             } else if (!isSelf && !isVisibleConversation && notifyLevel !== 'none') {
-              const followedTopic = messageTopic !== null && isFollowed(msgTarget, messageTopic);
-              const followedRoom = isFollowed(msgTarget);
+              const memoryOwner = selectDeviceMemoryOwner(get());
+              const followedTopic = Boolean(
+                memoryOwner
+                && messageTopic !== null
+                && isFollowed(msgTarget, messageTopic, memoryOwner),
+              );
+              const followedRoom = Boolean(
+                memoryOwner && isFollowed(msgTarget, null, memoryOwner),
+              );
               if (followedTopic || followedRoom) {
                 // A room follow applies to every message but must continue to
                 // reopen the whole room. Only a topic-specific match carries a
@@ -12318,11 +12329,12 @@ function _reconcileChannelTopicUnread(
   const isActiveWholeRoom = state.activeView.kind === 'channel'
     && state.activeView.channel.toLowerCase() === key
     && !state.activeChannelTopics.has(key);
+  const memoryOwner = selectDeviceMemoryOwner(state);
 
   const projection = projectRoomTopicUnread(
     key,
     channel.messages,
-    readTopicReadLedger(),
+    memoryOwner ? readTopicReadLedger(memoryOwner) : [],
     {
       fallbackBoundaryIndex: isActiveWholeRoom
         ? channel.messages.length
@@ -12362,7 +12374,8 @@ function markLatestTopicRead(state: OnyxState, key: string, topic: string): void
     message.topic?.trim().toLowerCase() === normalizedTopic
       && isEligibleChannelUnread(state, key, message),
   );
-  if (latest) markTopicRead(key, topic, latest);
+  const memoryOwner = selectDeviceMemoryOwner(state);
+  if (latest && memoryOwner) markTopicRead(key, topic, latest, memoryOwner);
 }
 
 /**

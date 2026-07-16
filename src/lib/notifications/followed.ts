@@ -5,7 +5,8 @@
  * SOLID IDIOMS: module-level createSignal; never mutate; setters return void.
  */
 
-import { createSignal, type Accessor } from 'solid-js';
+import { createSignal } from 'solid-js';
+import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 
 export const FOLLOWED_STORAGE_KEY = 'onyx:followed';
 export const MAX_FOLLOWED_KEYS = 256;
@@ -48,39 +49,53 @@ export function followKey(target: string, topic?: string | null): string {
 }
 
 /** Read the persisted followed set, ignoring malformed payloads. */
-export function loadFollowed(): Set<string> {
+function followedStorageKey(owner?: DeviceMemoryOwner): string | null {
+  return deviceMemoryStorageKey(FOLLOWED_STORAGE_KEY, owner);
+}
+
+export function loadFollowed(owner?: DeviceMemoryOwner): Set<string> {
   if (!hasStorage()) return new Set<string>();
+  const storageKey = followedStorageKey(owner);
+  if (!storageKey) return new Set<string>();
 
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(FOLLOWED_STORAGE_KEY) ?? '[]');
+    const parsed: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
     return Array.isArray(parsed) ? boundedFollowedKeys(parsed) : new Set<string>();
   } catch {
     return new Set<string>();
   }
 }
 
-function persist(next: ReadonlySet<string>): void {
+function persist(next: ReadonlySet<string>, owner?: DeviceMemoryOwner): void {
   if (!hasStorage()) return;
+  const storageKey = followedStorageKey(owner);
+  if (!storageKey) return;
 
   try {
-    localStorage.setItem(FOLLOWED_STORAGE_KEY, JSON.stringify(sortedKeys(next)));
+    localStorage.setItem(storageKey, JSON.stringify(sortedKeys(next)));
   } catch {
     /* storage unavailable / quota - non-fatal */
   }
 }
 
-const [followedAccessor, setFollowedSignal] = createSignal<ReadonlySet<string>>(loadFollowed());
+const [followedRevision, setFollowedRevision] = createSignal(0);
 
-/** Accessor for followed conversation keys. */
-export const followed: Accessor<ReadonlySet<string>> = followedAccessor;
+/** Reactive accessor for one account's followed conversation keys. */
+export function followed(owner?: DeviceMemoryOwner): ReadonlySet<string> {
+  followedRevision();
+  return loadFollowed(owner);
+}
 
-function setFollowed(next: ReadonlySet<string>): ReadonlySet<string> {
+function setFollowed(
+  next: ReadonlySet<string>,
+  owner?: DeviceMemoryOwner,
+): ReadonlySet<string> {
   // This is the single state boundary. Every loader, mutation, and portable
   // merge is normalized and capped here so no call path can grow the signal or
   // persisted payload beyond the advertised limits.
   const bounded = boundedFollowedKeys(next);
-  setFollowedSignal(bounded);
-  persist(bounded);
+  persist(bounded, owner);
+  setFollowedRevision((revision) => revision + 1);
   return bounded;
 }
 
@@ -89,15 +104,18 @@ export function parseFollowedKeys(value: unknown): string[] {
   return sortedKeys(boundedFollowedKeys(value));
 }
 
-export function exportFollowedKeys(): string[] {
-  return sortedKeys(followed());
+export function exportFollowedKeys(owner?: DeviceMemoryOwner): string[] {
+  return sortedKeys(followed(owner));
 }
 
-export function mergeFollowedKeys(keys: readonly string[]): { imported: number; total: number } {
+export function mergeFollowedKeys(
+  keys: readonly string[],
+  owner?: DeviceMemoryOwner,
+): { imported: number; total: number } {
   const parsed = parseFollowedKeys(keys);
-  const next = new Set(followed());
+  const next = new Set(followed(owner));
   for (const key of parsed) next.add(key);
-  const bounded = setFollowed(next);
+  const bounded = setFollowed(next, owner);
   return {
     imported: parsed.filter((key) => bounded.has(key)).length,
     total: bounded.size,
@@ -115,52 +133,62 @@ export interface ClearFollowedResult {
  * sanitized storage readback are both empty. The same-tab signal changes only
  * after storage verification, so a failed clear cannot disappear from the UI.
  */
-export function clearFollowed(): ClearFollowedResult {
-  const before = followed().size;
+export function clearFollowed(owner?: DeviceMemoryOwner): ClearFollowedResult {
+  const before = followed(owner).size;
   if (!hasStorage()) return { success: false, cleared: 0, remaining: before };
+  const storageKey = followedStorageKey(owner);
+  if (!storageKey) return { success: false, cleared: 0, remaining: before };
 
   try {
-    localStorage.removeItem(FOLLOWED_STORAGE_KEY);
-    const storageCleared = localStorage.getItem(FOLLOWED_STORAGE_KEY) === null
-      && loadFollowed().size === 0;
+    localStorage.removeItem(storageKey);
+    const storageCleared = localStorage.getItem(storageKey) === null
+      && loadFollowed(owner).size === 0;
     if (!storageCleared) {
-      return { success: false, cleared: 0, remaining: followed().size };
+      return { success: false, cleared: 0, remaining: followed(owner).size };
     }
-    setFollowedSignal(new Set<string>());
-    const success = followed().size === 0;
+    setFollowedRevision((revision) => revision + 1);
+    const success = followed(owner).size === 0;
     return {
       success,
       cleared: success ? before : 0,
-      remaining: followed().size,
+      remaining: followed(owner).size,
     };
   } catch {
-    return { success: false, cleared: 0, remaining: followed().size };
+    return { success: false, cleared: 0, remaining: followed(owner).size };
   }
 }
 
 /** Return whether the normalized conversation key is currently followed. */
-export function isFollowed(target: string, topic?: string | null): boolean {
-  return followed().has(followKey(target, topic));
+export function isFollowed(
+  target: string,
+  topic?: string | null,
+  owner?: DeviceMemoryOwner,
+): boolean {
+  return followed(owner).has(followKey(target, topic));
 }
 
 /** Follow the normalized conversation key and persist the updated set. */
-export function follow(target: string, topic?: string | null): void {
-  const next = new Set(followed());
+export function follow(target: string, topic?: string | null, owner?: DeviceMemoryOwner): void {
+  const next = new Set(followed(owner));
   next.add(followKey(target, topic));
-  setFollowed(next);
+  setFollowed(next, owner);
 }
 
 /** Unfollow the normalized conversation key and persist the updated set. */
-export function unfollow(target: string, topic?: string | null): void {
-  const next = new Set(followed());
+export function unfollow(target: string, topic?: string | null, owner?: DeviceMemoryOwner): void {
+  const next = new Set(followed(owner));
   next.delete(followKey(target, topic));
-  setFollowed(next);
+  setFollowed(next, owner);
 }
 
 /** Flip the normalized conversation key and return the new followed state. */
-export function toggleFollow(target: string, topic?: string | null): boolean {
+export function toggleFollow(
+  target: string,
+  topic?: string | null,
+  owner?: DeviceMemoryOwner,
+): boolean {
   const key = followKey(target, topic);
-  const next = new Set(followed());
+  const next = new Set(followed(owner));
   const shouldFollow = !next.has(key);
 
   if (shouldFollow) {
@@ -169,6 +197,6 @@ export function toggleFollow(target: string, topic?: string | null): boolean {
     next.delete(key);
   }
 
-  const bounded = setFollowed(next);
+  const bounded = setFollowed(next, owner);
   return shouldFollow ? bounded.has(key) : false;
 }

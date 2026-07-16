@@ -33,6 +33,20 @@ describe('followed conversations', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
+  it('isolates Alice and Bob followed topics and quarantines legacy state', () => {
+    const alice = { serverUrl: 'wss://followed.example/ws', identity: 'alice' } as const;
+    const bob = { serverUrl: 'wss://followed.example/ws', identity: 'bob' } as const;
+
+    follow('#legacy', 'private');
+    follow('#alice', 'private', alice);
+    follow('#bob', 'private', bob);
+
+    expect([...followed(alice)]).toEqual(['#alice/private']);
+    expect([...followed(bob)]).toEqual(['#bob/private']);
+    expect([...followed()]).toEqual(['#legacy/private']);
+    expect(isFollowed('#alice', 'private', bob)).toBe(false);
+  });
+
   describe('followKey', () => {
     it('trims and lowercases targets', () => {
       expect(followKey('  #General  ')).toBe('#general');

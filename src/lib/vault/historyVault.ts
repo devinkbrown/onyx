@@ -21,7 +21,7 @@ import {
   normalizeDeviceMemoryOwner,
   type DeviceMemoryOwner,
 } from '@/lib/deviceMemoryOwner';
-import { clearAllTopicReads } from '@/lib/topics/topicReadLedger';
+import { clearDeviceTopicReads } from '@/lib/topics/topicReadLedger';
 import { effectiveKeep, resolvePolicyForChannel, type RetentionPolicy } from './retentionPolicy';
 import { boundedSearchField, boundedSearchQuery } from './searchBounds';
 import {
@@ -1215,7 +1215,7 @@ export async function clearVault(): Promise<boolean> {
   // Topic cursors are device-local transcript memory too. Clear them even when
   // IndexedDB is unavailable so "forget this device" has one consistent
   // privacy boundary across the vault and localStorage.
-  const topicReadsCleared = clearAllTopicReads();
+  const topicReadsCleared = clearDeviceTopicReads();
   const indexedDbAvailable = typeof indexedDB !== 'undefined';
   const db = await openVault();
   // An unavailable/blocked IndexedDB handle is not evidence that persisted

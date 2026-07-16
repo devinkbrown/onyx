@@ -241,6 +241,12 @@ describe('portableTransfer', () => {
     await saveSearch({ label: 'Alice search', query: 'alice search plaintext', mode: 'exact' }, alice);
     await saveSearch({ label: 'Bob search', query: 'bob search plaintext', mode: 'exact' }, bob);
     await saveSearch({ label: 'Legacy search', query: 'legacy search plaintext', mode: 'exact' });
+    follow('#alice-follow', 'roadmap', alice);
+    follow('#bob-follow', 'release', bob);
+    follow('#legacy-follow');
+    markTopicRead('#alice', 'roadmap', { id: 'alice-cursor', time: new Date(4_000) }, alice);
+    markTopicRead('#bob', 'release', { id: 'bob-cursor', time: new Date(5_000) }, bob);
+    markTopicRead('#legacy', 'archive', { id: 'legacy-cursor', time: new Date(6_000) });
 
     const exported = await exportPortableTransfer(alice);
     const serialized = JSON.stringify(exported);
@@ -252,14 +258,33 @@ describe('portableTransfer', () => {
     expect(exported.savedSearches).toEqual([
       expect.objectContaining({ label: 'Alice search', query: 'alice search plaintext' }),
     ]);
+    expect(exported.followedConversations).toEqual(['#alice-follow/roadmap']);
+    expect(exported.topicReadCursors).toEqual([{
+      channel: '#alice',
+      topic: 'roadmap',
+      lastReadMessageId: 'alice-cursor',
+      lastReadAt: 4_000,
+    }]);
     expect(serialized).not.toContain('bob room plaintext');
     expect(serialized).not.toContain('legacy room plaintext');
     expect(serialized).not.toContain('bob search plaintext');
     expect(serialized).not.toContain('legacy search plaintext');
+    expect(serialized).not.toContain('#bob-follow');
+    expect(serialized).not.toContain('#legacy-follow');
+    expect(serialized).not.toContain('bob-cursor');
+    expect(serialized).not.toContain('legacy-cursor');
 
     const imported = await importPortableTransfer(exported, bob);
 
-    expect(imported).toMatchObject({ targets: 1, messages: 1, reviews: 1, drafts: 1, topicDrafts: 1 });
+    expect(imported).toMatchObject({
+      targets: 1,
+      messages: 1,
+      reviews: 1,
+      drafts: 1,
+      topicDrafts: 1,
+      followedConversations: 1,
+      topicReadCursors: 1,
+    });
     expect((await loadRecent('#alice', 50, bob)).map((message) => message.id)).toEqual(['alice-row']);
     expect(readReviewHistory(bob).map((entry) => entry.target)).toContain('#alice');
     expect(loadComposerDrafts(undefined, bob)).toMatchObject({ '#alice': 'alice room plaintext' });
@@ -267,6 +292,12 @@ describe('portableTransfer', () => {
     expect(await listSearches(bob)).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: 'Alice search', query: 'alice search plaintext' }),
     ]));
+    expect(isFollowed('#alice-follow', 'roadmap', bob)).toBe(true);
+    expect(isFollowed('#bob-follow', 'release', bob)).toBe(true);
+    expect(isFollowed('#legacy-follow', null, bob)).toBe(false);
+    expect(readTopicReadMarker('#alice', 'roadmap', bob)?.lastReadMessageId).toBe('alice-cursor');
+    expect(readTopicReadMarker('#bob', 'release', bob)?.lastReadMessageId).toBe('bob-cursor');
+    expect(readTopicReadMarker('#legacy', 'archive', bob)).toBeNull();
     expect(readReviewHistory(alice).map((entry) => entry.target)).toEqual(['#alice']);
   });
 

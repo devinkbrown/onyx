@@ -23,6 +23,7 @@ import { parseIRCMessage } from '@/lib/irc/parser';
 import type { Channel } from '@/lib/irc/types';
 import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
 import { saveChannelTopicDrafts } from '@/lib/channel/topicDrafts';
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { readReviewHistory, recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import { isPreferencesOpen, resetPreferences, setPreference } from '@/lib/prefs/preferences';
@@ -45,6 +46,7 @@ const memoryServer: Server = {
   account: MEMORY_OWNER.identity,
   connected: true,
 };
+const TOPIC_READ_STORAGE_KEY = deviceMemoryStorageKey(TOPIC_READ_LEDGER_KEY, MEMORY_OWNER)!;
 
 function makeUser(nick: string, modes: string[] = []): ChannelUser {
   return { nick, modes: new Set(modes) };
@@ -240,6 +242,7 @@ describe('AppShell', () => {
       channels.set('#general', channel);
       store.setState({
         ...initialState,
+        server: memoryServer,
         channels,
         activeView: { kind: 'channel', channel: '#general' },
         connectionStatus: 'connected',
@@ -294,6 +297,7 @@ describe('AppShell', () => {
       const channels = new Map<string, Channel>([['#general', channel]]);
       store.setState({
         ...initialState,
+        server: memoryServer,
         client: {
           sendRaw,
           isupport: { CHANTYPES: '#&' },
@@ -314,14 +318,14 @@ describe('AppShell', () => {
       expect(screen.getAllByLabelText('1 unread')).toHaveLength(2);
 
       fireEvent.click(screen.getByRole('button', { name: /roadmap.*1 unread/i }));
-      expect(readTopicReadMarker('#general', 'roadmap')?.lastReadMessageId).toBe('msg-roadmap-new');
-      expect(readTopicReadMarker('#general', 'release')).toBeNull();
+      expect(readTopicReadMarker('#general', 'roadmap', MEMORY_OWNER)?.lastReadMessageId).toBe('msg-roadmap-new');
+      expect(readTopicReadMarker('#general', 'release', MEMORY_OWNER)).toBeNull();
       expect(screen.getAllByLabelText('1 unread')).toHaveLength(1);
       expect(store.getState().channels.get('#general')?.unread).toBe(1);
       expect(sendRaw).not.toHaveBeenCalledWith('MARKREAD', expect.anything(), expect.anything());
 
       fireEvent.click(screen.getByRole('button', { name: /release.*1 unread/i }));
-      expect(readTopicReadMarker('#general', 'release')?.lastReadMessageId).toBe('msg-release-new');
+      expect(readTopicReadMarker('#general', 'release', MEMORY_OWNER)?.lastReadMessageId).toBe('msg-release-new');
       expect(screen.queryByLabelText('1 unread')).not.toBeInTheDocument();
       expect(store.getState().channels.get('#general')?.unread).toBe(0);
       expect(sendRaw).not.toHaveBeenCalledWith('MARKREAD', expect.anything(), expect.anything());
@@ -344,6 +348,7 @@ describe('AppShell', () => {
       );
       store.setState({
         ...initialState,
+        server: memoryServer,
         channels: new Map([['#general', channel]]),
         activeView: { kind: 'channel', channel: '#general' },
         connectionStatus: 'connected',
@@ -358,7 +363,7 @@ describe('AppShell', () => {
       expect(screen.getByLabelText('1 unread')).toBeInTheDocument();
 
       window.dispatchEvent(new StorageEvent('storage', {
-        key: TOPIC_READ_LEDGER_KEY,
+        key: TOPIC_READ_STORAGE_KEY,
         newValue: JSON.stringify([{
           channel: '#general',
           topic: 'release',
@@ -404,6 +409,7 @@ describe('AppShell', () => {
       channels.set('#general', channel);
       store.setState({
         ...initialState,
+        server: memoryServer,
         channels,
         activeView: { kind: 'channel', channel: '#general' },
         connectionStatus: 'connected',
@@ -434,7 +440,7 @@ describe('AppShell', () => {
       const followRoadmap = within(forum).getByRole('button', { name: 'Follow topic roadmap' });
       fireEvent.click(followRoadmap);
 
-      expect(isFollowed('#general', 'roadmap')).toBe(true);
+      expect(isFollowed('#general', 'roadmap', MEMORY_OWNER)).toBe(true);
       expect(within(forum).getByRole('button', { name: 'Unfollow topic roadmap' })).toHaveAttribute(
         'aria-pressed',
         'true',
@@ -442,7 +448,7 @@ describe('AppShell', () => {
 
       fireEvent.click(within(forum).getByRole('button', { name: 'Unfollow topic roadmap' }));
 
-      expect(isFollowed('#general', 'roadmap')).toBe(false);
+      expect(isFollowed('#general', 'roadmap', MEMORY_OWNER)).toBe(false);
 
       fireEvent.click(within(forum).getByRole('button', { name: /Open topic roadmap/i }));
 
@@ -725,6 +731,7 @@ describe('AppShell', () => {
       channels.set('#general', channel);
       store.setState({
         ...initialState,
+        server: memoryServer,
         channels,
         activeView: { kind: 'channel', channel: '#general' },
         connectionStatus: 'connected',
@@ -735,11 +742,11 @@ describe('AppShell', () => {
       render(() => <AppShell />);
 
       fireEvent.click(screen.getByRole('button', { name: 'Follow room' }));
-      expect(isFollowed('#general')).toBe(true);
+      expect(isFollowed('#general', null, MEMORY_OWNER)).toBe(true);
 
       fireEvent.click(screen.getByRole('button', { name: /roadmap/i }));
       fireEvent.click(screen.getByRole('button', { name: 'Follow roadmap' }));
-      expect(isFollowed('#general', 'roadmap')).toBe(true);
+      expect(isFollowed('#general', 'roadmap', MEMORY_OWNER)).toBe(true);
     });
 
     it('shows author names above their message groups', () => {

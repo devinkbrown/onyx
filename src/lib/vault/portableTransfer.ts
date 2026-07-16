@@ -150,8 +150,8 @@ export async function exportPortableTransfer(
       sceneMotion: sceneMotion(),
       retentionPolicy: getRetentionPolicy() ?? readRetentionPolicy(),
     },
-    followedConversations: exportFollowedKeys(),
-    topicReadCursors: readTopicReadLedger(),
+    followedConversations: exportFollowedKeys(owner),
+    topicReadCursors: readTopicReadLedger(owner),
     savedSearches: savedSearches.searches,
   };
 }
@@ -241,7 +241,7 @@ export async function importPortableTransfer(
   // leaves them absent; otherwise merge through the ledger's canonical parser,
   // bounds, persistence verification, and same-tab publication path.
   const topicReadCursors = preferences().localHistory
-    ? mergeTopicReadLedger(snapshot.topicReadCursors ?? [])
+    ? mergeTopicReadLedger(snapshot.topicReadCursors ?? [], owner)
     : { imported: 0, total: 0 };
   const reviews = mergeReviewHistory(snapshot.reviewHistory, owner);
   const drafts = portableComposerDrafts(snapshot.composerDrafts);
@@ -255,7 +255,7 @@ export async function importPortableTransfer(
     ...topicDrafts,
   }, undefined, owner);
   const accountHandoffs = importAccountHandoffs(snapshot.accountHandoffs);
-  const followedConversations = mergeFollowedKeys(snapshot.followedConversations);
+  const followedConversations = mergeFollowedKeys(snapshot.followedConversations, owner);
   const savedSearches = await importSavedSearches({
     kind: 'onyx-saved-searches',
     version: 1,

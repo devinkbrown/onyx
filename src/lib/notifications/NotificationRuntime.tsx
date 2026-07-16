@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { onCleanup, onMount } from 'solid-js';
 
-import { getState, subscribe } from '@/lib/store';
+import { getState, selectDeviceMemoryOwner, subscribe } from '@/lib/store';
 import type { Notification as StoreNotification } from '@/lib/store/store';
 
 import {
@@ -85,10 +85,15 @@ function bodyFor(note: StoreNotification): string {
 }
 
 function calmAllowsNotification(note: StoreNotification): boolean {
+  const owner = selectDeviceMemoryOwner(getState());
   const calmContext: CalmContext = {
     isMention: note.type === 'mention',
     isDirect: note.type === 'dm',
-    isFollowed: note.type === 'follow' || (!!note.channel && (isFollowed(note.channel, note.topic) || isFollowed(note.channel))),
+    isFollowed: note.type === 'follow' || Boolean(
+      owner
+      && note.channel
+      && (isFollowed(note.channel, note.topic, owner) || isFollowed(note.channel, null, owner)),
+    ),
     isBoost: false,
   };
   return classifyNotification(calmPreset(), calmContext) === 'notify';
