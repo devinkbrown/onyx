@@ -161,6 +161,67 @@
   height: 1.05rem;
 }
 
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .voice-call-body {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .voice-call-token {
+    width: 88px;
+    height: 88px;
+    margin-block: 0;
+  }
+
+  .voice-call-token::before {
+    inset: 6px;
+  }
+
+  .voice-call-token::after {
+    inset: -3px;
+  }
+
+  .voice-call-token .onyx-avatar {
+    width: 56px;
+    height: 56px;
+    font-size: 16px;
+  }
+
+  .voice-call-meta {
+    min-width: 0;
+    width: 100%;
+    gap: 4px;
+  }
+
+  .voice-call-kicker {
+    font-size: 14px;
+    letter-spacing: 0.08em;
+  }
+
+  .voice-call-name {
+    max-width: 100%;
+    font-size: 32px;
+    line-height: 1;
+  }
+
+  .voice-call-subtext,
+  .voice-call-status,
+  .voice-call-error {
+    max-width: 100%;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .voice-call-actions {
+    gap: 8px;
+  }
+
+  .voice-call-icon {
+    width: 24px;
+    height: 24px;
+  }
+}
+
 .voice-captions {
   position: fixed;
   left: 50%;
