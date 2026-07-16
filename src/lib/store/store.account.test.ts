@@ -20,6 +20,8 @@ import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { loadCredentials, saveCredentials } from '@/lib/credentials';
 import { saveComposerDrafts } from '@/lib/composer/drafts';
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
+import { DM_PINS_STORAGE_KEY, saveDMPins } from '@/lib/dmPins';
 
 const initialState = store.getInitialState();
 
@@ -752,6 +754,38 @@ describe('account replies — state from the message handler', () => {
     feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
 
     expect(store.getState().composerDrafts).toEqual({ '#ops': 'Bob private draft' });
+  });
+
+  it('quarantines Alice pinned DM plaintext when the live account switches to Bob', () => {
+    const serverUrl = seedServer('alice').url;
+    const alice = { serverUrl, identity: 'alice' } as const;
+    const bob = { serverUrl, identity: 'bob' } as const;
+    const pinned: ChatMessage = {
+      id: 'alice-pin',
+      time: new Date('2026-07-16T12:00:00.000Z'),
+      from: 'trev',
+      text: 'TSUMUGI1 ciphertext-envelope',
+      plaintext: 'Alice private decrypted note',
+      encrypted: true,
+      type: 'msg',
+      target: 'alice',
+    };
+    saveDMPins(new Map([['trev', [{ ...pinned, id: 'bob-pin', plaintext: 'Bob private body' }]]]), bob);
+    store.setState({
+      server: seedServer('alice'),
+      ourNick: 'alice',
+      dmPinnedMessages: new Map(),
+    });
+    store.getState().pinDMMessage('trev', pinned);
+    const aliceStorage = localStorage.getItem(deviceMemoryStorageKey(DM_PINS_STORAGE_KEY, alice)!);
+    expect(aliceStorage).not.toContain('Alice private decrypted note');
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+
+    const visible = [...store.getState().dmPinnedMessages.values()].flat();
+    expect(visible.map((message) => message.id)).toEqual(['bob-pin']);
+    expect(JSON.stringify(visible)).not.toContain('Alice private decrypted note');
+    expect(JSON.stringify(visible)).not.toContain('Bob private body');
   });
 
   it('ignores an Alice ACCOUNTINFO reply after the live account switches to Bob', () => {

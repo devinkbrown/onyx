@@ -9,7 +9,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store } from './store';
+import { store, type Server } from './store';
 import {
   selectIsChannelOp,
   selectOwnPrefix,
@@ -24,6 +24,17 @@ import { TOPIC_TAG } from '@/lib/topics/topics';
 import { follow, followed, unfollow } from '@/lib/notifications/followed';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://channels.test', identity: 'me' } as const;
+const memoryServer: Server = {
+  id: 'channel-test',
+  name: 'Channels',
+  network: 'Channels',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: MEMORY_OWNER.identity,
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
 
 /** Minimal IRCClient stand-in — assert on sendRaw, satisfy handler reads. */
 function makeClient() {
@@ -229,8 +240,8 @@ describe('channel management — raw command dispatch', () => {
 
   it('adds a follow notification for followed channel topics', () => {
     seed('#general', [makeUser('me', ['o'])]);
-    store.setState({ activeView: { kind: 'home' } });
-    follow('#general', 'roadmap');
+    store.setState({ activeView: { kind: 'home' }, server: memoryServer });
+    follow('#general', 'roadmap', MEMORY_OWNER);
 
     feed(`@${TOPIC_TAG}=roadmap;msgid=m-follow :alice!a@host PRIVMSG #general :quiet update`);
 

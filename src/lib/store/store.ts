@@ -83,6 +83,7 @@ import {
   setComposerDraft as updateComposerDraft,
   type ComposerDrafts,
 } from '@/lib/composer/drafts';
+import { loadDMPins, sanitizeDMPins, saveDMPins } from '@/lib/dmPins';
 import { markViewedRead, normalizeTargetKey, totalMentions } from '@/lib/notifications/readState';
 import {
   buildCreateOptions,
@@ -2706,6 +2707,9 @@ function _resetAccountBoundState(
     registerPending: false,
     registerError: null,
     verifyRequired: false,
+    dmPinnedMessages: new Map(),
+    showDMPins: false,
+    dmPinsNick: null,
     serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
   }));
 }
@@ -3439,6 +3443,13 @@ function _loadOwnedComposerDrafts(
   return owner ? loadComposerDrafts(undefined, owner) : {};
 }
 
+function _loadOwnedDMPins(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): Map<string, ChatMessage[]> {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadDMPins(owner) : new Map();
+}
+
 export interface DeviceMemoryContext {
   readonly owner: DeviceMemoryOwner;
   readonly client: IRCClient | null;
@@ -4013,6 +4024,7 @@ export const store = createStore<OnyxState>()(
               ourNick: newNick,
               server,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: newNick }),
+              dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: newNick }),
             };
           });
         },
@@ -4086,6 +4098,7 @@ export const store = createStore<OnyxState>()(
             set({
               server: srv,
               composerDrafts: _loadOwnedComposerDrafts({ server: srv, ourNick: get().ourNick }),
+              dmPinnedMessages: _loadOwnedDMPins({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
               serverCapabilities: caps,
@@ -7175,6 +7188,7 @@ export const store = createStore<OnyxState>()(
             return {
               server,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
+              dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
             };
           });
           break;
@@ -9548,6 +9562,7 @@ export const store = createStore<OnyxState>()(
               return {
                 server,
                 composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
+                dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
                 passkeyBusy: false,
                 passkeyError: null,
               };
@@ -9576,6 +9591,7 @@ export const store = createStore<OnyxState>()(
             return {
               server,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
+              dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
             };
           });
           break;
@@ -10583,27 +10599,36 @@ export const store = createStore<OnyxState>()(
     closeExportModal: () => set({ showExportModal: false }),
 
     // ── DM pins (stored locally per nick) ────────────────────────────────────
-    dmPinnedMessages: _loadDMPins(),
+    // Ownerless legacy pins can contain decrypted E2EE bodies. They stay
+    // quarantined until an identity is established, then the owner-aware
+    // loader purges that unsafe journal and reads only ciphertext-safe pins.
+    dmPinnedMessages: new Map(),
     showDMPins: false,
     dmPinsNick: null,
     pinDMMessage: (nick, msg) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
       const key = nick.toLowerCase();
       const pins = new Map(get().dmPinnedMessages);
       const existing = pins.get(key) ?? [];
       if (!existing.find(p => p.id === msg.id)) {
         const updated = [...existing, msg].slice(-20);
         pins.set(key, updated);
-        _saveDMPins(pins);
-        set({ dmPinnedMessages: pins });
+        const sanitized = sanitizeDMPins(pins);
+        saveDMPins(sanitized, owner);
+        set({ dmPinnedMessages: sanitized });
       }
     },
     unpinDMMessage: (nick, msgId) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
       const key = nick.toLowerCase();
       const pins = new Map(get().dmPinnedMessages);
       const existing = pins.get(key) ?? [];
       pins.set(key, existing.filter(p => p.id !== msgId));
-      _saveDMPins(pins);
-      set({ dmPinnedMessages: pins });
+      const sanitized = sanitizeDMPins(pins);
+      saveDMPins(sanitized, owner);
+      set({ dmPinnedMessages: sanitized });
     },
     openDMPins: (nick) => set({ showDMPins: true, dmPinsNick: nick }),
     closeDMPins: () => set({ showDMPins: false, dmPinsNick: null }),
@@ -12706,31 +12731,6 @@ function _saveNickColorOverrides(overrides: Map<string, string>): void {
   } catch {
     // Storage quota exceeded or unavailable — silently degrade
   }
-}
-
-// ── DM pin helpers ────────────────────────────────────────────────────────────
-
-function _loadDMPins(): Map<string, ChatMessage[]> {
-  if (typeof window === 'undefined') return new Map();
-  try {
-    const raw = localStorage.getItem('onyx:dm-pins');
-    if (!raw) return new Map();
-    const obj = JSON.parse(raw) as Record<string, Array<ChatMessage & { time: string }>>;
-    const map = new Map<string, ChatMessage[]>();
-    for (const [key, msgs] of Object.entries(obj)) {
-      map.set(key, msgs.map(m => ({ ...m, time: new Date(m.time) })));
-    }
-    return map;
-  } catch { return new Map(); }
-}
-
-function _saveDMPins(pins: Map<string, ChatMessage[]>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const obj: Record<string, ChatMessage[]> = {};
-    pins.forEach((msgs, key) => { obj[key] = msgs; });
-    localStorage.setItem('onyx:dm-pins', JSON.stringify(obj));
-  } catch {}
 }
 
 // ── CTCP config helpers ───────────────────────────────────────────────────────

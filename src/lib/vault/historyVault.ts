@@ -22,6 +22,7 @@ import {
   type DeviceMemoryOwner,
 } from '@/lib/deviceMemoryOwner';
 import { clearDeviceTopicReads } from '@/lib/topics/topicReadLedger';
+import { clearDeviceDMPins } from '@/lib/dmPins';
 import { effectiveKeep, resolvePolicyForChannel, type RetentionPolicy } from './retentionPolicy';
 import { boundedSearchField, boundedSearchQuery } from './searchBounds';
 import {
@@ -1212,10 +1213,11 @@ export async function clearVault(): Promise<boolean> {
   // SEARCH must fail closed for the entire clear/verification window. Only a
   // physically verified empty store promotes every target back to plain.
   const privacyGeneration = beginVaultDmPrivacyClear();
-  // Topic cursors are device-local transcript memory too. Clear them even when
-  // IndexedDB is unavailable so "forget this device" has one consistent
-  // privacy boundary across the vault and localStorage.
+  // Topic cursors and pinned DMs are device-local transcript memory too. Clear
+  // them even when IndexedDB is unavailable so "forget this device" has one
+  // consistent privacy boundary across the vault and localStorage.
   const topicReadsCleared = clearDeviceTopicReads();
+  const dmPinsCleared = clearDeviceDMPins();
   const indexedDbAvailable = typeof indexedDB !== 'undefined';
   const db = await openVault();
   // An unavailable/blocked IndexedDB handle is not evidence that persisted
@@ -1223,7 +1225,7 @@ export async function clearVault(): Promise<boolean> {
   // vault to wipe and remains a successful no-op; an implementation that was
   // present but failed to open cannot be verified.
   if (!db) {
-    const cleared = !indexedDbAvailable && topicReadsCleared;
+    const cleared = !indexedDbAvailable && topicReadsCleared && dmPinsCleared;
     finishVaultDmPrivacyClear(privacyGeneration, cleared);
     return cleared;
   }
@@ -1249,7 +1251,7 @@ export async function clearVault(): Promise<boolean> {
     ]);
     const outboxVerified = outboxCount === 0 && sanitizedOutbox.length === 0;
     if (outboxHadRows && outboxVerified) notifyOutbox({ kind: 'cleared' });
-    const cleared = messageCount === 0 && outboxVerified && topicReadsCleared;
+    const cleared = messageCount === 0 && outboxVerified && topicReadsCleared && dmPinsCleared;
     finishVaultDmPrivacyClear(privacyGeneration, cleared);
     return cleared;
   } catch {

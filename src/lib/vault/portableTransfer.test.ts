@@ -14,6 +14,7 @@ import { loadComposerDrafts, saveComposerDrafts } from '@/lib/composer/drafts';
 import { loadChannelTopicDrafts, saveChannelTopicDrafts } from '@/lib/channel/topicDrafts';
 import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
 import { preferences, resetPreferences, setPreference } from '@/lib/prefs/preferences';
+import { loadDMPins, saveDMPins } from '@/lib/dmPins';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import {
   MAX_TOPIC_READ_ENTRIES,
@@ -247,6 +248,12 @@ describe('portableTransfer', () => {
     markTopicRead('#alice', 'roadmap', { id: 'alice-cursor', time: new Date(4_000) }, alice);
     markTopicRead('#bob', 'release', { id: 'bob-cursor', time: new Date(5_000) }, bob);
     markTopicRead('#legacy', 'archive', { id: 'legacy-cursor', time: new Date(6_000) });
+    saveDMPins(new Map([['trev', [msg('alice-private-pin', 7_000, {
+      target: 'alice',
+      encrypted: true,
+      text: 'TSUMUGI1 alice-pin-ciphertext',
+      plaintext: 'Alice pinned decrypted plaintext',
+    })]]]), alice);
 
     const exported = await exportPortableTransfer(alice);
     const serialized = JSON.stringify(exported);
@@ -273,6 +280,9 @@ describe('portableTransfer', () => {
     expect(serialized).not.toContain('#legacy-follow');
     expect(serialized).not.toContain('bob-cursor');
     expect(serialized).not.toContain('legacy-cursor');
+    expect(serialized).not.toContain('alice-private-pin');
+    expect(serialized).not.toContain('alice-pin-ciphertext');
+    expect(serialized).not.toContain('Alice pinned decrypted plaintext');
 
     const imported = await importPortableTransfer(exported, bob);
 
@@ -407,7 +417,14 @@ describe('portableTransfer', () => {
   });
 
   it('does not retain vault rows when the imported preference disables local history', async () => {
+    const owner = { serverUrl: 'wss://portable.example/ws', identity: 'alice' } as const;
     await saveMessages('#alpha', [msg('a1', 1000, { target: '#alpha' })]);
+    saveDMPins(new Map([['trev', [msg('private-pin', 2_000, {
+      target: 'alice',
+      encrypted: true,
+      text: 'TSUMUGI1 private-pin-ciphertext',
+      plaintext: 'pinned decrypted plaintext',
+    })]]]), owner);
     const exported = await exportPortableTransfer();
     expect(exported.preferenceHandoff).not.toBeNull();
     exported.preferenceHandoff!.preferences.localHistory = false;
@@ -417,6 +434,7 @@ describe('portableTransfer', () => {
     expect(result.messages).toBe(0);
     expect(preferences().localHistory).toBe(false);
     expect(await loadRecent('#alpha')).toEqual([]);
+    expect(loadDMPins(owner)).toEqual(new Map());
   });
 
   it('rejects a local-history-disabled import when the privacy clear does not commit', async () => {

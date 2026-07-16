@@ -139,6 +139,9 @@ export async function exportPortableTransfer(
   owner?: DeviceMemoryOwner,
 ): Promise<PortableTransferSnapshot> {
   const savedSearches = await exportSavedSearches(owner);
+  // Pinned DMs deliberately remain device-only: an E2EE pin retains only its
+  // ciphertext envelope, while the destination receives no device key material
+  // that could safely rehydrate it. Never add the live pin map to this snapshot.
   return {
     ...(await exportVault(owner)),
     reviewHistory: readReviewHistory(owner),
