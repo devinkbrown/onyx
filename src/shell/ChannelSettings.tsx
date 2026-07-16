@@ -173,12 +173,23 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   // never learn the clipboard write succeeded (SC 4.1.3 Status Messages).
   const [copyStatus, setCopyStatus] = createSignal('');
   const [shareBusy, setShareBusy] = createSignal(false);
+  const [copyBusy, setCopyBusy] = createSignal(false);
   let shareEpoch = 0;
+  let copyEpoch = 0;
+
+  // The sheet can remain mounted while the session owner or selected channel
+  // changes. Treat that as a hard boundary for typed invite data and browser
+  // share/clipboard completions even when the resulting URL is identical.
   createEffect(() => {
-    if (local.open) {
-      setInvitePreferredNick('');
-      setCopyStatus('');
-    }
+    void local.open;
+    void local.channel;
+    void memoryOwner();
+    shareEpoch += 1;
+    copyEpoch += 1;
+    setShareBusy(false);
+    setCopyBusy(false);
+    setInvitePreferredNick('');
+    setCopyStatus('');
   });
 
   const inviteOrigin = createMemo(() =>
@@ -220,15 +231,18 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     const open = local.open;
     const shareUrl = inviteShareData().url;
     shareEpoch += 1;
+    copyEpoch += 1;
     setShareBusy(false);
+    setCopyBusy(false);
     if (open && shareUrl) setCopyStatus('');
   });
   onCleanup(() => {
     shareEpoch += 1;
+    copyEpoch += 1;
   });
 
   async function shareInvite(): Promise<void> {
-    if (!canShareInvite() || shareBusy()) return;
+    if (!canShareInvite() || shareBusy() || copyBusy()) return;
     const epoch = ++shareEpoch;
     const data = inviteShareData();
     setShareBusy(true);
@@ -249,20 +263,28 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   }
 
   async function copyInviteLink(): Promise<void> {
+    if (copyBusy() || shareBusy()) return;
+    const epoch = ++copyEpoch;
     const url = inviteLink().shareUrl;
-    const copied = await writeClipboardText(url);
-    if (copied) {
-      setCopyStatus('Invite link copied to clipboard.');
-      toast({ title: 'Invite link copied', description: url, intent: 'success' });
-      return;
-    }
+    setCopyBusy(true);
+    try {
+      const copied = await writeClipboardText(url);
+      if (epoch !== copyEpoch || !local.open) return;
+      if (copied) {
+        setCopyStatus('Invite link copied to clipboard.');
+        toast({ title: 'Invite link copied', description: url, intent: 'success' });
+        return;
+      }
 
-    setCopyStatus('Copy failed. Select and copy the link shown above.');
-    toast({
-      title: 'Copy failed',
-      description: 'Select and copy the link shown below.',
-      intent: 'warning',
-    });
+      setCopyStatus('Copy failed. Select and copy the link shown above.');
+      toast({
+        title: 'Copy failed',
+        description: 'Select and copy the link shown below.',
+        intent: 'warning',
+      });
+    } finally {
+      if (epoch === copyEpoch) setCopyBusy(false);
+    }
   }
 
   // ── Notifications (personal, per-channel; available to every member) ──────
@@ -516,15 +538,22 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 type="button"
                 variant="primary"
                 size="sm"
-                disabled={shareBusy()}
+                disabled={shareBusy() || copyBusy()}
                 aria-busy={shareBusy()}
                 onClick={() => void shareInvite()}
               >
                 {shareBusy() ? 'Opening share sheet…' : 'Share invite'}
               </Button>
             </Show>
-            <Button type="button" variant="primary" size="sm" onClick={() => void copyInviteLink()}>
-              Copy invite link
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              disabled={copyBusy() || shareBusy()}
+              aria-busy={copyBusy()}
+              onClick={() => void copyInviteLink()}
+            >
+              {copyBusy() ? 'Copying invite link…' : 'Copy invite link'}
             </Button>
             <a class="shell-chset-invite-open" href={inviteLink().appHref}>
               Open invite in Onyx

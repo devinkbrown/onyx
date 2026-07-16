@@ -8,7 +8,7 @@
  * available to every member (no op gate) and applies immediately. AAA pattern.
  */
 
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store, type Server } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
@@ -312,6 +312,34 @@ describe('ChannelSettings — Share invite a11y', () => {
     expect(status).toHaveAttribute('aria-live', 'polite');
     expect(status).toHaveAttribute('aria-atomic', 'true');
     expect(writeText).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards typed invite state and a pending copy result when the owner changes', async () => {
+    seed();
+    let resolveCopy: (() => void) | undefined;
+    const pendingCopy = new Promise<void>((resolve) => {
+      resolveCopy = resolve;
+    });
+    const writeText = vi.fn(() => pendingCopy);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    renderPanel();
+    fireEvent.input(screen.getByLabelText('Suggested guest name (optional)'), {
+      target: { value: 'alice-guest' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Copy invite link' }));
+    expect(screen.getByRole('button', { name: 'Copying invite link…' })).toBeDisabled();
+
+    store.setState({ server: testServer('bob'), ourNick: 'bob' });
+
+    await waitFor(() => expect(screen.getByLabelText('Suggested guest name (optional)')).toHaveValue(''));
+    expect(screen.getByRole('button', { name: 'Copy invite link' })).not.toBeDisabled();
+    resolveCopy?.();
+    await pendingCopy;
+    await Promise.resolve();
+    expect(screen.getByRole('status')).toHaveTextContent('');
   });
 
   it('announces a copy failure in the same region', async () => {
