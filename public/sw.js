@@ -116,6 +116,17 @@ function isCanonicalShellResponse(pathname, response) {
   }
 }
 
+function isCanonicalStaticResponse(requestUrl, response) {
+  if (!response) return false;
+  try {
+    const finalUrl = new URL(response.url);
+    return finalUrl.origin === self.location.origin
+      && finalUrl.pathname === requestUrl.pathname;
+  } catch {
+    return false;
+  }
+}
+
 function offlineNavigationFallback(pathname) {
   const fallbackPath = navigationFallbackPath(pathname);
   const unavailable = () => new Response(
@@ -268,8 +279,13 @@ self.addEventListener('fetch', (event) => {
     const loaded = caches.match(request)
       .catch(() => undefined)
       .then((cached) => {
-        if (cached) return { response: cached, shouldCache: false };
-        return fetch(request).then((response) => ({ response, shouldCache: response.ok }));
+        if (isCanonicalStaticResponse(url, cached)) {
+          return { response: cached, shouldCache: false };
+        }
+        return fetch(request).then((response) => ({
+          response,
+          shouldCache: response.ok && isCanonicalStaticResponse(url, response),
+        }));
       });
     // Keep the worker alive until a newly fetched asset is actually stored.
     // Without waitUntil(), the browser may terminate the worker after the

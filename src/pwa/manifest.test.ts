@@ -592,7 +592,11 @@ describe('PWA manifest', () => {
     await expect(unavailable.text()).resolves.toContain('app shell was not cached');
 
     const cachedClone = { kind: 'asset-clone' };
-    const assetResponse = { ok: true, clone: vi.fn(() => cachedClone) };
+    const assetResponse = {
+      ok: true,
+      url: 'https://onyx.test/assets/app.123.js',
+      clone: vi.fn(() => cachedClone),
+    };
     const assetRequest = { method: 'GET', mode: 'cors', url: 'https://onyx.test/assets/app.123.js' };
     let assetResponseWork: Promise<unknown> | undefined;
     let assetLifetimeWork: Promise<unknown> | undefined;
@@ -611,6 +615,36 @@ describe('PWA manifest', () => {
     await assetLifetimeWork;
     expect(assetResponse.clone).toHaveBeenCalledOnce();
     expect(put).toHaveBeenCalledWith(assetRequest, cachedClone);
+
+    const repairedClone = { kind: 'repaired-asset-clone' };
+    const repairedResponse = {
+      ok: true,
+      url: 'https://onyx.test/assets/repair.456.js',
+      clone: vi.fn(() => repairedClone),
+    };
+    const repairRequest = {
+      method: 'GET',
+      mode: 'cors',
+      url: 'https://onyx.test/assets/repair.456.js',
+    };
+    match.mockResolvedValueOnce({
+      ok: true,
+      url: 'https://cdn.example/assets/repair.456.js',
+    });
+    networkFetch.mockResolvedValueOnce(repairedResponse);
+    listeners.get('fetch')?.({
+      request: repairRequest,
+      respondWith: (work: Promise<unknown>) => {
+        assetResponseWork = work;
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        assetLifetimeWork = work;
+      },
+    });
+    await expect(assetResponseWork).resolves.toBe(repairedResponse);
+    await assetLifetimeWork;
+    expect(repairedResponse.clone).toHaveBeenCalledOnce();
+    expect(put).toHaveBeenCalledWith(repairRequest, repairedClone);
 
     const matchCallsBeforeUpload = match.mock.calls.length;
     const fetchCallsBeforeUpload = networkFetch.mock.calls.length;
