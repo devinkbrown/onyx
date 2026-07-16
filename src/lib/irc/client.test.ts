@@ -104,9 +104,11 @@ describe('IRCClient binary media plane', () => {
 // client, every reconnect replays the stale construction-time token — undefined
 // for a session that began with no saved token — and resume silently fails.
 describe('IRCClient session-resume token lifecycle', () => {
-  /** Attach a fake OPEN socket that captures every outbound line, and mark the
-   *  session as logged in so the 001 handler runs the resume path. */
-  function makeLoggedInClient(opts?: { sessionToken?: string; meshToken?: string }) {
+  /** Attach a fake OPEN socket that captures every outbound line. */
+  function makeSessionClient(
+    opts?: { sessionToken?: string; meshToken?: string },
+    loggedIn = false,
+  ) {
     const sent: string[] = [];
     const client = new IRCClient({
       url: 'wss://ircx.us:8080/',
@@ -121,9 +123,41 @@ describe('IRCClient session-resume token lifecycle', () => {
       _onMessage(ev: { data: string }): void;
     };
     priv.ws = { readyState: WebSocket.OPEN, send: (l: string) => sent.push(l) };
-    priv._loggedIn = true;
+    priv._loggedIn = loggedIn;
     return { client, sent, feed001: () => priv._onMessage({ data: ':eshmaki.me 001 onyx :Welcome' }) };
   }
+
+  function makeLoggedInClient(opts?: { sessionToken?: string; meshToken?: string }) {
+    return makeSessionClient(opts, true);
+  }
+
+  it('resumes a remembered session after 001 even when this connection did not run SASL', () => {
+    const { sent, feed001 } = makeSessionClient({ sessionToken: 'remembered-session' });
+    feed001();
+    expect(sent).toContain('SESSION RESUME remembered-session\r\n');
+    expect(sent).toContain('SESSION TOKEN\r\n');
+  });
+
+  it('sends no SESSION commands for an ordinary fresh guest connection', () => {
+    const { sent, feed001 } = makeSessionClient();
+    feed001();
+    expect(sent.filter(line => line.startsWith('SESSION '))).toEqual([]);
+  });
+
+  it('does not replay SESSION commands when 001 is received twice', () => {
+    const { sent, feed001 } = makeSessionClient({ meshToken: 'remembered-mesh' });
+    feed001();
+    feed001();
+    expect(sent.filter(line => line === 'SESSION RESUME remembered-mesh\r\n')).toHaveLength(1);
+    expect(sent.filter(line => line === 'SESSION TOKEN\r\n')).toHaveLength(1);
+  });
+
+  it('requests a token for a fresh SASL login without trying to resume', () => {
+    const { sent, feed001 } = makeLoggedInClient();
+    feed001();
+    expect(sent).toContain('SESSION TOKEN\r\n');
+    expect(sent.some(line => line.startsWith('SESSION RESUME '))).toBe(false);
+  });
 
   it('sends SESSION RESUME with the construction-time mesh token on 001', () => {
     const { sent, feed001 } = makeLoggedInClient({ sessionToken: 'local-A', meshToken: 'mesh-A' });

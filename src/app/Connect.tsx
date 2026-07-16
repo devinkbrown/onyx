@@ -958,11 +958,14 @@ export function Connect(props: ConnectProps): JSX.Element {
       return;
     }
 
-    if (typeof credentials.password !== 'string' || credentials.password.length === 0) {
+    if (
+      identity.access === 'sign-in'
+      && (typeof credentials.password !== 'string' || credentials.password.length === 0)
+    ) {
       refreshRememberedIdentities(identity.id);
       return;
     }
-    doConnect(credentials.nick, credentials.password, credentials);
+    doConnect(credentials.nick, credentials.password ?? '', credentials);
   }
 
   function handleForgetRemembered(identity: RememberedIdentity): void {

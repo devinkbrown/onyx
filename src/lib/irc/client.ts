@@ -108,8 +108,10 @@ export class IRCClient {
   private pongTimeout: ReturnType<typeof setTimeout> | null = null;
   private _destroyed = false;
   private _registered = false;
-  /** True once SASL has succeeded (903). Gates the post-001 SESSION commands. */
+  /** True once SASL has succeeded (903). Allows a fresh session to request a resume token. */
   private _loggedIn = false;
+  /** Prevent duplicate post-registration SESSION commands on one connection. */
+  private _sessionCommandsSent = false;
   private _saslPending = false;
   private _capNegotiating = true;
   private _capReqPending = 0;
@@ -232,6 +234,7 @@ export class IRCClient {
     this.opts.nick = this._authNick;
     this._registered = false;
     this._loggedIn = false;
+    this._sessionCommandsSent = false;
     this._saslPending = false;
     this._capNegotiating = true;
     this._capReqPending = 0;
@@ -747,18 +750,27 @@ export class IRCClient {
         // command is valid. Reclaim a prior detached session if we hold a token,
         // then request a fresh token for this session (arrives as
         // NOTE SESSION TOKEN, plus NOTE SESSION MTOKEN on mesh deployments).
-        // Both are no-ops server-side unless logged in.
+        // A held token represents a prior authenticated session, so RESUME must
+        // not depend on this connection having completed SASL first. This is
+        // especially important for remembered passwordless/passkey accounts.
         //
         // Prefer the mesh-sealed token for RESUME: a reconnect may land on a
         // different mesh node, where the local 16-byte token is meaningless but
         // the mesh token still reclaims/redirects (server.zig handleMeshReclaim).
         // Fall back to the local token when no mesh token is held.
-        if (this._loggedIn) {
+        // A malformed peer can send 001 more than once. Never replay a bearer
+        // token or request multiple replacements on the same connection.
+        if (!this._sessionCommandsSent) {
+          this._sessionCommandsSent = true;
           const resumeToken = this.opts.meshToken || this.opts.sessionToken;
           if (resumeToken) {
             this.send(buildSessionResumeLine(resumeToken));
           }
-          this.sendRaw('SESSION', 'TOKEN');
+          // RESUME establishes the account before this next command is handled;
+          // a fresh SASL login has already established it via numeric 903.
+          if (resumeToken || this._loggedIn) {
+            this.sendRaw('SESSION', 'TOKEN');
+          }
         }
         this.opts.onConnected?.();
         break;

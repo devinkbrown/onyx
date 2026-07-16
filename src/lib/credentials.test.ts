@@ -369,7 +369,7 @@ describe('credentials persistence', () => {
         'wss://third.example|carol': {
           nick: 'Carol',
           server: 'wss://third.example',
-          meshToken: 'token-without-sasl-secret',
+          meshToken: 'passwordless-resume-token',
           savedAt: '2026-07-07T00:00:00.000Z',
         },
       },
@@ -390,10 +390,11 @@ describe('credentials persistence', () => {
       access: 'sign-in',
     });
     expect(identities.find((identity) => identity.nick === 'Carol')).toMatchObject({
-      access: 'identity-only',
+      access: 'resume',
     });
     expect(serialized).not.toContain('password-secret');
     expect(serialized).not.toContain('session-secret');
+    expect(serialized).not.toContain('passwordless-resume-token');
     expect(serialized).not.toContain('server-secret');
     expect(serialized).not.toContain('url-secret');
     expect(identities.every((identity) => identity.id.startsWith('saved-'))).toBe(true);

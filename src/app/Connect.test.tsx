@@ -878,7 +878,7 @@ describe('Session resume', () => {
     expect(screen.queryByTestId('conn-resume')).not.toBeInTheDocument();
   });
 
-  it('does not offer authenticated resume for an identity-only handoff', async () => {
+  it('offers resume for a current token-only passwordless identity', async () => {
     window.localStorage.setItem(
       'onyx:credentials',
       JSON.stringify({
@@ -888,7 +888,7 @@ describe('Session resume', () => {
           'wss://ircx.us:8080|kain': {
             nick: 'kain',
             server: 'wss://ircx.us:8080',
-            meshToken: 'orphaned-token-without-sasl-secret',
+            meshToken: 'passkey-resume-token',
             savedAt: new Date().toISOString(),
           },
         },
@@ -898,16 +898,17 @@ describe('Session resume', () => {
 
     render(() => <Connect />);
 
-    await waitFor(() => expect(screen.getByTestId('conn-identity-use')).toBeInTheDocument());
-    expect(screen.queryByTestId('conn-resume')).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: /remembered identities/i })).toHaveTextContent(/identity only/i);
-    expect(screen.getByRole('region', { name: /remembered identities/i }).textContent).not.toContain('orphaned-token');
+    await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
+    expect(screen.getByRole('region', { name: /remembered identities/i })).toHaveTextContent(/session ready/i);
+    expect(screen.getByRole('region', { name: /remembered identities/i }).textContent).not.toContain('passkey-resume-token');
 
-    fireEvent.click(screen.getByTestId('conn-identity-use'));
+    fireEvent.click(screen.getByTestId('conn-resume'));
 
-    expect(connectSpy).not.toHaveBeenCalled();
-    expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'signin');
-    expect(nickField()).toHaveValue('kain');
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(connectSpy.mock.calls[0]![0]).toMatchObject({
+      nick: 'kain',
+      password: undefined,
+    });
     connectSpy.mockRestore();
   });
 

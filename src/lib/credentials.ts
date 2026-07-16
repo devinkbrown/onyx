@@ -8,10 +8,11 @@
  *   activeKey   — last-used credential key
  *   entries     — saved credentials keyed by normalized server + nick
  *
- * Session tokens are issued by Orochi after successful SASL auth via:
+ * Session tokens are issued by Orochi after successful account authentication via:
  *   NOTE SESSION TOKEN :<token>
- * Saved tokens are reused with SESSION RESUME after SASL succeeds. They are
- * not SASL mechanisms and must not replace the account password.
+ * Saved tokens are reused with SESSION RESUME after IRC registration. They are
+ * bearer reclaim credentials, not SASL mechanisms, so a current token can
+ * restore a passwordless/passkey account without rerunning SASL.
  *
  * On mesh deployments Orochi additionally emits:
  *   NOTE SESSION MTOKEN :<token>
@@ -20,8 +21,8 @@
  * token; `SESSION RESUME <mtoken>` routes through handleMeshReclaim, which either
  * reclaims a detached session held locally or redirects to the owning node.
  *
- * When no token is present (first login or expired) the password is used
- * for SASL PLAIN / SCRAM.  The password is stored in plain text — same as
+ * When no token is present (first login or expired), a saved password can be
+ * used for SASL PLAIN / SCRAM. The password is stored in plain text — same as
  * every desktop IRC client config file.
  */
 
@@ -136,10 +137,10 @@ function hasCurrentToken(creds: SavedCredentials): boolean {
 }
 
 function identityAccess(creds: SavedCredentials): RememberedIdentityAccess {
-  // SESSION RESUME happens only after SASL. A token without a stored password
-  // therefore cannot authenticate with the protocol Onyx implements today.
-  if (!hasPassword(creds)) return 'identity-only';
-  return hasCurrentToken(creds) ? 'resume' : 'sign-in';
+  // SESSION RESUME is itself the bearer-authenticated reclaim path. This must
+  // be token-first because passkey identities intentionally have no password.
+  if (hasCurrentToken(creds)) return 'resume';
+  return hasPassword(creds) ? 'sign-in' : 'identity-only';
 }
 
 function isSavedCredentials(value: unknown): value is SavedCredentials {
@@ -558,13 +559,12 @@ export function importAccountHandoffs(handoffs: readonly AccountHandoff[]): { im
 }
 
 /**
- * Return the SASL secret (password) for a connect attempt, or undefined for a
- * guest/token-only session.
+ * Return the SASL secret (password) for a connect attempt, or undefined when
+ * the identity is a guest or uses a passwordless resume path.
  *
  * The session token is intentionally NOT returned here: it is not a SASL
  * secret. It is supplied separately to IRCClient as `sessionToken` and replayed
- * via `SESSION RESUME` only after SASL has already succeeded (Orochi's SESSION
- * command requires a registered, logged-in connection).
+ * via `SESSION RESUME` after IRC registration.
  */
 export function getAuthSecret(creds: SavedCredentials): string | undefined {
   return creds.password;
