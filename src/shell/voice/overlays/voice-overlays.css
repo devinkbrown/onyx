@@ -489,6 +489,26 @@
   white-space: nowrap;
 }
 
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .voice-reactions {
+    bottom: 72px;
+  }
+
+  .voice-reaction {
+    gap: 4px;
+  }
+
+  .voice-reaction__emoji {
+    font-size: 32px;
+  }
+
+  .voice-reaction__nick {
+    max-width: 140px;
+    padding: 4px 8px;
+    font-size: 14px;
+  }
+}
+
 .voice-pip {
   position: fixed;
   top: 0;
