@@ -3,7 +3,7 @@
  * NotificationCenter tests — badge counting, list rendering, jump + mark-read.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Notification } from '@/lib/store/store';
 import { NotificationCenter } from './NotificationCenter';
@@ -22,9 +22,50 @@ beforeEach(() => {
   store.setState({ ...initialState, readNotificationIds: new Set<string>() }, true);
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 
 describe('<NotificationCenter>', () => {
+  it('ages relative times while the inbox stays open without a store update', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-16T12:00:00Z'));
+    store.setState({
+      notifications: [note({ id: 'timed', type: 'dm', from: 'mizu', at: new Date() })],
+    });
+    render(() => <NotificationCenter />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Inbox — 1 unread/i }));
+    expect(screen.getByText('just now')).toBeInTheDocument();
+
+    vi.advanceTimersByTime(60_000);
+
+    expect(screen.getByText('1m ago')).toBeInTheDocument();
+  });
+
+  it('runs the shared relative-time clock only while the inbox is open', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-16T12:00:00Z'));
+    const setIntervalSpy = vi.spyOn(window, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+    store.setState({
+      notifications: [note({ id: 'timed', type: 'dm', from: 'mizu', at: new Date() })],
+    });
+    render(() => <NotificationCenter />);
+    const trigger = screen.getByRole('button', { name: /Inbox — 1 unread/i });
+
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+    fireEvent.click(trigger);
+    expect(setIntervalSpy).toHaveBeenCalledOnce();
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
+    const clock = setIntervalSpy.mock.results[0]?.value;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close notification inbox' }));
+    expect(clearIntervalSpy).toHaveBeenCalledWith(clock);
+  });
+
   it('shows the empty state when there are no notifications', () => {
     const { getByText } = render(() => <NotificationCenter />);
     const trigger = screen.getByRole('button', { name: 'Inbox' });

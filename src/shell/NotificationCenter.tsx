@@ -12,7 +12,7 @@
  * SOLID IDIOMS: never destructure props; createMemo chains; For/Show.
  */
 import './notification-center.css';
-import { createEffect, createMemo, createSignal, For, Show, untrack, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import type { Notification } from '@/lib/store/store';
 import { Popover } from '@/primitives/index';
@@ -58,6 +58,7 @@ export function NotificationCenter(): JSX.Element {
   const notifications = useStore((s) => s.notifications);
   const readIds = useStore((s) => s.readNotificationIds);
   const [inboxOpen, setInboxOpen] = createSignal(false);
+  const [nowMs, setNowMs] = createSignal(Date.now());
   let centerRef: HTMLDivElement | undefined;
   let closeRef: HTMLButtonElement | undefined;
   let wrapperRef: HTMLSpanElement | undefined;
@@ -69,6 +70,14 @@ export function NotificationCenter(): JSX.Element {
         (n) => (n.type === 'mention' || n.type === 'dm' || n.type === 'follow') && !readIds().has(n.id),
       ).length,
   );
+
+  createEffect(() => {
+    if (!inboxOpen()) return;
+
+    setNowMs(Date.now());
+    const clock = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    onCleanup(() => window.clearInterval(clock));
+  });
 
   const focusTrigger = (): void => {
     queueMicrotask(() => {
@@ -248,7 +257,7 @@ export function NotificationCenter(): JSX.Element {
                           <span class="notif-center__meta">
                             <Show when={n.from}><strong>{n.from}</strong></Show>
                             <Show when={n.channel}><span class="notif-center__chan">{n.channel}</span></Show>
-                            <span class="notif-center__when">{relTime(n.at.getTime() / 1000, Date.now())}</span>
+                            <span class="notif-center__when">{relTime(n.at.getTime() / 1000, nowMs())}</span>
                           </span>
                           <span class="notif-center__preview">{n.text}</span>
                         </span>
