@@ -490,7 +490,8 @@
   align-items: center;
 }
 
-.pref-vault-compression-note {
+.pref-vault-compression-note,
+.pref-vault-capability-note {
   align-self: center;
   max-width: 18rem;
   color: var(--washi-mute);

@@ -63,6 +63,7 @@ import { PORTABLE_JSON_MAX_FILE_BYTES } from './importFileLimits';
 import * as portableTransfer from '@/lib/vault/portableTransfer';
 import type { PortableTransferSnapshot } from '@/lib/vault/portableTransfer';
 import * as portableCompression from '@/lib/vault/portableCompression';
+import * as portableShare from '@/lib/vault/portableShare';
 
 function emptyPortableSnapshot(): PortableTransferSnapshot {
   return {
@@ -374,6 +375,88 @@ describe('PreferencesPanel', () => {
     await Promise.resolve();
 
     expect(screen.queryByRole('heading', { name: 'Review import' })).not.toBeInTheDocument();
+  });
+
+  it('shares a bounded portable vault once from the explicit secondary action', async () => {
+    let resolveExport: (snapshot: PortableTransferSnapshot) => void = () => {};
+    const pendingExport = new Promise<PortableTransferSnapshot>((resolve) => {
+      resolveExport = resolve;
+    });
+    vi.spyOn(portableShare, 'supportsPortableFileShare').mockReturnValue(true);
+    const exportPortableTransfer = vi.spyOn(portableTransfer, 'exportPortableTransfer')
+      .mockReturnValue(pendingExport);
+    const sharePortableVaultJson = vi.spyOn(portableShare, 'sharePortableVaultJson')
+      .mockResolvedValue({ state: 'shared', detail: 'Portable vault file shared.' });
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL');
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    const share = screen.getByRole('button', { name: 'Share vault file' });
+    fireEvent.click(share);
+    fireEvent.click(share);
+
+    expect(exportPortableTransfer).toHaveBeenCalledOnce();
+    expect(share).toBeDisabled();
+    expect(share).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Preparing portable vault file to share…')).toHaveAttribute('role', 'status');
+
+    resolveExport(emptyPortableSnapshot());
+    expect(await screen.findByText('Portable vault file shared.')).toBeInTheDocument();
+    expect(sharePortableVaultJson).toHaveBeenCalledOnce();
+    expect(JSON.parse(sharePortableVaultJson.mock.calls[0]?.[0] ?? '{}')).toMatchObject({
+      kind: 'onyx-vault',
+    });
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Share vault file' })).not.toBeDisabled();
+  });
+
+  it('keeps JSON export first and visible when file sharing is unavailable', () => {
+    vi.spyOn(portableShare, 'supportsPortableFileShare').mockReturnValue(false);
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Share vault file' })).not.toBeInTheDocument();
+    expect(screen.getByText('File sharing unavailable; ordinary JSON export remains universal.')).toBeInTheDocument();
+  });
+
+  it('announces share cancellation as status and rejection as failure', async () => {
+    vi.spyOn(portableShare, 'supportsPortableFileShare').mockReturnValue(true);
+    vi.spyOn(portableTransfer, 'exportPortableTransfer').mockResolvedValue(emptyPortableSnapshot());
+    const sharePortableVaultJson = vi.spyOn(portableShare, 'sharePortableVaultJson')
+      .mockResolvedValueOnce({ state: 'cancelled', detail: 'Portable vault sharing cancelled.' })
+      .mockResolvedValueOnce({ state: 'rejected', detail: 'The browser rejected portable vault sharing. Export ordinary JSON instead.' });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share vault file' }));
+    expect(await screen.findByText('Portable vault sharing cancelled.')).toHaveAttribute('role', 'status');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share vault file' }));
+    expect(await screen.findByText(/browser rejected portable vault sharing/i)).toHaveAttribute('role', 'alert');
+    expect(sharePortableVaultJson).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores a share completion after Preferences unmounts', async () => {
+    let resolveShare: (result: portableShare.PortableShareResult) => void = () => {};
+    const pendingShare = new Promise<portableShare.PortableShareResult>((resolve) => {
+      resolveShare = resolve;
+    });
+    vi.spyOn(portableShare, 'supportsPortableFileShare').mockReturnValue(true);
+    vi.spyOn(portableTransfer, 'exportPortableTransfer').mockResolvedValue(emptyPortableSnapshot());
+    const sharePortableVaultJson = vi.spyOn(portableShare, 'sharePortableVaultJson')
+      .mockReturnValue(pendingShare);
+    openPreferences();
+    const view = render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share vault file' }));
+    await waitFor(() => expect(sharePortableVaultJson).toHaveBeenCalledOnce());
+    view.unmount();
+    resolveShare({ state: 'shared', detail: 'Portable vault file shared.' });
+    await pendingShare;
+    await Promise.resolve();
+
+    expect(screen.queryByText('Portable vault file shared.')).not.toBeInTheDocument();
   });
 
   it('announces failed app-shell recovery as an alert', async () => {

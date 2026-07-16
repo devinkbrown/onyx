@@ -89,6 +89,10 @@ import {
   supportsPortableGzip,
 } from '@/lib/vault/portableCompression';
 import {
+  sharePortableVaultJson,
+  supportsPortableFileShare,
+} from '@/lib/vault/portableShare';
+import {
   clearSavedSearches,
   listSearches,
   subscribeSavedSearches,
@@ -474,6 +478,7 @@ function PortableVaultControls(): JSX.Element {
   const [status, setStatus] = createSignal<{ message: string; failure: boolean } | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [exportFormat, setExportFormat] = createSignal<'json' | 'gzip' | null>(null);
+  const [shareBusy, setShareBusy] = createSignal(false);
   const [pendingImport, setPendingImport] = createSignal<{
     fileName: string;
     snapshot: PortableTransferSnapshot;
@@ -488,8 +493,10 @@ function PortableVaultControls(): JSX.Element {
   } | null>(null);
   const activeObjectUrls = new Map<string, number | null>();
   const gzipAvailable = supportsPortableGzip();
+  const fileShareAvailable = supportsPortableFileShare();
   let exportEpoch = 0;
   let importEpoch = 0;
+  let shareEpoch = 0;
   let disposed = false;
 
   const reportStatus = (message: string, failure = false) => {
@@ -512,6 +519,7 @@ function PortableVaultControls(): JSX.Element {
     disposed = true;
     exportEpoch += 1;
     importEpoch += 1;
+    shareEpoch += 1;
     for (const [url, timer] of activeObjectUrls) {
       if (timer !== null) window.clearTimeout(timer);
       try {
@@ -649,6 +657,36 @@ function PortableVaultControls(): JSX.Element {
     }
   }
 
+  async function handleShare(): Promise<void> {
+    if (busy()) return;
+    const epoch = ++shareEpoch;
+    setBusy(true);
+    setShareBusy(true);
+    reportStatus('Preparing portable vault file to share…');
+    try {
+      const snapshot = await exportPortableTransfer();
+      if (disposed || epoch !== shareEpoch) return;
+      const result = await sharePortableVaultJson(JSON.stringify(snapshot, null, 2));
+      if (disposed || epoch !== shareEpoch) return;
+      if (result.state === 'shared') {
+        reportStatus(result.detail);
+      } else if (result.state === 'cancelled' || result.state === 'unsupported') {
+        reportStatus(result.detail);
+      } else {
+        reportStatus(result.detail, true);
+      }
+    } catch {
+      if (!disposed && epoch === shareEpoch) {
+        reportStatus('Portable vault sharing failed. Export ordinary JSON instead.', true);
+      }
+    } finally {
+      if (!disposed && epoch === shareEpoch) {
+        setBusy(false);
+        setShareBusy(false);
+      }
+    }
+  }
+
   async function confirmImport(): Promise<void> {
     const pending = pendingImport();
     if (!pending) return;
@@ -697,6 +735,20 @@ function PortableVaultControls(): JSX.Element {
             onClick={() => void handleExport('gzip')}
           >
             {exportFormat() === 'gzip' ? 'Compressing export…' : 'Export compressed vault'}
+          </button>
+        </Show>
+        <Show
+          when={fileShareAvailable}
+          fallback={<span class="pref-vault-capability-note">File sharing unavailable; ordinary JSON export remains universal.</span>}
+        >
+          <button
+            type="button"
+            class="pref-reset"
+            disabled={busy()}
+            aria-busy={shareBusy()}
+            onClick={() => void handleShare()}
+          >
+            {shareBusy() ? 'Sharing vault file…' : 'Share vault file'}
           </button>
         </Show>
         <label class="pref-file">
