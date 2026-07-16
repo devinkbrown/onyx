@@ -19,21 +19,37 @@ import {
   deviceLabel,
   deviceSigningKeys,
 } from '../e2ee/deviceSign';
-import { AccountAttribution, RESIDENCE_TTL_MS, RESIDENCE_REFRESH_MS } from './attribution';
+import { deviceMemoryStorageKey } from '../deviceMemoryOwner';
+import {
+  AccountAttribution,
+  ATTRIBUTION_ENROLLED_STORAGE_KEY,
+  RESIDENCE_TTL_MS,
+  RESIDENCE_REFRESH_MS,
+} from './attribution';
 import type { IRCMessage } from './types';
 
 const NODE = 'a1b2c3d4e5f60718';
 const NODE2 = '00112233445566ff';
+const SERVER = 'wss://one.example/ws';
+const SERVER2 = 'wss://two.example/ws';
 
 interface Sent { command: string; params: string[] }
 
-function makeController(timing?: { ttlMs?: number; refreshMs?: number }) {
+function makeController(timing?: { ttlMs?: number; refreshMs?: number }, serverUrl = SERVER) {
   const sent: Sent[] = [];
   const ctl = new AccountAttribution(
     { sendRaw: (command: string, ...params: string[]) => sent.push({ command, params }) },
+    serverUrl,
     timing,
   );
   return { ctl, sent };
+}
+
+function enrolledKey(account = 'kain', serverUrl = SERVER): string {
+  return deviceMemoryStorageKey(ATTRIBUTION_ENROLLED_STORAGE_KEY, {
+    serverUrl,
+    identity: account,
+  })!;
 }
 
 function msg(command: string, ...params: string[]): IRCMessage {
@@ -174,21 +190,53 @@ describe('enroll + residence flow', () => {
 
 describe('enroll idempotence', () => {
   it('skips IDENTITY ADD once the server confirmed enrollment of this key', async () => {
-    const { ctl, sent } = makeController();
-    loggedIn(ctl);
-    ctl.setNode(NODE);
-    await vi.waitFor(() => expect(sent.length).toBe(2));
-    const label = sent[0]!.params[1]!;
+    const first = makeController();
+    loggedIn(first.ctl);
+    first.ctl.setNode(NODE);
+    await vi.waitFor(() => expect(first.sent.length).toBe(2));
+    const label = first.sent[0]!.params[1]!;
     // Server confirms: NOTICE :IDENTITY ADDED label=<label>
-    ctl.observe(msg('NOTICE', 'kain', `IDENTITY ADDED label=${label}`));
+    first.ctl.observe(msg('NOTICE', 'kain', `IDENTITY ADDED label=${label}`));
+    first.ctl.stop();
 
-    // Fresh connection: reset + re-learn account/node → RESIDENCE only.
-    ctl.reset();
-    sent.length = 0;
+    // A fresh controller for the same endpoint/account remembers only this
+    // server's confirmation and publishes RESIDENCE without another ADD.
+    const { ctl, sent } = makeController();
     loggedIn(ctl);
     ctl.setNode(NODE);
     await vi.waitFor(() => expect(sent.length).toBe(1));
     expect(sent[0]!.params[0]).toBe('RESIDENCE');
+  });
+
+  it('does not inherit same-name enrollment from another server', async () => {
+    const first = makeController();
+    loggedIn(first.ctl);
+    first.ctl.setNode(NODE);
+    await vi.waitFor(() => expect(first.sent.length).toBe(2));
+    const label = first.sent[0]!.params[1]!;
+    first.ctl.observe(msg('NOTICE', 'kain', `IDENTITY ADDED label=${label}`));
+    first.ctl.stop();
+
+    const second = makeController(undefined, SERVER2);
+    loggedIn(second.ctl);
+    second.ctl.setNode(NODE);
+    await vi.waitFor(() => expect(second.sent.length).toBe(2));
+    expect(second.sent[0]!.params[0]).toBe('ADD');
+    expect(second.sent[1]!.params[0]).toBe('RESIDENCE');
+    expect(localStorage.getItem(enrolledKey('kain', SERVER))).not.toBeNull();
+    expect(localStorage.getItem(enrolledKey('kain', SERVER2))).toBeNull();
+  });
+
+  it('quarantines the ambiguous pre-owner enrollment marker', async () => {
+    const keys = await deviceSigningKeys();
+    localStorage.setItem('onyx:attribution-enrolled:kain', keys!.publicHex);
+
+    const { ctl, sent } = makeController();
+    loggedIn(ctl);
+    ctl.setNode(NODE);
+    await vi.waitFor(() => expect(sent.length).toBe(2));
+    expect(sent[0]!.params[0]).toBe('ADD');
+    expect(localStorage.getItem('onyx:attribution-enrolled:kain')).toBeNull();
   });
 
   it('re-enrolls when no confirmation was ever observed (server may have lost it)', async () => {
@@ -203,6 +251,21 @@ describe('enroll idempotence', () => {
     ctl.setNode(NODE);
     await vi.waitFor(() => expect(sent.length).toBe(2));
     expect(sent[0]!.params[0]).toBe('ADD'); // idempotent overwrite server-side
+  });
+
+  it('re-enrolls and republishes when the authenticated account changes on the same node', async () => {
+    const { ctl, sent } = makeController();
+    loggedIn(ctl, 'alice');
+    ctl.setNode(NODE);
+    await vi.waitFor(() => expect(sent.length).toBe(2));
+    ctl.observe(msg('NOTICE', 'alice', `IDENTITY ADDED label=${sent[0]!.params[1]!}`));
+
+    loggedIn(ctl, 'bob');
+    await vi.waitFor(() => expect(sent.length).toBe(4));
+    expect(sent[2]!.params[0]).toBe('ADD');
+    expect(sent[3]!.params.slice(0, 2)).toEqual(['RESIDENCE', NODE]);
+    expect(localStorage.getItem(enrolledKey('alice'))).not.toBeNull();
+    expect(localStorage.getItem(enrolledKey('bob'))).toBeNull();
   });
 });
 
@@ -285,11 +348,11 @@ describe('hostile-sender rejection (server-origin gate)', () => {
 
     // Attacker (nick!user@host prefix) forges the confirmation mid-enrollment.
     ctl.observe(userMsg('NOTICE', 'kain', `IDENTITY ADDED label=${label}`));
-    expect(localStorage.getItem('onyx:attribution-enrolled:kain')).toBeNull();
+    expect(localStorage.getItem(enrolledKey())).toBeNull();
 
     // The genuine server confirmation still lands.
     ctl.observe(msg('NOTICE', 'kain', `IDENTITY ADDED label=${label}`));
-    expect(localStorage.getItem('onyx:attribution-enrolled:kain')).not.toBeNull();
+    expect(localStorage.getItem(enrolledKey())).not.toBeNull();
   });
 
   it('a USER-forged FAIL STALE_EPOCH never drives an extra publish', async () => {

@@ -30,6 +30,7 @@ import {
   signHex,
   type DeviceSigningKeys,
 } from '../e2ee/deviceSign';
+import { deviceMemoryStorageKey } from '../deviceMemoryOwner';
 import type { IRCMessage } from './types';
 
 /** Proof lifetime. The daemon hard-caps `expiry - now` at 1h; 50 min leaves
@@ -43,8 +44,9 @@ export const RESIDENCE_REFRESH_MS = 20 * 60_000;
 const STALE_EPOCH_BUMP_MS = 5 * 60_000;
 
 const NODE_HEX_RE = /^[0-9a-f]{16}$/;
-/** localStorage marker: the server confirmed this pubkey enrolled for the account. */
-const ENROLLED_PREFIX = 'onyx:attribution-enrolled:';
+/** Owner-scoped localStorage marker: this server confirmed this account's pubkey. */
+export const ATTRIBUTION_ENROLLED_STORAGE_KEY = 'onyx:attribution-enrolled';
+const LEGACY_ENROLLED_PREFIX = `${ATTRIBUTION_ENROLLED_STORAGE_KEY}:`;
 const ADDED_NOTICE_PREFIX = 'IDENTITY ADDED label=';
 const PUBLISHED_NOTICE_PREFIX = 'IDENTITY RESIDENCE PUBLISHED ';
 
@@ -74,6 +76,14 @@ function storageSet(key: string, value: string): void {
   }
 }
 
+function storageRemove(key: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
+  } catch {
+    /* private mode — the ambiguous marker is ignored even if removal fails */
+  }
+}
+
 export class AccountAttribution {
   private account: string | null = null;
   private nodeHex: string | null = null;
@@ -88,13 +98,20 @@ export class AccountAttribution {
   private pendingEnroll: { account: string; label: string; publicHex: string } | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
+  /** A state transition landed while an async signing pass was running. */
+  private rerunRequested = false;
+  private stopped = false;
   /** Generation counter — reset()/stop() bump it so stale async runs abort. */
   private gen = 0;
 
   private readonly ttlMs: number;
   private readonly refreshMs: number;
 
-  constructor(private readonly sender: AttributionSender, timing?: AttributionTiming) {
+  constructor(
+    private readonly sender: AttributionSender,
+    private readonly serverUrl: string,
+    timing?: AttributionTiming,
+  ) {
     this.ttlMs = timing?.ttlMs ?? RESIDENCE_TTL_MS;
     this.refreshMs = timing?.refreshMs ?? RESIDENCE_REFRESH_MS;
   }
@@ -102,6 +119,8 @@ export class AccountAttribution {
   /** New connection attempt: forget per-connection state (keep the epoch floor). */
   reset(): void {
     this.gen++;
+    this.stopped = false;
+    this.rerunRequested = false;
     this.account = null;
     this.nodeHex = null;
     this.publishedNode = null;
@@ -113,6 +132,8 @@ export class AccountAttribution {
   /** Socket closed / client destroyed: stop timers and abort in-flight work. */
   stop(): void {
     this.gen++;
+    this.stopped = true;
+    this.rerunRequested = false;
     this.clearRefresh();
   }
 
@@ -140,7 +161,15 @@ export class AccountAttribution {
         // The 2-param form is IRCX ERR_BADCOMMAND — not a login.
         const account = m.params.length >= 4 ? m.params[2] : undefined;
         if (account && account !== this.account) {
+          // A live account transition is a full attribution-owner boundary.
+          // Abort any old-account signing pass and force a new enrollment and
+          // residence proof even when the socket stayed on the same node.
+          this.gen++;
           this.account = account;
+          this.publishedNode = null;
+          this.pendingEnroll = null;
+          this.staleRetried = false;
+          this.clearRefresh();
           this.kick();
         }
         break;
@@ -151,7 +180,8 @@ export class AccountAttribution {
           const label = text.slice(ADDED_NOTICE_PREFIX.length).trim();
           const pending = this.pendingEnroll;
           if (pending && label === pending.label) {
-            storageSet(ENROLLED_PREFIX + pending.account, pending.publicHex);
+            const key = this.enrolledStorageKey(pending.account);
+            if (key) storageSet(key, pending.publicHex);
             this.pendingEnroll = null;
           }
         } else if (text.startsWith(PUBLISHED_NOTICE_PREFIX)) {
@@ -175,15 +205,21 @@ export class AccountAttribution {
   // ── internals ──────────────────────────────────────────────────────────
 
   private kick(): void {
+    if (this.stopped) return;
+    if (this.running) {
+      this.rerunRequested = true;
+      return;
+    }
     void this.run();
   }
 
   private async run(): Promise<void> {
     if (this.running) return; // the loop below re-checks state each pass
     this.running = true;
+    this.rerunRequested = false;
     const gen = this.gen;
     try {
-      while (gen === this.gen) {
+      while (!this.stopped && gen === this.gen) {
         const account = this.account;
         const nodeHex = this.nodeHex;
         if (!account || !nodeHex || this.publishedNode === nodeHex) return;
@@ -203,12 +239,28 @@ export class AccountAttribution {
       }
     } finally {
       this.running = false;
+      if (this.rerunRequested && !this.stopped) {
+        this.rerunRequested = false;
+        this.kick();
+      }
     }
+  }
+
+  private enrolledStorageKey(account: string): string | null {
+    return deviceMemoryStorageKey(ATTRIBUTION_ENROLLED_STORAGE_KEY, {
+      serverUrl: this.serverUrl,
+      identity: account,
+    });
   }
 
   /** True = enrolled (or already was); false = enrollment impossible ⇒ abort. */
   private async enrollIfNeeded(gen: number, keys: DeviceSigningKeys, account: string): Promise<boolean> {
-    if (storageGet(ENROLLED_PREFIX + account) === keys.publicHex) return true;
+    // The pre-owner key cannot prove which server confirmed the enrollment.
+    // Re-enrollment is idempotent, so quarantine it instead of attributing it
+    // to whichever endpoint happens to connect first after upgrade.
+    storageRemove(LEGACY_ENROLLED_PREFIX + account);
+    const storageKey = this.enrolledStorageKey(account);
+    if (storageKey && storageGet(storageKey) === keys.publicHex) return true;
     // Already sent on THIS connection (awaiting the ADDED confirmation) — a
     // refresh/retry must not spam duplicate ADDs.
     const pending = this.pendingEnroll;

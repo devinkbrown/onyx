@@ -154,7 +154,7 @@ export class IRCClient {
    * server advertises `ISUPPORT ACCOUNTRESIDENCE=` AND 900 RPL_LOGGEDIN named
    * the account; otherwise it never sends a byte (conservative UID path).
    */
-  private _attribution = new AccountAttribution(this);
+  private _attribution: AccountAttribution;
   /** In-flight LIST collection (see list()). */
   private _listPending: {
     rows: ChannelListRow[];
@@ -224,6 +224,7 @@ export class IRCClient {
 
   constructor(opts: IRCClientOptions) {
     this.opts = opts;
+    this._attribution = new AccountAttribution(this, opts.url);
     // Save before any nick mutations (433 collision appends '_')
     this._authNick = opts.nick;
   }
