@@ -31,14 +31,14 @@ import {
 } from './dmSearchPrivacy';
 
 const DB_NAME = 'onyx-vault';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE = 'messages';
 const OUTBOX = 'outbox';
 export const VAULT_KEEP = 400;
 /**
  * Global work cap for one cross-conversation search pass. Per-target retention
  * alone is not a global bound: a device can remember thousands of targets.
- * Search reads the newest rows first through the v3 `by_time` index and never
+ * Search reads the newest rows first through the v4 owner-time index and never
  * materializes or embeds more than this many rows for one query.
  */
 export const VAULT_SEARCH_SCAN_MAX = 4096;
@@ -92,7 +92,13 @@ export const MAX_VAULT_REPLY_TEXT_LENGTH = 4096;
 export const OMIT_AT_REST = ['plaintext'] as const;
 type OmitAtRestKey = (typeof OMIT_AT_REST)[number];
 
-type StoredMessage = Omit<ChatMessage, 'time' | OmitAtRestKey> & { time: number; target_key: string };
+type StoredMessage = Omit<ChatMessage, 'time' | OmitAtRestKey> & {
+  time: number;
+  /** Physical target namespace. Owned rows never collide with legacy rows. */
+  target_key: string;
+  /** Present only on v4 owner-aware rows; absent legacy rows stay quarantined. */
+  owner_key?: string;
+};
 
 export interface VaultExportTarget {
   /** Lowercase conversation key stored in this device vault. */
@@ -108,11 +114,83 @@ export interface VaultExportSnapshot {
   targets: VaultExportTarget[];
 }
 
-export interface OutboxOwner {
+export interface DeviceMemoryOwner {
   /** Exact WebSocket endpoint that owned the composing session. */
   serverUrl: string;
   /** Lowercased account name, or guest nick when no account was authenticated. */
   identity: string;
+}
+
+export type OutboxOwner = DeviceMemoryOwner;
+
+const MAX_DEVICE_MEMORY_SERVER_LENGTH = 2_048;
+const MAX_DEVICE_MEMORY_IDENTITY_LENGTH = 256;
+
+function normalizeDeviceMemoryOwner(value: unknown): DeviceMemoryOwner | null {
+  if (!isRecord(value)) return null;
+  const { serverUrl, identity } = value;
+  if (
+    typeof serverUrl !== 'string'
+    || serverUrl.length === 0
+    || serverUrl.length > MAX_DEVICE_MEMORY_SERVER_LENGTH
+    || serverUrl !== serverUrl.trim()
+    || typeof identity !== 'string'
+    || identity.length === 0
+    || identity.length > MAX_DEVICE_MEMORY_IDENTITY_LENGTH
+    || identity !== identity.trim()
+  ) return null;
+  return { serverUrl, identity: identity.toLowerCase() };
+}
+
+export function deviceMemoryOwnerKey(owner: DeviceMemoryOwner): string | null {
+  const safe = normalizeDeviceMemoryOwner(owner);
+  return safe ? JSON.stringify([safe.serverUrl, safe.identity]) : null;
+}
+
+function physicalTargetKey(target: string, owner?: DeviceMemoryOwner): string {
+  const logical = target.toLowerCase();
+  if (owner === undefined) return logical;
+  const safe = normalizeDeviceMemoryOwner(owner);
+  if (!safe) throw new TypeError('Invalid device-memory owner');
+  return JSON.stringify([safe.serverUrl, safe.identity, logical]);
+}
+
+function parseOwnedPhysicalTarget(key: string): { owner: DeviceMemoryOwner; target: string } | null {
+  try {
+    const parsed: unknown = JSON.parse(key);
+    if (
+      !Array.isArray(parsed)
+      || parsed.length !== 3
+      || typeof parsed[0] !== 'string'
+      || typeof parsed[1] !== 'string'
+      || typeof parsed[2] !== 'string'
+    ) return null;
+    const owner = normalizeDeviceMemoryOwner({ serverUrl: parsed[0], identity: parsed[1] });
+    return owner ? { owner, target: parsed[2] } : null;
+  } catch {
+    return null;
+  }
+}
+
+function logicalTargetFromPhysical(key: string, owner?: DeviceMemoryOwner): string | null {
+  if (owner === undefined) return parseOwnedPhysicalTarget(key) ? null : key;
+  const safe = normalizeDeviceMemoryOwner(owner);
+  if (!safe) return null;
+  const parsed = parseOwnedPhysicalTarget(key);
+  return parsed
+    && parsed.owner.serverUrl === safe.serverUrl
+    && parsed.owner.identity === safe.identity
+    ? parsed.target
+    : null;
+}
+
+/** Privacy-cache namespace used by owner-aware DM vault classification. */
+export function deviceMemoryPrivacyTarget(owner: DeviceMemoryOwner, target: string): string | null {
+  try {
+    return physicalTargetKey(target, owner);
+  } catch {
+    return null;
+  }
 }
 
 export interface OutboxEntry {
@@ -171,12 +249,16 @@ export async function applyRetentionPolicy(policy: RetentionPolicy | null): Prom
   _retentionPolicy = policy;
   const db = await openVault();
   if (!db) return false;
-  const targets = await storedTargetKeys(db);
-  for (const target of targets) {
-    const tracked = isVaultDmSearchPrivacyTracked(target);
-    if (tracked) invalidateVaultDmSearchPrivacy(target);
-    await pruneTarget(db, target, policy);
-    if (tracked) await classifyVaultDmSearchPrivacy(target);
+  const physicalTargets = await storedTargetKeys(db);
+  for (const physicalTarget of physicalTargets) {
+    const owned = parseOwnedPhysicalTarget(physicalTarget);
+    const logicalTarget = owned?.target ?? physicalTarget;
+    const tracked = isVaultDmSearchPrivacyTracked(physicalTarget);
+    if (tracked) invalidateVaultDmSearchPrivacy(physicalTarget);
+    await pruneTarget(db, physicalTarget, logicalTarget, policy);
+    if (tracked) {
+      await classifyVaultDmSearchPrivacy(logicalTarget, owned?.owner);
+    }
   }
   return true;
 }
@@ -200,6 +282,11 @@ function openVault(): Promise<IDBDatabase | null> {
         }
         if (messageStore && !messageStore.indexNames.contains('by_time')) {
           messageStore.createIndex('by_time', 'time');
+        }
+        if (messageStore && !messageStore.indexNames.contains('by_owner_time')) {
+          // Legacy rows have no owner_key and therefore do not enter this index.
+          // They remain physically clearable but cannot surface in an owned scan.
+          messageStore.createIndex('by_owner_time', ['owner_key', 'time']);
         }
         if (!db.objectStoreNames.contains(OUTBOX)) {
           db.createObjectStore(OUTBOX, { keyPath: 'id' });
@@ -256,7 +343,11 @@ function storedTargetKeys(db: IDBDatabase): Promise<string[]> {
   });
 }
 
-export function serializeMessage(target: string, msg: ChatMessage): StoredMessage {
+export function serializeMessage(
+  target: string,
+  msg: ChatMessage,
+  owner?: DeviceMemoryOwner,
+): StoredMessage {
   // Copy the message, then strip every omit-at-rest (decrypted/transient) field
   // so the vault stores only the ciphertext envelope (`text`), never a decrypted
   // body. Mutating the fresh copy — not `msg` — keeps the input immutable.
@@ -269,12 +360,17 @@ export function serializeMessage(target: string, msg: ChatMessage): StoredMessag
     };
   }
   row.time = msg.time instanceof Date ? msg.time.getTime() : Number(msg.time) || 0;
-  row.target_key = target.toLowerCase();
+  row.target_key = physicalTargetKey(target, owner);
+  if (owner !== undefined) {
+    const ownerKey = deviceMemoryOwnerKey(owner);
+    if (!ownerKey) throw new TypeError('Invalid device-memory owner');
+    row.owner_key = ownerKey;
+  }
   return row as StoredMessage;
 }
 
 export function deserializeMessage(row: StoredMessage): ChatMessage {
-  const { target_key: _key, time, ...rest } = row;
+  const { target_key: _key, owner_key: _owner, time, ...rest } = row;
   const message = { ...rest, time: new Date(time) } as ChatMessage;
   if (message.replyTo) {
     message.replyTo = {
@@ -295,13 +391,20 @@ export function deserializeMessage(row: StoredMessage): ChatMessage {
  * MUST gate on this so a silently-failed write is retried, never treated as
  * durable. The vault stays best-effort: `false` degrades, it never throws.
  */
-export async function saveMessages(target: string, msgs: readonly ChatMessage[]): Promise<boolean> {
+export async function saveMessages(
+  target: string,
+  msgs: readonly ChatMessage[],
+  owner?: DeviceMemoryOwner,
+): Promise<boolean> {
+  const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
+  if (owner !== undefined && !safeOwner) return false;
   if (msgs.length === 0) return true;
-  const privacyTracked = isVaultDmSearchPrivacyTracked(target)
+  const physicalTarget = physicalTargetKey(target, safeOwner ?? undefined);
+  const privacyTracked = isVaultDmSearchPrivacyTracked(physicalTarget)
     || msgs.some((message) => message.encrypted || isEnvelope(message.text));
   // Invalidate before the first await. SEARCH is synchronous, so even the small
   // window while a write is opening IndexedDB must not reuse an older `plain`.
-  if (privacyTracked) invalidateVaultDmSearchPrivacy(target);
+  if (privacyTracked) invalidateVaultDmSearchPrivacy(physicalTarget);
   const db = await openVault();
   if (!db) return false;
   try {
@@ -314,28 +417,34 @@ export async function saveMessages(target: string, msgs: readonly ChatMessage[])
     const tail = keep === 0 ? [] : msgs.slice(-keep);
     const tx = db.transaction(STORE, 'readwrite');
     const store = tx.objectStore(STORE);
-    for (const m of tail) store.put(serializeMessage(target, m));
+    for (const m of tail) store.put(serializeMessage(target, m, safeOwner ?? undefined));
     const committed = await txDone(tx);
     if (!committed) {
-      if (privacyTracked) await classifyVaultDmSearchPrivacy(target);
+      if (privacyTracked) await classifyVaultDmSearchPrivacy(target, safeOwner ?? undefined);
       return false;
     }
-    await pruneTarget(db, target.toLowerCase(), _retentionPolicy);
-    if (privacyTracked) await classifyVaultDmSearchPrivacy(target);
+    await pruneTarget(db, physicalTarget, target.toLowerCase(), _retentionPolicy);
+    if (privacyTracked) await classifyVaultDmSearchPrivacy(target, safeOwner ?? undefined);
     return true;
   } catch {
     /* quota / private mode — the vault is best-effort */
-    if (privacyTracked) await classifyVaultDmSearchPrivacy(target);
+    if (privacyTracked) await classifyVaultDmSearchPrivacy(target, safeOwner ?? undefined);
     return false;
   }
 }
 
 /** Load the most recent messages for a target, chronological. */
-export async function loadRecent(target: string, limit = VAULT_KEEP): Promise<ChatMessage[]> {
+export async function loadRecent(
+  target: string,
+  limit = VAULT_KEEP,
+  owner?: DeviceMemoryOwner,
+): Promise<ChatMessage[]> {
+  const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
+  if (owner !== undefined && !safeOwner) return [];
   const db = await openVault();
   if (!db) return [];
   try {
-    const key = target.toLowerCase();
+    const key = physicalTargetKey(target, safeOwner ?? undefined);
     const tx = db.transaction(STORE, 'readonly');
     const idx = tx.objectStore(STORE).index('by_target_time');
     const range = targetKeyRange(key);
@@ -368,8 +477,14 @@ export async function loadRecent(target: string, limit = VAULT_KEEP): Promise<Ch
  * `plain`. Epoch commit prevents a scan racing save/import/clear from publishing
  * a stale proof after that mutation begins.
  */
-export async function classifyVaultDmSearchPrivacy(target: string): Promise<VaultDmSearchPrivacy> {
-  const epoch = captureVaultDmPrivacyEpoch(target);
+export async function classifyVaultDmSearchPrivacy(
+  target: string,
+  owner?: DeviceMemoryOwner,
+): Promise<VaultDmSearchPrivacy> {
+  const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
+  if (owner !== undefined && !safeOwner) return 'unknown';
+  const physicalTarget = physicalTargetKey(target, safeOwner ?? undefined);
+  const epoch = captureVaultDmPrivacyEpoch(physicalTarget);
   if (typeof indexedDB === 'undefined') {
     return commitVaultDmSearchPrivacy(epoch, 'plain') ? 'plain' : 'unknown';
   }
@@ -414,11 +529,18 @@ export async function classifyVaultDmSearchPrivacy(target: string): Promise<Vaul
 }
 
 /** Load the local messages nearest a timestamp, returned chronological. */
-export async function loadAround(target: string, at: Date, limit = 50): Promise<ChatMessage[]> {
+export async function loadAround(
+  target: string,
+  at: Date,
+  limit = 50,
+  owner?: DeviceMemoryOwner,
+): Promise<ChatMessage[]> {
+  const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
+  if (owner !== undefined && !safeOwner) return [];
   const db = await openVault();
   if (!db) return [];
   try {
-    const key = target.toLowerCase();
+    const key = physicalTargetKey(target, safeOwner ?? undefined);
     const anchor = at.getTime();
     const tx = db.transaction(STORE, 'readonly');
     const idx = tx.objectStore(STORE).index('by_target_time');
@@ -449,7 +571,8 @@ export async function loadAround(target: string, at: Date, limit = 50): Promise<
 }
 
 /** Export every locally remembered target as a portable, device-safe JSON shape. */
-export async function exportVault(): Promise<VaultExportSnapshot> {
+export async function exportVault(owner?: DeviceMemoryOwner): Promise<VaultExportSnapshot> {
+  const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
   const db = await openVault();
   const snapshot: VaultExportSnapshot = {
     kind: 'onyx-vault',
@@ -457,29 +580,36 @@ export async function exportVault(): Promise<VaultExportSnapshot> {
     exportedAt: new Date().toISOString(),
     targets: [],
   };
-  if (!db) return snapshot;
+  if (!db || (owner !== undefined && !safeOwner)) return snapshot;
 
   try {
     const tx = db.transaction(STORE, 'readonly');
     const store = tx.objectStore(STORE);
+    const ownerKey = safeOwner ? deviceMemoryOwnerKey(safeOwner) : null;
     const rows = await new Promise<unknown[]>((resolve) => {
       const out: unknown[] = [];
-      const req = store.index('by_time').openCursor(null, 'prev');
+      const req = ownerKey
+        ? store.index('by_owner_time').openCursor(targetKeyRange(ownerKey), 'prev')
+        : store.index('by_time').openCursor(null, 'prev');
       req.onsuccess = () => {
         const cursor = req.result;
         if (!cursor || out.length >= MAX_EXPORT_TOTAL_RAW_MESSAGES) {
           resolve(out);
           return;
         }
-        out.push(cursor.value);
+        const row = cursor.value as StoredMessage;
+        // The legacy overload remains temporarily for the next wiring commit,
+        // but it must never become a back door into newly-owned rows.
+        if (ownerKey || row.owner_key === undefined) out.push(row);
         cursor.continue();
       };
       req.onerror = () => resolve(out);
     });
     const grouped = new Map<string, ChatMessage[]>();
     for (const row of rows) {
-      if (!isRecord(row)) continue;
-      const normalizedTarget = normalizeVaultTarget(row.target_key, '');
+      if (!isRecord(row) || typeof row.target_key !== 'string') continue;
+      const logicalTarget = logicalTargetFromPhysical(row.target_key, safeOwner ?? undefined);
+      const normalizedTarget = normalizeVaultTarget(logicalTarget, '');
       if (normalizedTarget === null) continue;
       const target = normalizedTarget.toLowerCase();
       const message = reviveExportMessage(row, target);
@@ -511,7 +641,12 @@ export async function exportVault(): Promise<VaultExportSnapshot> {
  * before writing. Success counters are exact surviving imported ids after the
  * destination retention policy prunes, not merely attempted writes.
  */
-export async function importVault(snapshot: VaultExportSnapshot): Promise<{ targets: number; messages: number }> {
+export async function importVault(
+  snapshot: VaultExportSnapshot,
+  owner?: DeviceMemoryOwner,
+): Promise<{ targets: number; messages: number }> {
+  const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
+  if (owner !== undefined && !safeOwner) return { targets: 0, messages: 0 };
   let targetCount = 0;
   let messageCount = 0;
   if (!Array.isArray(snapshot?.targets)) return { targets: 0, messages: 0 };
@@ -537,10 +672,10 @@ export async function importVault(snapshot: VaultExportSnapshot): Promise<{ targ
     // counters as a success message, so counting a quota/private-mode failure
     // would tell the user their history was restored when IndexedDB contains
     // nothing.
-    const committed = await saveMessages(target, retained);
+    const committed = await saveMessages(target, retained, safeOwner ?? undefined);
     if (!committed) continue;
     const candidateIds = new Set(retained.map((message) => message.id));
-    const survivors = (await loadRecent(target, keep))
+    const survivors = (await loadRecent(target, keep, safeOwner ?? undefined))
       .filter((message) => candidateIds.has(message.id)).length;
     if (survivors === 0) continue;
     targetCount += 1;
@@ -736,7 +871,8 @@ export function parseVaultExport(raw: unknown): VaultExportSnapshot | null {
 
 async function pruneTarget(
   db: IDBDatabase,
-  key: string,
+  physicalKey: string,
+  logicalKey = physicalKey,
   policy: RetentionPolicy | null = _retentionPolicy,
 ): Promise<void> {
   // Resolve the bound for this target. With no policy: keep === VAULT_KEEP and no
@@ -744,7 +880,7 @@ async function pruneTarget(
   let keep = VAULT_KEEP;
   let cutoffMs: number | null = null;
   if (policy) {
-    const resolved = resolvePolicyForChannel(policy, key);
+    const resolved = resolvePolicyForChannel(policy, logicalKey);
     keep = resolved.keep;
     if (resolved.maxAgeDays !== undefined) {
       cutoffMs = Date.now() - resolved.maxAgeDays * RETENTION_DAY_MS;
@@ -753,7 +889,7 @@ async function pruneTarget(
   try {
     const tx = db.transaction(STORE, 'readwrite');
     const idx = tx.objectStore(STORE).index('by_target_time');
-    const range = targetKeyRange(key);
+    const range = targetKeyRange(physicalKey);
     let seen = 0;
     await new Promise<void>((resolve) => {
       const cursorReq = idx.openCursor(range, 'prev');
@@ -783,23 +919,31 @@ export interface VaultSearchHit {
 async function readRecentSearchRows(
   db: IDBDatabase,
   requestedLimit = VAULT_SEARCH_SCAN_MAX,
+  owner?: DeviceMemoryOwner,
 ): Promise<StoredMessage[]> {
   const limit = Number.isFinite(requestedLimit)
     ? Math.min(VAULT_SEARCH_SCAN_MAX, Math.max(0, Math.floor(requestedLimit)))
     : VAULT_SEARCH_SCAN_MAX;
   if (limit === 0) return [];
+  const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
+  if (owner !== undefined && !safeOwner) return [];
+  const ownerKey = safeOwner ? deviceMemoryOwnerKey(safeOwner) : null;
   return await new Promise<StoredMessage[]>((resolve) => {
     try {
       const rows: StoredMessage[] = [];
       const tx = db.transaction(STORE, 'readonly');
-      const req = tx.objectStore(STORE).index('by_time').openCursor(null, 'prev');
+      const store = tx.objectStore(STORE);
+      const req = ownerKey
+        ? store.index('by_owner_time').openCursor(targetKeyRange(ownerKey), 'prev')
+        : store.index('by_time').openCursor(null, 'prev');
       req.onsuccess = () => {
         const cursor = req.result;
         if (!cursor || rows.length >= limit) {
           resolve(rows);
           return;
         }
-        rows.push(cursor.value as StoredMessage);
+        const row = cursor.value as StoredMessage;
+        if (ownerKey || row.owner_key === undefined) rows.push(row);
         cursor.continue();
       };
       req.onerror = () => resolve(rows);
@@ -816,13 +960,19 @@ async function readRecentSearchRows(
  * Search is globally capped in addition to per-target retention; the newest
  * remembered rows are scanned first.
  */
-export async function searchVault(query: string, limit = 80): Promise<VaultSearchHit[]> {
+export async function searchVault(
+  query: string,
+  limit = 80,
+  owner?: DeviceMemoryOwner,
+): Promise<VaultSearchHit[]> {
+  const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
+  if (owner !== undefined && !safeOwner) return [];
   const q = boundedSearchQuery(query).toLocaleLowerCase();
   if (!q) return [];
   const db = await openVault();
   if (!db) return [];
   try {
-    const rows = await readRecentSearchRows(db);
+    const rows = await readRecentSearchRows(db, VAULT_SEARCH_SCAN_MAX, safeOwner ?? undefined);
     return rows
       .filter((r) => {
         // Encrypted vault rows contain ciphertext envelopes only. They cannot
@@ -837,7 +987,11 @@ export async function searchVault(query: string, limit = 80): Promise<VaultSearc
       })
       .sort((a, b) => b.time - a.time)
       .slice(0, limit)
-      .map((r) => ({ target: r.target_key, message: deserializeMessage(r) }));
+      .map((r) => ({
+        target: logicalTargetFromPhysical(r.target_key, safeOwner ?? undefined) ?? '',
+        message: deserializeMessage(r),
+      }))
+      .filter((hit) => hit.target.length > 0);
   } catch {
     return [];
   }
@@ -849,14 +1003,23 @@ export async function searchVault(query: string, limit = 80): Promise<VaultSearc
  * redacted, and ciphertext-only encrypted rows are excluded, matching
  * {@link searchVault}.
  */
-export async function readAllVaultHits(limit = VAULT_SEARCH_SCAN_MAX): Promise<VaultSearchHit[]> {
+export async function readAllVaultHits(
+  limit = VAULT_SEARCH_SCAN_MAX,
+  owner?: DeviceMemoryOwner,
+): Promise<VaultSearchHit[]> {
+  const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
+  if (owner !== undefined && !safeOwner) return [];
   const db = await openVault();
   if (!db) return [];
   try {
-    const rows = await readRecentSearchRows(db, limit);
+    const rows = await readRecentSearchRows(db, limit, safeOwner ?? undefined);
     return rows
       .filter((r) => !r.deleted && !r.redacted && !r.encrypted)
-      .map((r) => ({ target: r.target_key, message: deserializeMessage(r) }));
+      .map((r) => ({
+        target: logicalTargetFromPhysical(r.target_key, safeOwner ?? undefined) ?? '',
+        message: deserializeMessage(r),
+      }))
+      .filter((hit) => hit.target.length > 0);
   } catch {
     return [];
   }
@@ -874,19 +1037,7 @@ function isSafeOutboxTarget(target: unknown): target is string {
 }
 
 function parseOutboxOwner(value: unknown): OutboxOwner | null {
-  if (!isRecord(value)) return null;
-  const { serverUrl, identity } = value;
-  if (
-    typeof serverUrl !== 'string'
-    || serverUrl.length === 0
-    || serverUrl.length > 2_048
-    || serverUrl !== serverUrl.trim()
-    || typeof identity !== 'string'
-    || identity.length === 0
-    || identity.length > 256
-    || identity !== identity.trim()
-  ) return null;
-  return { serverUrl, identity: identity.toLowerCase() };
+  return normalizeDeviceMemoryOwner(value);
 }
 
 /**

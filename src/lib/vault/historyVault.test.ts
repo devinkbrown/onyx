@@ -46,6 +46,8 @@ import {
 import { SEARCH_CORPUS_TEXT_MAX } from './searchBounds';
 
 const OUTBOX_OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
+const BOB_OWNER = { serverUrl: 'wss://example.test', identity: 'bob' } as const;
+const OTHER_SERVER_OWNER = { serverUrl: 'wss://other.test', identity: 'alice' } as const;
 const queueOwnedOutbox = (target: string, text: string) => queueOutbox(target, text, OUTBOX_OWNER);
 
 // ── Compile-time plaintext-at-rest partition guard ───────────────────────────
@@ -205,6 +207,32 @@ describe('historyVault', () => {
       expect(loaded[0]!.time.getTime()).toBe(1000);
     });
 
+    it('isolates the same target and message id by server identity', async () => {
+      await saveMessages('#room', [msg('shared-id', 1000, { text: 'Alice history' })], OUTBOX_OWNER);
+      await saveMessages('#room', [msg('shared-id', 2000, { text: 'Bob history' })], BOB_OWNER);
+      await saveMessages('#room', [msg('shared-id', 3000, { text: 'Other server history' })], OTHER_SERVER_OWNER);
+
+      await expect(loadRecent('#room', VAULT_KEEP, OUTBOX_OWNER)).resolves.toMatchObject([
+        { id: 'shared-id', text: 'Alice history' },
+      ]);
+      await expect(loadRecent('#room', VAULT_KEEP, BOB_OWNER)).resolves.toMatchObject([
+        { id: 'shared-id', text: 'Bob history' },
+      ]);
+      await expect(loadRecent('#room', VAULT_KEEP, OTHER_SERVER_OWNER)).resolves.toMatchObject([
+        { id: 'shared-id', text: 'Other server history' },
+      ]);
+      // The temporary legacy overload cannot read newly-owned rows either.
+      await expect(loadRecent('#room')).resolves.toEqual([]);
+    });
+
+    it('rejects malformed owners instead of falling back to the legacy namespace', async () => {
+      const invalid = { serverUrl: ' wss://example.test', identity: 'alice' };
+      await expect(saveMessages('#room', [msg('secret', 1000)], invalid)).resolves.toBe(false);
+      await expect(loadRecent('#room', VAULT_KEEP, invalid)).resolves.toEqual([]);
+      await expect(searchVault('secret', 80, invalid)).resolves.toEqual([]);
+      await expect(exportVault(invalid)).resolves.toMatchObject({ targets: [] });
+    });
+
     it('reports commit success so callers can track a durable watermark', async () => {
       expect(await saveMessages('#room', [msg('m1', 1000)])).toBe(true);
       // An empty batch is a committed no-op, not a failure.
@@ -319,6 +347,25 @@ describe('historyVault', () => {
   });
 
   describe('searchVault', () => {
+    it('searches and exports only the explicit owner namespace', async () => {
+      await saveMessages('#same', [msg('alice-owned', 1000, {
+        target: '#same',
+        text: 'alice migration phrase',
+      })], OUTBOX_OWNER);
+      await saveMessages('#same', [msg('bob-owned', 2000, {
+        target: '#same',
+        text: 'bob migration phrase',
+      })], BOB_OWNER);
+
+      expect((await searchVault('migration', 80, OUTBOX_OWNER)).map((hit) => hit.message.id))
+        .toEqual(['alice-owned']);
+      expect((await readAllVaultHits(VAULT_SEARCH_SCAN_MAX, BOB_OWNER)).map((hit) => hit.message.id))
+        .toEqual(['bob-owned']);
+      expect((await exportVault(OUTBOX_OWNER)).targets).toMatchObject([
+        { target: '#same', messages: [{ id: 'alice-owned' }] },
+      ]);
+    });
+
     beforeEach(async () => {
       await saveMessages('#alpha', [
         msg('a1', 1000, { text: 'the serpent stirs', target: '#alpha' }),
@@ -394,6 +441,7 @@ describe('historyVault', () => {
       try {
         const tx = db.transaction('messages', 'readonly');
         expect(tx.objectStore('messages').indexNames.contains('by_time')).toBe(true);
+        expect(tx.objectStore('messages').indexNames.contains('by_owner_time')).toBe(true);
       } finally {
         db.close();
       }
@@ -435,8 +483,102 @@ describe('historyVault', () => {
       try {
         const tx = upgraded.transaction('messages', 'readonly');
         expect(tx.objectStore('messages').indexNames.contains('by_time')).toBe(true);
+        expect(tx.objectStore('messages').indexNames.contains('by_owner_time')).toBe(true);
       } finally {
         upgraded.close();
+      }
+
+    });
+
+    it('upgrades v3 in place while quarantining ownerless rows from signed-in owners', async () => {
+      globalThis.indexedDB = new IDBFactory();
+      _resetVaultForTests();
+      const legacy = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('onyx-vault', 3);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          const messages = db.createObjectStore('messages', { keyPath: ['target_key', 'id'] });
+          messages.createIndex('by_target_time', ['target_key', 'time']);
+          messages.createIndex('by_time', 'time');
+          db.createObjectStore('outbox', { keyPath: 'id' });
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const legacyMessage = serializeMessage(
+        '#root',
+        msg('same-id', 1000, { target: '#root', text: 'legacy ownerless secret' }),
+      );
+      const legacyOutbox = {
+        id: 'legacy-outbox',
+        target_key: '#root',
+        target: '#root',
+        text: 'held queue row',
+        queued_at: 1000,
+        seq: 1,
+      };
+      await new Promise<void>((resolve, reject) => {
+        const tx = legacy.transaction(['messages', 'outbox'], 'readwrite');
+        tx.objectStore('messages').put(legacyMessage);
+        tx.objectStore('outbox').put(legacyOutbox);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+      legacy.close();
+      _resetVaultForTests();
+
+      await expect(loadRecent('#root', VAULT_KEEP, OUTBOX_OWNER)).resolves.toEqual([]);
+      await expect(searchVault('legacy ownerless secret', 80, OUTBOX_OWNER)).resolves.toEqual([]);
+      await expect(exportVault(OUTBOX_OWNER)).resolves.toMatchObject({ targets: [] });
+
+      await saveMessages('#root', [msg('same-id', 2000, {
+        target: '#root',
+        text: 'Alice owned secret',
+      })], OUTBOX_OWNER);
+      await expect(loadRecent('#root', VAULT_KEEP, OUTBOX_OWNER)).resolves.toMatchObject([
+        { id: 'same-id', text: 'Alice owned secret' },
+      ]);
+
+      const upgraded = await openTestVault();
+      try {
+        const tx = upgraded.transaction(['messages', 'outbox'], 'readonly');
+        const messages = tx.objectStore('messages');
+        expect(messages.indexNames.contains('by_owner_time')).toBe(true);
+        await expect(new Promise<number>((resolve, reject) => {
+          const request = messages.count();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        })).resolves.toBe(2);
+        const rawLegacy = await new Promise<unknown>((resolve, reject) => {
+          const request = messages.get(['#root', 'same-id']);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        expect(rawLegacy).toMatchObject({ text: 'legacy ownerless secret' });
+        expect(rawLegacy).not.toHaveProperty('owner_key');
+        await expect(new Promise<number>((resolve, reject) => {
+          const request = tx.objectStore('outbox').count();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        })).resolves.toBe(1);
+      } finally {
+        upgraded.close();
+      }
+
+      await expect(clearVault()).resolves.toBe(true);
+      const cleared = await openTestVault();
+      try {
+        await expect(new Promise<[number, number]>((resolve, reject) => {
+          const tx = cleared.transaction(['messages', 'outbox'], 'readonly');
+          const messages = tx.objectStore('messages').count();
+          const outbox = tx.objectStore('outbox').count();
+          tx.oncomplete = () => resolve([messages.result, outbox.result]);
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error);
+        })).resolves.toEqual([0, 0]);
+      } finally {
+        cleared.close();
       }
     });
 
@@ -536,6 +678,25 @@ describe('historyVault', () => {
       expect(result).toEqual({ targets: 2, messages: 2 });
       expect((await loadRecent('#alpha')).map((m) => m.id)).toEqual(['a1']);
       expect((await loadRecent('trev')).map((m) => m.id)).toEqual(['d1']);
+    });
+
+    it('imports a portable snapshot into only the explicit destination owner', async () => {
+      const snapshot: VaultExportSnapshot = {
+        kind: 'onyx-vault',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        targets: [{
+          target: '#private',
+          messages: [msg('owned-import', 1000, { target: '#private', text: 'Alice import' })],
+        }],
+      };
+
+      await expect(importVault(snapshot, OUTBOX_OWNER)).resolves.toEqual({ targets: 1, messages: 1 });
+      await expect(loadRecent('#private', VAULT_KEEP, OUTBOX_OWNER)).resolves.toMatchObject([
+        { id: 'owned-import', text: 'Alice import' },
+      ]);
+      await expect(loadRecent('#private', VAULT_KEEP, BOB_OWNER)).resolves.toEqual([]);
+      await expect(exportVault(BOB_OWNER)).resolves.toMatchObject({ targets: [] });
     });
 
     it('rejects unknown portable vault documents', () => {
