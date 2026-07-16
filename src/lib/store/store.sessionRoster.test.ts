@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseIRCMessage } from '@/lib/irc/parser';
+import { loadCredentials, saveCredentials, storeSessionToken } from '@/lib/credentials';
 import { _resetSessionRestoreForTests, store } from './store';
 
 const initialState = store.getInitialState();
@@ -135,5 +136,53 @@ describe('remembered session roster restoration', () => {
     receive(':kain!webchat@example JOIN #staff');
 
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+  });
+
+  it('promotes a passwordless remembered identity only after SESSION success evidence', () => {
+    saveCredentials({ nick: 'kain', server: 'wss://example.test' });
+    storeSessionToken('remembered-token');
+    store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+
+    receive(':example.test 433 * kain :Nickname is already in use');
+    receive(':example.test 001 kain_ :Welcome to IRCXNet');
+
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME remembered-token\r\n');
+    expect(store.getState().server?.account).toBeNull();
+    const reclaimAttemptsBeforeSuccess = FakeWebSocket.latest?.send.mock.calls
+      .filter(([line]) => line === 'NICK kain\r\n').length ?? 0;
+
+    receive(':example.test NOTE SESSION TOKEN :fresh-token');
+
+    expect(store.getState().server?.account).toBe('kain');
+    expect(FakeWebSocket.latest?.send.mock.calls
+      .filter(([line]) => line === 'NICK kain\r\n')).toHaveLength(reclaimAttemptsBeforeSuccess + 1);
+  });
+
+  it('keeps a failed remembered SESSION resume in the guest state', () => {
+    saveCredentials({ nick: 'kain', server: 'wss://example.test' });
+    storeSessionToken('stale-token');
+    store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 001 kain :Welcome to IRCXNet');
+
+    receive(':example.test FAIL SESSION INVALID_TOKEN :The session token is invalid');
+
+    expect(store.getState().server?.account).toBeNull();
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBeUndefined();
+
+    receive(':example.test NOTE SESSION TOKEN :late-token');
+
+    expect(store.getState().server?.account).toBeNull();
+  });
+
+  it('does not promote an ordinary guest from an unsolicited SESSION token note', () => {
+    store.getState().connect({ url: 'wss://example.test', nick: 'Guest42' });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 001 Guest42 :Welcome to IRCXNet');
+
+    receive(':example.test NOTE SESSION TOKEN :unsolicited-token');
+
+    expect(store.getState().server?.account).toBeNull();
   });
 });

@@ -2674,6 +2674,29 @@ function _armSessionRestoreReplay(get: GetFn, set: SetFn): void {
   _scheduleSessionRestoreExpiry(set, restore.generation, _SESSION_RESTORE_REPLAY_MS);
 }
 
+/**
+ * A token-only remembered resume does not run SASL, so no 900 names the account.
+ * A server-issued SESSION TOKEN/MTOKEN is the first positive proof that RESUME
+ * authenticated the bounded remembered identity. Promote only in that live
+ * restore generation; a guest or failed/stale resume remains fail-closed.
+ */
+function _confirmRememberedSessionAccount(get: GetFn, set: SetFn): void {
+  if (_saslAccount) return;
+  const restore = _currentSessionRestore(get);
+  const account = _connectNick.trim();
+  if (!restore?.allowEarlyNames || !account) return;
+  _saslAccount = account;
+  restore.identities.add(account.toLowerCase());
+  set(s => ({
+    server: s.server ? { ...s.server, account } : null,
+  }));
+  const state = get();
+  if (state.currentNickIsAlias && state.ourNick.toLowerCase() !== account.toLowerCase()) {
+    state.client?.sendRaw('NICK', account);
+    _startNickReclaim(account);
+  }
+}
+
 function _setRestoreRosterSyncing(set: SetFn, channelKey: string, syncing: boolean): void {
   const restore = _sessionRestore;
   if (restore) {
@@ -6081,6 +6104,7 @@ export const store = createStore<OnyxState>()(
         if (standard.kind === 'NOTE' && standard.command === 'SESSION' && standard.code === 'TOKEN') {
           const token = parseSessionTokenNote(msg);
           if (token) {
+            _confirmRememberedSessionAccount(get, set);
             const canonicalNick = _saslAccount ?? undefined;
             storeSessionToken(token, undefined, canonicalNick);
             // Push the freshly-issued token into the LIVE client so an auto-reconnect
@@ -6095,6 +6119,7 @@ export const store = createStore<OnyxState>()(
           // (server.zig handleSession TOKEN → handleMeshReclaim).
           const mtoken = parseSessionMeshTokenNote(msg);
           if (mtoken) {
+            _confirmRememberedSessionAccount(get, set);
             storeMeshToken(mtoken);
             // Prefer the mesh token on the live client so a reconnect landing on a
             // different node resumes correctly (updateResumeTokens merges, not clobbers).
@@ -6104,6 +6129,7 @@ export const store = createStore<OnyxState>()(
         }
         if (standard.kind === 'FAIL' && standard.command === 'SESSION') {
           clearSessionToken(get().server?.url, _connectNick || get().ourNick);
+          _clearSessionRestore(set);
           get().addNotification({ type: 'error', text: standard.description || `SESSION ${standard.code}` });
           return;
         }
@@ -7032,12 +7058,14 @@ export const store = createStore<OnyxState>()(
             // rolling mesh upgrade cannot strand reconnect state.
             const sessionToken = parseSessionTokenNote(msg);
             if (sessionToken) {
+              _confirmRememberedSessionAccount(get, set);
               storeSessionToken(sessionToken, undefined, _saslAccount ?? undefined);
               get().client?.updateResumeTokens({ sessionToken });
               break;
             }
             const sessionMeshToken = parseSessionMeshTokenNote(msg);
             if (sessionMeshToken) {
+              _confirmRememberedSessionAccount(get, set);
               storeMeshToken(sessionMeshToken);
               get().client?.updateResumeTokens({ meshToken: sessionMeshToken });
               break;
