@@ -41,6 +41,7 @@ const REVIEW_HISTORY_LIMIT = 5;
 export const MAX_REVIEW_HISTORY_INPUT_ENTRIES = 256;
 export const MAX_REVIEW_HISTORY_NAME_LENGTH = 128;
 export const MAX_REVIEW_HISTORY_PREVIEW_LENGTH = 512;
+export const MAX_REVIEW_HISTORY_STORAGE_CHARS = 128 * 1024;
 
 const MAX_CHANNEL_TARGET_LENGTH = 128;
 const MAX_DM_TARGET_LENGTH = 64;
@@ -253,6 +254,7 @@ export function readReviewHistory(owner?: DeviceMemoryOwner): ReviewHistoryEntry
   if (!storageKey) return [];
   try {
     const raw = store.getItem(storageKey);
+    if (raw && raw.length > MAX_REVIEW_HISTORY_STORAGE_CHARS) return [];
     const parsed = JSON.parse(raw ?? '[]');
     return parseReviewHistoryEntries(parsed);
   } catch {

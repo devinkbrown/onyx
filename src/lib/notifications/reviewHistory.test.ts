@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   MAX_REVIEW_HISTORY_INPUT_ENTRIES,
   MAX_REVIEW_HISTORY_NAME_LENGTH,
   MAX_REVIEW_HISTORY_PREVIEW_LENGTH,
+  MAX_REVIEW_HISTORY_STORAGE_CHARS,
   clearReviewHistory,
   latestReviewForTarget,
   mergeReviewHistory,
@@ -73,6 +75,16 @@ describe('reviewHistory', () => {
     ]));
 
     expect(readReviewHistory().map((item) => item.target)).toEqual(['#new', '#old']);
+  });
+
+  test('rejects oversized owner storage before parsing', () => {
+    const owner = { serverUrl: 'wss://example.test', identity: 'alice' };
+    const key = deviceMemoryStorageKey(REVIEW_HISTORY_KEY, owner)!;
+    localStorage.setItem(key, `[${'x'.repeat(MAX_REVIEW_HISTORY_STORAGE_CHARS)}]`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(readReviewHistory(owner)).toEqual([]);
+    expect(parse).not.toHaveBeenCalled();
   });
 
   test('records, deduplicates by target and first message, and caps history', () => {

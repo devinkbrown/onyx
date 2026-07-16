@@ -5,6 +5,7 @@ import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemo
 export const HIGHLIGHT_WORDS_STORAGE_KEY = 'onyx:highlight-words';
 export const MAX_HIGHLIGHT_WORDS = 128;
 export const MAX_HIGHLIGHT_WORD_LENGTH = 256;
+export const MAX_HIGHLIGHT_WORDS_STORAGE_CHARS = 128 * 1024;
 
 const CONTROL_CHARACTERS = /[\x00-\x1f\x7f]/u;
 
@@ -53,6 +54,7 @@ export function loadHighlightWords(owner?: DeviceMemoryOwner): string[] {
   if (owner !== undefined) purgeLegacyHighlightWords();
   try {
     const raw = store.getItem(key);
+    if (raw && raw.length > MAX_HIGHLIGHT_WORDS_STORAGE_CHARS) return [];
     return raw ? parseHighlightWords(JSON.parse(raw) as unknown) : [];
   } catch {
     return [];

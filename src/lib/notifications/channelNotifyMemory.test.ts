@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   CHANNEL_NOTIFY_STORAGE_KEY,
   loadChannelNotify,
+  MAX_CHANNEL_NOTIFY_STORAGE_CHARS,
   saveChannelNotify,
 } from './channelNotifyMemory';
 
@@ -13,6 +14,7 @@ const bob = { serverUrl: 'wss://notify.example/ws', identity: 'bob' } as const;
 
 describe('account-scoped channel notification policy', () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   it('isolates private room names and purges the ownerless journal', () => {
     localStorage.setItem(CHANNEL_NOTIFY_STORAGE_KEY, JSON.stringify({ '#legacy-secret': 'none' }));
@@ -34,5 +36,14 @@ describe('account-scoped channel notification policy', () => {
     const key = deviceMemoryStorageKey(CHANNEL_NOTIFY_STORAGE_KEY, alice)!;
     expect(JSON.parse(localStorage.getItem(key) ?? '{}')).toEqual({ '#room': 'mentions' });
     expect(Object.fromEntries(loadChannelNotify(alice))).toEqual({ '#room': 'mentions' });
+  });
+
+  it('rejects oversized owner storage before parsing', () => {
+    const key = deviceMemoryStorageKey(CHANNEL_NOTIFY_STORAGE_KEY, alice)!;
+    localStorage.setItem(key, `{${'x'.repeat(MAX_CHANNEL_NOTIFY_STORAGE_CHARS)}}`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(loadChannelNotify(alice)).toEqual(new Map());
+    expect(parse).not.toHaveBeenCalled();
   });
 });

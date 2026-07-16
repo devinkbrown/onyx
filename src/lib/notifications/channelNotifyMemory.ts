@@ -4,6 +4,7 @@ import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemo
 
 export const CHANNEL_NOTIFY_STORAGE_KEY = 'onyx:channel-notify';
 export const MAX_CHANNEL_NOTIFY_ENTRIES = 256;
+export const MAX_CHANNEL_NOTIFY_STORAGE_CHARS = 128 * 1024;
 
 export type ChannelNotifyLevel = 'all' | 'mentions' | 'none';
 export type ChannelNotifyMap = Map<string, Exclude<ChannelNotifyLevel, 'all'>>;
@@ -62,6 +63,7 @@ export function loadChannelNotify(owner?: DeviceMemoryOwner): ChannelNotifyMap {
   if (owner !== undefined) purgeLegacyChannelNotify();
   try {
     const raw = store.getItem(key);
+    if (raw && raw.length > MAX_CHANNEL_NOTIFY_STORAGE_CHARS) return new Map();
     return raw ? parse(JSON.parse(raw) as unknown) : new Map();
   } catch {
     return new Map();
