@@ -7,6 +7,7 @@ import {
   ENVELOPE_PREFIX,
   _resetDeviceKeysForTests,
   _resetSharedKeysForTests,
+  _sharedKeyCacheSizeForTests,
   deviceKeys,
   fromB64url,
   isEnvelope,
@@ -162,6 +163,31 @@ describe('dmCipher security contracts', () => {
     const secondKey = requireValue(await sharedKeyWith(peer.publicB64), 'second shared key');
 
     expect(await openEnvelopeWithKey(secondKey, envelope)).toBe('stable fixed-pair key material');
+  });
+
+  it('LRU-bounds retained shared keys and evicts failed derivations', async () => {
+    const peers = await Promise.all(Array.from({ length: 65 }, () => makePeerDevice()));
+    const retainedKeys: CryptoKey[] = [];
+    for (const peer of peers.slice(0, 64)) {
+      retainedKeys.push(requireValue(await sharedKeyWith(peer.publicB64), 'cached shared key'));
+    }
+    expect(_sharedKeyCacheSizeForTests()).toBe(64);
+
+    // Refresh peer 0 so adding peer 64 evicts peer 1 as the least-recently used.
+    expect(await sharedKeyWith(peers[0]!.publicB64)).toBe(retainedKeys[0]);
+    await sharedKeyWith(peers[64]!.publicB64);
+    expect(_sharedKeyCacheSizeForTests()).toBe(64);
+    expect(await sharedKeyWith(peers[0]!.publicB64)).toBe(retainedKeys[0]);
+    expect(await sharedKeyWith(peers[1]!.publicB64)).not.toBe(retainedKeys[1]);
+    expect(_sharedKeyCacheSizeForTests()).toBe(64);
+
+    // Malformed points never consume a slot; structurally valid points that
+    // WebCrypto rejects are removed as soon as the failed derivation settles.
+    _resetSharedKeysForTests();
+    await expect(sharedKeyWith('malformed')).resolves.toBeNull();
+    expect(_sharedKeyCacheSizeForTests()).toBe(0);
+    await expect(sharedKeyWith(toB64url(new Uint8Array([0x04, ...new Uint8Array(64)])))).resolves.toBeNull();
+    expect(_sharedKeyCacheSizeForTests()).toBe(0);
   });
 
   it('uses a fresh AES-GCM nonce for repeated seals of the same plaintext', async () => {

@@ -191,7 +191,23 @@ export async function deviceRegistryId(publicB64: string): Promise<string | null
   }
 }
 
+/**
+ * Derived AES keys are cheap to reproduce but sensitive to retain indefinitely.
+ * Keep a modest working set for active conversations instead of allowing every
+ * peer key observed during a long-lived tab to remain resident forever.
+ */
+const SHARED_KEY_CACHE_CAP = 64;
 const _sharedKeyCache = new Map<string, Promise<CryptoKey | null>>();
+
+function rememberSharedKey(peerPublicB64: string, key: Promise<CryptoKey | null>): void {
+  _sharedKeyCache.delete(peerPublicB64);
+  _sharedKeyCache.set(peerPublicB64, key);
+  while (_sharedKeyCache.size > SHARED_KEY_CACHE_CAP) {
+    const oldest = _sharedKeyCache.keys().next().value;
+    if (oldest === undefined) break;
+    _sharedKeyCache.delete(oldest);
+  }
+}
 
 /**
  * The AES-GCM key shared with a peer's published device key. Symmetric in
@@ -200,15 +216,20 @@ const _sharedKeyCache = new Map<string, Promise<CryptoKey | null>>();
  */
 export function sharedKeyWith(peerPublicB64: string): Promise<CryptoKey | null> {
   const cached = _sharedKeyCache.get(peerPublicB64);
-  if (cached) return cached;
+  if (cached) {
+    rememberSharedKey(peerPublicB64, cached);
+    return cached;
+  }
+  // Reject malformed advertisements before they can occupy cache space. Curve
+  // membership is still verified by WebCrypto's importKey below.
+  if (!isValidPeerPublicKey(peerPublicB64)) return Promise.resolve(null);
+
   const p = (async (): Promise<CryptoKey | null> => {
     try {
       const mine = await deviceKeys();
       if (!mine) return null;
       const peerRaw = fromB64url(peerPublicB64);
-      if (!peerRaw || peerRaw.length !== SEC1_UNCOMPRESSED_BYTES || peerRaw[0] !== SEC1_UNCOMPRESSED_TAG) {
-        return null;
-      }
+      if (!peerRaw) return null;
       const peerKey = await crypto.subtle.importKey(
         'raw',
         peerRaw.buffer as ArrayBuffer,
@@ -235,13 +256,26 @@ export function sharedKeyWith(peerPublicB64: string): Promise<CryptoKey | null> 
       return null;
     }
   })();
-  _sharedKeyCache.set(peerPublicB64, p);
+  rememberSharedKey(peerPublicB64, p);
+  // Do not retain failed imports/derivations or a transient device-key failure
+  // for the lifetime of the page. The identity check avoids deleting a newer
+  // derivation if this promise was evicted and the same peer was requested again.
+  void p.then((key) => {
+    if (key === null && _sharedKeyCache.get(peerPublicB64) === p) {
+      _sharedKeyCache.delete(peerPublicB64);
+    }
+  });
   return p;
 }
 
 /** Test hook — clear derived-key cache (peers rotate between tests). */
 export function _resetSharedKeysForTests(): void {
   _sharedKeyCache.clear();
+}
+
+/** Test hook — inspect the cache bound without exposing any key material. */
+export function _sharedKeyCacheSizeForTests(): number {
+  return _sharedKeyCache.size;
 }
 
 // ── envelope ─────────────────────────────────────────────────────────────────
