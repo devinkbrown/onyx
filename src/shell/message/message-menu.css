@@ -335,3 +335,81 @@
     transform: none;
   }
 }
+
+/* Shared Popover constrains the sheet at extreme zoom; this consumer must not
+   reintroduce rem-sized intrinsic widths inside it. Keep menu and translation
+   controls at readable fixed sizes while the panel owns vertical scrolling. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .msg-menu .onyx-popover__panel {
+    padding: 4px;
+  }
+
+  .msg-menu-overflow {
+    gap: 4px;
+  }
+
+  .msg-menu-list {
+    min-width: 0;
+  }
+
+  .msg-menu-item {
+    min-height: 44px;
+    gap: 8px;
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  .msg-menu-translation-note,
+  .msg-menu-translation {
+    width: 100%;
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  .msg-menu-translation-head,
+  .msg-menu-translation-actions {
+    gap: 4px;
+  }
+
+  .msg-menu-translation-head > span:last-child,
+  .msg-menu-translation-copy-status {
+    font-size: 11px;
+  }
+
+  .msg-menu-translation-text,
+  .msg-menu-translation-copy-status {
+    margin: 4px 0;
+  }
+
+  .msg-menu-translation-action {
+    min-height: 44px;
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  .msg-menu-emoji {
+    width: 100%;
+  }
+
+  .msg-menu-emoji-search {
+    min-height: 44px;
+    margin-bottom: 4px;
+    padding: 0 8px;
+    font-size: 16px;
+  }
+
+  .msg-menu-emoji-grid {
+    grid-template-columns: repeat(5, minmax(44px, 1fr));
+    gap: 4px;
+    max-height: 132px;
+  }
+
+  .msg-menu-emoji-choice {
+    font-size: 24px;
+  }
+
+  .msg-menu-emoji-empty {
+    padding: 8px;
+    font-size: 12px;
+  }
+}
