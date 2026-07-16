@@ -339,7 +339,7 @@ export function Composer(props: ComposerProps): JSX.Element {
     // The Enter that CONFIRMS a candidate carries isComposing=true; letting it
     // reach the send/slash paths would fire a half-composed message and destroy
     // the in-progress composition. Yield the whole event to the browser/IME.
-    if (e.isComposing) return;
+    if (keyboardEventIsClaimed(e)) return;
 
     if (slashVisible()) {
       const commands = slashCommands();

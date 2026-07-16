@@ -193,6 +193,11 @@ describe('Composer accessibility', () => {
     // Assert — confirming a candidate must NOT send the half-composed message.
     expect(sendSpy).not.toHaveBeenCalled();
 
+    // Some engines expose the terminal composition key only as legacy 229.
+    fireEvent.keyDown(textarea, { key: 'Enter', keyCode: 229 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sendSpy).not.toHaveBeenCalled();
+
     // Act — a normal Enter after the composition has ended.
     fireEvent.keyDown(textarea, { key: 'Enter' });
     await new Promise((resolve) => setTimeout(resolve, 0));
