@@ -60,6 +60,26 @@ import {
 } from '@/lib/credentials';
 import { PreferencesPanel } from './PreferencesPanel';
 import { PORTABLE_JSON_MAX_FILE_BYTES } from './importFileLimits';
+import * as portableTransfer from '@/lib/vault/portableTransfer';
+import type { PortableTransferSnapshot } from '@/lib/vault/portableTransfer';
+import * as portableCompression from '@/lib/vault/portableCompression';
+
+function emptyPortableSnapshot(): PortableTransferSnapshot {
+  return {
+    kind: 'onyx-vault',
+    version: 1,
+    exportedAt: '2026-07-16T00:00:00.000Z',
+    targets: [],
+    reviewHistory: [],
+    composerDrafts: {},
+    channelTopicDrafts: {},
+    accountHandoffs: [],
+    preferenceHandoff: null,
+    followedConversations: [],
+    topicReadCursors: [],
+    savedSearches: [],
+  };
+}
 
 describe('PreferencesPanel', () => {
   beforeEach(() => {
@@ -181,6 +201,181 @@ describe('PreferencesPanel', () => {
     );
   });
 
+  it('downloads one portable vault through an attached anchor and releases its object URL', async () => {
+    let resolveExport: (snapshot: PortableTransferSnapshot) => void = () => {};
+    const pendingExport = new Promise<PortableTransferSnapshot>((resolve) => {
+      resolveExport = resolve;
+    });
+    const exportPortableTransfer = vi.spyOn(portableTransfer, 'exportPortableTransfer')
+      .mockReturnValue(pendingExport);
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:onyx-portable');
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const activatedAnchors: HTMLAnchorElement[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      activatedAnchors.push(this);
+      expect(this.isConnected).toBe(true);
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    const exportButton = screen.getByRole('button', { name: 'Export vault' });
+    fireEvent.click(exportButton);
+    fireEvent.click(exportButton);
+
+    expect(exportPortableTransfer).toHaveBeenCalledTimes(1);
+    expect(exportButton).toBeDisabled();
+    expect(exportButton).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Preparing portable vault export…')).toHaveAttribute('role', 'status');
+
+    resolveExport(emptyPortableSnapshot());
+    expect(await screen.findByText(/^Exported 0 messages/)).toBeInTheDocument();
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(activatedAnchors).toHaveLength(1);
+    expect(activatedAnchors[0]?.download).toMatch(/^onyx-portable-\d{4}-\d{2}-\d{2}\.json$/);
+    expect(activatedAnchors[0]?.isConnected).toBe(false);
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:onyx-portable'));
+    expect(screen.getByRole('button', { name: 'Export vault' })).not.toBeDisabled();
+  });
+
+  it('cleans up the anchor and object URL when download activation fails', async () => {
+    vi.spyOn(portableTransfer, 'exportPortableTransfer').mockResolvedValue(emptyPortableSnapshot());
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:failed-portable');
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const activatedAnchors: HTMLAnchorElement[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      activatedAnchors.push(this);
+      throw new Error('downloads blocked');
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export vault' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Export failed');
+    expect(activatedAnchors).toHaveLength(1);
+    expect(activatedAnchors[0]?.isConnected).toBe(false);
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:failed-portable'));
+    expect(screen.getByRole('button', { name: 'Export vault' })).not.toBeDisabled();
+  });
+
+  it('does not activate a stale export after the Preferences panel unmounts', async () => {
+    let resolveExport: (snapshot: PortableTransferSnapshot) => void = () => {};
+    const pendingExport = new Promise<PortableTransferSnapshot>((resolve) => {
+      resolveExport = resolve;
+    });
+    vi.spyOn(portableTransfer, 'exportPortableTransfer').mockReturnValue(pendingExport);
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:stale-portable');
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    openPreferences();
+    const view = render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export vault' }));
+    expect(screen.getByText('Preparing portable vault export…')).toHaveAttribute('role', 'status');
+    view.unmount();
+
+    resolveExport(emptyPortableSnapshot());
+    await pendingExport;
+    await Promise.resolve();
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('offers gzip as a secondary export with a safe filename and the same URL cleanup', async () => {
+    vi.spyOn(portableCompression, 'supportsPortableGzip').mockReturnValue(true);
+    vi.spyOn(portableTransfer, 'exportPortableTransfer').mockResolvedValue(emptyPortableSnapshot());
+    const compressedBlob = new Blob(['compressed'], { type: 'application/gzip' });
+    const compressPortableJson = vi.spyOn(portableCompression, 'compressPortableJson')
+      .mockResolvedValue(compressedBlob);
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:compressed-portable');
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const activatedAnchors: HTMLAnchorElement[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      activatedAnchors.push(this);
+      expect(this.isConnected).toBe(true);
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export compressed vault' }));
+
+    expect(await screen.findByText(/^Exported compressed 0 messages/)).toBeInTheDocument();
+    expect(compressPortableJson).toHaveBeenCalledOnce();
+    expect(JSON.parse(compressPortableJson.mock.calls[0]?.[0] ?? '{}')).toMatchObject({ kind: 'onyx-vault' });
+    expect(createObjectURL).toHaveBeenCalledWith(compressedBlob);
+    expect(activatedAnchors).toHaveLength(1);
+    expect(activatedAnchors[0]?.download).toMatch(/^onyx-portable-\d{4}-\d{2}-\d{2}\.json\.gz$/);
+    expect(activatedAnchors[0]?.isConnected).toBe(false);
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:compressed-portable'));
+    expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
+  });
+
+  it('keeps ordinary JSON available when Compression Streams are unsupported', () => {
+    vi.spyOn(portableCompression, 'supportsPortableGzip').mockReturnValue(false);
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export compressed vault' })).not.toBeInTheDocument();
+    expect(screen.getByText('Compressed export unavailable; ordinary JSON remains portable.')).toBeInTheDocument();
+  });
+
+  it('decompresses a bounded portable gzip before staging the ordinary import review', async () => {
+    const decompressPortableJson = vi.spyOn(portableCompression, 'decompressPortableJson')
+      .mockResolvedValue(JSON.stringify(emptyPortableSnapshot()));
+    openPreferences();
+    render(() => <PreferencesPanel />);
+    const file = new File(['gzip bytes'], 'onyx-portable.json.gz', { type: 'application/gzip' });
+
+    fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
+
+    expect(screen.getByText('Decompressing and checking portable vault…')).toHaveAttribute('role', 'status');
+    expect(await screen.findByRole('heading', { name: 'Review import' })).toBeInTheDocument();
+    expect(decompressPortableJson).toHaveBeenCalledWith(file);
+    expect(screen.getByRole('group', { name: 'Review import' })).toHaveTextContent('onyx-portable.json.gz');
+  });
+
+  it('rejects an oversized compressed vault before opening its stream', async () => {
+    const decompressPortableJson = vi.spyOn(portableCompression, 'decompressPortableJson');
+    const stream = vi.fn();
+    const file = {
+      name: 'oversized-portable.json.gz',
+      type: 'application/gzip',
+      size: portableCompression.PORTABLE_GZIP_MAX_COMPRESSED_BYTES + 1,
+      stream,
+    } as unknown as File;
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'oversized-portable.json.gz exceeds the 16 MiB compressed portable vault limit',
+    );
+    expect(decompressPortableJson).not.toHaveBeenCalled();
+    expect(stream).not.toHaveBeenCalled();
+  });
+
+  it('ignores a stale gzip decompression after Preferences unmounts', async () => {
+    let resolveDecompression: (json: string) => void = () => {};
+    const pendingDecompression = new Promise<string>((resolve) => {
+      resolveDecompression = resolve;
+    });
+    vi.spyOn(portableCompression, 'decompressPortableJson').mockReturnValue(pendingDecompression);
+    openPreferences();
+    const view = render(() => <PreferencesPanel />);
+    const file = new File(['gzip bytes'], 'onyx-portable.json.gz', { type: 'application/gzip' });
+
+    fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
+    expect(screen.getByText('Decompressing and checking portable vault…')).toBeInTheDocument();
+    view.unmount();
+    resolveDecompression(JSON.stringify(emptyPortableSnapshot()));
+    await pendingDecompression;
+    await Promise.resolve();
+
+    expect(screen.queryByRole('heading', { name: 'Review import' })).not.toBeInTheDocument();
+  });
+
   it('announces failed app-shell recovery as an alert', async () => {
     vi.stubGlobal('navigator', {
       serviceWorker: {
@@ -201,6 +396,78 @@ describe('PreferencesPanel', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Update recovery could not complete. Use the browser reload control once.',
     );
+  });
+
+  it('requests persistent vault storage only from the explicit button and guards rapid clicks', async () => {
+    let resolvePersistence: (granted: boolean) => void = () => {};
+    const pendingPersistence = new Promise<boolean>((resolve) => {
+      resolvePersistence = resolve;
+    });
+    const persisted = vi.fn().mockResolvedValue(false);
+    const persist = vi.fn().mockReturnValue(pendingPersistence);
+    vi.stubGlobal('navigator', {
+      storage: { persisted, persist },
+      serviceWorker: { controller: null },
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    const request = await screen.findByRole('button', { name: 'Keep vault on this device' });
+    expect(persisted).toHaveBeenCalledOnce();
+    expect(persist).not.toHaveBeenCalled();
+
+    fireEvent.click(request);
+    fireEvent.click(request);
+    expect(persist).toHaveBeenCalledOnce();
+    expect(request).toBeDisabled();
+    expect(request).toHaveAttribute('aria-busy', 'true');
+    expect(request).toHaveTextContent('Requesting persistence');
+
+    resolvePersistence(true);
+    expect(await screen.findByText(/Persistent storage was granted for Onyx against automatic eviction/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Keep vault on this device' })).not.toBeInTheDocument();
+  });
+
+  it('reports persistent-storage request failure without claiming durability and allows retry', async () => {
+    const persist = vi.fn().mockRejectedValue(new Error('browser rejected request'));
+    vi.stubGlobal('navigator', {
+      storage: {
+        persisted: vi.fn().mockResolvedValue(false),
+        persist,
+      },
+      serviceWorker: { controller: null },
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep vault on this device' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('must not be assumed durable');
+    expect(screen.getByRole('button', { name: 'Keep vault on this device' })).not.toBeDisabled();
+  });
+
+  it('ignores a persistent-storage completion after Preferences unmounts', async () => {
+    let resolvePersistence: (granted: boolean) => void = () => {};
+    const pendingPersistence = new Promise<boolean>((resolve) => {
+      resolvePersistence = resolve;
+    });
+    vi.stubGlobal('navigator', {
+      storage: {
+        persisted: vi.fn().mockResolvedValue(false),
+        persist: vi.fn().mockReturnValue(pendingPersistence),
+      },
+      serviceWorker: { controller: null },
+    });
+    openPreferences();
+    const view = render(() => <PreferencesPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep vault on this device' }));
+    view.unmount();
+    resolvePersistence(false);
+    await pendingPersistence;
+    await Promise.resolve();
+
+    expect(screen.queryByText(/browser did not grant persistent storage/i)).not.toBeInTheDocument();
   });
 
   it('exposes segmented settings as a valid roving-tabindex radio group', () => {

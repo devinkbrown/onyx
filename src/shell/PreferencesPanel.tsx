@@ -72,6 +72,19 @@ import {
   type PortableTransferSnapshot,
 } from '@/lib/vault/portableTransfer';
 import {
+  readVaultPersistence,
+  requestVaultPersistence,
+  type VaultPersistenceResult,
+} from '@/lib/vault/persistentStorage';
+import {
+  compressPortableJson,
+  decompressPortableJson,
+  isPortableGzipFile,
+  PORTABLE_GZIP_MAX_COMPRESSED_BYTES,
+  PortableGzipError,
+  supportsPortableGzip,
+} from '@/lib/vault/portableCompression';
+import {
   clearSavedSearches,
   listSearches,
   subscribeSavedSearches,
@@ -454,8 +467,9 @@ function AccessibilityAuditLedger(): JSX.Element {
 }
 
 function PortableVaultControls(): JSX.Element {
-  const [status, setStatus] = createSignal<string | null>(null);
+  const [status, setStatus] = createSignal<{ message: string; failure: boolean } | null>(null);
   const [busy, setBusy] = createSignal(false);
+  const [exportFormat, setExportFormat] = createSignal<'json' | 'gzip' | null>(null);
   const [pendingImport, setPendingImport] = createSignal<{
     fileName: string;
     snapshot: PortableTransferSnapshot;
@@ -468,26 +482,93 @@ function PortableVaultControls(): JSX.Element {
     topicReadCursors: number;
     savedSearches: number;
   } | null>(null);
+  const activeObjectUrls = new Map<string, number | null>();
+  const gzipAvailable = supportsPortableGzip();
+  let exportEpoch = 0;
+  let importEpoch = 0;
+  let disposed = false;
 
-  async function handleExport(): Promise<void> {
+  const reportStatus = (message: string, failure = false) => {
+    setStatus({ message, failure });
+  };
+
+  const revokeObjectUrlSoon = (url: string) => {
+    if (!activeObjectUrls.has(url)) return;
+    const timer = window.setTimeout(() => {
+      try {
+        URL.revokeObjectURL(url);
+      } finally {
+        activeObjectUrls.delete(url);
+      }
+    }, 0);
+    activeObjectUrls.set(url, timer);
+  };
+
+  onCleanup(() => {
+    disposed = true;
+    exportEpoch += 1;
+    importEpoch += 1;
+    for (const [url, timer] of activeObjectUrls) {
+      if (timer !== null) window.clearTimeout(timer);
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // Cleanup is best-effort; the component is already being disposed.
+      }
+    }
+    activeObjectUrls.clear();
+  });
+
+  async function handleExport(format: 'json' | 'gzip' = 'json'): Promise<void> {
+    if (busy()) return;
+    const epoch = ++exportEpoch;
     setBusy(true);
+    setExportFormat(format);
+    setStatus(null);
+    let url: string | null = null;
+    let link: HTMLAnchorElement | null = null;
     try {
       const snapshot = await exportPortableTransfer();
-      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      if (disposed || epoch !== exportEpoch) return;
+      const json = JSON.stringify(snapshot, null, 2);
+      const blob = format === 'gzip'
+        ? await compressPortableJson(json)
+        : new Blob([json], { type: 'application/json' });
+      if (disposed || epoch !== exportEpoch) return;
+      url = URL.createObjectURL(blob);
+      activeObjectUrls.set(url, null);
+      link = document.createElement('a');
       link.href = url;
-      link.download = `onyx-portable-${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `onyx-portable-${new Date().toISOString().slice(0, 10)}.json${format === 'gzip' ? '.gz' : ''}`;
+      document.body.append(link);
       link.click();
-      URL.revokeObjectURL(url);
       const messageCount = snapshot.targets.reduce((sum, target) => sum + target.messages.length, 0);
       const draftCount = Object.keys(snapshot.composerDrafts).length;
       const topicDraftCount = Object.keys(snapshot.channelTopicDrafts).length;
-      setStatus(`Exported ${countLabel(messageCount, 'message')}, ${countLabel(snapshot.targets.length, 'target')}, ${countLabel(snapshot.reviewHistory.length, 'review')}, ${countLabel(draftCount, 'room draft')}, ${countLabel(topicDraftCount, 'topic draft')}, ${countLabel(snapshot.followedConversations.length, 'followed conversation')}, ${countLabel(snapshot.topicReadCursors.length, 'topic read cursor')}, ${countLabel(snapshot.savedSearches.length, 'saved search', 'saved searches')}, ${countLabel(snapshot.accountHandoffs.length, 'account handoff')}, and ${countLabel(snapshot.preferenceHandoff ? 1 : 0, 'preference set')}.`);
-    } catch {
-      setStatus('Export failed. Try again after closing private browsing or freeing storage.');
+      reportStatus(`Exported${format === 'gzip' ? ' compressed' : ''} ${countLabel(messageCount, 'message')}, ${countLabel(snapshot.targets.length, 'target')}, ${countLabel(snapshot.reviewHistory.length, 'review')}, ${countLabel(draftCount, 'room draft')}, ${countLabel(topicDraftCount, 'topic draft')}, ${countLabel(snapshot.followedConversations.length, 'followed conversation')}, ${countLabel(snapshot.topicReadCursors.length, 'topic read cursor')}, ${countLabel(snapshot.savedSearches.length, 'saved search', 'saved searches')}, ${countLabel(snapshot.accountHandoffs.length, 'account handoff')}, and ${countLabel(snapshot.preferenceHandoff ? 1 : 0, 'preference set')}.`);
+    } catch (error) {
+      if (!disposed && epoch === exportEpoch) {
+        if (format === 'gzip' && error instanceof PortableGzipError) {
+          if (error.code === 'unsupported') {
+            reportStatus('Compressed export is unavailable in this browser. Export ordinary JSON instead.', true);
+          } else if (error.code === 'json-limit') {
+            reportStatus('Compressed export stopped because the portable JSON exceeds the 64 MiB decoded limit. Export ordinary JSON instead.', true);
+          } else if (error.code === 'compressed-limit') {
+            reportStatus('Compressed export stopped because the gzip output exceeds the 16 MiB compressed limit. Export ordinary JSON instead.', true);
+          } else {
+            reportStatus('Compressed export failed. Export ordinary JSON instead.', true);
+          }
+        } else {
+          reportStatus('Export failed. Try again after closing private browsing or freeing storage.', true);
+        }
+      }
     } finally {
-      setBusy(false);
+      link?.remove();
+      if (url) revokeObjectUrlSoon(url);
+      if (!disposed && epoch === exportEpoch) {
+        setBusy(false);
+        setExportFormat(null);
+      }
     }
   }
 
@@ -495,29 +576,38 @@ function PortableVaultControls(): JSX.Element {
     const input = event.currentTarget as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = '';
+    if (busy()) return;
+    const file = files[0] ?? null;
+    const compressed = file ? isPortableGzipFile(file) : false;
+    const maxFileBytes = compressed
+      ? PORTABLE_GZIP_MAX_COMPRESSED_BYTES
+      : PORTABLE_JSON_MAX_FILE_BYTES;
     const limitFailure = validateImportFileSelection(files, {
       maxFiles: PORTABLE_JSON_MAX_FILES,
-      maxFileBytes: PORTABLE_JSON_MAX_FILE_BYTES,
-      maxAggregateBytes: PORTABLE_JSON_MAX_AGGREGATE_BYTES,
+      maxFileBytes,
+      maxAggregateBytes: compressed ? PORTABLE_GZIP_MAX_COMPRESSED_BYTES : PORTABLE_JSON_MAX_AGGREGATE_BYTES,
     });
     if (limitFailure) {
       setPendingImport(null);
       if (limitFailure.kind === 'count') {
-        setStatus('Choose one Onyx portable JSON file at a time.');
+        reportStatus('Choose one Onyx portable JSON file at a time.', true);
       } else if (limitFailure.kind === 'file') {
-        setStatus(`${limitFailure.fileName} exceeds the ${formatImportMib(limitFailure.maxFileBytes)} portable JSON limit. Choose a smaller portable vault file.`);
+        reportStatus(`${limitFailure.fileName} exceeds the ${formatImportMib(limitFailure.maxFileBytes)} ${compressed ? 'compressed portable vault' : 'portable JSON'} limit. Choose a smaller portable vault file.`, true);
       } else {
-        setStatus(`That portable JSON exceeds the ${formatImportMib(limitFailure.maxAggregateBytes)} total import limit. Choose a smaller portable vault file.`);
+        reportStatus(`That ${compressed ? 'compressed portable vault' : 'portable JSON'} exceeds the ${formatImportMib(limitFailure.maxAggregateBytes)} total import limit. Choose a smaller portable vault file.`, true);
       }
       return;
     }
-    const file = files[0] ?? null;
     if (!file) return;
+    const epoch = ++importEpoch;
     setBusy(true);
+    reportStatus(compressed ? 'Decompressing and checking portable vault…' : 'Reading and checking portable JSON…');
     try {
-      const parsed = parsePortableTransfer(JSON.parse(await file.text()));
+      const text = compressed ? await decompressPortableJson(file) : await file.text();
+      if (disposed || epoch !== importEpoch) return;
+      const parsed = parsePortableTransfer(JSON.parse(text));
       if (!parsed) {
-        setStatus('Import rejected. Choose an Onyx portable JSON file.');
+        reportStatus(`Import rejected. Choose an Onyx portable ${compressed ? '.json.gz' : 'JSON'} file.`, true);
         setPendingImport(null);
         return;
       }
@@ -530,12 +620,28 @@ function PortableVaultControls(): JSX.Element {
       const topicReadCursors = parsed.topicReadCursors.length;
       const savedSearches = parsed.savedSearches.length;
       setPendingImport({ fileName: file.name, snapshot: parsed, messages, drafts, topicDrafts, accountHandoffs, preferenceHandoffs, followedConversations, topicReadCursors, savedSearches });
-      setStatus(`Ready to import ${countLabel(messages, 'message')}, ${countLabel(parsed.targets.length, 'target')}, ${countLabel(parsed.reviewHistory.length, 'review')}, ${countLabel(drafts, 'room draft')}, ${countLabel(topicDrafts, 'topic draft')}, ${countLabel(followedConversations, 'followed conversation')}, ${countLabel(topicReadCursors, 'topic read cursor')}, ${countLabel(savedSearches, 'saved search', 'saved searches')}, ${countLabel(accountHandoffs, 'account handoff')}, and ${countLabel(preferenceHandoffs, 'preference set')}.`);
-    } catch {
-      setStatus('Import failed. Choose a readable Onyx portable JSON file.');
-      setPendingImport(null);
+      reportStatus(`Ready to import ${countLabel(messages, 'message')}, ${countLabel(parsed.targets.length, 'target')}, ${countLabel(parsed.reviewHistory.length, 'review')}, ${countLabel(drafts, 'room draft')}, ${countLabel(topicDrafts, 'topic draft')}, ${countLabel(followedConversations, 'followed conversation')}, ${countLabel(topicReadCursors, 'topic read cursor')}, ${countLabel(savedSearches, 'saved search', 'saved searches')}, ${countLabel(accountHandoffs, 'account handoff')}, and ${countLabel(preferenceHandoffs, 'preference set')}.`);
+    } catch (error) {
+      if (!disposed && epoch === importEpoch) {
+        if (compressed && error instanceof PortableGzipError) {
+          if (error.code === 'unsupported') {
+            reportStatus('Compressed portable vault import is unavailable in this browser. Choose ordinary JSON instead.', true);
+          } else if (error.code === 'json-limit') {
+            reportStatus('Compressed portable vault expands beyond the 64 MiB decoded JSON limit. Choose a smaller vault.', true);
+          } else if (error.code === 'compressed-limit') {
+            reportStatus('Compressed portable vault exceeds the 16 MiB compressed limit. Choose a smaller vault.', true);
+          } else {
+            reportStatus('Compressed import failed. Choose a readable Onyx portable .json.gz file or ordinary JSON.', true);
+          }
+        } else if (compressed) {
+          reportStatus('Compressed import failed. Choose a readable Onyx portable .json.gz file or ordinary JSON.', true);
+        } else {
+          reportStatus('Import failed. Choose a readable Onyx portable JSON file.', true);
+        }
+        setPendingImport(null);
+      }
     } finally {
-      setBusy(false);
+      if (!disposed && epoch === importEpoch) setBusy(false);
     }
   }
 
@@ -549,9 +655,9 @@ function PortableVaultControls(): JSX.Element {
         getState().setComposerDraft(target, draft);
       }
       setPendingImport(null);
-      setStatus(`Imported ${countLabel(result.messages, 'message')}, ${countLabel(result.targets, 'target')}, ${countLabel(result.reviews, 'review')}, ${countLabel(result.drafts, 'room draft')}, ${countLabel(result.topicDrafts, 'topic draft')}, ${countLabel(result.followedConversations, 'followed conversation')}, ${countLabel(result.topicReadCursors, 'topic read cursor')}, ${countLabel(result.savedSearches, 'saved search', 'saved searches')}, ${countLabel(result.accountHandoffs, 'account handoff')}, and ${countLabel(result.preferenceHandoffs, 'preference set')}.`);
+      reportStatus(`Imported ${countLabel(result.messages, 'message')}, ${countLabel(result.targets, 'target')}, ${countLabel(result.reviews, 'review')}, ${countLabel(result.drafts, 'room draft')}, ${countLabel(result.topicDrafts, 'topic draft')}, ${countLabel(result.followedConversations, 'followed conversation')}, ${countLabel(result.topicReadCursors, 'topic read cursor')}, ${countLabel(result.savedSearches, 'saved search', 'saved searches')}, ${countLabel(result.accountHandoffs, 'account handoff')}, and ${countLabel(result.preferenceHandoffs, 'preference set')}.`);
     } catch {
-      setStatus('Import failed while merging this portable vault.');
+      reportStatus('Import failed while merging this portable vault.', true);
     } finally {
       setBusy(false);
     }
@@ -566,14 +672,34 @@ function PortableVaultControls(): JSX.Element {
         Export or merge this device's local history, reviewed catch-up state, room composer drafts, channel topic drafts, followed rooms/topics, named-conversation read cursors, saved searches, saved sign-in targets, retention policy, and Preferences switches. Read cursors contain only room/topic, message ID, and timestamp metadata. Saved query text is included. Passwords, session tokens, mesh tokens, and decrypted DM plaintext are not exported automatically.
       </p>
       <div class="pref-vault-actions">
-        <button type="button" class="pref-reset" disabled={busy()} onClick={() => void handleExport()}>
-          Export vault
+        <button
+          type="button"
+          class="pref-reset"
+          disabled={busy()}
+          aria-busy={exportFormat() === 'json'}
+          onClick={() => void handleExport()}
+        >
+          {exportFormat() === 'json' ? 'Preparing export…' : 'Export vault'}
         </button>
+        <Show
+          when={gzipAvailable}
+          fallback={<span class="pref-vault-compression-note">Compressed export unavailable; ordinary JSON remains portable.</span>}
+        >
+          <button
+            type="button"
+            class="pref-reset"
+            disabled={busy()}
+            aria-busy={exportFormat() === 'gzip'}
+            onClick={() => void handleExport('gzip')}
+          >
+            {exportFormat() === 'gzip' ? 'Compressing export…' : 'Export compressed vault'}
+          </button>
+        </Show>
         <label class="pref-file">
           <span>Import portable JSON</span>
           <input
             type="file"
-            accept="application/json,.json"
+            accept="application/json,application/gzip,application/x-gzip,.json,.json.gz"
             disabled={busy()}
             onChange={(event) => void handleImport(event)}
           />
@@ -605,7 +731,7 @@ function PortableVaultControls(): JSX.Element {
                 disabled={busy()}
                 onClick={() => {
                   setPendingImport(null);
-                  setStatus('Import cancelled.');
+                  reportStatus('Import cancelled.');
                 }}
               >
                 Cancel import
@@ -614,8 +740,19 @@ function PortableVaultControls(): JSX.Element {
           </div>
         )}
       </Show>
+      <Show when={exportFormat()}>
+        {(format) => (
+          <p class="pref-status" role="status">
+            {format() === 'gzip' ? 'Compressing portable vault export…' : 'Preparing portable vault export…'}
+          </p>
+        )}
+      </Show>
       <Show when={status()}>
-        <p class="pref-status" role="status">{status()}</p>
+        {(current) => (
+          <p class={`pref-status${current().failure ? ' pref-status--error' : ''}`} role={current().failure ? 'alert' : 'status'}>
+            {current().message}
+          </p>
+        )}
       </Show>
     </section>
   );
@@ -1718,6 +1855,36 @@ function PwaReadinessPanel(): JSX.Element {
   const items = createMemo(() => pwaReadiness());
   const [updateResult, setUpdateResult] = createSignal<PwaUpdateRecoveryResult | null>(null);
   const [updateBusy, setUpdateBusy] = createSignal(false);
+  const [persistenceResult, setPersistenceResult] = createSignal<VaultPersistenceResult | null>(null);
+  const [persistenceBusy, setPersistenceBusy] = createSignal(false);
+  let persistenceEpoch = 0;
+  let disposed = false;
+
+  onCleanup(() => {
+    disposed = true;
+    persistenceEpoch += 1;
+  });
+
+  onMount(() => {
+    const epoch = ++persistenceEpoch;
+    void readVaultPersistence().then((result) => {
+      if (disposed || epoch !== persistenceEpoch) return;
+      setPersistenceResult(result);
+    });
+  });
+
+  async function persistVaultStorage(): Promise<void> {
+    if (persistenceBusy()) return;
+    const epoch = ++persistenceEpoch;
+    setPersistenceBusy(true);
+    try {
+      const result = await requestVaultPersistence();
+      if (disposed || epoch !== persistenceEpoch) return;
+      setPersistenceResult(result);
+    } finally {
+      if (!disposed && epoch === persistenceEpoch) setPersistenceBusy(false);
+    }
+  }
 
   async function recoverUpdate(): Promise<void> {
     setUpdateBusy(true);
@@ -1764,6 +1931,33 @@ function PwaReadinessPanel(): JSX.Element {
           )}
         </For>
       </div>
+      <section class="pref-storage-persistence" aria-labelledby="pref-storage-persistence-title">
+        <h4 id="pref-storage-persistence-title" class="pref-pwa-readiness__title">Local vault persistence</h4>
+        <Show
+          when={persistenceResult()}
+          fallback={<p class="pref-status" role="status">Checking browser storage persistence…</p>}
+        >
+          {(result) => (
+            <p
+              class={`pref-status${result().state === 'error' ? ' pref-status--error' : ''}`}
+              role={result().state === 'error' ? 'alert' : 'status'}
+            >
+              {result().detail}
+            </p>
+          )}
+        </Show>
+        <Show when={persistenceResult()?.state === 'not-persisted' || persistenceResult()?.state === 'denied' || persistenceResult()?.state === 'error'}>
+          <button
+            type="button"
+            class="pref-reset"
+            disabled={persistenceBusy()}
+            aria-busy={persistenceBusy()}
+            onClick={() => void persistVaultStorage()}
+          >
+            {persistenceBusy() ? 'Requesting persistence…' : 'Keep vault on this device'}
+          </button>
+        </Show>
+      </section>
     </section>
   );
 }

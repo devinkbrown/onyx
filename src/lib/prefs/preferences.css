@@ -490,6 +490,14 @@
   align-items: center;
 }
 
+.pref-vault-compression-note {
+  align-self: center;
+  max-width: 18rem;
+  color: var(--washi-mute);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 .pref-file {
   display: inline-flex;
   align-items: center;
@@ -550,6 +558,10 @@
   font-size: 0.76rem;
   line-height: 1.35;
   color: var(--lapis-bright);
+}
+
+.pref-status--error {
+  color: color-mix(in oklab, var(--danger) 72%, var(--washi));
 }
 
 .pref-count {
@@ -828,6 +840,20 @@
   color: var(--washi);
   font-size: 0.84rem;
   font-weight: 650;
+}
+
+.pref-storage-persistence {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 24%, var(--line));
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 30%, transparent);
+}
+
+.pref-storage-persistence h4 {
+  margin: 0;
 }
 
 @media (max-width: 560px) {

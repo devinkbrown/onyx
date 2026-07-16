@@ -108,10 +108,10 @@ export function pwaReadiness(): PwaReadinessItem[] {
     {
       key: 'storage',
       label: 'Local state',
-      state: hasDurableStorage ? 'ready' : 'unavailable',
+      state: hasDurableStorage ? 'attention' : 'unavailable',
       detail: hasDurableStorage
-        ? 'IndexedDB and localStorage are available for vault, drafts, and portable transfer.'
-        : 'Local storage is unavailable; vault recall, drafts, and portable transfer cannot be durable.',
+        ? 'IndexedDB and localStorage are available, but API availability alone does not protect the vault from browser eviction. Check persistence below.'
+        : 'Local storage is unavailable; vault recall, drafts, and portable transfer cannot be stored on this device.',
     },
   ];
 }

@@ -21,7 +21,7 @@ describe('PWA readiness', () => {
       expect.objectContaining({ key: 'window', state: 'ready' }),
       expect.objectContaining({ key: 'worker', state: 'ready' }),
       expect.objectContaining({ key: 'notifications', state: 'ready' }),
-      expect.objectContaining({ key: 'storage', state: 'ready' }),
+      expect.objectContaining({ key: 'storage', state: 'attention' }),
     ]);
   });
 
@@ -38,7 +38,7 @@ describe('PWA readiness', () => {
     expect(readiness).toContainEqual(expect.objectContaining({ key: 'window', state: 'attention' }));
     expect(readiness).toContainEqual(expect.objectContaining({ key: 'worker', state: 'attention' }));
     expect(readiness).toContainEqual(expect.objectContaining({ key: 'notifications', state: 'unavailable' }));
-    expect(readiness).toContainEqual(expect.objectContaining({ key: 'storage', state: 'ready' }));
+    expect(readiness).toContainEqual(expect.objectContaining({ key: 'storage', state: 'attention' }));
   });
 
   it('probes durable storage once per readiness snapshot', () => {
