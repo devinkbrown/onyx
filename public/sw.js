@@ -8,6 +8,7 @@
 // build time (e.g. the media-upload URL).
 const CACHE_NAME = 'onyx-shell-__BUILD_VERSION__';
 const CACHE_PREFIX = 'onyx-shell-';
+const PRIOR_SHELL_CACHE_LIMIT = 4;
 
 // App shell assets to precache on install
 const PRECACHE_URLS = [
@@ -128,6 +129,36 @@ function isCanonicalStaticResponse(requestUrl, response) {
   }
 }
 
+function priorShellCacheNames() {
+  return caches.keys()
+    .then((keys) => keys
+      .filter((key) => typeof key === 'string'
+        && key.startsWith(CACHE_PREFIX)
+        && key !== CACHE_NAME)
+      .sort()
+      .reverse()
+      .slice(0, PRIOR_SHELL_CACHE_LIMIT))
+    .catch(() => []);
+}
+
+function matchNamedShellResponse(name, request, isValid) {
+  return caches.open(name)
+    .then((cache) => cache.match(request))
+    .then((response) => isValid(response) ? response : undefined)
+    .catch(() => undefined);
+}
+
+function matchRetainedShellResponse(request, isValid) {
+  // The normal path stays one cache read. Enumerate retained names only when
+  // the freshly stamped cache misses or contains an invalid response.
+  return matchNamedShellResponse(CACHE_NAME, request, isValid)
+    .then((current) => current ?? priorShellCacheNames().then((names) => names.reduce(
+      (pending, name) => pending.then((matched) => matched
+        ?? matchNamedShellResponse(name, request, isValid)),
+      Promise.resolve(undefined)
+    )));
+}
+
 function offlineNavigationFallback(pathname) {
   const fallbackPath = navigationFallbackPath(pathname);
   const unavailable = () => new Response(
@@ -143,9 +174,11 @@ function offlineNavigationFallback(pathname) {
     },
   );
   if (fallbackPath === null) return Promise.resolve(unavailable());
-  return caches.open(CACHE_NAME)
-    .then((cache) => cache.match(fallbackPath))
-    .then((cached) => isCanonicalShellResponse(fallbackPath, cached) ? cached : unavailable())
+  return matchRetainedShellResponse(
+    fallbackPath,
+    (cached) => isCanonicalShellResponse(fallbackPath, cached)
+  )
+    .then((cached) => cached ?? unavailable())
     .catch(() => unavailable());
 }
 
@@ -278,11 +311,12 @@ self.addEventListener('fetch', (event) => {
 
   // Cache-first for static assets (hashed /assets from Vite, fonts, icons)
   if (isCacheableStaticPath(url.pathname)) {
-    const loaded = caches.open(CACHE_NAME)
-      .then((cache) => cache.match(request))
-      .catch(() => undefined)
+    const loaded = matchRetainedShellResponse(
+      request,
+      (cached) => isCanonicalStaticResponse(url, cached)
+    )
       .then((cached) => {
-        if (isCanonicalStaticResponse(url, cached)) {
+        if (cached) {
           return { response: cached, shouldCache: false };
         }
         return fetch(request).then((response) => ({

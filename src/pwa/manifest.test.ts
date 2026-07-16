@@ -361,6 +361,8 @@ describe('PWA manifest', () => {
       url: `https://onyx.test${url}`,
     }));
     const cache = { add, match: currentCacheMatch, put };
+    const priorCacheMatch = vi.fn<(key: unknown) => Promise<unknown>>(async () => undefined);
+    const priorCache = { match: priorCacheMatch };
     const matchAnyCache = vi.fn<(key: unknown) => Promise<unknown>>(async (key) => ({
       fallback: key,
       ok: true,
@@ -370,7 +372,10 @@ describe('PWA manifest', () => {
       throw new Error('stale cache is unavailable');
     });
     const caches = {
-      open: vi.fn(async () => cache),
+      open: vi.fn(async (name: string) => name.startsWith('onyx-shell-')
+        && name !== 'onyx-shell-__BUILD_VERSION__'
+        ? priorCache
+        : cache),
       keys: vi.fn(async () => [
         'public-site-cache',
         'onyx-shell-old-build',
@@ -554,7 +559,74 @@ describe('PWA manifest', () => {
     await expect(navigationWork).resolves.toMatchObject({ fallback: '/' });
     expect(currentCacheMatch).toHaveBeenLastCalledWith('/');
 
+    const retainedAppShell = {
+      source: 'retained-app-shell',
+      ok: true,
+      url: 'https://onyx.test/app/',
+    };
+    currentCacheMatch.mockResolvedValueOnce(undefined);
+    priorCacheMatch.mockResolvedValueOnce(retainedAppShell);
+    caches.open.mockClear();
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/retained' },
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    await expect(navigationWork).resolves.toBe(retainedAppShell);
+    expect(caches.open.mock.calls.map(([name]) => name)).toEqual([
+      'onyx-shell-__BUILD_VERSION__',
+      'onyx-shell-old-build',
+    ]);
+    expect(caches.open).not.toHaveBeenCalledWith('public-site-cache');
+
+    currentCacheMatch.mockResolvedValueOnce(undefined);
+    priorCacheMatch.mockResolvedValueOnce({
+      source: 'poisoned-retained-shell',
+      ok: true,
+      url: 'https://login.example/app/',
+    });
+    caches.open.mockClear();
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/retained-poisoned' },
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    const rejectedRetainedShell = await navigationWork as Response;
+    expect(rejectedRetainedShell).toBeInstanceOf(Response);
+    expect(rejectedRetainedShell.status).toBe(503);
+    expect(caches.open).not.toHaveBeenCalledWith('public-site-cache');
+
+    const manyPriorCaches = Array.from(
+      { length: 7 },
+      (_, index) => `onyx-shell-202607${String(index + 1).padStart(2, '0')}-120000-build${index}`,
+    );
+    caches.keys.mockResolvedValueOnce([
+      'public-site-cache',
+      ...manyPriorCaches,
+      'onyx-shell-__BUILD_VERSION__',
+    ]);
+    currentCacheMatch.mockResolvedValueOnce(undefined);
+    priorCacheMatch.mockResolvedValue(undefined);
+    caches.open.mockClear();
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/bounded-retained' },
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    const boundedMiss = await navigationWork as Response;
+    expect(boundedMiss).toBeInstanceOf(Response);
+    expect(boundedMiss.status).toBe(503);
+    expect(caches.open.mock.calls.map(([name]) => name)).toEqual([
+      'onyx-shell-__BUILD_VERSION__',
+      ...manyPriorCaches.sort().reverse().slice(0, 4),
+    ]);
+
     const matchCallsBeforeDocument = currentCacheMatch.mock.calls.length;
+    const priorMatchCallsBeforeDocument = priorCacheMatch.mock.calls.length;
+    const cacheKeyCallsBeforeDocument = caches.keys.mock.calls.length;
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/guides/' },
       respondWith: (work: Promise<unknown>) => {
@@ -567,6 +639,8 @@ describe('PWA manifest', () => {
     expect(unavailableDocument.headers.get('Cache-Control')).toBe('no-store');
     await expect(unavailableDocument.text()).resolves.toContain('page is unavailable offline');
     expect(currentCacheMatch).toHaveBeenCalledTimes(matchCallsBeforeDocument);
+    expect(priorCacheMatch).toHaveBeenCalledTimes(priorMatchCallsBeforeDocument);
+    expect(caches.keys).toHaveBeenCalledTimes(cacheKeyCallsBeforeDocument);
 
     currentCacheMatch.mockResolvedValueOnce({
       fallback: '/app/',
@@ -609,6 +683,34 @@ describe('PWA manifest', () => {
     expect(unavailable.status).toBe(503);
     await expect(unavailable.text()).resolves.toContain('app shell was not cached');
 
+    let assetResponseWork: Promise<unknown> | undefined;
+    let assetLifetimeWork: Promise<unknown> | undefined;
+    const retainedAssetRequest = {
+      method: 'GET',
+      mode: 'cors',
+      url: 'https://onyx.test/assets/retained.101.js',
+    };
+    const retainedAssetResponse = {
+      source: 'retained-static-asset',
+      ok: true,
+      url: retainedAssetRequest.url,
+    };
+    currentCacheMatch.mockResolvedValueOnce(undefined);
+    priorCacheMatch.mockResolvedValueOnce(retainedAssetResponse);
+    networkFetch.mockClear();
+    listeners.get('fetch')?.({
+      request: retainedAssetRequest,
+      respondWith: (work: Promise<unknown>) => {
+        assetResponseWork = work;
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        assetLifetimeWork = work;
+      },
+    });
+    await expect(assetResponseWork).resolves.toBe(retainedAssetResponse);
+    await assetLifetimeWork;
+    expect(networkFetch).not.toHaveBeenCalled();
+
     const cachedClone = { kind: 'asset-clone' };
     const assetResponse = {
       ok: true,
@@ -616,8 +718,6 @@ describe('PWA manifest', () => {
       clone: vi.fn(() => cachedClone),
     };
     const assetRequest = { method: 'GET', mode: 'cors', url: 'https://onyx.test/assets/app.123.js' };
-    let assetResponseWork: Promise<unknown> | undefined;
-    let assetLifetimeWork: Promise<unknown> | undefined;
     currentCacheMatch.mockRejectedValueOnce(new Error('static cache read unavailable'));
     networkFetch.mockResolvedValueOnce(assetResponse);
     listeners.get('fetch')?.({
