@@ -11829,14 +11829,17 @@ function _saveNsfwChannels(channels: Set<string>): void {
 }
 
 // ── Clean leave on deliberate page unload ─────────────────────────────────────
-// A page refresh/close fires `pagehide`; an accidental network drop does NOT.
+// A page refresh/close fires non-persisted `pagehide`; an accidental network
+// drop does NOT. A persisted pagehide is BFCache suspension, not a close: QUIT
+// there would deliberately destroy the session the browser is preserving.
 // Sending QUIT here tells the server to remove our nick from channels right away
 // instead of letting the session linger (resume window / ping timeout) as a
 // ghost that reappears under the old nick when you reconnect. Best-effort: the
 // synchronous WS frame usually flushes during unload. This module only loads on
 // the /app route, so the listener never affects the landing page.
 if (typeof window !== 'undefined') {
-  window.addEventListener('pagehide', () => {
+  window.addEventListener('pagehide', (event) => {
+    if (event.persisted) return;
     try {
       const s = store.getState();
       if (s.connectionStatus === 'connected') {

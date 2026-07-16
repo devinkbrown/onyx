@@ -35,6 +35,7 @@ import {
   createMemo,
   createEffect,
   For,
+  onCleanup,
   onMount,
   Show,
   type JSX,
@@ -61,6 +62,7 @@ import {
   type SavedCredentials,
 } from '@/lib/credentials';
 import { initialNode, selectBestNode, type IrcNode } from './nodes';
+import { installConnectPageLifecycle } from './connectPageLifecycle';
 
 // ── Deep-water atmosphere — depth, azure currents, bioluminescence ───────────
 // Self-contained to the connect screen (namespaced .conn-sea-*) so it carries
@@ -402,6 +404,7 @@ export function Connect(props: ConnectProps): JSX.Element {
   const [routing, setRouting] = createSignal(true);
 
   onMount(() => {
+    onCleanup(installConnectPageLifecycle(getState));
     void selectBestNode().then((node) => {
       setChosenNode(node);
       setRouting(false);
