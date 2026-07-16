@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { parseStringArray, parseEmojiArray } from './persistParse';
+import { parseStringArray, parseEmojiArray, parseWatchList } from './persistParse';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
 import { parseChannelFolders } from './channelFoldersPersistence';
 import { IRCClient } from '@/lib/irc/client';
@@ -11701,8 +11701,7 @@ function _saveBackground(id: string): void {
 function _loadWatchList(): Array<{ nick: string; online: boolean; lastSeen?: Date }> {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = JSON.parse(localStorage.getItem('onyx:watch-list') ?? '[]') as Array<{ nick: string; online: boolean; lastSeen?: string }>;
-    return raw.map(w => ({ ...w, online: false, lastSeen: w.lastSeen ? new Date(w.lastSeen) : undefined }));
+    return parseWatchList(localStorage.getItem('onyx:watch-list'));
   } catch { return []; }
 }
 function _saveWatchList(list: Array<{ nick: string; online: boolean }>): void {

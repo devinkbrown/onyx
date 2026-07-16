@@ -44,6 +44,12 @@ export interface CustomEmoji {
   addedBy?: string;
 }
 
+export interface PersistedWatchEntry {
+  nick: string;
+  online: false;
+  lastSeen?: Date;
+}
+
 /**
  * Parse a persisted JSON string into a `CustomEmoji[]`, discarding anything that
  * is not a JSON array of `{ name: string; url: string }` records. Always returns
@@ -79,4 +85,40 @@ export function parseEmojiArray(raw: string | null): CustomEmoji[] {
   } catch {
     return [];
   }
+}
+
+/** Parse the persisted WATCH roster without trusting entry shape or dates. */
+export function parseWatchList(raw: string | null): PersistedWatchEntry[] {
+  if (!raw || raw.length > MAX_PERSISTED_COLLECTION_BYTES) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const out: PersistedWatchEntry[] = [];
+  const seen = new Set<string>();
+  for (const value of parsed) {
+    if (out.length >= MAX_PERSISTED_STRING_ITEMS) break;
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue;
+    const record = value as Record<string, unknown>;
+    if (
+      typeof record.nick !== 'string'
+      || record.nick.length === 0
+      || record.nick.length > 128
+    ) continue;
+    const key = record.nick.toLocaleLowerCase('en');
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const entry: PersistedWatchEntry = { nick: record.nick, online: false };
+    if (typeof record.lastSeen === 'string' && record.lastSeen.length <= 64) {
+      const lastSeen = new Date(record.lastSeen);
+      if (Number.isFinite(lastSeen.getTime())) entry.lastSeen = lastSeen;
+    }
+    out.push(entry);
+  }
+  return out;
 }

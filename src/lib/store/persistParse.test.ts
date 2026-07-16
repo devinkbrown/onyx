@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, it, expect } from 'vitest';
-import { parseStringArray, parseEmojiArray } from './persistParse';
+import { parseStringArray, parseEmojiArray, parseWatchList } from './persistParse';
 
 describe('parseStringArray', () => {
   it('returns [] for null / empty input', () => {
@@ -109,5 +109,42 @@ describe('parseEmojiArray', () => {
       // The exact call that crashed the settings handler:
       expect(() => [...out.filter(e => e.name !== 'z'), { name: 'z', url: 'u' }]).not.toThrow();
     }
+  });
+});
+
+describe('parseWatchList', () => {
+  it('rejects wrong roots and malformed entries', () => {
+    for (const raw of [null, '', '{', '{}', 'null', '"watch"']) {
+      expect(parseWatchList(raw)).toEqual([]);
+    }
+    expect(parseWatchList(JSON.stringify([
+      null,
+      7,
+      { nick: '' },
+      { nick: 42 },
+      { nick: 'x'.repeat(129) },
+      { nick: 'valid' },
+    ]))).toEqual([{ nick: 'valid', online: false }]);
+  });
+
+  it('forces offline startup, validates dates, and deduplicates nicks case-insensitively', () => {
+    const parsed = parseWatchList(JSON.stringify([
+      { nick: 'Alice', online: true, lastSeen: '2026-07-16T01:02:03.000Z' },
+      { nick: 'alice', online: true, lastSeen: '2026-07-17T01:02:03.000Z' },
+      { nick: 'Bob', online: true, lastSeen: 'not-a-date' },
+    ]));
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0]).toEqual({
+      nick: 'Alice',
+      online: false,
+      lastSeen: new Date('2026-07-16T01:02:03.000Z'),
+    });
+    expect(parsed[1]).toEqual({ nick: 'Bob', online: false });
+  });
+
+  it('bounds restored watch entries and serialized size', () => {
+    const many = Array.from({ length: 300 }, (_, index) => ({ nick: `nick-${index}`, online: true }));
+    expect(parseWatchList(JSON.stringify(many))).toHaveLength(256);
+    expect(parseWatchList(`"${'x'.repeat(512 * 1024)}"`)).toEqual([]);
   });
 });
