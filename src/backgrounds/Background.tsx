@@ -43,7 +43,12 @@ export function Background(props: BackgroundProps) {
 
   // Metadata (id + kind) resolves synchronously from the catalogue; the heavy
   // render module is fetched on demand so only the ACTIVE variant's chunk loads.
-  const activeId = createMemo(() => selectBackgroundId(props.id, effectiveReducedMotion()));
+  // An undefined resource source is Solid's explicit "do not fetch" state.
+  // Keep Off outside the lazy-loader entirely; restoring Animated/Still changes
+  // this source back to an id and loads the selected renderer normally.
+  const activeId = createMemo(() => sceneDisabled()
+    ? undefined
+    : selectBackgroundId(props.id, effectiveReducedMotion()));
   const [variant] = createResource(activeId, loadBackgroundVariant);
 
   const scene = createMemo(() => {

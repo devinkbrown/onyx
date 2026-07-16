@@ -54,6 +54,13 @@ else
   echo "WARN: ${LANDING} missing — deploying the bare SPA (no community site!)"
 fi
 
+# Static files must remain readable/traversable by nginx. Some landing build
+# environments create output under a restrictive umask, and `rsync -a` would
+# otherwise preserve those modes into the live tree.
+echo "==> normalising static asset permissions"
+find dist -type d -exec chmod 0755 {} +
+find dist -type f -exec chmod 0644 {} +
+
 echo "==> syncing dist/ -> out/ (live)"
 mkdir -p out
 rsync -a --delete dist/ out/

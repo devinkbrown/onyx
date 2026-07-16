@@ -16,6 +16,7 @@ type WebManifest = {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const manifestPath = join(root, 'public', 'manifest.json');
+const serviceWorkerPath = join(root, 'public', 'sw.js');
 
 function loadManifest(): WebManifest {
   return JSON.parse(readFileSync(manifestPath, 'utf8')) as WebManifest;
@@ -42,6 +43,18 @@ describe('PWA manifest', () => {
       expect(screenshot.label).toMatch(/^Onyx /);
       expect(screenshot.sizes).toMatch(/^\d+x\d+$/);
       expect(existsSync(join(root, 'public', screenshot.src))).toBe(true);
+    }
+  });
+
+  it('references notification icons that exist in public assets', () => {
+    const worker = readFileSync(serviceWorkerPath, 'utf8');
+    const notificationAssets = [...worker.matchAll(/(?:icon|badge):\s*'\/([^']+)'/g)]
+      .map((match) => match[1])
+      .filter((asset): asset is string => asset !== undefined);
+
+    expect(notificationAssets.length).toBeGreaterThan(0);
+    for (const asset of notificationAssets) {
+      expect(existsSync(join(root, 'public', asset))).toBe(true);
     }
   });
 });

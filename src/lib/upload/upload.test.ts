@@ -132,9 +132,10 @@ describe('upload helper', () => {
       .toBe('https://cdn.example.test/a.png');
   });
 
-  it('keeps relative response paths when the configured media URL has no origin', () => {
+  it('roots relative response paths for the default same-origin upload endpoint', () => {
     // Arrange / Act / Assert
-    expect(resolveUploadUrl('/upload', 'a.png')).toBe('a.png');
+    expect(resolveUploadUrl('/upload', 'a.png')).toBe('/uploads/a.png');
+    expect(resolveUploadUrl('/upload', 'uploads/a.png')).toBe('/uploads/a.png');
   });
 
   it('parses JSON upload responses with relative paths', async () => {
@@ -180,6 +181,15 @@ describe('upload helper', () => {
       JSON.stringify({ url: ' ', file: { path: '' } }),
       'application/json',
     )).rejects.toThrow('Upload response did not include a file URL.');
+    await expect(parseUploadResponse(
+      'https://media.example.test',
+      'null',
+      'application/json',
+    )).rejects.toMatchObject({
+      name: 'UploadError',
+      code: 'response',
+      message: 'Upload response did not include a file URL.',
+    });
     await expect(parseUploadResponse(
       'https://media.example.test',
       '   ',
@@ -467,6 +477,26 @@ describe('upload helper', () => {
       code: 'network',
       status: null,
       message: 'Upload failed before the server responded.',
+    });
+  });
+
+  it('wraps response-body stream failures in the upload error shape', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 201,
+      headers: new Headers(),
+      text: vi.fn(async () => { throw new TypeError('stream reset'); }),
+    }) as unknown as Response);
+    const file = new File(['x'], 'x.txt', { type: 'text/plain' });
+
+    await expect(uploadFile(file, {
+      mediaUrl: 'https://media.example.test',
+      fetchImpl: fetchMock,
+    })).rejects.toMatchObject({
+      name: 'UploadError',
+      code: 'network',
+      status: null,
+      message: 'Upload failed while reading the server response.',
     });
   });
 });

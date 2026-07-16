@@ -109,8 +109,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title ?? 'Onyx', {
       body: data.body ?? '',
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
       tag: data.tag ?? 'onyx-notification',
       renotify: !!data.tag,
       data: { url: data.url ?? '/' },

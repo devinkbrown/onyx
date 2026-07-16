@@ -20,6 +20,32 @@ type CandidateMatch = {
   indices: number[];
 };
 
+/**
+ * Lowercase text for matching while retaining offsets into the original title.
+ * Unicode case folding can expand one source character into several UTF-16
+ * code units (for example `İ` -> `i` + combining dot); using folded offsets
+ * directly as slice positions would then highlight the wrong original text.
+ */
+function foldWithOriginalOffsets(text: string): { folded: string; offsets: number[] } {
+  let folded = '';
+  const offsets: number[] = [];
+  for (let index = 0; index < text.length;) {
+    const codePoint = text.codePointAt(index);
+    if (codePoint === undefined) break;
+    const source = String.fromCodePoint(codePoint);
+    const lower = source.toLowerCase();
+    folded += lower;
+    for (let offset = 0; offset < lower.length; offset += 1) {
+      // Preserve both UTF-16 code units of an astral source character, while
+      // mapping genuine lowercase expansions (İ -> i + combining dot) back to
+      // their single original code unit.
+      offsets.push(index + Math.min(offset, source.length - 1));
+    }
+    index += source.length;
+  }
+  return { folded, offsets };
+}
+
 function isWordBoundary(text: string, index: number): boolean {
   if (index === 0) return true;
 
@@ -54,19 +80,25 @@ function compactRanges(indices: number[]): HighlightRange[] {
 }
 
 function scoreCandidate(text: string, query: string): CandidateMatch | null {
-  const haystack = text.toLowerCase();
+  const { folded: haystack, offsets } = foldWithOriginalOffsets(text);
   const needle = query.toLowerCase();
-  const indices: number[] = [];
+  const foldedIndices: number[] = [];
   let needleIndex = 0;
 
   for (let haystackIndex = 0; haystackIndex < haystack.length && needleIndex < needle.length; haystackIndex += 1) {
     if (haystack[haystackIndex] !== needle[needleIndex]) continue;
 
-    indices.push(haystackIndex);
+    foldedIndices.push(haystackIndex);
     needleIndex += 1;
   }
 
   if (needleIndex !== needle.length) return null;
+
+  // Multiple folded code units may belong to one source character. Highlight
+  // that character once and keep every range valid for slicing `text`.
+  const indices = foldedIndices
+    .map((index) => offsets[index] ?? index)
+    .filter((index, at, all) => at === 0 || index !== all[at - 1]);
 
   const first = indices[0] ?? 0;
   let score = 120 - first * 2 + needle.length * 12;
@@ -82,8 +114,10 @@ function scoreCandidate(text: string, query: string): CandidateMatch | null {
     }
   }
 
-  const substringIndex = haystack.indexOf(needle);
-  if (substringIndex >= 0) score += 70 - substringIndex;
+  const foldedSubstringIndex = haystack.indexOf(needle);
+  if (foldedSubstringIndex >= 0) {
+    score += 70 - (offsets[foldedSubstringIndex] ?? foldedSubstringIndex);
+  }
   if (haystack.startsWith(needle)) score += 45;
 
   return { score, indices };

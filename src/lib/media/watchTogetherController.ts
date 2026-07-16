@@ -6,12 +6,22 @@
 // lives here (coverage-counting) so the SolidJS surface can stay thin.
 //
 // The wire representation is the SAME `ocean.watch` channel PROP that
-// `parseWatchTogetherProp` reads — `serializeWatchTogetherProp` is its exact
-// inverse, so `parseWatchTogetherProp(serializeWatchTogetherProp(x))` deep-equals
-// any valid `WatchTogetherActivity`. `tick()` advances `positionSeconds` locally
-// between PROP pushes so playback stays smooth without wire chatter.
+// `parseWatchTogetherProp` reads. Serialization first normalizes adversarial
+// local input, so every state-machine-produced activity round-trips exactly and
+// arbitrary input round-trips to its bounded normalized form. `tick()` advances
+// `positionSeconds` locally between PROP pushes so playback stays smooth without
+// wire chatter.
 
-import { parseWatchTogetherProp, type WatchTogetherActivity } from './watchTogether';
+import {
+  normalizeWatchNick,
+  normalizeWatchSeconds,
+  normalizeWatchTogetherActivity,
+  parseWatchTogetherProp,
+  serializeWatchTogetherActivity,
+  WATCH_PARTICIPANT_MAX_COUNT,
+  WATCH_SECONDS_MAX,
+  type WatchTogetherActivity,
+} from './watchTogether';
 
 /**
  * A live watch-together session: the round-trippable activity snapshot plus a
@@ -40,16 +50,15 @@ function sameNick(a: string | null | undefined, b: string | null | undefined): b
 }
 
 function normalizeDuration(value: number | null | undefined): number | null {
-  if (value === null || value === undefined) return null;
-  if (!Number.isFinite(value) || value < 0) return null;
-  return Math.floor(value);
+  return normalizeWatchSeconds(value);
 }
 
 function clampPosition(seconds: number, durationSeconds: number | null): number {
   const floored = Number.isFinite(seconds) ? Math.floor(seconds) : 0;
   const atLeastZero = floored < 0 ? 0 : floored;
-  if (durationSeconds !== null && atLeastZero > durationSeconds) return durationSeconds;
-  return atLeastZero;
+  const bounded = Math.min(atLeastZero, WATCH_SECONDS_MAX);
+  if (durationSeconds !== null && bounded > durationSeconds) return durationSeconds;
+  return bounded;
 }
 
 /** True when `selfNick` is the current host and therefore holds the controls. */
@@ -62,21 +71,13 @@ function hasParticipant(participants: readonly string[], nick: string): boolean 
 }
 
 /**
- * Serialize an activity into the `ocean.watch` PROP value. Exact inverse of
- * `parseWatchTogetherProp`. Uses `URLSearchParams` so values are form-encoded
- * (the parser normalizes `;`→`&` before decoding, so `&` separators are safe).
+ * Serialize an activity into the `ocean.watch` PROP value. Arbitrary local
+ * input is normalized first; the resulting bounded activity is the exact
+ * inverse of `parseWatchTogetherProp`. Values are form-encoded, so separators
+ * embedded in display text cannot become new fields.
  */
 export function serializeWatchTogetherProp(activity: WatchTogetherActivity): string {
-  const params = new URLSearchParams();
-  params.set('title', activity.title);
-  if (activity.url) params.set('url', activity.url);
-  if (activity.host) params.set('host', activity.host);
-  params.set('state', activity.state);
-  if (activity.positionSeconds !== null) params.set('position', String(activity.positionSeconds));
-  if (activity.durationSeconds !== null) params.set('duration', String(activity.durationSeconds));
-  if (activity.participants.length > 0) params.set('participants', activity.participants.join(','));
-  if (activity.handoffTo) params.set('handoff', activity.handoffTo);
-  return params.toString();
+  return serializeWatchTogetherActivity(activity);
 }
 
 /**
@@ -85,24 +86,22 @@ export function serializeWatchTogetherProp(activity: WatchTogetherActivity): str
  * pushes.
  */
 export function sessionFromActivity(activity: WatchTogetherActivity, nowMs: number): WatchSession {
-  return { activity, anchorMs: nowMs };
+  return { activity: normalizeWatchTogetherActivity(activity), anchorMs: nowMs };
 }
 
 /** Start a fresh session as host, paused at 0, with the host as sole participant. */
 export function createWatchSession(opts: CreateWatchSessionOptions): WatchSession {
-  const host = opts.host.trim();
-  const title = opts.title.trim() || DEFAULT_TITLE;
-  const url = opts.url?.trim() || null;
-  const activity: WatchTogetherActivity = {
-    title,
-    url,
-    host: host || null,
+  const host = normalizeWatchNick(opts.host);
+  const activity = normalizeWatchTogetherActivity({
+    title: opts.title.trim() || DEFAULT_TITLE,
+    url: opts.url ?? null,
+    host,
     state: 'paused',
     positionSeconds: 0,
     durationSeconds: normalizeDuration(opts.durationSeconds),
     participants: host ? [host] : [],
     handoffTo: null,
-  };
+  });
   return { activity, anchorMs: opts.nowMs };
 }
 
@@ -123,6 +122,17 @@ export function tick(session: WatchSession, nowMs: number): WatchSession {
   const target = (activity.positionSeconds ?? 0) + wholeSeconds;
   const duration = activity.durationSeconds;
   const nextAnchor = anchorMs + wholeSeconds * 1000;
+
+  if (target >= WATCH_SECONDS_MAX) {
+    return {
+      activity: normalizeWatchTogetherActivity({
+        ...activity,
+        positionSeconds: WATCH_SECONDS_MAX,
+        state: 'paused',
+      }),
+      anchorMs: nextAnchor,
+    };
+  }
 
   if (duration !== null && target >= duration) {
     return {
@@ -181,48 +191,43 @@ export function seek(
  * already present. Does not disturb playback timing.
  */
 export function join(session: WatchSession, nick: string, _nowMs: number): WatchSession {
-  const clean = nick.trim();
+  const clean = normalizeWatchNick(nick);
   if (!clean) return session;
   if (hasParticipant(session.activity.participants, clean)) return session;
+  if (session.activity.participants.length >= WATCH_PARTICIPANT_MAX_COUNT) return session;
+  const activity = normalizeWatchTogetherActivity({
+    ...session.activity,
+    participants: [...session.activity.participants, clean],
+  });
+  if (!hasParticipant(activity.participants, clean)) return session;
   return {
     ...session,
-    activity: {
-      ...session.activity,
-      participants: [...session.activity.participants, clean],
-    },
+    activity,
   };
 }
 
 /**
- * Anyone: remove `nick` from the roster. When the host leaves, playback freezes
- * at the ticked position and the host slot is vacated (controls disabled until a
- * handoff is accepted).
+ * Participants may remove themselves from the roster. The active host cannot
+ * leave directly because that would silently orphan authorization; ownership
+ * must be handed off first. If the pending target leaves, cancel the offer into
+ * a paused state.
  */
-export function leave(session: WatchSession, nick: string, nowMs: number): WatchSession {
-  const clean = nick.trim();
+export function leave(session: WatchSession, nick: string, _nowMs: number): WatchSession {
+  const clean = normalizeWatchNick(nick);
   if (!clean) return session;
   if (!hasParticipant(session.activity.participants, clean)) return session;
+  if (sameNick(session.activity.host, clean)) return session;
 
   const participants = session.activity.participants.filter((p) => !sameNick(p, clean));
-
-  if (sameNick(session.activity.host, clean)) {
-    const frozen = tick(session, nowMs);
-    return {
-      activity: {
-        ...frozen.activity,
-        participants,
-        host: null,
-        state: 'paused',
-        handoffTo: null,
-      },
-      anchorMs: nowMs,
-    };
-  }
-
-  const handoffTo = sameNick(session.activity.handoffTo, clean) ? null : session.activity.handoffTo;
+  const leavingPendingTarget = sameNick(session.activity.handoffTo, clean);
   return {
     ...session,
-    activity: { ...session.activity, participants, handoffTo },
+    activity: normalizeWatchTogetherActivity({
+      ...session.activity,
+      participants,
+      state: leavingPendingTarget ? 'paused' : session.activity.state,
+      handoffTo: leavingPendingTarget ? null : session.activity.handoffTo,
+    }),
   };
 }
 
@@ -238,17 +243,36 @@ export function handoff(
   selfNick: string,
 ): WatchSession {
   if (!isWatchHost(session, selfNick)) return session;
-  const target = targetNick.trim();
+  const target = normalizeWatchNick(targetNick);
   if (!target || sameNick(target, session.activity.host)) return session;
   if (!hasParticipant(session.activity.participants, target)) return session;
 
   const frozen = tick(session, nowMs);
+  const activity = normalizeWatchTogetherActivity({
+    ...frozen.activity,
+    state: 'handoff',
+    handoffTo: target,
+  });
   return {
-    activity: {
-      ...frozen.activity,
-      state: 'handoff',
-      handoffTo: target,
-    },
+    activity,
+    anchorMs: nowMs,
+  };
+}
+
+/** Host-only: withdraw a pending handoff and remain paused at its frozen position. */
+export function cancelHandoff(
+  session: WatchSession,
+  nowMs: number,
+  selfNick: string,
+): WatchSession {
+  if (!isWatchHost(session, selfNick)) return session;
+  if (session.activity.state !== 'handoff') return session;
+  return {
+    activity: normalizeWatchTogetherActivity({
+      ...session.activity,
+      state: 'paused',
+      handoffTo: null,
+    }),
     anchorMs: nowMs,
   };
 }
@@ -259,7 +283,8 @@ export function handoff(
  * Lands paused at the frozen position.
  */
 export function acceptHandoff(session: WatchSession, nowMs: number, selfNick: string): WatchSession {
-  const self = selfNick.trim();
+  const self = normalizeWatchNick(selfNick);
+  if (!self) return session;
   if (session.activity.state !== 'handoff') return session;
   if (!sameNick(session.activity.handoffTo, self)) return session;
 
@@ -268,13 +293,13 @@ export function acceptHandoff(session: WatchSession, nowMs: number, selfNick: st
     : [...session.activity.participants, self];
 
   return {
-    activity: {
+    activity: normalizeWatchTogetherActivity({
       ...session.activity,
       host: self,
       handoffTo: null,
       state: 'paused',
       participants,
-    },
+    }),
     anchorMs: nowMs,
   };
 }

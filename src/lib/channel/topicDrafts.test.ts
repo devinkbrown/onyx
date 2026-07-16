@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CHANNEL_TOPIC_DRAFTS_KEY,
   channelTopicDraftKey,
+  clearChannelTopicDrafts,
   loadChannelTopicDrafts,
   readChannelTopicDraft,
   sanitizeChannelTopicDrafts,
@@ -86,5 +87,49 @@ describe('channel topic drafts', () => {
     saveChannelTopicDraft('   ', 'draft', 'server');
 
     expect(loadChannelTopicDrafts()).toEqual({});
+  });
+
+  it('clears channel topic drafts only after verified storage readback', () => {
+    saveChannelTopicDrafts({ '#root': 'release train', '&ops': 'incident draft' });
+
+    expect(clearChannelTopicDrafts()).toEqual({ success: true, cleared: 2, remaining: 0 });
+    expect(localStorage.getItem(CHANNEL_TOPIC_DRAFTS_KEY)).toBeNull();
+    expect(loadChannelTopicDrafts()).toEqual({});
+  });
+
+  it('verifies an already-empty topic-draft key', () => {
+    expect(clearChannelTopicDrafts()).toEqual({ success: true, cleared: 0, remaining: 0 });
+  });
+
+  it('does not report success when storage silently retains topic drafts', () => {
+    saveChannelTopicDrafts({ '#root': 'keep me' });
+    const retainingStorage = {
+      getItem: localStorage.getItem.bind(localStorage),
+      setItem: localStorage.setItem.bind(localStorage),
+      removeItem: vi.fn(),
+    };
+
+    expect(clearChannelTopicDrafts(retainingStorage)).toEqual({
+      success: false,
+      cleared: 0,
+      remaining: 1,
+    });
+    expect(loadChannelTopicDrafts()).toEqual({ '#root': 'keep me' });
+  });
+
+  it('does not throw or report success when topic-draft removal fails', () => {
+    saveChannelTopicDrafts({ '#root': 'keep me' });
+    const throwingStorage = {
+      getItem: localStorage.getItem.bind(localStorage),
+      setItem: localStorage.setItem.bind(localStorage),
+      removeItem: () => { throw new Error('blocked remove'); },
+    };
+
+    expect(clearChannelTopicDrafts(throwingStorage)).toEqual({
+      success: false,
+      cleared: 0,
+      remaining: 1,
+    });
+    expect(loadChannelTopicDrafts()).toEqual({ '#root': 'keep me' });
   });
 });

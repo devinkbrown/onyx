@@ -15,6 +15,20 @@ import { createSignal, onCleanup, Show, type JSX } from 'solid-js';
 import { importVault, VAULT_KEEP } from '@/lib/vault/historyVault';
 import type { DiscordPackageFile } from '@/lib/import/discordPackageImport';
 import { countLabel } from '@/lib/format/countLabel';
+import {
+  DISCORD_PACKAGE_MAX_AGGREGATE_BYTES,
+  DISCORD_PACKAGE_MAX_FILE_BYTES,
+  DISCORD_PACKAGE_MAX_SELECTED_FILES,
+  formatImportMib,
+  GENERIC_JSON_MAX_AGGREGATE_BYTES,
+  GENERIC_JSON_MAX_FILE_BYTES,
+  GENERIC_JSON_MAX_FILES,
+  IRC_LOG_MAX_AGGREGATE_BYTES,
+  IRC_LOG_MAX_FILE_BYTES,
+  IRC_LOG_MAX_FILES,
+  validateImportFileSelection,
+  type ImportFileLimitFailure,
+} from './importFileLimits';
 import '@/lib/prefs/preferences.css';
 
 // The per-platform parsers (~1.6k LOC of Discord/Slack/IRC log-format logic) are
@@ -51,10 +65,34 @@ interface PendingJsonImport {
   newest: string | null;
 }
 
+const GENERIC_JSON_LIMITS = {
+  maxFiles: GENERIC_JSON_MAX_FILES,
+  maxFileBytes: GENERIC_JSON_MAX_FILE_BYTES,
+  maxAggregateBytes: GENERIC_JSON_MAX_AGGREGATE_BYTES,
+} as const;
+
+function jsonLimitMessage(failure: ImportFileLimitFailure): string {
+  if (failure.kind === 'count') {
+    return `Choose no more than ${failure.maxFiles} JSON files at once. Split this import into smaller batches.`;
+  }
+  if (failure.kind === 'file') {
+    return `${failure.fileName} exceeds the ${formatImportMib(failure.maxFileBytes)} per-file JSON limit. Split or export it as smaller JSON files, then try again.`;
+  }
+  return `Those JSON files exceed the ${formatImportMib(failure.maxAggregateBytes)} total import limit. Choose a smaller batch.`;
+}
+
 function shortDate(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+}
+
+/** Defer focus until Solid has mounted or removed the conditional review UI. */
+function focusSoon(target: () => HTMLElement | undefined): void {
+  queueMicrotask(() => {
+    const element = target();
+    if (element?.isConnected) element.focus();
+  });
 }
 
 interface JsonVaultImportProps {
@@ -73,6 +111,21 @@ interface JsonVaultImportProps {
   loadParse: () => Promise<(raw: unknown) => VaultImportResultLike | null>;
 }
 
+async function loadDiscordExportParser(): Promise<(raw: unknown) => VaultImportResultLike | null> {
+  const { parseDiscordExport } = await import('@/lib/import/discordImport');
+  return (raw) => parseDiscordExport(raw);
+}
+
+async function loadSlackExportParser(): Promise<(raw: unknown) => VaultImportResultLike | null> {
+  const { parseSlackExport } = await import('@/lib/import/slackImport');
+  return (raw) => {
+    const result = parseSlackExport(raw);
+    if (!result) return null;
+    // The generic control speaks `guild`; Slack calls it a workspace.
+    return { snapshot: result.snapshot, summary: { ...result.summary, guild: result.summary.workspace } };
+  };
+}
+
 /**
  * Generic on-device "import history from a JSON export" control: choose one or
  * more JSON files, preview an aggregate summary, then merge into the local
@@ -83,12 +136,20 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
   const [status, setStatus] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [pending, setPending] = createSignal<PendingJsonImport | null>(null);
+  let fileInput: HTMLInputElement | undefined;
+  let reviewHeading: HTMLHeadingElement | undefined;
 
   async function handleSelect(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = '';
     if (files.length === 0) return;
+    const limitFailure = validateImportFileSelection(files, GENERIC_JSON_LIMITS);
+    if (limitFailure) {
+      setPending(null);
+      setStatus(jsonLimitMessage(limitFailure));
+      return;
+    }
     setBusy(true);
     try {
       const parse = await props.loadParse();
@@ -136,6 +197,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
       setPending({ fileNames, snapshots, channels: targets.size, messages, skipped, droppedOverCap, guild, oldest, newest });
       const rejectedNote = rejected > 0 ? ` ${countLabel(rejected, 'file')} skipped as unreadable.` : '';
       setStatus(`Ready to import ${countLabel(messages, 'message')} across ${countLabel(targets.size, 'channel')}${guild ? ` from ${guild}` : ''}.${rejectedNote}`);
+      focusSoon(() => reviewHeading);
     } catch {
       setPending(null);
       setStatus(props.rejectMessage);
@@ -156,6 +218,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
       }
       setPending(null);
       setStatus(`Imported ${countLabel(imported, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+      focusSoon(() => fileInput);
     } catch {
       setStatus('Import failed while merging into the local vault.');
     } finally {
@@ -177,6 +240,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
             accept="application/json,.json"
             multiple
             disabled={busy()}
+            ref={fileInput}
             onChange={(event) => void handleSelect(event)}
           />
         </label>
@@ -184,7 +248,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
       <Show when={pending()}>
         {(job) => (
           <div class="pref-import-review" role="group" aria-labelledby={`pref-${props.id}-review-title`}>
-            <h4 id={`pref-${props.id}-review-title`}>Review import</h4>
+            <h4 id={`pref-${props.id}-review-title`} tabindex={-1} ref={reviewHeading}>Review import</h4>
             <p>
               {countLabel(job().fileNames.length, 'file')}: {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
               {job().guild ? ` from ${job().guild}` : ''}
@@ -204,6 +268,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
                 onClick={() => {
                   setPending(null);
                   setStatus('Import cancelled.');
+                  focusSoon(() => fileInput);
                 }}
               >
                 Cancel import
@@ -228,10 +293,7 @@ export function DiscordImportControls(): JSX.Element {
       title="Import from Discord"
       chooseLabel="Choose Discord JSON"
       rejectMessage="No Discord export recognized. Export channels from DiscordChatExporter in JSON mode, then choose those .json files."
-      loadParse={async () => {
-        const { parseDiscordExport } = await import('@/lib/import/discordImport');
-        return (raw) => parseDiscordExport(raw);
-      }}
+      loadParse={loadDiscordExportParser}
       description={
         <>
           Leaving Discord? Export your channels with{' '}
@@ -266,8 +328,21 @@ function isPackageFileName(name: string): boolean {
   );
 }
 
-/** A single package file larger than this is skipped rather than read into memory. */
-const MAX_PACKAGE_FILE_BYTES = 256 * 1024 * 1024;
+const DISCORD_PACKAGE_LIMITS = {
+  maxFiles: DISCORD_PACKAGE_MAX_SELECTED_FILES,
+  maxFileBytes: DISCORD_PACKAGE_MAX_FILE_BYTES,
+  maxAggregateBytes: DISCORD_PACKAGE_MAX_AGGREGATE_BYTES,
+} as const;
+
+function discordPackageLimitMessage(failure: ImportFileLimitFailure): string {
+  if (failure.kind === 'count') {
+    return `That folder contains more than ${failure.maxFiles} selected files. Choose a smaller unzipped Discord package folder.`;
+  }
+  if (failure.kind === 'file') {
+    return `${failure.fileName} exceeds the ${formatImportMib(failure.maxFileBytes)} per-file Discord package limit. Remove that channel export or choose a smaller package.`;
+  }
+  return `Recognized Discord package files exceed the ${formatImportMib(failure.maxAggregateBytes)} total import limit. Choose a smaller package folder.`;
+}
 
 /**
  * Import Discord's OFFICIAL self-serve data package — the export every user can
@@ -281,18 +356,39 @@ export function DiscordPackageImportControls(): JSX.Element {
   const [status, setStatus] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [pending, setPending] = createSignal<PendingPackageImport | null>(null);
+  let packageInput: HTMLInputElement | undefined;
+  let reviewHeading: HTMLHeadingElement | undefined;
 
   async function handleSelect(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = '';
     if (files.length === 0) return;
+    if (files.length > DISCORD_PACKAGE_MAX_SELECTED_FILES) {
+      setPending(null);
+      setStatus(discordPackageLimitMessage({ kind: 'count', maxFiles: DISCORD_PACKAGE_MAX_SELECTED_FILES }));
+      return;
+    }
+    // Only recognized package payloads are read or charged to the byte budget.
+    // Unrelated account-package files are ignored before aggregate accounting.
+    const recognizedFiles = files.filter(file => isPackageFileName(file.name));
+    const limitFailure = validateImportFileSelection(
+      recognizedFiles.map(file => ({
+        name: file.webkitRelativePath || file.name,
+        size: file.size,
+      })),
+      DISCORD_PACKAGE_LIMITS,
+    );
+    if (limitFailure) {
+      setPending(null);
+      setStatus(discordPackageLimitMessage(limitFailure));
+      return;
+    }
     setBusy(true);
     try {
       const packageFiles: DiscordPackageFile[] = [];
-      for (const file of files) {
+      for (const file of recognizedFiles) {
         const path = file.webkitRelativePath || file.name;
-        if (!isPackageFileName(file.name) || file.size > MAX_PACKAGE_FILE_BYTES) continue;
         packageFiles.push({ path, text: await file.text() });
       }
       const { parseDiscordPackage } = await import('@/lib/import/discordPackageImport');
@@ -314,6 +410,7 @@ export function DiscordPackageImportControls(): JSX.Element {
         newest: s.newest,
       });
       setStatus(`Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'channel')}${s.guild ? ` from ${s.guild}` : ''}.`);
+      focusSoon(() => reviewHeading);
     } catch {
       setPending(null);
       setStatus('Could not read that folder as a Discord data package.');
@@ -330,6 +427,7 @@ export function DiscordPackageImportControls(): JSX.Element {
       const result = await importVault(job.snapshot);
       setPending(null);
       setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+      focusSoon(() => packageInput);
     } catch {
       setStatus('Import failed while merging into the local vault.');
     } finally {
@@ -352,7 +450,10 @@ export function DiscordPackageImportControls(): JSX.Element {
             type="file"
             multiple
             disabled={busy()}
-            ref={(el) => el.setAttribute('webkitdirectory', '')}
+            ref={(element) => {
+              packageInput = element;
+              element.setAttribute('webkitdirectory', '');
+            }}
             onChange={(event) => void handleSelect(event)}
           />
         </label>
@@ -360,7 +461,7 @@ export function DiscordPackageImportControls(): JSX.Element {
       <Show when={pending()}>
         {(job) => (
           <div class="pref-import-review" role="group" aria-labelledby="pref-discord-package-review-title">
-            <h4 id="pref-discord-package-review-title">Review import</h4>
+            <h4 id="pref-discord-package-review-title" tabindex={-1} ref={reviewHeading}>Review import</h4>
             <p>
               {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
               {job().guild ? ` from ${job().guild}` : ''}
@@ -380,6 +481,7 @@ export function DiscordPackageImportControls(): JSX.Element {
                 onClick={() => {
                   setPending(null);
                   setStatus('Import cancelled.');
+                  focusSoon(() => packageInput);
                 }}
               >
                 Cancel import
@@ -427,8 +529,11 @@ export function DiscordBotImportControls(): JSX.Element {
   const [busy, setBusy] = createSignal(false);
   const [token, setToken] = createSignal('');
   const [guildId, setGuildId] = createSignal('');
+  const [proxyAcknowledged, setProxyAcknowledged] = createSignal(false);
   const [pending, setPending] = createSignal<PendingBotImport | null>(null);
   const [abort, setAbort] = createSignal<AbortController | null>(null);
+  let tokenInput: HTMLInputElement | undefined;
+  let reviewHeading: HTMLHeadingElement | undefined;
 
   // Token contract: on unmount, abort any in-flight fetch (so the run's
   // finally disposes the client and releases its token copy immediately) and
@@ -436,9 +541,14 @@ export function DiscordBotImportControls(): JSX.Element {
   onCleanup(() => {
     abort()?.abort();
     setToken('');
+    setProxyAcknowledged(false);
   });
 
   async function handleFetch(): Promise<void> {
+    if (!proxyAcknowledged()) {
+      setStatus('Acknowledge the import proxy disclosure before fetching history.');
+      return;
+    }
     const tok = token().trim();
     const guild = guildId().trim();
     if (!tok) {
@@ -485,16 +595,20 @@ export function DiscordBotImportControls(): JSX.Element {
       setStatus(
         `Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'channel')}${s.guild ? ` from ${s.guild}` : ''}.`,
       );
+      focusSoon(() => reviewHeading);
     } catch (err) {
       setPending(null);
       // DiscordImportError.message is already user-safe and never contains the token.
       setStatus(err instanceof Error && err.message ? err.message : 'Discord import failed.');
     } finally {
       // Zero the token at end-of-run: fetching is done, the vault merge below
-      // never needs it. A retry re-pastes.
+      // never needs it. Consent is per-request, so a retry re-pastes and
+      // explicitly acknowledges the proxy disclosure again.
       setToken('');
+      setProxyAcknowledged(false);
       setAbort(null);
       setBusy(false);
+      if (!pending()) focusSoon(() => tokenInput);
     }
   }
 
@@ -506,6 +620,7 @@ export function DiscordBotImportControls(): JSX.Element {
       const result = await importVault(job.snapshot);
       setPending(null);
       setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+      focusSoon(() => tokenInput);
     } catch {
       setStatus('Import failed while merging into the local vault.');
     } finally {
@@ -519,7 +634,10 @@ export function DiscordBotImportControls(): JSX.Element {
         <h3 id="pref-discord-bot-import-title" class="pref-label">Import from a Discord server (bot token)</h3>
       </div>
       <p class="pref-desc">
-        Own a Discord server? Create a bot, invite it, and pull the <strong>whole server's</strong> history straight in — every text, announcement, and forum channel, plus pins. The token and Server ID you enter below are used only for this import — they are never saved to this device, never uploaded anywhere but Discord's own API, and never written to the imported history. All calls go through this site's read-only Discord proxy.
+        Own a Discord server? Create a bot, invite it, and pull the <strong>whole server's</strong> history straight in — every text, announcement, and forum channel, plus pins.
+      </p>
+      <p class="pref-desc" id="pref-discord-bot-proxy-disclosure">
+        Your bot token is sent to this Onyx deployment's same-origin import proxy, which contacts Discord's API on your behalf. The token is used only for this request and is not stored in the portable vault or local history.
       </p>
       <ol class="pref-discord-bot-steps">
         <li>Create an application at <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer noopener">discord.com/developers</a>, then add a <strong>Bot</strong> to it.</li>
@@ -539,6 +657,7 @@ export function DiscordBotImportControls(): JSX.Element {
             placeholder="Bot token (used once, never saved)"
             value={token()}
             disabled={busy()}
+            ref={tokenInput}
             onInput={(event) => setToken(event.currentTarget.value)}
           />
         </label>
@@ -554,7 +673,23 @@ export function DiscordBotImportControls(): JSX.Element {
             onInput={(event) => setGuildId(event.currentTarget.value)}
           />
         </label>
-        <button type="button" class="pref-reset" disabled={busy()} onClick={() => void handleFetch()}>
+        <label class="pref-discord-bot-consent">
+          <input
+            type="checkbox"
+            checked={proxyAcknowledged()}
+            disabled={busy()}
+            aria-describedby="pref-discord-bot-proxy-disclosure"
+            onChange={(event) => setProxyAcknowledged(event.currentTarget.checked)}
+          />
+          <span>I understand that my bot token will be sent to this deployment's import proxy.</span>
+        </label>
+        <button
+          type="button"
+          class="pref-reset"
+          disabled={busy() || !proxyAcknowledged()}
+          aria-describedby="pref-discord-bot-proxy-disclosure"
+          onClick={() => void handleFetch()}
+        >
           Fetch history
         </button>
         <Show when={busy() && abort()}>
@@ -573,7 +708,7 @@ export function DiscordBotImportControls(): JSX.Element {
       <Show when={pending()}>
         {(job) => (
           <div class="pref-import-review" role="group" aria-labelledby="pref-discord-bot-review-title">
-            <h4 id="pref-discord-bot-review-title">Review import</h4>
+            <h4 id="pref-discord-bot-review-title" tabindex={-1} ref={reviewHeading}>Review import</h4>
             <p>
               {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
               {job().guild ? ` from ${job().guild}` : ''}
@@ -598,6 +733,7 @@ export function DiscordBotImportControls(): JSX.Element {
                 onClick={() => {
                   setPending(null);
                   setStatus('Import cancelled.');
+                  focusSoon(() => tokenInput);
                 }}
               >
                 Cancel import
@@ -620,15 +756,7 @@ export function SlackImportControls(): JSX.Element {
       title="Import from Slack"
       chooseLabel="Choose Slack JSON"
       rejectMessage="No Slack export recognized. Unzip your Slack workspace export and choose its per-channel .json files."
-      loadParse={async () => {
-        const { parseSlackExport } = await import('@/lib/import/slackImport');
-        return (raw) => {
-          const result = parseSlackExport(raw);
-          if (!result) return null;
-          // The generic control speaks `guild`; Slack calls it a workspace.
-          return { snapshot: result.snapshot, summary: { ...result.summary, guild: result.summary.workspace } };
-        };
-      }}
+      loadParse={loadSlackExportParser}
       description={
         <>
           Leaving Slack? Request your workspace export (Slack → Settings & administration → Workspace settings → Import/Export Data), unzip it, and choose the per-channel <strong>JSON</strong> files here. Everything happens on this device — nothing is uploaded. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
@@ -641,7 +769,9 @@ export function SlackImportControls(): JSX.Element {
 interface PendingIrcLogImport {
   fileName: string;
   snapshot: import('@/lib/vault/historyVault').VaultExportSnapshot;
-  channel: string;
+  requestedChannel: string;
+  target: string;
+  targetChanged: boolean;
   messages: number;
   skipped: number;
   droppedOverCap: number;
@@ -658,29 +788,80 @@ export function IrcLogImportControls(): JSX.Element {
   const [busy, setBusy] = createSignal(false);
   const [channel, setChannel] = createSignal('');
   const [pending, setPending] = createSignal<PendingIrcLogImport | null>(null);
+  let fileInput: HTMLInputElement | undefined;
+  let reviewHeading: HTMLHeadingElement | undefined;
 
   async function handleSelect(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0] ?? null;
+    const files = Array.from(input.files ?? []);
     input.value = '';
+    const limitFailure = validateImportFileSelection(files, {
+      maxFiles: IRC_LOG_MAX_FILES,
+      maxFileBytes: IRC_LOG_MAX_FILE_BYTES,
+      maxAggregateBytes: IRC_LOG_MAX_AGGREGATE_BYTES,
+    });
+    if (limitFailure) {
+      setPending(null);
+      if (limitFailure.kind === 'count') {
+        setStatus('Choose one IRC log at a time.');
+      } else if (limitFailure.kind === 'file') {
+        setStatus(`${limitFailure.fileName} exceeds the ${formatImportMib(limitFailure.maxFileBytes)} IRC log limit. Split the log and import each part separately.`);
+      } else {
+        setStatus(`That IRC log exceeds the ${formatImportMib(limitFailure.maxAggregateBytes)} total import limit. Split it and import each part separately.`);
+      }
+      return;
+    }
+    const file = files[0] ?? null;
     if (!file) return;
-    const chan = channel().trim();
-    if (!chan) {
+    const requestedChannel = channel();
+    if (!requestedChannel.trim()) {
       setStatus('Enter the channel these logs belong to first (e.g. #dev).');
       return;
     }
     setBusy(true);
     try {
-      const { parseIrcLog } = await import('@/lib/import/ircLogImport');
-      const result = parseIrcLog(await file.text(), { channel: chan });
+      const { normalizeIrcChannelTarget, parseIrcLog } = await import('@/lib/import/ircLogImport');
+      const normalizedTarget = normalizeIrcChannelTarget(requestedChannel);
+      if (!normalizedTarget) {
+        setPending(null);
+        setStatus(`The requested channel "${requestedChannel}" does not normalize to a safe destination. Enter a channel containing letters or numbers (for example, #dev).`);
+        return;
+      }
+      const result = parseIrcLog(await file.text(), { channel: requestedChannel });
       if (!result || result.summary.messages === 0) {
         setPending(null);
         setStatus('No recognizable log lines found. Supported: weechat, irssi, and mIRC text logs.');
         return;
       }
+      const snapshotTarget = result.snapshot.targets[0];
+      const actualTarget = snapshotTarget?.target ?? '';
+      const targetIsConsistent = result.snapshot.targets.length === 1
+        && actualTarget === normalizedTarget
+        && normalizeIrcChannelTarget(actualTarget) === actualTarget
+        && snapshotTarget?.messages.every(message => message.target === actualTarget);
+      if (!targetIsConsistent) {
+        setPending(null);
+        setStatus('Import rejected because the IRC log did not produce one safe, consistent destination. Enter a different channel and try again.');
+        return;
+      }
       const s = result.summary;
-      setPending({ fileName: file.name, snapshot: result.snapshot, channel: chan, messages: s.messages, skipped: s.skipped, droppedOverCap: s.droppedOverCap, oldest: s.oldest, newest: s.newest });
-      setStatus(`Ready to import ${countLabel(s.messages, 'message')} into ${chan}.`);
+      setPending({
+        fileName: file.name,
+        snapshot: result.snapshot,
+        requestedChannel,
+        target: actualTarget,
+        targetChanged: requestedChannel !== actualTarget,
+        messages: s.messages,
+        skipped: s.skipped,
+        droppedOverCap: s.droppedOverCap,
+        oldest: s.oldest,
+        newest: s.newest,
+      });
+      const changed = requestedChannel !== actualTarget
+        ? ` Requested "${requestedChannel}"; exact destination ${actualTarget}. Review and confirm that destination.`
+        : '';
+      setStatus(`Ready to import ${countLabel(s.messages, 'message')} into ${actualTarget}.${changed}`);
+      focusSoon(() => reviewHeading);
     } catch {
       setPending(null);
       setStatus('Could not read that log file.');
@@ -696,7 +877,8 @@ export function IrcLogImportControls(): JSX.Element {
     try {
       const result = await importVault(job.snapshot);
       setPending(null);
-      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${job.channel}. Open it to read the history, or search from anywhere.`);
+      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${job.target}. Open it to read the history, or search from anywhere.`);
+      focusSoon(() => fileInput);
     } catch {
       setStatus('Import failed while merging into the local vault.');
     } finally {
@@ -730,6 +912,7 @@ export function IrcLogImportControls(): JSX.Element {
             type="file"
             accept="text/plain,.log,.txt,.weechatlog"
             disabled={busy()}
+            ref={fileInput}
             onChange={(event) => void handleSelect(event)}
           />
         </label>
@@ -737,17 +920,22 @@ export function IrcLogImportControls(): JSX.Element {
       <Show when={pending()}>
         {(job) => (
           <div class="pref-import-review" role="group" aria-labelledby="pref-irclog-review-title">
-            <h4 id="pref-irclog-review-title">Review import</h4>
+            <h4 id="pref-irclog-review-title" tabindex={-1} ref={reviewHeading}>Review import</h4>
             <p>
-              {job().fileName}: {countLabel(job().messages, 'message')} into {job().channel}
+              {job().fileName}: {countLabel(job().messages, 'message')} into {job().target}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'unparseable/filtered line')} skipped.` : ''}
               {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
               {' '}Existing local history is merged, not replaced.
             </p>
+            <Show when={job().targetChanged}>
+              <p class="pref-status" role="alert">
+                Channel destination changed. Requested "{job().requestedChannel}"; import destination: {job().target}. Confirm only if this is the intended room.
+              </p>
+            </Show>
             <div class="pref-import-review__actions">
               <button type="button" class="pref-reset" disabled={busy()} onClick={() => void confirmImport()}>
-                Import into vault
+                Import into {job().target}
               </button>
               <button
                 type="button"
@@ -756,6 +944,7 @@ export function IrcLogImportControls(): JSX.Element {
                 onClick={() => {
                   setPending(null);
                   setStatus('Import cancelled.');
+                  focusSoon(() => fileInput);
                 }}
               >
                 Cancel import

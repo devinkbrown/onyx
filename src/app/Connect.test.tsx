@@ -19,6 +19,7 @@ import { Connect } from './Connect';
 import { NODES } from './nodes';
 import { store, getState } from '@/lib/store';
 import { preferences, resetPreferences } from '@/lib/prefs/preferences';
+import { loadCredentials } from '@/lib/credentials';
 
 // The connect screen probes node latency by opening real WebSockets on mount.
 // In jsdom that would hit the live servers, so stub the probe + selector here —
@@ -52,6 +53,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -309,6 +311,81 @@ describe('Sign in connect', () => {
     expect(connectSpy).not.toHaveBeenCalled();
     connectSpy.mockRestore();
   });
+
+  it('persists the exact password when Stay signed in is enabled', async () => {
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+    fireEvent.click(screen.getByRole('switch', { name: 'Stay signed in' }));
+    fireEvent.input(nickField(), { target: { value: 'kain' } });
+    fireEvent.input(screen.getByLabelText(/account password/i), { target: { value: '  spaced password  ' } });
+    fireEvent.submit(document.querySelector('form')!);
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(connectSpy.mock.calls[0]![0].password).toBe('  spaced password  ');
+    expect(loadCredentials()).toMatchObject({
+      nick: 'kain',
+      password: '  spaced password  ',
+    });
+    connectSpy.mockRestore();
+  });
+
+  it('does not persist credentials when Stay signed in is disabled', async () => {
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+    fireEvent.input(nickField(), { target: { value: 'kain' } });
+    fireEvent.input(screen.getByLabelText(/account password/i), { target: { value: 'hunter2!' } });
+    fireEvent.submit(document.querySelector('form')!);
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(loadCredentials()).toBeNull();
+    connectSpy.mockRestore();
+  });
+
+  it('makes password persistence explicit and opt-in', () => {
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+
+    expect(screen.getByRole('switch', { name: 'Stay signed in' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText(/stores your account password in this browser/i)).toBeInTheDocument();
+    expect(screen.getByText(/only on a private device/i)).toBeInTheDocument();
+  });
+
+  it('does not expose a stale resume token to a normal stay-off sign-in', async () => {
+    const selected = NODES[0]!;
+    window.localStorage.setItem(
+      'onyx:credentials',
+      JSON.stringify({
+        version: 2,
+        activeKey: `${selected.wss}|kain`,
+        entries: {
+          [`${selected.wss}|kain`]: {
+            nick: 'kain',
+            server: selected.wss,
+            password: 'old-password',
+            meshToken: 'stale-mesh-token',
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }),
+    );
+    let tokenSeenByConnect: string | undefined;
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation((opts) => {
+      tokenSeenByConnect = loadCredentials(opts.url, opts.nick)?.meshToken;
+    });
+    render(() => <Connect />);
+    await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
+    clickMode(/sign in/i);
+    fireEvent.input(screen.getByLabelText(/account password/i), { target: { value: 'new-password' } });
+
+    fireEvent.submit(document.querySelector('form')!);
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(tokenSeenByConnect).toBeUndefined();
+    expect(loadCredentials()).toBeNull();
+    connectSpy.mockRestore();
+  });
 });
 
 // ── Register → verify flow ──────────────────────────────────────────────────────
@@ -457,12 +534,12 @@ describe('GHOST reclaim', () => {
     await waitFor(() => expect(screen.getByTestId('conn-reclaim-open')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('conn-reclaim-open'));
-    fireEvent.input(screen.getByLabelText(/account password/i), { target: { value: 'secret12' } });
+    fireEvent.input(screen.getByLabelText(/account password/i), { target: { value: '  secret12  ' } });
     fireEvent.click(screen.getByTestId('conn-reclaim-submit'));
 
     await waitFor(() => expect(ghostSpy).toHaveBeenCalledOnce());
     expect(ghostSpy.mock.calls[0]![0]).toBe('kain');
-    expect(ghostSpy.mock.calls[0]![1]).toBe('secret12');
+    expect(ghostSpy.mock.calls[0]![1]).toBe('  secret12  ');
     // and it retries the connection
     expect(connectSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
 
@@ -485,6 +562,7 @@ describe('Session resume', () => {
             nick: 'kain',
             server: 'wss://ircx.us:8080',
             password: 'remembered1',
+            sessionToken: 'resume-token',
             savedAt: new Date().toISOString(),
           },
         },
@@ -496,7 +574,10 @@ describe('Session resume', () => {
     seedSavedCredentials();
     render(() => <Connect />);
     await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
-    expect(screen.getByTestId('conn-resume').closest('.conn-resume')).toHaveTextContent(/resume as/i);
+    const switcher = screen.getByRole('region', { name: /remembered identities/i });
+    expect(switcher).toHaveTextContent('kain');
+    expect(switcher).toHaveTextContent('wss://ircx.us:8080');
+    expect(switcher).toHaveTextContent(/session ready/i);
   });
 
   it('connects with the remembered nick + password on resume', async () => {
@@ -511,9 +592,256 @@ describe('Session resume', () => {
     connectSpy.mockRestore();
   });
 
+  it('copies a mesh resume token to the newly selected node before connecting', async () => {
+    const selected = NODES[0]!;
+    const previous = NODES[1]!;
+    window.localStorage.setItem(
+      'onyx:credentials',
+      JSON.stringify({
+        version: 2,
+        activeKey: `${previous.wss}|kain`,
+        entries: {
+          [`${previous.wss}|kain`]: {
+            nick: 'kain',
+            server: previous.wss,
+            password: 'remembered1',
+            meshToken: 'mesh-resume-token',
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }),
+    );
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+    render(() => <Connect />);
+    await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('switch'));
+
+    fireEvent.click(screen.getByTestId('conn-resume'));
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(connectSpy.mock.calls[0]![0].url).toBe(selected.wss);
+    expect(loadCredentials(selected.wss, 'kain')).toMatchObject({
+      password: 'remembered1',
+      meshToken: 'mesh-resume-token',
+    });
+    connectSpy.mockRestore();
+  });
+
+  it('returns to the issuing node when only a node-local resume token exists', async () => {
+    const previous = NODES[1]!;
+    window.localStorage.setItem(
+      'onyx:credentials',
+      JSON.stringify({
+        version: 2,
+        activeKey: `${previous.wss}|kain`,
+        entries: {
+          [`${previous.wss}|kain`]: {
+            nick: 'kain',
+            server: previous.wss,
+            password: 'remembered1',
+            sessionToken: 'local-resume-token',
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }),
+    );
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+    render(() => <Connect />);
+    await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('switch'));
+
+    fireEvent.click(screen.getByTestId('conn-resume'));
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(connectSpy.mock.calls[0]![0].url).toBe(previous.wss);
+    expect(loadCredentials(previous.wss, 'kain')?.sessionToken).toBe('local-resume-token');
+    connectSpy.mockRestore();
+  });
+
+  it('makes a one-time token visible to connect before forgetting it when persistence is off', async () => {
+    const selected = NODES[0]!;
+    const previous = NODES[1]!;
+    window.localStorage.setItem(
+      'onyx:credentials',
+      JSON.stringify({
+        version: 2,
+        activeKey: `${previous.wss}|kain`,
+        entries: {
+          [`${previous.wss}|kain`]: {
+            nick: 'kain',
+            server: previous.wss,
+            password: 'remembered1',
+            meshToken: 'one-time-mesh-token',
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }),
+    );
+    let tokenSeenByConnect: string | undefined;
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation((opts) => {
+      tokenSeenByConnect = loadCredentials(opts.url, opts.nick)?.meshToken;
+    });
+    render(() => <Connect />);
+    await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('conn-resume'));
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(connectSpy.mock.calls[0]![0].url).toBe(selected.wss);
+    expect(tokenSeenByConnect).toBe('one-time-mesh-token');
+    expect(loadCredentials()).toBeNull();
+    connectSpy.mockRestore();
+  });
+
   it('does not show resume when nothing is remembered', () => {
     render(() => <Connect />);
     expect(screen.queryByTestId('conn-resume')).not.toBeInTheDocument();
+  });
+
+  it('does not offer authenticated resume for an identity-only handoff', async () => {
+    window.localStorage.setItem(
+      'onyx:credentials',
+      JSON.stringify({
+        version: 2,
+        activeKey: 'wss://ircx.us:8080|kain',
+        entries: {
+          'wss://ircx.us:8080|kain': {
+            nick: 'kain',
+            server: 'wss://ircx.us:8080',
+            meshToken: 'orphaned-token-without-sasl-secret',
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }),
+    );
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+
+    render(() => <Connect />);
+
+    await waitFor(() => expect(screen.getByTestId('conn-identity-use')).toBeInTheDocument());
+    expect(screen.queryByTestId('conn-resume')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /remembered identities/i })).toHaveTextContent(/identity only/i);
+    expect(screen.getByRole('region', { name: /remembered identities/i }).textContent).not.toContain('orphaned-token');
+
+    fireEvent.click(screen.getByTestId('conn-identity-use'));
+
+    expect(connectSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'signin');
+    expect(nickField()).toHaveValue('kain');
+    connectSpy.mockRestore();
+  });
+
+  it('labels a saved password without a session token as sign-in, not resume', async () => {
+    window.localStorage.setItem(
+      'onyx:credentials',
+      JSON.stringify({
+        version: 2,
+        activeKey: 'wss://ircx.us:8080|kain',
+        entries: {
+          'wss://ircx.us:8080|kain': {
+            nick: 'kain',
+            server: 'wss://ircx.us:8080',
+            password: 'remembered1',
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }),
+    );
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+
+    render(() => <Connect />);
+
+    await waitFor(() => expect(screen.getByTestId('conn-remembered-signin')).toBeInTheDocument());
+    expect(screen.queryByTestId('conn-resume')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('conn-remembered-signin'));
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(connectSpy.mock.calls[0]![0]).toMatchObject({
+      nick: 'kain',
+      password: 'remembered1',
+    });
+    connectSpy.mockRestore();
+  });
+
+  it('switches among multiple server identities and forgets only the chosen entry', async () => {
+    const first = NODES[0]!;
+    const second = NODES[1]!;
+    window.localStorage.setItem(
+      'onyx:credentials',
+      JSON.stringify({
+        version: 2,
+        activeKey: `${first.wss}|alice`,
+        entries: {
+          [`${first.wss}|alice`]: {
+            nick: 'Alice',
+            server: first.wss,
+            password: 'alice-secret',
+            meshToken: 'alice-token',
+            savedAt: new Date().toISOString(),
+          },
+          [`${second.wss}|bob`]: {
+            nick: 'Bob',
+            server: second.wss,
+            password: 'bob-secret',
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }),
+    );
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+
+    render(() => <Connect />);
+
+    const switcher = await screen.findByRole('region', { name: /remembered identities/i });
+    expect(within(switcher).getByText('Alice')).toBeInTheDocument();
+    expect(within(switcher).getByText('Bob')).toBeInTheDocument();
+    expect(switcher.textContent).not.toContain('alice-secret');
+    expect(switcher.textContent).not.toContain('bob-secret');
+    expect(switcher.textContent).not.toContain('alice-token');
+
+    fireEvent.click(within(switcher).getByRole('button', { name: `Select Bob on ${second.wss}` }));
+    expect(nickField()).toHaveValue('Bob');
+    expect(screen.getByTestId('conn-remembered-signin')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('conn-remembered-signin'));
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(connectSpy.mock.calls[0]![0]).toMatchObject({ nick: 'Bob', password: 'bob-secret' });
+    connectSpy.mockRestore();
+  });
+
+  it('forgets one remembered identity without removing the others', async () => {
+    const first = NODES[0]!;
+    const second = NODES[1]!;
+    window.localStorage.setItem(
+      'onyx:credentials',
+      JSON.stringify({
+        version: 2,
+        activeKey: `${first.wss}|alice`,
+        entries: {
+          [`${first.wss}|alice`]: {
+            nick: 'Alice',
+            server: first.wss,
+            password: 'alice-secret',
+            savedAt: new Date().toISOString(),
+          },
+          [`${second.wss}|bob`]: {
+            nick: 'Bob',
+            server: second.wss,
+            password: 'bob-secret',
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }),
+    );
+
+    render(() => <Connect />);
+
+    const switcher = await screen.findByRole('region', { name: /remembered identities/i });
+    fireEvent.click(within(switcher).getByRole('button', { name: `Forget Bob on ${second.wss}` }));
+
+    expect(within(switcher).queryByText('Bob')).not.toBeInTheDocument();
+    expect(within(switcher).getByText('Alice')).toBeInTheDocument();
+    expect(loadCredentials(second.wss, 'Bob')).toBeNull();
+    expect(loadCredentials(first.wss, 'Alice')).toMatchObject({ password: 'alice-secret' });
   });
 });
 

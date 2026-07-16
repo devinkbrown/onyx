@@ -7,13 +7,71 @@ import { describe, expect, it } from 'vitest';
 
 import {
   EMBEDDING_DIM,
+  EMBEDDING_MAX_CONCURRENCY,
   HashingEmbeddingProvider,
   OllamaEmbeddingProvider,
   cosineSimilarity,
   embed,
+  embedItemsBounded,
   rankBySimilarity,
   tokenize,
 } from './embeddingIndex';
+
+describe('embedItemsBounded', () => {
+  it('never exceeds the shared async provider concurrency cap', async () => {
+    let active = 0;
+    let peak = 0;
+    const provider = {
+      dim: 2,
+      async embed(): Promise<Float32Array> {
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        active -= 1;
+        return new Float32Array([1, 0]);
+      },
+    };
+
+    const results = await embedItemsBounded(
+      Array.from({ length: 17 }, (_, index) => index),
+      String,
+      provider,
+    );
+
+    expect(results).toHaveLength(17);
+    expect(peak).toBe(EMBEDDING_MAX_CONCURRENCY);
+  });
+
+  it('stops scheduling and discards in-flight output after abort', async () => {
+    const controller = new AbortController();
+    let calls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const provider = {
+      dim: 2,
+      async embed(): Promise<Float32Array> {
+        calls += 1;
+        await gate;
+        return new Float32Array([1, 0]);
+      },
+    };
+
+    const pending = embedItemsBounded(
+      Array.from({ length: 100 }, (_, index) => index),
+      String,
+      provider,
+      controller.signal,
+    );
+    await Promise.resolve();
+    expect(calls).toBe(EMBEDDING_MAX_CONCURRENCY);
+
+    controller.abort();
+    release();
+
+    await expect(pending).resolves.toEqual([]);
+    expect(calls).toBe(EMBEDDING_MAX_CONCURRENCY);
+  });
+});
 
 describe('tokenize', () => {
   it('lowercases and splits on non-alphanumeric boundaries', () => {

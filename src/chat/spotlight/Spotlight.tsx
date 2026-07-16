@@ -53,6 +53,7 @@ const GRAMMAR_EXAMPLES = [
   'away lunch',
   'focus',
   'schedule 15m: ping the team',
+  'review #root',
   'mute 1h',
 ] as const;
 

@@ -24,6 +24,10 @@ import type { ProvenanceScope } from '@/lib/intelligence/provenance';
 /** On-device translation is computed locally, so its provenance is always the device scope. */
 export const TRANSLATION_PROVENANCE: ProvenanceScope = 'device';
 
+/** Keep local model requests and transient results within a predictable memory budget. */
+export const MAX_TRANSLATION_SOURCE_LENGTH = 4_096;
+export const MAX_TRANSLATION_RESULT_LENGTH = 8_192;
+
 // ── the interface (model-independent) ────────────────────────────────────────
 
 /** A translator hands one piece of text to a model and resolves the translated text. */
@@ -85,7 +89,7 @@ export function buildTranslationRequest(
   targetLang: string,
 ): TranslationRequest {
   const normalizedTarget = normalizeLang(targetLang);
-  const sourceText = message.text;
+  const sourceText = message.text.slice(0, MAX_TRANSLATION_SOURCE_LENGTH);
   const sourceLang = message.lang ? normalizeLang(message.lang) : undefined;
   const passthrough =
     sourceText.trim().length === 0 ||
@@ -106,7 +110,7 @@ export function applyTranslationResult(
   return {
     ...message,
     translation: {
-      translated,
+      translated: translated.slice(0, MAX_TRANSLATION_RESULT_LENGTH),
       targetLang: normalizeLang(targetLang),
       provenance: TRANSLATION_PROVENANCE,
     },
@@ -173,7 +177,8 @@ export class BrowserTranslatorAdapter implements Translator {
       sourceLanguage: this.sourceLanguage,
       targetLanguage: normalizeLang(targetLang),
     });
-    return await instance.translate(text);
+    const translated = await instance.translate(text.slice(0, MAX_TRANSLATION_SOURCE_LENGTH));
+    return translated.slice(0, MAX_TRANSLATION_RESULT_LENGTH);
   }
 }
 

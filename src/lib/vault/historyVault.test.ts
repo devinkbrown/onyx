@@ -6,14 +6,24 @@
  */
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ChatMessage } from '@/lib/irc/types';
+import {
+  markTopicRead,
+  readTopicReadLedger,
+} from '@/lib/topics/topicReadLedger';
 import type { VaultExportSnapshot } from './historyVault';
 import {
   OMIT_AT_REST,
+  MAX_EXPORT_TOTAL_RAW_MESSAGES,
+  MAX_VAULT_MESSAGE_TEXT_LENGTH,
+  OUTBOX_MAX_ENTRIES,
   VAULT_KEEP,
+  VAULT_SEARCH_SCAN_MAX,
   _resetVaultForTests,
+  applyRetentionPolicy,
+  clearOutbox,
   clearVault,
   deleteOutboxEntry,
   deserializeMessage,
@@ -25,11 +35,14 @@ import {
   loadRecent,
   parseVaultExport,
   queueOutbox,
+  readAllVaultHits,
   saveMessages,
   searchVault,
   serializeMessage,
   setRetentionPolicy,
+  subscribeOutbox,
 } from './historyVault';
+import { SEARCH_CORPUS_TEXT_MAX } from './searchBounds';
 
 // ── Compile-time plaintext-at-rest partition guard ───────────────────────────
 // Every ChatMessage field must be consciously classified as either PERSISTED
@@ -82,6 +95,32 @@ async function until<T>(read: () => Promise<T>, ok: (v: T) => boolean, ms = 2000
     const v = await read();
     if (ok(v) || Date.now() > deadline) return v;
     await new Promise((r) => setTimeout(r, 10));
+  }
+}
+
+async function openTestVault(): Promise<IDBDatabase> {
+  // Initialize the current schema through the production path, then open the same DB
+  // for deliberate raw-row corruption tests.
+  await loadOutbox();
+  return await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open('onyx-vault');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function putRawOutboxRows(rows: readonly Record<string, unknown>[]): Promise<void> {
+  const db = await openTestVault();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('outbox', 'readwrite');
+      for (const row of rows) tx.objectStore('outbox').put(row);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
   }
 }
 
@@ -294,9 +333,117 @@ describe('historyVault', () => {
       expect(hits.map((h) => h.message.id)).not.toContain('a3');
     });
 
+    it('never searches ciphertext-only encrypted vault rows', async () => {
+      await saveMessages('mika', [
+        msg('encrypted-vault', 4500, {
+          target: 'mika',
+          text: 'TSUMUGI1 searchable-looking-ciphertext',
+          encrypted: true,
+        }),
+      ]);
+
+      expect(await searchVault('searchable-looking-ciphertext')).toEqual([]);
+      expect((await readAllVaultHits()).map((hit) => hit.message.id)).not.toContain(
+        'encrypted-vault',
+      );
+    });
+
     it('returns [] for a blank query', async () => {
       expect(await searchVault('   ')).toEqual([]);
     });
+
+    it('does not lowercase or scan an unbounded stored message field', async () => {
+      await saveMessages('#bounded', [
+        msg('inside-bound', 5000, {
+          target: '#bounded',
+          text: `needle ${'x'.repeat(SEARCH_CORPUS_TEXT_MAX)}`,
+        }),
+        msg('past-bound', 6000, {
+          target: '#bounded',
+          text: `${'x'.repeat(SEARCH_CORPUS_TEXT_MAX)} hidden-tail-needle`,
+        }),
+      ]);
+
+      expect((await searchVault('needle')).map((hit) => hit.message.id)).toEqual(['inside-bound']);
+      expect(await searchVault('hidden-tail-needle')).toEqual([]);
+    });
+
+    it('uses the global newest-first search index added by the v3 schema', async () => {
+      const db = await openTestVault();
+      try {
+        const tx = db.transaction('messages', 'readonly');
+        expect(tx.objectStore('messages').indexNames.contains('by_time')).toBe(true);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('migrates an existing v2 vault to the bounded global time index without data loss', async () => {
+      // This describe's seed hook already opened v3; switch to a fresh factory
+      // so this case can deliberately construct the legacy schema first.
+      globalThis.indexedDB = new IDBFactory();
+      _resetVaultForTests();
+      const legacy = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('onyx-vault', 2);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          const messages = db.createObjectStore('messages', { keyPath: ['target_key', 'id'] });
+          messages.createIndex('by_target_time', ['target_key', 'time']);
+          db.createObjectStore('outbox', { keyPath: 'id' });
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      await new Promise<void>((resolve, reject) => {
+        const tx = legacy.transaction('messages', 'readwrite');
+        tx.objectStore('messages').put(serializeMessage(
+          '#legacy',
+          msg('legacy-search-row', 1234, { target: '#legacy', text: 'migrated recall' }),
+        ));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+      legacy.close();
+      _resetVaultForTests();
+
+      await expect(searchVault('migrated')).resolves.toMatchObject([
+        { target: '#legacy', message: { id: 'legacy-search-row' } },
+      ]);
+      const upgraded = await openTestVault();
+      try {
+        const tx = upgraded.transaction('messages', 'readonly');
+        expect(tx.objectStore('messages').indexNames.contains('by_time')).toBe(true);
+      } finally {
+        upgraded.close();
+      }
+    });
+
+    it('bounds a global search read before materializing an oversized multi-target vault', async () => {
+      const db = await openTestVault();
+      const total = VAULT_SEARCH_SCAN_MAX + 2;
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const tx = db.transaction('messages', 'readwrite');
+          const store = tx.objectStore('messages');
+          for (let index = 0; index < total; index += 1) {
+            const target = `#scan-${index}`;
+            store.put(serializeMessage(target, msg(`scan-${index}`, index, { target })));
+          }
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error);
+        });
+      } finally {
+        db.close();
+      }
+
+      const hits = await readAllVaultHits();
+      expect(hits).toHaveLength(VAULT_SEARCH_SCAN_MAX);
+      expect(hits[0]?.message.id).toBe(`scan-${total - 1}`);
+      expect(hits.some((hit) => hit.message.id === 'scan-0')).toBe(false);
+      expect(hits.some((hit) => hit.message.id === 'scan-1')).toBe(false);
+    }, 30_000);
   });
 
   describe('portable vault import/export', () => {
@@ -327,6 +474,33 @@ describe('historyVault', () => {
       });
       expect('plaintext' in snapshot.targets[1]!.messages[0]!).toBe(false);
     });
+
+    it('bounds export materialization globally and keeps the newest rows', async () => {
+      const db = await openTestVault();
+      const total = MAX_EXPORT_TOTAL_RAW_MESSAGES + 2;
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const tx = db.transaction('messages', 'readwrite');
+          const store = tx.objectStore('messages');
+          for (let index = 0; index < total; index += 1) {
+            store.put(serializeMessage('#export', msg(`export-${index}`, index, { target: '#export' })));
+          }
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error);
+        });
+      } finally {
+        db.close();
+      }
+
+      const snapshot = await exportVault();
+      const exported = snapshot.targets[0]!.messages;
+
+      expect(exported).toHaveLength(MAX_EXPORT_TOTAL_RAW_MESSAGES);
+      expect(exported[0]!.id).toBe('export-2');
+      expect(exported.at(-1)!.id).toBe(`export-${total - 1}`);
+      expect(exported.some((item) => item.id === 'export-0' || item.id === 'export-1')).toBe(false);
+    }, 30_000);
 
     it('imports a validated JSON round trip into the local vault', async () => {
       await saveMessages('#Alpha', [msg('a1', 1000, { target: '#Alpha' })]);
@@ -387,6 +561,47 @@ describe('historyVault', () => {
       expect(result).toEqual({ targets: 1, messages: 1 });
       expect((await loadRecent('#good')).map((m) => m.id)).toEqual(['g1']);
     });
+
+    it('revalidates direct-import rows and reports only retention survivors', async () => {
+      const rawMessages = [
+        { ...msg('oversized', 1, { target: '#direct' }), text: 'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH + 1) },
+        ...Array.from({ length: VAULT_KEEP + 2 }, (_, index) => (
+          msg(`direct-${index}`, index + 2, { target: '#direct' })
+        )),
+      ];
+      const snapshot = {
+        kind: 'onyx-vault',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        targets: [{ target: '#direct', messages: rawMessages }],
+      } as VaultExportSnapshot;
+
+      const result = await importVault(snapshot);
+      const stored = await loadRecent('#direct');
+
+      expect(result).toEqual({ targets: 1, messages: VAULT_KEEP });
+      expect(stored).toHaveLength(VAULT_KEEP);
+      expect(stored[0]!.id).toBe('direct-2');
+      expect(stored.at(-1)!.id).toBe(`direct-${VAULT_KEEP + 1}`);
+      expect(stored.some((item) => item.id === 'oversized')).toBe(false);
+    });
+
+    it('does not report imports that could not commit to IndexedDB', async () => {
+      // A privacy mode / unsupported browser can remove IndexedDB after the
+      // user has already selected a valid archive. The success counters must
+      // describe durable rows, not merely rows we attempted to write.
+      // @ts-expect-error -- deliberately removing the browser API
+      delete globalThis.indexedDB;
+      _resetVaultForTests();
+      const snapshot: VaultExportSnapshot = {
+        kind: 'onyx-vault',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        targets: [{ target: '#room', messages: [msg('a1', 1000)] }],
+      };
+
+      await expect(importVault(snapshot)).resolves.toEqual({ targets: 0, messages: 0 });
+    });
   });
 
   describe('outbox', () => {
@@ -403,6 +618,133 @@ describe('historyVault', () => {
       expect((await loadOutbox()).map((e) => e.id)).toEqual([second!.id]);
     });
 
+    it('rejects new entries at the hard cap without evicting existing messages', async () => {
+      await putRawOutboxRows(Array.from({ length: OUTBOX_MAX_ENTRIES - 1 }, (_, i) => ({
+        id: `seed-${i}`,
+        target_key: '#room',
+        target: '#room',
+        text: `message ${i}`,
+        queued_at: 1000 + i,
+        seq: i,
+      })));
+      const finalSlot = await queueOutbox('#room', 'fills the final slot');
+      expect(finalSlot).not.toBeNull();
+
+      const listener = vi.fn();
+      subscribeOutbox(listener);
+      await expect(queueOutbox('#room', 'must not displace anything')).resolves.toBeNull();
+
+      const loaded = await loadOutbox();
+      expect(loaded).toHaveLength(OUTBOX_MAX_ENTRIES);
+      expect(loaded.some((entry) => entry.id === 'seed-0')).toBe(true);
+      expect(loaded.some((entry) => entry.id === finalSlot!.id)).toBe(true);
+      expect(loaded.some((entry) => entry.text === 'must not displace anything')).toBe(false);
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('validates raw rows fail-closed, strips unknown fields, and orders deterministically', async () => {
+      await putRawOutboxRows([
+        { id: 'good', target_key: '#room', target: '#Room', text: 'keep', queued_at: 200, seq: 2, secret: 'strip-me' },
+        { id: 'z', target_key: '#room', target: '#room', text: 'third', queued_at: 100, seq: 2 },
+        { id: 'b', target_key: '#room', target: '#room', text: 'second', queued_at: 100, seq: 1 },
+        { id: 'a', target_key: '#room', target: '#room', text: 'first', queued_at: 100, seq: 1 },
+        { id: 'bad-target-key', target_key: '#elsewhere', target: '#room', text: 'drop', queued_at: 1, seq: 1 },
+        { id: 'bad-target', target_key: '#room', target: '#room\r\nJOIN #other', text: 'drop', queued_at: 1, seq: 1 },
+        { id: 'bad-text', target_key: '#room', target: '#room', text: 42, queued_at: 1, seq: 1 },
+        { id: 'bad-time', target_key: '#room', target: '#room', text: 'drop', queued_at: Number.NaN, seq: 1 },
+        { id: 'bad-seq', target_key: '#room', target: '#room', text: 'drop', queued_at: 1, seq: '1' },
+      ]);
+
+      const loaded = await loadOutbox();
+      expect(loaded.map((entry) => entry.id)).toEqual(['a', 'b', 'z', 'good']);
+      expect(loaded.find((entry) => entry.id === 'good')).toEqual({
+        id: 'good',
+        target_key: '#room',
+        target: '#Room',
+        text: 'keep',
+        queued_at: 200,
+        seq: 2,
+      });
+      expect('secret' in (loaded.find((entry) => entry.id === 'good') as unknown as Record<string, unknown>)).toBe(false);
+    });
+
+    it('publishes metadata-only notifications after commits and supports unsubscribe', async () => {
+      const throwing = vi.fn(() => {
+        throw new Error('listener failure');
+      });
+      const heard = vi.fn();
+      const stopThrowing = subscribeOutbox(throwing);
+      const stopHeard = subscribeOutbox(heard);
+
+      const first = await queueOutbox('#room', 'sensitive queued text');
+      expect(first).not.toBeNull();
+      expect(await loadOutbox()).toHaveLength(1); // listener failure did not undo persistence
+      await deleteOutboxEntry(first!.id);
+      await deleteOutboxEntry(first!.id); // deleting a missing id is not a change
+      await queueOutbox('#room', 'another secret');
+      await clearVault();
+
+      expect(heard.mock.calls.map(([change]) => change)).toEqual([
+        { kind: 'queued' },
+        { kind: 'deleted' },
+        { kind: 'queued' },
+        { kind: 'cleared' },
+      ]);
+      expect(JSON.stringify(heard.mock.calls)).not.toContain('sensitive queued text');
+      expect(JSON.stringify(heard.mock.calls)).not.toContain('another secret');
+      expect(throwing).toHaveBeenCalledTimes(4);
+
+      stopHeard();
+      stopHeard(); // cleanup is idempotent
+      stopThrowing();
+      await queueOutbox('#room', 'after unsubscribe');
+      expect(heard).toHaveBeenCalledTimes(4);
+      expect(throwing).toHaveBeenCalledTimes(4);
+    });
+
+    it('clears only the committed outbox and publishes a metadata-only invalidation', async () => {
+      await queueOutbox('#private', 'queued plaintext must not publish');
+      await putRawOutboxRows([{
+        id: 'corrupt-hidden-row',
+        target_key: '#wrong',
+        target: '#private',
+        text: 'hidden corrupt plaintext',
+        queued_at: 1,
+        seq: 1,
+      }]);
+      await saveMessages('#private', [msg('vault-kept', Date.now())]);
+      const listener = vi.fn();
+      const stop = subscribeOutbox(listener);
+
+      await expect(clearOutbox()).resolves.toBe(true);
+
+      expect(await loadOutbox()).toEqual([]);
+      expect((await loadRecent('#private')).map((message) => message.id)).toEqual(['vault-kept']);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenLastCalledWith({ kind: 'cleared' });
+      expect(JSON.stringify(listener.mock.calls)).not.toContain('plaintext');
+      stop();
+    });
+
+    it('does not publish or claim an outbox clear when its transaction aborts', async () => {
+      const entry = await queueOutbox('#room', 'keep after bulk clear failure');
+      const listener = vi.fn();
+      const stop = subscribeOutbox(listener);
+      const realClear = IDBObjectStore.prototype.clear;
+      vi.spyOn(IDBObjectStore.prototype, 'clear').mockImplementation(function (
+        this: IDBObjectStore,
+      ): IDBRequest<undefined> {
+        const request = realClear.call(this);
+        if (this.name === 'outbox') this.transaction.abort();
+        return request;
+      });
+
+      await expect(clearOutbox()).resolves.toBe(false);
+      expect((await loadOutbox()).map((row) => row.id)).toEqual([entry!.id]);
+      expect(listener).not.toHaveBeenCalled();
+      stop();
+    });
+
     it('degrades to null/[] without IndexedDB', async () => {
       // @ts-expect-error — deliberately removing the global
       delete globalThis.indexedDB;
@@ -410,18 +752,135 @@ describe('historyVault', () => {
       expect(await queueOutbox('#room', 'x')).toBeNull();
       expect(await loadOutbox()).toEqual([]);
       await expect(deleteOutboxEntry('nope')).resolves.toBeUndefined();
+      await expect(clearOutbox()).resolves.toBe(false);
+    });
+
+    it('returns null when the outbox write transaction aborts', async () => {
+      const listener = vi.fn();
+      subscribeOutbox(listener);
+      const realAdd = IDBObjectStore.prototype.add;
+      const add = vi.spyOn(IDBObjectStore.prototype, 'add').mockImplementation(function (
+        this: IDBObjectStore,
+        value: unknown,
+        key?: IDBValidKey,
+      ): IDBRequest<IDBValidKey> {
+        const request = key === undefined
+          ? realAdd.call(this, value)
+          : realAdd.call(this, value, key);
+        this.transaction.abort();
+        return request;
+      });
+
+      try {
+        await expect(queueOutbox('#room', 'not durable')).resolves.toBeNull();
+        expect(await loadOutbox()).toEqual([]);
+        expect(listener).not.toHaveBeenCalled();
+      } finally {
+        add.mockRestore();
+      }
+    });
+
+    it('does not publish or lose the row when a delete transaction aborts', async () => {
+      const entry = await queueOutbox('#room', 'keep after failed delete');
+      const listener = vi.fn();
+      subscribeOutbox(listener);
+      const realDelete = IDBObjectStore.prototype.delete;
+      const del = vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function (
+        this: IDBObjectStore,
+        query: IDBValidKey | IDBKeyRange,
+      ): IDBRequest<undefined> {
+        const request = realDelete.call(this, query);
+        this.transaction.abort();
+        return request;
+      });
+
+      try {
+        await expect(deleteOutboxEntry(entry!.id)).resolves.toBeUndefined();
+        expect((await loadOutbox()).map((row) => row.id)).toEqual([entry!.id]);
+        expect(listener).not.toHaveBeenCalled();
+      } finally {
+        del.mockRestore();
+      }
+    });
+
+    it('does not publish or partially clear when the clear transaction aborts', async () => {
+      const entry = await queueOutbox('#room', 'keep after failed clear');
+      await saveMessages('#room', [msg('keep', 1000)]);
+      const listener = vi.fn();
+      subscribeOutbox(listener);
+      const realClear = IDBObjectStore.prototype.clear;
+      const clear = vi.spyOn(IDBObjectStore.prototype, 'clear').mockImplementation(function (
+        this: IDBObjectStore,
+      ): IDBRequest<undefined> {
+        const request = realClear.call(this);
+        if (this.name === 'outbox') this.transaction.abort();
+        return request;
+      });
+
+      try {
+        await expect(clearVault()).resolves.toBe(false);
+        expect((await loadOutbox()).map((row) => row.id)).toEqual([entry!.id]);
+        expect((await loadRecent('#room')).map((row) => row.id)).toEqual(['keep']);
+        expect(listener).not.toHaveBeenCalled();
+      } finally {
+        clear.mockRestore();
+      }
     });
   });
 
   describe('clearVault', () => {
-    it('erases every target and the outbox', async () => {
+    it('does not report a verified device wipe when an available IndexedDB cannot be opened', async () => {
+      const realIndexedDB = globalThis.indexedDB;
+      _resetVaultForTests();
+      vi.stubGlobal('indexedDB', {
+        open: () => {
+          throw new Error('blocked storage');
+        },
+      } as unknown as IDBFactory);
+
+      try {
+        await expect(clearVault()).resolves.toBe(false);
+      } finally {
+        vi.stubGlobal('indexedDB', realIndexedDB);
+        _resetVaultForTests();
+      }
+    });
+
+    it('erases every target, the outbox, and device-local topic read state', async () => {
       await saveMessages('#alpha', [msg('a', 1000)]);
       await saveMessages('#beta', [msg('b', 2000)]);
       await queueOutbox('#alpha', 'queued line');
-      await clearVault();
+      markTopicRead('#alpha', 'roadmap', { id: 'a', time: new Date(1000) });
+      await expect(clearVault()).resolves.toBe(true);
       expect(await loadRecent('#alpha')).toEqual([]);
       expect(await loadRecent('#beta')).toEqual([]);
       expect(await loadOutbox()).toEqual([]);
+      expect(readTopicReadLedger()).toEqual([]);
+    });
+
+    it('does not report success when a committed clear leaves physical message rows behind', async () => {
+      await saveMessages('#alpha', [msg('keep', 1000)]);
+      await queueOutbox('#alpha', 'discarded independently');
+      const realClear = IDBObjectStore.prototype.clear;
+      const clear = vi.spyOn(IDBObjectStore.prototype, 'clear').mockImplementation(function (
+        this: IDBObjectStore,
+      ): IDBRequest<undefined> {
+        if (this.name === 'messages') {
+          // Keep the transaction valid and committed while deliberately doing
+          // no write to the message store. Post-commit physical readback must
+          // catch the retained row instead of trusting transaction completion.
+          return this.count() as unknown as IDBRequest<undefined>;
+        }
+        return realClear.call(this);
+      });
+
+      try {
+        await expect(clearVault()).resolves.toBe(false);
+        expect((await loadRecent('#alpha')).map((item) => item.id)).toEqual(['keep']);
+        expect(await loadOutbox()).toEqual([]);
+      } finally {
+        clear.mockRestore();
+      }
     });
   });
 
@@ -501,6 +960,28 @@ describe('historyVault', () => {
       // Only the fresh (within 2 days) messages remain.
       expect(kept.every((m) => m.id.startsWith('f'))).toBe(true);
     }, 30_000);
+
+    it('immediately prunes dormant targets when a stricter policy is applied', async () => {
+      await saveMessages('#dormant', Array.from(
+        { length: 8 },
+        (_, i) => msg(`d${i}`, 1000 + i, { target: '#dormant' }),
+      ));
+
+      await expect(applyRetentionPolicy({ keep: 2 })).resolves.toBe(true);
+
+      expect((await loadRecent('#dormant', 100)).map((message) => message.id)).toEqual(['d6', 'd7']);
+    });
+
+    it('never writes an input batch when retention keep is zero', async () => {
+      setRetentionPolicy({ keep: 0 });
+
+      await expect(saveMessages('#none', [
+        msg('n1', 1000, { target: '#none' }),
+        msg('n2', 2000, { target: '#none' }),
+      ])).resolves.toBe(true);
+
+      expect(await loadRecent('#none')).toEqual([]);
+    });
   });
 
   describe('without IndexedDB', () => {
@@ -513,7 +994,7 @@ describe('historyVault', () => {
       // rather than throwing; callers treat this as a non-durable no-op.
       await expect(saveMessages('#room', [msg('x', 1)])).resolves.toBe(false);
       await expect(loadRecent('#room')).resolves.toEqual([]);
-      await expect(clearVault()).resolves.toBeUndefined();
+      await expect(clearVault()).resolves.toBe(true);
     });
   });
 });

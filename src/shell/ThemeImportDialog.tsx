@@ -5,6 +5,7 @@
 
 import { createMemo, createSignal, onCleanup, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { parseThemeParam, themeShareUrl } from '@/lib/theme/themeShare';
 import type { CustomTheme } from '@/theme';
 import './ThemeImportDialog.css';
@@ -30,10 +31,6 @@ function extractThemeSearchParam(input: string): string | null {
   }
 }
 
-function clipboardAvailable(): boolean {
-  return typeof navigator !== 'undefined' && typeof navigator.clipboard?.writeText === 'function';
-}
-
 function locationOrigin(): string {
   return typeof location === 'undefined' ? '' : location.origin;
 }
@@ -45,7 +42,7 @@ export function ThemeImportDialog(props: {
   shareTheme?: CustomTheme;
 }): JSX.Element {
   const [importInput, setImportInput] = createSignal('');
-  const [copied, setCopied] = createSignal(false);
+  const [copyStatus, setCopyStatus] = createSignal<'idle' | 'copied' | 'failed'>('idle');
   let copyTimer: number | undefined;
 
   const importedTheme = createMemo(() => parseThemeParam(extractCode(importInput())));
@@ -59,7 +56,7 @@ export function ThemeImportDialog(props: {
     return theme ? themeShareUrl(theme, locationOrigin()) : '';
   });
   const shareThemeName = createMemo(() => props.shareTheme?.name ?? 'current theme');
-  const canCopyShareUrl = createMemo(() => shareUrl().length > 0 && clipboardAvailable());
+  const canCopyShareUrl = createMemo(() => shareUrl().length > 0);
 
   const clearCopyTimer = (): void => {
     if (copyTimer === undefined || typeof window === 'undefined') return;
@@ -71,7 +68,7 @@ export function ThemeImportDialog(props: {
     clearCopyTimer();
     if (typeof window === 'undefined') return;
     copyTimer = window.setTimeout(() => {
-      setCopied(false);
+      setCopyStatus('idle');
       copyTimer = undefined;
     }, COPY_FEEDBACK_MS);
   };
@@ -84,9 +81,16 @@ export function ThemeImportDialog(props: {
   const copyShareLink = async (): Promise<void> => {
     if (!canCopyShareUrl()) return;
 
-    await navigator.clipboard.writeText(shareUrl());
-    setCopied(true);
-    queueCopyReset();
+    clearCopyTimer();
+    setCopyStatus('idle');
+    const copied = await writeClipboardText(shareUrl());
+    if (copied) {
+      setCopyStatus('copied');
+      queueCopyReset();
+      return;
+    }
+
+    setCopyStatus('failed');
   };
 
   onCleanup(() => clearCopyTimer());
@@ -167,9 +171,20 @@ export function ThemeImportDialog(props: {
                 aria-label={`Copy share link for ${shareThemeName()}`}
                 onClick={() => void copyShareLink()}
               >
-                {copied() ? 'Copied' : 'Copy link'}
+                {copyStatus() === 'copied'
+                  ? 'Copied'
+                  : copyStatus() === 'failed'
+                    ? 'Copy failed'
+                    : 'Copy link'}
               </button>
             </div>
+            <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+              {copyStatus() === 'copied'
+                ? `Share link copied for ${shareThemeName()}.`
+                : copyStatus() === 'failed'
+                  ? `Could not copy the share link for ${shareThemeName()}. Select and copy it from the field.`
+                  : ''}
+            </span>
           </section>
         </Show>
       </div>

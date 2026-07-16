@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store, type Server } from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
+import { loadCredentials, saveCredentials } from '@/lib/credentials';
 
 const initialState = store.getInitialState();
 
@@ -20,6 +21,7 @@ const initialState = store.getInitialState();
 function makeClient() {
   return {
     sendRaw: vi.fn(),
+    updateResumeTokens: vi.fn(),
     isupport: { CHANTYPES: '#&' },
     negotiatedCaps: new Set<string>(),
   };
@@ -45,7 +47,55 @@ function feed(line: string): void {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   store.setState(initialState, true);
+});
+
+describe('SESSION token persistence — server NOTICE compatibility', () => {
+  it('persists and activates a local token from NOTICE SESSION TOKEN', () => {
+    const client = makeClient();
+    saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'pw' });
+    store.setState({
+      client: client as never,
+      server: seedServer('alice'),
+      ourNick: 'alice',
+    });
+
+    feed(':eshmaki.me NOTICE alice :SESSION TOKEN local-token');
+
+    expect(loadCredentials()?.sessionToken).toBe('local-token');
+    expect(client.updateResumeTokens).toHaveBeenCalledWith({ sessionToken: 'local-token' });
+  });
+
+  it('persists and activates a mesh token from NOTICE SESSION MTOKEN', () => {
+    const client = makeClient();
+    saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'pw' });
+    store.setState({
+      client: client as never,
+      server: seedServer('alice'),
+      ourNick: 'alice',
+    });
+
+    feed(':eshmaki.me NOTICE alice :SESSION MTOKEN mesh-token');
+
+    expect(loadCredentials()?.meshToken).toBe('mesh-token');
+    expect(client.updateResumeTokens).toHaveBeenCalledWith({ meshToken: 'mesh-token' });
+  });
+
+  it('ignores a peer NOTICE that impersonates a SESSION token reply', () => {
+    const client = makeClient();
+    saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'pw' });
+    store.setState({
+      client: client as never,
+      server: seedServer('alice'),
+      ourNick: 'alice',
+    });
+
+    feed(':mallory!u@host NOTICE alice :SESSION TOKEN attacker-token');
+
+    expect(loadCredentials()?.sessionToken).toBeUndefined();
+    expect(client.updateResumeTokens).not.toHaveBeenCalled();
+  });
 });
 
 describe('account actions — raw command dispatch', () => {
@@ -231,6 +281,22 @@ describe('account replies — state from the message handler', () => {
   it('900 RPL_LOGGEDIN sets the server account (IDENTIFY success path)', () => {
     store.setState({ server: seedServer(null) });
     feed(':eshmaki.me 900 alice alice!u@h alice :You are now logged in as alice');
+    expect(store.getState().server?.account).toBe('alice');
+  });
+
+  it('does not replace our identity when another user sends account-notify', () => {
+    store.setState({ server: seedServer('alice'), ourNick: 'alice' });
+
+    feed(':mallory!m@evil ACCOUNT *');
+
+    expect(store.getState().server?.account).toBe('alice');
+  });
+
+  it('updates our identity from our own account-notify event', () => {
+    store.setState({ server: seedServer(null), ourNick: 'alice' });
+
+    feed(':alice!a@host ACCOUNT alice');
+
     expect(store.getState().server?.account).toBe('alice');
   });
 

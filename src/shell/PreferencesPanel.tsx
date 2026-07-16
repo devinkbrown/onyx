@@ -11,9 +11,25 @@
  * SOLID IDIOMS: component runs once; never destructure props; For/Show; createMemo.
  */
 
-import { createMemo, createSignal, createUniqueId, For, Show, type JSX } from 'solid-js';
+import { createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
-import { VAULT_KEEP, clearVault } from '@/lib/vault/historyVault';
+import {
+  VAULT_KEEP,
+  applyRetentionPolicy,
+  clearOutbox,
+  clearVault,
+  getRetentionPolicy,
+  loadOutbox,
+  setRetentionPolicy,
+  subscribeOutbox,
+} from '@/lib/vault/historyVault';
+import {
+  readRetentionPolicy,
+  sanitizeRetentionPolicy,
+  subscribeRetentionPolicy,
+  writeRetentionPolicy,
+  type RetentionPolicy,
+} from '@/lib/vault/retentionPolicy';
 import { countLabel } from '@/lib/format/countLabel';
 import {
   VAULT_SEARCH_MODES,
@@ -23,21 +39,59 @@ import {
 import { setVaultMode, type VaultSearchMode } from './search/useMessageSearch';
 import { DiscordImportControls, DiscordPackageImportControls, DiscordBotImportControls, SlackImportControls, IrcLogImportControls } from './HistoryImportControls';
 import {
+  formatImportMib,
+  PORTABLE_JSON_MAX_AGGREGATE_BYTES,
+  PORTABLE_JSON_MAX_FILE_BYTES,
+  PORTABLE_JSON_MAX_FILES,
+  validateImportFileSelection,
+} from './importFileLimits';
+import {
   clearClientExtensionAudit,
   clearClientExtensionActions,
   exportClientExtensionActionManifest,
+  normalizeClientExtensionActions,
   parseClientExtensionActionManifest,
+  previewClientExtensionAction,
   readClientExtensionAudit,
   readClientExtensionActions,
+  saveClientExtensionActions,
+  type ClientExtensionAction,
   type ClientExtensionAuditEntry,
 } from '@/lib/extensions/clientActions';
 import { getState } from '@/lib/store';
+import {
+  clearReviewHistory,
+  readReviewHistory,
+  subscribeReviewHistory,
+} from '@/lib/notifications/reviewHistory';
+import { clearFollowed, followed } from '@/lib/notifications/followed';
 import {
   exportPortableTransfer,
   importPortableTransfer,
   parsePortableTransfer,
   type PortableTransferSnapshot,
 } from '@/lib/vault/portableTransfer';
+import {
+  clearSavedSearches,
+  listSearches,
+  subscribeSavedSearches,
+} from '@/lib/vault/savedSearches';
+import {
+  clearRoomComposerDrafts,
+  loadComposerDrafts,
+  type ComposerDrafts,
+} from '@/lib/composer/drafts';
+import {
+  clearChannelTopicDrafts,
+  loadChannelTopicDrafts,
+  saveChannelTopicDrafts,
+  type ChannelTopicDrafts,
+} from '@/lib/channel/topicDrafts';
+import {
+  clearAllTopicReads,
+  readTopicReadLedger,
+  subscribeTopicReadLedger,
+} from '@/lib/topics/topicReadLedger';
 import { localTranslationReadiness, preferredTranslationTarget } from '@/lib/intelligence/localLanguage';
 import {
   TRANSLATION_TARGETS,
@@ -83,9 +137,26 @@ const SCENE_MOTION_LABELS: Record<SceneMotion, string> = {
   off: 'Off',
 };
 const VAULT_SEARCH_MODE_LABELS: Record<VaultSearchMode, string> = {
-  hybrid: 'Hybrid',
+  hybrid: 'Text + related',
   exact: 'Exact',
-  semantic: 'Semantic',
+  semantic: 'Related terms',
+};
+const VAULT_KEEP_OPTIONS = ['200', '400', '1000', '5000'] as const;
+type VaultKeepOption = (typeof VAULT_KEEP_OPTIONS)[number];
+const VAULT_KEEP_LABELS: Record<VaultKeepOption, string> = {
+  '200': '200',
+  '400': '400',
+  '1000': '1,000',
+  '5000': '5,000',
+};
+const VAULT_AGE_OPTIONS = ['none', '7', '30', '90', '365'] as const;
+type VaultAgeOption = (typeof VAULT_AGE_OPTIONS)[number];
+const VAULT_AGE_LABELS: Record<VaultAgeOption, string> = {
+  none: 'Any age',
+  '7': '7 days',
+  '30': '30 days',
+  '90': '90 days',
+  '365': '1 year',
 };
 
 function resetAllPreferences(): void {
@@ -391,6 +462,8 @@ function PortableVaultControls(): JSX.Element {
     accountHandoffs: number;
     preferenceHandoffs: number;
     followedConversations: number;
+    topicReadCursors: number;
+    savedSearches: number;
   } | null>(null);
 
   async function handleExport(): Promise<void> {
@@ -407,7 +480,7 @@ function PortableVaultControls(): JSX.Element {
       const messageCount = snapshot.targets.reduce((sum, target) => sum + target.messages.length, 0);
       const draftCount = Object.keys(snapshot.composerDrafts).length;
       const topicDraftCount = Object.keys(snapshot.channelTopicDrafts).length;
-      setStatus(`Exported ${countLabel(messageCount, 'message')}, ${countLabel(snapshot.targets.length, 'target')}, ${countLabel(snapshot.reviewHistory.length, 'review')}, ${countLabel(draftCount, 'room draft')}, ${countLabel(topicDraftCount, 'topic draft')}, ${countLabel(snapshot.followedConversations.length, 'followed conversation')}, ${countLabel(snapshot.accountHandoffs.length, 'account handoff')}, and ${countLabel(snapshot.preferenceHandoff ? 1 : 0, 'preference set')}.`);
+      setStatus(`Exported ${countLabel(messageCount, 'message')}, ${countLabel(snapshot.targets.length, 'target')}, ${countLabel(snapshot.reviewHistory.length, 'review')}, ${countLabel(draftCount, 'room draft')}, ${countLabel(topicDraftCount, 'topic draft')}, ${countLabel(snapshot.followedConversations.length, 'followed conversation')}, ${countLabel(snapshot.topicReadCursors.length, 'topic read cursor')}, ${countLabel(snapshot.savedSearches.length, 'saved search', 'saved searches')}, ${countLabel(snapshot.accountHandoffs.length, 'account handoff')}, and ${countLabel(snapshot.preferenceHandoff ? 1 : 0, 'preference set')}.`);
     } catch {
       setStatus('Export failed. Try again after closing private browsing or freeing storage.');
     } finally {
@@ -417,8 +490,25 @@ function PortableVaultControls(): JSX.Element {
 
   async function handleImport(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0] ?? null;
+    const files = Array.from(input.files ?? []);
     input.value = '';
+    const limitFailure = validateImportFileSelection(files, {
+      maxFiles: PORTABLE_JSON_MAX_FILES,
+      maxFileBytes: PORTABLE_JSON_MAX_FILE_BYTES,
+      maxAggregateBytes: PORTABLE_JSON_MAX_AGGREGATE_BYTES,
+    });
+    if (limitFailure) {
+      setPendingImport(null);
+      if (limitFailure.kind === 'count') {
+        setStatus('Choose one Onyx portable JSON file at a time.');
+      } else if (limitFailure.kind === 'file') {
+        setStatus(`${limitFailure.fileName} exceeds the ${formatImportMib(limitFailure.maxFileBytes)} portable JSON limit. Choose a smaller portable vault file.`);
+      } else {
+        setStatus(`That portable JSON exceeds the ${formatImportMib(limitFailure.maxAggregateBytes)} total import limit. Choose a smaller portable vault file.`);
+      }
+      return;
+    }
+    const file = files[0] ?? null;
     if (!file) return;
     setBusy(true);
     try {
@@ -434,8 +524,10 @@ function PortableVaultControls(): JSX.Element {
       const accountHandoffs = parsed.accountHandoffs.length;
       const preferenceHandoffs = parsed.preferenceHandoff ? 1 : 0;
       const followedConversations = parsed.followedConversations.length;
-      setPendingImport({ fileName: file.name, snapshot: parsed, messages, drafts, topicDrafts, accountHandoffs, preferenceHandoffs, followedConversations });
-      setStatus(`Ready to import ${countLabel(messages, 'message')}, ${countLabel(parsed.targets.length, 'target')}, ${countLabel(parsed.reviewHistory.length, 'review')}, ${countLabel(drafts, 'room draft')}, ${countLabel(topicDrafts, 'topic draft')}, ${countLabel(followedConversations, 'followed conversation')}, ${countLabel(accountHandoffs, 'account handoff')}, and ${countLabel(preferenceHandoffs, 'preference set')}.`);
+      const topicReadCursors = parsed.topicReadCursors.length;
+      const savedSearches = parsed.savedSearches.length;
+      setPendingImport({ fileName: file.name, snapshot: parsed, messages, drafts, topicDrafts, accountHandoffs, preferenceHandoffs, followedConversations, topicReadCursors, savedSearches });
+      setStatus(`Ready to import ${countLabel(messages, 'message')}, ${countLabel(parsed.targets.length, 'target')}, ${countLabel(parsed.reviewHistory.length, 'review')}, ${countLabel(drafts, 'room draft')}, ${countLabel(topicDrafts, 'topic draft')}, ${countLabel(followedConversations, 'followed conversation')}, ${countLabel(topicReadCursors, 'topic read cursor')}, ${countLabel(savedSearches, 'saved search', 'saved searches')}, ${countLabel(accountHandoffs, 'account handoff')}, and ${countLabel(preferenceHandoffs, 'preference set')}.`);
     } catch {
       setStatus('Import failed. Choose a readable Onyx portable JSON file.');
       setPendingImport(null);
@@ -454,7 +546,7 @@ function PortableVaultControls(): JSX.Element {
         getState().setComposerDraft(target, draft);
       }
       setPendingImport(null);
-      setStatus(`Imported ${countLabel(result.messages, 'message')}, ${countLabel(result.targets, 'target')}, ${countLabel(result.reviews, 'review')}, ${countLabel(result.drafts, 'room draft')}, ${countLabel(result.topicDrafts, 'topic draft')}, ${countLabel(result.followedConversations, 'followed conversation')}, ${countLabel(result.accountHandoffs, 'account handoff')}, and ${countLabel(result.preferenceHandoffs, 'preference set')}.`);
+      setStatus(`Imported ${countLabel(result.messages, 'message')}, ${countLabel(result.targets, 'target')}, ${countLabel(result.reviews, 'review')}, ${countLabel(result.drafts, 'room draft')}, ${countLabel(result.topicDrafts, 'topic draft')}, ${countLabel(result.followedConversations, 'followed conversation')}, ${countLabel(result.topicReadCursors, 'topic read cursor')}, ${countLabel(result.savedSearches, 'saved search', 'saved searches')}, ${countLabel(result.accountHandoffs, 'account handoff')}, and ${countLabel(result.preferenceHandoffs, 'preference set')}.`);
     } catch {
       setStatus('Import failed while merging this portable vault.');
     } finally {
@@ -468,7 +560,7 @@ function PortableVaultControls(): JSX.Element {
         <h3 id="pref-vault-portable-title" class="pref-label">Portable vault</h3>
       </div>
       <p class="pref-desc">
-        Export or merge this device's local history, reviewed catch-up state, room composer drafts, channel topic drafts, followed rooms/topics, saved sign-in targets, and Preferences switches. Passwords, session tokens, mesh tokens, and encrypted DM plaintext are not included.
+        Export or merge this device's local history, reviewed catch-up state, room composer drafts, channel topic drafts, followed rooms/topics, named-conversation read cursors, saved searches, saved sign-in targets, retention policy, and Preferences switches. Read cursors contain only room/topic, message ID, and timestamp metadata. Saved query text is included. Passwords, session tokens, mesh tokens, and decrypted DM plaintext are not exported automatically.
       </p>
       <div class="pref-vault-actions">
         <button type="button" class="pref-reset" disabled={busy()} onClick={() => void handleExport()}>
@@ -495,8 +587,10 @@ function PortableVaultControls(): JSX.Element {
               {' '}{countLabel(pending().drafts, 'room draft')},
               {' '}{countLabel(pending().topicDrafts, 'topic draft')},
               {' '}{countLabel(pending().followedConversations, 'followed conversation')},
+              {' '}{countLabel(pending().topicReadCursors, 'topic read cursor')},
+              {' '}{countLabel(pending().savedSearches, 'saved search', 'saved searches')},
               {' '}{countLabel(pending().accountHandoffs, 'account handoff')}, and
-              {' '}{countLabel(pending().preferenceHandoffs, 'preference set')}. Existing local history, followed rooms/topics, saved sign-in targets, and Preferences switches are merged, not replaced.
+              {' '}{countLabel(pending().preferenceHandoffs, 'preference set')}. Existing local history, followed rooms/topics, topic read cursors, saved searches, saved sign-in targets, and Preferences switches are merged, not replaced.
             </p>
             <div class="pref-import-review__actions">
               <button type="button" class="pref-reset" disabled={busy()} onClick={() => void confirmImport()}>
@@ -519,6 +613,846 @@ function PortableVaultControls(): JSX.Element {
       </Show>
       <Show when={status()}>
         <p class="pref-status" role="status">{status()}</p>
+      </Show>
+    </section>
+  );
+}
+
+function ClearReviewedAnchorsControls(): JSX.Element {
+  const [anchorCount, setAnchorCount] = createSignal(readReviewHistory().length);
+  const [confirming, setConfirming] = createSignal(false);
+  const [status, setStatus] = createSignal<{
+    message: string;
+    failure: boolean;
+  } | null>(null);
+
+  onCleanup(subscribeReviewHistory((entries) => setAnchorCount(entries.length)));
+
+  function clearNow(): void {
+    const result = clearReviewHistory();
+    setAnchorCount(result.remaining);
+    setConfirming(false);
+    if (result.success) {
+      setStatus({
+        message: result.cleared > 0
+          ? `Cleared ${countLabel(result.cleared, 'reviewed anchor')} from this device.`
+          : 'No reviewed anchors were stored on this device.',
+        failure: false,
+      });
+      return;
+    }
+    setStatus({
+      message: 'Could not verify that reviewed anchors were cleared on this device. Message history and other local data were not erased.',
+      failure: true,
+    });
+  }
+
+  return (
+    <section class="pref-group pref-clear-history" aria-labelledby="pref-clear-reviewed-title">
+      <div class="pref-group-head">
+        <h3 id="pref-clear-reviewed-title" class="pref-label">Reviewed catch-up anchors</h3>
+        <span class="pref-count">{countLabel(anchorCount(), 'reviewed anchor')}</span>
+      </div>
+      <p class="pref-desc">
+        These metadata-only anchors reopen exact catch-up points reviewed on this device. Clearing
+        them does not erase vault messages, named-topic read cursors, saved searches, or server history.
+      </p>
+      <Show
+        when={confirming()}
+        fallback={
+          <div class="pref-clear-history__actions">
+            <button
+              type="button"
+              class="pref-reset pref-reset--danger"
+              onClick={() => {
+                setStatus(null);
+                setConfirming(true);
+              }}
+            >
+              Clear reviewed anchors
+            </button>
+          </div>
+        }
+      >
+        <div class="pref-clear-history__confirm" role="group" aria-label="Confirm clear reviewed anchors">
+          <p class="pref-desc">
+            Remove {countLabel(anchorCount(), 'reviewed anchor')} from this device only?
+          </p>
+          <div class="pref-clear-history__actions">
+            <button
+              type="button"
+              class="pref-reset pref-reset--danger"
+              onClick={clearNow}
+            >
+              Erase reviewed anchors
+            </button>
+            <button
+              type="button"
+              class="pref-reset"
+              onClick={() => setConfirming(false)}
+            >
+              Keep reviewed anchors
+            </button>
+          </div>
+        </div>
+      </Show>
+      <Show when={status()}>
+        {(current) => (
+          <p class="pref-status" role={current().failure ? 'alert' : 'status'}>
+            {current().message}
+          </p>
+        )}
+      </Show>
+    </section>
+  );
+}
+
+function ClearSavedSearchesControls(): JSX.Element {
+  const [searchCount, setSearchCount] = createSignal<number | null>(null);
+  const [stagedCount, setStagedCount] = createSignal<number | null>(null);
+  const [confirming, setConfirming] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
+  const [status, setStatus] = createSignal<{
+    message: string;
+    failure: boolean;
+  } | null>(null);
+  let clearTrigger: HTMLButtonElement | undefined;
+
+  async function refreshCount(): Promise<number> {
+    const count = (await listSearches()).length;
+    setSearchCount(count);
+    return count;
+  }
+
+  onMount(() => {
+    void refreshCount();
+  });
+  onCleanup(subscribeSavedSearches(() => {
+    void refreshCount();
+  }));
+
+  async function beginClear(trigger: HTMLButtonElement): Promise<void> {
+    clearTrigger = trigger;
+    setBusy(true);
+    setStatus(null);
+    const count = await refreshCount();
+    setStagedCount(count);
+    setConfirming(true);
+    setBusy(false);
+  }
+
+  function cancelClear(): void {
+    setConfirming(false);
+    setStagedCount(null);
+    setStatus({ message: 'Saved searches kept on this device.', failure: false });
+    queueMicrotask(() => clearTrigger?.focus());
+  }
+
+  async function confirmClear(): Promise<void> {
+    const expected = stagedCount();
+    if (expected === null) return;
+    setBusy(true);
+    const current = (await listSearches()).length;
+    setSearchCount(current);
+    if (current !== expected) {
+      setStagedCount(current);
+      setStatus({
+        message: `Saved search count changed to ${current}. Review the updated count and confirm again.`,
+        failure: false,
+      });
+      setBusy(false);
+      return;
+    }
+
+    const cleared = await clearSavedSearches();
+    const remaining = (await listSearches()).length;
+    if (!cleared || remaining > 0) {
+      // A false clear result means the empty readback is not authoritative.
+      // Keep the disclosed count when verification failed without retained rows.
+      setSearchCount(remaining > 0 ? remaining : current);
+      setStagedCount(remaining > 0 ? remaining : current);
+      setStatus({
+        message: 'Could not verify that all saved searches and query text were cleared. The confirmation remains open; free storage or retry.',
+        failure: true,
+      });
+      setBusy(false);
+      return;
+    }
+
+    setSearchCount(0);
+    setStagedCount(null);
+    setConfirming(false);
+    setStatus({
+      message: `Cleared ${countLabel(current, 'saved search', 'saved searches')} and removed the saved query text from this device.`,
+      failure: false,
+    });
+    setBusy(false);
+  }
+
+  return (
+    <section class="pref-group pref-clear-history" aria-labelledby="pref-clear-saved-searches-title">
+      <div class="pref-group-head">
+        <h3 id="pref-clear-saved-searches-title" class="pref-label">Saved searches</h3>
+        <span class="pref-count">
+          {searchCount() === null
+            ? 'Checking saved searches…'
+            : countLabel(searchCount()!, 'saved search', 'saved searches')}
+        </span>
+      </div>
+      <p class="pref-desc">
+        Saved search names, modes, and query text stay on this device. Clear them independently
+        without erasing vault messages, reviewed anchors, or named-topic read cursors.
+      </p>
+      <Show
+        when={confirming()}
+        fallback={
+          <div class="pref-clear-history__actions">
+            <button
+              ref={clearTrigger}
+              type="button"
+              class="pref-reset pref-reset--danger"
+              disabled={busy() || searchCount() === null}
+              onClick={(event) => void beginClear(event.currentTarget)}
+            >
+              Clear all saved searches
+            </button>
+          </div>
+        }
+      >
+        <div class="pref-clear-history__confirm" role="group" aria-label="Confirm clear all saved searches">
+          <p class="pref-desc">
+            Permanently erase {countLabel(stagedCount() ?? 0, 'saved search', 'saved searches')}
+            {' '}and their saved query text from this device?
+          </p>
+          <div class="pref-clear-history__actions">
+            <button
+              type="button"
+              class="pref-reset pref-reset--danger"
+              disabled={busy()}
+              onClick={() => void confirmClear()}
+            >
+              Erase all saved searches
+            </button>
+            <button
+              type="button"
+              class="pref-reset"
+              disabled={busy()}
+              onClick={cancelClear}
+            >
+              Keep saved searches
+            </button>
+          </div>
+        </div>
+      </Show>
+      <Show when={status()}>
+        {(current) => (
+          <p class="pref-status" role={current().failure ? 'alert' : 'status'}>
+            {current().message}
+          </p>
+        )}
+      </Show>
+    </section>
+  );
+}
+
+function ClearTopicReadPositionsControls(): JSX.Element {
+  const [cursorCount, setCursorCount] = createSignal(readTopicReadLedger().length);
+  const [stagedCount, setStagedCount] = createSignal<number | null>(null);
+  const [confirming, setConfirming] = createSignal(false);
+  const [status, setStatus] = createSignal<{
+    message: string;
+    failure: boolean;
+  } | null>(null);
+  let clearTrigger: HTMLButtonElement | undefined;
+
+  onCleanup(subscribeTopicReadLedger((markers) => setCursorCount(markers.length)));
+
+  function beginClear(trigger: HTMLButtonElement): void {
+    clearTrigger = trigger;
+    const count = readTopicReadLedger().length;
+    setCursorCount(count);
+    setStagedCount(count);
+    setStatus(null);
+    setConfirming(true);
+  }
+
+  function cancelClear(): void {
+    setConfirming(false);
+    setStagedCount(null);
+    setStatus({ message: 'Topic read positions kept on this device.', failure: false });
+    queueMicrotask(() => clearTrigger?.focus());
+  }
+
+  function confirmClear(): void {
+    const expected = stagedCount();
+    if (expected === null) return;
+    const current = readTopicReadLedger().length;
+    setCursorCount(current);
+    if (current !== expected) {
+      setStagedCount(current);
+      setStatus({
+        message: `Topic read position count changed to ${current}. Review the updated count and confirm again.`,
+        failure: false,
+      });
+      return;
+    }
+
+    const cleared = clearAllTopicReads();
+    const remaining = readTopicReadLedger().length;
+    if (!cleared || remaining > 0) {
+      setCursorCount(remaining > 0 ? remaining : current);
+      setStagedCount(remaining > 0 ? remaining : current);
+      setStatus({
+        message: 'Could not verify that all topic read positions were cleared. The confirmation remains open; retry after checking browser storage.',
+        failure: true,
+      });
+      return;
+    }
+
+    setCursorCount(0);
+    setStagedCount(null);
+    setConfirming(false);
+    setStatus({
+      message: `Cleared ${countLabel(current, 'topic read position')} from this device.`,
+      failure: false,
+    });
+  }
+
+  return (
+    <section class="pref-group pref-clear-history" aria-labelledby="pref-clear-topic-reads-title">
+      <div class="pref-group-head">
+        <h3 id="pref-clear-topic-reads-title" class="pref-label">Topic read positions</h3>
+        <span class="pref-count">{countLabel(cursorCount(), 'topic read position')}</span>
+      </div>
+      <p class="pref-desc">
+        Clear only the per-topic navigation positions remembered on this device. Messages, vault
+        rows, followed topics, saved searches, reviewed anchors, and server history remain unchanged.
+      </p>
+      <Show
+        when={confirming()}
+        fallback={
+          <div class="pref-clear-history__actions">
+            <button
+              ref={clearTrigger}
+              type="button"
+              class="pref-reset pref-reset--danger"
+              onClick={(event) => beginClear(event.currentTarget)}
+            >
+              Clear topic read positions
+            </button>
+          </div>
+        }
+      >
+        <div class="pref-clear-history__confirm" role="group" aria-label="Confirm clear topic read positions">
+          <p class="pref-desc">
+            Remove {countLabel(stagedCount() ?? 0, 'topic read position')} from this device only?
+          </p>
+          <div class="pref-clear-history__actions">
+            <button
+              type="button"
+              class="pref-reset pref-reset--danger"
+              onClick={confirmClear}
+            >
+              Erase topic read positions
+            </button>
+            <button
+              type="button"
+              class="pref-reset"
+              onClick={cancelClear}
+            >
+              Keep topic read positions
+            </button>
+          </div>
+        </div>
+      </Show>
+      <Show when={status()}>
+        {(current) => (
+          <p class="pref-status" role={current().failure ? 'alert' : 'status'}>
+            {current().message}
+          </p>
+        )}
+      </Show>
+    </section>
+  );
+}
+
+function ClearFollowedConversationsControls(): JSX.Element {
+  const followCount = createMemo(() => followed().size);
+  const [stagedCount, setStagedCount] = createSignal<number | null>(null);
+  const [confirming, setConfirming] = createSignal(false);
+  const [status, setStatus] = createSignal<{
+    message: string;
+    failure: boolean;
+  } | null>(null);
+  let clearTrigger: HTMLButtonElement | undefined;
+
+  function beginClear(trigger: HTMLButtonElement): void {
+    clearTrigger = trigger;
+    setStagedCount(followed().size);
+    setStatus(null);
+    setConfirming(true);
+  }
+
+  function cancelClear(): void {
+    setConfirming(false);
+    setStagedCount(null);
+    setStatus({ message: 'Followed conversations kept on this device.', failure: false });
+    queueMicrotask(() => clearTrigger?.focus());
+  }
+
+  function confirmClear(): void {
+    const expected = stagedCount();
+    if (expected === null) return;
+    const current = followed().size;
+    if (current !== expected) {
+      setStagedCount(current);
+      setStatus({
+        message: `Followed conversation count changed to ${current}. Review the updated count and confirm again.`,
+        failure: false,
+      });
+      return;
+    }
+
+    const result = clearFollowed();
+    if (!result.success || result.remaining > 0) {
+      setStagedCount(result.remaining > 0 ? result.remaining : current);
+      setStatus({
+        message: 'Could not verify that followed conversations were cleared. The confirmation remains open; notification and catch-up metadata may still be stored.',
+        failure: true,
+      });
+      return;
+    }
+
+    setStagedCount(null);
+    setConfirming(false);
+    setStatus({
+      message: `Cleared ${countLabel(current, 'followed conversation')} from this device.`,
+      failure: false,
+    });
+  }
+
+  return (
+    <section class="pref-group pref-clear-history" aria-labelledby="pref-clear-followed-title">
+      <div class="pref-group-head">
+        <h3 id="pref-clear-followed-title" class="pref-label">Followed conversations</h3>
+        <span class="pref-count">{countLabel(followCount(), 'followed conversation')}</span>
+      </div>
+      <p class="pref-desc">
+        Clear the room and named-topic keys this device uses for calm notifications and Home
+        catch-up ranking. No message text or notification payload is stored in these keys.
+      </p>
+      <p class="pref-desc">
+        Messages, queued sends, drafts, reviewed anchors, topic positions, saved searches,
+        sign-in data, notification preferences, translation preferences, and room-wide watch
+        activity remain unchanged.
+      </p>
+      <Show
+        when={confirming()}
+        fallback={
+          <div class="pref-clear-history__actions">
+            <button
+              ref={clearTrigger}
+              type="button"
+              class="pref-reset pref-reset--danger"
+              onClick={(event) => beginClear(event.currentTarget)}
+            >
+              Clear followed conversations
+            </button>
+          </div>
+        }
+      >
+        <div class="pref-clear-history__confirm" role="group" aria-label="Confirm clear followed conversations">
+          <p class="pref-desc">
+            Remove {countLabel(stagedCount() ?? 0, 'followed conversation')} from this device only?
+          </p>
+          <div class="pref-clear-history__actions">
+            <button
+              type="button"
+              class="pref-reset pref-reset--danger"
+              onClick={confirmClear}
+            >
+              Erase followed conversations
+            </button>
+            <button
+              type="button"
+              class="pref-reset"
+              onClick={cancelClear}
+            >
+              Keep followed conversations
+            </button>
+          </div>
+        </div>
+      </Show>
+      <Show when={status()}>
+        {(current) => (
+          <p class="pref-status" role={current().failure ? 'alert' : 'status'}>
+            {current().message}
+          </p>
+        )}
+      </Show>
+    </section>
+  );
+}
+
+interface LocalDraftSnapshot {
+  roomDrafts: ComposerDrafts;
+  topicDrafts: ChannelTopicDrafts;
+  roomCount: number;
+  topicCount: number;
+}
+
+function readLocalDraftSnapshot(): LocalDraftSnapshot {
+  const roomDrafts = Object.fromEntries(
+    Object.entries(loadComposerDrafts()).filter(([target]) => (
+      target.startsWith('#') || target.startsWith('&')
+    )),
+  );
+  const topicDrafts = loadChannelTopicDrafts();
+  return {
+    roomDrafts,
+    topicDrafts,
+    roomCount: Object.keys(roomDrafts).length,
+    topicCount: Object.keys(topicDrafts).length,
+  };
+}
+
+function localDraftCountLabel(roomCount: number, topicCount: number): string {
+  return `${countLabel(roomCount, 'room draft')} · ${countLabel(topicCount, 'topic draft')}`;
+}
+
+function DiscardLocalDraftsControls(): JSX.Element {
+  const initial = readLocalDraftSnapshot();
+  const [counts, setCounts] = createSignal({
+    roomCount: initial.roomCount,
+    topicCount: initial.topicCount,
+  });
+  const [stagedCounts, setStagedCounts] = createSignal<{
+    roomCount: number;
+    topicCount: number;
+  } | null>(null);
+  const [confirming, setConfirming] = createSignal(false);
+  const [status, setStatus] = createSignal<{
+    message: string;
+    failure: boolean;
+  } | null>(null);
+  let discardTrigger: HTMLButtonElement | undefined;
+
+  function refreshCounts(): LocalDraftSnapshot {
+    const snapshot = readLocalDraftSnapshot();
+    setCounts({ roomCount: snapshot.roomCount, topicCount: snapshot.topicCount });
+    return snapshot;
+  }
+
+  function beginDiscard(trigger: HTMLButtonElement): void {
+    discardTrigger = trigger;
+    const snapshot = refreshCounts();
+    setStagedCounts({ roomCount: snapshot.roomCount, topicCount: snapshot.topicCount });
+    setStatus(null);
+    setConfirming(true);
+  }
+
+  function cancelDiscard(): void {
+    setConfirming(false);
+    setStagedCounts(null);
+    setStatus({ message: 'Local room and topic drafts kept on this device.', failure: false });
+    queueMicrotask(() => discardTrigger?.focus());
+  }
+
+  function restoreRoomDrafts(drafts: ComposerDrafts): void {
+    for (const [target, text] of Object.entries(drafts)) {
+      getState().setComposerDraft(target, text);
+    }
+  }
+
+  function discardNow(): void {
+    const expected = stagedCounts();
+    if (!expected) return;
+
+    const current = refreshCounts();
+    if (current.roomCount !== expected.roomCount || current.topicCount !== expected.topicCount) {
+      setStagedCounts({ roomCount: current.roomCount, topicCount: current.topicCount });
+      setStatus({
+        message: `Draft counts changed to ${localDraftCountLabel(current.roomCount, current.topicCount)}. Review the updated counts and confirm again.`,
+        failure: false,
+      });
+      return;
+    }
+
+    const roomResult = clearRoomComposerDrafts();
+    if (!roomResult.success) {
+      const retained = refreshCounts();
+      setStagedCounts({ roomCount: retained.roomCount, topicCount: retained.topicCount });
+      setStatus({
+        message: 'Could not verify that room drafts were discarded. The confirmation remains open; topic drafts and other local data were not erased.',
+        failure: true,
+      });
+      return;
+    }
+
+    for (const target of Object.keys(current.roomDrafts)) {
+      getState().setComposerDraft(target, '');
+    }
+    const persistedRoomsCleared = readLocalDraftSnapshot().roomCount === 0;
+    const storedRoomsCleared = Object.keys(getState().composerDrafts).every((target) => (
+      !target.startsWith('#') && !target.startsWith('&')
+    ));
+    if (!persistedRoomsCleared || !storedRoomsCleared) {
+      restoreRoomDrafts(current.roomDrafts);
+      const retained = refreshCounts();
+      setStagedCounts({ roomCount: retained.roomCount, topicCount: retained.topicCount });
+      setStatus({
+        message: 'Could not verify that room drafts were removed from storage and the active session. The confirmation remains open; retry after checking browser storage.',
+        failure: true,
+      });
+      return;
+    }
+
+    const topicResult = clearChannelTopicDrafts();
+    if (!topicResult.success) {
+      restoreRoomDrafts(current.roomDrafts);
+      const retained = refreshCounts();
+      setStagedCounts({ roomCount: retained.roomCount, topicCount: retained.topicCount });
+      setStatus({
+        message: 'Could not verify that topic drafts were discarded. Room drafts were restored and the confirmation remains open.',
+        failure: true,
+      });
+      return;
+    }
+
+    const verified = readLocalDraftSnapshot();
+    const verifiedStore = Object.keys(getState().composerDrafts).every((target) => (
+      !target.startsWith('#') && !target.startsWith('&')
+    ));
+    if (verified.roomCount > 0 || verified.topicCount > 0 || !verifiedStore) {
+      restoreRoomDrafts(current.roomDrafts);
+      saveChannelTopicDrafts(current.topicDrafts);
+      const retained = refreshCounts();
+      setStagedCounts({ roomCount: retained.roomCount, topicCount: retained.topicCount });
+      setStatus({
+        message: 'Could not verify an empty draft readback. Drafts were restored where possible and the confirmation remains open.',
+        failure: true,
+      });
+      return;
+    }
+
+    setCounts({ roomCount: 0, topicCount: 0 });
+    setStagedCounts(null);
+    setConfirming(false);
+    setStatus({
+      message: `Discarded ${localDraftCountLabel(current.roomCount, current.topicCount)} from this device. Direct-message drafts were not changed.`,
+      failure: false,
+    });
+  }
+
+  return (
+    <section class="pref-group pref-clear-history" aria-labelledby="pref-discard-local-drafts-title">
+      <div class="pref-group-head">
+        <h3 id="pref-discard-local-drafts-title" class="pref-label">Local drafts</h3>
+        <span class="pref-count">
+          {localDraftCountLabel(counts().roomCount, counts().topicCount)}
+        </span>
+      </div>
+      <p class="pref-desc">
+        Discard unsent room composer drafts and channel-topic drafts stored on this device. This
+        does not change messages, vault history, queued sends, reviewed anchors, topic read
+        positions, saved searches, followed topics, or sign-in data.
+      </p>
+      <p class="pref-desc">
+        Direct-message draft plaintext is excluded from portable transfer, is not counted here,
+        and will remain on this device.
+      </p>
+      <Show
+        when={confirming()}
+        fallback={
+          <div class="pref-clear-history__actions">
+            <button
+              ref={discardTrigger}
+              type="button"
+              class="pref-reset pref-reset--danger"
+              onClick={(event) => beginDiscard(event.currentTarget)}
+            >
+              Discard local drafts
+            </button>
+          </div>
+        }
+      >
+        <div class="pref-clear-history__confirm" role="group" aria-label="Confirm discard local drafts">
+          <p class="pref-desc">
+            Discard {localDraftCountLabel(
+              stagedCounts()?.roomCount ?? 0,
+              stagedCounts()?.topicCount ?? 0,
+            )}? Their unsent text will be removed from this device. Direct-message drafts remain.
+          </p>
+          <div class="pref-clear-history__actions">
+            <button
+              type="button"
+              class="pref-reset pref-reset--danger"
+              onClick={discardNow}
+            >
+              Discard room and topic drafts
+            </button>
+            <button
+              type="button"
+              class="pref-reset"
+              onClick={cancelDiscard}
+            >
+              Keep local drafts
+            </button>
+          </div>
+        </div>
+      </Show>
+      <Show when={status()}>
+        {(current) => (
+          <p class="pref-status" role={current().failure ? 'alert' : 'status'}>
+            {current().message}
+          </p>
+        )}
+      </Show>
+    </section>
+  );
+}
+
+function DiscardQueuedSendsControls(): JSX.Element {
+  const [queueCount, setQueueCount] = createSignal<number | null>(null);
+  const [stagedCount, setStagedCount] = createSignal<number | null>(null);
+  const [confirming, setConfirming] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
+  const [status, setStatus] = createSignal<{
+    message: string;
+    failure: boolean;
+  } | null>(null);
+  let discardTrigger: HTMLButtonElement | undefined;
+
+  async function refreshCount(): Promise<number> {
+    const count = (await loadOutbox()).length;
+    setQueueCount(count);
+    return count;
+  }
+
+  onMount(() => {
+    void refreshCount();
+  });
+  onCleanup(subscribeOutbox(() => {
+    void refreshCount();
+  }));
+
+  async function beginDiscard(trigger: HTMLButtonElement): Promise<void> {
+    discardTrigger = trigger;
+    setBusy(true);
+    setStatus(null);
+    const count = await refreshCount();
+    setStagedCount(count);
+    setConfirming(true);
+    setBusy(false);
+  }
+
+  function cancelDiscard(): void {
+    setConfirming(false);
+    setStagedCount(null);
+    setStatus({ message: 'Queued sends kept on this device.', failure: false });
+    queueMicrotask(() => discardTrigger?.focus());
+  }
+
+  async function confirmDiscard(): Promise<void> {
+    const expected = stagedCount();
+    if (expected === null) return;
+    setBusy(true);
+    const current = (await loadOutbox()).length;
+    setQueueCount(current);
+    if (current !== expected) {
+      setStagedCount(current);
+      setStatus({
+        message: `Queued send count changed to ${current}. Review the updated count and confirm again.`,
+        failure: false,
+      });
+      setBusy(false);
+      return;
+    }
+
+    const cleared = await clearOutbox();
+    const remaining = (await loadOutbox()).length;
+    if (!cleared || remaining > 0) {
+      setQueueCount(remaining > 0 ? remaining : current);
+      setStagedCount(remaining > 0 ? remaining : current);
+      setStatus({
+        message: 'Could not verify that all queued sends were discarded. The confirmation remains open; nothing will be reported as removed until device storage confirms it.',
+        failure: true,
+      });
+      setBusy(false);
+      return;
+    }
+
+    setQueueCount(0);
+    setStagedCount(null);
+    setConfirming(false);
+    setStatus({
+      message: `Discarded ${countLabel(current, 'queued send')}. Their unsent message text was removed from this device and will not be sent.`,
+      failure: false,
+    });
+    setBusy(false);
+  }
+
+  return (
+    <section class="pref-group pref-clear-history" aria-labelledby="pref-discard-queued-title">
+      <div class="pref-group-head">
+        <h3 id="pref-discard-queued-title" class="pref-label">Queued sends</h3>
+        <span class="pref-count">
+          {queueCount() === null
+            ? 'Checking queued sends…'
+            : countLabel(queueCount()!, 'queued send')}
+        </span>
+      </div>
+      <p class="pref-desc">
+        Discard messages composed while offline without sending them. This removes only queued
+        unsent text; vault history, drafts, reviewed anchors, topic positions, and saved searches remain.
+      </p>
+      <Show
+        when={confirming()}
+        fallback={
+          <div class="pref-clear-history__actions">
+            <button
+              ref={discardTrigger}
+              type="button"
+              class="pref-reset pref-reset--danger"
+              disabled={busy() || queueCount() === null}
+              onClick={(event) => void beginDiscard(event.currentTarget)}
+            >
+              Discard queued sends
+            </button>
+          </div>
+        }
+      >
+        <div class="pref-clear-history__confirm" role="group" aria-label="Confirm discard queued sends">
+          <p class="pref-desc">
+            Discard {countLabel(stagedCount() ?? 0, 'queued send')}? Their unsent message text will
+            {' '}be removed from this device and will not be sent.
+          </p>
+          <div class="pref-clear-history__actions">
+            <button
+              type="button"
+              class="pref-reset pref-reset--danger"
+              disabled={busy()}
+              onClick={() => void confirmDiscard()}
+            >
+              Discard all queued sends
+            </button>
+            <button
+              type="button"
+              class="pref-reset"
+              disabled={busy()}
+              onClick={cancelDiscard}
+            >
+              Keep queued sends
+            </button>
+          </div>
+        </div>
+      </Show>
+      <Show when={status()}>
+        {(current) => (
+          <p class="pref-status" role={current().failure ? 'alert' : 'status'}>
+            {current().message}
+          </p>
+        )}
       </Show>
     </section>
   );
@@ -571,25 +1505,64 @@ function ExtensionAuditControls(): JSX.Element {
 function ExtensionActionManifestControls(): JSX.Element {
   const [actionCount, setActionCount] = createSignal(readClientExtensionActions().length);
   const [manifestText, setManifestText] = createSignal('');
+  const [pendingActions, setPendingActions] = createSignal<ClientExtensionAction[] | null>(null);
   const [status, setStatus] = createSignal('');
 
-  function importManifest(): void {
-    const imported = parseClientExtensionActionManifest(manifestText());
-    if (!imported) {
-      setStatus('Manifest was not valid JSON with an actions array.');
+  function replaceManifestText(value: string): void {
+    setManifestText(value);
+    setPendingActions(null);
+    setStatus('');
+  }
+
+  function reviewManifest(): void {
+    const reviewed = parseClientExtensionActionManifest(manifestText());
+    if (!reviewed) {
+      setPendingActions(null);
+      setStatus('Manifest must be a version 1 object or a legacy action array.');
       return;
     }
-    setActionCount(imported.length);
-    setStatus(`Imported ${countLabel(imported.length, 'safe action')}.`);
+    if (reviewed.length === 0) {
+      setPendingActions(null);
+      setStatus('Manifest does not contain any supported safe actions.');
+      return;
+    }
+    setPendingActions(reviewed);
+    setStatus(`Ready to import ${countLabel(reviewed.length, 'safe action')}. Review each capability and detail.`);
+  }
+
+  function confirmManifest(): void {
+    const staged = pendingActions();
+    if (!staged) return;
+
+    // Revalidate the normalized stage at the persistence boundary and require it
+    // to describe exactly the same actions the preview displayed.
+    const revalidated = normalizeClientExtensionActions(staged);
+    if (revalidated.length === 0 || JSON.stringify(revalidated) !== JSON.stringify(staged)) {
+      setPendingActions(null);
+      setStatus('Reviewed actions changed before import. Review the manifest again.');
+      return;
+    }
+
+    const committed = saveClientExtensionActions(revalidated);
+    if (!committed || JSON.stringify(committed) !== JSON.stringify(revalidated)) {
+      setStatus('Could not save reviewed actions on this device.');
+      return;
+    }
+
+    setActionCount(committed.length);
+    setPendingActions(null);
+    setStatus(`Imported ${countLabel(committed.length, 'safe action')}.`);
   }
 
   function exportManifest(): void {
+    setPendingActions(null);
     setManifestText(exportClientExtensionActionManifest());
     setStatus(`Exported ${countLabel(actionCount(), 'safe action')}.`);
   }
 
   function clearManifest(): void {
     clearClientExtensionActions();
+    setPendingActions(null);
     setActionCount(0);
     setManifestText('');
     setStatus('Extension actions cleared on this device.');
@@ -611,11 +1584,11 @@ function ExtensionActionManifestControls(): JSX.Element {
         rows={5}
         spellcheck={false}
         value={manifestText()}
-        onInput={(event) => setManifestText(event.currentTarget.value)}
+        onInput={(event) => replaceManifestText(event.currentTarget.value)}
       />
       <div class="pref-import-review__actions">
-        <button type="button" class="pref-reset" onClick={importManifest} disabled={!manifestText().trim()}>
-          Import actions
+        <button type="button" class="pref-reset" onClick={reviewManifest} disabled={!manifestText().trim()}>
+          Review actions
         </button>
         <button type="button" class="pref-reset" onClick={exportManifest}>
           Export actions
@@ -624,6 +1597,49 @@ function ExtensionActionManifestControls(): JSX.Element {
           Clear actions
         </button>
       </div>
+      <Show when={pendingActions()}>
+        {(actions) => (
+          <div class="pref-extension-review" role="group" aria-labelledby="pref-extension-review-title">
+            <h4 id="pref-extension-review-title">Review extension actions</h4>
+            <p>
+              Only these normalized actions will be stored. Payload values remain hidden during review.
+            </p>
+            <div
+              class="pref-extension-review__rows"
+              role="list"
+              aria-label="Reviewed extension actions"
+            >
+              <For each={actions()}>
+                {(action) => {
+                  const preview = previewClientExtensionAction(action);
+                  return (
+                    <div class="pref-extension-review__row" role="listitem">
+                      <span class="pref-extension-review__title">{preview.title}</span>
+                      <span class="pref-extension-review__capability">{preview.capability}</span>
+                      <span class="pref-extension-review__detail">{preview.detail}</span>
+                    </div>
+                  );
+                }}
+              </For>
+            </div>
+            <div class="pref-import-review__actions">
+              <button type="button" class="pref-reset" onClick={confirmManifest}>
+                Import reviewed actions
+              </button>
+              <button
+                type="button"
+                class="pref-reset"
+                onClick={() => {
+                  setPendingActions(null);
+                  setStatus('Reviewed actions cancelled.');
+                }}
+              >
+                Cancel reviewed actions
+              </button>
+            </div>
+          </div>
+        )}
+      </Show>
       <Show when={status()}>
         <p class="pref-status" role="status">{status()}</p>
       </Show>
@@ -746,20 +1762,94 @@ function PwaReadinessPanel(): JSX.Element {
 }
 
 function VaultRetentionCard(): JSX.Element {
-  // Read-only: the local vault keeps at most VAULT_KEEP recent messages per
-  // conversation, oldest pruned. Nothing here leaves the device.
+  const initial = sanitizeRetentionPolicy(getRetentionPolicy() ?? readRetentionPolicy());
+  setRetentionPolicy(initial);
+  const [policy, setPolicy] = createSignal<RetentionPolicy>(initial);
+  const [status, setStatus] = createSignal<string | null>(null);
+
+  onCleanup(subscribeRetentionPolicy((next) => setPolicy(next)));
+
+  function keepOption(): VaultKeepOption {
+    const value = String(policy().keep);
+    return VAULT_KEEP_OPTIONS.includes(value as VaultKeepOption)
+      ? (value as VaultKeepOption)
+      : String(VAULT_KEEP) as VaultKeepOption;
+  }
+
+  function ageOption(): VaultAgeOption {
+    const value = policy().maxAgeDays;
+    if (value === undefined) return 'none';
+    const key = String(value);
+    return VAULT_AGE_OPTIONS.includes(key as VaultAgeOption) ? (key as VaultAgeOption) : 'none';
+  }
+
+  function applyPolicy(next: RetentionPolicy): void {
+    const safe = sanitizeRetentionPolicy(next);
+    setPolicy(safe);
+    const saved = writeRetentionPolicy(safe);
+    setStatus('Applying local history limit…');
+    void applyRetentionPolicy(safe).then((pruned) => {
+      setStatus(
+        saved && pruned
+          ? 'Local history limit saved and existing messages pruned for this device.'
+          : saved
+            ? 'Local history limit saved; the vault is unavailable in this browser session.'
+            : 'Limit applied for this session, but this browser could not save it.',
+      );
+    });
+  }
+
+  function setKeep(value: VaultKeepOption): void {
+    applyPolicy({ ...policy(), keep: Number(value) });
+  }
+
+  function setAge(value: VaultAgeOption): void {
+    const current = policy();
+    if (value === 'none') {
+      const next: RetentionPolicy = { keep: current.keep };
+      if (current.perChannel) next.perChannel = current.perChannel;
+      applyPolicy(next);
+      return;
+    }
+    applyPolicy({ ...current, maxAgeDays: Number(value) });
+  }
+
   return (
     <section class="pref-group pref-vault-retention" aria-labelledby="pref-vault-retention-title">
       <div class="pref-group-head">
         <h3 id="pref-vault-retention-title" class="pref-label">On-device history</h3>
-        <span class="pref-count">{countLabel(VAULT_KEEP, 'message')} per room</span>
+        <span class="pref-vault-retention__scope">This device</span>
       </div>
       <p class="pref-desc">
-        Onyx keeps up to {countLabel(VAULT_KEEP, 'recent message')} for each conversation in this
-        browser's private storage so rooms open instantly and read offline. Older messages are
-        pruned automatically. History stays on this device — it is never uploaded, and encrypted
-        DM plaintext is never stored.
+        Choose how much recent history this browser keeps for fast opening, offline reading, and
+        device-memory search. Older messages are pruned automatically. Encrypted DM plaintext is
+        never stored.
       </p>
+      <div class="pref-vault-retention__controls">
+        <Segmented
+          legend="Messages per conversation"
+          description="The newest messages retained for each room or DM on this device."
+          options={VAULT_KEEP_OPTIONS}
+          labels={VAULT_KEEP_LABELS}
+          value={keepOption}
+          onSelect={setKeep}
+        />
+        <Segmented
+          legend="Maximum local age"
+          description="Also prune messages older than this age, even when the message limit has room."
+          options={VAULT_AGE_OPTIONS}
+          labels={VAULT_AGE_LABELS}
+          value={ageOption}
+          onSelect={setAge}
+        />
+      </div>
+      <p class="pref-vault-retention__boundary">
+        This changes only Onyx's private vault in this browser. It does not change server history
+        or a room's EPHEMERAL retention setting.
+      </p>
+      <Show when={status()}>
+        <p class="pref-status" role="status">{status()}</p>
+      </Show>
     </section>
   );
 }
@@ -772,8 +1862,10 @@ function ClearLocalHistoryControls(): JSX.Element {
   async function clearNow(): Promise<void> {
     setBusy(true);
     try {
-      await clearVault();
-      setStatus('Local history cleared on this device.');
+      const cleared = await clearVault();
+      setStatus(cleared
+        ? 'Local history cleared on this device.'
+        : 'Could not clear all local history. Try again after freeing storage.');
     } catch {
       setStatus('Could not clear local history. Try again after freeing storage.');
     } finally {
@@ -1009,6 +2101,8 @@ export function PreferencesPanel(): JSX.Element {
 
         <PortableVaultControls />
 
+        <ClearReviewedAnchorsControls />
+
         <PreferenceSection
           title="Search & history"
           description="How on-device search matches, what this browser keeps, and how to erase it."
@@ -1016,7 +2110,7 @@ export function PreferencesPanel(): JSX.Element {
 
         <Segmented
           legend="Default search mode"
-          description="Which matching a device-memory search starts in: Hybrid (lexical then on-device semantic), Exact (literal substring), or Semantic (on-device meaning). All run in this browser — nothing is sent anywhere."
+          description="Which matching a device-memory search starts in: Text + related (literal matches, then token-similar terms), Exact (literal substring), or Related terms (token similarity only). All run in this browser — nothing is sent anywhere."
           options={VAULT_SEARCH_MODES}
           labels={VAULT_SEARCH_MODE_LABELS}
           value={() => defaultVaultSearchMode()}
@@ -1025,6 +2119,16 @@ export function PreferencesPanel(): JSX.Element {
             setVaultMode(value);
           }}
         />
+
+        <DiscardQueuedSendsControls />
+
+        <DiscardLocalDraftsControls />
+
+        <ClearFollowedConversationsControls />
+
+        <ClearSavedSearchesControls />
+
+        <ClearTopicReadPositionsControls />
 
         <VaultRetentionCard />
 

@@ -40,4 +40,21 @@ describe('PWA readiness', () => {
     expect(readiness).toContainEqual(expect.objectContaining({ key: 'notifications', state: 'unavailable' }));
     expect(readiness).toContainEqual(expect.objectContaining({ key: 'storage', state: 'ready' }));
   });
+
+  it('probes durable storage once per readiness snapshot', () => {
+    vi.stubGlobal('navigator', {});
+    vi.stubGlobal('Notification', { permission: 'default' });
+    vi.stubGlobal('indexedDB', {});
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    const setItem = vi.fn();
+    vi.stubGlobal('localStorage', {
+      setItem,
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    });
+
+    pwaReadiness();
+
+    expect(setItem).toHaveBeenCalledTimes(1);
+  });
 });

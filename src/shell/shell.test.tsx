@@ -24,6 +24,7 @@ import { saveChannelTopicDrafts } from '@/lib/channel/topicDrafts';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { readReviewHistory, recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import { isPreferencesOpen, resetPreferences, setPreference } from '@/lib/prefs/preferences';
+import { readTopicReadMarker, TOPIC_READ_LEDGER_KEY } from '@/lib/topics/topicReadLedger';
 import { _resetVaultForTests, queueOutbox, saveMessages } from '@/lib/vault/historyVault';
 import { Spotlight } from '@/chat/spotlight';
 import { AppShell } from './AppShell';
@@ -210,7 +211,7 @@ describe('AppShell', () => {
       expect(firstRow).not.toHaveClass('shell-msg-revealed');
     });
 
-    it('filters channel messages by named conversation topic', () => {
+    it('opens existing topics safely and returns composer focus when clearing to All', async () => {
       const channel = makeChannel(
         '#general',
         [
@@ -230,6 +231,11 @@ describe('AppShell', () => {
         ourNick: 'testuser',
         viewUnreadDividerId: new Map([['#general', 'msg-topic-b']]),
       }, true);
+      const openChannelConversation = vi.fn(
+        (channelName: string, topic: string | null) =>
+          initialState.openChannelConversation(channelName, topic),
+      );
+      store.setState({ openChannelConversation });
 
       setPreference('topicTools', true);
       render(() => <AppShell />);
@@ -245,14 +251,118 @@ describe('AppShell', () => {
       expect(screen.queryByText('Loose note')).not.toBeInTheDocument();
       expect(screen.getByText('#roadmap')).toBeInTheDocument();
       expect(store.getState().activeChannelTopics.get('#general')).toBe('roadmap');
+      expect(openChannelConversation).toHaveBeenLastCalledWith('#general', 'roadmap');
 
-      fireEvent.click(screen.getByRole('button', { name: 'Clear topic roadmap' }));
+      const clearTopic = screen.getByRole('button', { name: 'Clear topic roadmap' });
+      clearTopic.focus();
+      fireEvent.click(clearTopic);
 
       expect(store.getState().activeChannelTopics.has('#general')).toBe(false);
+      expect(openChannelConversation).toHaveBeenLastCalledWith('#general', null);
+      await waitFor(() => {
+        expect(document.activeElement).toBe(screen.getByRole('textbox', { name: /message #general/i }));
+      });
+    });
+
+    it('tracks interleaved topic reads independently and reserves the server room marker for All', () => {
+      const sendRaw = vi.fn();
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-old', 'alice', 'Older roadmap item', '#general', 'roadmap'),
+          makeMessage('msg-roadmap-new', 'alice', 'New roadmap item', '#general', 'roadmap'),
+          makeMessage('msg-release-new', 'bob', 'New release item', '#general', 'release'),
+        ],
+        [makeUser('alice'), makeUser('bob')],
+      );
+      channel.unread = 2;
+      const channels = new Map<string, Channel>([['#general', channel]]);
+      store.setState({
+        ...initialState,
+        client: {
+          sendRaw,
+          isupport: { CHANTYPES: '#&' },
+          negotiatedCaps: new Set(['draft/read-marker']),
+        } as never,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        channelUnread: { '#general': 2 },
+        firstUnreadId: new Map([['#general', 'msg-roadmap-new']]),
+        viewUnreadDividerId: new Map([['#general', 'msg-roadmap-new']]),
+      }, true);
+
+      setPreference('topicTools', true);
+      render(() => <AppShell />);
+
+      expect(screen.getAllByLabelText('1 unread')).toHaveLength(2);
+
+      fireEvent.click(screen.getByRole('button', { name: /roadmap.*1 unread/i }));
+      expect(readTopicReadMarker('#general', 'roadmap')?.lastReadMessageId).toBe('msg-roadmap-new');
+      expect(readTopicReadMarker('#general', 'release')).toBeNull();
+      expect(screen.getAllByLabelText('1 unread')).toHaveLength(1);
+      expect(store.getState().channels.get('#general')?.unread).toBe(1);
+      expect(sendRaw).not.toHaveBeenCalledWith('MARKREAD', expect.anything(), expect.anything());
+
+      fireEvent.click(screen.getByRole('button', { name: /release.*1 unread/i }));
+      expect(readTopicReadMarker('#general', 'release')?.lastReadMessageId).toBe('msg-release-new');
+      expect(screen.queryByLabelText('1 unread')).not.toBeInTheDocument();
+      expect(store.getState().channels.get('#general')?.unread).toBe(0);
+      expect(sendRaw).not.toHaveBeenCalledWith('MARKREAD', expect.anything(), expect.anything());
+
+      fireEvent.click(screen.getByRole('button', { name: 'All' }));
+      expect(store.getState().channels.get('#general')?.unread).toBe(0);
+      expect(store.getState().channelUnread['#general']).toBe(0);
+      expect(store.getState().firstUnreadId.has('#general')).toBe(false);
+      expect(sendRaw).toHaveBeenCalledWith('MARKREAD', '#general', expect.stringMatching(/^timestamp=/));
+    });
+
+    it('updates topic unread badges from sanitized cross-tab read markers', () => {
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-old', 'alice', 'Older release item', '#general', 'release'),
+          makeMessage('msg-release-new', 'bob', 'New release item', '#general', 'release'),
+        ],
+        [makeUser('alice'), makeUser('bob')],
+      );
+      store.setState({
+        ...initialState,
+        channels: new Map([['#general', channel]]),
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        channelNotify: new Map([['#general', 'mentions']]),
+        highlightWords: ['release'],
+        viewUnreadDividerId: new Map([['#general', 'msg-release-new']]),
+      }, true);
+
+      setPreference('topicTools', true);
+      render(() => <AppShell />);
+      expect(screen.getByLabelText('1 unread')).toBeInTheDocument();
+
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: TOPIC_READ_LEDGER_KEY,
+        newValue: JSON.stringify([{
+          channel: '#general',
+          topic: 'release',
+          lastReadMessageId: 'msg-release-new',
+          lastReadAt: channel.messages[1]!.time.getTime(),
+          text: 'must be discarded',
+        }]),
+      }));
+
+      expect(screen.queryByLabelText('1 unread')).not.toBeInTheDocument();
     });
 
     it('starts a new named conversation before the first message', () => {
       seedStore('#general');
+      const openChannelConversation = vi.fn(
+        (channelName: string, topic: string | null) =>
+          initialState.openChannelConversation(channelName, topic),
+      );
+      store.setState({ openChannelConversation });
 
       setPreference('topicTools', true);
       render(() => <AppShell />);
@@ -262,9 +372,10 @@ describe('AppShell', () => {
 
       expect(store.getState().activeChannelTopics.get('#general')).toBe('incident');
       expect(screen.getByText('#incident')).toBeInTheDocument();
+      expect(openChannelConversation).not.toHaveBeenCalled();
     });
 
-    it('projects named conversations into a browsable forum view', () => {
+    it('projects named conversations into a browsable forum view', async () => {
       const channel = makeChannel(
         '#general',
         [
@@ -282,7 +393,13 @@ describe('AppShell', () => {
         activeView: { kind: 'channel', channel: '#general' },
         connectionStatus: 'connected',
         ourNick: 'testuser',
+        viewUnreadDividerId: new Map([['#general', 'msg-topic-b']]),
       }, true);
+      const openChannelConversation = vi.fn(
+        (channelName: string, topic: string | null) =>
+          initialState.openChannelConversation(channelName, topic),
+      );
+      store.setState({ openChannelConversation });
 
       setPreference('topicTools', true);
       render(() => <AppShell />);
@@ -295,6 +412,8 @@ describe('AppShell', () => {
       expect(store.getState().forumChannels.has('#general')).toBe(true);
       expect(screen.getByRole('button', { name: 'Forum pinned' })).toHaveAttribute('aria-pressed', 'true');
       expect(within(forum).getByText('2 messages')).toBeInTheDocument();
+      expect(within(forum).getAllByText('1 unread')).toHaveLength(2);
+      expect(within(forum).getByRole('button', { name: /Open topic roadmap, 2 messages, 1 unread on this device/i })).toBeInTheDocument();
       expect(within(forum).getByText('Another roadmap item')).toBeInTheDocument();
 
       const followRoadmap = within(forum).getByRole('button', { name: 'Follow topic roadmap' });
@@ -310,10 +429,15 @@ describe('AppShell', () => {
 
       expect(isFollowed('#general', 'roadmap')).toBe(false);
 
-      fireEvent.click(within(forum).getByRole('button', { name: /#roadmap/i }));
+      fireEvent.click(within(forum).getByRole('button', { name: /Open topic roadmap/i }));
 
       expect(store.getState().activeChannelTopics.get('#general')).toBe('roadmap');
+      expect(openChannelConversation).toHaveBeenCalledWith('#general', 'roadmap');
       expect(screen.queryByLabelText('Topic forum')).not.toBeInTheDocument();
+      await waitFor(() => {
+        const filters = screen.getByRole('group', { name: 'Topic filters' });
+        expect(document.activeElement).toBe(within(filters).getByRole('button', { name: /roadmap/i }));
+      });
     });
 
     it('opens pinned forum channels directly', () => {
@@ -710,6 +834,58 @@ describe('AppShell', () => {
       const attach = container.querySelector('button[aria-label="Attach files"]') as HTMLButtonElement;
       expect(attach).toBeDisabled();
     });
+
+    it('preserves an offline IRC command instead of silently dropping the draft', async () => {
+      seedStore('#general');
+      store.setState({ connectionStatus: 'disconnected' });
+      const sendMessageSpy = vi.spyOn(store.getState(), 'sendMessage').mockImplementation(() => {});
+      const { container } = render(() => <AppShell />);
+      const textarea = container.querySelector('.shell-composer-textarea') as HTMLTextAreaElement;
+
+      fireEvent.input(textarea, { target: { value: '/me waves' } });
+      fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+      expect(await screen.findByText(/Commands can't be queued/)).toBeInTheDocument();
+      expect(sendMessageSpy).not.toHaveBeenCalled();
+      expect(textarea).toHaveValue('/me waves');
+      expect(store.getState().getComposerDraft('#general')).toBe('/me waves');
+      await waitFor(() => expect(document.activeElement).toBe(textarea));
+    });
+
+    it('applies the same offline command guard from the Send button', async () => {
+      seedStore('#general');
+      store.setState({ connectionStatus: 'disconnected' });
+      const sendMessageSpy = vi.spyOn(store.getState(), 'sendMessage').mockImplementation(() => {});
+      const { container } = render(() => <AppShell />);
+      const textarea = container.querySelector('.shell-composer-textarea') as HTMLTextAreaElement;
+
+      fireEvent.input(textarea, { target: { value: '/join #elsewhere' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+      expect(await screen.findByText(/Commands can't be queued/)).toBeInTheDocument();
+      expect(sendMessageSpy).not.toHaveBeenCalled();
+      expect(textarea).toHaveValue('/join #elsewhere');
+      expect(store.getState().getComposerDraft('#general')).toBe('/join #elsewhere');
+      await waitFor(() => expect(document.activeElement).toBe(textarea));
+    });
+
+    it('still expands text-only slash conveniences before queueing offline', async () => {
+      seedStore('#general');
+      store.setState({ connectionStatus: 'disconnected' });
+      const sendMessageSpy = vi.spyOn(store.getState(), 'sendMessage').mockImplementation(() => {});
+      const { container } = render(() => <AppShell />);
+      const textarea = container.querySelector('.shell-composer-textarea') as HTMLTextAreaElement;
+
+      fireEvent.input(textarea, { target: { value: '/shrug still shipping' } });
+      fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+
+      await waitFor(() => {
+        expect(sendMessageSpy).toHaveBeenCalledWith('#general', '¯\\_(ツ)_/¯ still shipping');
+      });
+      expect(textarea).toHaveValue('');
+      expect(store.getState().getComposerDraft('#general')).toBe('');
+      expect(screen.queryByText(/Commands can't be queued/)).not.toBeInTheDocument();
+    });
   });
 
   describe('channel switching updates activeView', () => {
@@ -850,11 +1026,15 @@ describe('AppShell', () => {
       render(() => <AppShell />);
       fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
 
-      // Assert
-      await waitFor(() => {
-        expect(store.getState().showVoiceSettings).toBe(true);
-        expect(screen.getByRole('dialog', { name: 'Voice settings' })).toBeInTheDocument();
-      });
+      // The state transition is synchronous; the dialog itself is a lazy
+      // chunk and can take longer than Testing Library's default 1s timeout
+      // when the full 3k-test suite is transforming modules in parallel.
+      expect(store.getState().showVoiceSettings).toBe(true);
+      expect(await screen.findByRole(
+        'dialog',
+        { name: 'Voice settings' },
+        { timeout: 5_000 },
+      )).toBeInTheDocument();
     });
 
     it('shows scheduled room events in the presence header and opens the event moment', () => {
@@ -1076,7 +1256,7 @@ describe('AppShell', () => {
       }));
       await waitFor(() => {
         expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
-        expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('goto #general');
+        expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('review #general');
       });
       fireEvent.click(screen.getByRole('button', { name: 'Close spotlight' }));
 
@@ -1088,7 +1268,11 @@ describe('AppShell', () => {
       if (reopenedView.kind === 'channel') expect(reopenedView.channel).toBe('#general');
       expect(store.getState().timeTravelLandingId).toBe('msg-new-a');
       expect(travelToSpy).toHaveBeenCalledTimes(2);
-      expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date('2025-01-01T12:00:00Z'));
+      expect(travelToSpy).toHaveBeenLastCalledWith(
+        '#general',
+        new Date('2025-01-01T12:00:00Z'),
+        'msg-new-a',
+      );
 
       store.getState().navigate({ kind: 'home' });
       const reviewHistoryAgain = await screen.findByLabelText('Recent catch-up reviews');
@@ -1131,9 +1315,9 @@ describe('AppShell', () => {
 
       render(() => <AppShell />);
 
-      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 queued send'));
-      expect(screen.getByRole('status')).toHaveTextContent('1 room draft');
-      expect(screen.getByRole('status')).toHaveTextContent('1 topic draft');
+      const localMemory = await screen.findByText(/Local-memory mode:.*1 queued send/);
+      expect(localMemory).toHaveTextContent('1 room draft');
+      expect(localMemory).toHaveTextContent('1 topic draft');
       const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
       expect(within(reviewHistory).getByText('Reviewed recently')).toBeInTheDocument();
       expect(within(reviewHistory).getByText('offline recall')).toBeInTheDocument();

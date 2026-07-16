@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createSignal } from 'solid-js';
-import { fireEvent, render, screen } from '@solidjs/testing-library';
+import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { describe, expect, it, vi } from 'vitest';
 import { BlockKitModal } from './BlockKitModal';
 import type { BlockKitLiteModalBlock } from '@/lib/integrations/blockKitLite';
@@ -50,10 +50,15 @@ describe('BlockKitModal', () => {
     expect(onAction).toHaveBeenCalledWith(
       { type: 'select-notify', target: '#ops', value: 'environment' },
       'prod',
+      expect.any(HTMLSelectElement),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
-    expect(onAction).toHaveBeenCalledWith({ type: 'send', target: '#ops', value: 'approved' });
+    expect(onAction).toHaveBeenCalledWith(
+      { type: 'send', target: '#ops', value: 'approved' },
+      undefined,
+      expect.any(HTMLButtonElement),
+    );
   });
 
   it('closes through the existing modal primitive contract', () => {
@@ -72,5 +77,27 @@ describe('BlockKitModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close block details' }));
 
     expect(screen.queryByRole('dialog', { name: 'Release details' })).toBeNull();
+  });
+
+  it('announces clipboard failure for a modal copy control', async () => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    const copyModal: BlockKitLiteModalBlock = {
+      ...releaseModal,
+      buttons: [{ label: 'Copy release ID', url: null, value: 'rel-42', action: null }],
+    };
+
+    render(() => (
+      <BlockKitModal
+        block={copyModal}
+        open
+        onOpenChange={() => undefined}
+      />
+    ));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy value for Copy release ID' }));
+
+    await waitFor(() => expect(
+      screen.getByRole('button', { name: 'Copy value for Copy release ID' }),
+    ).toHaveTextContent('Copy failed'));
+    expect(screen.getByRole('status')).toHaveTextContent('Copy release ID value could not be copied.');
   });
 });

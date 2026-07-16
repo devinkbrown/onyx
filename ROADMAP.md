@@ -103,6 +103,10 @@ down to TLS.
    plaintext transient+view-only; locked placeholder for undecryptable;
    e2eeDms pref. 9 unit tests; live-verified publish + server relay. Client
    only, no server change. (Future: multi-device, verification, PFS.)
+   ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — published browser device keys
+   now derive a stable bounded registry ID from the validated P-256 public key,
+   replacing the shared `browser` identifier so separate browser profiles no
+   longer overwrite one another's key-transparency entries.
 7. **Ephemeral rooms** — IRCX PROP TTL prop: messages past N hours drop from
    history/replay/stats server-side.
    ✅ **SHIPPED 2026-07-02** — channel IRCX prop `EPHEMERAL <secs>` (60s..30d,
@@ -204,6 +208,64 @@ down to TLS.
     with no genuine boundary, so one tap `navigate`s to the room/DM and
     `focusMessage`es the *exact* first-unread message (`src/shell/HomeView.tsx:216`)
     rather than the start of a heuristic window.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Search is now a global Search
+    Center reachable from Home and `Cmd/Ctrl-F` even without an active room. It
+    searches the device vault across targets, supports named save/run/delete
+    queries, disables server search without a concrete room or DM, and hydrates
+    archived results through the existing `travelTo` + message-focus path.
+    Saved queries now support exact, related-term, and combined modes without
+    overstating token similarity as embeddings or model inference.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Every live Search Center entry
+    path now shares a 512-character work bound, including typed input,
+    command-palette prefills, recall pivots, and server history requests. A
+    pasted or programmatic query can no longer drive unbounded local token/vector
+    work or an oversized `SEARCH` command.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Search inside an E2EE-capable
+    DM now matches only transient decrypted text from loaded lines and keeps the
+    query on this device. Full-history server search is suppressed, while vault
+    and archived panes discard ciphertext envelopes instead of presenting or
+    deriving recall terms from them. Legacy Tsumugi envelopes also fail closed
+    when an old row omitted its encrypted flag, including after the local E2EE
+    preference is disabled. Flagged encrypted vault rows are now excluded before
+    lexical matching or candidate embedding, so an optional local provider never
+    receives a ciphertext envelope that cannot yield a useful text match.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Saved-search deletion and
+    clear operations now verify IndexedDB transaction completion and readback
+    instead of treating a best-effort request as success. A failed deletion
+    keeps the saved row visible and reports the device-storage failure in the
+    Search Center; existing encrypted DM history also remains device-only even
+    if the E2EE preference is later disabled.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Cross-conversation vault
+    search now has a true global work bound in addition to per-target retention.
+    A migrated newest-first IndexedDB time index limits each lexical or
+    related-term pass to 4,096 materialized rows before matching or embedding,
+    preventing a device with many remembered targets from turning one query
+    into an unbounded full-vault allocation. Superseded related-term jobs stop
+    scheduling work, and explicitly configured async embedding providers are
+    limited to four concurrent calls per search. Each stored sender/body
+    candidate also has a 32 KiB lowercase/tokenization work cap, so one malformed
+    legacy or imported row cannot bypass the global row bound with an enormous
+    string. Matched bodies are reduced to a match-aware 4 KiB reactive/render
+    excerpt before entering result state, while navigation keeps the exact
+    target/message id.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Device-local reviewed anchors now
+    surface in Spotlight as a bounded newest-first recall set searchable by
+    review, target, and saved preview. Recall navigates to the reviewed room or
+    DM, focuses the exact stored message id, and passes that id through vault
+    time travel; malformed imported timestamps fail closed without blocking the
+    safe exact-id handoff.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Preferences now provides
+    separate count-aware, two-step controls for clearing reviewed catch-up
+    anchors and saved Search Center queries. Both operations verify removal by
+    readback, retain confirmation on failure, restore focus on cancel, and prove
+    that unrelated vault rows, topic cursors, and other local-memory stores are
+    not changed.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Search Center saved-query
+    operations now use lifecycle and operation epochs, so rapid close/reopen,
+    target/query changes, unmounts, and overlapping IndexedDB completions cannot
+    overwrite newer rows or status. Persistence remains tied only to the
+    explicit Save action, and refresh/save/delete pending, success, and failure
+    outcomes are announced without treating a stale completion as current.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
     and richer cross-room review handoffs before adding new server surface.
 16. **Reader mode** *(client)* — a calm single-pane transcript view for long
@@ -258,6 +320,11 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The global keyboard layer now adds
     `J`/`K` transcript navigation over rendered message rows, reusing the
     existing message landing pulse so reader-mode review can move line by line.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — The keyboard reading layer now
+    carries exact conversation context: `N` captures and focuses the target's
+    authoritative first-unread message before read-state advances, while `U`
+    follows the selected named conversation when a topic filter is active
+    instead of silently following the entire room.
     ✅ **CLIENT SLICE SHIPPED 2026-07-11** — Command-palette time grammar broadened
     (`src/chat/spotlight/timeGrammar.ts:279`): `parseTimeExpr` now resolves weekday
     names (`tuesday`, `fri 08:30`, `last friday noon`), dayparts (`this
@@ -337,6 +404,12 @@ down to TLS.
     (`src/shell/HistoryImportControls.tsx:210`) and a successful invite-link copy
     in Channel settings (`src/shell/ChannelSettings.tsx:444`) — the status node
     pre-exists its text so screen readers reliably announce the update.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Discord JSON, Slack JSON,
+    Discord package, Discord bot-token, and IRC-log import reviews now move
+    keyboard focus to their named review heading when preparation completes,
+    then restore focus to the initiating chooser or token field after cancel or
+    successful merge. This closes the conditional-review focus-loss boundary
+    while retaining the existing polite live-status announcements.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 
@@ -385,6 +458,19 @@ client or public site needs to expose the result.
     before the device is ever prompted. Surfaced as **Add a passkey** in the
     Account panel (`src/app/Account.tsx`) and **Sign in with a passkey** on
     Connect (`src/app/Connect.tsx`, gated on `isPasskeySupported()`).
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Connect now exposes a bounded
+    catalogue of the active and 11 newest sanitized server/nick identities
+    instead of silently selecting one entry.
+    Users can switch or forget entries individually; capability labels clearly
+    distinguish resume-ready credentials, password sign-in, and identity-only
+    handoff data, while expired tokens fail closed and selecting an identity
+    clears any password typed for the previous one.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — The authenticated account from
+    `900 RPL_LOGGEDIN` is now retained across the pre-registration SASL → `001`
+    boundary, so a successfully resumed session constructs its shell identity as
+    the signed-in account instead of reverting the top-bar chip to “Guest”. Own
+    account-notify updates remain scoped to the local nick, preventing a peer's
+    logout from clobbering that identity.
 20. **Brand and glossary cleanup** *(main site + client)* — enforce one public
     glossary across home, about, status, roadmap, accessibility, app chrome,
     invite unfurls, and docs. Track the master-roadmap direction to make
@@ -409,6 +495,24 @@ client or public site needs to expose the result.
     one-tap follow/unfollow controls for named conversations, and channels can
     pin their forum projection so long-lived topics reopen as a durable room
     knowledge surface.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Forum cards now expose device-local
+    unread counts, latest-activity dates, descriptive open actions, a labelled
+    forum heading, forced-colors treatment, and coarse-pointer controls at least
+    44px tall without adding a new server read-state contract.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Named conversations now keep a
+    bounded, sanitized device-local read ledger (message id/timestamp metadata
+    only) so interleaved topics clear independently across reloads and tabs.
+    Opening a topic reprojects room totals, mentions, and the exact remaining
+    unread boundary without publishing an over-broad server marker; only the
+    whole-room `All` view advances `MARKREAD`. Topic and room follows preserve
+    their actual scope, stale notification topics fail safely to the room, and
+    the in-app notification dialog closes cleanly after activation.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Topic deep links now wait for
+    retained messages, history replay, or the IRCX registry before applying a
+    filter, then fail safely to the whole room when the label is stale. Device
+    cursor changes reconcile affected inactive rooms across tabs, and live
+    custom-highlight classification preserves unread mentions in hidden sibling
+    topics instead of diverging from replay projection.
 22. **Calm notifications and quiet boosts** *(client)* — formalize calm,
     regular, and power notification presets; keep followed conversations and
     mentions prominent while quiet reactions and ambient movement collect into
@@ -454,6 +558,14 @@ client or public site needs to expose the result.
     the renderer itself: Animated runs normally, Still starts canvas and DOM
     scenes in static mode, Off skips mounting the background renderer entirely,
     and Preferences reset restores the scene mode to Animated.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Canvas scenes now cap real
+    paints, decelerate from actual user inactivity, reset stale FPS evidence on
+    activity/resume, and repaint frozen bitmaps after resize or quality changes.
+    Off no longer requests a lazy scene chunk, while DOM/SVG scenes share a
+    cleanup-safe hidden/blur/idle hold that resumes on focus or input without
+    misreporting the user's Animated mode as Still. The shared hold also pauses
+    feature-detected SVG SMIL timelines, and the Appearance picker debounces
+    transient pointer sweeps so they do not request every crossed scene chunk.
 26. **Theme-reactive community identity** *(client + main site)* — allow bounded
     accent, tint, banner, and wordmark expression within contrast-locked OKLCH
     tokens so rooms can feel distinct without unbounded CSS or broken access.
@@ -499,6 +611,14 @@ client or public site needs to expose the result.
     popover when media is available, shows positioned-peer counts from the
     existing spatial store, and disables itself with a clear unavailable label
     when the current media path cannot support it.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — The in-call toolbar and every stage
+    layout now share a case-insensitive union of local, decoded, and mesh-roster
+    participants, so cross-node members remain counted and visible while the
+    local user shares their screen without duplicate nick tiles.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Screen sharing now exposes a
+    disabled, explicitly labelled unavailable state when the browser lacks
+    display capture or the media path is unavailable. An already-active share
+    always retains its enabled Stop control even if capability state changes.
 30. **Watch-together surface** *(client)* — expose synchronized playback as a
     room activity with clear host, participant, pause, seek, and handoff states.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Channels can now surface a
@@ -506,6 +626,50 @@ client or public site needs to expose the result.
     title, open link, host, participant count, synchronized position/duration,
     and playing/paused/seeking/handoff state without turning it into a chat
     message.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Untrusted `ocean.watch` room
+    metadata is now rejected or bounded before parsing/rendering: title, URL,
+    host, handoff target, clock values, and the case-insensitive participant
+    roster have explicit client work limits while valid wire snapshots retain
+    their existing format.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Hosts can now offer control to a
+    bounded participant, targets can explicitly accept, and a pending offer
+    freezes misleading playback controls. The old host can safely cancel an
+    unanswered offer; every transition republishes through the existing
+    `ocean.watch` path with host/target authorization rechecked in the pure
+    controller.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Every locally authored
+    `ocean.watch` snapshot now passes through the same title, URL, identity,
+    roster, clock, and wire-size bounds as received metadata. Unsafe URL
+    schemes are omitted instead of published, and host/handoff identities are
+    preserved when a crowded roster must be reduced to the PROP budget.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Signed-in room members can now
+    explicitly join or leave an activity, with their current role and the
+    bounded 128-member capacity announced in the strip. Full activities and
+    unavailable publishers disable the action honestly, publication failures
+    preserve the displayed role, and hosts must hand off before leaving.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — The current host can now end a
+    room activity through a named, participant-count-aware confirmation that
+    republishes an explicit clear only after rechecking the active channel,
+    exact wire snapshot, host authority, and publisher. Cancel restores focus;
+    stale state and publication failures leave the activity visible and report
+    why it was not cleared.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Signed-in channel members can now
+    start an activity when no valid `ocean.watch` snapshot exists. Bounded title,
+    optional HTTP(S) URL, and duration inputs remain transient, pass through the
+    existing controller/serializer, and require a room-wide review confirmation
+    that rechecks channel, identity, current metadata, and publisher before send.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — The activity strip now includes a
+    keyboard-operable bounded participant disclosure. Its named list reuses the
+    normalized 128-entry roster and derives case-insensitive Host, Pending host,
+    and You labels without duplicating identities or rendering raw metadata; it
+    closes when the channel or activity changes.
+    ✅ **CLIENT ACCESSIBILITY HARDENING SHIPPED 2026-07-16** — Watch activity
+    start/end reviews now retain deliberate focus after every confirmation that
+    closes: the remounted initiating control receives focus when available, and
+    a programmatically focusable polite atomic status receives focus when stale
+    activity or authority state removed that control. Successful requests and
+    rejected stale confirmations therefore leave both a truthful announcement
+    and a deterministic keyboard location.
 
 ## Phase 12 — Yorishiro Apps and Integrations ← PLANNED
 31. **Block-Kit-lite renderer** *(client)* — render structured webhook/plugin
@@ -520,6 +684,12 @@ client or public site needs to expose the result.
     links, value buttons copy their bounded value with live feedback, and
     command-like payloads still do not execute. The public integrations page
     now documents structured controls as safe link/copy affordances.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Attacker-authored structured
+    send/select controls now stage an accessible confirmation showing the exact
+    same-conversation target and outgoing plaintext. Inline and detail-modal
+    controls dispatch only after explicit confirmation, revalidate every action
+    constraint at send time, reset cancelled selects, and restore focus to the
+    originating control.
 32. **Client extension surface** *(client)* — prepare a capability-scoped,
     UI-safe extension surface for first-party plugins, starting with command
     palette actions and message/room cards.
@@ -528,6 +698,16 @@ client or public site needs to expose the result.
     surface with explicit `open-url` and `copy-text` capabilities; unsafe URLs,
     duplicate IDs, unknown capabilities, and arbitrary executable payloads are
     rejected before commands are built.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Extension scaffolds now reject
+    missing or unsupported schema versions instead of silently reinterpreting
+    them as v1. Clipboard actions no longer persist a secret-text fallback or
+    record a successful audit entry when the browser clipboard is unavailable
+    or rejects the write.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Message links, time-scrubber
+    anchors, channel invites, theme values, extension copy actions, and
+    Block-Kit copy controls now share one real browser-clipboard boundary.
+    Rejected or unavailable writes report failure in the originating surface;
+    no copy path stores the intended clipboard text or claims false success.
 33. **Importer and webhook migration path** *(client + main site)* — document
     and surface server-snapshot imports, incoming webhooks, Slack export import,
     IRC-log-to-vault import, and bridge status as switching-cost reducers rather
@@ -547,8 +727,23 @@ client or public site needs to expose the result.
     choose → review-summary → confirm flow. Hardened per an independent
     GPT-5.6/Codex review (bounded memory, collision-safe ids, reaction-count
     preservation, cross-page reply resolution). See `docs/importing.md`.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Network-backed Discord snapshot
+    import now states that the bot token goes to this deployment's same-origin
+    proxy, requires a fresh explicit acknowledgement before each request, makes
+    no request without it, and clears both token and consent after success,
+    failure, abort, or unmount.
     (`src/lib/import/{discordImport,slackImport,ircLogImport}.ts`,
     `src/shell/HistoryImportControls.tsx`; 105 unit + 6 integration tests.)
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Every browser file-import path
+    now validates selected-file count, per-file bytes, and aggregate recognized
+    bytes before calling `file.text()`. Oversized JSON, logs, portable vaults,
+    and official package selections reject with actionable limits and no partial
+    read/import; unrecognized package files are excluded from byte accounting.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — IRC-log import previews now
+    show the exact normalized vault target that will be written and require
+    confirmation against that same value. Empty or unsafe raw targets reject
+    before file contents are read, and a warning makes any raw-to-canonical
+    transformation visible before import.
     ✅ **CLIENT SLICE SHIPPED 2026-07-11** — Added the **official Discord data
     package** path (no third-party tool): `parseDiscordPackage`
     (`src/lib/import/discordPackageImport.ts:272`) reads the folder tree from
@@ -578,6 +773,10 @@ client or public site needs to expose the result.
     recall pivot chips from visible-buffer and device-vault hits only, letting
     users refine "what did we decide" searches without invoking server history
     or any external inference endpoint.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Device recall pivots now use
+    bounded Unicode letter/number tokenization rather than an ASCII-only word
+    pattern, so accented and non-Latin remembered text can refine local search
+    without changing its on-device provenance or work limits.
 36. **Local catch-up, captions, and translation** *(client)* — extend catch-up
     and media surfaces with optional local recap, caption, and translation
     affordances, keeping AI out of the front-door interaction model.
@@ -597,6 +796,20 @@ client or public site needs to expose the result.
     transcript copy readiness, browser-local translator detection, and an
     explicit no-external-translation guarantee. The public agent-safety page now
     documents browser-local language tools under the same provenance contract.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Browser-local caption
+    translation now bounds source and translated text, permits at most three
+    concurrent caption jobs, and keeps one in-flight request per caption.
+    Replaced captions, target changes, and unmounted overlays discard stale
+    completions; unavailable, pending, failed, and retry states remain explicit
+    and accessible without persisting transcript text or calling an external
+    endpoint.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Loaded readable messages now
+    expose an explicit Translate on this device action with a four-job global
+    cap, per-row single flight, stale-result rejection, and accessible
+    unavailable/pending/error/retry/dismiss states. Encrypted rows contribute
+    only transient plaintext when unlocked and never expose ciphertext; a
+    successful transient translation can be copied through the verified browser
+    clipboard boundary without persisting either source or result.
 37. **Agent-safe public contract** *(client + main site)* — document that channel
     content is hostile input for any agent surface, exclude E2EE payloads, and
     require visible audit trails for agent actions.
@@ -629,15 +842,46 @@ client or public site needs to expose the result.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now shows a local-memory mode
     status while disconnected so offline reading, reviewed spans, drafts, and
     queued sends are presented as deliberate behavior.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Reconnect status now keeps its
+    visible seconds countdown while assistive technology receives only polite,
+    atomic connection-phase updates. A successful recovery briefly shows and
+    announces `Back online`, with cleanup-safe timers and no decorative motion.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Offline command submission now
+    fails visibly at the composer instead of clearing and silently losing the
+    draft. Real IRC commands stay preserved for reconnect, while text-only
+    conveniences such as `/shrug` expand to ordinary text and still queue.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now reads the persisted offline
     outbox and shows the exact queued-send count in local-memory mode, turning
     reconnect reconciliation into visible device state instead of hidden queueing.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — The outbox is now capped at 100
+    non-evicting entries, validates persisted rows fail-closed, and emits
+    metadata-only committed-change notifications. Home reacts with a
+    privacy-preserving destination/age journal that can restore pending rows
+    after reload, retry while connected, or remove one entry after confirmation
+    without rendering queued message bodies on the Home surface.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home local-memory mode now counts
     room composer drafts and channel-topic moderation drafts alongside queued
     sends, keeping offline compose state visible without exposing DM draft text.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Preferences now offers an
+    independent exact-count, two-step Discard queued sends boundary. It requires
+    a committed outbox clear plus physical-store and sanitized empty readbacks,
+    publishes only metadata invalidation, never renders queued plaintext, and
+    proves that vault history, drafts, reviewed anchors, topic positions, and
+    saved searches remain untouched.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Local room-composer and
+    channel-topic drafts now have verified, separately testable clear boundaries
+    and one count-only Preferences confirmation. Count drift re-confirms,
+    partial topic-clear failure rolls room drafts back, and same-tab composer
+    updates flow through the store action; DM drafts remain byte-for-structure
+    preserved and excluded from portable plaintext transfer.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Channel topic moderation now keeps
     unsaved edits as local offline drafts, disables connected-only saves while
     disconnected, and sends the same draft through TOPIC after reconnect.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Preferences now exposes bounded
+    device-memory retention controls for both per-target message count and
+    maximum age. The policy is persisted under an `onyx:` key, applied through
+    the existing vault pruning path at app startup, and explicitly framed as a
+    local browser policy rather than a server EPHEMERAL-room promise.
 39. **PWA and desktop packaging path** *(client + main site)* — make install,
     update, notification, and wrapped push behavior explicit for browser PWA,
     desktop shell, and future mobile wrappers.
@@ -692,6 +936,51 @@ client or public site needs to expose the result.
     followed room/topic keys that power calm notifications and Home catch-up
     ranking, merging them into the destination device without moving message
     content or notification payloads.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Portable transfer now carries saved
+    Search Center queries and the device-memory retention policy. Older exports
+    remain valid when either field is absent; imports merge saved queries and
+    apply an explicitly present retention preference without exporting
+    authentication secrets, tokens, or decrypted DM message bodies.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — A transfer that disables local
+    history now treats the device-vault clear as a verified privacy boundary.
+    If IndexedDB cannot commit the clear, import stops and reports failure
+    instead of merging the remaining snapshot and claiming a partial success.
+    The committed clear is also verified through physical message/outbox counts
+    and sanitized outbox readback, so a retained row cannot be mistaken for a
+    successful device-memory wipe.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Portable vault validation now
+    has a 16,384-row aggregate work ceiling across targets in addition to its
+    per-target and conversation-count caps, preventing two individually bounded
+    dimensions from multiplying into millions of untrusted row validations
+    before retention can run.
+    Device export shares that global ceiling through a newest-first IndexedDB
+    cursor, so a long-lived browser cannot materialize an unbounded full-vault
+    array before producing its portable snapshot.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Portable vault validation now
+    also bounds every untrusted conversation, message, sender, body, topic,
+    reaction, reactor, and reply field before it reaches IndexedDB. Oversized or
+    control-bearing wire identifiers are dropped, optional oversized metadata
+    is omitted, and exact-limit regression coverage preserves valid exports.
+    The IndexedDB import boundary repeats those checks for direct on-device
+    Discord/Slack/IRC conversions and reports only imported ids that survive
+    the destination retention policy, rather than attempted or pre-prune rows.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-16** — Portable transfer now carries
+    bounded topic-read cursors as metadata-only navigation state. Imports
+    preview the cursor count, merge without moving any transcript content, never
+    regress a newer local cursor, publish same-tab updates, and cap parsing work
+    before sorting or deduplication; older snapshots remain compatible.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Preferences can now clear
+    topic-read positions through an exact-count, two-step control whose storage
+    boundary requires both key removal and empty sanitized readback. Count drift
+    requires re-confirmation, failure remains visible, and isolation tests prove
+    that messages, followed topics, saved searches, and reviewed anchors remain
+    untouched.
+    ✅ **WEBSITE SLICE SHIPPED 2026-07-16** — The public `/memory/` guide now
+    explains the real device↔server boundary as a visual ledger: Search
+    Center, reviewed anchors, topic positions, queued sends/drafts, local
+    translation, encrypted-DM search, portable transfer, and verified clear
+    controls. Guides, Community privacy, Install/offline, footer navigation, and
+    the sitemap link the route; LADON/Ophion media framing remains explicit.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something

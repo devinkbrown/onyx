@@ -203,6 +203,36 @@ describe('SHORTCUTS descriptor', () => {
     dispose();
   });
 
+  it('lands on the authoritative first unread message when N changes conversations', () => {
+    const dispose = mountKeyboardHarness();
+    const channel = (name: string, unread: number): Channel => ({
+      name,
+      topic: '',
+      topicSetBy: '',
+      topicSetAt: null,
+      modes: '',
+      users: new Map(),
+      unread,
+      highlights: 0,
+      createdAt: null,
+      messages: [],
+    });
+    store.setState({
+      channels: new Map([
+        ['#general', channel('#general', 0)],
+        ['#alerts', channel('#alerts', 2)],
+      ]),
+      activeView: { kind: 'channel', channel: '#general' },
+      firstUnreadId: new Map([['#alerts', 'alert-first']]),
+    });
+
+    fireEvent.keyDown(window, { key: 'n' });
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#alerts' });
+    expect(store.getState().timeTravelLandingId).toBe('alert-first');
+    dispose();
+  });
+
   it('moves through transcript messages with J and K', () => {
     const dispose = mountKeyboardHarness();
     const feed = document.createElement('div');
@@ -266,6 +296,21 @@ describe('SHORTCUTS descriptor', () => {
     expect(isFollowed('#general')).toBe(true);
     fireEvent.keyDown(window, { key: 'u' });
     expect(isFollowed('#general')).toBe(false);
+    dispose();
+  });
+
+  it('toggles the selected named conversation with U instead of the whole room', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({
+      activeView: { kind: 'channel', channel: '#general' },
+      activeChannelTopics: new Map([['#general', 'roadmap']]),
+    });
+
+    fireEvent.keyDown(window, { key: 'u' });
+    expect(isFollowed('#general', 'roadmap')).toBe(true);
+    expect(isFollowed('#general')).toBe(false);
+    fireEvent.keyDown(window, { key: 'u' });
+    expect(isFollowed('#general', 'roadmap')).toBe(false);
     dispose();
   });
 

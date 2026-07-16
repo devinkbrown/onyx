@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createMemo, createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
 import { Background, backgroundOptions, type BackgroundId } from '@/backgrounds';
 import { useTheme, THEMES, THEME_IDS, type ThemeId } from '@/theme';
 // Import ThemeStudio from its module directly, NOT via the '@/theme' barrel.
@@ -15,6 +15,10 @@ import './appearance.css';
 type ThemeChip = { id: string; label: string; custom: boolean; swatch: string[] };
 type BgChip = { id: string; label: string; kind: string };
 
+/** Short intent window that prevents a pointer sweep from fetching every
+ * background chunk it crosses. Focus and activation bypass this delay. */
+export const POINTER_PREVIEW_DELAY_MS = 160;
+
 /** Palette dots for a built-in theme, read straight from its token map. */
 function themeSwatch(id: string): string[] {
   const t = THEMES[id as ThemeId]?.tokens;
@@ -29,9 +33,48 @@ export default function Appearance() {
   const backgroundId = useStore((s) => s.backgroundId);
   const chooseBg = (id: string) => getState().setBackground(id);
 
-  // Hover-to-preview: hovering/focusing a background chip previews it live on the
-  // full-page backdrop without committing; leaving reverts to the selected one.
+  // Pointer hover waits for intent before changing the lazy Background source;
+  // keyboard focus and explicit activation stay immediate.
   const [hoverBg, setHoverBg] = createSignal<string | null>(null);
+  let pointerPreviewTimer: ReturnType<typeof setTimeout> | undefined;
+  let pendingPointerBg: string | null = null;
+
+  const cancelPointerPreview = (id?: string): void => {
+    if (pointerPreviewTimer === undefined) return;
+    if (id !== undefined && pendingPointerBg !== id) return;
+    clearTimeout(pointerPreviewTimer);
+    pointerPreviewTimer = undefined;
+    pendingPointerBg = null;
+  };
+
+  const schedulePointerPreview = (id: string): void => {
+    cancelPointerPreview();
+    pendingPointerBg = id;
+    pointerPreviewTimer = setTimeout(() => {
+      pointerPreviewTimer = undefined;
+      pendingPointerBg = null;
+      setHoverBg(id);
+    }, POINTER_PREVIEW_DELAY_MS);
+  };
+
+  const previewImmediately = (id: string): void => {
+    cancelPointerPreview();
+    setHoverBg(id);
+  };
+
+  const restoreSelectedBackground = (id: string): void => {
+    cancelPointerPreview(id);
+    setHoverBg((current) => (current === id ? null : current));
+  };
+
+  const selectBackground = (id: string): void => {
+    cancelPointerPreview();
+    setHoverBg(null);
+    chooseBg(id);
+  };
+
+  onCleanup(() => cancelPointerPreview());
+
   const previewBgId = createMemo(
     () => resolveBackgroundId(hoverBg() ?? backgroundId(), theme.themeId()) as BackgroundId,
   );
@@ -55,11 +98,11 @@ export default function Appearance() {
       class="ap-chip"
       classList={{ on: backgroundId() === opt.id, previewing: hoverBg() === opt.id }}
       aria-pressed={backgroundId() === opt.id}
-      onMouseEnter={() => setHoverBg(opt.id)}
-      onMouseLeave={() => setHoverBg((v) => (v === opt.id ? null : v))}
-      onFocus={() => setHoverBg(opt.id)}
-      onBlur={() => setHoverBg((v) => (v === opt.id ? null : v))}
-      onClick={() => chooseBg(opt.id)}
+      onPointerEnter={() => schedulePointerPreview(opt.id)}
+      onPointerLeave={() => restoreSelectedBackground(opt.id)}
+      onFocus={() => previewImmediately(opt.id)}
+      onBlur={() => restoreSelectedBackground(opt.id)}
+      onClick={() => selectBackground(opt.id)}
     >
       {opt.label}
       <i class="ap-kind" data-kind={opt.kind}>{opt.kind}</i>
@@ -111,16 +154,18 @@ export default function Appearance() {
 
         <div class="ap-group">
           <span class="ap-glabel">Background</span>
-          <p class="ap-ghint">Hover to preview live · click to keep</p>
+          <p class="ap-ghint">Hover or focus to preview live · click to keep</p>
           <div class="ap-chips">
             <button
               type="button"
               class="ap-chip ap-chip--auto"
               classList={{ on: backgroundId() === AUTO_BACKGROUND_ID }}
               aria-pressed={backgroundId() === AUTO_BACKGROUND_ID}
-              onMouseEnter={() => setHoverBg(AUTO_BACKGROUND_ID)}
-              onMouseLeave={() => setHoverBg((v) => (v === AUTO_BACKGROUND_ID ? null : v))}
-              onClick={() => chooseBg(AUTO_BACKGROUND_ID)}
+              onPointerEnter={() => schedulePointerPreview(AUTO_BACKGROUND_ID)}
+              onPointerLeave={() => restoreSelectedBackground(AUTO_BACKGROUND_ID)}
+              onFocus={() => previewImmediately(AUTO_BACKGROUND_ID)}
+              onBlur={() => restoreSelectedBackground(AUTO_BACKGROUND_ID)}
+              onClick={() => selectBackground(AUTO_BACKGROUND_ID)}
             >
               Auto
               <i class="ap-kind" data-kind="auto">match theme</i>

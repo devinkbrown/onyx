@@ -59,4 +59,16 @@ describe('RelativeTime', () => {
 
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it('fails closed for a finite timestamp outside the JavaScript Date range', () => {
+    const { container } = render(() => (
+      <RelativeTime timestamp={8.64e15 + 1} now={() => FIXED_NOW} />
+    ));
+
+    const el = container.querySelector('time');
+    expect(el).not.toBeNull();
+    expect(el?.textContent).toBe('');
+    expect(el?.getAttribute('datetime')).toBeNull();
+    expect(el?.getAttribute('title')).toBeNull();
+  });
 });

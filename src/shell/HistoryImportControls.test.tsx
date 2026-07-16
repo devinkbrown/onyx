@@ -6,8 +6,8 @@
  */
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import {
   DiscordImportControls,
   DiscordPackageImportControls,
@@ -15,15 +15,35 @@ import {
   IrcLogImportControls,
 } from './HistoryImportControls';
 import { loadRecent, _resetVaultForTests } from '@/lib/vault/historyVault';
+import {
+  DISCORD_PACKAGE_MAX_AGGREGATE_BYTES,
+  DISCORD_PACKAGE_MAX_FILE_BYTES,
+  DISCORD_PACKAGE_MAX_SELECTED_FILES,
+  GENERIC_JSON_MAX_AGGREGATE_BYTES,
+  GENERIC_JSON_MAX_FILE_BYTES,
+  GENERIC_JSON_MAX_FILES,
+  IRC_LOG_MAX_FILE_BYTES,
+} from './importFileLimits';
 
-/** A File-like stand-in: the controls only read `.name` and `.text()`. */
+type TrackedFile = { file: File; text: ReturnType<typeof vi.fn> };
+
+function trackedFile(name: string, contents: string, size = new TextEncoder().encode(contents).byteLength): TrackedFile {
+  const text = vi.fn(async () => contents);
+  return { file: { name, size, text } as unknown as File, text };
+}
+
+/** A File-like stand-in with realistic byte metadata. */
 function fakeFile(name: string, contents: string): File {
-  return { name, text: async () => contents } as unknown as File;
+  return trackedFile(name, contents).file;
 }
 
 function chooseFile(labelText: string, file: File): void {
+  chooseFiles(labelText, [file]);
+}
+
+function chooseFiles(labelText: string, files: File[]): void {
   const input = screen.getByLabelText(labelText) as HTMLInputElement;
-  fireEvent.change(input, { target: { files: [file] } });
+  fireEvent.change(input, { target: { files } });
 }
 
 const discordExport = JSON.stringify({
@@ -45,15 +65,20 @@ beforeEach(() => {
 describe('DiscordImportControls', () => {
   it('previews then merges a Discord export into the vault', async () => {
     render(() => <DiscordImportControls />);
+    const chooser = screen.getByLabelText('Choose Discord JSON') as HTMLInputElement;
+    chooser.focus();
     chooseFile('Choose Discord JSON', fakeFile('general.json', discordExport));
 
     // Review summary appears with the guild name and counts.
     const review = await screen.findByText(/Ready to import 2 messages across 1 channel from Cool Project/);
     expect(review).toBeInTheDocument();
+    const reviewHeading = screen.getByRole('heading', { name: 'Review import' });
+    await waitFor(() => expect(reviewHeading).toHaveFocus());
 
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
 
     await screen.findByText(/Imported 2 messages into 1 channel/);
+    await waitFor(() => expect(chooser).toHaveFocus());
     const stored = await loadRecent('#general');
     expect(stored.map((m) => m.text)).toEqual(['hello', 'world']);
   });
@@ -68,13 +93,41 @@ describe('DiscordImportControls', () => {
 
   it('cancels a pending import without touching the vault', async () => {
     render(() => <DiscordImportControls />);
+    const chooser = screen.getByLabelText('Choose Discord JSON') as HTMLInputElement;
     chooseFile('Choose Discord JSON', fakeFile('general.json', discordExport));
     await screen.findByText(/Ready to import/);
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }));
     await screen.findByText(/Import cancelled/);
+    await waitFor(() => expect(chooser).toHaveFocus());
     const stored = await loadRecent('#general');
     expect(stored).toHaveLength(0);
+  });
+
+  it('rejects too many JSON files before reading any selection', async () => {
+    const text = vi.fn(async () => discordExport);
+    const files = Array.from({ length: GENERIC_JSON_MAX_FILES + 1 }, (_, index) => ({
+      name: `${index}.json`,
+      size: 1,
+      text,
+    } as unknown as File));
+    render(() => <DiscordImportControls />);
+
+    chooseFiles('Choose Discord JSON', files);
+
+    await screen.findByText(`Choose no more than ${GENERIC_JSON_MAX_FILES} JSON files at once. Split this import into smaller batches.`);
+    expect(text).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Import into vault' })).not.toBeInTheDocument();
+  });
+
+  it('rejects an oversized Discord JSON file before reading it', async () => {
+    const oversized = trackedFile('huge.json', discordExport, GENERIC_JSON_MAX_FILE_BYTES + 1);
+    render(() => <DiscordImportControls />);
+
+    chooseFile('Choose Discord JSON', oversized.file);
+
+    await screen.findByText('huge.json exceeds the 64 MiB per-file JSON limit. Split or export it as smaller JSON files, then try again.');
+    expect(oversized.text).not.toHaveBeenCalled();
   });
 });
 
@@ -93,15 +146,30 @@ describe('SlackImportControls', () => {
       workspace: 'Acme',
     });
     render(() => <SlackImportControls />);
+    const chooser = screen.getByLabelText('Choose Slack JSON') as HTMLInputElement;
     chooseFile('Choose Slack JSON', fakeFile('dev.json', slackExport));
 
     await screen.findByText(/Ready to import 1 message across 1 channel from Acme/);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Review import' })).toHaveFocus());
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
 
     await screen.findByText(/Imported 1 message into 1 channel/);
+    await waitFor(() => expect(chooser).toHaveFocus());
     const stored = await loadRecent('#dev');
     expect(stored).toHaveLength(1);
     expect(stored[0]!.text).toContain('ship it');
+  });
+
+  it('rejects a Slack JSON batch over the aggregate limit before any read', async () => {
+    const files = Array.from({ length: 4 }, (_, index) =>
+      trackedFile(`${index}.json`, '{}', GENERIC_JSON_MAX_AGGREGATE_BYTES / 3).file
+    );
+    render(() => <SlackImportControls />);
+
+    chooseFiles('Choose Slack JSON', files);
+
+    await screen.findByText('Those JSON files exceed the 192 MiB total import limit. Choose a smaller batch.');
+    for (const file of files) expect(file.text).not.toHaveBeenCalled();
   });
 });
 
@@ -115,24 +183,95 @@ describe('IrcLogImportControls', () => {
   it('imports a plain-text IRC log into the named channel', async () => {
     render(() => <IrcLogImportControls />);
     fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '#dev' } });
+    const chooser = screen.getByLabelText('Choose log file') as HTMLInputElement;
     chooseFile(
       'Choose log file',
       fakeFile('log.txt', '2025-01-01 10:00:00\t<alice>\thi there\n2025-01-01 10:01:00\t<bob>\thello'),
     );
 
     await screen.findByText(/Ready to import 2 messages into #dev/);
-    fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Review import' })).toHaveTextContent('2 messages into #dev');
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Review import' })).toHaveFocus());
+    fireEvent.click(screen.getByRole('button', { name: 'Import into #dev' }));
 
     await screen.findByText(/Imported 2 messages into #dev/);
+    await waitFor(() => expect(chooser).toHaveFocus());
     const stored = await loadRecent('#dev');
     expect(stored).toHaveLength(2);
+  });
+
+  it('warns when normalization changes the requested label and confirms only the exact displayed target', async () => {
+    render(() => <IrcLogImportControls />);
+    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '  #Ops Room!  ' } });
+    chooseFile('Choose log file', fakeFile('ops.log', '2025-01-01 10:00:00\t<alice>\tship it'));
+
+    await screen.findByText(/Ready to import 1 message into #ops-room/);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Channel destination changed. Requested " #Ops Room! "; import destination: #ops-room. Confirm only if this is the intended room.',
+    );
+    expect(await loadRecent('#ops-room')).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import into #ops-room' }));
+
+    await screen.findByText(/Imported 1 message into #ops-room/);
+    expect((await loadRecent('#ops-room')).map(message => message.text)).toEqual(['ship it']);
+    expect(await loadRecent('#ops room!')).toHaveLength(0);
+  });
+
+  it('makes a collision-looking label explicit before any merge', async () => {
+    render(() => <IrcLogImportControls />);
+    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '#ops---room!' } });
+    chooseFile('Choose log file', fakeFile('ops.log', '2025-01-01 10:00:00\t<alice>\tship it'));
+
+    await screen.findByText(/Ready to import 1 message into #ops-room/);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Requested "#ops---room!"; import destination: #ops-room',
+    );
+    expect(screen.getByRole('button', { name: 'Import into #ops-room' })).toBeInTheDocument();
+    expect(await loadRecent('#ops-room')).toHaveLength(0);
+  });
+
+  it('rejects a requested label that normalizes to an unsafe target before reading the log', async () => {
+    const unsafe = trackedFile('unsafe.log', '2025-01-01 10:00:00\t<alice>\tignored');
+    render(() => <IrcLogImportControls />);
+    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '___' } });
+
+    chooseFile('Choose log file', unsafe.file);
+
+    await screen.findByText('The requested channel "___" does not normalize to a safe destination. Enter a channel containing letters or numbers (for example, #dev).');
+    expect(unsafe.text).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'Review import' })).not.toBeInTheDocument();
+  });
+
+  it('rejects an oversized IRC log before reading it', async () => {
+    const oversized = trackedFile('huge.log', 'ignored', IRC_LOG_MAX_FILE_BYTES + 1);
+    render(() => <IrcLogImportControls />);
+    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '#dev' } });
+
+    chooseFile('Choose log file', oversized.file);
+
+    await screen.findByText('huge.log exceeds the 128 MiB IRC log limit. Split the log and import each part separately.');
+    expect(oversized.text).not.toHaveBeenCalled();
   });
 });
 
 /** A package File-like: name is the basename; webkitRelativePath is the tree path. */
-function fakePackageFile(path: string, contents: string): File {
+function trackedPackageFile(
+  path: string,
+  contents: string,
+  size = new TextEncoder().encode(contents).byteLength,
+): TrackedFile {
   const name = path.slice(path.lastIndexOf('/') + 1);
-  return { name, webkitRelativePath: path, text: async () => contents } as unknown as File;
+  const tracked = trackedFile(name, contents, size);
+  return {
+    file: { ...tracked.file, name, size, webkitRelativePath: path, text: tracked.text } as unknown as File,
+    text: tracked.text,
+  };
+}
+
+function fakePackageFile(path: string, contents: string): File {
+  return trackedPackageFile(path, contents).file;
 }
 
 const packageFiles = [
@@ -175,5 +314,69 @@ describe('DiscordPackageImportControls — a11y contracts', () => {
     const region = await screen.findByRole('status');
     await screen.findByText(/Ready to import 2 messages across 1 channel from My Server/);
     expect(region).toHaveTextContent(/Ready to import 2 messages/);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Review import' })).toHaveFocus());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }));
+    await waitFor(() => expect(input).toHaveFocus());
+  });
+
+  it('rejects excessive selected-file count before reading any package file', async () => {
+    const text = vi.fn(async () => '{}');
+    const files = Array.from({ length: DISCORD_PACKAGE_MAX_SELECTED_FILES + 1 }, (_, index) => ({
+      name: `${index}.ignored`,
+      size: 1,
+      webkitRelativePath: `misc/${index}.ignored`,
+      text,
+    } as unknown as File));
+    render(() => <DiscordPackageImportControls />);
+
+    chooseFiles('Choose package folder', files);
+
+    await screen.findByText(`That folder contains more than ${DISCORD_PACKAGE_MAX_SELECTED_FILES} selected files. Choose a smaller unzipped Discord package folder.`);
+    expect(text).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized recognized package file before reading any recognized file', async () => {
+    const metadata = trackedPackageFile('messages/index.json', '{}');
+    const oversized = trackedPackageFile(
+      'messages/c100/messages.json',
+      '[]',
+      DISCORD_PACKAGE_MAX_FILE_BYTES + 1,
+    );
+    render(() => <DiscordPackageImportControls />);
+
+    chooseFiles('Choose package folder', [metadata.file, oversized.file]);
+
+    await screen.findByText('messages/c100/messages.json exceeds the 128 MiB per-file Discord package limit. Remove that channel export or choose a smaller package.');
+    expect(metadata.text).not.toHaveBeenCalled();
+    expect(oversized.text).not.toHaveBeenCalled();
+  });
+
+  it('rejects recognized package files over the aggregate limit before reading any', async () => {
+    const files = [
+      trackedPackageFile('a/messages.json', '[]', DISCORD_PACKAGE_MAX_AGGREGATE_BYTES / 2),
+      trackedPackageFile('b/messages.csv', '', DISCORD_PACKAGE_MAX_AGGREGATE_BYTES / 2),
+      trackedPackageFile('c/channel.json', '{}', 1),
+    ];
+    render(() => <DiscordPackageImportControls />);
+
+    chooseFiles('Choose package folder', files.map(item => item.file));
+
+    await screen.findByText('Recognized Discord package files exceed the 256 MiB total import limit. Choose a smaller package folder.');
+    for (const file of files) expect(file.text).not.toHaveBeenCalled();
+  });
+
+  it('ignores unrecognized package files before byte accounting and never reads them', async () => {
+    const unrecognized = trackedPackageFile(
+      'activity/huge.bin',
+      'not import data',
+      DISCORD_PACKAGE_MAX_AGGREGATE_BYTES + 1,
+    );
+    render(() => <DiscordPackageImportControls />);
+
+    chooseFiles('Choose package folder', [unrecognized.file, ...packageFiles]);
+
+    await screen.findByText(/Ready to import 2 messages across 1 channel from My Server/);
+    expect(unrecognized.text).not.toHaveBeenCalled();
   });
 });

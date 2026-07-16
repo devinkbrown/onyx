@@ -5,14 +5,17 @@
  * No IndexedDB is touched: these functions are math over plain objects, so
  * `fake-indexeddb` is deliberately NOT imported.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   RETENTION_MAX_AGE_DAYS,
   RETENTION_MAX_KEEP,
+  RETENTION_POLICY_STORAGE_KEY,
   effectiveKeep,
+  readRetentionPolicy,
   resolvePolicyForChannel,
   sanitizeRetentionPolicy,
   selectMessagesToPrune,
+  writeRetentionPolicy,
   type RetentionCandidate,
   type RetentionPolicy,
 } from './retentionPolicy';
@@ -20,6 +23,10 @@ import { VAULT_KEEP } from './historyVault';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = 1_700_000_000_000;
+
+afterEach(() => {
+  localStorage.removeItem(RETENTION_POLICY_STORAGE_KEY);
+});
 
 /** Build `n` candidates, one per day going back from `now`, newest = id `m0`. */
 function timeline(n: number, now = NOW): RetentionCandidate[] {
@@ -71,6 +78,30 @@ describe('sanitizeRetentionPolicy', () => {
   it('is idempotent (sanitize of a sanitized policy is unchanged)', () => {
     const once = sanitizeRetentionPolicy({ keep: 12.9, perChannel: { '#A': 3.7 }, maxAgeDays: 5 });
     expect(sanitizeRetentionPolicy(once)).toEqual(once);
+  });
+});
+
+describe('retention policy persistence', () => {
+  it('defaults to the existing vault bound when no preference is stored', () => {
+    expect(readRetentionPolicy()).toEqual({ keep: VAULT_KEEP });
+  });
+
+  it('round-trips a sanitized device policy', () => {
+    expect(writeRetentionPolicy({ keep: 1000, maxAgeDays: 90 })).toBe(true);
+
+    expect(readRetentionPolicy()).toEqual({ keep: 1000, maxAgeDays: 90 });
+    expect(JSON.parse(localStorage.getItem(RETENTION_POLICY_STORAGE_KEY) ?? '')).toEqual({
+      keep: 1000,
+      maxAgeDays: 90,
+    });
+  });
+
+  it('fails closed to the default for malformed or non-object storage', () => {
+    localStorage.setItem(RETENTION_POLICY_STORAGE_KEY, '{broken');
+    expect(readRetentionPolicy()).toEqual({ keep: VAULT_KEEP });
+
+    localStorage.setItem(RETENTION_POLICY_STORAGE_KEY, '[]');
+    expect(readRetentionPolicy()).toEqual({ keep: VAULT_KEEP });
   });
 });
 

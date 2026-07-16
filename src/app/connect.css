@@ -334,12 +334,11 @@
   cursor: not-allowed;
 }
 
-/* ── Session resume — one-tap welcome back ── */
-.conn-resume {
+/* ── Remembered identity switcher ── */
+.conn-identities {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  flex-direction: column;
+  gap: 12px;
   padding: 13px 15px;
   border-radius: var(--r-sm);
   border: 1px solid color-mix(in oklab, var(--lapis) 36%, transparent);
@@ -350,14 +349,15 @@
   box-shadow: 0 0 22px -12px color-mix(in oklab, var(--lapis) 70%, transparent);
 }
 
-.conn-resume-body {
+.conn-identities-head {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .conn-resume-eyebrow {
+  display: block;
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.2em;
@@ -365,20 +365,143 @@
   color: var(--lapis-bright);
 }
 
-.conn-resume-nick {
+.conn-identities-title {
+  margin: 3px 0 0;
   font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 0.96rem;
-  color: var(--washi-dim);
+  font-size: 0.98rem;
+  font-weight: 500;
+  color: var(--washi);
+}
+
+.conn-identities-count {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: 1px solid color-mix(in oklab, var(--lapis) 40%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--lapis-deep) 24%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--lapis-bright);
+}
+
+.conn-identities-list {
+  display: grid;
+  gap: 7px;
+  max-height: 214px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.conn-identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 62%, var(--stone));
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.conn-identity[data-selected='true'] {
+  border-color: color-mix(in oklab, var(--lapis-bright) 58%, transparent);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, var(--stone));
+}
+
+.conn-identity-select,
+.conn-identity-forget {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.conn-identity-select {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'nick status'
+    'server status';
+  align-items: center;
+  gap: 2px 10px;
+  min-width: 0;
+  padding: 10px 11px;
+  text-align: left;
+}
+
+.conn-identity-select:focus-visible,
+.conn-identity-forget:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+.conn-identity-nick {
+  grid-area: nick;
   overflow: hidden;
+  font-family: var(--font-serif);
+  font-size: 0.94rem;
+  color: var(--washi);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.conn-resume-nick b { color: var(--washi); font-weight: 500; font-style: normal; }
+
+.conn-identity-server {
+  grid-area: server;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--washi-mute);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conn-identity-status {
+  grid-area: status;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--lapis-deep) 24%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--washi-dim);
+  white-space: nowrap;
+}
+
+.conn-identity[data-access='identity-only'] .conn-identity-status {
+  background: color-mix(in oklab, var(--stone) 72%, transparent);
+  color: var(--washi-mute);
+}
+
+.conn-identity-forget {
+  margin: 6px 6px 6px 0;
+  padding: 4px 7px;
+  border-left: 1px solid var(--seam-faint);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+  transition: color var(--dur) var(--ease);
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.conn-identity-forget:hover {
+  color: var(--danger, #e97b78);
+}
 
 .conn-resume-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
   flex: none;
 }
@@ -959,7 +1082,7 @@
 .conn-fields,
 .conn-verify,
 .conn-reclaim-form,
-.conn-resume,
+.conn-identities,
 .conn-claim,
 .conn-invite {
   animation: conn-rise var(--dur) var(--ease) both;
@@ -980,7 +1103,7 @@
   .conn-fields,
   .conn-verify,
   .conn-reclaim-form,
-  .conn-resume,
+  .conn-identities,
   .conn-claim,
   .conn-invite {
     animation: none !important;
@@ -1091,7 +1214,7 @@
 
   .conn-claim,
   .conn-invite,
-  .conn-resume,
+  .conn-identities,
   .conn-toggle,
   .conn-status,
   .conn-reclaim-form {

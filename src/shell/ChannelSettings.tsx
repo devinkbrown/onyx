@@ -51,6 +51,7 @@ import {
 } from '@/lib/interop/bridgeStatus';
 import { Button, FormField, Sheet, toast } from '@/primitives/index';
 import { buildInviteLink } from '@/lib/invite/inviteLink';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { BridgeStatusBadge } from './BridgeStatusBadge';
 
 // Common simple channel flags exposed as toggles. Letters match Orochi's
@@ -181,18 +182,19 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
   async function copyInviteLink(): Promise<void> {
     const url = inviteLink().shareUrl;
-    try {
-      await navigator.clipboard.writeText(url);
+    const copied = await writeClipboardText(url);
+    if (copied) {
       setCopyStatus('Invite link copied to clipboard.');
       toast({ title: 'Invite link copied', description: url, intent: 'success' });
-    } catch {
-      setCopyStatus('Copy failed. Select and copy the link shown above.');
-      toast({
-        title: 'Copy failed',
-        description: 'Select and copy the link shown below.',
-        intent: 'warning',
-      });
+      return;
     }
+
+    setCopyStatus('Copy failed. Select and copy the link shown above.');
+    toast({
+      title: 'Copy failed',
+      description: 'Select and copy the link shown below.',
+      intent: 'warning',
+    });
   }
 
   // ── Notifications (personal, per-channel; available to every member) ──────
@@ -441,7 +443,9 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
           </div>
 
           {/* Always-mounted polite live region so the copy result is announced. */}
-          <span class="sr-only" role="status" aria-live="polite">{copyStatus()}</span>
+          <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            {copyStatus()}
+          </span>
         </section>
 
         {/* ── Notifications (personal) ── */}

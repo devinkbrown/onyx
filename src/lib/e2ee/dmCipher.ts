@@ -170,6 +170,27 @@ export function isValidPeerPublicKey(peerPublicB64: string): boolean {
   return raw !== null && raw.length === SEC1_UNCOMPRESSED_BYTES && raw[0] === SEC1_UNCOMPRESSED_TAG;
 }
 
+/**
+ * Stable, non-secret registry id for this browser's E2EE key.
+ *
+ * The account protocol indexes keys by a caller-provided device id. A constant
+ * id such as `browser` makes a second Onyx installation overwrite the first.
+ * Derive a compact id from the public point instead: it is stable across page
+ * reloads, distinct for independently generated devices, valid for the wire's
+ * 32-character id bound, and reveals no private material.
+ */
+export async function deviceRegistryId(publicB64: string): Promise<string | null> {
+  if (!isValidPeerPublicKey(publicB64)) return null;
+  const raw = fromB64url(publicB64);
+  if (!raw) return null;
+  try {
+    const digest = await crypto.subtle.digest('SHA-256', raw.buffer as ArrayBuffer);
+    return `web-${toB64url(new Uint8Array(digest)).slice(0, 20)}`;
+  } catch {
+    return null;
+  }
+}
+
 const _sharedKeyCache = new Map<string, Promise<CryptoKey | null>>();
 
 /**

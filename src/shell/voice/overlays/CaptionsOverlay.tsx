@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
 
 import { localTranslationReadiness, preferredTranslationTarget } from '@/lib/intelligence/localLanguage';
 import {
@@ -25,6 +25,8 @@ type CaptionTranslation =
   | { status: 'pending'; lang: string }
   | { status: 'done'; text: string; lang: string }
   | { status: 'error'; lang: string };
+
+const MAX_CONCURRENT_CAPTION_TRANSLATIONS = 3;
 
 /** Content-stable key for a caption line (lines scroll, so index is not stable). */
 function captionKey(line: CaptionLine): string {
@@ -82,24 +84,68 @@ export function CaptionsOverlay() {
   const target = createMemo(() => resolveTranslationTarget(translationTarget(), preferredTranslationTarget()));
   const canTranslate = createMemo(() => localTranslationReadiness(target()).state === 'available');
   const translator = createBrowserTranslator();
+  const activeTranslations = new Map<string, symbol>();
 
-  // Component runs once; guard async completions that land after unmount.
+  // Component runs once; invalidate async completions when their caption leaves the
+  // live window, the target changes, or the overlay unmounts. The map is deliberately
+  // transient and bounded to the three visible captions.
   let disposed = false;
+  let observedTarget: string | undefined;
+  createEffect(() => {
+    const currentTarget = target();
+    const currentKeys = new Set(visibleLines().map(captionKey));
+    if (observedTarget === undefined) {
+      observedTarget = currentTarget;
+    } else if (currentTarget !== observedTarget) {
+      observedTarget = currentTarget;
+      activeTranslations.clear();
+      setTranslations(new Map());
+      return;
+    }
+
+    for (const key of activeTranslations.keys()) {
+      if (!currentKeys.has(key)) activeTranslations.delete(key);
+    }
+    setTranslations((previous) => {
+      if ([...previous.keys()].every((key) => currentKeys.has(key))) return previous;
+      return new Map([...previous].filter(([key]) => currentKeys.has(key)));
+    });
+  });
   onCleanup(() => {
     disposed = true;
+    activeTranslations.clear();
   });
 
   const translateLine = async (line: CaptionLine) => {
     const key = captionKey(line);
     const lang = target();
+    if (!canTranslate() || activeTranslations.has(key)) return;
+    if (activeTranslations.size >= MAX_CONCURRENT_CAPTION_TRANSLATIONS) return;
+    if (!visibleLines().some((visible) => captionKey(visible) === key)) return;
+
+    const request = Symbol(key);
+    activeTranslations.set(key, request);
     setTranslations((prev) => new Map(prev).set(key, { status: 'pending', lang }));
     try {
       const result = await translateMessage(translator, { text: line.text }, lang);
-      if (disposed) return;
-      const text = result.translation?.translated ?? line.text;
+      if (
+        disposed
+        || activeTranslations.get(key) !== request
+        || target() !== lang
+        || !visibleLines().some((visible) => captionKey(visible) === key)
+      ) return;
+      activeTranslations.delete(key);
+      const text = result.translation?.translated;
+      if (text === undefined) throw new Error('The on-device translator returned no result.');
       setTranslations((prev) => new Map(prev).set(key, { status: 'done', text, lang }));
     } catch {
-      if (disposed) return;
+      if (
+        disposed
+        || activeTranslations.get(key) !== request
+        || target() !== lang
+        || !visibleLines().some((visible) => captionKey(visible) === key)
+      ) return;
+      activeTranslations.delete(key);
       setTranslations((prev) => new Map(prev).set(key, { status: 'error', lang }));
     }
   };
@@ -126,6 +172,11 @@ export function CaptionsOverlay() {
             </Show>
           </div>
         </div>
+        <Show when={!canTranslate()}>
+          <p class="voice-captions__copy-state" role="status" aria-live="polite" aria-atomic="true">
+            On-device caption translation is unavailable in this browser.
+          </p>
+        </Show>
         {/* The live region is scoped to the caption lines only — the toolbar above
             (Copy transcript, provenance, copy-state) stays out of the announced feed,
             so its controls are never read as new caption activity (SC 4.1.3). */}
@@ -152,12 +203,23 @@ export function CaptionsOverlay() {
                   <button
                     class="voice-captions__copy voice-caption-translate"
                     type="button"
-                    aria-label={`Translate ${line.nick}'s caption to ${languageLabel(target())}`}
+                    aria-label={translation()?.status === 'error'
+                      ? `Retry translating ${line.nick}'s caption to ${languageLabel(target())}`
+                      : `Translate ${line.nick}'s caption to ${languageLabel(target())}`}
                     disabled={translation()?.status === 'pending'}
                     onClick={() => void translateLine(line)}
                   >
-                    {translation()?.status === 'pending' ? 'Translating…' : 'Translate'}
+                    {translation()?.status === 'pending'
+                      ? 'Translating…'
+                      : translation()?.status === 'error'
+                        ? 'Retry'
+                        : 'Translate'}
                   </button>
+                </Show>
+                <Show when={translation()?.status === 'pending'}>
+                  <span class="voice-caption-translation" role="status" aria-live="polite">
+                    Translating on this device…
+                  </span>
                 </Show>
                 <Show when={doneTranslation()}>
                   {(done) => (
@@ -168,8 +230,8 @@ export function CaptionsOverlay() {
                   )}
                 </Show>
                 <Show when={translation()?.status === 'error'}>
-                  <span class="voice-caption-translation" role="status">
-                    On-device translation unavailable.
+                  <span class="voice-caption-translation" role="status" aria-live="polite">
+                    On-device translation failed. Use Retry to try again.
                   </span>
                 </Show>
               </p>

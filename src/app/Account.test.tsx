@@ -14,9 +14,10 @@
  * effect that fetches ACCOUNTINFO on open has something to call.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { cleanup, render, screen, fireEvent } from '@solidjs/testing-library';
+import { cleanup, render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
 import { AccountPanel } from './Account';
 import { store, getState, type Server } from '@/lib/store';
+import * as dmCipher from '@/lib/e2ee/dmCipher';
 
 const initialState = store.getInitialState();
 
@@ -211,14 +212,37 @@ describe('Account panel — signed in', () => {
 
   it('lists E2EE device keys and refreshes key transparency status', () => {
     const listSpy = vi.spyOn(getState(), 'e2eeKeyList');
+    const deleteSpy = vi.spyOn(getState(), 'e2eeKeyDelete');
     const statusSpy = vi.spyOn(getState(), 'keyTransparencyStatus');
     renderPanel({ account: 'alice' });
 
     fireEvent.click(screen.getByRole('button', { name: 'List device keys' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove legacy browser key' }));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh transparency root' }));
 
     expect(listSpy).toHaveBeenCalled();
+    expect(deleteSpy).toHaveBeenCalledWith('browser');
     expect(statusSpy).toHaveBeenCalled();
+  });
+
+  it('publishes this browser under its derived stable device id', async () => {
+    vi.spyOn(dmCipher, 'deviceKeys').mockResolvedValue({
+      publicB64: 'validated-public-key',
+      keyPair: {} as CryptoKeyPair,
+    });
+    vi.spyOn(dmCipher, 'deviceRegistryId').mockResolvedValue('web-stable-device-id');
+    const addSpy = vi.spyOn(getState(), 'e2eeKeyAdd');
+    renderPanel({ account: 'alice' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish this device key' }));
+
+    await waitFor(() => {
+      expect(addSpy).toHaveBeenCalledWith(
+        'web-stable-device-id',
+        'tsumugi-p256',
+        'validated-public-key',
+      );
+    });
   });
 
   it('surfaces E2EEKEY and KEYTRANS account notices', () => {

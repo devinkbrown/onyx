@@ -159,6 +159,7 @@ describe('ChannelSettings — Share invite a11y', () => {
     const status = await screen.findByText('Invite link copied to clipboard.');
     expect(status).toHaveAttribute('role', 'status');
     expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveAttribute('aria-atomic', 'true');
     expect(writeText).toHaveBeenCalledTimes(1);
   });
 
@@ -175,5 +176,21 @@ describe('ChannelSettings — Share invite a11y', () => {
 
     const status = await screen.findByText(/Copy failed\. Select and copy the link shown above\./);
     expect(status).toHaveAttribute('role', 'status');
+    expect(status).not.toHaveTextContent('copied');
+  });
+
+  it('reports failure without a false copied state when the Clipboard API is unavailable', async () => {
+    seed();
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy invite link' }));
+
+    const status = await screen.findByText(/Copy failed\. Select and copy the link shown above\./);
+    expect(status).toHaveAttribute('role', 'status');
+    expect(status).not.toHaveTextContent('copied');
   });
 });

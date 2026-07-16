@@ -81,12 +81,20 @@ export const IDLE_DECEL_AFTER_MS = 8000;
 export const IDLE_DECEL_RAMP_MS = 12000;
 /** The floor the idle cadence decelerates to — still alive, barely moving. */
 export const IDLE_MIN_FPS = 12;
+/** Coalesce high-frequency input bursts before resetting the idle window. */
+export const ACTIVITY_THROTTLE_MS = 500;
 /** FPS-guard starvation threshold as a fraction of the cap (so a healthy capped
  * loop never trips it, but genuine starvation below the cap still does). */
 const GUARD_FPS_RATIO = 0.8;
 /** Render when at least this fraction of the target interval has elapsed — a
  * little slack so rAF jitter around the boundary doesn't halve the real fps. */
 const FRAME_CAP_TOLERANCE = 0.9;
+const PASSIVE_ACTIVITY_OPTIONS: AddEventListenerOptions = { passive: true };
+const PASSIVE_CAPTURE_ACTIVITY_OPTIONS: AddEventListenerOptions = { passive: true, capture: true };
+
+function animationNow(): number {
+  return typeof performance === 'undefined' ? Date.now() : performance.now();
+}
 
 /** Pure: milliseconds between frames at `fps` (guarded against div-by-~0). */
 export function frameInterval(fps: number): number {
@@ -178,8 +186,10 @@ export class BackgroundEngine {
   /** Timestamp of the last painted animation frame — drives the cadence cap. */
   private lastRenderAt: number | null = null;
   /** When the current active (visible, interacted) window began — drives idle
-   * deceleration. Reset on start, visibility-return, resize, and theme change. */
+   * deceleration. Reset on start, accepted input, resize, and visibility return. */
   private activeSince: number | null = null;
+  /** Last accepted user-activity signal, used to coalesce input bursts. */
+  private lastActivityAt: number | null = null;
   /** True while the cadence is idle-decelerated below its cap; the FPS guard
    * ignores these frames so intentional throttling never drops quality. */
   private throttled = false;
@@ -215,12 +225,12 @@ export class BackgroundEngine {
       return;
     }
 
-    const now = typeof performance === 'undefined' ? 0 : performance.now();
+    const now = animationNow();
+    this.restoreActiveCadence(now);
     this.renderFrame(now);
     // Seed the cadence clocks off the first painted frame so the cap and idle
     // deceleration are measured from an active start.
     this.lastRenderAt = now;
-    this.activeSince = now;
     this.scheduleNextFrame();
   }
 
@@ -231,6 +241,7 @@ export class BackgroundEngine {
     this.lastFrameAt = null;
     this.lastRenderAt = null;
     this.activeSince = null;
+    this.lastActivityAt = null;
     this.throttled = false;
     this.lowFpsFrames = 0;
   }
@@ -279,6 +290,13 @@ export class BackgroundEngine {
       quality: this.currentQuality,
       qualityScale: QUALITY_PROFILES[this.currentQuality].scale,
     };
+
+    // Assigning canvas.width/height clears the bitmap. Once initialized, every
+    // resize path (viewport, ResizeObserver, or a quality change) must repaint a
+    // renderer that has no animation loop of its own.
+    if (this.running && this.initialized && rendersSingleFrame(this.staticMode, this.variant.kind)) {
+      this.refreshStaticFrame();
+    }
   }
 
   renderFrame(time: number): void {
@@ -345,6 +363,7 @@ export class BackgroundEngine {
   private scheduleNextFrame(): void {
     if (!this.running || this.staticMode || this.variant.kind === 'solid' || isDocumentHidden()) return;
     if (this.rafId !== null) return;
+    if (typeof requestAnimationFrame === 'undefined') return;
 
     this.rafId = requestAnimationFrame((time) => {
       this.rafId = null;
@@ -374,7 +393,7 @@ export class BackgroundEngine {
 
   private cancelFrame(): void {
     if (this.rafId === null) return;
-    cancelAnimationFrame(this.rafId);
+    if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(this.rafId);
     this.rafId = null;
   }
 
@@ -387,8 +406,18 @@ export class BackgroundEngine {
     // instead of trusting a possibly-stale cached theme.
     bumpThemeEpoch();
 
-    window.addEventListener('resize', this.handleResize);
-    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', this.handleResize);
+      window.addEventListener('pointerdown', this.handleUserActivity, PASSIVE_ACTIVITY_OPTIONS);
+      window.addEventListener('keydown', this.handleUserActivity);
+      window.addEventListener('wheel', this.handleUserActivity, PASSIVE_ACTIVITY_OPTIONS);
+      window.addEventListener('touchstart', this.handleUserActivity, PASSIVE_ACTIVITY_OPTIONS);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+      // Capture descendant scroll events: unlike wheel, `scroll` does not bubble.
+      document.addEventListener('scroll', this.handleUserActivity, PASSIVE_CAPTURE_ACTIVITY_OPTIONS);
+    }
 
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(this.handleResize);
@@ -414,8 +443,17 @@ export class BackgroundEngine {
     if (!this.listenersAttached) return;
     this.listenersAttached = false;
 
-    window.removeEventListener('resize', this.handleResize);
-    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('resize', this.handleResize);
+      window.removeEventListener('pointerdown', this.handleUserActivity, PASSIVE_ACTIVITY_OPTIONS);
+      window.removeEventListener('keydown', this.handleUserActivity);
+      window.removeEventListener('wheel', this.handleUserActivity, PASSIVE_ACTIVITY_OPTIONS);
+      window.removeEventListener('touchstart', this.handleUserActivity, PASSIVE_ACTIVITY_OPTIONS);
+    }
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+      document.removeEventListener('scroll', this.handleUserActivity, PASSIVE_CAPTURE_ACTIVITY_OPTIONS);
+    }
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.themeObserver?.disconnect();
@@ -434,15 +472,30 @@ export class BackgroundEngine {
       this.pendingStaticRefresh = true;
       return;
     }
-    const now = typeof performance === 'undefined' ? 0 : performance.now();
+    const now = animationNow();
     this.renderFrame(now);
   }
 
+  /** Restore full cadence and discard FPS-guard evidence from the old window. */
+  private restoreActiveCadence(time: number): void {
+    this.activeSince = time;
+    this.lastRenderAt = null;
+    this.lastFrameAt = null;
+    this.lowFpsFrames = 0;
+    this.throttled = false;
+  }
+
+  private readonly handleUserActivity = (): void => {
+    const now = animationNow();
+    if (this.lastActivityAt !== null && now - this.lastActivityAt < ACTIVITY_THROTTLE_MS) return;
+    this.lastActivityAt = now;
+    this.restoreActiveCadence(now);
+    this.scheduleNextFrame();
+  };
+
   private readonly handleResize = (): void => {
     // A resize is user activity — restore full cadence and paint promptly.
-    this.activeSince = typeof performance === 'undefined' ? 0 : performance.now();
-    this.lastRenderAt = null;
-    this.throttled = false;
+    this.restoreActiveCadence(animationNow());
     this.resize();
   };
 
@@ -460,12 +513,13 @@ export class BackgroundEngine {
       this.cancelFrame();
       this.lastFrameAt = null;
       this.lastRenderAt = null;
+      this.lowFpsFrames = 0;
+      this.throttled = false;
       return;
     }
 
     // Returning to the tab is activity — reset the idle window to full cadence.
-    this.activeSince = typeof performance === 'undefined' ? 0 : performance.now();
-    this.throttled = false;
+    this.restoreActiveCadence(animationNow());
 
     if (this.pendingStaticRefresh) {
       this.pendingStaticRefresh = false;

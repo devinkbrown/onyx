@@ -10,12 +10,15 @@
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { DiscordBotImportControls } from './HistoryImportControls';
 import { loadRecent, _resetVaultForTests } from '@/lib/vault/historyVault';
 
 /** Typed fetch signature so `mock.calls[i]` carries the [url, init] tuple. */
 type FetchFn = (...args: Parameters<typeof fetch>) => Promise<Response>;
+
+const PROXY_DISCLOSURE = "Your bot token is sent to this Onyx deployment's same-origin import proxy, which contacts Discord's API on your behalf. The token is used only for this request and is not stored in the portable vault or local history.";
+const PROXY_ACKNOWLEDGEMENT = "I understand that my bot token will be sent to this deployment's import proxy.";
 
 function fakeRes(status: number, body: unknown, headers: Record<string, string> = {}): Response {
   return {
@@ -64,6 +67,7 @@ function guildFetch(
 async function enterAndFetch(token: string, guild: string): Promise<void> {
   fireEvent.input(screen.getByLabelText('Bot token'), { target: { value: token } });
   fireEvent.input(screen.getByLabelText('Server ID'), { target: { value: guild } });
+  fireEvent.click(screen.getByRole('checkbox', { name: PROXY_ACKNOWLEDGEMENT }));
   fireEvent.click(screen.getByRole('button', { name: 'Fetch history' }));
 }
 
@@ -78,15 +82,38 @@ afterEach(() => {
 });
 
 describe('DiscordBotImportControls', () => {
+  it('precisely discloses the same-origin proxy and local storage boundary', () => {
+    render(() => <DiscordBotImportControls />);
+
+    expect(screen.getByText(PROXY_DISCLOSURE)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: PROXY_ACKNOWLEDGEMENT })).not.toBeChecked();
+  });
+
+  it('keeps network import disabled and makes no request before explicit acknowledgement', () => {
+    const fetchMock = vi.fn<FetchFn>();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(() => <DiscordBotImportControls />);
+    fireEvent.input(screen.getByLabelText('Bot token'), { target: { value: 'secret' } });
+    fireEvent.input(screen.getByLabelText('Server ID'), { target: { value: '9' } });
+    const fetchButton = screen.getByRole('button', { name: 'Fetch history' });
+
+    expect(fetchButton).toBeDisabled();
+    fireEvent.click(fetchButton);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('walks a guild over the proxy, previews, then merges into the vault', async () => {
     const channels = [{ id: '100', name: 'general', type: 0, position: 0 }];
     const fetchMock = guildFetch(channels, { '100': [restMsg('200', 'hello'), restMsg('201', 'world')] });
     vi.stubGlobal('fetch', fetchMock);
 
     render(() => <DiscordBotImportControls />);
+    const tokenInput = screen.getByLabelText('Bot token') as HTMLInputElement;
     await enterAndFetch('super-secret-token', '9');
 
     await screen.findByText(/Ready to import 2 messages across 1 channel/, undefined, { timeout: 4000 });
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Review import' })).toHaveFocus());
     // The first call enumerates the guild's channels over the same-origin proxy.
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('/discord-import/guilds/9/channels');
@@ -94,6 +121,7 @@ describe('DiscordBotImportControls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
     await screen.findByText(/Imported 2 messages into 1 channel/);
+    await waitFor(() => expect(tokenInput).toHaveFocus());
     const stored = await loadRecent('#general');
     expect(stored.map((m) => m.text)).toEqual(['hello', 'world']);
   });
@@ -138,10 +166,15 @@ describe('DiscordBotImportControls', () => {
     vi.stubGlobal('fetch', guildFetch(channels, { '100': stripped }));
 
     render(() => <DiscordBotImportControls />);
+    const tokenInput = screen.getByLabelText('Bot token') as HTMLInputElement;
+    const acknowledgement = screen.getByRole('checkbox', { name: PROXY_ACKNOWLEDGEMENT });
     await enterAndFetch('tok', '9');
 
-    await screen.findByText(/MESSAGE CONTENT INTENT/, undefined, { timeout: 4000 });
+    await screen.findByText(/Discord returned messages with no text/, undefined, { timeout: 4000 });
     expect(screen.queryByRole('button', { name: 'Import into vault' })).toBeNull();
+    expect(tokenInput.value).toBe('');
+    expect(acknowledgement).not.toBeChecked();
+    await waitFor(() => expect(tokenInput).toHaveFocus());
   });
 
   it('zeroes the bot token from the input at end-of-run (token contract)', async () => {
@@ -150,11 +183,13 @@ describe('DiscordBotImportControls', () => {
 
     render(() => <DiscordBotImportControls />);
     const tokenInput = screen.getByLabelText('Bot token') as HTMLInputElement;
+    const acknowledgement = screen.getByRole('checkbox', { name: PROXY_ACKNOWLEDGEMENT });
     await enterAndFetch('leak-me-not', '9');
 
     await screen.findByText(/Ready to import/, undefined, { timeout: 4000 });
     // The signal was cleared in the finally block, emptying the bound input.
     expect(tokenInput.value).toBe('');
+    expect(acknowledgement).not.toBeChecked();
   });
 
   it('rejects a non-numeric Server ID without any fetch', async () => {

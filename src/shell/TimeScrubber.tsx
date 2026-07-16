@@ -12,6 +12,7 @@ import {
 } from 'solid-js';
 import { useStore } from '@/lib/store';
 import { buildMomentLink } from '@/lib/deeplink';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { fetchChannelPulse } from '@/lib/stats/channelStats';
 
 type TimeScrubberBar = {
@@ -26,6 +27,7 @@ const HOUR_COUNT = 24;
 const REFRESH_MS = 60_000;
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const COPY_RESET_MS = 1800;
+type CopyState = 'idle' | 'copied' | 'failed';
 
 export function buildTimeScrubberBars(
   hours: readonly number[] | null | undefined,
@@ -90,7 +92,7 @@ export function TimeScrubber(): JSX.Element {
   const travelTo = useStore((s) => s.travelTo);
   const [selectedDate, setSelectedDate] = createSignal(formatUtcDate(new Date()));
   const [selectedMoment, setSelectedMoment] = createSignal(new Date());
-  const [copied, setCopied] = createSignal(false);
+  const [copyState, setCopyState] = createSignal<CopyState>('idle');
   const [nowMs, setNowMs] = createSignal(Date.now());
   let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -129,7 +131,7 @@ export function TimeScrubber(): JSX.Element {
     const at = dateAtUtc(selectedDate(), hour, minute);
     if (!channel || !at) return;
     setSelectedMoment(at);
-    setCopied(false);
+    setCopyState('idle');
     travelTo()(channel, at);
   }
 
@@ -144,7 +146,7 @@ export function TimeScrubber(): JSX.Element {
     const at = dateAtUtc(next, 12, 0);
     if (!channel || !at) return;
     setSelectedMoment(at);
-    setCopied(false);
+    setCopyState('idle');
     travelTo()(channel, at);
   }
 
@@ -154,22 +156,19 @@ export function TimeScrubber(): JSX.Element {
     const href = typeof window !== 'undefined' ? window.location.href : undefined;
     const link = buildMomentLink(channel, selectedMoment(), href);
 
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(link);
-      } else if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('onyx:last-copied-moment', link);
-      }
-      setCopied(true);
-      if (copyResetTimer) clearTimeout(copyResetTimer);
-      copyResetTimer = setTimeout(() => setCopied(false), COPY_RESET_MS);
-    } catch {
-      try {
-        if (typeof localStorage !== 'undefined') localStorage.setItem('onyx:last-copied-moment', link);
-        setCopied(true);
-      } catch {
-        setCopied(false);
-      }
+    if (copyResetTimer) {
+      clearTimeout(copyResetTimer);
+      copyResetTimer = null;
+    }
+    setCopyState('idle');
+
+    const copied = await writeClipboardText(link);
+    setCopyState(copied ? 'copied' : 'failed');
+    if (copied) {
+      copyResetTimer = setTimeout(() => {
+        setCopyState('idle');
+        copyResetTimer = null;
+      }, COPY_RESET_MS);
     }
   }
 
@@ -228,10 +227,18 @@ export function TimeScrubber(): JSX.Element {
               aria-label={`Copy moment link for ${channel()}`}
               onClick={() => void copyMoment()}
             >
-              {copied() ? 'Copied' : 'Copy moment'}
+              {copyState() === 'copied'
+                ? 'Copied'
+                : copyState() === 'failed'
+                  ? 'Copy failed'
+                  : 'Copy moment'}
             </button>
-            <span class="sr-only" role="status" aria-live="polite">
-              {copied() ? `Moment link copied for ${channel()}` : ''}
+            <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+              {copyState() === 'copied'
+                ? `Moment link copied for ${channel()}`
+                : copyState() === 'failed'
+                  ? `Could not copy moment link for ${channel()}. Clipboard access is unavailable.`
+                  : ''}
             </span>
           </div>
         </section>

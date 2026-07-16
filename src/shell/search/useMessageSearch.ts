@@ -2,19 +2,34 @@
 import { createEffect, createMemo, createSignal, onCleanup, type Accessor } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
+import { isEnvelope } from '@/lib/e2ee/dmCipher';
 import { preferences } from '@/lib/prefs/preferences';
 import { VAULT_SEARCH_MODES, loadDefaultVaultSearchMode } from '@/lib/prefs/vaultSearchMode';
 import { searchVault } from '@/lib/vault/historyVault';
 import { searchVaultSemantic } from '@/lib/vault/searchVaultSemantic';
 import { searchVaultHybrid } from '@/lib/vault/searchVaultHybrid';
+import {
+  boundedSearchField,
+  boundedSearchQueryInput,
+  boundedSearchResultText,
+  SEARCH_QUERY_TEXT_MAX,
+} from '@/lib/vault/searchBounds';
 
 /**
  * How the device-memory (vault) pane matches:
- *  - 'hybrid'   — lexical substring hits first, then on-device semantic neighbours (default)
+ *  - 'hybrid'   — lexical substring hits first, then related token-vector neighbours (default)
  *  - 'exact'    — literal case-insensitive substring only
- *  - 'semantic' — on-device cosine neighbours only
+ *  - 'semantic' — on-device token-vector cosine neighbours only (persisted legacy name)
  */
 export type VaultSearchMode = 'exact' | 'semantic' | 'hybrid';
+
+/**
+ * One work bound for every live Search Center entry path. Besides keeping the
+ * UI and saved-search contract aligned, this prevents a pasted/prefilled value
+ * from driving unbounded lowercase/token/vector work or an oversized SEARCH
+ * command. The original message corpus remains untouched.
+ */
+export const MESSAGE_SEARCH_QUERY_MAX = SEARCH_QUERY_TEXT_MAX;
 
 /**
  * Discoverable cycle order the toggle walks: default first, then the two pure
@@ -44,11 +59,16 @@ export type VaultSearchResult = {
 export type UseMessageSearch = {
   /** Server-side (draft/search) history search over the active conversation */
   canServerSearch: Accessor<boolean>;
+  /** True when an E2EE DM deliberately keeps query text off the server. */
+  serverSearchBlockedByE2ee: Accessor<boolean>;
   serverStatus: Accessor<'idle' | 'pending' | 'done' | 'error'>;
   serverResults: Accessor<MessageSearchResult[]>;
   serverError: Accessor<string | null>;
+  serverNotice: Accessor<string | null>;
   runServerSearch: () => void;
   isOpen: Accessor<boolean>;
+  /** Increments for every open request, including Cmd/Ctrl-F while already open. */
+  focusRequest: Accessor<number>;
   query: Accessor<string>;
   setQuery: (next: string) => void;
   results: Accessor<MessageSearchResult[]>;
@@ -59,8 +79,12 @@ export type UseMessageSearch = {
   activeResultId: Accessor<string | null>;
   targetLabel: Accessor<string>;
   hasConversation: Accessor<boolean>;
+  /** Whether device-memory persistence/search is enabled in Preferences. */
+  localHistoryEnabled: Accessor<boolean>;
   /** Device-memory (vault) hits from OTHER conversations, newest first */
   vaultResults: Accessor<VaultSearchResult[]>;
+  /** Async device-memory query lifecycle for accessible progress feedback. */
+  vaultStatus: Accessor<'idle' | 'pending' | 'done' | 'error'>;
   /** How the vault pane matches: 'hybrid' | 'exact' | 'semantic' */
   vaultMode: Accessor<VaultSearchMode>;
   /** Cycle the vault pane through hybrid → exact → semantic */
@@ -72,6 +96,8 @@ export type UseMessageSearch = {
   applyRecallSuggestion: (term: string) => void;
   /** Open a vault hit: navigate to its conversation and land on the message */
   openVaultResult: (result: VaultSearchResult) => void;
+  /** Hydrate an archived server hit around its timestamp and land on it. */
+  openServerResult: (result: MessageSearchResult) => void;
   open: () => void;
   close: () => void;
   next: () => void;
@@ -79,6 +105,7 @@ export type UseMessageSearch = {
 };
 
 const [isMessageSearchOpen, setMessageSearchOpen] = createSignal(false);
+const [messageSearchFocusRequest, setMessageSearchFocusRequest] = createSignal(0);
 // The element focused when the non-modal search overlay opened (the trigger).
 // Captured on open, replayed on close so Escape/close returns the keyboard user
 // to where they were instead of dropping focus to <body>. (WCAG SC 2.4.3)
@@ -137,9 +164,19 @@ function normalized(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
 
+function sameSearchTarget(left: string, right: string): boolean {
+  // Compare lengths before case-folding so malformed injected state cannot
+  // force an unbounded lowercase allocation at the render/click boundary.
+  return left.length === right.length && left.toLowerCase() === right.toLowerCase();
+}
+
+function boundedQuery(value: string): string {
+  return boundedSearchQueryInput(value);
+}
+
 function recallTermsFromText(text: string): string[] {
   const terms = new Set<string>();
-  for (const raw of text.toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g) ?? []) {
+  for (const raw of boundedSearchField(text).toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}-]{2,}/gu) ?? []) {
     const term = raw.replace(/^-+|-+$/g, '');
     if (term.length < 3 || SEARCH_RECALL_STOP_WORDS.has(term)) continue;
     terms.add(term);
@@ -157,6 +194,18 @@ function sortedMessages(messages: readonly ChatMessage[]): ChatMessage[] {
     .map((item) => item.message);
 }
 
+/**
+ * Search/display text for a loaded row. E2EE ciphertext is never useful user
+ * text and must not enter recall terms; decrypted plaintext is transient store
+ * state and remains device-only.
+ */
+function visibleSearchText(message: ChatMessage, dmContext: boolean): string | null {
+  if (!message.encrypted && !(dmContext && isEnvelope(message.text))) return message.text;
+  return typeof message.plaintext === 'string' && message.plaintext.length > 0
+    ? message.plaintext
+    : null;
+}
+
 function currentConversationKey(): string | null {
   const view = getState().activeView;
   if (view.kind === 'channel') return `channel:${view.channel.toLocaleLowerCase()}`;
@@ -169,18 +218,18 @@ export function hasMessageSearchableConversation(): boolean {
 }
 
 export function openMessageSearch(): void {
-  if (!hasMessageSearchableConversation()) return;
   captureMessageSearchTrigger();
+  setMessageSearchFocusRequest((request) => request + 1);
   setMessageSearchOpen(true);
 }
 
 export function openMessageSearchWithQuery(query: string): void {
-  if (!hasMessageSearchableConversation()) return;
-  const trimmed = query.trim();
+  const trimmed = boundedQuery(query.trim());
   if (!trimmed) return;
   captureMessageSearchTrigger();
   setMessageSearchQuerySignal(trimmed);
   setMessageSearchActiveIndex(0);
+  setMessageSearchFocusRequest((request) => request + 1);
   setMessageSearchOpen(true);
 }
 
@@ -190,7 +239,11 @@ export function closeMessageSearch(): void {
   setMessageSearchQuerySignal('');
   setMessageSearchActiveIndex(0);
   setMessageSearchActiveResultId(null);
-  getState().clearServerSearch();
+  const state = getState();
+  // SEARCH replies have no client request id. Keep a pending request locked
+  // across close/reopen so a late batch cannot be mistaken for a newer query
+  // on the same target. Settled state is safe to clear immediately.
+  if (state.serverSearch.status !== 'pending') state.clearServerSearch();
   // Restore focus to the trigger so a keyboard user keeps their place; the
   // search input unmounts on close and would otherwise strand focus on <body>.
   const previous = messageSearchReturnFocus;
@@ -202,7 +255,7 @@ export function activeMessageSearchResultId(): string | null {
   return messageSearchActiveResultId();
 }
 
-/** Current shared vault-pane matching mode ('exact' | 'semantic'). */
+/** Current shared vault-pane matching mode. */
 export { vaultSearchMode };
 
 /** Set the shared vault-pane matching mode explicitly. */
@@ -225,6 +278,10 @@ export function useMessageSearch(): UseMessageSearch {
   const canSearchHistory = useStore((s) => s.canSearchHistory);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const serverSearch = useStore((s) => s.serverSearch);
+  const peerDmKeys = useStore((s) => s.peerDmKeys);
+  const client = useStore((s) => s.client);
+
+  const channelTypes = createMemo(() => client()?.isupport.CHANTYPES ?? '#&');
 
   const searchTarget = createMemo(() => {
     const view = activeView();
@@ -233,25 +290,79 @@ export function useMessageSearch(): UseMessageSearch {
     return null;
   });
 
+  const serverSearchBlockedByE2ee = createMemo(() => {
+    const view = activeView();
+    if (view.kind !== 'dm') return false;
+    const key = view.nick.toLowerCase();
+    const conversation = dms().get(key) ?? dms().get(view.nick);
+    // A remembered encrypted row keeps the boundary active even when the local
+    // preference was later disabled, fresh key discovery has not completed, or
+    // the peer rotated/removed a key. The preference gates only prospective
+    // key-based capability; it must never reclassify existing ciphertext as a
+    // conversation whose query is safe to send to server history.
+    const containsEncryptedHistory = conversation?.messages.some(
+      (message) => message.encrypted || isEnvelope(message.text),
+    ) ?? false;
+    return containsEncryptedHistory
+      || (preferences().e2eeDms && peerDmKeys().has(key));
+  });
+
   const canServerSearch = createMemo(() =>
-    connectionStatus() === 'connected' && canSearchHistory() && searchTarget() !== null,
+    connectionStatus() === 'connected'
+      && canSearchHistory()
+      && searchTarget() !== null
+      && !serverSearchBlockedByE2ee(),
   );
 
+  const serverSearchMatchesContext = createMemo(() => {
+    const search = serverSearch();
+    const target = searchTarget();
+    return target !== null
+      && sameSearchTarget(search.target, target)
+      && search.query === messageSearchQuery().trim();
+  });
+
+  const serverStatus = createMemo(() => {
+    const status = serverSearch().status;
+    // Keep an in-flight request visible/locked even if the input changes: the
+    // wire protocol has no request id with which to cancel or disambiguate a
+    // second SEARCH. Once that request settles, however, never present its
+    // results or error under a different query/conversation.
+    if (status === 'pending') return status;
+    return serverSearchMatchesContext() ? status : 'idle';
+  });
+
   const serverResults = createMemo((): MessageSearchResult[] =>
-    serverSearch().results.map((message, ordinal) => ({
-      id: message.id,
-      from: message.from,
-      text: message.text,
-      time: message.time,
-      target: message.target,
-      ordinal,
-    })),
+    (serverSearchMatchesContext() ? serverSearch().results : [])
+      // Archived E2EE rows contain ciphertext because plaintext is never stored
+      // server-side. Do not render or derive recall terms from that envelope.
+      // The collector also enforces target equality; keep this UI boundary so
+      // injected/stale store state can never turn a result click into a jump to
+      // a conversation other than the one that was searched.
+      .filter((message) => {
+        const view = activeView();
+        const target = searchTarget();
+        return target !== null
+          && sameSearchTarget(message.target, target)
+          && !message.encrypted
+          && !(view.kind === 'dm' && isEnvelope(message.text));
+      })
+      .map((message, ordinal) => ({
+        id: message.id,
+        from: message.from,
+        text: boundedSearchResultText(message.text, messageSearchQuery()),
+        time: message.time,
+        target: message.target,
+        ordinal,
+      })),
   );
 
   function runServerSearch(): void {
     const target = searchTarget();
     const query = messageSearchQuery().trim();
-    if (!target || !query || !canServerSearch()) return;
+    // Only one SEARCH can safely be in flight: replies carry no client request
+    // id, so overlapping same-target requests can otherwise be misattributed.
+    if (!target || !query || !canServerSearch() || serverSearch().status === 'pending') return;
     getState().searchServerHistory(target, query);
   }
 
@@ -264,7 +375,7 @@ export function useMessageSearch(): UseMessageSearch {
     const view = activeView();
     if (view.kind === 'channel') return view.channel;
     if (view.kind === 'dm') return `@${view.nick}`;
-    return '';
+    return 'all remembered conversations';
   });
 
   const conversationKey = createMemo(() => {
@@ -290,24 +401,32 @@ export function useMessageSearch(): UseMessageSearch {
   const results = createMemo((): MessageSearchResult[] => {
     const query = normalized(messageSearchQuery());
     if (!query) return [];
+    const dmContext = activeView().kind === 'dm';
 
     return messages()
-      .filter((message) => {
-        const text = message.text.toLocaleLowerCase();
-        const from = message.from.toLocaleLowerCase();
-        return text.includes(query) || from.includes(query);
+      .flatMap((message) => {
+        const visibleText = visibleSearchText(message, dmContext);
+        if (visibleText === null) return [];
+        const text = boundedSearchField(visibleText).toLocaleLowerCase();
+        const from = boundedSearchField(message.from).toLocaleLowerCase();
+        if (!text.includes(query) && !from.includes(query)) return [];
+        return [{ message, visibleText }];
       })
-      .map((message, ordinal) => ({
+      .map(({ message, visibleText }, ordinal) => ({
         id: message.id,
         from: message.from,
-        text: message.text,
+        text: boundedSearchResultText(visibleText, query),
         time: message.time,
         target: message.target,
         ordinal,
       }));
   });
 
-  const loadedMessageIds = createMemo(() => new Set(messages().map((message) => message.id)));
+  const loadedMessageKeys = createMemo(() => {
+    const target = searchTarget()?.toLowerCase();
+    if (!target) return new Set<string>();
+    return new Set(messages().map((message) => `${target}\n${message.id}`));
+  });
 
   const resultCount = createMemo(() => results().length);
   const activeResult = createMemo(() => results()[messageSearchActiveIndex()] ?? null);
@@ -333,16 +452,11 @@ export function useMessageSearch(): UseMessageSearch {
   });
 
   createEffect(() => {
-    if (!hasConversation() && isMessageSearchOpen()) {
-      closeMessageSearch();
-      return;
-    }
-
     setMessageSearchActiveResultId(activeResultId());
   });
 
   function setQuery(next: string): void {
-    setMessageSearchQuerySignal(next);
+    setMessageSearchQuerySignal(boundedQuery(next));
     setMessageSearchActiveIndex(0);
   }
 
@@ -357,42 +471,80 @@ export function useMessageSearch(): UseMessageSearch {
   // `vaultHits` memo below, so newly-loaded rows still drop out cheaply without
   // disturbing the debounce.
   const [vaultRawHits, setVaultRawHits] = createSignal<VaultSearchResult[]>([]);
+  const [vaultStatus, setVaultStatus] = createSignal<'idle' | 'pending' | 'done' | 'error'>('idle');
   let vaultTimer: ReturnType<typeof setTimeout> | undefined;
+  let vaultAbort: AbortController | undefined;
   let vaultSeq = 0;
   createEffect(() => {
     const query = messageSearchQuery().trim();
     const open = isMessageSearchOpen();
     const mode = vaultSearchMode();
     const localHistory = preferences().localHistory;
+    const chantypes = channelTypes();
     if (vaultTimer !== undefined) clearTimeout(vaultTimer);
+    vaultAbort?.abort();
+    vaultAbort = undefined;
+    // Invalidate not just an older valid query, but also an in-flight request
+    // when search closes, the query becomes too short, or local history is
+    // disabled. Otherwise its late promise can repopulate a cleared panel.
+    const seq = ++vaultSeq;
     if (!open || query.length < 2 || !localHistory) {
       setVaultRawHits([]);
+      setVaultStatus('idle');
       return;
     }
-    const seq = ++vaultSeq;
+    setVaultStatus('pending');
     vaultTimer = setTimeout(() => {
+      const abort = new AbortController();
+      vaultAbort = abort;
       const run =
         mode === 'semantic'
-          ? searchVaultSemantic(query)
+          ? searchVaultSemantic(query, { signal: abort.signal })
           : mode === 'hybrid'
-            ? searchVaultHybrid(query)
+            ? searchVaultHybrid(query, { signal: abort.signal })
             : searchVault(query);
-      void run.then((hits) => {
-        if (seq !== vaultSeq) return; // a newer query superseded this one
-        setVaultRawHits(
-          hits.map((h) => ({
-            id: h.message.id,
-            from: h.message.from,
-            text: h.message.text,
-            time: h.message.time,
-            target: h.target,
-          })),
-        );
-      });
+      void run
+        .then((hits) => {
+          if (seq !== vaultSeq || abort.signal.aborted) return; // a newer query superseded this one
+          setVaultRawHits(
+            hits
+              // Vault serialization strips plaintext by construction. An
+              // encrypted hit is therefore only a ciphertext envelope.
+              .filter((hit) => (
+                !hit.message.encrypted
+                && (
+                  (hit.target.length > 0 && chantypes.includes(hit.target[0]!))
+                  || !isEnvelope(hit.message.text)
+                )
+              ))
+              .map((h) => ({
+                id: h.message.id,
+                from: h.message.from,
+                text: boundedSearchResultText(h.message.text, query),
+                time: h.message.time,
+                target: h.target,
+              })),
+          );
+          setVaultStatus('done');
+        })
+        .catch(() => {
+          // IndexedDB or an opt-in embedding provider may fail. Search is a
+          // best-effort projection, so fail closed without an unhandled promise.
+          if (seq === vaultSeq && !abort.signal.aborted) {
+            setVaultRawHits([]);
+            setVaultStatus('error');
+          }
+        })
+        .finally(() => {
+          if (vaultAbort === abort) vaultAbort = undefined;
+        });
     }, 200);
   });
   onCleanup(() => {
     if (vaultTimer !== undefined) clearTimeout(vaultTimer);
+    vaultAbort?.abort();
+    vaultAbort = undefined;
+    vaultSeq += 1;
   });
 
   // De-dupe vault hits against messages already loaded in the active conversation.
@@ -400,9 +552,9 @@ export function useMessageSearch(): UseMessageSearch {
   // re-running the debounced fetch above; older same-room rows that only exist in
   // the local vault remain searchable.
   const vaultHits = createMemo((): VaultSearchResult[] => {
-    const loaded = loadedMessageIds();
+    const loaded = loadedMessageKeys();
     return vaultRawHits()
-      .filter((hit) => !loaded.has(hit.id))
+      .filter((hit) => !loaded.has(`${hit.target.toLowerCase()}\n${hit.id}`))
       .slice(0, 25);
   });
 
@@ -431,6 +583,28 @@ export function useMessageSearch(): UseMessageSearch {
     closeMessageSearch();
   }
 
+  function openServerResult(result: MessageSearchResult): void {
+    const state = getState();
+    const view = state.activeView;
+    const target = searchTarget();
+    if (
+      target === null
+      || !sameSearchTarget(result.target, target)
+    ) return;
+    // SEARCH is target-bound, but explicitly navigate before hydration so this
+    // remains correct if the active view changes between response and click.
+    if (view.kind === 'channel') {
+      state.navigate({ kind: 'channel', channel: result.target });
+    } else if (view.kind === 'dm') {
+      state.navigate({ kind: 'dm', nick: result.target });
+    } else {
+      return;
+    }
+    state.travelTo(result.target, result.time, result.id);
+    state.focusMessage(result.id);
+    closeMessageSearch();
+  }
+
   function move(delta: number): void {
     const count = resultCount();
     if (count === 0) return;
@@ -439,11 +613,14 @@ export function useMessageSearch(): UseMessageSearch {
 
   return {
     canServerSearch,
-    serverStatus: () => serverSearch().status,
+    serverSearchBlockedByE2ee,
+    serverStatus,
     serverResults,
-    serverError: () => serverSearch().error,
+    serverError: () => serverSearchMatchesContext() ? serverSearch().error : null,
+    serverNotice: () => serverSearchMatchesContext() ? serverSearch().notice ?? null : null,
     runServerSearch,
     isOpen: isMessageSearchOpen,
+    focusRequest: messageSearchFocusRequest,
     query: messageSearchQuery,
     setQuery,
     results,
@@ -454,13 +631,16 @@ export function useMessageSearch(): UseMessageSearch {
     activeResultId,
     targetLabel,
     hasConversation,
+    localHistoryEnabled: () => preferences().localHistory,
     vaultResults: vaultHits,
+    vaultStatus,
     vaultMode: vaultSearchMode,
     toggleVaultMode,
     setVaultMode,
     recallSuggestions,
     applyRecallSuggestion: setQuery,
     openVaultResult,
+    openServerResult,
     open: openMessageSearch,
     close: closeMessageSearch,
     next: () => move(1),

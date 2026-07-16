@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { extractBlockKitLite, parseBlockKitLitePayload } from './blockKitLite';
+import { extractBlockKitLite, parseBlockKitLitePayload, prepareBlockKitAction } from './blockKitLite';
 
 const blockKitLiteSourcePath = join(dirname(fileURLToPath(import.meta.url)), 'blockKitLite.ts');
 
@@ -173,6 +173,33 @@ describe('blockKitLite', () => {
       null,
       { type: 'send', target: 'OperServ', value: 'status' },
     ]);
+  });
+
+  it('prepares only same-origin normalized plaintext and revalidates raw action fields', () => {
+    expect(prepareBlockKitAction(
+      { type: 'send', target: '#ops', value: '  approved  ' },
+      '#ops',
+    )).toEqual({ target: '#ops', text: 'approved' });
+
+    expect(prepareBlockKitAction(
+      { type: 'select-notify', target: '#ops', value: 'environment' },
+      '#ops',
+      '  prod  ',
+    )).toEqual({ target: '#ops', text: 'environment: prod' });
+
+    expect(prepareBlockKitAction(
+      { type: 'send', target: '#other', value: 'approved' },
+      '#ops',
+    )).toBeNull();
+    expect(prepareBlockKitAction(
+      { type: 'send', target: '#ops', value: '/oper root' },
+      '#ops',
+    )).toBeNull();
+    expect(prepareBlockKitAction(
+      { type: 'select-notify', target: '#ops', value: null },
+      '#ops',
+      'ok\r\nPRIVMSG #root :oops',
+    )).toBeNull();
   });
 
   it('routes select-option values through the action-value guard (CRLF/leading-slash rejected)', () => {

@@ -33,6 +33,7 @@ import { useThemeOptional } from '@/theme';
 import { Background } from '@/backgrounds/index';
 import { resolveBackgroundId } from './themeBackground';
 import { NotificationRuntime } from '@/lib/notifications';
+import { TopicReadRuntime } from '@/lib/topics/TopicReadRuntime';
 import { ServerRail } from './ServerRail';
 import { ChannelSidebar } from './ChannelSidebar';
 import { HomeView } from './HomeView';
@@ -40,6 +41,7 @@ const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
 import { PresenceRibbon } from './PresenceRibbon';
 import { GuestClaimPrompt } from './GuestClaimPrompt';
 import { DmKeyChangeBanner } from './DmKeyChangeBanner';
+import { ReconnectStatusBanner } from './ReconnectStatusBanner';
 import { TimeScrubber } from './TimeScrubber';
 import { WatchTogetherActivity } from './WatchTogetherActivity';
 import { MessageView } from './MessageView';
@@ -78,7 +80,7 @@ import { applyCalmPreset } from '@/lib/notifications/calmMode';
 import { ShortcutsOverlay } from './ShortcutsOverlay';
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { MessageSearch } from './search/MessageSearch';
-import { hasMessageSearchableConversation, openMessageSearch } from './search/useMessageSearch';
+import { closeMessageSearch, openMessageSearch } from './search/useMessageSearch';
 import { channelIdentityTarget, roomIdentityForTarget, type RoomIdentity } from './roomIdentity';
 import {
   forcedColors,
@@ -111,49 +113,17 @@ function focusableIn(root: HTMLElement | null | undefined): HTMLElement[] {
 
 // ── Disconnected banner ──────────────────────────────────────────────────────
 
-function DisconnectedBanner(): JSX.Element {
-  const connectionStatus = useStore((s) => s.connectionStatus);
-  const reconnectIn = useStore((s) => s.reconnectIn);
-
-  const isDown = createMemo(() => {
-    const s = connectionStatus();
-    return s === 'disconnected' || s === 'reconnecting';
-  });
-
-  return (
-    <Show when={isDown()}>
-      <div
-        class="shell-disconnected-banner"
-        role="alert"
-        aria-live="assertive"
-        aria-atomic="true"
-      >
-        <span aria-hidden="true">⚠</span>
-        <Show
-          when={connectionStatus() === 'reconnecting'}
-          fallback={<span>Disconnected from network.</span>}
-        >
-          <span>
-            Reconnecting
-            <Show when={reconnectIn() > 0}>
-              {' '}in {reconnectIn()}s
-            </Show>
-            …
-          </span>
-        </Show>
-      </div>
-    </Show>
-  );
-}
-
 function handleMessageSearchHotkey(event: KeyboardEvent): void {
   if (event.defaultPrevented) return;
 
   const key = event.key.toLowerCase();
   const isFindCombo = key === 'f' && (event.metaKey || event.ctrlKey) && !event.altKey;
-  if (!isFindCombo || !hasMessageSearchableConversation()) return;
+  if (!isFindCombo) return;
 
   event.preventDefault();
+  // Do not move focus behind a modal Sheet/overlay. The active dialog owns the
+  // keyboard until it closes; Search Center can be opened immediately after.
+  if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
   openMessageSearch();
 }
 
@@ -201,7 +171,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   onMount(() => {
     window.addEventListener('keydown', handleMessageSearchHotkey);
-    onCleanup(() => window.removeEventListener('keydown', handleMessageSearchHotkey));
+    onCleanup(() => {
+      window.removeEventListener('keydown', handleMessageSearchHotkey);
+      // Search is shell-scoped. Clear its module-level state when the connected
+      // shell leaves so a later session cannot inherit a stale open overlay.
+      closeMessageSearch();
+    });
   });
 
   // Reflect saved display/behaviour preferences onto <html> on first paint.
@@ -219,23 +194,39 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // still bind to this component's lifecycle) either at idle, or eagerly the
   // moment the local user chooses to join, whichever comes first.
   const mediaOwner = getOwner();
-  let mediaBooted = false;
+  let mediaBootPromise: Promise<boolean> | null = null;
   let mediaDisposed = false;
   onCleanup(() => {
     mediaDisposed = true;
   });
-  async function ensureMediaEngine(): Promise<void> {
-    if (mediaBooted || mediaDisposed) return;
-    mediaBooted = true;
-    const { mountMedia } = await import('@/media/useSuimyakuMedia');
-    if (mediaDisposed) return;
-    runWithOwner(mediaOwner, () => mountMedia());
+  function ensureMediaEngine(): Promise<boolean> {
+    if (mediaDisposed) return Promise.resolve(false);
+    // Idle preloading and a user click may race. Share the actual import/mount
+    // promise so every caller waits for readiness instead of treating
+    // "loading" as "booted" and attempting a no-op join.
+    if (mediaBootPromise) return mediaBootPromise;
+    mediaBootPromise = import('@/media/useSuimyakuMedia')
+      .then(({ mountMedia }) => {
+        if (mediaDisposed) return false;
+        runWithOwner(mediaOwner, () => mountMedia());
+        return true;
+      })
+      .catch((error: unknown) => {
+        // Allow a later user action to retry a transient chunk-load failure.
+        mediaBootPromise = null;
+        throw error;
+      });
+    return mediaBootPromise;
   }
   if (typeof window !== 'undefined') {
     const ric = (window as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void })
       .requestIdleCallback;
-    if (typeof ric === 'function') ric(() => void ensureMediaEngine(), { timeout: 2000 });
-    else setTimeout(() => void ensureMediaEngine(), 200);
+    const preloadMedia = () => void ensureMediaEngine().catch(() => {
+      // Best-effort idle preload. A direct user action retries and surfaces the
+      // failure in context.
+    });
+    if (typeof ric === 'function') ric(preloadMedia, { timeout: 2000 });
+    else setTimeout(preloadMedia, 200);
   }
 
   const voice = useStore((s) => s.voice);
@@ -256,10 +247,18 @@ export function AppShell(props: AppShellProps): JSX.Element {
   async function joinVoice(withVideo: boolean): Promise<void> {
     const v = activeView();
     if (v.kind !== 'channel') return;
-    await ensureMediaEngine();
-    const state = getState();
-    state.openVoiceSettings();
-    void state.joinVoiceChannel(v.channel, withVideo);
+    // Give immediate feedback while the lazy media chunk loads.
+    getState().openVoiceSettings();
+    try {
+      if (!(await ensureMediaEngine())) return;
+      void getState().joinVoiceChannel(v.channel, withVideo);
+    } catch {
+      getState().addToast({
+        variant: 'error',
+        title: 'Voice could not start',
+        description: 'The media engine did not load. Try joining again.',
+      });
+    }
   }
 
   // ── The rail is hidden when fewer than 3 servers are present.
@@ -453,6 +452,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   return (
     <>
       <NotificationRuntime />
+      <TopicReadRuntime />
 
       {/* Fixed background canvas behind everything */}
       <Background id={effectiveBgId()} quality="high" />
@@ -493,7 +493,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
             when hidden, so the conversation keeps the 1fr track either way. */}
         <div class="shell-conversation">
           {/* Disconnected banner */}
-          <DisconnectedBanner />
+          <ReconnectStatusBanner />
 
           {/* Presence ribbon */}
           <PresenceRibbon
@@ -524,7 +524,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
               <VoiceStage />
             </Show>
             <MessageView selfNick={displayNick()} />
-            <MessageSearch />
             {/* Persistent call controls while in a call */}
             <Show when={inCall()}>
               <VoiceBar />
@@ -536,6 +535,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
             {/* Read-only server/status buffer — no composer, no voice */}
             <MessageView selfNick={displayNick()} />
           </Show>
+          {/* Search Center is global: on Home/status it searches every local
+              vault target; server search appears only for a concrete room/DM. */}
+          <MessageSearch />
         </div>
 
         {/* ── Member List (right drawer on mobile) ── */}

@@ -109,6 +109,37 @@ describe('offline outbox', () => {
     expect(store.getState().toasts.some((t) => t.title.includes('sent'))).toBe(true);
   });
 
+  it('reopens a persisted queued send and restores its placeholder after reload', async () => {
+    const entry = await queueOutbox('#reloaded', 'survived the reload');
+    expect(entry).not.toBeNull();
+    expect(store.getState().channels.has('#reloaded')).toBe(false);
+
+    store.getState().openQueuedSend(entry!.id);
+
+    await until(() => store.getState().channels.get('#reloaded')?.messages.length === 1);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#reloaded' });
+    expect(store.getState().timeTravelLandingId).toBe(`outbox:${entry!.id}`);
+    expect(store.getState().channels.get('#reloaded')?.messages[0]).toMatchObject({
+      id: `outbox:${entry!.id}`,
+      text: 'survived the reload',
+      pending: true,
+    });
+  });
+
+  it('explicitly discards a queued send and removes its pending placeholder', async () => {
+    store.getState().sendMessage('#room', 'do not send this');
+    await until(async () => (await loadOutbox()).length === 1);
+    const [entry] = await loadOutbox();
+    await until(() => store.getState().channels.get('#room')?.messages.some((message) => message.pending) ?? false);
+
+    store.getState().discardQueuedSend(entry!.id);
+
+    await until(async () => (await loadOutbox()).length === 0);
+    await until(() => !(store.getState().channels.get('#room')?.messages.some((message) => message.pending) ?? false));
+    expect(store.getState().channels.get('#room')?.messages).toEqual([]);
+    expect(store.getState().toasts.some((toast) => toast.title === 'Queued message removed')).toBe(true);
+  });
+
   it('holds channel messages until the channel is joined', async () => {
     store.getState().sendMessage('#elsewhere', 'waits for the join');
     await until(async () => (await loadOutbox()).length === 1);

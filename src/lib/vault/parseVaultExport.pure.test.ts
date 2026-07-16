@@ -28,7 +28,19 @@ import type { ChatMessage } from '@/lib/irc/types';
 import {
   deserializeMessage,
   MAX_EXPORT_RAW_MESSAGES,
+  MAX_EXPORT_TOTAL_RAW_MESSAGES,
   MAX_EXPORT_TARGETS,
+  MAX_VAULT_MESSAGE_ID_LENGTH,
+  MAX_VAULT_MESSAGE_TEXT_LENGTH,
+  MAX_VAULT_MESSAGE_TYPE_LENGTH,
+  MAX_VAULT_REACTIONS,
+  MAX_VAULT_REACTION_FIELD_LENGTH,
+  MAX_VAULT_REACTION_USERS,
+  MAX_VAULT_REPLY_TEXT_LENGTH,
+  MAX_VAULT_SENDER_LENGTH,
+  MAX_VAULT_TARGET_LENGTH,
+  MAX_VAULT_TIMESTAMP_LENGTH,
+  MAX_VAULT_TOPIC_LENGTH,
   parseVaultExport,
   serializeMessage,
   type VaultExportSnapshot,
@@ -323,6 +335,153 @@ describe('parseVaultExport — vault import validation contract', () => {
     expect(parsed!.targets).toHaveLength(MAX_EXPORT_TARGETS);
     // The tail targets beyond the ceiling are never materialized.
     expect(parsed!.targets.at(-1)!.target).toBe(`#chan${MAX_EXPORT_TARGETS - 1}`);
+  });
+
+  it('BOUNDS aggregate message validation work across many valid targets', () => {
+    const perTarget = MAX_EXPORT_RAW_MESSAGES;
+    const targetCount = Math.ceil(MAX_EXPORT_TOTAL_RAW_MESSAGES / perTarget) + 2;
+    const targets = Array.from({ length: targetCount }, (_, targetIndex) => ({
+      target: `#bulk-${targetIndex}`,
+      messages: Array.from({ length: perTarget }, (_, messageIndex) => jsonClone(message(
+        `m-${targetIndex}-${messageIndex}`,
+        `#bulk-${targetIndex}`,
+        targetIndex * perTarget + messageIndex,
+      ))),
+    }));
+
+    const parsed = parseVaultExport({ kind: 'onyx-vault', version: 1, targets });
+    const parsedCount = parsed!.targets.reduce((count, target) => count + target.messages.length, 0);
+
+    expect(parsedCount).toBe(MAX_EXPORT_TOTAL_RAW_MESSAGES);
+    expect(parsed!.targets.length).toBeLessThan(targetCount);
+  });
+
+  it('rejects overlong targets and rows before importing them', () => {
+    const valid = jsonClone(message('ok', '#valid', 1));
+    const raw = {
+      kind: 'onyx-vault',
+      version: 1,
+      targets: [
+        { target: `#${'t'.repeat(MAX_VAULT_TARGET_LENGTH)}`, messages: [valid] },
+        {
+          target: '#valid',
+          messages: [
+            { ...message('ok', '#valid', 1), id: 'i'.repeat(MAX_VAULT_MESSAGE_ID_LENGTH + 1) },
+            { ...message('ok', '#valid', 1), from: 'f'.repeat(MAX_VAULT_SENDER_LENGTH + 1) },
+            { ...message('ok', '#valid', 1), text: 'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH + 1) },
+            { ...message('ok', '#valid', 1), target: `#${'m'.repeat(MAX_VAULT_TARGET_LENGTH)}` },
+          ],
+        },
+      ],
+    };
+
+    const parsed = parseVaultExport(raw)!;
+
+    expect(parsed.targets).toHaveLength(1);
+    expect(parsed.targets[0]!.target).toBe('#valid');
+    expect(parsed.targets[0]!.messages).toEqual([]);
+  });
+
+  it('preserves exact-limit core fields and rejects control-bearing wire tokens', () => {
+    const exactTarget = `#${'t'.repeat(MAX_VAULT_TARGET_LENGTH - 1)}`;
+    const raw = {
+      kind: 'onyx-vault',
+      version: 1,
+      targets: [{
+        target: exactTarget,
+        messages: [
+          {
+            ...message('i'.repeat(MAX_VAULT_MESSAGE_ID_LENGTH), exactTarget, 1),
+            from: 'f'.repeat(MAX_VAULT_SENDER_LENGTH),
+            text: 'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH),
+          },
+          { ...message('bad id', exactTarget, 2) },
+          { ...message('bad-from', exactTarget, 3), from: 'bad\nfrom' },
+        ],
+      }],
+    };
+
+    const parsed = parseVaultExport(raw)!;
+
+    expect(parsed.targets[0]!.target).toBe(exactTarget);
+    expect(parsed.targets[0]!.messages).toHaveLength(1);
+    expect(parsed.targets[0]!.messages[0]).toMatchObject({
+      id: 'i'.repeat(MAX_VAULT_MESSAGE_ID_LENGTH),
+      from: 'f'.repeat(MAX_VAULT_SENDER_LENGTH),
+      text: 'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH),
+    });
+  });
+
+  it('bounds timestamp and type validation before parsing untrusted strings', () => {
+    const raw = {
+      kind: 'onyx-vault',
+      version: 1,
+      exportedAt: '2'.repeat(MAX_VAULT_TIMESTAMP_LENGTH + 1),
+      targets: [{
+        target: '#bounded',
+        messages: [
+          { ...message('bad-time', '#bounded', 1), time: '2'.repeat(MAX_VAULT_TIMESTAMP_LENGTH + 1) },
+          { ...message('bad-type', '#bounded', 2), type: 'm'.repeat(MAX_VAULT_MESSAGE_TYPE_LENGTH + 1) },
+          message('good', '#bounded', 3),
+        ],
+      }],
+    };
+
+    const parsed = parseVaultExport(raw)!;
+
+    expect(Number.isNaN(Date.parse(parsed.exportedAt))).toBe(false);
+    expect(parsed.exportedAt).not.toBe(raw.exportedAt);
+    expect(parsed.targets[0]!.messages.map((item) => item.id)).toEqual(['good']);
+  });
+
+  it('bounds optional topic, reaction, and reply metadata independently', () => {
+    const reactions = Array.from({ length: MAX_VAULT_REACTIONS + 2 }, (_, index) => ({
+      emoji: index === 0 ? 'e'.repeat(MAX_VAULT_REACTION_FIELD_LENGTH + 1) : `e${index}`,
+      users: [
+        ...Array.from({ length: MAX_VAULT_REACTION_USERS }, (_, userIndex) => `u${userIndex}`),
+        'u'.repeat(MAX_VAULT_REACTION_FIELD_LENGTH + 1),
+        'overflow',
+      ],
+    }));
+    const raw = {
+      kind: 'onyx-vault',
+      version: 1,
+      targets: [{
+        target: '#metadata',
+        messages: [
+          {
+            ...message('bounded', '#metadata', 1),
+            topic: 't'.repeat(MAX_VAULT_TOPIC_LENGTH + 1),
+            reactions,
+            replyTo: { id: 'reply', from: 'alice', text: 'r'.repeat(MAX_VAULT_REPLY_TEXT_LENGTH + 1) },
+          },
+          {
+            ...message('exact', '#metadata', 2),
+            topic: 't'.repeat(MAX_VAULT_TOPIC_LENGTH),
+            replyTo: {
+              id: 'i'.repeat(MAX_VAULT_MESSAGE_ID_LENGTH),
+              from: 'f'.repeat(MAX_VAULT_SENDER_LENGTH),
+              text: 'r'.repeat(MAX_VAULT_REPLY_TEXT_LENGTH),
+            },
+          },
+        ],
+      }],
+    };
+
+    const parsed = parseVaultExport(raw)!;
+    const bounded = parsed.targets[0]!.messages[0]!;
+    const exact = parsed.targets[0]!.messages[1]!;
+
+    expect(bounded.topic).toBeUndefined();
+    expect(bounded.replyTo).toBeUndefined();
+    expect(bounded.reactions).toHaveLength(MAX_VAULT_REACTIONS - 1);
+    expect(bounded.reactions![0]!.users).toHaveLength(MAX_VAULT_REACTION_USERS);
+    expect(exact.topic).toHaveLength(MAX_VAULT_TOPIC_LENGTH);
+    expect(exact.replyTo).toEqual({
+      id: 'i'.repeat(MAX_VAULT_MESSAGE_ID_LENGTH),
+      from: 'f'.repeat(MAX_VAULT_SENDER_LENGTH),
+      text: 'r'.repeat(MAX_VAULT_REPLY_TEXT_LENGTH),
+    });
   });
 
   it('DEDUPES duplicate message ids within a target deterministically (last occurrence wins)', () => {

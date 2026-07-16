@@ -20,7 +20,8 @@
  *      the rest. Auto-promotes the active speaker when nobody is pinned.
  *
  * Self tile: sourced from store.voice.localStream / cameraStream.
- * Peer tiles: iterated from store.voice.peers Map.
+ * Peer tiles: merged case-insensitively from store.voice.peers and the room's
+ *   server-propagated voice roster.
  * Video streams: resolved from store.voice.videoParticipants (peer) or
  *   store.voice.cameraStream / screenshareStream (self).
  * Channel users (for role badges): from store.channels.get(callChannel).
@@ -33,6 +34,7 @@ import { getState, useStore } from '@/lib/store';
 import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
 import { ParticipantTile } from './ParticipantTile';
 import { CallStatusAnnouncer } from './CallStatusAnnouncer';
+import { mergeVoiceParticipants } from './voiceParticipants';
 import './voice.css';
 
 /** A normalized participant — self or a remote peer — for layout passes. */
@@ -65,9 +67,6 @@ export function VoiceStage() {
 
   const userFor = (nick: string) => channelUsers()?.get(nick.toLowerCase());
 
-  // All peers as an array (stable iteration order)
-  const peers = createMemo<SuimyakuPeerState[]>(() => [...voice().peers.values()]);
-
   // Screenshare is active: self screenshare takes the primary slot
   const screenshareActive = createMemo(() => voice().screenshareActive && !!voice().screenshareStream);
 
@@ -87,58 +86,53 @@ export function VoiceStage() {
 
   const selfNick = createMemo(() => ourNick() ?? 'you');
 
+  const participants = createMemo(() => {
+    const ch = voice().callChannel;
+    const roster = ch ? voiceChannelParticipants().get(ch.toLowerCase()) : undefined;
+    return mergeVoiceParticipants(selfNick(), voice().peers, roster);
+  });
+
+  // Event-plane nick sets are not guaranteed to preserve the same casing as a
+  // decoded media peer. Normalize once per store update, then every slot lookup
+  // uses the same case-insensitive key space as the participant union.
+  const normalizedSpeakingNicks = createMemo(() =>
+    new Set([...speakingNicks()].map(nick => nick.toLowerCase()))
+  );
+  const normalizedMutedNicks = createMemo(() =>
+    new Set([...mutedNicks()].map(nick => nick.toLowerCase()))
+  );
+  const normalizedRaisedHands = createMemo(() =>
+    new Set([...voice().raisedHands].map(nick => nick.toLowerCase()))
+  );
+
+  const hasNick = (nicks: ReadonlySet<string>, nick: string): boolean =>
+    nicks.has(nick.toLowerCase());
+
   const selfSlot = createMemo<Slot>(() => ({
     key: '__self__',
     nick: selfNick(),
     peer: null,
     isSelf: true,
     stream: selfVideoStream(),
-    speaking: speakingNicks().has(selfNick()),
+    speaking: hasNick(normalizedSpeakingNicks(), selfNick()),
     handRaised: voice().handRaised,
     muted: voice().muted,
   }));
 
-  const peerSlots = createMemo<Slot[]>(() =>
-    peers().map(p => ({
-      key: p.nick,
-      nick: p.nick,
-      peer: p,
+  // One remote slot model powers grid, spotlight, and screenshare. Roster-only
+  // members therefore remain visible even before a local media peer exists.
+  const remoteSlots = createMemo<Slot[]>(() =>
+    participants().filter(participant => !participant.isSelf).map(participant => ({
+      key: participant.nick.toLowerCase(),
+      nick: participant.nick,
+      peer: participant.peer,
       isSelf: false,
-      stream: peerStream(p.nick),
-      speaking: p.speaking || speakingNicks().has(p.nick),
-      handRaised: voice().raisedHands.has(p.nick),
-      muted: p.muted || mutedNicks().has(p.nick),
+      stream: participant.peer ? peerStream(participant.peer.nick) : null,
+      speaking: (participant.peer?.speaking ?? false) || hasNick(normalizedSpeakingNicks(), participant.nick),
+      handRaised: hasNick(normalizedRaisedHands(), participant.nick),
+      muted: (participant.peer?.muted ?? false) || hasNick(normalizedMutedNicks(), participant.nick),
     }))
   );
-
-  // Cross-node (and any not-yet-decoding) call members: present in the mesh-
-  // propagated roster but with no local media peer. Render them as audio-only
-  // tiles driven entirely by the server's MEDIA event-plane state, so a call
-  // spanning two servers actually shows everyone in it.
-  const rosterSlots = createMemo<Slot[]>(() => {
-    const ch = voice().callChannel;
-    if (!ch) return [];
-    const roster = voiceChannelParticipants().get(ch.toLowerCase());
-    if (!roster) return [];
-    const known = new Set<string>([selfNick().toLowerCase(), ...peers().map(p => p.nick.toLowerCase())]);
-    const out: Slot[] = [];
-    for (const nick of roster) {
-      if (known.has(nick.toLowerCase())) continue;
-      out.push({
-        key: nick,
-        nick,
-        peer: null,
-        isSelf: false,
-        stream: null,
-        speaking: speakingNicks().has(nick),
-        handRaised: voice().raisedHands.has(nick),
-        muted: mutedNicks().has(nick),
-      });
-    }
-    return out;
-  });
-
-  const remoteSlots = createMemo<Slot[]>(() => [...peerSlots(), ...rosterSlots()]);
   const allSlots = createMemo<Slot[]>(() => [selfSlot(), ...remoteSlots()]);
 
   // Total participant count (self + media peers + roster-only members).
@@ -283,7 +277,7 @@ export function VoiceStage() {
               peer={null}
               stream={voice().cameraStream}
               isSelf
-              speaking={speakingNicks().has(selfNick())}
+              speaking={hasNick(normalizedSpeakingNicks(), selfNick())}
               muted={voice().muted}
               deafened={voice().deafened}
               handRaised={voice().handRaised}
@@ -292,16 +286,18 @@ export function VoiceStage() {
             />
           </Show>
 
-          <For each={peers()}>
-            {(peer) => (
+          <For each={remoteSlots()}>
+            {(slot) => (
               <ParticipantTile
-                nick={peer.nick}
-                peer={peer}
-                stream={peerStream(peer.nick)}
-                handRaised={voice().raisedHands.has(peer.nick)}
-                pinned={voice().pinnedParticipant === peer.nick}
+                nick={slot.nick}
+                peer={slot.peer}
+                stream={slot.stream}
+                speaking={slot.speaking}
+                muted={slot.muted}
+                handRaised={slot.handRaised}
+                pinned={voice().pinnedParticipant === slot.nick}
                 onPin={handlePin}
-                channelUser={userFor(peer.nick)}
+                channelUser={userFor(slot.nick)}
                 class="voice-stage__filmstrip-tile"
               />
             )}

@@ -56,6 +56,42 @@ export function saveChannelTopicDrafts(
   } catch {}
 }
 
+export interface ClearChannelTopicDraftsResult {
+  success: boolean;
+  cleared: number;
+  remaining: number;
+}
+
+/**
+ * Remove all persisted channel-topic drafts and verify both the physical key
+ * and the sanitized readback before reporting success.
+ */
+export function clearChannelTopicDrafts(
+  storage?: TopicDraftStorage,
+): ClearChannelTopicDraftsResult {
+  const resolved = storageOrDefault(storage);
+  const before = loadChannelTopicDrafts(storage);
+  const count = Object.keys(before).length;
+  if (!resolved) return { success: false, cleared: 0, remaining: count };
+
+  try {
+    resolved.removeItem(CHANNEL_TOPIC_DRAFTS_KEY);
+    const remaining = Object.keys(loadChannelTopicDrafts(storage)).length;
+    const success = resolved.getItem(CHANNEL_TOPIC_DRAFTS_KEY) === null && remaining === 0;
+    return {
+      success,
+      cleared: success ? count : 0,
+      remaining,
+    };
+  } catch {
+    return {
+      success: false,
+      cleared: 0,
+      remaining: Object.keys(loadChannelTopicDrafts(storage)).length,
+    };
+  }
+}
+
 export function readChannelTopicDraft(channel: string, storage?: TopicDraftStorage): string | null {
   return loadChannelTopicDrafts(storage)[channelTopicDraftKey(channel)] ?? null;
 }

@@ -46,6 +46,7 @@ import {
   GridIcon, SpotlightIcon, SpatialAudioIcon, SettingsIcon, HangupIcon,
 } from './icons';
 import type { NetworkQualityTier } from '@/lib/suimyaku-media/types';
+import { mergeVoiceParticipants } from './voiceParticipants';
 import './voice.css';
 
 // ── Connection quality ────────────────────────────────────────────────────────
@@ -97,6 +98,14 @@ function formatBitrate(bps: number): string {
   if (bps <= 0) return '';
   if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)}M`;
   return `${Math.round(bps / 1000)}k`;
+}
+
+/** Browser display-capture support, guarded for non-browser test/tooling
+ * environments. Read when VoiceBar mounts because browser capabilities are
+ * stable for the lifetime of the page. */
+function supportsDisplayCapture(): boolean {
+  return typeof navigator !== 'undefined'
+    && typeof navigator.mediaDevices?.getDisplayMedia === 'function';
 }
 
 interface NetSample {
@@ -228,6 +237,7 @@ export function VoiceBar() {
   const showSettings = useStore(s => s.showVoiceSettings);
   const mediaAvailable = useStore(s => s.mediaAvailable);
   const spatialPositions = useStore(s => s.spatialPositions);
+  const voiceChannelParticipants = useStore(s => s.voiceChannelParticipants);
 
   const [reactionsOpen, setReactionsOpen] = createSignal(false);
   const [spatialOpen, setSpatialOpen] = createSignal(false);
@@ -240,6 +250,9 @@ export function VoiceBar() {
   // Tracks the OS "reduce motion" preference so the active-speaker chip only
   // animates its focus pulse when motion is welcome.
   const [reducedMotion, setReducedMotion] = createSignal(false);
+  const [displayCaptureAvailable, setDisplayCaptureAvailable] = createSignal(
+    supportsDisplayCapture(),
+  );
 
   let spatialPadRef: HTMLDivElement | undefined;
 
@@ -249,7 +262,11 @@ export function VoiceBar() {
 
   const channelLabel = createMemo(() => voice().callChannel ?? voice().callWith ?? '');
   const selfNick = createMemo(() => ourNick() ?? '');
-  const participantCount = createMemo(() => voice().peers.size + 1);
+  const participantCount = createMemo(() => {
+    const channel = voice().callChannel;
+    const roster = channel ? voiceChannelParticipants().get(channel.toLowerCase()) : undefined;
+    return mergeVoiceParticipants(selfNick() || 'you', voice().peers, roster).length;
+  });
   const isSpotlight = createMemo(() => voice().callLayout === 'spotlight');
   const spatialPositionCount = createMemo(() => {
     const channel = channelLabel();
@@ -454,12 +471,24 @@ export function VoiceBar() {
     return displayNick(nick);
   });
 
+  const screenshareUnavailable = createMemo(() =>
+    !voice().screenshareActive && (!mediaAvailable() || !displayCaptureAvailable())
+  );
+  const screenshareLabel = createMemo(() => {
+    if (voice().screenshareActive) return 'Stop sharing screen';
+    return screenshareUnavailable() ? 'Screen sharing unavailable' : 'Share screen';
+  });
+
   const handleToggleScreenshare = () => {
     if (voice().screenshareActive) {
       voice().stopScreenshare();
-    } else {
-      void voice().startScreenshare();
+      return;
     }
+    if (!mediaAvailable() || !supportsDisplayCapture()) {
+      setDisplayCaptureAvailable(false);
+      return;
+    }
+    void voice().startScreenshare();
   };
 
   const handleLeave = () => getState().leaveVoiceChannel();
@@ -660,12 +689,14 @@ export function VoiceBar() {
               </button>
             </Tooltip>
 
-            <Tooltip content={voice().screenshareActive ? 'Stop sharing screen' : 'Share screen'} placement="top">
+            <Tooltip content={screenshareLabel()} placement="top">
               <button
                 type="button"
                 class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
-                aria-label={voice().screenshareActive ? 'Stop sharing screen' : 'Share screen'}
+                aria-label={screenshareLabel()}
                 aria-pressed={voice().screenshareActive}
+                title={screenshareLabel()}
+                disabled={screenshareUnavailable()}
                 onClick={handleToggleScreenshare}
                 data-testid="screenshare-button"
               >

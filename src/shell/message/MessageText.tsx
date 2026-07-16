@@ -24,6 +24,7 @@ import {
   Show,
   Switch,
   Match,
+  onCleanup,
   splitProps,
   type JSX,
 } from 'solid-js';
@@ -34,14 +35,18 @@ import { parseMessage } from '@/lib/format/parseMessage';
 import { lookupEmoji } from '@/lib/format/emoji';
 import {
   extractBlockKitLite,
+  prepareBlockKitAction,
   type BlockKitLiteAction,
   type BlockKitLiteBlock,
   type BlockKitLiteButton,
   type BlockKitLiteMessageBlock,
   type BlockKitLiteModalBlock,
   type BlockKitLiteSelect,
+  type PreparedBlockKitAction,
 } from '@/lib/integrations/blockKitLite';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { getState } from '@/lib/store';
+import { BlockKitActionConfirmationDialog } from './BlockKitActionConfirmation';
 import { BlockKitModal } from './BlockKitModal';
 import type {
   Token,
@@ -161,46 +166,43 @@ type BlockKitLiteViewProps = {
   origin: string;
 };
 
-function blockKitActionText(action: BlockKitLiteAction, selectedValue?: string): string | null {
-  if (action.type === 'send') return action.value;
-  const selected = selectedValue?.trim();
-  if (!selected) return null;
-  return action.value ? `${action.value}: ${selected}` : selected;
-}
+type BlockKitActionSource = HTMLButtonElement | HTMLSelectElement;
 
-/**
- * Dispatch a Block-Kit action into the conversation it is rendered in.
- *
- * A Block-Kit block is attacker-authored and extractBlockKitLite runs on EVERY
- * message body, so `action.target` is fully attacker-controlled. It must NEVER be
- * used as a routing input: a block posted in #public could otherwise emit
- * attacker-chosen text AS THE VIEWER into #other or a DM (a confused deputy). We
- * therefore refuse to send unless the block's declared target matches `origin`,
- * and always send to the trusted `origin` value — closing that identity-borrow.
- */
-function runBlockKitAction(action: BlockKitLiteAction, origin: string, selectedValue?: string): void {
-  if (!origin || action.target !== origin) return;
-  const text = blockKitActionText(action, selectedValue)?.trim();
-  if (!text || text.startsWith('/')) return;
-  getState().sendMessage(origin, text);
-}
+type PendingBlockKitAction = {
+  action: BlockKitLiteAction;
+  origin: string;
+  selectedValue: string | undefined;
+  prepared: PreparedBlockKitAction;
+  source: BlockKitActionSource;
+};
+
+type StageBlockKitAction = (
+  action: BlockKitLiteAction,
+  selectedValue: string | undefined,
+  source: BlockKitActionSource,
+) => void;
 
 function BlockKitLiteButtonView(props: {
   button: BlockKitLiteButton;
-  onAction: (action: BlockKitLiteAction) => void;
+  onAction: StageBlockKitAction;
 }): JSX.Element {
   const [local] = splitProps(props, ['button', 'onAction']);
-  const [copied, setCopied] = createSignal(false);
+  const [copyStatus, setCopyStatus] = createSignal<'idle' | 'copied' | 'failed'>('idle');
+  let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
+
+  onCleanup(() => {
+    if (copyResetTimer !== undefined) clearTimeout(copyResetTimer);
+  });
 
   async function copyValue(): Promise<void> {
     if (!local.button.value) return;
-    try {
-      await navigator.clipboard?.writeText(local.button.value);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1400);
-    } catch {
-      setCopied(false);
-    }
+    const copied = await writeClipboardText(local.button.value);
+    setCopyStatus(copied ? 'copied' : 'failed');
+    if (copyResetTimer !== undefined) clearTimeout(copyResetTimer);
+    copyResetTimer = setTimeout(() => {
+      copyResetTimer = undefined;
+      setCopyStatus('idle');
+    }, 1400);
   }
 
   return (
@@ -210,20 +212,36 @@ function BlockKitLiteButtonView(props: {
         <Show
           when={local.button.action}
           fallback={(
-            <button
-              type="button"
-              disabled={!local.button.value}
-              title={local.button.value ? `Copy ${local.button.value}` : undefined}
-              aria-label={local.button.value ? `Copy value for ${local.button.label}` : local.button.label}
-              data-copied={copied() ? 'true' : undefined}
-              onClick={() => void copyValue()}
-            >
-              {copied() ? 'Copied' : local.button.label}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={!local.button.value}
+                title={local.button.value ? `Copy ${local.button.value}` : undefined}
+                aria-label={local.button.value ? `Copy value for ${local.button.label}` : local.button.label}
+                data-copy-state={copyStatus()}
+                onClick={() => void copyValue()}
+              >
+                {copyStatus() === 'copied'
+                  ? 'Copied'
+                  : copyStatus() === 'failed'
+                    ? 'Copy failed'
+                    : local.button.label}
+              </button>
+              <span class="sr-only" role="status" aria-live="polite">
+                {copyStatus() === 'copied'
+                  ? `${local.button.label} value copied.`
+                  : copyStatus() === 'failed'
+                    ? `${local.button.label} value could not be copied.`
+                    : ''}
+              </span>
+            </>
           )}
         >
           {(action) => (
-            <button type="button" onClick={() => local.onAction(action())}>
+            <button
+              type="button"
+              onClick={(event) => local.onAction(action(), undefined, event.currentTarget)}
+            >
               {local.button.label}
             </button>
           )}
@@ -241,14 +259,16 @@ function BlockKitLiteButtonView(props: {
 
 function BlockKitLiteSelectView(props: {
   select: BlockKitLiteSelect;
-  onAction: (action: BlockKitLiteAction, selectedValue: string) => void;
+  onAction: StageBlockKitAction;
 }): JSX.Element {
   const [local] = splitProps(props, ['select', 'onAction']);
 
   function handleChange(event: Event): void {
-    const selectedValue = (event.currentTarget as HTMLSelectElement).value;
+    const source = event.currentTarget as HTMLSelectElement;
+    const selectedValue = source.value;
     if (!selectedValue || !local.select.action) return;
-    local.onAction(local.select.action, selectedValue);
+    source.value = '';
+    local.onAction(local.select.action, selectedValue, source);
   }
 
   return (
@@ -268,11 +288,9 @@ function BlockKitLiteSelectView(props: {
 
 function BlockKitLiteMessageView(props: {
   block: BlockKitLiteMessageBlock;
-  origin: string;
+  onAction: StageBlockKitAction;
 }): JSX.Element {
-  const [local] = splitProps(props, ['block', 'origin']);
-  const dispatch = (action: BlockKitLiteAction, selectedValue?: string): void =>
-    runBlockKitAction(action, local.origin, selectedValue);
+  const [local] = splitProps(props, ['block', 'onAction']);
 
   return (
     <>
@@ -297,14 +315,14 @@ function BlockKitLiteMessageView(props: {
       <Show when={local.block.selects.length > 0}>
         <div class="shell-msg-blockkit-selects">
           <For each={local.block.selects}>
-            {(select) => <BlockKitLiteSelectView select={select} onAction={dispatch} />}
+            {(select) => <BlockKitLiteSelectView select={select} onAction={local.onAction} />}
           </For>
         </div>
       </Show>
       <Show when={local.block.buttons.length > 0}>
         <div class="shell-msg-blockkit-actions">
           <For each={local.block.buttons}>
-            {(button) => <BlockKitLiteButtonView button={button} onAction={dispatch} />}
+            {(button) => <BlockKitLiteButtonView button={button} onAction={local.onAction} />}
           </For>
         </div>
         <span class="shell-msg-blockkit-hint" aria-live="polite">
@@ -317,21 +335,36 @@ function BlockKitLiteMessageView(props: {
 
 function BlockKitLiteModalTrigger(props: {
   block: BlockKitLiteModalBlock;
-  origin: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAction: StageBlockKitAction;
+  confirmation: PreparedBlockKitAction | null;
+  onConfirm: () => void;
+  onCancel: () => void;
 }): JSX.Element {
-  const [local] = splitProps(props, ['block', 'origin']);
-  const [modalOpen, setModalOpen] = createSignal(false);
+  const [local] = splitProps(props, [
+    'block',
+    'open',
+    'onOpenChange',
+    'onAction',
+    'confirmation',
+    'onConfirm',
+    'onCancel',
+  ]);
 
   return (
     <>
-      <button type="button" onClick={() => setModalOpen(true)}>
+      <button type="button" onClick={() => local.onOpenChange(true)}>
         {local.block.triggerLabel}
       </button>
       <BlockKitModal
         block={local.block}
-        open={modalOpen()}
-        onOpenChange={setModalOpen}
-        onAction={(action, selectedValue) => runBlockKitAction(action, local.origin, selectedValue)}
+        open={local.open}
+        onOpenChange={local.onOpenChange}
+        onAction={local.onAction}
+        confirmation={local.confirmation}
+        onConfirm={local.onConfirm}
+        onCancel={local.onCancel}
       />
     </>
   );
@@ -339,15 +372,99 @@ function BlockKitLiteModalTrigger(props: {
 
 function BlockKitLiteView(props: BlockKitLiteViewProps): JSX.Element {
   const [local] = splitProps(props, ['block', 'origin']);
+  const [pending, setPending] = createSignal<PendingBlockKitAction | null>(null);
+  const [detailsOpen, setDetailsOpen] = createSignal(false);
+
+  function stageAction(
+    action: BlockKitLiteAction,
+    selectedValue: string | undefined,
+    source: BlockKitActionSource,
+  ): void {
+    // Snapshot every attacker-controlled field used by the later confirmation
+    // pass. The preview and confirmation revalidation must describe one request.
+    const actionSnapshot: BlockKitLiteAction = action.type === 'send'
+      ? { type: 'send', target: action.target, value: action.value }
+      : { type: 'select-notify', target: action.target, value: action.value };
+    const originSnapshot = local.origin;
+    const prepared = prepareBlockKitAction(actionSnapshot, originSnapshot, selectedValue);
+    if (!prepared) return;
+
+    setPending({
+      action: actionSnapshot,
+      origin: originSnapshot,
+      selectedValue,
+      prepared,
+      source,
+    });
+  }
+
+  function dismissPending(): void {
+    const source = pending()?.source;
+    setPending(null);
+    queueMicrotask(() => source?.focus());
+  }
+
+  function confirmPending(): void {
+    const request = pending();
+    if (!request) return;
+
+    // Re-run all target, CRLF, leading-slash and text bounds at the only dispatch
+    // point. A changed result fails closed instead of sending a different message
+    // than the plaintext the user reviewed.
+    const revalidated = prepareBlockKitAction(
+      request.action,
+      request.origin,
+      request.selectedValue,
+    );
+    if (
+      revalidated
+      && revalidated.target === request.prepared.target
+      && revalidated.text === request.prepared.text
+    ) {
+      getState().sendMessage(revalidated.target, revalidated.text);
+    }
+    dismissPending();
+  }
+
+  function changeDetailsOpen(open: boolean): void {
+    if (!open && pending()) {
+      // Escape/backdrop/close while reviewing cancels the staged send, then
+      // returns to the exact originating control still mounted in the details.
+      dismissPending();
+      return;
+    }
+    setDetailsOpen(open);
+  }
 
   return (
     <div class="shell-msg-blockkit" role="group" aria-label={local.block.title ?? 'Structured message actions'}>
       <Switch>
         <Match when={local.block.type === 'modal'}>
-          <BlockKitLiteModalTrigger block={local.block as BlockKitLiteModalBlock} origin={local.origin} />
+          <BlockKitLiteModalTrigger
+            block={local.block as BlockKitLiteModalBlock}
+            open={detailsOpen()}
+            onOpenChange={changeDetailsOpen}
+            onAction={stageAction}
+            confirmation={pending()?.prepared ?? null}
+            onConfirm={confirmPending}
+            onCancel={dismissPending}
+          />
         </Match>
         <Match when={local.block.type === 'message'}>
-          <BlockKitLiteMessageView block={local.block as BlockKitLiteMessageBlock} origin={local.origin} />
+          <BlockKitLiteMessageView
+            block={local.block as BlockKitLiteMessageBlock}
+            onAction={stageAction}
+          />
+          <Show when={pending()}>
+            {(request) => (
+              <BlockKitActionConfirmationDialog
+                open
+                prepared={request().prepared}
+                onConfirm={confirmPending}
+                onCancel={dismissPending}
+              />
+            )}
+          </Show>
         </Match>
       </Switch>
     </div>

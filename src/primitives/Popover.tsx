@@ -33,6 +33,17 @@ export function Popover(props: PopoverProps) {
     local.onOpenChange?.(next);
   };
 
+  const handleNativeToggle = (event: Event): void => {
+    const next = (event as Event & { newState?: string }).newState === 'open';
+    // Native popover="auto" can close itself on light-dismiss or Escape. Keep
+    // the Solid state in lockstep so aria-expanded and the next trigger click
+    // reflect what is actually visible. Programmatic show/hide already updates
+    // state before the native toggle event, so do not emit duplicate changes.
+    if (isOpen() !== next) setOpen(next);
+  };
+
+  onCleanup(() => panelRef?.removeEventListener('toggle', handleNativeToggle));
+
   createEffect(() => {
     const panel = panelRef;
     if (!panel) return;
@@ -121,6 +132,7 @@ export function Popover(props: PopoverProps) {
       <div
         ref={(element) => {
           panelRef = element;
+          element.addEventListener('toggle', handleNativeToggle);
           // Progressive enhancement: only opt into the native Popover API where the
           // browser implements it. Otherwise the panel's visibility is driven by
           // `hidden` + <Show>, so it still works (and stays testable under jsdom).

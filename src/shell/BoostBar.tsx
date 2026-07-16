@@ -36,6 +36,7 @@ export function BoostBar(props: {
               class="boost-pill"
               classList={{ you: group.youBoosted }}
               aria-pressed={group.youBoosted}
+              aria-label={`${group.youBoosted ? 'Remove' : 'Add'} ${group.emoji} boost, ${group.count} total`}
               title={formatBoostTitle(group)}
               onClick={() => props.onBoost?.(group.emoji)}
             >

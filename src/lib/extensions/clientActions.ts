@@ -19,9 +19,14 @@ export type ClientExtensionAuditEntry = {
   detail: string;
 };
 
+export type ClientExtensionActionPreview = Pick<ClientExtensionAction, 'title' | 'capability'> & {
+  detail: string;
+};
+
 const STORAGE_KEY = 'onyx:client-extension-actions';
 const AUDIT_STORAGE_KEY = 'onyx:client-extension-audit';
 const MAX_ACTIONS = 12;
+const MAX_MANIFEST_ENTRIES = MAX_ACTIONS * 4;
 const MAX_KEYWORDS = 8;
 const MAX_AUDIT_ENTRIES = 20;
 
@@ -92,6 +97,36 @@ export function normalizeClientExtensionAction(raw: unknown): ClientExtensionAct
   };
 }
 
+/** Pure, bounded normalization shared by manifest review and verified commit. */
+export function normalizeClientExtensionActions(
+  rawActions: readonly unknown[],
+): ClientExtensionAction[] {
+  const seen = new Set<string>();
+  const actions: ClientExtensionAction[] = [];
+  for (const entry of rawActions.slice(0, MAX_MANIFEST_ENTRIES)) {
+    const action = normalizeClientExtensionAction(entry);
+    if (!action || seen.has(action.id)) continue;
+    seen.add(action.id);
+    actions.push(action);
+    if (actions.length >= MAX_ACTIONS) break;
+  }
+  return actions;
+}
+
+/** Payload-safe detail for a reviewed action. Never includes copy text or URL path/query/userinfo. */
+export function previewClientExtensionAction(
+  action: ClientExtensionAction,
+): ClientExtensionActionPreview {
+  if (action.capability === 'open-url' && action.url) {
+    return { title: action.title, capability: action.capability, detail: new URL(action.url).origin };
+  }
+  return {
+    title: action.title,
+    capability: action.capability,
+    detail: `${action.text?.length ?? 0} characters`,
+  };
+}
+
 export function readClientExtensionActions(): ClientExtensionAction[] {
   if (typeof localStorage === 'undefined') return [];
   try {
@@ -111,33 +146,35 @@ export function readClientExtensionActions(): ClientExtensionAction[] {
   }
 }
 
-export function saveClientExtensionActions(rawActions: unknown[]): ClientExtensionAction[] {
-  const seen = new Set<string>();
-  const actions: ClientExtensionAction[] = [];
-  for (const entry of rawActions) {
-    const action = normalizeClientExtensionAction(entry);
-    if (!action || seen.has(action.id)) continue;
-    seen.add(action.id);
-    actions.push(action);
-    if (actions.length >= MAX_ACTIONS) break;
-  }
+export function saveClientExtensionActions(
+  rawActions: readonly unknown[],
+): ClientExtensionAction[] | null {
+  const actions = normalizeClientExtensionActions(rawActions);
+  if (typeof localStorage === 'undefined') return null;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(actions));
   } catch {
-    /* storage unavailable */
+    return null;
   }
-  return actions;
+
+  // A browser can accept setItem yet fail to retain/read the value (quota,
+  // privacy mode, policy shims). Success means the normalized committed value is
+  // byte-for-byte equivalent to what was reviewed, not merely that setItem ran.
+  const committed = readClientExtensionActions();
+  return JSON.stringify(committed) === JSON.stringify(actions) ? committed : null;
 }
 
 export function parseClientExtensionActionManifest(raw: string): ClientExtensionAction[] | null {
   try {
     const parsed = JSON.parse(raw) as unknown;
-    const source = Array.isArray(parsed)
-      ? parsed
-      : parsed && typeof parsed === 'object' && Array.isArray((parsed as { actions?: unknown }).actions)
-        ? (parsed as { actions: unknown[] }).actions
-        : null;
-    return source ? saveClientExtensionActions(source) : null;
+    if (Array.isArray(parsed)) {
+      // Intentional compatibility with the documented pre-v1 array shape.
+      return normalizeClientExtensionActions(parsed);
+    }
+    if (!parsed || typeof parsed !== 'object') return null;
+    const manifest = parsed as { version?: unknown; actions?: unknown };
+    if (manifest.version !== 1 || !Array.isArray(manifest.actions)) return null;
+    return normalizeClientExtensionActions(manifest.actions);
   } catch {
     return null;
   }

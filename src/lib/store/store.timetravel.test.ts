@@ -127,6 +127,18 @@ describe('travelTo', () => {
     expect(store.getState().timeTravelLandingId).toBeNull();
   });
 
+  it('preserves an explicitly selected archived message through AROUND hydration', () => {
+    const at = new Date('2026-06-30T12:00:00.000Z');
+    store.getState().travelTo('#root', at, 'old-same-time-b');
+
+    feed('BATCH +selected chathistory #root');
+    feed('@time=2026-06-30T12:00:00.000Z;msgid=old-same-time-a :kain!k@h PRIVMSG #root :first at moment');
+    feed('@time=2026-06-30T12:00:00.000Z;msgid=old-same-time-b :mira!m@h PRIVMSG #root :selected at moment');
+    feed('BATCH -selected');
+
+    expect(store.getState().timeTravelLandingId).toBe('old-same-time-b');
+  });
+
   it('ignores chathistory batches for other targets', () => {
     store.setState({
       channels: new Map([

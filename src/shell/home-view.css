@@ -58,6 +58,139 @@
   line-height: 1.4;
 }
 
+/* ── Device outbox journal ──────────────────────────────────────────────── */
+.home-outbox {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in oklab, var(--shu) 34%, var(--seam-faint));
+  border-radius: var(--r-lg);
+  background: color-mix(in oklab, var(--stone-2) 62%, transparent);
+}
+
+.home-outbox__head,
+.home-outbox__item,
+.home-outbox__actions {
+  display: flex;
+  align-items: center;
+}
+
+.home-outbox__head,
+.home-outbox__item {
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.home-outbox__privacy {
+  margin: var(--space-1) 0 0;
+  color: var(--washi-mute);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.home-outbox__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-outbox__item {
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 44%, transparent);
+}
+
+.home-outbox__target {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-weight: 800;
+}
+
+.home-outbox__age {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.home-outbox__actions {
+  gap: var(--space-2);
+}
+
+.home-outbox__actions button,
+.home-outbox__retry {
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--stone) 58%, transparent);
+  color: var(--washi-dim);
+  cursor: pointer;
+  font: 800 0.68rem/1 var(--font-mono);
+}
+
+.home-outbox__actions button:hover,
+.home-outbox__actions button:focus-visible,
+.home-outbox__retry:hover,
+.home-outbox__retry:focus-visible {
+  outline: none;
+  border-color: var(--lapis-bright);
+  color: var(--washi);
+}
+
+.home-outbox__actions button.is-confirming {
+  border-color: var(--shu);
+  color: var(--shu-bright);
+}
+
+@media (pointer: coarse) {
+  .home-outbox__actions button,
+  .home-outbox__retry {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .home-outbox__head,
+  .home-outbox__item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .home-outbox__actions {
+    width: 100%;
+  }
+
+  .home-outbox__actions button,
+  .home-outbox__retry {
+    flex: 1 1 0;
+  }
+}
+
+@media (forced-colors: active) {
+  .home-outbox,
+  .home-outbox__item,
+  .home-outbox__actions button,
+  .home-outbox__retry {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .home-outbox__actions button.is-confirming {
+    border-color: Highlight;
+    color: Highlight;
+  }
+}
+
 /* Pulse strip */
 .home-events {
   margin: 0 0 28px;

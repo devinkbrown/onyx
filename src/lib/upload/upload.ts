@@ -74,7 +74,14 @@ export function resolveUploadUrl(mediaUrl: string, returnedUrl: string): string 
   }
 
   const origin = baseOrigin(mediaUrl);
-  if (!origin) return raw;
+  // The production default is the same-origin relative endpoint `/upload`.
+  // A bare filename returned there must still become a root `/uploads/...`
+  // URL; leaving it relative makes `/app` resolve it as `/app/<filename>`.
+  if (!origin) {
+    if (raw.startsWith('/')) return raw;
+    if (raw.startsWith('uploads/')) return `/${raw}`;
+    return `/uploads/${raw.replace(/^\/+/, '')}`;
+  }
   if (raw.startsWith('/')) return new URL(raw, origin).toString();
   if (raw.startsWith('uploads/')) return new URL(`/${raw}`, origin).toString();
   return new URL(`/uploads/${raw.replace(/^\/+/, '')}`, origin).toString();
@@ -104,13 +111,15 @@ export async function parseUploadResponse(
   const isJson = contentType?.toLowerCase().includes('application/json') ?? false;
 
   if (isJson) {
-    let parsed: UploadResponseShape;
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(body) as UploadResponseShape;
+      parsed = JSON.parse(body) as unknown;
     } catch {
       throw new UploadError('Upload service returned invalid JSON.', 'response');
     }
-    const url = responseUrlFromJson(parsed);
+    const url = typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? responseUrlFromJson(parsed as UploadResponseShape)
+      : null;
     if (!url) throw new UploadError('Upload response did not include a file URL.', 'response');
     return { url: resolveUploadUrl(mediaUrl, url) };
   }
@@ -187,7 +196,12 @@ export async function uploadFile(file: File, options: UploadOptions = {}): Promi
     throw new UploadError('Upload failed before the server responded.', 'network');
   }
 
-  const body = await response.text();
+  let body: string;
+  try {
+    body = await response.text();
+  } catch {
+    throw new UploadError('Upload failed while reading the server response.', 'network');
+  }
   if (!response.ok) {
     const message = body.trim() || `Upload failed with HTTP ${response.status}.`;
     throw new UploadError(message, 'response', response.status);

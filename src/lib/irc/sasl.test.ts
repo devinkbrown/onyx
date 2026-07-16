@@ -7,7 +7,7 @@ import type { IRCMessage } from './types';
 // Drive the client with a fake OPEN socket that captures every outbound frame
 // verbatim, plus separate capture of the redacted onRaw log stream and onError.
 interface Priv {
-  ws: { readyState: number; send(l: string): void } | null;
+  ws: { readyState: number; send(l: string): void; close(code?: number, reason?: string): void } | null;
   _saslMech: string | null;
   _saslPending: boolean;
   _loggedIn: boolean;
@@ -19,6 +19,7 @@ function makeSaslClient(password?: string) {
   const sent: string[] = [];
   const raw: Array<{ line: string; dir: 'in' | 'out' }> = [];
   const errors: string[] = [];
+  const closed: Array<{ code?: number; reason?: string }> = [];
   const client = new IRCClient({
     url: 'wss://ircx.us:8080/',
     nick: 'kain',
@@ -28,9 +29,13 @@ function makeSaslClient(password?: string) {
     onError: (e) => errors.push(e),
   });
   const priv = client as unknown as Priv;
-  priv.ws = { readyState: WebSocket.OPEN, send: (l: string) => sent.push(l) };
+  priv.ws = {
+    readyState: WebSocket.OPEN,
+    send: (l: string) => sent.push(l),
+    close: (code?: number, reason?: string) => closed.push({ code, reason }),
+  };
   const feed = (data: string) => priv._onMessage({ data });
-  return { client, priv, sent, raw, errors, feed };
+  return { client, priv, sent, raw, errors, closed, feed };
 }
 
 async function waitForSend(sent: string[], prevLen: number): Promise<void> {
@@ -75,6 +80,15 @@ describe('SASL AUTHENTICATE redaction in the raw log', () => {
     expect(outLog).toContain('AUTHENTICATE EXTERNAL');
   });
 
+  it('redacts an uppercase-only base64 payload rather than mistaking it for a mechanism', () => {
+    const { client, raw } = makeSaslClient();
+    const payload = 'QUJDREVGR0hJSktM';
+    client.sendRaw('AUTHENTICATE', payload);
+    const outLog = raw.filter((r) => r.dir === 'out').map((r) => r.line);
+    expect(outLog).toContain('AUTHENTICATE <redacted>');
+    expect(outLog).not.toContain(`AUTHENTICATE ${payload}`);
+  });
+
   it('redacts an inbound base64 AUTHENTICATE challenge but keeps + visible', () => {
     const { raw, feed } = makeSaslClient();
     feed('AUTHENTICATE cj1hYmMscz1kZWYsaT00MDk2'); // base64 server-first challenge
@@ -89,19 +103,22 @@ describe('SASL AUTHENTICATE redaction in the raw log', () => {
 // ── FIX 3 — SASL failure surfaces to the user ────────────────────────────────
 describe('SASL failure numerics surface via onError', () => {
   it('904 during an in-flight SASL exchange calls onError', () => {
-    const { priv, errors, feed } = makeSaslClient('wrong');
+    const { priv, errors, closed, sent, feed } = makeSaslClient('wrong');
     priv._saslPending = true;
     priv._saslMech = 'PLAIN';
     feed(':eshmaki.me 904 kain :SASL authentication failed');
     expect(errors).toContain('SASL authentication failed');
+    expect(closed).toContainEqual({ code: 4003, reason: 'SASL authentication failed' });
+    expect(sent).not.toContain('CAP END\r\n');
   });
 
   it('905 during an in-flight SASL exchange calls onError', () => {
-    const { priv, errors, feed } = makeSaslClient('wrong');
+    const { priv, errors, closed, feed } = makeSaslClient('wrong');
     priv._saslPending = true;
     priv._saslMech = 'SCRAM-SHA-256';
     feed(':eshmaki.me 905 kain :too many attempts');
     expect(errors).toContain('SASL authentication failed');
+    expect(closed).toContainEqual({ code: 4003, reason: 'SASL authentication failed' });
   });
 
   it('a post-registration 904 (IRCX error, no SASL in flight) does NOT call onError', () => {
@@ -110,6 +127,52 @@ describe('SASL failure numerics surface via onError', () => {
     priv._saslMech = null;
     feed(':eshmaki.me 904 kain #chan :ERR_BADTAG');
     expect(errors).toEqual([]);
+  });
+});
+
+describe('SASL PLAIN UTF-8 credentials', () => {
+  it('encodes a Unicode password as UTF-8 instead of throwing in btoa', () => {
+    const password = 'correct horse 🐎 水';
+    const { priv, sent, feed } = makeSaslClient(password);
+    priv._saslPending = true;
+    priv._saslMech = 'PLAIN';
+
+    feed('AUTHENTICATE +');
+
+    const encoded = sent.at(-1)!.replace(/^AUTHENTICATE /, '').replace(/\r\n$/, '');
+    const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+    expect(new TextDecoder().decode(bytes)).toBe(`\0kain\0${password}`);
+  });
+
+  it('chunks long payloads into IRCv3-sized AUTHENTICATE frames', () => {
+    const password = `water-${'水'.repeat(300)}`;
+    const { priv, sent, feed } = makeSaslClient(password);
+    priv._saslPending = true;
+    priv._saslMech = 'PLAIN';
+
+    feed('AUTHENTICATE +');
+
+    const chunks = sent.map((line) => line.slice('AUTHENTICATE '.length, -2));
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.length <= 400)).toBe(true);
+    const encoded = chunks.filter((chunk) => chunk !== '+').join('');
+    const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+    expect(new TextDecoder().decode(bytes)).toBe(`\0kain\0${password}`);
+  });
+
+  it('terminates an exact 400-byte payload with an empty continuation', () => {
+    // `\0kain\0` is 6 bytes; +294 ASCII password bytes = 300 raw bytes =
+    // exactly 400 base64 bytes.
+    const password = 'x'.repeat(294);
+    const { priv, sent, feed } = makeSaslClient(password);
+    priv._saslPending = true;
+    priv._saslMech = 'PLAIN';
+
+    feed('AUTHENTICATE +');
+
+    expect(sent).toHaveLength(2);
+    expect(sent[0]).toHaveLength('AUTHENTICATE '.length + 400 + 2);
+    expect(sent[1]).toBe('AUTHENTICATE +\r\n');
   });
 });
 
@@ -198,6 +261,7 @@ describe('SCRAM-SHA-256 server-signature verification', () => {
 
     h.feed(`AUTHENTICATE ${btoa(`v=${badSig}`)}`);
     expect(h.errors.some((e) => /SASL authentication failed/i.test(e))).toBe(true);
+    expect(h.closed).toContainEqual({ code: 4003, reason: 'SASL authentication failed' });
 
     // Even a following (spoofed) 903 must not flip logged-in — the exchange was
     // torn down when verification failed closed.

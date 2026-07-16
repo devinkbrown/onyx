@@ -17,6 +17,7 @@ import type { WatchTogetherActivity } from '../media/watchTogether';
 
 /** IRCX channel PROP key carrying the watch-together activity (wire format). */
 const WATCH_PROP = 'ocean.watch';
+const SASL_CHUNK_BYTES = 400;
 
 /**
  * SASL AUTHENTICATE payloads carry credentials: the base64 PLAIN blob decodes
@@ -32,10 +33,19 @@ function redactAuthenticateForLog(line: string): string {
   const PREFIX = 'AUTHENTICATE ';
   if (!line.startsWith(PREFIX)) return line;
   const arg = line.slice(PREFIX.length);
-  // `+` continuation and uppercase mechanism tokens (A-Z/0-9/hyphen only) are
-  // not secrets; a base64 payload always falls outside that shape.
-  if (arg === '+' || /^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(arg)) return line;
+  // Only the mechanisms this client can actually select are safe to expose.
+  // A shape-based uppercase test leaks valid unpadded base64 such as
+  // `QUJDREVGR0hJSktM`, which is indistinguishable from a made-up mechanism.
+  if (arg === '+' || arg === 'PLAIN' || arg === 'SCRAM-SHA-256' || arg === 'EXTERNAL') return line;
   return `${PREFIX}<redacted>`;
+}
+
+/** RFC 4616 SASL PLAIN fields are UTF-8; btoa itself accepts Latin-1 only. */
+function encodeBase64Utf8(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 
 /**
@@ -202,8 +212,8 @@ export class IRCClient {
     this._authNick = opts.nick;
   }
 
-  connect() {
-    if (this._destroyed) return;
+  connect(): boolean {
+    if (this._destroyed) return false;
     // Never run two sockets in parallel. Tear down any prior socket first, and
     // detach its handlers so its close event can't trigger another reconnect.
     if (this.ws) {
@@ -252,8 +262,10 @@ export class IRCClient {
       this.ws.onmessage = this._onMessage.bind(this);
       this.ws.onclose = this._onClose.bind(this);
       this.ws.onerror = this._onError.bind(this);
+      return true;
     } catch (e) {
       this.opts.onError?.(`WebSocket error: ${e}`);
+      return false;
     }
   }
 
@@ -573,16 +585,15 @@ export class IRCClient {
                 this._saslMech = mech;
                 this.sendRaw('AUTHENTICATE', mech);
               } else {
-                this.opts.onError?.(`No supported SASL mechanism offered (${this._saslMechs.join(', ') || 'none'})`);
-                this.ws?.close(4003, 'Unsupported SASL mechanism');
+                this._failSasl(
+                  `No supported SASL mechanism offered (${this._saslMechs.join(', ') || 'none'})`,
+                  'Unsupported SASL mechanism',
+                );
                 return;
               }
               // Guard against server never responding to AUTHENTICATE
               this._saslTimer = setTimeout(() => {
-                this.opts.onError?.('SASL authentication timed out');
-                this._saslPending = false;
-                this._saslMech = null;
-                this._finishCap();
+                this._failSasl('SASL authentication timed out');
               }, 15_000);
             } else {
               this._finishCapIfReady();
@@ -639,8 +650,8 @@ export class IRCClient {
             // Use _authNick for the same reason — post-433, opts.nick is the alias.
             const nick = this._authNick;
             const pass = this.opts.password ?? '';
-            const plain = btoa(`\0${nick}\0${pass}`);
-            this.sendRaw('AUTHENTICATE', plain);
+            const plain = encodeBase64Utf8(`\0${nick}\0${pass}`);
+            this._sendAuthenticatePayload(plain);
           }
         } else if (this._saslMech === 'EXTERNAL') {
           if (param === '+') this.sendRaw('AUTHENTICATE', '+');
@@ -655,9 +666,7 @@ export class IRCClient {
           } else {
             // Server-first challenge — process it into client-final.
             this._scramClientFinal(param).catch(e => {
-              this.opts.onError?.(`SCRAM error: ${e}`);
-              this._saslPending = false;
-              this._finishCap();
+              this._failSasl(`SCRAM error: ${e}`);
             });
           }
         }
@@ -688,15 +697,10 @@ export class IRCClient {
       case '904': // ERR_SASLFAIL (during SASL only)
       case '905':
         if (this._saslPending || this._saslMech) {
-          if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
-          this._saslPending = false;
-          this._saslMech = null;
-          this._scramState = null;
-          // Surface the failure — otherwise CAP finishes and we register
-          // UNAUTHENTICATED with no signal, so a wrong-password user believes
-          // they are logged in. Mirrors the mechanism-selection failure path.
-          this.opts.onError?.('SASL authentication failed');
-          this._finishCapIfReady();
+          // An explicit sign-in must never degrade into a guest registration.
+          // CAP END would let 001 arrive and overwrite the error state with a
+          // connected anonymous session, so terminate this attempt instead.
+          this._failSasl('SASL authentication failed');
         }
         break;
 
@@ -801,6 +805,37 @@ export class IRCClient {
     }
   }
 
+  /** Abort an explicit SASL attempt without falling through to guest registration. */
+  private _failSasl(message: string, closeReason = 'SASL authentication failed') {
+    if (this._saslTimer) {
+      clearTimeout(this._saslTimer);
+      this._saslTimer = null;
+    }
+    this._saslPending = false;
+    this._saslMech = null;
+    this._scramState = null;
+    this.opts.onError?.(message);
+    try {
+      this.ws?.close(4003, closeReason);
+    } catch {
+      // A raced CLOSED socket will still deliver/has already delivered close.
+    }
+  }
+
+  /**
+   * IRCv3 limits each AUTHENTICATE parameter to 400 bytes. Base64 is ASCII, so
+   * string slices are byte-exact here. An exact 400-byte final chunk requires a
+   * trailing `+` to distinguish "finished" from "more chunks follow".
+   */
+  private _sendAuthenticatePayload(payload: string): void {
+    for (let offset = 0; offset < payload.length; offset += SASL_CHUNK_BYTES) {
+      this.sendRaw('AUTHENTICATE', payload.slice(offset, offset + SASL_CHUNK_BYTES));
+    }
+    if (payload.length === 0 || payload.length % SASL_CHUNK_BYTES === 0) {
+      this.sendRaw('AUTHENTICATE', '+');
+    }
+  }
+
   private _requestCaps(caps: string[]) {
     const uniqueCaps = [...new Set(caps)]
       .filter(c => !this.negotiatedCaps.has(c))
@@ -893,7 +928,7 @@ export class IRCClient {
     const clientFirstMsgBare = `n=${this._authNick},r=${nonce}`;
     this._scramState = { clientFirstMsgBare, nonce, hash, bits };
     const msg = `n,,${clientFirstMsgBare}`;
-    this.sendRaw('AUTHENTICATE', btoa(msg));
+    this._sendAuthenticatePayload(btoa(msg));
   }
 
   private async _scramClientFinal(challengeB64: string) {
@@ -904,7 +939,7 @@ export class IRCClient {
     try {
       serverFirst = atob(challengeB64);
     } catch {
-      this.opts.onError?.('SCRAM: invalid challenge encoding');
+      this._failSasl('SCRAM: invalid challenge encoding');
       return;
     }
 
@@ -918,7 +953,7 @@ export class IRCClient {
     const iterations = parseInt(parts['i'] ?? '4096', 10);
 
     if (!serverNonce.startsWith(state.nonce)) {
-      this.opts.onError?.('SCRAM: server nonce mismatch');
+      this._failSasl('SCRAM: server nonce mismatch');
       return;
     }
 
@@ -967,7 +1002,7 @@ export class IRCClient {
     // Retain state (do NOT null it) so _scramVerifyServerFinal can check the
     // server-final; the exchange is only fully torn down on 903/904/905.
     this._scramState = { ...state, expectedServerSig };
-    this.sendRaw('AUTHENTICATE', btoa(clientFinal));
+    this._sendAuthenticatePayload(btoa(clientFinal));
   }
 
   /**
@@ -983,12 +1018,7 @@ export class IRCClient {
     if (expected === undefined) return;
 
     const fail = (reason: string) => {
-      if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
-      this._saslPending = false;
-      this._saslMech = null;
-      this._scramState = null;
-      this.opts.onError?.(`SASL authentication failed: ${reason}`);
-      this._finishCapIfReady();
+      this._failSasl(`SASL authentication failed: ${reason}`);
     };
 
     let serverFinal: string;

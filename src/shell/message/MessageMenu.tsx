@@ -13,11 +13,12 @@
  * user's own, non-deleted text message.
  *
  * SOLID IDIOMS: components run once; never destructure props (splitProps);
- * createSignal/createMemo/onCleanup; For/Show. No innerHTML. Clipboard via
- * navigator.clipboard.writeText. Animations are transform/opacity only (CSS).
+ * createSignal/createMemo/onCleanup; For/Show. No innerHTML. Clipboard writes
+ * use the shared observable-result helper. Animations are transform/opacity only.
  */
 
 import {
+  createEffect,
   createMemo,
   createSignal,
   For,
@@ -30,10 +31,20 @@ import { getState, useStore, selectChannelPins, selectIsChannelOp } from '@/lib/
 import type { ChatMessage } from '@/lib/irc/types';
 import { Popover } from '@/primitives/index';
 import { buildMomentLink } from '@/lib/deeplink';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { searchEmojis } from '@/lib/emoji/emoji';
+import { localTranslationReadiness, preferredTranslationTarget } from '@/lib/intelligence/localLanguage';
+import {
+  createBrowserTranslator,
+  languageLabel,
+  resolveTranslationTarget,
+  translateMessage,
+  translationTarget,
+} from '@/lib/intelligence/translateMessage';
 import { isValidTopicLabel } from '@/lib/topics/topics';
 import { openMessageSearchWithQuery } from '@/shell/search/useMessageSearch';
-import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, SearchIcon, TopicIcon, TrashIcon } from './icons';
+import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
+import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, SearchIcon, TopicIcon, TranslateIcon, TrashIcon } from './icons';
 
 import './message-menu.css';
 
@@ -134,6 +145,32 @@ export type MessageMenuProps = {
 };
 
 const EMOJI_PICKER_LIMIT = 36;
+const MAX_CONCURRENT_MESSAGE_TRANSLATIONS = 4;
+
+let activeMessageTranslations = 0;
+
+type MessageTranslationState =
+  | { status: 'idle' }
+  | { status: 'pending'; lang: string }
+  | { status: 'done'; lang: string; text: string }
+  | { status: 'error'; lang: string; reason: 'busy' | 'failed' };
+
+type VisibleMessageTranslation = Exclude<MessageTranslationState, { status: 'idle' }>;
+
+type TranslationCopyState = 'idle' | 'pending' | 'copied' | 'failed';
+
+/**
+ * Return only text already readable in this loaded row. Encrypted rows are
+ * translatable exclusively from transient plaintext; a locked row's ciphertext
+ * is never treated as language input.
+ */
+export function loadedMessageTranslationSource(
+  msg: Pick<ChatMessage, 'text' | 'plaintext' | 'encrypted' | 'deleted' | 'redacted'>,
+): string | null {
+  if (msg.deleted || msg.redacted) return null;
+  const text = msg.encrypted ? msg.plaintext : msg.text;
+  return typeof text === 'string' && text.trim().length > 0 ? text : null;
+}
 
 export function MessageMenu(props: MessageMenuProps): JSX.Element {
   const [local] = splitProps(props, [
@@ -166,6 +203,13 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   // ── popover open states ──
   const [reactOpen, setReactOpen] = createSignal(false);
   const [innerMenuOpen, setInnerMenuOpen] = createSignal(false);
+  const [clipboardStatus, setClipboardStatus] = createSignal('');
+  const [messageTranslation, setMessageTranslation] = createSignal<MessageTranslationState>({ status: 'idle' });
+  const [translationCopyState, setTranslationCopyState] = createSignal<TranslationCopyState>('idle');
+  const visibleMessageTranslation = createMemo<VisibleMessageTranslation | null>(() => {
+    const state = messageTranslation();
+    return state.status === 'idle' ? null : state;
+  });
   const menuOpen = () => local.menuOpen ?? innerMenuOpen();
   const setMenuOpen = (next: boolean): void => {
     if (local.menuOpen === undefined) setInnerMenuOpen(next);
@@ -176,6 +220,74 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   const [emojiQuery, setEmojiQuery] = createSignal('');
   const emojiMatches = createMemo(() => searchEmojis(emojiQuery(), EMOJI_PICKER_LIMIT));
   const messageActionTarget = createMemo(() => `message from ${local.msg.from}`);
+  const translationSource = createMemo(() => loadedMessageTranslationSource(local.msg));
+  const translationLang = createMemo(() => (
+    resolveTranslationTarget(translationTarget(), preferredTranslationTarget())
+  ));
+  const localTranslatorAvailable = createMemo(() => (
+    localTranslationReadiness(translationLang()).state === 'available'
+  ));
+  const translator = createBrowserTranslator();
+
+  let disposed = false;
+  let activeTranslation: symbol | undefined;
+  let activeTranslationCopy: symbol | undefined;
+  let observedTranslationInput = false;
+  let observedMessageId = '';
+  let observedSource: string | null = null;
+  let observedTarget = '';
+  let observedCopyState = false;
+  let observedCopyMessageId = '';
+  let observedCopyTarget = '';
+  let observedCopyText: string | null = null;
+
+  // A keyed row is normally stable, but controlled tests and list replacement
+  // can update props in place. Invalidate any old completion before it can land.
+  createEffect(() => {
+    const messageId = local.msg.id;
+    const source = translationSource();
+    const lang = translationLang();
+    if (!observedTranslationInput) {
+      observedTranslationInput = true;
+      observedMessageId = messageId;
+      observedSource = source;
+      observedTarget = lang;
+      return;
+    }
+    if (messageId === observedMessageId && source === observedSource && lang === observedTarget) return;
+    observedMessageId = messageId;
+    observedSource = source;
+    observedTarget = lang;
+    activeTranslation = undefined;
+    setMessageTranslation({ status: 'idle' });
+  });
+
+  // Clipboard feedback belongs to one successful transient result. Invalidate
+  // it whenever the row, target, or translated text changes so stale writes can
+  // never announce success for a replacement message.
+  createEffect(() => {
+    const state = messageTranslation();
+    const messageId = local.msg.id;
+    const target = translationLang();
+    const translated = state.status === 'done' ? state.text : null;
+    if (!observedCopyState) {
+      observedCopyState = true;
+      observedCopyMessageId = messageId;
+      observedCopyTarget = target;
+      observedCopyText = translated;
+      return;
+    }
+    if (
+      messageId === observedCopyMessageId
+      && target === observedCopyTarget
+      && translated === observedCopyText
+    ) return;
+    observedCopyMessageId = messageId;
+    observedCopyTarget = target;
+    observedCopyText = translated;
+    activeTranslationCopy = undefined;
+    setTranslationCopyState('idle');
+  });
 
   // ── actions ──
   function react(emoji: string): void {
@@ -214,14 +326,104 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     setMenuOpen(false);
   }
 
+  async function translateOnDevice(): Promise<void> {
+    const source = translationSource();
+    const lang = translationLang();
+    const messageId = local.msg.id;
+    if (source === null || !localTranslatorAvailable() || activeTranslation !== undefined) return;
+    if (activeMessageTranslations >= MAX_CONCURRENT_MESSAGE_TRANSLATIONS) {
+      setMessageTranslation({ status: 'error', lang, reason: 'busy' });
+      return;
+    }
+
+    const request = Symbol(messageId);
+    activeTranslation = request;
+    activeMessageTranslations += 1;
+    setMessageTranslation({ status: 'pending', lang });
+    try {
+      const result = await translateMessage(translator, { text: source }, lang);
+      if (
+        disposed
+        || activeTranslation !== request
+        || local.msg.id !== messageId
+        || translationSource() !== source
+        || translationLang() !== lang
+      ) return;
+      const translated = result.translation?.translated;
+      if (translated === undefined) throw new Error('The on-device translator returned no result.');
+      activeTranslation = undefined;
+      setMessageTranslation({ status: 'done', lang, text: translated });
+    } catch {
+      if (
+        disposed
+        || activeTranslation !== request
+        || local.msg.id !== messageId
+        || translationSource() !== source
+        || translationLang() !== lang
+      ) return;
+      activeTranslation = undefined;
+      setMessageTranslation({ status: 'error', lang, reason: 'failed' });
+    } finally {
+      activeMessageTranslations = Math.max(0, activeMessageTranslations - 1);
+    }
+  }
+
+  function dismissTranslation(): void {
+    activeTranslation = undefined;
+    setMessageTranslation({ status: 'idle' });
+  }
+
+  async function copyTranslatedText(): Promise<void> {
+    const state = messageTranslation();
+    if (state.status !== 'done' || activeTranslationCopy !== undefined) return;
+    const messageId = local.msg.id;
+    const lang = state.lang;
+    const text = state.text;
+    const request = Symbol(messageId);
+    activeTranslationCopy = request;
+    setTranslationCopyState('pending');
+
+    const copied = await writeClipboardText(text);
+    const current = messageTranslation();
+    if (
+      disposed
+      || activeTranslationCopy !== request
+      || local.msg.id !== messageId
+      || translationLang() !== lang
+      || current.status !== 'done'
+      || current.text !== text
+    ) return;
+    activeTranslationCopy = undefined;
+    setTranslationCopyState(copied ? 'copied' : 'failed');
+  }
+
+  function reportClipboardResult(copied: boolean, kind: 'message' | 'moment'): void {
+    if (copied) {
+      const status = kind === 'message' ? 'Message text copied.' : 'Moment link copied.';
+      setClipboardStatus(status);
+      getState().addToast({
+        variant: 'success',
+        title: kind === 'message' ? 'Message copied' : 'Moment copied',
+        description: status,
+      });
+      return;
+    }
+
+    const status = kind === 'message'
+      ? 'Could not copy message text. Clipboard access is unavailable.'
+      : 'Could not copy moment link. Clipboard access is unavailable.';
+    setClipboardStatus(status);
+    getState().addToast({
+      variant: 'error',
+      title: 'Copy failed',
+      description: 'Allow clipboard access in this browser and try again.',
+    });
+  }
+
   async function copyText(): Promise<void> {
     if (!caps().canCopy) return;
-    try {
-      await navigator.clipboard?.writeText(local.msg.text);
-    } catch {
-      // Clipboard can reject (denied permission / insecure context). Failing to
-      // copy is non-fatal; we simply close the menu without surfacing an error.
-    }
+    const copied = await writeClipboardText(local.msg.text);
+    reportClipboardResult(copied, 'message');
     setMenuOpen(false);
   }
 
@@ -230,31 +432,8 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     const href = typeof window !== 'undefined' ? window.location.href : undefined;
     const link = buildMomentLink(local.target, local.msg.time, href);
 
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(link);
-      } else if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('onyx:last-copied-moment', link);
-      }
-      getState().addToast({
-        variant: 'success',
-        title: 'Moment copied',
-        description: 'Link opens this room near the selected message.',
-      });
-    } catch {
-      try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('onyx:last-copied-moment', link);
-          getState().addToast({
-            variant: 'success',
-            title: 'Moment saved',
-            description: 'Clipboard was unavailable, so the link was saved locally.',
-          });
-        }
-      } catch {
-        /* no clipboard or storage — non-fatal */
-      }
-    }
+    const copied = await writeClipboardText(link);
+    reportClipboardResult(copied, 'moment');
     setMenuOpen(false);
   }
 
@@ -350,6 +529,9 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   };
 
   onCleanup(() => {
+    disposed = true;
+    activeTranslation = undefined;
+    activeTranslationCopy = undefined;
     setReactOpen(false);
     setInnerMenuOpen(false);
   });
@@ -460,20 +642,21 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
             </span>
           }
         >
-          <div
-            ref={(element) => {
-              overflowMenuRef = element;
-              // This element only mounts while the Popover is open, so moving
-              // focus into the menu on mount == focus-into-menu on open (menu
-              // pattern). Deferred so the conditional <Show> menuitems exist
-              // before we focus the first one.
-              queueMicrotask(() => focusMenuItem(0));
-            }}
-            class="msg-menu-list"
-            role="menu"
-            aria-label={`More actions for ${messageActionTarget()}`}
-            onKeyDown={onMenuKeyDown}
-          >
+          <div class="msg-menu-overflow">
+            <div
+              ref={(element) => {
+                overflowMenuRef = element;
+                // This element only mounts while the Popover is open, so moving
+                // focus into the menu on mount == focus-into-menu on open (menu
+                // pattern). Deferred so the conditional <Show> menuitems exist
+                // before we focus the first one.
+                queueMicrotask(() => focusMenuItem(0));
+              }}
+              class="msg-menu-list"
+              role="menu"
+              aria-label={`More actions for ${messageActionTarget()}`}
+              onKeyDown={onMenuKeyDown}
+            >
             <Show when={caps().canCopy}>
               <button
                 type="button"
@@ -508,6 +691,19 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
               >
                 <SearchIcon class="msg-menu-item-icon" />
                 <span>Search this text</span>
+              </button>
+            </Show>
+            <Show when={translationSource() !== null && localTranslatorAvailable()}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                aria-label={`Translate ${messageActionTarget()} on this device`}
+                disabled={messageTranslation().status === 'pending'}
+                onClick={() => void translateOnDevice()}
+              >
+                <TranslateIcon class="msg-menu-item-icon" />
+                <span>Translate on this device</span>
               </button>
             </Show>
             <Show when={caps().canReply}>
@@ -570,9 +766,87 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                 <span>Delete</span>
               </button>
             </Show>
+            </div>
+            <Show when={translationSource() !== null && !localTranslatorAvailable()}>
+              <p class="msg-menu-translation-note" role="note">
+                On-device translation is unavailable in this browser.
+              </p>
+            </Show>
+            <Show when={visibleMessageTranslation()} keyed>
+              {(state) => (
+                <section
+                  class="msg-menu-translation"
+                  aria-label={`On-device translation for ${messageActionTarget()}`}
+                >
+                  <div class="msg-menu-translation-head">
+                    <ProvenanceBadge scope="device" subject={`Translation for ${messageActionTarget()}`} />
+                    <span>{languageLabel(state.lang)}</span>
+                  </div>
+                  <p class="msg-menu-translation-text" role="status" aria-live="polite" aria-atomic="true">
+                    {state.status === 'pending'
+                      ? 'Translating on this device…'
+                      : state.status === 'done'
+                        ? state.text
+                        : state.reason === 'busy'
+                          ? 'On-device translation is busy. Retry in a moment.'
+                          : 'On-device translation failed. Retry when the local model is ready.'}
+                  </p>
+                  <div class="msg-menu-translation-actions">
+                    <Show when={state.status === 'error'}>
+                      <button
+                        type="button"
+                        class="msg-menu-translation-action"
+                        aria-label={`Retry translating ${messageActionTarget()} on this device`}
+                        onClick={() => void translateOnDevice()}
+                      >
+                        Retry
+                      </button>
+                    </Show>
+                    <Show when={state.status === 'done'}>
+                      <button
+                        type="button"
+                        class="msg-menu-translation-action"
+                        aria-label={`Copy translated text for ${messageActionTarget()}`}
+                        disabled={translationCopyState() === 'pending'}
+                        onClick={() => void copyTranslatedText()}
+                      >
+                        Copy translation
+                      </button>
+                    </Show>
+                    <Show when={state.status !== 'pending'}>
+                      <button
+                        type="button"
+                        class="msg-menu-translation-action"
+                        aria-label={`Dismiss translation for ${messageActionTarget()}`}
+                        onClick={dismissTranslation}
+                      >
+                        Dismiss
+                      </button>
+                    </Show>
+                  </div>
+                  <Show when={translationCopyState() !== 'idle'}>
+                    <p
+                      class="msg-menu-translation-copy-status"
+                      role="status"
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      {translationCopyState() === 'pending'
+                        ? 'Copying translation…'
+                        : translationCopyState() === 'copied'
+                          ? 'Translation copied.'
+                          : 'Could not copy translation. Clipboard access is unavailable.'}
+                    </p>
+                  </Show>
+                </section>
+              )}
+            </Show>
           </div>
         </Popover>
       </div>
+      <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {clipboardStatus()}
+      </span>
     </div>
   );
 }

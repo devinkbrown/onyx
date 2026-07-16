@@ -19,6 +19,8 @@ export function Tooltip(props: TooltipProps) {
   const anchorName = `--onyx-tooltip-anchor-${instanceId}`;
   let triggerRef: HTMLSpanElement | undefined;
   let timer: number | undefined;
+  let describedTarget: HTMLElement | undefined;
+  let describedId: string | undefined;
 
   const clearTimer = () => {
     if (timer !== undefined) window.clearTimeout(timer);
@@ -36,21 +38,38 @@ export function Tooltip(props: TooltipProps) {
     setOpen(false);
   };
 
+  const removeTooltipDescription = (): void => {
+    if (!describedTarget || !describedId) return;
+    const remaining = (describedTarget.getAttribute('aria-describedby') ?? '')
+      .split(/\s+/u)
+      .filter((token) => token && token !== describedId);
+    if (remaining.length > 0) describedTarget.setAttribute('aria-describedby', remaining.join(' '));
+    else describedTarget.removeAttribute('aria-describedby');
+    describedTarget = undefined;
+    describedId = undefined;
+  };
+
   createEffect(() => {
     const target = triggerRef?.firstElementChild instanceof HTMLElement
       ? triggerRef.firstElementChild
       : triggerRef;
+    const tooltipId = id();
 
-    if (!target) return;
-    if (open()) {
-      target.setAttribute('aria-describedby', id());
-      return;
-    }
+    removeTooltipDescription();
 
-    target.removeAttribute('aria-describedby');
+    if (!target || !open()) return;
+
+    const ids = new Set((target.getAttribute('aria-describedby') ?? '').split(/\s+/u).filter(Boolean));
+    ids.add(tooltipId);
+    target.setAttribute('aria-describedby', [...ids].join(' '));
+    describedTarget = target;
+    describedId = tooltipId;
   });
 
-  onCleanup(clearTimer);
+  onCleanup(() => {
+    clearTimer();
+    removeTooltipDescription();
+  });
 
   return (
     <span

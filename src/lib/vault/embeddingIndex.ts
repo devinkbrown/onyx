@@ -26,6 +26,51 @@ export interface EmbeddingProvider {
   embed(text: string): Float32Array | Promise<Float32Array>;
 }
 
+/** Never fan one local recall query out into an unbounded provider burst. */
+export const EMBEDDING_MAX_CONCURRENCY = 4;
+
+export interface EmbeddedItem<T> {
+  item: T;
+  vector: Float32Array;
+}
+
+/**
+ * Embed a bounded corpus with a small worker pool. This matters even for a
+ * device-local provider: a superseded query should stop scheduling work, and an
+ * explicitly configured async provider must not receive thousands of parallel
+ * calls from one vault scan.
+ */
+export async function embedItemsBounded<T>(
+  items: readonly T[],
+  textOf: (item: T) => string,
+  provider: EmbeddingProvider,
+  signal?: AbortSignal,
+): Promise<EmbeddedItem<T>[]> {
+  if (items.length === 0 || signal?.aborted) return [];
+  const results = new Array<EmbeddedItem<T> | undefined>(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (!signal?.aborted) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) return;
+      const item = items[index];
+      if (item === undefined) continue;
+      const vector = await Promise.resolve(provider.embed(textOf(item)));
+      if (signal?.aborted) return;
+      results[index] = { item, vector };
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(EMBEDDING_MAX_CONCURRENCY, items.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results.filter((result): result is EmbeddedItem<T> => result !== undefined);
+}
+
 /**
  * Split text into lowercased alphanumeric tokens.
  *

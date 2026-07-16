@@ -123,3 +123,15 @@ export function TopicIcon(props: IconProps): JSX.Element {
     </Svg>
   );
 }
+
+/** Language glyphs — on-device translation. */
+export function TranslateIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <path d="M4 5h10M9 3v2" />
+      <path d="M6 8c1.2 3 3.1 5.2 6 6.6" />
+      <path d="M12 8c-1 3.1-3.2 5.7-6.5 7.4" />
+      <path d="m14 20 3-8 3 8M15 17h4" />
+    </Svg>
+  );
+}

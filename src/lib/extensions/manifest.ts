@@ -57,6 +57,9 @@ export function normalizeExtensionPermissions(value: unknown): ExtensionPermissi
 
 export function normalizeExtensionManifest(raw: unknown): ExtensionManifest | null {
   if (!isRecord(raw)) return null;
+  // Schema versions are an authorization boundary: never reinterpret a future
+  // manifest under today's smaller permission model by silently stamping v1.
+  if (raw.manifestVersion !== EXTENSION_MANIFEST_VERSION) return null;
 
   const name = cleanString(raw.name, MAX_NAME_LENGTH);
   if (!name || !NAME_PATTERN.test(name)) return null;

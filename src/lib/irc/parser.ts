@@ -397,10 +397,25 @@ export function parseAccountInfo(text: string): AccountInfoFields | null {
   return matched ? fields : null;
 }
 
-export function parseSessionTokenNote(msg: IRCMessage): string | null {
+function parseSessionCredential(msg: IRCMessage, kind: 'TOKEN' | 'MTOKEN'): string | null {
   const reply = parseStandardReply(msg);
-  if (!reply || reply.kind !== 'NOTE' || reply.command !== 'SESSION' || reply.code !== 'TOKEN') return null;
-  return reply.description || null;
+  if (reply?.kind === 'NOTE' && reply.command === 'SESSION' && reply.code === kind) {
+    return reply.description || null;
+  }
+
+  // Current Orochi emits session credentials as a traditional server NOTICE:
+  //   :server NOTICE <nick> :SESSION TOKEN <token>
+  // while older deployments used NOTE SESSION TOKEN. Accept both envelopes;
+  // the store applies the NOTICE result only inside its server-source trust gate.
+  if (msg.command !== 'NOTICE') return null;
+  const body = msg.params[msg.params.length - 1]?.trim() ?? '';
+  const match = /^SESSION\s+(TOKEN|MTOKEN)\s+(\S+)(?:\s+.*)?$/i.exec(body);
+  if (match?.[1]?.toUpperCase() !== kind) return null;
+  return match[2] ?? null;
+}
+
+export function parseSessionTokenNote(msg: IRCMessage): string | null {
+  return parseSessionCredential(msg, 'TOKEN');
 }
 
 /**
@@ -409,9 +424,7 @@ export function parseSessionTokenNote(msg: IRCMessage): string | null {
  * reclaim/redirect the session from any node via `SESSION RESUME <mtoken>`.
  */
 export function parseSessionMeshTokenNote(msg: IRCMessage): string | null {
-  const reply = parseStandardReply(msg);
-  if (!reply || reply.kind !== 'NOTE' || reply.command !== 'SESSION' || reply.code !== 'MTOKEN') return null;
-  return reply.description || null;
+  return parseSessionCredential(msg, 'MTOKEN');
 }
 
 export function buildSessionResumeLine(token: string): string {

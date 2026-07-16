@@ -49,6 +49,24 @@ export interface AccountHandoff {
   active?: boolean;
 }
 
+export type RememberedIdentityAccess = 'resume' | 'sign-in' | 'identity-only';
+
+/**
+ * Secret-free account metadata for identity pickers.
+ *
+ * `server` is a display label with URL credentials, query parameters, and
+ * fragments removed. `id` is an opaque local reference; neither field contains
+ * a password or reclaim token.
+ */
+export interface RememberedIdentity {
+  id: string;
+  nick: string;
+  server: string;
+  savedAt: string;
+  active: boolean;
+  access: RememberedIdentityAccess;
+}
+
 interface CredentialsStore {
   version: 2;
   activeKey?: string;
@@ -72,6 +90,56 @@ function normalizeServer(server: string): string {
 
 function credentialKey(server: string, nick: string): string {
   return `${normalizeServer(server)}|${nick.trim().toLowerCase()}`;
+}
+
+function identityId(key: string): string {
+  // Two independent 32-bit hashes make a compact, stable reference without
+  // exposing the normalized credential key (which can contain a URL path).
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < key.length; index += 1) {
+    const code = key.charCodeAt(index);
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ code, 0x85ebca6b);
+  }
+  return `saved-${(first >>> 0).toString(36)}-${(second >>> 0).toString(36)}`;
+}
+
+function serverDisplayLabel(server: string): string {
+  const trimmed = server.trim();
+  try {
+    const url = new URL(trimmed);
+    const path = url.pathname === '/' ? '' : url.pathname;
+    return `${url.protocol}//${url.host}${path}`.slice(0, MAX_HANDOFF_FIELD);
+  } catch {
+    // A hand-edited or imported non-URL endpoint should still be recognizable,
+    // but never echo URL-style credentials, query secrets, or control bytes.
+    return trimmed
+      .replace(/[\u0000-\u001f\u007f]/g, '')
+      .split(/[?#]/, 1)[0]!
+      .replace(/^([^/]*\/\/)?[^/@]+@/, '$1')
+      .slice(0, MAX_HANDOFF_FIELD);
+  }
+}
+
+function hasPassword(creds: SavedCredentials): boolean {
+  return typeof creds.password === 'string' && creds.password.length > 0;
+}
+
+function hasCurrentToken(creds: SavedCredentials): boolean {
+  const hasToken = (typeof creds.sessionToken === 'string' && creds.sessionToken.length > 0)
+    || (typeof creds.meshToken === 'string' && creds.meshToken.length > 0);
+  if (!hasToken) return false;
+  if (!creds.tokenExpiry) return true;
+  const expiry = Date.parse(creds.tokenExpiry);
+  return Number.isFinite(expiry) && Date.now() < expiry;
+}
+
+function identityAccess(creds: SavedCredentials): RememberedIdentityAccess {
+  // SESSION RESUME happens only after SASL. A token without a stored password
+  // therefore cannot authenticate with the protocol Onyx implements today.
+  if (!hasPassword(creds)) return 'identity-only';
+  return hasCurrentToken(creds) ? 'resume' : 'sign-in';
 }
 
 function isSavedCredentials(value: unknown): value is SavedCredentials {
@@ -142,7 +210,10 @@ function writeStore(store: CredentialsStore): void {
 function purgeExpiredTokens(store: CredentialsStore): boolean {
   let changed = false;
   for (const [key, creds] of Object.entries(store.entries)) {
-    if ((creds.sessionToken || creds.meshToken) && creds.tokenExpiry && Date.now() > new Date(creds.tokenExpiry).getTime()) {
+    const hasToken = (typeof creds.sessionToken === 'string' && creds.sessionToken.length > 0)
+      || (typeof creds.meshToken === 'string' && creds.meshToken.length > 0);
+    const expiry = creds.tokenExpiry ? Date.parse(creds.tokenExpiry) : Number.NaN;
+    if (hasToken && creds.tokenExpiry && (!Number.isFinite(expiry) || Date.now() >= expiry)) {
       store.entries[key] = {
         ...creds,
         sessionToken: undefined,
@@ -155,19 +226,107 @@ function purgeExpiredTokens(store: CredentialsStore): boolean {
   return changed;
 }
 
+/** Bound durable credential material, preserving the active and newest entries. */
+function enforceCredentialLimit(store: CredentialsStore): boolean {
+  const keys = Object.keys(store.entries);
+  if (keys.length <= MAX_HANDOFFS) return false;
+  keys.sort((left, right) => {
+    if (left === store.activeKey) return -1;
+    if (right === store.activeKey) return 1;
+    const leftTime = Date.parse(store.entries[left]?.savedAt ?? '');
+    const rightTime = Date.parse(store.entries[right]?.savedAt ?? '');
+    const byTime = (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+    return byTime || left.localeCompare(right);
+  });
+  const keep = new Set(keys.slice(0, MAX_HANDOFFS));
+  for (const key of keys) {
+    if (!keep.has(key)) delete store.entries[key];
+  }
+  if (!store.activeKey || !store.entries[store.activeKey]) store.activeKey = keys[0];
+  return true;
+}
+
 /** Load credentials from localStorage. Returns null when nothing is saved. */
 export function loadCredentials(server?: string, nick?: string): SavedCredentials | null {
   if (typeof window === 'undefined') return null;
   try {
     const store = readStore();
     if (!store) return null;
-    if (purgeExpiredTokens(store)) writeStore(store);
+    const tokensChanged = purgeExpiredTokens(store);
+    const limitChanged = enforceCredentialLimit(store);
+    const changed = tokensChanged || limitChanged;
+    if (changed) writeStore(store);
 
     const key = server && nick ? credentialKey(server, nick) : store.activeKey;
     const creds = key ? store.entries[key] : Object.values(store.entries)[0];
     return creds ?? null;
   } catch {
     return null;
+  }
+}
+
+/** List remembered identities without returning passwords or session tokens. */
+export function listRememberedIdentities(): RememberedIdentity[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const store = readStore();
+    if (!store) return [];
+    if (purgeExpiredTokens(store)) writeStore(store);
+
+    return Object.entries(store.entries)
+      .sort(([left], [right]) => {
+        if (left === store.activeKey) return -1;
+        if (right === store.activeKey) return 1;
+        return left.localeCompare(right);
+      })
+      .map(([key, creds]) => ({
+        id: identityId(key),
+        nick: creds.nick.trim().slice(0, MAX_HANDOFF_FIELD),
+        server: serverDisplayLabel(creds.server),
+        savedAt: typeof creds.savedAt === 'string'
+          ? creds.savedAt.slice(0, MAX_HANDOFF_FIELD)
+          : '',
+        active: key === store.activeKey,
+        access: identityAccess(creds),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Make a remembered identity active and return its private record to the auth
+ * caller. Identity-picker rendering should use `listRememberedIdentities()`.
+ */
+export function selectRememberedIdentity(id: string): SavedCredentials | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const store = readStore();
+    if (!store) return null;
+    if (purgeExpiredTokens(store)) writeStore(store);
+    const match = Object.entries(store.entries).find(([key]) => identityId(key) === id);
+    if (!match) return null;
+    const [key, credentials] = match;
+    store.activeKey = key;
+    writeStore(store);
+    localStorage.setItem('onyx:saved-nick', credentials.nick);
+    return { ...credentials };
+  } catch {
+    return null;
+  }
+}
+
+/** Forget one identity by its opaque picker id. */
+export function removeRememberedIdentity(id: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const store = readStore();
+    if (!store) return false;
+    const match = Object.keys(store.entries).find((key) => identityId(key) === id);
+    if (!match) return false;
+    return removeCredentialKey(store, match);
+  } catch {
+    return false;
   }
 }
 
@@ -198,6 +357,7 @@ export function saveCredentials(opts: {
     };
     store.entries[key] = creds;
     store.activeKey = key;
+    enforceCredentialLimit(store);
     writeStore(store);
     // Also keep legacy key so the nick field stays pre-filled
     localStorage.setItem('onyx:saved-nick', opts.nick);
@@ -296,6 +456,36 @@ export function clearCredentials(): void {
     localStorage.removeItem(KEY);
     localStorage.removeItem('onyx:saved-nick');
   } catch { /* ignore */ }
+}
+
+function removeCredentialKey(store: CredentialsStore, key: string): boolean {
+  if (!store.entries[key]) return false;
+  delete store.entries[key];
+  const remainingKeys = Object.keys(store.entries);
+  if (remainingKeys.length === 0) {
+    localStorage.removeItem(KEY);
+    localStorage.removeItem('onyx:saved-nick');
+    return true;
+  }
+
+  if (store.activeKey === key || !store.activeKey || !store.entries[store.activeKey]) {
+    store.activeKey = remainingKeys[0];
+  }
+  writeStore(store);
+  const active = store.activeKey ? store.entries[store.activeKey] : undefined;
+  if (active) localStorage.setItem('onyx:saved-nick', active.nick);
+  return true;
+}
+
+/** Forget one saved identity while leaving other accounts on this device intact. */
+export function removeCredentials(server: string, nick: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const store = readStore();
+    if (!store) return;
+    const key = credentialKey(server, nick);
+    removeCredentialKey(store, key);
+  } catch { /* quota / malformed storage */ }
 }
 
 export function exportAccountHandoffs(): AccountHandoff[] {

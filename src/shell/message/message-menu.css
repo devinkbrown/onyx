@@ -140,6 +140,11 @@
 }
 
 /* ── Overflow menu list ──────────────────────────────────────────────────── */
+.msg-menu-overflow {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .msg-menu-list {
   display: grid;
   gap: 1px;
@@ -189,6 +194,66 @@
   width: 16px;
   height: 16px;
   display: block;
+}
+
+.msg-menu-translation-note,
+.msg-menu-translation {
+  width: min(20rem, 78vw);
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid color-mix(in oklab, var(--lapis) 34%, var(--seam-faint));
+  border-radius: var(--r-sm);
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--lapis-deep) 14%, var(--ink));
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.msg-menu-translation-head,
+.msg-menu-translation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.msg-menu-translation-head > span:last-child {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.msg-menu-translation-text {
+  margin: var(--space-2) 0;
+  color: var(--washi);
+  overflow-wrap: anywhere;
+}
+
+.msg-menu-translation-copy-status {
+  margin: var(--space-2) 0 0;
+  color: var(--washi-mute);
+  font-size: 0.72rem;
+}
+
+.msg-menu-translation-action {
+  min-height: 30px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  color: var(--washi-dim);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.msg-menu-translation-action:hover,
+.msg-menu-translation-action:focus-visible {
+  color: var(--washi);
+  border-color: var(--lapis);
+  outline: none;
 }
 
 /* ── React emoji picker ────────────────────────────────────────────────────── */

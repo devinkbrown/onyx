@@ -103,6 +103,9 @@
   .shell-jump-latest,
   .kbd-help__panel,
   .onyx-message-search__surface,
+  .onyx-message-search__saved,
+  .onyx-message-search__recall,
+  .onyx-message-search__history-off,
   .onyx-message-search__server,
   .onyx-message-search__vault,
   .onyx-spotlight__panel,
@@ -249,6 +252,9 @@
   .onyx-tooltip__content,
   .onyx-tabs__content,
   .onyx-message-search__surface,
+  .onyx-message-search__saved,
+  .onyx-message-search__recall,
+  .onyx-message-search__history-off,
   .onyx-message-search__server,
   .onyx-message-search__vault {
     border-color: CanvasText;
@@ -269,6 +275,12 @@
   .shell-composer-send:not(:disabled),
   .shell-jump-latest--unread,
   .onyx-spotlight__option[aria-selected='true'] {
+    color: HighlightText;
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .onyx-message-search__segment[aria-pressed='true'] {
     color: HighlightText;
     background: Highlight;
     border-color: Highlight;

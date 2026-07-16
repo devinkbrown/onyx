@@ -14,6 +14,7 @@ describe('extension manifest', () => {
     const manifest = parseExtensionManifest(JSON.stringify({
       name: 'Build Helper',
       version: '1.2.3',
+      manifestVersion: EXTENSION_MANIFEST_VERSION,
       permissions: ['channel:read-current', 'command:send-approved'],
       entry: 'worker.mjs',
     }));
@@ -31,6 +32,7 @@ describe('extension manifest', () => {
     expect(normalizeExtensionManifest({
       name: 'No Powers',
       version: '1',
+      manifestVersion: EXTENSION_MANIFEST_VERSION,
       permissions: [],
       entry: 'extension.js',
     })).toMatchObject({
@@ -51,6 +53,7 @@ describe('extension manifest', () => {
     expect(normalizeExtensionManifest({
       name: 'Too Powerful',
       version: '1.0.0',
+      manifestVersion: EXTENSION_MANIFEST_VERSION,
       permissions: ['channel:read-current', 'storage:read-all'],
       entry: 'worker.mjs',
     })).toBeNull();
@@ -68,6 +71,7 @@ describe('extension manifest', () => {
     const valid = {
       name: 'Build Helper',
       version: '1.0.0',
+      manifestVersion: EXTENSION_MANIFEST_VERSION,
       permissions: ['channel:read-current'],
       entry: 'worker.mjs',
     };
@@ -79,6 +83,21 @@ describe('extension manifest', () => {
     expect(normalizeExtensionManifest({ ...valid, entry: '../worker.mjs' })).toBeNull();
     expect(normalizeExtensionManifest({ ...valid, entry: '/worker.mjs' })).toBeNull();
     expect(normalizeExtensionManifest({ ...valid, entry: 'worker.ts' })).toBeNull();
+  });
+
+  it('rejects missing, malformed, and unsupported schema versions', () => {
+    const valid = {
+      name: 'Build Helper',
+      version: '1.0.0',
+      manifestVersion: EXTENSION_MANIFEST_VERSION,
+      permissions: [],
+      entry: 'worker.mjs',
+    };
+
+    const { manifestVersion: _omitted, ...missing } = valid;
+    expect(normalizeExtensionManifest(missing)).toBeNull();
+    expect(normalizeExtensionManifest({ ...valid, manifestVersion: '1' })).toBeNull();
+    expect(normalizeExtensionManifest({ ...valid, manifestVersion: 2 })).toBeNull();
   });
 
   it('exports the exact deny-by-default permission allowlist', () => {

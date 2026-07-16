@@ -5,6 +5,7 @@ import {
   COMPOSER_DRAFTS_KEY,
   MAX_COMPOSER_DRAFTS,
   MAX_DRAFT_LEN,
+  clearRoomComposerDrafts,
   composerDraftKey,
   getComposerDraft,
   loadComposerDrafts,
@@ -105,5 +106,55 @@ describe('composer draft logic', () => {
     const updated = setComposerDraft(drafts, '#chan0', 'edited');
     expect(updated['#chan0']).toBe('edited');
     expect(Object.keys(updated)).toHaveLength(MAX_COMPOSER_DRAFTS);
+  });
+
+  it('clears only room drafts and preserves direct-message plaintext', () => {
+    const storage = makeStorage();
+    saveComposerDrafts({ '#room': 'room text', '&local': 'local text', alice: 'private text' }, storage);
+
+    expect(clearRoomComposerDrafts(storage)).toEqual({ success: true, cleared: 2, remaining: 0 });
+    expect(loadComposerDrafts(storage)).toEqual({ alice: 'private text' });
+    expect(storage.getItem(COMPOSER_DRAFTS_KEY)).toBe(JSON.stringify({ alice: 'private text' }));
+  });
+
+  it('verifies an already-empty room-draft key', () => {
+    const storage = makeStorage();
+
+    expect(clearRoomComposerDrafts(storage)).toEqual({ success: true, cleared: 0, remaining: 0 });
+    expect(storage.getItem(COMPOSER_DRAFTS_KEY)).toBeNull();
+  });
+
+  it('does not report success when storage retains room drafts', () => {
+    const storage = makeStorage();
+    saveComposerDrafts({ '#room': 'keep me' }, storage);
+    const retainingStorage = {
+      getItem: storage.getItem.bind(storage),
+      setItem: storage.setItem.bind(storage),
+      removeItem: () => {},
+    };
+
+    expect(clearRoomComposerDrafts(retainingStorage)).toEqual({
+      success: false,
+      cleared: 0,
+      remaining: 1,
+    });
+    expect(loadComposerDrafts(storage)).toEqual({ '#room': 'keep me' });
+  });
+
+  it('does not report success when retaining DM drafts cannot be committed', () => {
+    const storage = makeStorage();
+    saveComposerDrafts({ '#room': 'room text', alice: 'private text' }, storage);
+    const throwingStorage = {
+      getItem: storage.getItem.bind(storage),
+      setItem: () => { throw new Error('blocked write'); },
+      removeItem: storage.removeItem.bind(storage),
+    };
+
+    expect(clearRoomComposerDrafts(throwingStorage)).toEqual({
+      success: false,
+      cleared: 0,
+      remaining: 1,
+    });
+    expect(loadComposerDrafts(storage)).toEqual({ '#room': 'room text', alice: 'private text' });
   });
 });

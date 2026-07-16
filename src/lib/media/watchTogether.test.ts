@@ -3,6 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   formatWatchClock,
   parseWatchTogetherProp,
+  WATCH_NICK_MAX_LENGTH,
+  WATCH_PARTICIPANT_MAX_COUNT,
+  WATCH_PROP_MAX_LENGTH,
+  WATCH_SECONDS_MAX,
+  WATCH_TITLE_MAX_LENGTH,
+  WATCH_URL_MAX_LENGTH,
   watchTogetherStateLabel,
 } from './watchTogether';
 
@@ -38,5 +44,38 @@ describe('watchTogether', () => {
       participants: [],
       handoffTo: 'bob',
     })).toBe('Handoff to bob');
+  });
+
+  it('rejects oversized room metadata before parsing it', () => {
+    expect(parseWatchTogetherProp(`title=${'x'.repeat(WATCH_PROP_MAX_LENGTH)}`)).toBeNull();
+  });
+
+  it('bounds display fields, clocks, and a case-insensitive participant roster', () => {
+    const longParticipant = `person-${'n'.repeat(WATCH_NICK_MAX_LENGTH)}`;
+    const participants = [longParticipant, longParticipant.toUpperCase()];
+    participants.push(...Array.from(
+      { length: WATCH_PARTICIPANT_MAX_COUNT + 20 },
+      (_, index) => `p-${index}`,
+    ));
+    const activity = parseWatchTogetherProp(new URLSearchParams({
+      title: 't'.repeat(WATCH_TITLE_MAX_LENGTH + 20),
+      url: `https://example.test/${'u'.repeat(WATCH_URL_MAX_LENGTH + 20)}`,
+      host: 'h'.repeat(WATCH_NICK_MAX_LENGTH + 20),
+      handoff: 'b'.repeat(WATCH_NICK_MAX_LENGTH + 20),
+      position: String(WATCH_SECONDS_MAX + 1),
+      duration: String(WATCH_SECONDS_MAX + 1),
+      participants: participants.join(','),
+    }).toString());
+
+    expect(activity).not.toBeNull();
+    expect(activity?.title).toHaveLength(WATCH_TITLE_MAX_LENGTH);
+    expect(activity?.url).toHaveLength(WATCH_URL_MAX_LENGTH);
+    expect(activity?.host).toHaveLength(WATCH_NICK_MAX_LENGTH);
+    expect(activity?.handoffTo).toHaveLength(WATCH_NICK_MAX_LENGTH);
+    expect(activity?.positionSeconds).toBeNull();
+    expect(activity?.durationSeconds).toBeNull();
+    expect(activity?.participants).toHaveLength(WATCH_PARTICIPANT_MAX_COUNT);
+    expect(activity?.participants[0]).toHaveLength(WATCH_NICK_MAX_LENGTH);
+    expect(activity?.participants[1]?.toLowerCase()).not.toBe(activity?.participants[0]?.toLowerCase());
   });
 });

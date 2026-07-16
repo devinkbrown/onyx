@@ -72,7 +72,13 @@ function ChannelRow(props: { channel: StatsChannel; nowMs: number }) {
           <span class="channel-spark-bars" aria-hidden="true">
             <For each={c().spark.slice(-14)}>
               {(n) => (
-                <i style={`--h: ${maxSpark() <= 0 ? 3 : Math.max(3, Math.round((n / maxSpark()) * 100))}`} />
+                <i
+                  style={{
+                    '--h': String(maxSpark() <= 0
+                      ? 3
+                      : Math.max(3, Math.round((n / maxSpark()) * 100))),
+                  }}
+                />
               )}
             </For>
           </span>
@@ -149,7 +155,7 @@ export default function StatsRoute() {
                   <span
                     class="data-bar"
                     title={`${day.date}: ${day.messages.toLocaleString('en-US')} messages`}
-                    style={`--h: ${barHeight(day, maxDay())}`}
+                    style={{ '--h': String(barHeight(day, maxDay())) }}
                   />
                 )}
               </For>

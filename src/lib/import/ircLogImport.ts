@@ -94,8 +94,6 @@ interface ParsedBody {
 interface TargetBucket {
   target: string;
   messages: ChatMessage[];
-  emittedIds: Set<string>;
-  seq: number;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -128,7 +126,9 @@ export function normalizeIrcChannelTarget(rawName: string): string {
     .replace(/[^a-z0-9\-_]/g, '')
     .replace(/-{2,}/g, '-')
     .replace(/^-+|-+$/g, '');
-  return cleaned ? `#${cleaned}` : '';
+  // A punctuation-only key (for example "___") is technically non-empty but
+  // does not identify a meaningful room and is dangerously collision-prone.
+  return cleaned && /[a-z0-9]/.test(cleaned) ? `#${cleaned}` : '';
 }
 
 function stripNickPrefix(raw: string): string {
@@ -143,6 +143,14 @@ function datePartsFromIsoDay(raw: string): DateParts | null {
   const day = Number(match[3]);
   if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  // Date.UTC normalizes impossible calendar dates (2025-02-30 -> March 2),
+  // which would silently misfile an invalid log line under the wrong day.
+  const check = new Date(0);
+  check.setUTCHours(0, 0, 0, 0);
+  check.setUTCFullYear(year, month - 1, day);
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    return null;
+  }
   return { year, month, day };
 }
 
@@ -175,7 +183,12 @@ function baseDayFromOption(value: unknown): number | null {
 }
 
 function dayFromParts(parts: DateParts): number {
-  return Date.UTC(parts.year, parts.month - 1, parts.day);
+  // Date.UTC treats years 0..99 as 1900..1999. setUTCFullYear preserves the
+  // literal four-digit year from an imported log.
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(parts.year, parts.month - 1, parts.day);
+  return date.getTime();
 }
 
 function partsToMs(dayStart: number, parts: TimeParts): number {
@@ -317,20 +330,10 @@ function parseLineBody(line: ParsedLine): ParsedBody | null {
   return parseBody(line.body);
 }
 
-function uniqueId(bucket: TargetBucket, time: Date, lineNumber: number): string {
-  const base = `irclog:${bucket.target}:${time.getTime()}:${lineNumber}`;
-  if (!bucket.emittedIds.has(base)) {
-    bucket.emittedIds.add(base);
-    return base;
-  }
-  let n = 2;
-  let candidate = `${base}#${n}`;
-  while (bucket.emittedIds.has(candidate)) {
-    n += 1;
-    candidate = `${base}#${n}`;
-  }
-  bucket.emittedIds.add(candidate);
-  return candidate;
+function messageId(target: string, time: Date, lineNumber: number): string {
+  // lineNumber is unique within this source string, so a growing Set bought no
+  // collision protection and defeated the importer's bounded-memory contract.
+  return `irclog:${target}:${time.getTime()}:${lineNumber}`;
 }
 
 function timestampForLine(
@@ -384,7 +387,7 @@ export function parseIrcLog(raw: string, options: IrcLogImportOptions): IrcLogIm
   const compactAt = keepPerChannel * 2;
   const sinceDays = finitePositiveInt(options.sinceDays, 0);
   const cutoff = sinceDays > 0 ? Date.now() - sinceDays * DAY_MS : null;
-  const bucket: TargetBucket = { target, messages: [], emittedIds: new Set(), seq: 0 };
+  const bucket: TargetBucket = { target, messages: [] };
   const dateState = {
     runningDay: null as number | null,
     lastTimeOfDay: null as number | null,
@@ -432,9 +435,8 @@ export function parseIrcLog(raw: string, options: IrcLogImportOptions): IrcLogIm
       continue;
     }
 
-    bucket.seq += 1;
     bucket.messages.push({
-      id: uniqueId(bucket, time, index + 1),
+      id: messageId(bucket.target, time, index + 1),
       time,
       from: body.from,
       text: body.text,

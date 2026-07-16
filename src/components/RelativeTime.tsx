@@ -41,10 +41,10 @@ export function RelativeTime(props: RelativeTimeProps): JSX.Element {
     onCleanup(() => clearInterval(timer));
   });
 
-  const label = createMemo(() => formatRelative(props.timestamp, nowMs()));
-  const iso = createMemo(() =>
-    Number.isFinite(props.timestamp) ? new Date(props.timestamp).toISOString() : undefined,
-  );
+  const timestampDate = createMemo(() => new Date(props.timestamp));
+  const validTimestamp = createMemo(() => Number.isFinite(timestampDate().getTime()));
+  const label = createMemo(() => validTimestamp() ? formatRelative(props.timestamp, nowMs()) : '');
+  const iso = createMemo(() => validTimestamp() ? timestampDate().toISOString() : undefined);
 
   return (
     <time class="relative-time" datetime={iso()} title={iso()}>

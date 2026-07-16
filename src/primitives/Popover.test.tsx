@@ -61,6 +61,31 @@ describe('Popover', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('syncs native light-dismiss so the trigger reopens on the next click', () => {
+    const onOpenChange = vi.fn();
+    render(() => (
+      <Popover trigger="Actions" defaultOpen onOpenChange={onOpenChange}>
+        Room actions
+      </Popover>
+    ));
+
+    const trigger = screen.getByRole('button', { name: 'Actions' });
+    const dialog = screen.getByRole('dialog');
+    const toggle = new Event('toggle');
+    Object.defineProperty(toggle, 'newState', { value: 'closed' });
+    dialog.dispatchEvent(toggle);
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+
+    fireEvent.click(trigger);
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('dialog').textContent).toContain('Room actions');
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+  });
+
   it('clamps desktop placement to the viewport and flips away from bottom overflow', async () => {
     vi.stubGlobal('requestAnimationFrame', ((callback: FrameRequestCallback) => {
       callback(0);

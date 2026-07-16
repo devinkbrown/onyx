@@ -11,6 +11,7 @@ import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suim
 import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
 import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
+import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
 import { selectDueMessages } from '@/lib/schedule/dispatch';
 import { deviceKeys, isEnvelope } from '@/lib/e2ee/dmCipher';
 import { openDmTrusted, peerSafetyNumber, pinnedPeerKey, pinPeerKey, safetyNumber, sealDmTrusted } from '@/lib/e2ee/keyPinning';
@@ -36,6 +37,12 @@ import {
   TOPIC_PROP,
   topicMessageTag,
 } from '@/lib/topics/topics';
+import {
+  markAllTopicsRead,
+  markTopicRead,
+  projectRoomTopicUnread,
+  readTopicReadLedger,
+} from '@/lib/topics/topicReadLedger';
 import { isFollowed } from '@/lib/notifications/followed';
 import { channelNotifyMode as computeChannelNotifyMode, shouldNotify as computeShouldNotify, modeToLevel, type NotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { parseScheduledEvent, type ScheduledEvent } from '@/lib/notifications/scheduledEvents';
@@ -309,6 +316,8 @@ export interface ServerSearchState {
   status: 'idle' | 'pending' | 'done' | 'error';
   results: ChatMessage[];
   error: string | null;
+  /** Honest bounded/filtering notice while still allowing valid results. */
+  notice?: string | null;
 }
 
 export interface Notification {
@@ -830,6 +839,10 @@ export interface OnyxState {
   // ── Named conversations ───────────────────────────────────────────────
   /** channel.toLowerCase() → selected topic; missing means the whole room */
   activeChannelTopics: Map<string, string>;
+  /** Open a whole room or one currently-known named conversation. */
+  openChannelConversation(channel: string, topic: string | null): void;
+  /** Re-derive aggregate room unread state from room + named-conversation cursors. */
+  reconcileChannelTopicUnread(channel: string): void;
   setActiveChannelTopic(channel: string, topic: string | null): void;
   splitTopicIntoThread(channel: string, messageId: string, label: string): void;
 
@@ -906,7 +919,7 @@ export interface OnyxState {
   setPendingDeepLinkJoin(channel: string | null, at?: Date | null, topic?: string | null): void;
 
   /** Time travel: fetch history around a moment and land the feed on it */
-  travelTo(target: string, at: Date): void;
+  travelTo(target: string, at: Date, preferredMessageId?: string): void;
 
   /** Consume the time-travel landing id after the feed has scrolled to it */
   clearTimeTravelLanding(): void;
@@ -919,6 +932,12 @@ export interface OnyxState {
 
   /** Send queued offline messages (runs on reconnect; retries while joins land) */
   flushOutbox(): void;
+
+  /** Reopen one persisted queued send, restoring its pending placeholder after reload. */
+  openQueuedSend(id: string): void;
+
+  /** Explicitly cancel one persisted queued send and remove its pending placeholder. */
+  discardQueuedSend(id: string): void;
 
   /** Prepend locally-vaulted history (deduped by id) into a buffer */
   hydrateHistory(target: string, msgs: ChatMessage[]): void;
@@ -2002,8 +2021,168 @@ function serverIcon(network: string): string {
 const _typingLastSent = new Map<string, number>();
 
 // ── CHATHISTORY batch collectors (module-level) ───────────────────────────────
-/** ref → { target, messages[] } — accumulates PRIVMSG during a BATCH */
+export const SERVER_SEARCH_RESULT_MAX = 200;
+/** Stop doing full validation after this many rows in one untrusted replay. */
+export const SERVER_SEARCH_ROW_MAX = 400;
+export const SERVER_SEARCH_TEXT_MAX = 8 * 1024;
+const SERVER_SEARCH_TARGET_MAX = 512;
+const SERVER_SEARCH_ID_MAX = 256;
+const SERVER_SEARCH_FROM_MAX = 128;
+const SERVER_SEARCH_TIMEOUT_MS = 6_000;
+
+interface PendingServerSearch {
+  generation: number;
+  target: string;
+  targetKey: string;
+  query: string;
+  batchRef: string | null;
+}
+
+interface StaleServerSearch {
+  generation: number;
+  openRefs: Set<string>;
+}
+
+type BatchCollectorKind = 'multiline' | 'search' | 'search-quarantine';
+
+interface BatchCollector {
+  target: string;
+  messages: ChatMessage[];
+  /** Search batches never merge; quarantined batches discard every inner row. */
+  kind?: BatchCollectorKind;
+  searchGeneration?: number;
+  seenIds?: Set<string>;
+  receivedRows?: number;
+  resultLimited?: boolean;
+  processingLimited?: boolean;
+  textTruncated?: boolean;
+  invalidDropped?: boolean;
+  duplicateDropped?: boolean;
+  encryptedDropped?: boolean;
+  /** Raw line parts for multiline assembly (concat = join without newline). */
+  parts?: { text: string; concat: boolean }[];
+  /** First inner line's provenance, reused for the assembled synthetic PRIVMSG. */
+  src?: { tags: Record<string, string>; prefix: string | null; nick: string | null; host: string | null };
+}
+
 let _serverSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+let _serverSearchGeneration = 0;
+let _pendingServerSearch: PendingServerSearch | null = null;
+const _staleServerSearches = new Map<string, StaleServerSearch>();
+
+function _clearServerSearchTimeout(): void {
+  if (_serverSearchTimeout) clearTimeout(_serverSearchTimeout);
+  _serverSearchTimeout = null;
+}
+
+function _resetServerSearchTransport(): void {
+  _clearServerSearchTimeout();
+  _pendingServerSearch = null;
+  _staleServerSearches.clear();
+}
+
+function _serverSearchOwnsTarget(target: string): boolean {
+  const pending = _pendingServerSearch;
+  return pending !== null
+    && target.length === pending.target.length
+    && pending.targetKey === target.toLowerCase();
+}
+
+function _markServerSearchStale(search: PendingServerSearch): StaleServerSearch {
+  const stale: StaleServerSearch = { generation: search.generation, openRefs: new Set() };
+  for (const [ref, collector] of _batchCollectors) {
+    if (collector.kind !== 'search' || collector.searchGeneration !== search.generation) continue;
+    collector.kind = 'search-quarantine';
+    stale.openRefs.add(ref);
+  }
+  _staleServerSearches.set(search.targetKey, stale);
+  return stale;
+}
+
+function _serverSearchNotice(collector: BatchCollector): string | null {
+  const notices: string[] = [];
+  if (collector.resultLimited) {
+    notices.push(`Results were limited to ${SERVER_SEARCH_RESULT_MAX}.`);
+  }
+  if (collector.processingLimited) {
+    notices.push(`Only the first ${SERVER_SEARCH_ROW_MAX} server rows were processed.`);
+  }
+  if (collector.textTruncated) notices.push('Oversized message text was shortened.');
+  if (collector.invalidDropped) notices.push('Invalid search rows were omitted.');
+  if (collector.duplicateDropped) notices.push('Duplicate search rows were removed.');
+  if (collector.encryptedDropped) {
+    notices.push('Encrypted history rows were omitted and remain device-only.');
+  }
+  return notices.length > 0 ? notices.join(' ') : null;
+}
+
+function _collectServerSearchMessage(
+  collector: BatchCollector,
+  message: ChatMessage,
+  hasServerId: boolean,
+  hasServerTime: boolean,
+): void {
+  if (collector.kind === 'search-quarantine') return;
+  if (collector.kind !== 'search') return;
+  collector.receivedRows = (collector.receivedRows ?? 0) + 1;
+  if (collector.receivedRows > SERVER_SEARCH_ROW_MAX) {
+    collector.processingLimited = true;
+    return;
+  }
+  if (collector.messages.length >= SERVER_SEARCH_RESULT_MAX) {
+    collector.resultLimited = true;
+    return;
+  }
+
+  const id = message.id;
+  const from = message.from;
+  const timeMs = message.time.getTime();
+  if (
+    !hasServerId
+    || !hasServerTime
+    || !id
+    || id.length > SERVER_SEARCH_ID_MAX
+    || /[\u0000-\u001f\u007f]/u.test(id)
+    || !from
+    || from.length > SERVER_SEARCH_FROM_MAX
+    || /[\u0000-\u001f\u007f]/u.test(from)
+    || !Number.isFinite(timeMs)
+    || message.target.length > SERVER_SEARCH_TARGET_MAX
+    || message.target.toLowerCase() !== collector.target.toLowerCase()
+  ) {
+    collector.invalidDropped = true;
+    return;
+  }
+  const seenIds = collector.seenIds ?? new Set<string>();
+  collector.seenIds = seenIds;
+  if (seenIds.has(id)) {
+    collector.duplicateDropped = true;
+    return;
+  }
+  seenIds.add(id);
+  if (message.encrypted || isEnvelope(message.text)) {
+    collector.encryptedDropped = true;
+    return;
+  }
+
+  const corpusBounded = boundedSearchField(message.text);
+  let text = corpusBounded;
+  if (text.length > SERVER_SEARCH_TEXT_MAX) {
+    text = text.slice(0, SERVER_SEARCH_TEXT_MAX);
+    const finalCodeUnit = text.charCodeAt(text.length - 1);
+    if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) text = text.slice(0, -1);
+  }
+  if (text !== message.text) collector.textTruncated = true;
+  collector.messages.push({
+    id,
+    time: new Date(timeMs),
+    from,
+    text,
+    type: message.type,
+    highlight: false,
+    target: collector.target,
+  });
+}
 
 /**
  * draft/event-playback guard — CHATHISTORY replays include historical
@@ -2038,17 +2217,7 @@ function _pushReplayEvent(tags: Record<string, string>, channel: string | null, 
   });
 }
 
-const _batchCollectors = new Map<string, {
-  target: string;
-  messages: ChatMessage[];
-  /** 'multiline' reassembles one message; 'search' diverts a history replay
-      into serverSearch.results; default (absent) is chathistory merge. */
-  kind?: 'multiline' | 'search';
-  /** Raw line parts for multiline assembly (concat = join without newline). */
-  parts?: { text: string; concat: boolean }[];
-  /** First inner line's provenance, reused for the assembled synthetic PRIVMSG. */
-  src?: { tags: Record<string, string>; prefix: string | null; nick: string | null; host: string | null };
-}>();
+const _batchCollectors = new Map<string, BatchCollector>();
 /**
  * Lowercased target → batch ref for every currently-open `chathistory` BATCH.
  * Orochi's CHATHISTORY replay does NOT stamp `@batch=<ref>` on the inner
@@ -2069,7 +2238,7 @@ const _openChathistoryByTarget = new Map<string, string>();
  * the message nearest `at` and its id becomes timeTravelLandingId (the feed
  * scrolls to it and pulses). One-shot; cleared on connect/disconnect resets.
  */
-let _pendingTravel: { key: string; at: Date } | null = null;
+let _pendingTravel: { key: string; at: Date; preferredMessageId?: string } | null = null;
 
 /** Collected WEBAUTHN AUTH-CHALLENGE + ALLOW-CRED lines; the get ceremony runs
  * once the allow-list has settled (a short debounce after the challenge). */
@@ -2341,6 +2510,108 @@ function _clearReconnectCountdown() {
 type SetFn = (partial: Partial<OnyxState> | ((s: OnyxState) => Partial<OnyxState>)) => void;
 type GetFn = () => OnyxState;
 
+const DEEP_LINK_TOPIC_RESOLUTION_TIMEOUT_MS = 8_000;
+
+interface PendingDeepLinkTopicResolution {
+  channelKey: string;
+  registryComplete: boolean;
+  historyComplete: boolean;
+  sawJoin: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
+let _pendingDeepLinkTopicResolution: PendingDeepLinkTopicResolution | null = null;
+
+function _clearPendingDeepLinkTopicResolution(): void {
+  if (_pendingDeepLinkTopicResolution?.timer) {
+    clearTimeout(_pendingDeepLinkTopicResolution.timer);
+  }
+  _pendingDeepLinkTopicResolution = null;
+}
+
+/** Clear the module-level deep-link timeout between isolated store tests. */
+export function _resetPendingDeepLinkTopicResolutionForTests(): void {
+  _clearPendingDeepLinkTopicResolution();
+}
+
+function _ensurePendingDeepLinkTopicResolution(
+  get: GetFn,
+  set: SetFn,
+  channel: string,
+): PendingDeepLinkTopicResolution | null {
+  const state = get();
+  const pendingJoin = state.pendingDeepLinkJoin;
+  const pendingTopic = state.pendingDeepLinkTopic;
+  const channelKey = channel.toLowerCase();
+  if (!pendingJoin || !pendingTopic || pendingJoin.toLowerCase() !== channelKey) return null;
+
+  if (_pendingDeepLinkTopicResolution?.channelKey === channelKey) {
+    return _pendingDeepLinkTopicResolution;
+  }
+
+  _clearPendingDeepLinkTopicResolution();
+  const resolution: PendingDeepLinkTopicResolution = {
+    channelKey,
+    registryComplete: !state.isIRCX,
+    historyComplete: !hasChatHistoryCap(state.client),
+    sawJoin: false,
+    timer: null,
+  };
+  resolution.timer = setTimeout(() => {
+    _tryPendingDeepLinkTopicResolution(get, set, channel, { final: true });
+  }, DEEP_LINK_TOPIC_RESOLUTION_TIMEOUT_MS);
+  _pendingDeepLinkTopicResolution = resolution;
+  return resolution;
+}
+
+interface DeepLinkTopicEvidence {
+  registryComplete?: boolean;
+  historyComplete?: boolean;
+  sawJoin?: boolean;
+  final?: boolean;
+}
+
+function _tryPendingDeepLinkTopicResolution(
+  get: GetFn,
+  set: SetFn,
+  channel: string,
+  evidence: DeepLinkTopicEvidence = {},
+): void {
+  const resolution = _ensurePendingDeepLinkTopicResolution(get, set, channel);
+  if (!resolution) return;
+  if (evidence.registryComplete) resolution.registryComplete = true;
+  if (evidence.historyComplete) resolution.historyComplete = true;
+  if (evidence.sawJoin) resolution.sawJoin = true;
+
+  const state = get();
+  const pendingJoin = state.pendingDeepLinkJoin;
+  const pendingTopic = state.pendingDeepLinkTopic;
+  if (!pendingJoin || !pendingTopic || pendingJoin.toLowerCase() !== resolution.channelKey) {
+    _clearPendingDeepLinkTopicResolution();
+    return;
+  }
+
+  const resolvedTopic = resolveKnownChannelTopic(state, resolution.channelKey, pendingTopic);
+  const evidenceComplete = resolution.registryComplete && resolution.historyComplete;
+  if (!resolvedTopic && !evidenceComplete && !evidence.final) return;
+
+  const activeMatches = state.activeView.kind === 'channel'
+    && state.activeView.channel.toLowerCase() === resolution.channelKey;
+  if (!activeMatches && !resolution.sawJoin && !evidence.final) {
+    // Evidence may race ahead of the self-JOIN echo. Keep it pending until the
+    // requested room becomes the active view instead of pulling the user away.
+    return;
+  }
+
+  _clearPendingDeepLinkTopicResolution();
+  set({ pendingDeepLinkJoin: null, pendingDeepLinkAt: null, pendingDeepLinkTopic: null });
+  if (activeMatches) {
+    // The shared opener canonicalises registry labels, marks only the visible
+    // topic read, and turns stale labels into normal whole-room navigation.
+    get().openChannelConversation(pendingJoin, resolvedTopic ?? pendingTopic);
+  }
+}
+
 /**
  * Re-request NAMES for a joined channel so its member list reconciles to the
  * server's authoritative roster. Throttled per channel (_ROSTER_REFRESH_MS) so
@@ -2477,8 +2748,10 @@ function _startReconnectCountdown(get: GetFn, set: SetFn) {
     }
     set({ connectionStatus: "connecting", reconnectIn: 0 });
     const { client } = get();
-    if (client) {
-      client.connect();
+    if (client && !client.connect()) {
+      _stopRosterPoll();
+      _stopScheduledDispatch();
+      set({ status: 'disconnected', connectionStatus: 'disconnected', reconnectIn: 0, autoReconnect: false });
     }
   }, delaySecs * 1000);
 }
@@ -2803,11 +3076,16 @@ export const store = createStore<OnyxState>()(
       const { client } = get();
       if (client) {
         set({ connectionStatus: 'connecting', reconnectIn: 0 });
-        client.connect();
+        if (!client.connect()) {
+          _stopRosterPoll();
+          _stopScheduledDispatch();
+          set({ status: 'disconnected', connectionStatus: 'disconnected', reconnectIn: 0, autoReconnect: false });
+        }
       }
     },
 
     connect({ url, nick, password, realname, hasClientCert }) {
+      const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
       const prev = get().client;
       if (prev) prev.destroy();
       // Clear any in-progress reconnect countdown
@@ -2816,7 +3094,9 @@ export const store = createStore<OnyxState>()(
       // leak across a (re)connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      _resetServerSearchTransport();
       _pendingTravel = null;
+      _clearPendingDeepLinkTopicResolution();
       _namesBursts.clear();
       _lastRosterRefresh.clear();
       _motdBuffer = '';
@@ -2849,6 +3129,17 @@ export const store = createStore<OnyxState>()(
         dms: new Map(),
         activeView: { kind: 'home' },
         firstUnreadId: new Map(),
+        ...(searchWasPending
+          ? {
+              serverSearch: {
+                ...get().serverSearch,
+                status: 'error' as const,
+                results: [],
+                error: 'Connection changed before the server search completed',
+                notice: null,
+              },
+            }
+          : {}),
       });
       _nickAliasTryIdx = 0;
       const savedCreds = loadCredentials(url, nick);
@@ -2901,16 +3192,43 @@ export const store = createStore<OnyxState>()(
           hasRegistered = true;
         },
         onDisconnected(reason) {
+          // A credential/mechanism failure is deterministic, not a transient
+          // network flap. Retrying the same rejected SASL exchange used to burn
+          // through the entire reconnect backoff before finally returning the
+          // user to Connect. Stop immediately and keep the original auth error
+          // visible instead.
+          const authFatal = reason === 'SASL authentication failed'
+            || reason === 'Unsupported SASL mechanism';
+          const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
+          _batchCollectors.clear();
+          _openChathistoryByTarget.clear();
+          _pendingTravel = null;
+          _resetServerSearchTransport();
           set(s => ({
             status: 'disconnected',
             server: s.server ? { ...s.server, connected: false } : null,
             connectedAt: null,
+            activeChannelTopics: new Map(),
+            ...(searchWasPending
+              ? {
+                  serverSearch: {
+                    ...s.serverSearch,
+                    status: 'error' as const,
+                    results: [],
+                    error: 'Disconnected before the server search completed',
+                    notice: null,
+                  },
+                }
+              : {}),
+            ...(authFatal
+              ? { autoReconnect: false, connectionStatus: 'disconnected' as const, reconnectIn: 0 }
+              : {}),
           }));
           get().addNotification({ type: 'system', text: `Disconnected: ${reason}` });
           get().addServerLog(`Disconnected: ${reason}`, '', 'error');
 
           // Start auto-reconnect countdown if enabled
-          if (get().autoReconnect) {
+          if (!authFatal && get().autoReconnect) {
             _startReconnectCountdown(get, set);
           } else {
             set({ connectionStatus: 'disconnected', reconnectIn: 0 });
@@ -2947,7 +3265,23 @@ export const store = createStore<OnyxState>()(
         });
       };
 
-      client.connect();
+      if (!client.connect()) {
+        // `new WebSocket(url)` can throw synchronously for a malformed or
+        // unsupported endpoint. There will be no close event to finish the
+        // state transition, so return the form to an actionable error state
+        // immediately instead of leaving it on "connecting" forever.
+        _stopRosterPoll();
+        _stopScheduledDispatch();
+        client.destroy();
+        set({
+          client: null,
+          status: 'disconnected',
+          connectionStatus: 'disconnected',
+          reconnectIn: 0,
+          autoReconnect: false,
+        });
+        return;
+      }
 
       // Wait for registration to build the Server object
       const unsub = store.subscribe(
@@ -2996,7 +3330,10 @@ export const store = createStore<OnyxState>()(
       // swallow live messages after a fresh connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
+      _resetServerSearchTransport();
       _pendingTravel = null;
+      _clearPendingDeepLinkTopicResolution();
       _stopRosterPoll();
       _stopScheduledDispatch();
       _motdBuffer = '';
@@ -3011,10 +3348,25 @@ export const store = createStore<OnyxState>()(
         dms: new Map(),
         server: null,
         activeView: { kind: 'home' },
+        activeChannelTopics: new Map(),
+        pendingDeepLinkJoin: null,
+        pendingDeepLinkAt: null,
+        pendingDeepLinkTopic: null,
         serverRules: [],
         accountInfo: null,
         accountInfoPending: false,
         accountActionError: null,
+        ...(searchWasPending
+          ? {
+              serverSearch: {
+                ...get().serverSearch,
+                status: 'error' as const,
+                results: [],
+                error: 'Disconnected before the server search completed',
+                notice: null,
+              },
+            }
+          : {}),
       });
     },
 
@@ -3024,6 +3376,7 @@ export const store = createStore<OnyxState>()(
     },
 
     setPendingDeepLinkJoin(channel, at, topic) {
+      _clearPendingDeepLinkTopicResolution();
       set({
         pendingDeepLinkJoin: channel,
         pendingDeepLinkAt: channel ? (at ?? null) : null,
@@ -3031,22 +3384,25 @@ export const store = createStore<OnyxState>()(
       });
     },
 
-    travelTo(target, at) {
+    travelTo(target, at, preferredMessageId) {
       // Time travel (?at= deep link / stats links): pull a window of history
       // AROUND the moment; the batch-close merge sorts the buffer and picks
       // the nearest message as the landing (timeTravelLandingId → feed scroll).
       const { client } = get();
+      if (_serverSearchOwnsTarget(target)) return;
       if (!hasChatHistoryCap(client)) {
         if (!preferences().localHistory) return;
         void loadAround(target, at, HISTORY_PAGE_SIZE).then((localMsgs) => {
           if (localMsgs.length === 0) return;
           get().hydrateHistory(target, localMsgs);
-          const landingId = nearestMessageId(localMsgs, at);
+          const landingId = preferredMessageId && localMsgs.some((message) => message.id === preferredMessageId)
+            ? preferredMessageId
+            : nearestMessageId(localMsgs, at);
           if (landingId) set({ timeTravelLandingId: landingId });
         });
         return;
       }
-      _pendingTravel = { key: target.toLowerCase(), at };
+      _pendingTravel = { key: target.toLowerCase(), at, preferredMessageId };
       client?.sendRaw('CHATHISTORY', 'AROUND', target, `timestamp=${at.toISOString()}`, String(HISTORY_PAGE_SIZE));
     },
 
@@ -3131,6 +3487,80 @@ export const store = createStore<OnyxState>()(
           _outboxRetries += 1;
           setTimeout(() => get().flushOutbox(), 4000);
         }
+      })();
+    },
+
+    openQueuedSend(id) {
+      void (async () => {
+        const entry = (await loadOutbox()).find((candidate) => candidate.id === id);
+        if (!entry) {
+          get().addToast({
+            variant: 'warning',
+            title: 'Queued message unavailable',
+            description: 'It may already have been sent or removed.',
+          });
+          return;
+        }
+
+        const placeholderId = `outbox:${entry.id}`;
+        // openVaultResult creates a local channel/DM shell when the target is
+        // absent, which is exactly the reload case where the original pending
+        // placeholder no longer exists in memory.
+        get().openVaultResult(entry.target, placeholderId);
+        set((state) => {
+          const existing = state.channels.get(entry.target_key)?.messages ??
+            state.dms.get(entry.target_key)?.messages ?? [];
+          if (existing.some((message) => message.id === placeholderId)) return {};
+          return _addMessage(state, entry.target, {
+            id: placeholderId,
+            time: new Date(entry.queued_at),
+            from: state.ourNick || 'you',
+            text: entry.text,
+            type: 'msg',
+            target: entry.target,
+            pending: true,
+          });
+        });
+        get().focusMessage(placeholderId);
+      })();
+    },
+
+    discardQueuedSend(id) {
+      void (async () => {
+        const entry = (await loadOutbox()).find((candidate) => candidate.id === id);
+        if (!entry) return;
+        await deleteOutboxEntry(entry.id);
+        if ((await loadOutbox()).some((candidate) => candidate.id === entry.id)) {
+          get().addToast({
+            variant: 'error',
+            title: 'Queued message kept',
+            description: 'This browser could not remove it from device storage.',
+          });
+          return;
+        }
+
+        set((state) => {
+          const placeholderId = `outbox:${entry.id}`;
+          const strip = (messages: ChatMessage[]) => messages.filter((message) => message.id !== placeholderId);
+          const channels = new Map(state.channels);
+          const channel = channels.get(entry.target_key);
+          if (channel) {
+            channels.set(entry.target_key, { ...channel, messages: strip(channel.messages) });
+            return { channels };
+          }
+          const dms = new Map(state.dms);
+          const dm = dms.get(entry.target_key);
+          if (dm) {
+            dms.set(entry.target_key, { ...dm, messages: strip(dm.messages) });
+            return { dms };
+          }
+          return {};
+        });
+        get().addToast({
+          variant: 'success',
+          title: 'Queued message removed',
+          description: `Nothing will be sent to ${entry.target}.`,
+        });
       })();
     },
 
@@ -3313,30 +3743,147 @@ export const store = createStore<OnyxState>()(
     },
 
     searchServerHistory(target, query) {
-      const { client } = get();
-      const trimmed = query.trim();
-      if (!client?.negotiatedCaps.has('draft/search') || !target || !trimmed) return;
-      if (_serverSearchTimeout) clearTimeout(_serverSearchTimeout);
-      set({ serverSearch: { target, query: trimmed, status: 'pending', results: [], error: null } });
-      client.sendRaw('SEARCH', target, trimmed);
+      const state = get();
+      const { client } = state;
+      const trimmed = boundedSearchQuery(query);
+      const targetCandidate = target.length <= SERVER_SEARCH_TARGET_MAX ? target.trim() : '';
+      const cleanTarget = targetCandidate
+        && !/[\u0000-\u0020\u007f,]/u.test(targetCandidate)
+        && !targetCandidate.startsWith(':')
+        ? targetCandidate
+        : '';
+      if (!client?.negotiatedCaps.has('draft/search') || !cleanTarget || !trimmed) return;
+      if (_pendingServerSearch || state.serverSearch.status === 'pending') return;
+      if (_staleServerSearches.size > 0) {
+        set({
+          serverSearch: {
+            target: cleanTarget,
+            query: trimmed,
+            status: 'error',
+            results: [],
+            error: 'A prior search response is still ambiguous. Reconnect before searching again.',
+            notice: null,
+          },
+        });
+        return;
+      }
+
+      const targetKey = cleanTarget.toLowerCase();
+      if (
+        state.historyLoading.get(targetKey)
+        || _openChathistoryByTarget.has(targetKey)
+        || _pendingTravel?.key === targetKey
+      ) {
+        set({
+          serverSearch: {
+            target: cleanTarget,
+            query: trimmed,
+            status: 'error',
+            results: [],
+            error: 'Wait for the current history request to finish before searching this conversation.',
+            notice: null,
+          },
+        });
+        return;
+      }
+
+      const dm = state.dms.get(targetKey);
+      const encryptedDm = dm?.messages.some(
+        (message) => message.encrypted || isEnvelope(message.text),
+      ) ?? false;
+      if (encryptedDm || (preferences().e2eeDms && state.peerDmKeys.has(targetKey))) {
+        set({
+          serverSearch: {
+            target: cleanTarget,
+            query: trimmed,
+            status: 'error',
+            results: [],
+            error: 'Encrypted conversation search stays on this device.',
+            notice: null,
+          },
+        });
+        return;
+      }
+
+      const generation = ++_serverSearchGeneration;
+      _pendingServerSearch = {
+        generation,
+        target: cleanTarget,
+        targetKey,
+        query: trimmed,
+        batchRef: null,
+      };
+      _clearServerSearchTimeout();
+      set({
+        serverSearch: {
+          target: cleanTarget,
+          query: trimmed,
+          status: 'pending',
+          results: [],
+          error: null,
+          notice: null,
+        },
+      });
+      client.sendRaw('SEARCH', cleanTarget, trimmed);
       // The reply is a chathistory-shaped batch (diverted in the BATCH
       // handler); if nothing arrives, surface a timeout instead of spinning.
       _serverSearchTimeout = setTimeout(() => {
         _serverSearchTimeout = null;
-        set(st => st.serverSearch.status === 'pending'
-          ? { serverSearch: { ...st.serverSearch, status: 'error', error: 'No response from the server' } }
-          : {});
-      }, 6000);
+        const pending = _pendingServerSearch;
+        if (!pending || pending.generation !== generation) return;
+        _markServerSearchStale(pending);
+        _pendingServerSearch = null;
+        set(st => (
+          st.serverSearch.status === 'pending'
+          && st.serverSearch.target.toLowerCase() === pending.targetKey
+          && st.serverSearch.query === pending.query
+            ? {
+                serverSearch: {
+                  ...st.serverSearch,
+                  status: 'error',
+                  results: [],
+                  error: 'No response from the server. Late results will be discarded.',
+                  notice: null,
+                },
+              }
+            : {}
+        ));
+      }, SERVER_SEARCH_TIMEOUT_MS);
     },
 
     clearServerSearch() {
-      if (_serverSearchTimeout) { clearTimeout(_serverSearchTimeout); _serverSearchTimeout = null; }
-      set({ serverSearch: { target: '', query: '', status: 'idle', results: [], error: null } });
+      if (_pendingServerSearch) _markServerSearchStale(_pendingServerSearch);
+      _pendingServerSearch = null;
+      _clearServerSearchTimeout();
+      set({
+        serverSearch: {
+          target: '',
+          query: '',
+          status: 'idle',
+          results: [],
+          error: null,
+          notice: null,
+        },
+      });
     },
 
     navigate(view) {
-      set({ activeView: view });
       if (view.kind === 'channel') {
+        const key = view.channel.toLowerCase();
+        const before = get();
+        const messages = before.channels.get(key)?.messages ?? [];
+        // A plain channel navigation always means the whole room. Persist all
+        // currently loaded named-conversation boundaries before advancing the
+        // universal MARKREAD cursor, so a later topic filter cannot resurrect
+        // rows the user already consumed in the All view.
+        markAllTopicsRead(view.channel, messages, (message) =>
+          !isEligibleChannelUnread(before, key, message),
+        );
+        set(s => {
+          const activeChannelTopics = new Map(s.activeChannelTopics);
+          activeChannelTopics.delete(key);
+          return { activeView: view, activeChannelTopics };
+        });
         get().captureUnreadDivider(view.channel);
         get().markRead(view.channel);
         get().markChannelRead(view.channel);
@@ -3345,6 +3892,8 @@ export const store = createStore<OnyxState>()(
         // Reconcile the member list to the server's authoritative roster on
         // focus — heals a list left stale by a mesh netsplit or a missed delta.
         _refreshChannelRoster(get, view.channel);
+      } else {
+        set({ activeView: view });
       }
       if (view.kind === 'dm') {
         get().captureUnreadDivider(view.nick);
@@ -3812,6 +4361,7 @@ export const store = createStore<OnyxState>()(
     requestHistory(channel, limit = 50) {
       const key = channel.toLowerCase();
       const { client, historyLoading, historyExhausted } = get();
+      if (_serverSearchOwnsTarget(channel)) return;
       if (historyLoading.get(key) || historyExhausted.get(key)) return;
       if (!hasChatHistoryCap(client)) {
         get().setHistoryExhausted(channel);
@@ -3999,6 +4549,42 @@ export const store = createStore<OnyxState>()(
 
     setComposerEditingMessage(msg) {
       set({ editingMessage: msg });
+    },
+
+    openChannelConversation(channel, requestedTopic) {
+      const key = channel.toLowerCase();
+      const topic = resolveKnownChannelTopic(get(), key, requestedTopic);
+
+      if (!topic) {
+        // Whole-room navigation deliberately keeps the established read-marker
+        // semantics. A stale/invalid topic also lands here so an old link can
+        // never leave the user looking at an empty, phantom conversation.
+        get().setActiveChannelTopic(channel, null);
+        get().navigate({ kind: 'channel', channel: key });
+        return;
+      }
+
+      // A topic is only one visible slice of the room. Opening it must not
+      // clear the parent channel's aggregate unread state or advance MARKREAD,
+      // because other named conversations remain hidden and unread.
+      set(s => {
+        const activeChannelTopics = new Map(s.activeChannelTopics);
+        activeChannelTopics.set(key, topic);
+        return {
+          // Channel maps are keyed case-insensitively. Keep activeView on that
+          // retained key because view consumers index the maps directly.
+          activeView: { kind: 'channel' as const, channel: key },
+          activeChannelTopics,
+        };
+      });
+      markLatestTopicRead(get(), key, topic);
+      get().reconcileChannelTopicUnread(key);
+      _refreshChannelRoster(get, channel);
+    },
+
+    reconcileChannelTopicUnread(channel) {
+      const key = channel.toLowerCase();
+      set(s => _reconcileChannelTopicUnread(s, key));
     },
 
     setActiveChannelTopic(channel, topic) {
@@ -4779,6 +5365,7 @@ export const store = createStore<OnyxState>()(
     loadHistory(target, before) {
       const key = target.toLowerCase();
       const { historyLoading, historyExhausted, client } = get();
+      if (_serverSearchOwnsTarget(target)) return;
       if (historyLoading.get(key) || historyExhausted.get(key)) return;
 
       if (!hasChatHistoryCap(client)) {
@@ -5338,10 +5925,34 @@ export const store = createStore<OnyxState>()(
           return;
         }
         if (standard.kind === 'FAIL' && standard.command === 'SEARCH') {
-          if (_serverSearchTimeout) { clearTimeout(_serverSearchTimeout); _serverSearchTimeout = null; }
-          set(st => st.serverSearch.status === 'pending'
-            ? { serverSearch: { ...st.serverSearch, status: 'error', error: standard.description || 'Search failed' } }
-            : {});
+          const pending = _pendingServerSearch;
+          _pendingServerSearch = null;
+          _clearServerSearchTimeout();
+          if (!pending && _staleServerSearches.size > 0) {
+            // A terminal FAIL after our timeout is sufficient protocol evidence
+            // that no replay batch will follow. A batch which was already open is
+            // contradictory evidence, however, and stays quarantined until close.
+            for (const [targetKey, stale] of _staleServerSearches) {
+              if (stale.openRefs.size === 0) _staleServerSearches.delete(targetKey);
+            }
+            return;
+          }
+          set(st => (
+            pending
+            && st.serverSearch.status === 'pending'
+            && st.serverSearch.target.toLowerCase() === pending.targetKey
+            && st.serverSearch.query === pending.query
+              ? {
+                  serverSearch: {
+                    ...st.serverSearch,
+                    status: 'error',
+                    results: [],
+                    error: standard.description || 'Search failed',
+                    notice: null,
+                  },
+                }
+              : {}
+          ));
           return;
         }
         if (standard.command === 'MEDIA') {
@@ -5562,8 +6173,15 @@ export const store = createStore<OnyxState>()(
               if (pendingJoin) {
                 setTimeout(() => {
                   get().client?.sendRaw('JOIN', pendingJoin);
-                  if (pendingTopic) get().setActiveChannelTopic(pendingJoin, pendingTopic);
-                  set({ pendingDeepLinkJoin: null, pendingDeepLinkAt: null, pendingDeepLinkTopic: null });
+                  if (pendingTopic) {
+                    // Keep the requested label pending until the server's PROP
+                    // registry or replayed history can prove it exists. The
+                    // room itself remains visible and unfiltered meanwhile.
+                    set({ pendingDeepLinkAt: null });
+                    _tryPendingDeepLinkTopicResolution(get, set, pendingJoin);
+                  } else {
+                    set({ pendingDeepLinkJoin: null, pendingDeepLinkAt: null, pendingDeepLinkTopic: null });
+                  }
                   if (pendingAt) {
                     // ?at= time travel: fetch AROUND the moment once the join
                     // replay has had a beat to land (the sorted merge tolerates
@@ -5611,6 +6229,11 @@ export const store = createStore<OnyxState>()(
         }
 
         case 'ACCOUNT': {
+          // IRCv3 account-notify is broadcast for every visible user. Only our
+          // own ACCOUNT event describes the identity behind the top-bar account
+          // chip; folding a peer's `ACCOUNT *` into server.account made any
+          // other user logging out turn the local UI into "Guest".
+          if (!nick || nick.toLowerCase() !== ourNick.toLowerCase()) break;
           const account = params[0] === '*' ? null : params[0] ?? null;
           set(s => ({ server: s.server ? { ...s.server, account } : null }));
           break;
@@ -5675,6 +6298,7 @@ export const store = createStore<OnyxState>()(
             // authoritative + idempotent (throttled per channel), so requesting
             // it here guarantees the roster however we ended up in the channel.
             _refreshChannelRoster(get, ch);
+            _tryPendingDeepLinkTopicResolution(get, set, ch, { sawJoin: true });
           } else {
             // Someone else joined
             // A mesh relink re-announces JOINs for members who never left —
@@ -5734,7 +6358,9 @@ export const store = createStore<OnyxState>()(
               const next: ActiveView = active.kind === 'channel' && active.channel.toLowerCase() === key
                 ? { kind: 'home' }
                 : active;
-              return { channels, channelFolders, activeView: next };
+              const activeChannelTopics = new Map(s.activeChannelTopics);
+              activeChannelTopics.delete(key);
+              return { channels, channelFolders, activeView: next, activeChannelTopics };
             });
           } else {
             const partReason = params[1] ?? '';
@@ -5845,9 +6471,14 @@ export const store = createStore<OnyxState>()(
           const { client: c366, channels: chans366 } = get();
           const hasHistory = c366?.negotiatedCaps?.has('draft/chathistory') || c366?.negotiatedCaps?.has('chathistory');
           const chData = chans366.get(ch366.toLowerCase());
-          if (hasHistory && chData && chData.messages.length === 0) {
+          const requestedHistory = Boolean(hasHistory && chData && chData.messages.length === 0);
+          if (requestedHistory) {
             get().requestHistory(ch366, 50);
           }
+          _tryPendingDeepLinkTopicResolution(get, set, ch366, {
+            historyComplete: !requestedHistory,
+            sawJoin: true,
+          });
           break;
         }
 
@@ -5884,11 +6515,19 @@ export const store = createStore<OnyxState>()(
               return { userProps };
             }
           });
+          if (isChan(propTarget)) {
+            _tryPendingDeepLinkTopicResolution(get, set, propTarget);
+          }
           break;
         }
 
-        case '819': // RPL_PROPEND — signals list is complete; no action needed
+        case '819': { // RPL_PROPEND — the requested registry snapshot is complete
+          const propTarget = params[1];
+          if (propTarget && isChan(propTarget)) {
+            _tryPendingDeepLinkTopicResolution(get, set, propTarget, { registryComplete: true });
+          }
           break;
+        }
 
         // ── Names list ────────────────────────────────────────────────────
         case '353': { // RPL_NAMREPLY
@@ -6015,6 +6654,23 @@ export const store = createStore<OnyxState>()(
             !isChan(target) &&
             !sender
           ) {
+            // Current Orochi delivers fresh resume credentials via server
+            // NOTICEs (`SESSION TOKEN …` / `SESSION MTOKEN …`). Older nodes
+            // used NOTE standard replies, handled above. Keep both paths so a
+            // rolling mesh upgrade cannot strand reconnect state.
+            const sessionToken = parseSessionTokenNote(msg);
+            if (sessionToken) {
+              storeSessionToken(sessionToken, undefined, _saslAccount ?? undefined);
+              get().client?.updateResumeTokens({ sessionToken });
+              break;
+            }
+            const sessionMeshToken = parseSessionMeshTokenNote(msg);
+            if (sessionMeshToken) {
+              storeMeshToken(sessionMeshToken);
+              get().client?.updateResumeTokens({ meshToken: sessionMeshToken });
+              break;
+            }
+
             // ── TOTP: structured 2FA notices ─────────────────────────────
             if (text.startsWith('TOTP:')) {
               const body = text.slice(5).trim();
@@ -6390,7 +7046,11 @@ export const store = createStore<OnyxState>()(
           const msgTarget = isChannel ? target : (isSelf ? target : sender);
           const msgKey = msgTarget.toLowerCase();
 
-          const time = tags['time'] ? new Date(tags['time']) : new Date();
+          const rawServerTime = tags['time'];
+          const boundedServerTime = rawServerTime && rawServerTime.length <= 64
+            ? rawServerTime
+            : null;
+          const time = boundedServerTime ? new Date(boundedServerTime) : new Date();
           const messageTopic = isChannel ? parseMessageTopic(tags) : null;
 
           // Use server-provided msgid when available (e.g. from CHATHISTORY batch)
@@ -6429,6 +7089,13 @@ export const store = createStore<OnyxState>()(
               if (!collector.src) {
                 collector.src = { tags: { ...tags }, prefix: msg.prefix, nick, host: msg.host };
               }
+            } else if (collector.kind === 'search' || collector.kind === 'search-quarantine') {
+              _collectServerSearchMessage(
+                collector,
+                chatMsg,
+                serverMsgId !== undefined,
+                boundedServerTime !== null,
+              );
             } else {
               collector.messages.push(chatMsg);
             }
@@ -6436,44 +7103,88 @@ export const store = createStore<OnyxState>()(
           }
           const openBatchRef = _openChathistoryByTarget.get(msgKey);
           if (openBatchRef && _batchCollectors.has(openBatchRef)) {
-            _batchCollectors.get(openBatchRef)!.messages.push(chatMsg);
+            const collector = _batchCollectors.get(openBatchRef)!;
+            if (collector.kind === 'search' || collector.kind === 'search-quarantine') {
+              _collectServerSearchMessage(
+                collector,
+                chatMsg,
+                serverMsgId !== undefined,
+                boundedServerTime !== null,
+              );
+            } else {
+              collector.messages.push(chatMsg);
+            }
             break;
           }
 
           if (isChannel) {
             const notifyLevel = get().channelNotify.get(msgKey) ?? 'all';
             // 'none' → never increment unread/highlights; store message only
-            // 'mentions' → only count as unread if it mentions us or a channel-wide ping
-            const isChannelWidePing = /@(everyone|here)\b/i.test(displayText);
-            const effectiveHighlight =
-              isSelf ? false
-              : notifyLevel === 'none' ? false
-              : notifyLevel === 'mentions' ? (mentionsMe(text, ourNick) || isChannelWidePing)
-              : highlight;
-            const skipUnread = isSelf || notifyLevel === 'none' || (notifyLevel === 'mentions' && !mentionsMe(text, ourNick) && !isChannelWidePing);
-            const activeTarget = get().activeView;
-            const isActiveChannel = activeTarget.kind === 'channel' &&
-              activeTarget.channel.toLowerCase() === msgKey;
-            set(s => _addChannelMessage(s, msgKey, chatMsg, effectiveHighlight, skipUnread));
-            get().updateChannelActivity(msgTarget);
-            if (effectiveHighlight && notifyLevel !== 'none') {
-              get().addNotification({ type: 'mention', text: displayText, from: sender, channel: msgTarget });
-            } else if (
-              !isSelf &&
-              !isActiveChannel &&
-              notifyLevel !== 'none' &&
-              (isFollowed(msgTarget, messageTopic) || isFollowed(msgTarget))
+            // 'mentions' → only count shared highlight classification (nick,
+            // channel-wide ping, or a custom highlight word). Reuse the same
+            // classifier as replay reconciliation so live and retained rows
+            // cannot disagree about unread/mention state.
+            const classifiedHighlight = isChannelUnreadHighlight(get(), chatMsg);
+            const effectiveHighlight = !isSelf
+              && notifyLevel !== 'none'
+              && classifiedHighlight;
+            const skipUnread = isSelf
+              || notifyLevel === 'none'
+              || (notifyLevel === 'mentions' && !classifiedHighlight);
+            // A named conversation narrows the active surface inside its
+            // parent channel. Messages outside that selection still belong in
+            // the room history, but remain unread and may trigger a followed
+            // conversation notification.
+            const isVisibleConversation = isChannelMessageVisible(get(), msgKey, messageTopic);
+            set(s => _addChannelMessage(
+              s,
+              msgKey,
+              chatMsg,
+              effectiveHighlight,
+              skipUnread,
+              isVisibleConversation,
+            ));
+            // A tagged live row is also authoritative retained evidence for a
+            // pending topic deep link (for example when replay is unavailable).
+            if (messageTopic) _tryPendingDeepLinkTopicResolution(get, set, msgTarget);
+            // A message delivered into the selected named conversation is
+            // already visible. Advance only that device-local cursor, then
+            // re-project the parent room so hidden sibling and untagged rows
+            // retain their unread/mention state.
+            const selectedTopic = get().activeChannelTopics.get(msgKey);
+            if (
+              selectedTopic
+              && isVisibleConversation
+              && !skipUnread
+              && messageTopic
+              && messageTopic.trim().toLowerCase() === selectedTopic.trim().toLowerCase()
+              && isEligibleChannelUnread(get(), msgKey, chatMsg)
             ) {
-              get().addNotification({ type: 'follow', text: displayText, from: sender, channel: msgTarget, topic: messageTopic });
+              markTopicRead(msgTarget, selectedTopic, chatMsg);
+              get().reconcileChannelTopicUnread(msgKey);
+            }
+            get().updateChannelActivity(msgTarget);
+            if (effectiveHighlight) {
+              get().addNotification({ type: 'mention', text: displayText, from: sender, channel: msgTarget });
+            } else if (!isSelf && !isVisibleConversation && notifyLevel !== 'none') {
+              const followedTopic = messageTopic !== null && isFollowed(msgTarget, messageTopic);
+              const followedRoom = isFollowed(msgTarget);
+              if (followedTopic || followedRoom) {
+                // A room follow applies to every message but must continue to
+                // reopen the whole room. Only a topic-specific match carries a
+                // topic destination; when both match, the narrower one wins.
+                get().addNotification({
+                  type: 'follow',
+                  text: displayText,
+                  from: sender,
+                  channel: msgTarget,
+                  topic: followedTopic ? messageTopic : null,
+                });
+              }
             }
             // Track per-channel unread for sidebar badges
-            if (!skipUnread) {
-              if (!isActiveChannel) {
-                const isMention = effectiveHighlight ||
-                  isChannelWidePing ||
-                  get().highlightWords.some(w => displayText.toLowerCase().includes(w.toLowerCase()));
-                get().incrementUnread(msgTarget, isMention);
-              }
+            if (!skipUnread && !isVisibleConversation) {
+              get().incrementUnread(msgTarget, effectiveHighlight);
             }
           } else if (msgTarget) {
             // Guard: server-sourced NOTICE/PRIVMSG with no nick/target parses to
@@ -7105,6 +7816,12 @@ export const store = createStore<OnyxState>()(
             break;
           }
           const mrTs = mrParam.startsWith('timestamp=') ? mrParam.slice('timestamp='.length) : mrParam;
+          const markerState = get();
+          const activeMarkerTopic = markerState.activeView.kind === 'channel'
+            && markerState.activeView.channel.toLowerCase() === mrKey
+            ? markerState.activeChannelTopics.get(mrKey)
+            : undefined;
+          if (activeMarkerTopic) markLatestTopicRead(get(), mrKey, activeMarkerTopic);
           set(s => _applyReadMarker(s, mrKey, mrTs));
           break;
         }
@@ -7271,19 +7988,61 @@ export const store = createStore<OnyxState>()(
             const batchTarget = params[2] ?? '';
             if (
               batchTarget &&
+              batchTarget.length <= SERVER_SEARCH_TARGET_MAX &&
               (batchType === 'draft/chathistory' || batchType === 'chathistory')
             ) {
-              // A pending server SEARCH replays as a chathistory batch for the
-              // same target — divert it into serverSearch instead of merging.
-              const pendingSearch = get().serverSearch;
-              const isSearchReplay = pendingSearch.status === 'pending' &&
-                pendingSearch.target.toLowerCase() === batchTarget.toLowerCase();
+              if (!batchRef || _batchCollectors.has(batchRef)) break;
+              const targetKey = batchTarget.toLowerCase();
+              const pendingSearch = _pendingServerSearch;
+              const staleSearch = _staleServerSearches.get(targetKey);
+              const existingRef = _openChathistoryByTarget.get(targetKey);
+              let kind: BatchCollectorKind | undefined;
+              let searchGeneration: number | undefined;
+
+              if (staleSearch) {
+                kind = 'search-quarantine';
+                searchGeneration = staleSearch.generation;
+                staleSearch.openRefs.add(batchRef);
+              } else if (pendingSearch?.targetKey === targetKey) {
+                if (pendingSearch.batchRef || (existingRef && existingRef !== batchRef)) {
+                  const stale = _markServerSearchStale(pendingSearch);
+                  if (existingRef) {
+                    const existing = _batchCollectors.get(existingRef);
+                    if (existing) {
+                      existing.kind = 'search-quarantine';
+                      existing.searchGeneration = pendingSearch.generation;
+                      stale.openRefs.add(existingRef);
+                    }
+                  }
+                  stale.openRefs.add(batchRef);
+                  kind = 'search-quarantine';
+                  searchGeneration = pendingSearch.generation;
+                  _pendingServerSearch = null;
+                  _clearServerSearchTimeout();
+                  set(st => ({
+                    serverSearch: {
+                      ...st.serverSearch,
+                      status: 'error',
+                      results: [],
+                      error: 'The server returned overlapping history batches, so search results were discarded.',
+                      notice: null,
+                    },
+                  }));
+                } else {
+                  pendingSearch.batchRef = batchRef;
+                  kind = 'search';
+                  searchGeneration = pendingSearch.generation;
+                }
+              }
+
               _batchCollectors.set(batchRef, {
                 target: batchTarget,
                 messages: [],
-                ...(isSearchReplay ? { kind: 'search' as const } : {}),
+                ...(kind ? { kind } : {}),
+                ...(searchGeneration !== undefined ? { searchGeneration } : {}),
+                ...(kind === 'search' ? { seenIds: new Set<string>() } : {}),
               });
-              _openChathistoryByTarget.set(batchTarget.toLowerCase(), batchRef);
+              _openChathistoryByTarget.set(targetKey, batchRef);
             } else if (batchTarget && batchType === 'draft/multiline') {
               // draft/multiline: the inner PRIVMSGs reassemble into ONE message
               // when the batch closes (echo of our own sends included).
@@ -7298,15 +8057,62 @@ export const store = createStore<OnyxState>()(
             // BATCH -ref — end of batch
             const batchRef = batchParam.slice(1);
             const collector = _batchCollectors.get(batchRef);
+            if (collector && collector.kind === 'search-quarantine') {
+              _batchCollectors.delete(batchRef);
+              const targetKey = collector.target.toLowerCase();
+              if (_openChathistoryByTarget.get(targetKey) === batchRef) {
+                _openChathistoryByTarget.delete(targetKey);
+              }
+              const stale = _staleServerSearches.get(targetKey);
+              if (stale && stale.generation === collector.searchGeneration) {
+                stale.openRefs.delete(batchRef);
+                if (stale.openRefs.size === 0) _staleServerSearches.delete(targetKey);
+              }
+              break;
+            }
             if (collector && collector.kind === 'search') {
               _batchCollectors.delete(batchRef);
-              if (_openChathistoryByTarget.get(collector.target.toLowerCase()) === batchRef) {
-                _openChathistoryByTarget.delete(collector.target.toLowerCase());
+              const targetKey = collector.target.toLowerCase();
+              if (_openChathistoryByTarget.get(targetKey) === batchRef) {
+                _openChathistoryByTarget.delete(targetKey);
               }
-              if (_serverSearchTimeout) { clearTimeout(_serverSearchTimeout); _serverSearchTimeout = null; }
-              set(st => ({
-                serverSearch: { ...st.serverSearch, status: 'done', results: collector.messages, error: null },
-              }));
+              const pending = _pendingServerSearch;
+              const stateSearch = get().serverSearch;
+              const ownsSearch = Boolean(
+                pending
+                && pending.generation === collector.searchGeneration
+                && pending.batchRef === batchRef
+                && pending.targetKey === targetKey
+                && stateSearch.status === 'pending'
+                && stateSearch.target.toLowerCase() === targetKey
+                && stateSearch.query === pending.query
+              );
+              if (!ownsSearch || !pending) {
+                break;
+              }
+              _pendingServerSearch = null;
+              _clearServerSearchTimeout();
+              const results = collector.messages.slice().sort((a, b) => {
+                const byTime = a.time.getTime() - b.time.getTime();
+                if (byTime !== 0) return byTime;
+                return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+              });
+              const notice = _serverSearchNotice(collector);
+              set(st => (
+                st.serverSearch.status === 'pending'
+                && st.serverSearch.target.toLowerCase() === targetKey
+                && st.serverSearch.query === pending.query
+                  ? {
+                      serverSearch: {
+                        ...st.serverSearch,
+                        status: 'done',
+                        results,
+                        error: null,
+                        notice,
+                      },
+                    }
+                  : {}
+              ));
               break;
             }
             if (collector && collector.kind === 'multiline') {
@@ -7395,8 +8201,25 @@ export const store = createStore<OnyxState>()(
               // jump-pill stay correct across bouncer (session-sync) replay.
               {
                 const storedMarker = get().readMarkers.get(batchKey);
-                if (storedMarker) set(s => _applyReadMarker(s, batchKey, storedMarker));
+                if (storedMarker) {
+                  const batchState = get();
+                  const activeBatchTopic = batchState.activeView.kind === 'channel'
+                    && batchState.activeView.channel.toLowerCase() === batchKey
+                    ? batchState.activeChannelTopics.get(batchKey)
+                    : undefined;
+                  if (activeBatchTopic) markLatestTopicRead(get(), batchKey, activeBatchTopic);
+                  set(s => _applyReadMarker(s, batchKey, storedMarker));
+                }
               }
+
+              // The replay is now fully merged, even when it was empty. This
+              // is the point at which a topic deep link may safely resolve
+              // against retained rows or reject a stale label. The shared
+              // opener also writes the device-topic cursor when no server
+              // read marker exists.
+              _tryPendingDeepLinkTopicResolution(get, set, batchTarget, {
+                historyComplete: true,
+              });
 
               // E2EE: CHATHISTORY-replayed encrypted DMs arrive as ciphertext
               // envelopes — decrypt them in place now they are merged.
@@ -7411,12 +8234,14 @@ export const store = createStore<OnyxState>()(
               // fetch — pick the merged message nearest the requested moment
               // and hand it to the feed (scroll + pulse), one-shot.
               if (_pendingTravel && _pendingTravel.key === batchKey) {
-                const at = _pendingTravel.at;
+                const { at, preferredMessageId } = _pendingTravel;
                 _pendingTravel = null;
                 const st = get();
                 const buf =
                   st.channels.get(batchKey)?.messages ?? st.dms.get(batchKey)?.messages ?? [];
-                const landing = nearestMessageId(buf, at);
+                const landing = preferredMessageId && buf.some((message) => message.id === preferredMessageId)
+                  ? preferredMessageId
+                  : nearestMessageId(buf, at);
                 if (landing) set({ timeTravelLandingId: landing });
               }
             }
@@ -10126,30 +10951,222 @@ function _addChannelMessage(
   msg: ChatMessage,
   highlight: boolean,
   skipUnread = false,
+  isVisibleConversation = isChannelMessageVisible(state, key, msg.topic),
 ): Partial<OnyxState> {
   // Drop messages from ignored users silently
   if (msg.from && state.ignoredUsers.has(msg.from.toLowerCase())) return {};
   const channels = new Map(state.channels);
   const c = channels.get(key);
   if (!c) return {};
-  const isActive =
-    state.activeView.kind === 'channel' &&
-    state.activeView.channel.toLowerCase() === key;
+  const isActiveWholeRoom = state.activeView.kind === 'channel'
+    && state.activeView.channel.toLowerCase() === key
+    && !state.activeChannelTopics.has(key);
   channels.set(key, {
     ...c,
     messages: [...(c.messages ?? []).slice(-499), msg],
-    unread: (isActive || skipUnread) ? c.unread : c.unread + 1,
-    highlights: isActive ? 0 : c.highlights + (highlight ? 1 : 0),
+    unread: isActiveWholeRoom
+      ? 0
+      : (isVisibleConversation || skipUnread) ? c.unread : c.unread + 1,
+    highlights: isActiveWholeRoom
+      ? 0
+      : isVisibleConversation ? c.highlights : c.highlights + (highlight ? 1 : 0),
   });
 
   // Track first unread message id (only when not active and not skipUnread)
-  if (!isActive && !skipUnread && !state.firstUnreadId.has(key)) {
+  if (!isVisibleConversation && !skipUnread && !state.firstUnreadId.has(key)) {
     const firstUnreadId = new Map(state.firstUnreadId);
     firstUnreadId.set(key, msg.id);
     return { channels, firstUnreadId };
   }
 
   return { channels };
+}
+
+/**
+ * Whether a channel message belongs to the conversation the user can
+ * currently see. Topic labels are protocol identifiers and therefore match
+ * case-insensitively; an untagged message belongs only to the whole-room view.
+ */
+function isChannelMessageVisible(
+  state: Pick<OnyxState, 'activeView' | 'activeChannelTopics'>,
+  key: string,
+  messageTopic: string | null | undefined,
+): boolean {
+  const channelKey = key.toLowerCase();
+  if (
+    state.activeView.kind !== 'channel' ||
+    state.activeView.channel.toLowerCase() !== channelKey
+  ) {
+    return false;
+  }
+
+  const selectedTopic = state.activeChannelTopics.get(channelKey);
+  if (!selectedTopic) return true;
+  if (!messageTopic) return false;
+
+  return messageTopic.trim().toLowerCase() === selectedTopic.trim().toLowerCase();
+}
+
+/**
+ * Resolve a requested named conversation against state we currently retain.
+ * Topic syntax alone is insufficient: old notification/deep links can outlive
+ * both the bounded message window and the server-persisted registry. Returning
+ * null makes callers fall back to the whole room instead of opening an empty
+ * synthetic conversation.
+ */
+function resolveKnownChannelTopic(
+  state: Pick<OnyxState, 'channels' | 'channelProps'>,
+  channelKey: string,
+  requestedTopic: string | null,
+): string | null {
+  const clean = requestedTopic?.trim() ?? '';
+  if (!isValidTopicLabel(clean)) return null;
+
+  const key = channelKey.toLowerCase();
+  const requestedKey = clean.toLowerCase();
+  const registered = parseTopicRegistry(state.channelProps.get(key)?.[TOPIC_PROP])
+    .find((topic) => topic.toLowerCase() === requestedKey);
+  if (registered) return registered;
+
+  const retained = state.channels.get(key)?.messages
+    .map((message) => message.topic?.trim() ?? '')
+    .find((topic) => isValidTopicLabel(topic) && topic.toLowerCase() === requestedKey);
+  return retained || null;
+}
+
+const CHANNEL_UNREAD_MESSAGE_TYPES = new Set<ChatMessage['type']>([
+  'msg',
+  'action',
+  'notice',
+  'whisper',
+]);
+
+/** Message-level highlight classification shared by live and re-projected state. */
+function isChannelUnreadHighlight(
+  state: Pick<OnyxState, 'highlightWords'>,
+  message: ChatMessage,
+): boolean {
+  if (message.highlight) return true;
+  if (/@(everyone|here)\b/i.test(message.text)) return true;
+  const lower = message.text.toLowerCase();
+  return state.highlightWords.some((word) => {
+    const clean = word.trim().toLowerCase();
+    return clean.length > 0 && lower.includes(clean);
+  });
+}
+
+/**
+ * Eligibility for room unread projection. This deliberately mirrors the live
+ * delivery guards: self/system rows never count, `none` suppresses the room,
+ * and a mentions-only room admits only a highlight-worthy row.
+ */
+function isEligibleChannelUnread(
+  state: Pick<OnyxState, 'ourNick' | 'channelNotify' | 'highlightWords'>,
+  key: string,
+  message: ChatMessage,
+): boolean {
+  if (!CHANNEL_UNREAD_MESSAGE_TYPES.has(message.type)) return false;
+  if (message.from.toLowerCase() === state.ourNick.toLowerCase()) return false;
+  const notify = state.channelNotify.get(key) ?? 'all';
+  if (notify === 'none') return false;
+  return notify !== 'mentions' || isChannelUnreadHighlight(state, message);
+}
+
+/** Universal room boundary used when a named conversation has no newer cursor. */
+function roomUnreadBoundaryIndex(
+  state: Pick<OnyxState, 'channels' | 'readMarkers' | 'firstUnreadId'>,
+  key: string,
+  markerOverride?: string,
+): number {
+  const channel = state.channels.get(key);
+  const messages = channel?.messages ?? [];
+  if (markerOverride) {
+    const markerMs = new Date(markerOverride).getTime();
+    if (!Number.isNaN(markerMs)) {
+      const after = messages.findIndex((message) => message.time.getTime() > markerMs);
+      return after < 0 ? messages.length : after;
+    }
+  }
+
+  const firstId = state.firstUnreadId.get(key);
+  if (firstId) {
+    const firstIndex = messages.findIndex((message) => message.id === firstId);
+    if (firstIndex >= 0) return firstIndex;
+  }
+
+  const storedMarker = state.readMarkers.get(key);
+  if (storedMarker) {
+    const markerMs = new Date(storedMarker).getTime();
+    if (!Number.isNaN(markerMs)) {
+      const after = messages.findIndex((message) => message.time.getTime() > markerMs);
+      return after < 0 ? messages.length : after;
+    }
+  }
+
+  // Legacy/test state can retain counters without an exact first-unread id.
+  // Recover the tightest safe suffix instead of promoting the whole bounded
+  // history to unread.
+  const retainedUnread = channel?.unread ?? 0;
+  if (retainedUnread > 0) return Math.max(0, messages.length - retainedUnread);
+  return messages.length;
+}
+
+function _reconcileChannelTopicUnread(
+  state: OnyxState,
+  key: string,
+  markerOverride?: string,
+): Partial<OnyxState> {
+  const channel = state.channels.get(key);
+  if (!channel) return {};
+
+  const isActiveWholeRoom = state.activeView.kind === 'channel'
+    && state.activeView.channel.toLowerCase() === key
+    && !state.activeChannelTopics.has(key);
+
+  const projection = projectRoomTopicUnread(
+    key,
+    channel.messages,
+    readTopicReadLedger(),
+    {
+      fallbackBoundaryIndex: isActiveWholeRoom
+        ? channel.messages.length
+        : roomUnreadBoundaryIndex(state, key, markerOverride),
+      isExcludedMessage: (message) => !isEligibleChannelUnread(state, key, message),
+      isHighlightMessage: (message) => isChannelUnreadHighlight(state, message),
+    },
+  );
+  const channels = new Map(state.channels);
+  channels.set(key, {
+    ...channel,
+    unread: projection.totalUnread,
+    highlights: projection.highlightCount,
+  });
+  const channelUnread = { ...state.channelUnread, [key]: projection.totalUnread };
+  const channelMentions = { ...state.channelMentions, [key]: projection.highlightCount };
+  const firstUnreadId = new Map(state.firstUnreadId);
+  if (projection.earliestUnreadMessageId) {
+    firstUnreadId.set(key, projection.earliestUnreadMessageId);
+  } else {
+    firstUnreadId.delete(key);
+  }
+
+  return {
+    channels,
+    channelUnread,
+    channelMentions,
+    totalUnreadMentions: totalMentions(channelMentions),
+    firstUnreadId,
+  };
+}
+
+function markLatestTopicRead(state: OnyxState, key: string, topic: string): void {
+  const normalizedTopic = topic.trim().toLowerCase();
+  const messages = state.channels.get(key)?.messages ?? [];
+  const latest = [...messages].reverse().find((message) =>
+    message.topic?.trim().toLowerCase() === normalizedTopic
+      && isEligibleChannelUnread(state, key, message),
+  );
+  if (latest) markTopicRead(key, topic, latest);
 }
 
 /**
@@ -10165,6 +11182,13 @@ function _applyReadMarker(state: OnyxState, key: string, iso: string): Partial<O
 
   const markerMs = new Date(iso).getTime();
   if (Number.isNaN(markerMs)) return out;
+
+  if (state.channels.has(key)) {
+    return {
+      ...out,
+      ..._reconcileChannelTopicUnread(state, key, iso),
+    };
+  }
 
   const ourLower = state.ourNick.toLowerCase();
   const countable = (m: ChatMessage): boolean =>

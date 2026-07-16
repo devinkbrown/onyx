@@ -25,10 +25,13 @@ interface PendingDesktop {
 function notificationTarget(note: StoreNotification): { key: string; label: string; navigate: () => void } | null {
   if ((note.type === 'mention' || note.type === 'follow') && note.channel) {
     const channel = note.channel;
+    const followedTopic = note.type === 'follow' ? note.topic?.trim() || null : null;
     return {
       key: channel.toLowerCase(),
       label: channel,
-      navigate: () => getState().navigate({ kind: 'channel', channel }),
+      navigate: () => {
+        getState().openChannelConversation(channel, followedTopic ?? null);
+      },
     };
   }
 
@@ -66,6 +69,16 @@ function bodyFor(note: StoreNotification): string {
   return note.text.length > 180 ? `${note.text.slice(0, 177)}...` : note.text;
 }
 
+function calmAllowsNotification(note: StoreNotification): boolean {
+  const calmContext: CalmContext = {
+    isMention: note.type === 'mention',
+    isDirect: note.type === 'dm',
+    isFollowed: note.type === 'follow' || (!!note.channel && (isFollowed(note.channel, note.topic) || isFollowed(note.channel))),
+    isBoost: false,
+  };
+  return classifyNotification(calmPreset(), calmContext) === 'notify';
+}
+
 export function NotificationRuntime(): null {
   onMount(() => {
     let seen = new Set(getState().notifications.map((note) => note.id));
@@ -96,7 +109,30 @@ export function NotificationRuntime(): null {
       const pending = pendingDesktop.get(key);
       if (!pending) return;
       pendingDesktop.delete(key);
-      showNote(pending.last, pending.count);
+
+      // A queued alert can sit here for almost the full throttle window. The
+      // user may enable DND or return focus to Onyx in that time, so re-run the
+      // CURRENT policy rather than blindly replaying the stale decision that
+      // originally queued it. Omit the previous desktop timestamp: the timer
+      // itself has already served the throttle delay.
+      const target = notificationTarget(pending.last);
+      if (!target || !calmAllowsNotification(pending.last)) return;
+      const state = getState();
+      const decision = shouldNotify({
+        kind: pending.last.type,
+        isSelf: !!pending.last.from && pending.last.from.toLowerCase() === state.ourNick.toLowerCase(),
+        muted: false,
+        pushEnabled: state.pushNotificationsEnabled,
+        soundEnabled: false,
+        dnd: isNotificationDndActive(),
+        permission: getDesktopNotificationPermission(),
+        pageVisible: typeof document === 'undefined' ? true : document.visibilityState === 'visible',
+        appFocused: typeof document === 'undefined' ? true : document.hasFocus(),
+        nowMs: Date.now(),
+        desktopThrottleMs: DESKTOP_THROTTLE_MS,
+        soundThrottleMs: SOUND_THROTTLE_MS,
+      });
+      if (decision.desktop) showNote(pending.last, pending.count);
     }
 
     function queueCoalesced(note: StoreNotification, key: string, waitMs: number): void {
@@ -123,13 +159,7 @@ export function NotificationRuntime(): null {
       //  - 'silent': omit entirely (the store already tracks the unread entry)
       //  - 'badge':  unread count only, no sound and no OS notification
       //  - 'notify': fall through to the existing full sound + desktop path
-      const calmContext: CalmContext = {
-        isMention: note.type === 'mention',
-        isDirect: note.type === 'dm',
-        isFollowed: note.type === 'follow' || (!!note.channel && (isFollowed(note.channel, note.topic) || isFollowed(note.channel))),
-        isBoost: false,
-      };
-      if (classifyNotification(calmPreset(), calmContext) !== 'notify') return;
+      if (!calmAllowsNotification(note)) return;
 
       const state = getState();
       const nowMs = Date.now();

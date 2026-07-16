@@ -39,6 +39,14 @@
   backdrop-filter: blur(18px) saturate(1.2);
 }
 
+.onyx-message-search__surface:focus-within {
+  border-color: color-mix(in oklab, var(--lapis-bright) 70%, var(--seam));
+  box-shadow:
+    0 22px 60px -34px color-mix(in oklab, var(--ink) 96%, transparent),
+    0 0 0 3px color-mix(in oklab, var(--lapis) 24%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--lapis-bright) 42%, transparent);
+}
+
 .onyx-message-search__sigil {
   width: 1.85rem;
   height: 1.85rem;
@@ -285,6 +293,277 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .onyx-message-search__button,
+  .shell-msg-search-pulse {
+    transition: none;
+    animation: none;
+  }
+
+  .onyx-message-search__button:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ── Server-side history search (draft/search) ───────────────────────── */
+/* The results strips are SIBLINGS of the input surface: they must restore
+   pointer-events (the root disables them to let clicks reach the feed) and
+   carry the same glass treatment so the panel reads as one unit. */
+.onyx-message-search__saved,
+.onyx-message-search__history-off,
+.onyx-message-search__server,
+.onyx-message-search__vault {
+  pointer-events: auto;
+  width: min(42rem, 100%);
+  padding: 6px 10px;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone-2) 66%, transparent),
+      color-mix(in oklab, var(--ink) 78%, transparent)
+    ),
+    color-mix(in oklab, var(--ink) 88%, var(--stone));
+  box-shadow: 0 22px 60px -34px color-mix(in oklab, var(--ink) 96%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.onyx-message-search__history-off {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--washi-dim);
+  font-size: 0.78rem;
+}
+
+/* ── Saved Search Center queries ─────────────────────────────────────── */
+.onyx-message-search__saved-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 26px;
+}
+
+.onyx-message-search__save-form {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.onyx-message-search__save-input {
+  min-width: 0;
+  height: 1.9rem;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  padding: 0 0.6rem;
+  background: color-mix(in oklab, var(--ink) 72%, transparent);
+  color: var(--washi);
+  font: 500 0.76rem/1 var(--font-sans);
+}
+
+.onyx-message-search__save-input::placeholder {
+  color: var(--washi-mute);
+}
+
+.onyx-message-search__save-input:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 1px;
+}
+
+.onyx-message-search__saved-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 190px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.onyx-message-search__saved-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.onyx-message-search__saved-run,
+.onyx-message-search__saved-delete {
+  appearance: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font: inherit;
+}
+
+.onyx-message-search__saved-run {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(5rem, auto) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 7px;
+  color: var(--washi-dim);
+  background: transparent;
+  text-align: left;
+}
+
+.onyx-message-search__saved-run:hover,
+.onyx-message-search__saved-run:focus-visible {
+  background: color-mix(in oklab, var(--stone-2) 60%, transparent);
+}
+
+.onyx-message-search__saved-run strong {
+  color: var(--washi);
+  font-size: 0.76rem;
+}
+
+.onyx-message-search__saved-run span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.74rem;
+}
+
+.onyx-message-search__saved-run small {
+  color: var(--lapis-bright);
+  font: 650 0.62rem/1 var(--font-mono);
+  white-space: nowrap;
+}
+
+.onyx-message-search__saved-delete {
+  padding: 5px 7px;
+  color: var(--washi-mute);
+  background: transparent;
+  font-size: 0.68rem;
+}
+
+.onyx-message-search__saved-delete:hover,
+.onyx-message-search__saved-delete:focus-visible {
+  color: var(--shu-bright);
+  background: color-mix(in oklab, var(--shu) 10%, transparent);
+}
+.onyx-message-search__server-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 26px;
+}
+.onyx-message-search__deep {
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--lapis) 30%, transparent);
+  border-radius: 999px;
+  padding: 3px 12px;
+  cursor: pointer;
+  transition: background 160ms var(--ease);
+}
+.onyx-message-search__deep:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--lapis) 18%, transparent);
+}
+.onyx-message-search__deep:focus-visible,
+.onyx-message-search__server-row:focus-visible,
+.onyx-message-search__saved-run:focus-visible,
+.onyx-message-search__saved-delete:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+.onyx-message-search__deep:disabled { opacity: 0.6; cursor: default; }
+.onyx-message-search__server-count {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--washi-mute);
+}
+.onyx-message-search__server-error {
+  font-size: 0.72rem;
+  color: var(--shu-bright);
+}
+.onyx-message-search__server-notice {
+  font-size: 0.72rem;
+  color: var(--washi-mute);
+}
+.onyx-message-search__server-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.onyx-message-search__server-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--washi-dim);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  min-width: 0;
+}
+.onyx-message-search__server-row:hover,
+.onyx-message-search__server-row:focus-visible {
+  background: color-mix(in oklab, var(--stone-2) 60%, transparent);
+}
+.onyx-message-search__server-when {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--washi-mute);
+}
+.onyx-message-search__server-row strong { flex: none; color: var(--washi); font-weight: 600; }
+.onyx-message-search__server-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Device-memory (vault) search across other conversations ─────────── */
+.onyx-message-search__vault-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+}
+.onyx-message-search__vault-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+.onyx-message-search__vault-target {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 10%, transparent);
+  border-radius: 5px;
+  padding: 1px 6px;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Keep responsive overrides after every base search rule so equal-specificity
+   declarations cannot be accidentally undone by the archived/saved sections. */
 @media (max-width: 560px) {
   .onyx-message-search {
     position: fixed;
@@ -328,6 +607,8 @@
   }
 
   .onyx-message-search__recall,
+  .onyx-message-search__saved,
+  .onyx-message-search__history-off,
   .onyx-message-search__server,
   .onyx-message-search__vault {
     width: 100%;
@@ -339,31 +620,29 @@
     scrollbar-width: none;
   }
 
-  .onyx-message-search__recall::-webkit-scrollbar {
-    display: none;
-  }
-
-  .onyx-message-search__recall-chip {
-    min-height: 34px;
-    flex: none;
-  }
-
-  .onyx-message-search__segmented {
-    flex: none;
-  }
-
-  .onyx-message-search__segment {
-    min-height: 38px;
-  }
+  .onyx-message-search__recall::-webkit-scrollbar { display: none; }
+  .onyx-message-search__recall-chip { min-height: 34px; flex: none; }
+  .onyx-message-search__segmented { flex: none; }
+  .onyx-message-search__segment { min-height: 38px; }
 
   .onyx-message-search__server-bar,
+  .onyx-message-search__saved-bar,
   .onyx-message-search__vault-bar {
     flex-wrap: wrap;
   }
 
-  .onyx-message-search__server-list {
-    max-height: min(36svh, 240px);
+  .onyx-message-search__server-list { max-height: min(36svh, 240px); }
+  .onyx-message-search__saved-list { max-height: min(28svh, 190px); }
+  .onyx-message-search__save-form { grid-template-columns: minmax(0, 1fr) auto; }
+
+  .onyx-message-search__history-off { align-items: stretch; flex-direction: column; }
+  .onyx-message-search__saved-run,
+  .onyx-message-search__saved-delete,
+  .onyx-message-search__deep {
+    min-height: 44px;
   }
+
+  .onyx-message-search__saved-delete { min-width: 44px; }
 
   .onyx-message-search__server-row {
     display: grid;
@@ -373,14 +652,10 @@
   }
 
   .onyx-message-search__vault-target,
-  .onyx-message-search__server-when {
-    grid-row: 1;
-  }
+  .onyx-message-search__server-when { grid-row: 1; }
 
   .onyx-message-search__server-row strong,
-  .onyx-message-search__server-text {
-    grid-column: 1 / -1;
-  }
+  .onyx-message-search__server-text { grid-column: 1 / -1; }
 
   .onyx-message-search__server-text {
     white-space: normal;
@@ -388,136 +663,4 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .onyx-message-search__button,
-  .shell-msg-search-pulse {
-    transition: none;
-    animation: none;
-  }
-
-  .onyx-message-search__button:hover:not(:disabled) {
-    transform: none;
-  }
-}
-
-/* ── Server-side history search (draft/search) ───────────────────────── */
-/* The results strips are SIBLINGS of the input surface: they must restore
-   pointer-events (the root disables them to let clicks reach the feed) and
-   carry the same glass treatment so the panel reads as one unit. */
-.onyx-message-search__server,
-.onyx-message-search__vault {
-  pointer-events: auto;
-  width: min(42rem, 100%);
-  padding: 6px 10px;
-  border: 1px solid var(--seam);
-  border-radius: var(--r-md);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--stone-2) 66%, transparent),
-      color-mix(in oklab, var(--ink) 78%, transparent)
-    ),
-    color-mix(in oklab, var(--ink) 88%, var(--stone));
-  box-shadow: 0 22px 60px -34px color-mix(in oklab, var(--ink) 96%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
-  backdrop-filter: blur(18px) saturate(1.2);
-}
-.onyx-message-search__server-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 26px;
-}
-.onyx-message-search__deep {
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--lapis-bright);
-  background: color-mix(in oklab, var(--lapis) 10%, transparent);
-  border: 1px solid color-mix(in oklab, var(--lapis) 30%, transparent);
-  border-radius: 999px;
-  padding: 3px 12px;
-  cursor: pointer;
-  transition: background 160ms var(--ease);
-}
-.onyx-message-search__deep:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--lapis) 18%, transparent);
-}
-.onyx-message-search__deep:disabled { opacity: 0.6; cursor: default; }
-.onyx-message-search__server-count {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--washi-mute);
-}
-.onyx-message-search__server-error {
-  font-size: 0.72rem;
-  color: var(--shu-bright);
-}
-.onyx-message-search__server-list {
-  list-style: none;
-  margin: 6px 0 0;
-  padding: 0;
-  max-height: 240px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.onyx-message-search__server-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  width: 100%;
-  text-align: left;
-  font: inherit;
-  font-size: 0.78rem;
-  color: var(--washi-dim);
-  background: none;
-  border: 0;
-  border-radius: 6px;
-  padding: 4px 6px;
-  cursor: pointer;
-  min-width: 0;
-}
-.onyx-message-search__server-row:hover { background: color-mix(in oklab, var(--stone-2) 60%, transparent); }
-.onyx-message-search__server-when {
-  flex: none;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  color: var(--washi-mute);
-}
-.onyx-message-search__server-row strong { flex: none; color: var(--washi); font-weight: 600; }
-.onyx-message-search__server-text {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ── Device-memory (vault) search across other conversations ─────────── */
-.onyx-message-search__vault-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 22px;
-}
-.onyx-message-search__vault-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--washi-mute);
-}
-.onyx-message-search__vault-target {
-  flex: none;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--lapis-bright);
-  background: color-mix(in oklab, var(--lapis) 10%, transparent);
-  border-radius: 5px;
-  padding: 1px 6px;
-  max-width: 9rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }

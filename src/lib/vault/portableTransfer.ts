@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import {
+  applyRetentionPolicy,
+  clearVault,
   exportVault,
+  getRetentionPolicy,
   importVault,
   parseVaultExport,
   type VaultExportSnapshot,
@@ -46,10 +49,30 @@ import {
   setSceneMotion,
   type SceneMotion,
 } from '@/lib/prefs/sceneMotion';
+import {
+  exportSavedSearches,
+  importSavedSearches,
+  parseSavedSearchExport,
+  type SavedSearch,
+} from './savedSearches';
+import {
+  readRetentionPolicy,
+  sanitizeRetentionPolicy,
+  writeRetentionPolicy,
+  type RetentionPolicy,
+} from './retentionPolicy';
+import {
+  mergeTopicReadLedger,
+  parseTopicReadLedger,
+  readTopicReadLedger,
+  type TopicReadMarker,
+} from '@/lib/topics/topicReadLedger';
 
 export interface PortablePreferenceHandoff {
   preferences: Preferences;
   sceneMotion: SceneMotion;
+  /** Optional for compatibility with snapshots written before retention controls shipped. */
+  retentionPolicy: RetentionPolicy | null;
 }
 
 export interface PortableTransferSnapshot extends VaultExportSnapshot {
@@ -65,6 +88,10 @@ export interface PortableTransferSnapshot extends VaultExportSnapshot {
   preferenceHandoff: PortablePreferenceHandoff | null;
   /** Followed room/topic keys that drive calm notifications and catch-up ranking. */
   followedConversations: string[];
+  /** Bounded room/topic read cursor metadata; never message bodies or account data. */
+  topicReadCursors: TopicReadMarker[];
+  /** Bounded device-local query metadata only; never message bodies or decrypted text. */
+  savedSearches: SavedSearch[];
 }
 
 export interface PortableTransferImportResult {
@@ -76,6 +103,8 @@ export interface PortableTransferImportResult {
   accountHandoffs: number;
   preferenceHandoffs: number;
   followedConversations: number;
+  topicReadCursors: number;
+  savedSearches: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -95,13 +124,18 @@ function parsePreferenceHandoff(value: unknown): PortablePreferenceHandoff | nul
   const parsedPreferences = parsePreferencesSnapshot(value.preferences);
   const parsedSceneMotion = parseSceneMotion(value.sceneMotion);
   if (!parsedPreferences || !parsedSceneMotion) return null;
+  const retentionPolicy = isRecord(value.retentionPolicy)
+    ? sanitizeRetentionPolicy(value.retentionPolicy as unknown as RetentionPolicy)
+    : null;
   return {
     preferences: parsedPreferences,
     sceneMotion: parsedSceneMotion,
+    retentionPolicy,
   };
 }
 
 export async function exportPortableTransfer(): Promise<PortableTransferSnapshot> {
+  const savedSearches = await exportSavedSearches();
   return {
     ...(await exportVault()),
     reviewHistory: readReviewHistory(),
@@ -111,8 +145,11 @@ export async function exportPortableTransfer(): Promise<PortableTransferSnapshot
     preferenceHandoff: {
       preferences: preferences(),
       sceneMotion: sceneMotion(),
+      retentionPolicy: getRetentionPolicy() ?? readRetentionPolicy(),
     },
     followedConversations: exportFollowedKeys(),
+    topicReadCursors: readTopicReadLedger(),
+    savedSearches: savedSearches.searches,
   };
 }
 
@@ -137,6 +174,17 @@ export function parsePortableTransfer(raw: unknown): PortableTransferSnapshot | 
   const followedConversations = isRecord(raw)
     ? parseFollowedKeys(raw.followedConversations ?? [])
     : [];
+  const topicReadCursors = isRecord(raw)
+    ? parseTopicReadLedger(raw.topicReadCursors ?? [])
+    : [];
+  const savedSearches = isRecord(raw)
+    ? parseSavedSearchExport({
+        kind: 'onyx-saved-searches',
+        version: 1,
+        exportedAt: raw.exportedAt,
+        searches: raw.savedSearches ?? [],
+      })?.searches ?? []
+    : [];
   return {
     ...vault,
     reviewHistory,
@@ -145,13 +193,52 @@ export function parsePortableTransfer(raw: unknown): PortableTransferSnapshot | 
     accountHandoffs,
     preferenceHandoff,
     followedConversations,
+    topicReadCursors,
+    savedSearches,
   };
 }
 
 export async function importPortableTransfer(
   snapshot: PortableTransferSnapshot,
 ): Promise<PortableTransferImportResult> {
-  const vault = await importVault(snapshot);
+  const preferenceHandoff = snapshot.preferenceHandoff;
+  if (preferenceHandoff) {
+    applyPreferencesSnapshot(preferenceHandoff.preferences);
+    setSceneMotion(preferenceHandoff.sceneMotion);
+  }
+
+  // Apply an imported retention policy before writing vault rows so the import
+  // itself obeys the destination policy. Applying it afterwards could leave up
+  // to the old/default bound resident until that conversation next received a
+  // message and triggered pruning.
+  const importedRetentionPolicy = preferenceHandoff?.retentionPolicy;
+  if (importedRetentionPolicy) {
+    writeRetentionPolicy(importedRetentionPolicy);
+    await applyRetentionPolicy(importedRetentionPolicy);
+  }
+  // A transferred or already-active localHistory=false preference is a hard
+  // privacy boundary: clear existing rows and do not persist imported history.
+  let vault: { targets: number; messages: number };
+  if (preferences().localHistory) {
+    vault = await importVault(snapshot);
+  } else {
+    const cleared = await clearVault();
+    if (!cleared) {
+      // `localHistory=false` is a privacy boundary, not a best-effort hint. Do
+      // not continue merging the rest of a portable snapshot while old vault
+      // rows may still be resident: the caller must report the failed import
+      // instead of claiming a successful, partially-applied handoff.
+      throw new Error('Could not clear device-local history for portable import');
+    }
+    vault = { targets: 0, messages: 0 };
+  }
+  // Topic cursors are device-local transcript memory. Preserve the same
+  // localHistory privacy boundary as the vault: a disabled handoff clears and
+  // leaves them absent; otherwise merge through the ledger's canonical parser,
+  // bounds, persistence verification, and same-tab publication path.
+  const topicReadCursors = preferences().localHistory
+    ? mergeTopicReadLedger(snapshot.topicReadCursors ?? [])
+    : { imported: 0, total: 0 };
   const reviews = mergeReviewHistory(snapshot.reviewHistory);
   const drafts = portableComposerDrafts(snapshot.composerDrafts);
   saveComposerDrafts({
@@ -164,11 +251,13 @@ export async function importPortableTransfer(
     ...topicDrafts,
   });
   const accountHandoffs = importAccountHandoffs(snapshot.accountHandoffs);
-  if (snapshot.preferenceHandoff) {
-    applyPreferencesSnapshot(snapshot.preferenceHandoff.preferences);
-    setSceneMotion(snapshot.preferenceHandoff.sceneMotion);
-  }
   const followedConversations = mergeFollowedKeys(snapshot.followedConversations);
+  const savedSearches = await importSavedSearches({
+    kind: 'onyx-saved-searches',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    searches: snapshot.savedSearches,
+  });
   return {
     targets: vault.targets,
     messages: vault.messages,
@@ -176,7 +265,9 @@ export async function importPortableTransfer(
     drafts: Object.keys(drafts).length,
     topicDrafts: Object.keys(topicDrafts).length,
     accountHandoffs: accountHandoffs.imported,
-    preferenceHandoffs: snapshot.preferenceHandoff ? 1 : 0,
+    preferenceHandoffs: preferenceHandoff ? 1 : 0,
     followedConversations: followedConversations.imported,
+    topicReadCursors: topicReadCursors.imported,
+    savedSearches: savedSearches.imported,
   };
 }

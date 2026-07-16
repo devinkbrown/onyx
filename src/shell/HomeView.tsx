@@ -31,6 +31,7 @@ import { followed } from '@/lib/notifications/followed';
 import { buildHomeMemory, type HomeMemoryItem } from '@/lib/notifications/homeMemory';
 import { buildQuietActivity, type QuietActivityItem } from '@/lib/notifications/quietActivity';
 import {
+  planReviewedAnchorRecall,
   readReviewHistory,
   recordReviewHistory,
   type ReviewHistoryEntry,
@@ -49,10 +50,15 @@ import { preferences } from '@/lib/prefs/preferences';
 import { buildQuietBoostDigest, type QuietBoostDigestItem } from '@/lib/reactions/quietBoosts';
 import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
 import { loadChannelTopicDrafts } from '@/lib/channel/topicDrafts';
-import { loadOutbox, loadRecent } from '@/lib/vault/historyVault';
+import {
+  loadOutbox,
+  loadRecent,
+  subscribeOutbox,
+  type OutboxEntry,
+} from '@/lib/vault/historyVault';
 import type { ChatMessage } from '@/lib/irc/types';
 import { openSpotlight } from '@/chat/spotlight/useSpotlight';
-import { openMessageSearchWithQuery } from './search/useMessageSearch';
+import { openMessageSearch, openMessageSearchWithQuery } from './search/useMessageSearch';
 import { MarkAllCaughtUp } from './MarkAllCaughtUp';
 
 export { relTime };
@@ -183,9 +189,15 @@ export function HomeView(): JSX.Element {
   const reviewHistorySummary = createMemo(() =>
     connectionStatus() === 'connected' ? 'catch-up ranges' : 'offline recall',
   );
-  const [outboxEntries] = createResource(connectionStatus, () => loadOutbox());
+  const [outboxEntries, { refetch: refetchOutbox }] = createResource(connectionStatus, () => loadOutbox());
+  const [confirmDiscardId, setConfirmDiscardId] = createSignal<string | null>(null);
+  onCleanup(subscribeOutbox(() => {
+    setConfirmDiscardId(null);
+    void refetchOutbox();
+  }));
   const [topicDrafts] = createResource(connectionStatus, () => loadChannelTopicDrafts());
-  const queuedSendCount = createMemo(() => outboxEntries()?.length ?? 0);
+  const queuedEntries = createMemo<OutboxEntry[]>(() => outboxEntries() ?? []);
+  const queuedSendCount = createMemo(() => queuedEntries().length);
   const roomDraftCount = createMemo(() => channelDraftCount(composerDrafts()));
   const topicDraftCount = createMemo(() => Object.keys(topicDrafts() ?? {}).length);
   const localMemoryStatus = createMemo(() => {
@@ -199,6 +211,19 @@ export function HomeView(): JSX.Element {
     }
     return 'Local-memory mode: remembered rooms, reviewed spans, drafts, and queued sends stay available until reconnect.';
   });
+
+  function openQueuedSend(entry: OutboxEntry): void {
+    getState().openQueuedSend(entry.id);
+  }
+
+  function discardQueuedSend(entry: OutboxEntry): void {
+    if (confirmDiscardId() !== entry.id) {
+      setConfirmDiscardId(entry.id);
+      return;
+    }
+    setConfirmDiscardId(null);
+    getState().discardQueuedSend(entry.id);
+  }
 
   // "Catch up" — what you missed across every joined room + DM, ranked so
   // mentions and DMs surface and ambient chatter accumulates quietly below.
@@ -290,14 +315,14 @@ export function HomeView(): JSX.Element {
     if (recap.item.kind === 'channel') state.travelTo(recap.item.target, recap.firstMessage.time);
   };
   const reopenReview = (entry: ReviewHistoryEntry) => {
+    const plan = planReviewedAnchorRecall(entry);
+    if (!plan) return;
     const state = getState();
-    if (entry.kind === 'channel') state.navigate({ kind: 'channel', channel: entry.target });
-    else state.navigate({ kind: 'dm', nick: entry.target });
-    state.focusMessage(entry.firstMessageId);
-    if (entry.kind === 'channel') state.travelTo(entry.target, new Date(entry.firstAt));
+    state.openVaultResult(plan.target, plan.messageId);
+    if (plan.at) state.travelTo(plan.target, plan.at, plan.messageId);
   };
   const openReviewSpotlight = (entry: ReviewHistoryEntry) =>
-    openSpotlight(entry.kind === 'channel' ? `goto ${entry.target}` : `dm ${entry.target}`);
+    openSpotlight(`review ${entry.target}`);
   const searchReviewText = (entry: ReviewHistoryEntry) => {
     const state = getState();
     if (entry.kind === 'channel') state.navigate({ kind: 'channel', channel: entry.target });
@@ -480,6 +505,55 @@ export function HomeView(): JSX.Element {
             </p>
           </Show>
         </header>
+
+        <Show when={queuedEntries().length > 0}>
+          <section class="home-outbox" aria-labelledby="home-outbox-title">
+            <div class="home-outbox__head">
+              <div>
+                <h3 id="home-outbox-title" class="home-section-label">Queued on this device</h3>
+                <p class="home-outbox__privacy">
+                  Message bodies stay inside their conversations; Home shows only destination and age.
+                </p>
+              </div>
+              <Show when={connectionStatus() === 'connected'}>
+                <button type="button" class="home-outbox__retry" onClick={() => getState().flushOutbox()}>
+                  Try sending now
+                </button>
+              </Show>
+            </div>
+            <ul class="home-outbox__list" aria-label="Queued messages waiting on this device">
+              <For each={queuedEntries()}>
+                {(entry) => (
+                  <li class="home-outbox__item">
+                    <span class="home-outbox__target">{entry.target}</span>
+                    <time class="home-outbox__age" dateTime={new Date(entry.queued_at).toISOString()}>
+                      queued {relTime(Math.floor(entry.queued_at / 1000), nowMs())}
+                    </time>
+                    <div class="home-outbox__actions">
+                      <button
+                        type="button"
+                        onClick={() => openQueuedSend(entry)}
+                        aria-label={`Open queued message for ${entry.target}`}
+                      >
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        classList={{ 'is-confirming': confirmDiscardId() === entry.id }}
+                        onClick={() => discardQueuedSend(entry)}
+                        aria-label={confirmDiscardId() === entry.id
+                          ? `Confirm remove queued message for ${entry.target}`
+                          : `Remove queued message for ${entry.target}`}
+                      >
+                        {confirmDiscardId() === entry.id ? 'Confirm remove' : 'Remove'}
+                      </button>
+                    </div>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </section>
+        </Show>
 
         <Show when={connectionStatus() === 'connected' && hasRooms()}>
           <section class="home-catchup" aria-label="Catch up on what you missed">
@@ -744,6 +818,9 @@ export function HomeView(): JSX.Element {
           </button>
           <button type="button" class="home-action" onClick={() => void getState().joinChannel('#root')}>
             Join #root →
+          </button>
+          <button type="button" class="home-action" onClick={openMessageSearch}>
+            Search device memory
           </button>
           <button type="button" class="home-action" onClick={() => getState().openAppearance()}>
             Appearance

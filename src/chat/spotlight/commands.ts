@@ -24,6 +24,10 @@ import {
   setTranslationTarget,
   TRANSLATION_TARGETS,
 } from '@/lib/intelligence/translateMessage';
+import {
+  planReviewedAnchorRecall,
+  readReviewHistory,
+} from '@/lib/notifications/reviewHistory';
 import { aiPolicyBadgeText } from '@/shell/AiPolicyBadge';
 import type { AiPolicy } from '@/lib/irc/aiPolicyProp';
 import {
@@ -31,6 +35,7 @@ import {
   recordClientExtensionActionRun,
   type ClientExtensionAction,
 } from '@/lib/extensions/clientActions';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { useSpotlight } from './useSpotlight';
 import { parseTimeExpr } from './timeGrammar';
 import { isSchedulable, parseDateTimeLocal } from '@/lib/schedule/scheduleTime';
@@ -187,7 +192,12 @@ function parseVaultMode(value: string): VaultSearchMode | null {
   ) {
     return 'hybrid';
   }
-  if (normalized === 'semantic' || normalized === 'meaning' || normalized === 'smart' || normalized === 'rag') {
+  if (
+    normalized === 'semantic' ||
+    normalized === 'related' ||
+    normalized === 'similar' ||
+    normalized === 'tokens'
+  ) {
     return 'semantic';
   }
   if (normalized === 'exact' || normalized === 'literal' || normalized === 'text' || normalized === 'substring') {
@@ -198,9 +208,9 @@ function parseVaultMode(value: string): VaultSearchMode | null {
 
 /** Human-facing label per vault mode; also the order the bare `vault` verb cycles. */
 const VAULT_MODE_LABEL: Record<VaultSearchMode, string> = {
-  hybrid: 'hybrid (text, then meaning)',
+  hybrid: 'hybrid (text, then related terms)',
   exact: 'exact text',
-  semantic: 'meaning (semantic)',
+  semantic: 'related terms (token similarity)',
 };
 
 /** Mirrors the hook's VAULT_MODE_CYCLE (hybrid → exact → semantic) so the toggle title names the next step. */
@@ -211,8 +221,8 @@ const NEXT_VAULT_MODE: Record<VaultSearchMode, VaultSearchMode> = {
 };
 
 function vaultModeTitle(mode: VaultSearchMode): string {
-  if (mode === 'hybrid') return 'Search device memory by text, then meaning';
-  if (mode === 'semantic') return 'Search device memory by meaning';
+  if (mode === 'hybrid') return 'Search device memory by text, then related terms';
+  if (mode === 'semantic') return 'Search device memory by related terms';
   return 'Search device memory by exact text';
 }
 
@@ -407,6 +417,47 @@ function catchUpCommands(state: CommandState, query: string): SpotlightCommand[]
   }
 
   return commands;
+}
+
+/**
+ * Device-local reviewed anchors are already capped and ordered by
+ * `readReviewHistory`. Keep that order so Spotlight presents the newest recall
+ * first. Planning is repeated at run time so malformed imported state can
+ * never turn into a time-travel request.
+ */
+function reviewedAnchorCommands(): SpotlightCommand[] {
+  return readReviewHistory().flatMap<SpotlightCommand>((entry) => {
+    const plan = planReviewedAnchorRecall(entry);
+    if (!plan) return [];
+    const preview = entry.preview.replace(/\s+/g, ' ').trim().slice(0, 180);
+    const name = entry.name.replace(/\s+/g, ' ').trim().slice(0, 128);
+
+    return [{
+      id: `review:${plan.kind}:${plan.target.toLowerCase()}:${plan.messageId}`,
+      section: 'Actions',
+      title: `Reopen reviewed ${name || plan.target}`,
+      hint: preview || 'saved on this device',
+      keywords: [
+        'review',
+        'reviewed',
+        'recall',
+        plan.target,
+        name,
+        preview,
+        plan.messageId,
+      ],
+      run: () => {
+        const currentPlan = planReviewedAnchorRecall(entry);
+        if (!currentPlan) return;
+
+        const current = getState();
+        current.openVaultResult(currentPlan.target, currentPlan.messageId);
+        if (currentPlan.at) {
+          current.travelTo(currentPlan.target, currentPlan.at, currentPlan.messageId);
+        }
+      },
+    }];
+  });
 }
 
 function vaultToggleCommand(query: string): SpotlightCommand {
@@ -912,28 +963,27 @@ function channelLink(serverUrl: string | undefined, channel: string): string | n
 }
 
 async function copyText(text: string): Promise<void> {
-  if (!text) return;
-
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  try {
-    localStorage.setItem('onyx:last-copied-node-address', text);
-  } catch {
-    /* storage unavailable */
-  }
+  await writeClipboardText(text);
 }
 
 function runClientExtensionAction(action: ClientExtensionAction): void | Promise<void> {
-  recordClientExtensionActionRun(action);
   if (action.capability === 'open-url' && action.url) {
-    if (typeof window !== 'undefined') window.open(action.url, '_blank', 'noopener,noreferrer');
+    if (typeof window === 'undefined') return;
+    try {
+      window.open(action.url, '_blank', 'noopener,noreferrer');
+      // Browsers intentionally return null for `noopener` even when a new tab
+      // opened, so the most accurate observable success boundary is that the
+      // dispatch itself did not throw.
+      recordClientExtensionActionRun(action);
+    } catch {
+      // A failed dispatch is not an action run and must not enter the audit.
+    }
     return;
   }
   if (action.capability === 'copy-text' && action.text) {
-    return copyText(action.text);
+    return writeClipboardText(action.text).then((copied) => {
+      if (copied) recordClientExtensionActionRun(action);
+    });
   }
 }
 
@@ -1221,6 +1271,7 @@ export function buildCommands(state: CommandState = getState(), query = ''): Spo
   return [
     ...grammarCommands(state, query),
     ...timeJumpCommands(state, query),
+    ...reviewedAnchorCommands(),
     ...catchUpCommands(state, query),
     ...channels,
     ...dms,

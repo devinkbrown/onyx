@@ -151,6 +151,86 @@ describe('useMessageSearch — hybrid vault mode', () => {
     dispose();
   });
 
+  it('dedupes loaded rows by conversation and message id, not message id alone', async () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([[
+        '#root',
+        channel('#root', [message('shared-id', 'Kai', 'already loaded here', 1)]),
+      ]]),
+    });
+
+    searchVaultHybridMock.mockResolvedValueOnce([
+      hit('shared-id', 'Kai', 'already loaded here', 1, '#root'),
+      hit('shared-id', 'Mira', 'different conversation, same id', 2, '#archive'),
+    ]);
+
+    let dispose!: () => void;
+    let search!: ReturnType<typeof useMessageSearch>;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      search = useMessageSearch();
+      openMessageSearch();
+      search.setQuery('shared');
+    });
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(search.vaultResults().map((result) => `${result.target}:${result.id}`)).toEqual([
+      '#archive:shared-id',
+    ]);
+
+    dispose();
+  });
+
+  it('drops vault E2EE ciphertext envelopes from device-memory results', async () => {
+    setState({ activeView: { kind: 'home' } });
+    searchVaultHybridMock.mockResolvedValueOnce([{
+      target: 'mika',
+      message: {
+        ...message('encrypted-vault', 'Mika', 'e2ee:v1:ciphertext-token', 1, 'Mika'),
+        encrypted: true,
+      },
+    }]);
+
+    let dispose!: () => void;
+    let search!: ReturnType<typeof useMessageSearch>;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      search = useMessageSearch();
+      openMessageSearch();
+      search.setQuery('ciphertext-token');
+    });
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(searchVaultHybridMock).toHaveBeenCalledWith('ciphertext-token');
+    expect(search.vaultResults()).toEqual([]);
+    dispose();
+  });
+
+  it('drops a legacy DM envelope without a flag but preserves the same text in a channel', async () => {
+    setState({ activeView: { kind: 'home' } });
+    searchVaultHybridMock.mockResolvedValueOnce([
+      hit('legacy-dm', 'Mika', 'TSUMUGI1 hidden-token', 1, 'Mika'),
+      hit('channel-example', 'Kai', 'TSUMUGI1 hidden-token', 2, '#examples'),
+    ]);
+
+    let dispose!: () => void;
+    let search!: ReturnType<typeof useMessageSearch>;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      search = useMessageSearch();
+      openMessageSearch();
+      search.setQuery('hidden-token');
+    });
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(search.vaultResults().map((result) => result.id)).toEqual(['channel-example']);
+    dispose();
+  });
+
   it('cycles hybrid → exact → semantic → hybrid via toggleVaultMode', () => {
     let dispose!: () => void;
     let search!: ReturnType<typeof useMessageSearch>;

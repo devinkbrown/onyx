@@ -18,7 +18,13 @@
 import { preferences } from '@/lib/prefs/preferences';
 import { listTopics, summarizeTopics } from '@/lib/search/topicFilter';
 import { suggestTopic } from '@/lib/topics/suggestTopic';
-import { bucketUnreadByTopic, isValidTopicLabel, parseTopicRegistry, TOPIC_PROP } from '@/lib/topics/topics';
+import {
+  projectRoomTopicUnread,
+  readTopicReadLedger,
+  subscribeTopicReadLedger,
+  type TopicReadMarker,
+} from '@/lib/topics/topicReadLedger';
+import { isValidTopicLabel, parseTopicRegistry, TOPIC_PROP } from '@/lib/topics/topics';
 import { followed, isFollowed, toggleFollow } from '@/lib/notifications/followed';
 import {
   latestReviewForTarget,
@@ -611,13 +617,22 @@ export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
 
 export function MessageView(props: MessageViewProps): JSX.Element {
   const [local] = splitProps(props, ['selfNick']);
+  const [topicReadMarkers, setTopicReadMarkers] = createSignal<readonly TopicReadMarker[]>(
+    readTopicReadLedger(),
+  );
+  onCleanup(subscribeTopicReadLedger((markers) => {
+    setTopicReadMarkers(markers);
+  }));
 
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
   const serverLog = useStore((s) => s.serverLog);
   const channelProps = useStore((s) => s.channelProps);
+  const channelNotify = useStore((s) => s.channelNotify);
+  const highlightWords = useStore((s) => s.highlightWords);
   const activeChannelTopics = useStore((s) => s.activeChannelTopics);
+  const firstUnreadId = useStore((s) => s.firstUnreadId);
   const ourNick = useStore((s) => s.ourNick);
   const canEditMessages = useStore((s) => s.canEditMessages);
   const historyLoading = useStore((s) => s.historyLoading);
@@ -633,10 +648,10 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     return activeChannelTopics().get(view.channel.toLowerCase()) ?? null;
   });
 
-  function setActiveTopic(topic: string | null): void {
+  function openExistingTopic(topic: string | null): void {
     const view = activeView();
     if (view.kind !== 'channel') return;
-    getState().setActiveChannelTopic(view.channel, topic);
+    getState().openChannelConversation(view.channel, topic);
   }
 
   const allMessages = createMemo((): ChatMessage[] => {
@@ -782,22 +797,33 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   });
 
   const topicUnreadCounts = createMemo((): ReadonlyMap<string, number> => {
-    const dividerId = unreadDividerId();
-    if (!dividerId) return new Map<string, number>();
     const all = allMessages();
-    const dividerIndex = all.findIndex((message) => message.id === dividerId);
-    if (dividerIndex < 0) return new Map<string, number>();
-    const rawCounts = bucketUnreadByTopic(
-      all.map((message, index) => ({
-        topic: message.topic ?? null,
-        unread: index >= dividerIndex && !isSystemMsg(message),
-      })),
-    );
-    const normalized = new Map<string, number>();
-    for (const [topic, count] of rawCounts) {
-      if (topic) normalized.set(topic.toLowerCase(), count);
-    }
-    return normalized;
+    const view = activeView();
+    if (view.kind !== 'channel') return new Map<string, number>();
+    const key = view.channel.toLowerCase();
+    const boundaryId = unreadDividerId() ?? firstUnreadId().get(key) ?? null;
+    const boundaryIndex = boundaryId
+      ? all.findIndex((message) => message.id === boundaryId)
+      : all.length;
+    const notify = channelNotify().get(key) ?? 'all';
+    const ourKey = selfNick().toLowerCase();
+    const words = highlightWords()
+      .map((word) => word.trim().toLowerCase())
+      .filter(Boolean);
+    const isHighlight = (message: ChatMessage): boolean => {
+      if (message.highlight || /@(everyone|here)\b/i.test(message.text)) return true;
+      const lower = message.text.toLowerCase();
+      return words.some((word) => lower.includes(word));
+    };
+    return projectRoomTopicUnread(view.channel, all, topicReadMarkers(), {
+      fallbackBoundaryIndex: boundaryIndex < 0 ? all.length : boundaryIndex,
+      isExcludedMessage: (message) => {
+        if (isSystemMsg(message) || message.from.toLowerCase() === ourKey || notify === 'none') return true;
+        if (notify !== 'mentions') return false;
+        return !isHighlight(message);
+      },
+      isHighlightMessage: isHighlight,
+    }).unreadByTopic;
   });
 
   const sinceDigest = createMemo(() => {
@@ -1079,6 +1105,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
       const node = feedEl?.querySelector<HTMLElement>(`[data-message-search-id="${esc}"]`);
       if (node) {
         node.scrollIntoView({ block: 'center' });
+        node.focus({ preventScroll: true });
         setAtBottom(false);
         node.classList.add('shell-msg-search-pulse');
         if (typeof window !== 'undefined') {
@@ -1131,8 +1158,16 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   }
 
   function openTopic(topic: string): void {
-    setActiveTopic(topic);
+    openExistingTopic(topic);
     setForumView(false);
+    // The forum card disappears with the forum projection. Hand focus to the
+    // now-active filter chip so keyboard/screen-reader users land on the same
+    // conversation instead of falling back to the document body.
+    queueMicrotask(() => {
+      feedEl?.parentElement
+        ?.querySelector<HTMLButtonElement>('.topic-filter-bar .topic-chip.is-active')
+        ?.focus();
+    });
   }
 
   const canStartTopic = createMemo(() => isValidTopicLabel(topicDraft().trim()));
@@ -1141,7 +1176,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     event.preventDefault();
     const topic = topicDraft().trim();
     if (!isValidTopicLabel(topic)) return;
-    setActiveTopic(topic);
+    const view = activeView();
+    if (view.kind !== 'channel') return;
+    // This label does not exist yet, so the known-conversation opener would
+    // correctly reject it as stale. Keep creation on the raw setter until the
+    // first tagged message/registering split makes the topic discoverable.
+    getState().setActiveChannelTopic(view.channel, topic);
     setForumView(false);
     setTopicDraft('');
   }
@@ -1252,7 +1292,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               topics={availableTopics()}
               active={activeTopic()}
               unreadCounts={topicUnreadCounts()}
-              onSelect={setActiveTopic}
+              onSelect={openExistingTopic}
             />
           </Show>
           <form class="shell-topic-create" onSubmit={startTopic}>
@@ -1316,16 +1356,29 @@ export function MessageView(props: MessageViewProps): JSX.Element {
         onScroll={checkScroll}
       >
         <Show when={forumView() && topicSummaries().length > 0}>
-          <section class="shell-topic-forum" aria-label="Topic forum">
+          <section class="shell-topic-forum" aria-labelledby="shell-topic-forum-title">
+            <h3 id="shell-topic-forum-title" class="sr-only">Topic forum</h3>
             <For each={topicSummaries()}>
               {(summary) => {
                 const latest = createMemo(() => latestTopicMessage(summary.topic));
+                const unread = createMemo(() => topicUnreadCounts().get(summary.topic.toLowerCase()) ?? 0);
                 return (
                   <article class="shell-topic-card">
-                    <button type="button" class="shell-topic-card-main" onClick={() => openTopic(summary.topic)}>
+                    <button
+                      type="button"
+                      class="shell-topic-card-main"
+                      onClick={() => openTopic(summary.topic)}
+                      aria-label={`Open topic ${summary.topic}, ${summary.count} ${summary.count === 1 ? 'message' : 'messages'}${unread() > 0 ? `, ${unread()} unread on this device` : ''}`}
+                    >
                       <span class="shell-topic-card-title">#{summary.topic}</span>
                       <span class="shell-topic-card-meta">
-                        {summary.count} {summary.count === 1 ? 'message' : 'messages'}
+                        <span>{summary.count} {summary.count === 1 ? 'message' : 'messages'}</span>
+                        <Show when={unread() > 0}>
+                          <span class="shell-topic-card-unread">{unread()} unread</span>
+                        </Show>
+                        <time dateTime={summary.lastAt.toISOString()} title={summary.lastAt.toLocaleString()}>
+                          latest {summary.lastAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </time>
                       </span>
                       <Show when={latest()}>
                         {(message) => (
@@ -1497,10 +1550,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         'shell-msg-system',
                         activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
                       ].filter(Boolean).join(' ')}
-                      data-message-search-id={msg.id}
-                      data-event={msg.type}
-                      role="status"
-                      aria-label={msg.text}
+                    data-message-search-id={msg.id}
+                    data-event={msg.type}
+                    role="status"
+                    tabIndex={-1}
+                    aria-label={msg.text}
                     >
                       {msg.text}
                     </div>

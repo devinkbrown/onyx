@@ -38,7 +38,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { useStore, getState, selectAccount } from '@/lib/store';
-import { deviceKeys } from '@/lib/e2ee/dmCipher';
+import { deviceKeys, deviceRegistryId } from '@/lib/e2ee/dmCipher';
 import { PasskeysSection } from '@/shell/PasskeysSection';
 import { ModalShell } from '@/primitives/index';
 import { Button } from '@/primitives/index';
@@ -255,7 +255,9 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     try {
       const keys = await deviceKeys();
       if (!keys?.publicB64) return;
-      getState().e2eeKeyAdd('browser', 'tsumugi-p256', keys.publicB64);
+      const deviceId = await deviceRegistryId(keys.publicB64);
+      if (!deviceId) return;
+      getState().e2eeKeyAdd(deviceId, 'tsumugi-p256', keys.publicB64);
     } finally {
       setE2eeDeviceBusy(false);
     }
@@ -690,10 +692,22 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               <Button type="button" variant="ghost" size="sm" onClick={() => getState().e2eeKeyList()}>
                 List device keys
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => getState().e2eeKeyDelete('browser')}
+              >
+                Remove legacy browser key
+              </Button>
               <Button type="button" variant="ghost" size="sm" onClick={() => getState().keyTransparencyStatus()}>
                 Refresh transparency root
               </Button>
             </div>
+            <p class="acct-section-hint">
+              Older Onyx versions published every browser under the shared id “browser”. After
+              publishing this device’s stable key, remove that legacy entry if it is still listed.
+            </p>
             <Show when={e2eeNotices().length > 0}>
               <ul class="acct-cert-list" aria-label="E2EE device key notices">
                 <For each={e2eeNotices()}>

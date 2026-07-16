@@ -13,36 +13,218 @@ export interface ReviewHistoryEntry {
   preview: string;
 }
 
+/**
+ * A trusted, side-effect-free instruction for reopening one reviewed anchor.
+ * `at` is deliberately nullable: an exact message id remains safe to focus
+ * when imported history contains a malformed timestamp, but time travel must
+ * fail closed rather than normalizing or sending that timestamp.
+ */
+export interface ReviewedAnchorRecallPlan {
+  kind: ReviewHistoryKind;
+  target: string;
+  messageId: string;
+  at: Date | null;
+}
+
+export interface ClearReviewHistoryResult {
+  success: boolean;
+  cleared: number;
+  remaining: number;
+}
+
+export type ReviewHistoryListener = (entries: readonly ReviewHistoryEntry[]) => void;
+
 export const REVIEW_HISTORY_KEY = 'onyx:home-review-history';
 const REVIEW_HISTORY_LIMIT = 5;
+export const MAX_REVIEW_HISTORY_INPUT_ENTRIES = 256;
+export const MAX_REVIEW_HISTORY_NAME_LENGTH = 128;
+export const MAX_REVIEW_HISTORY_PREVIEW_LENGTH = 512;
+
+const MAX_CHANNEL_TARGET_LENGTH = 128;
+const MAX_DM_TARGET_LENGTH = 64;
+const MAX_MESSAGE_ID_LENGTH = 512;
+const TARGET_INVALID_PATTERN = /[\s,\x00-\x1f\x7f]/u;
+const MESSAGE_ID_CONTROL_PATTERN = /[\x00-\x1f\x7f]/u;
+const DISPLAY_TEXT_CONTROL_PATTERN = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u;
+const CANONICAL_INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
+const listeners = new Set<ReviewHistoryListener>();
+
+function canonicalInstant(value: unknown): Date | null {
+  if (typeof value !== 'string' || (value.length !== 20 && value.length !== 24)) return null;
+  if (value !== value.trim() || !CANONICAL_INSTANT_PATTERN.test(value)) return null;
+  const instant = new Date(value);
+  if (!Number.isFinite(instant.getTime())) return null;
+  try {
+    const canonicalValue = value.includes('.') ? value : value.replace(/Z$/, '.000Z');
+    return instant.toISOString() === canonicalValue ? instant : null;
+  } catch {
+    return null;
+  }
+}
+
+function canonicalTimestamp(value: unknown): string | null {
+  return canonicalInstant(value)?.toISOString() ?? null;
+}
+
+function normalizeTarget(value: unknown, kind: ReviewHistoryKind): string | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  const maxLength = kind === 'channel' ? MAX_CHANNEL_TARGET_LENGTH : MAX_DM_TARGET_LENGTH;
+  if (value.length > maxLength || value !== value.trim()) return null;
+  const channelTarget = value.startsWith('#') || value.startsWith('&');
+  if (
+    TARGET_INVALID_PATTERN.test(value)
+    || (kind === 'channel'
+      ? !channelTarget
+      : channelTarget)
+  ) return null;
+  return value;
+}
+
+function normalizeMessageId(value: unknown): string | null {
+  if (
+    typeof value !== 'string'
+    || value.length === 0
+    || value.length > MAX_MESSAGE_ID_LENGTH
+    || value !== value.trim()
+    || MESSAGE_ID_CONTROL_PATTERN.test(value)
+  ) return null;
+  return value;
+}
+
+function normalizeDisplayText(
+  value: unknown,
+  maxLength: number,
+  allowEmpty: boolean,
+): string | null {
+  // Reject before regex/replacement work so hostile multi-megabyte strings do
+  // not turn a five-row reviewed-anchor feature into an unbounded text pass.
+  if (typeof value !== 'string' || value.length > maxLength) return null;
+  if (DISPLAY_TEXT_CONTROL_PATTERN.test(value)) return null;
+  const normalized = value.replace(/\s+/gu, ' ').trim();
+  return normalized.length > 0 || allowEmpty ? normalized : null;
+}
+
+function normalizeCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : null;
+}
+
+function sanitizeReviewHistoryEntry(value: unknown): ReviewHistoryEntry | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const item = value as Record<string, unknown>;
+  const kind = item.kind === 'channel' || item.kind === 'dm' ? item.kind : null;
+  if (!kind) return null;
+
+  const target = normalizeTarget(item.target, kind);
+  const name = normalizeDisplayText(item.name, MAX_REVIEW_HISTORY_NAME_LENGTH, false);
+  const firstMessageId = normalizeMessageId(item.firstMessageId);
+  const reviewedAt = canonicalTimestamp(item.reviewedAt);
+  const messageCount = normalizeCount(item.messageCount);
+  const mentionCount = normalizeCount(item.mentionCount);
+  const preview = normalizeDisplayText(item.preview, MAX_REVIEW_HISTORY_PREVIEW_LENGTH, true);
+  if (
+    !target || !name || !firstMessageId || !reviewedAt
+    || messageCount === null || mentionCount === null || preview === null
+    || mentionCount > messageCount
+    || typeof item.firstAt !== 'string'
+  ) return null;
+
+  // Existing recall intentionally treats a malformed firstAt as "exact id
+  // only". Preserve that useful fail-closed contract without retaining the
+  // untrusted timestamp string itself.
+  const firstAt = canonicalTimestamp(item.firstAt) ?? '';
+  return {
+    target,
+    name,
+    kind,
+    firstMessageId,
+    firstAt,
+    reviewedAt,
+    messageCount,
+    mentionCount,
+    preview,
+  };
+}
+
+/**
+ * Validate a persisted reviewed anchor without reading storage or mutating the
+ * store. Target and message id are required for any recall. A bad `firstAt`
+ * only disables time travel; callers can still navigate and focus the exact id.
+ */
+export function planReviewedAnchorRecall(
+  entry: unknown,
+): ReviewedAnchorRecallPlan | null {
+  const safe = sanitizeReviewHistoryEntry(entry);
+  if (!safe) return null;
+
+  return {
+    kind: safe.kind,
+    target: safe.target,
+    messageId: safe.firstMessageId,
+    at: canonicalInstant(safe.firstAt),
+  };
+}
 
 function storage(): Storage | null {
   return typeof localStorage === 'undefined' ? null : localStorage;
-}
-
-function isReviewHistoryEntry(value: unknown): value is ReviewHistoryEntry {
-  if (!value || typeof value !== 'object') return false;
-  const item = value as Record<string, unknown>;
-  return typeof item.target === 'string'
-    && typeof item.name === 'string'
-    && (item.kind === 'channel' || item.kind === 'dm')
-    && typeof item.firstMessageId === 'string'
-    && typeof item.firstAt === 'string'
-    && typeof item.reviewedAt === 'string'
-    && typeof item.messageCount === 'number'
-    && typeof item.mentionCount === 'number'
-    && typeof item.preview === 'string';
 }
 
 function reviewHistoryKey(entry: ReviewHistoryEntry): string {
   return `${entry.kind}:${entry.target.toLowerCase()}:${entry.firstMessageId}`;
 }
 
+function compareText(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
+function compareNewest(left: ReviewHistoryEntry, right: ReviewHistoryEntry): number {
+  const timeOrder = Date.parse(right.reviewedAt) - Date.parse(left.reviewedAt);
+  return timeOrder || compareText(reviewHistoryKey(left), reviewHistoryKey(right));
+}
+
+function sameEntries(
+  left: readonly ReviewHistoryEntry[],
+  right: readonly ReviewHistoryEntry[],
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function publish(entries: readonly ReviewHistoryEntry[]): void {
+  for (const listener of [...listeners]) {
+    try {
+      listener(entries.map((entry) => ({ ...entry })));
+    } catch {
+      // A consumer cannot prevent later listeners from receiving authoritative
+      // device state.
+    }
+  }
+}
+
+/** Subscribe to verified same-tab reviewed-anchor changes. */
+export function subscribeReviewHistory(listener: ReviewHistoryListener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 export function parseReviewHistoryEntries(value: unknown): ReviewHistoryEntry[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .filter(isReviewHistoryEntry)
-    .sort((a, b) => Date.parse(b.reviewedAt) - Date.parse(a.reviewedAt))
+
+  const byKey = new Map<string, ReviewHistoryEntry>();
+  const inputLength = Math.min(value.length, MAX_REVIEW_HISTORY_INPUT_ENTRIES);
+  for (let index = 0; index < inputLength; index += 1) {
+    const entry = sanitizeReviewHistoryEntry(value[index]);
+    if (!entry) continue;
+    const key = reviewHistoryKey(entry);
+    const existing = byKey.get(key);
+    if (!existing || Date.parse(entry.reviewedAt) > Date.parse(existing.reviewedAt)) {
+      byKey.set(key, entry);
+    }
+  }
+
+  return [...byKey.values()]
+    .sort(compareNewest)
     .slice(0, REVIEW_HISTORY_LIMIT);
 }
 
@@ -69,48 +251,84 @@ export function latestReviewForTarget(
 }
 
 export function recordReviewHistory(entry: ReviewHistoryEntry): ReviewHistoryEntry[] {
+  const current = readReviewHistory();
+  const safe = sanitizeReviewHistoryEntry(entry);
+  if (!safe) return current;
   const store = storage();
-  if (!store) return [entry];
+  if (!store) return current;
 
-  const key = reviewHistoryKey(entry);
-  const next = [
-    entry,
-    ...readReviewHistory().filter((item) =>
-      reviewHistoryKey(item) !== key,
-    ),
-  ]
-    .sort((a, b) => Date.parse(b.reviewedAt) - Date.parse(a.reviewedAt))
-    .slice(0, REVIEW_HISTORY_LIMIT);
+  const next = parseReviewHistoryEntries([safe, ...current]);
 
   try {
     store.setItem(REVIEW_HISTORY_KEY, JSON.stringify(next));
   } catch {
-    // Storage may be full or disabled; keep the in-memory result for this render.
+    const retained = readReviewHistory();
+    publish(retained);
+    return retained;
   }
-  return next;
+  const committed = readReviewHistory();
+  if (!sameEntries(committed, next)) {
+    publish(committed);
+    return committed;
+  }
+  publish(committed);
+  return committed;
 }
 
 export function mergeReviewHistory(entries: readonly unknown[]): { imported: number; total: number } {
   const imported = parseReviewHistoryEntries(entries);
+  const current = readReviewHistory();
   const store = storage();
-  if (!store) return { imported: imported.length, total: imported.length };
+  if (!store || imported.length === 0) return { imported: 0, total: current.length };
 
-  const byKey = new Map<string, ReviewHistoryEntry>();
-  for (const entry of [...readReviewHistory(), ...imported]) {
-    const key = reviewHistoryKey(entry);
-    const current = byKey.get(key);
-    if (!current || Date.parse(entry.reviewedAt) > Date.parse(current.reviewedAt)) {
-      byKey.set(key, entry);
-    }
-  }
-  const next = [...byKey.values()]
-    .sort((a, b) => Date.parse(b.reviewedAt) - Date.parse(a.reviewedAt))
-    .slice(0, REVIEW_HISTORY_LIMIT);
+  // Existing entries come first, so an imported collision with the exact same
+  // reviewedAt cannot overwrite device-local display metadata. A strictly
+  // newer reviewedAt still wins in parseReviewHistoryEntries.
+  const next = parseReviewHistoryEntries([...current, ...imported]);
 
   try {
     store.setItem(REVIEW_HISTORY_KEY, JSON.stringify(next));
   } catch {
-    // Storage may be full or disabled; report the in-memory merge.
+    const retained = readReviewHistory();
+    publish(retained);
+    return { imported: 0, total: retained.length };
   }
-  return { imported: imported.length, total: next.length };
+  const committed = readReviewHistory();
+  publish(committed);
+  if (!sameEntries(committed, next)) return { imported: 0, total: committed.length };
+
+  const retainedImported = imported.filter((entry) =>
+    committed.some((item) => reviewHistoryKey(item) === reviewHistoryKey(entry)
+      && JSON.stringify(item) === JSON.stringify(entry)),
+  ).length;
+  return { imported: retainedImported, total: committed.length };
+}
+
+/**
+ * Remove only device-local reviewed anchors and verify the authoritative key
+ * state before reporting success. Message history, topic cursors, searches,
+ * drafts, and every other local surface are deliberately outside this boundary.
+ */
+export function clearReviewHistory(): ClearReviewHistoryResult {
+  const before = readReviewHistory();
+  const store = storage();
+  if (!store) {
+    publish(before);
+    return { success: false, cleared: 0, remaining: before.length };
+  }
+
+  try {
+    store.removeItem(REVIEW_HISTORY_KEY);
+    const keyRemoved = store.getItem(REVIEW_HISTORY_KEY) === null;
+    const remaining = readReviewHistory();
+    publish(remaining);
+    if (!keyRemoved || remaining.length > 0) {
+      return { success: false, cleared: 0, remaining: remaining.length };
+    }
+    return { success: true, cleared: before.length, remaining: 0 };
+  } catch {
+    const retained = readReviewHistory();
+    publish(retained);
+    return { success: false, cleared: 0, remaining: retained.length };
+  }
 }

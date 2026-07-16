@@ -11,7 +11,7 @@
  *
  *   1. Lexical ranking — rows whose sender or ciphertext body contain the query
  *      as a case-insensitive substring, ordered newest-first (stable).
- *   2. Semantic ranking — every row embedded locally with the deterministic
+ *   2. Semantic ranking — each globally bounded candidate embedded locally
  *      hashing vectorizer and ranked by cosine similarity to the query, keeping
  *      only rows above `minScore`.
  *
@@ -29,15 +29,18 @@
  * reciprocal contributions and wins — which is exactly the hybrid intent.
  *
  * Nothing leaves the device; the vectorizer is pure and deterministic, so
- * results are stable across repeated calls. Bounded at vault scale
- * (≤ VAULT_KEEP rows per target), so the full embed pass stays cheap.
+ * results are stable across repeated calls. The history-vault reader applies a
+ * global newest-first row cap in addition to per-target retention before the
+ * embed pass starts.
  */
 import { readAllVaultHits, type VaultSearchHit } from './historyVault';
 import {
   defaultEmbeddingProvider,
+  embedItemsBounded,
   rankBySimilarity,
   type EmbeddingProvider,
 } from './embeddingIndex';
+import { boundedSearchQuery, buildBoundedSearchText } from './searchBounds';
 
 /** Reciprocal Rank Fusion damping constant (Cormack et al. 2009 default). */
 export const RRF_K = 60;
@@ -98,13 +101,15 @@ export interface HybridSearchOptions {
   minScore?: number;
   /** Override the on-device embedding provider (defaults to the hashing one). */
   provider?: EmbeddingProvider;
+  /** Stop scheduling candidate work when a newer UI query supersedes this one. */
+  signal?: AbortSignal;
 }
 
 const DEFAULT_LIMIT = 40;
 
 /** The text a message contributes to matching/embedding: sender + body. */
 function candidateText(hit: VaultSearchHit): string {
-  return `${hit.message.from} ${hit.message.text}`;
+  return buildBoundedSearchText(hit.message.from, hit.message.text);
 }
 
 /**
@@ -126,16 +131,16 @@ function newestFirst(a: VaultSearchHit, b: VaultSearchHit): number {
 }
 
 /**
- * Rank every remembered conversation on this device against `query` by fusing
- * an exact-substring lexical ranking with an on-device semantic ranking via
- * Reciprocal Rank Fusion. Returns [] for an empty query or an empty/absent
- * vault. Deterministic and network-free.
+ * Rank the globally bounded newest slice of remembered conversations on this
+ * device against `query` by fusing an exact-substring lexical ranking with an
+ * on-device related-term ranking via Reciprocal Rank Fusion. Returns [] for an
+ * empty query or an empty/absent vault. Deterministic and network-free.
  */
 export async function searchVaultHybrid(
   query: string,
   opts: HybridSearchOptions = {},
 ): Promise<VaultSearchHit[]> {
-  const trimmed = query.trim();
+  const trimmed = boundedSearchQuery(query);
   if (!trimmed) return [];
 
   const provider = opts.provider ?? defaultEmbeddingProvider;
@@ -143,7 +148,7 @@ export async function searchVaultHybrid(
   const minScore = opts.minScore ?? 0;
 
   const hits = await readAllVaultHits();
-  if (hits.length === 0) return [];
+  if (hits.length === 0 || opts.signal?.aborted) return [];
 
   // Lexical ranking: locale-aware, case-insensitive substring over sender+body,
   // newest-first (stable). Mirrors searchVault's matcher so accented and
@@ -158,12 +163,10 @@ export async function searchVaultHybrid(
   // and keep only rows above minScore. Scoring every row (not just non-lexical
   // ones) is what lets RRF reward a doc that both legs rank highly.
   const qVec = await Promise.resolve(provider.embed(trimmed));
-  const candidates = await Promise.all(
-    hits.map(async (hit) => ({
-      hit,
-      vector: await Promise.resolve(provider.embed(candidateText(hit))),
-    })),
-  );
+  if (opts.signal?.aborted) return [];
+  const embedded = await embedItemsBounded(hits, candidateText, provider, opts.signal);
+  if (opts.signal?.aborted) return [];
+  const candidates = embedded.map(({ item: hit, vector }) => ({ hit, vector }));
   const semanticRanking = rankBySimilarity(qVec, candidates)
     .filter((entry) => entry.score > minScore)
     .map((entry) => entry.hit);

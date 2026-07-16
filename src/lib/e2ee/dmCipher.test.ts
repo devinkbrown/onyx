@@ -14,6 +14,7 @@ import {
   ENVELOPE_PREFIX,
   _resetDeviceKeysForTests,
   _resetSharedKeysForTests,
+  deviceRegistryId,
   deviceKeys,
   fromB64url,
   isEnvelope,
@@ -71,6 +72,21 @@ describe('dmCipher', () => {
     const raw = fromB64url(first!.publicB64)!;
     expect(raw.length).toBe(65);
     expect(raw[0]).toBe(0x04);
+  });
+
+  it('derives a stable bounded registry id without collapsing different devices', async () => {
+    const first = await makePeer();
+    const second = await makePeer();
+
+    const firstId = await deviceRegistryId(first.publicB64);
+    expect(firstId).toMatch(/^web-[A-Za-z0-9_-]{20}$/);
+    expect(await deviceRegistryId(first.publicB64)).toBe(firstId);
+    expect(await deviceRegistryId(second.publicB64)).not.toBe(firstId);
+  });
+
+  it('refuses to derive a registry id from a malformed public point', async () => {
+    await expect(deviceRegistryId('browser')).resolves.toBeNull();
+    await expect(deviceRegistryId(toB64url(new Uint8Array(65)))).resolves.toBeNull();
   });
 
   it('seals an envelope the peer can open (and vice versa)', async () => {

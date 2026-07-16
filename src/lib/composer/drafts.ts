@@ -80,6 +80,57 @@ export function saveComposerDrafts(drafts: ComposerDrafts, storage?: DraftStorag
   } catch {}
 }
 
+export interface ClearRoomComposerDraftsResult {
+  success: boolean;
+  cleared: number;
+  remaining: number;
+}
+
+function isRoomDraftTarget(target: string): boolean {
+  return target.startsWith('#') || target.startsWith('&');
+}
+
+/**
+ * Remove only persisted room composer drafts and verify the committed shape.
+ * DM drafts are intentionally retained: portable transfer excludes that
+ * plaintext, and this room/topic control must not silently broaden its scope.
+ */
+export function clearRoomComposerDrafts(
+  storage?: DraftStorage,
+): ClearRoomComposerDraftsResult {
+  const resolved = storageOrDefault(storage);
+  const before = loadComposerDrafts(storage);
+  const roomKeys = Object.keys(before).filter(isRoomDraftTarget);
+  if (!resolved) return { success: false, cleared: 0, remaining: roomKeys.length };
+
+  const retained = Object.fromEntries(
+    Object.entries(before).filter(([target]) => !isRoomDraftTarget(target)),
+  );
+  try {
+    if (Object.keys(retained).length === 0) resolved.removeItem(COMPOSER_DRAFTS_KEY);
+    else resolved.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify(retained));
+
+    const committed = loadComposerDrafts(storage);
+    const remaining = Object.keys(committed).filter(isRoomDraftTarget).length;
+    const retainedCommitted = Object.fromEntries(
+      Object.entries(committed).filter(([target]) => !isRoomDraftTarget(target)),
+    );
+    const keyShapeVerified = Object.keys(retained).length > 0
+      || resolved.getItem(COMPOSER_DRAFTS_KEY) === null;
+    const success = keyShapeVerified
+      && remaining === 0
+      && JSON.stringify(retainedCommitted) === JSON.stringify(retained);
+    return {
+      success,
+      cleared: success ? roomKeys.length : 0,
+      remaining,
+    };
+  } catch {
+    const remaining = Object.keys(loadComposerDrafts(storage)).filter(isRoomDraftTarget).length;
+    return { success: false, cleared: 0, remaining };
+  }
+}
+
 export function setComposerDraft(
   drafts: ComposerDrafts,
   target: string,

@@ -16,11 +16,15 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Encrypted message tags')).toBeInTheDocument();
     expect(screen.getByText('Channel encryption policy')).toBeInTheDocument();
     expect(screen.getByText('Account device-key publishing')).toBeInTheDocument();
+    expect(screen.getByText('Stable device-key identity')).toBeInTheDocument();
     expect(screen.getByText('Key transparency status')).toBeInTheDocument();
     expect(screen.getByText('Scheduled events on Home')).toBeInTheDocument();
     expect(screen.getByText('Vault memory previews')).toBeInTheDocument();
     expect(screen.getByText('Quiet room activity')).toBeInTheDocument();
     expect(screen.getByText('Home return recaps')).toBeInTheDocument();
+    expect(screen.getByText('Global Search Center')).toBeInTheDocument();
+    expect(screen.getByText('Saved search queries')).toBeInTheDocument();
+    expect(screen.getByText('Archived-result hydration')).toBeInTheDocument();
     expect(screen.getByText('Spotlight handoff')).toBeInTheDocument();
     expect(screen.getByText('Room rhythm heatlines')).toBeInTheDocument();
     expect(screen.getByText('Event context')).toBeInTheDocument();
@@ -87,6 +91,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Generated public sitemap')).toBeInTheDocument();
     expect(screen.getByText('Public glossary')).toBeInTheDocument();
     expect(screen.getByText('Native onboarding forms')).toBeInTheDocument();
+    expect(screen.getByText('Remembered identity switcher')).toBeInTheDocument();
+    expect(screen.getByText('Capability-labelled sign-in')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Venue model' })).toBeInTheDocument();
     expect(screen.getByText('Named conversations')).toBeInTheDocument();
     expect(screen.getByText('Forum topic follow controls')).toBeInTheDocument();
@@ -159,6 +165,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Offline reviewed recall')).toBeInTheDocument();
     expect(screen.getByText('Offline search gating')).toBeInTheDocument();
     expect(screen.getByText('Local-memory mode status')).toBeInTheDocument();
+    expect(screen.getByText('Device-memory retention controls')).toBeInTheDocument();
+    expect(screen.getByText('Bounded vault pruning')).toBeInTheDocument();
     expect(screen.getByText('Outbox count status')).toBeInTheDocument();
     expect(screen.getByText('Offline draft counts')).toBeInTheDocument();
     expect(screen.getByText('Offline topic drafts')).toBeInTheDocument();
@@ -175,6 +183,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Reviewed catch-up transfer')).toBeInTheDocument();
     expect(screen.getByText('Room draft transfer')).toBeInTheDocument();
     expect(screen.getByText('Topic draft transfer')).toBeInTheDocument();
+    expect(screen.getByText('Saved search transfer')).toBeInTheDocument();
+    expect(screen.getByText('Retention policy transfer')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByText('complete phases').closest('.data-metric')).toHaveTextContent('4');
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();

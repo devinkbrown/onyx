@@ -35,9 +35,9 @@ const phases: Phase[] = [
     phase: 'Phase 3',
     title: 'Privacy',
     state: 'complete',
-    date: '2026-07-02',
-    summary: 'DMs, room policies, and account key surfaces keep private state out of durable replay while exposing verifiable identity hooks.',
-    items: ['Tsumugi-encrypted DMs', 'Orochi E2EE capability', 'Encrypted message tags', 'Channel encryption policy', 'Account device-key publishing', 'Key transparency status', 'Ephemeral room TTL', 'Ciphertext-only vault/search'],
+    date: '2026-07-16',
+    summary: 'DMs, room policies, and account key surfaces keep private state out of durable replay while exposing stable, verifiable device identity hooks.',
+    items: ['Tsumugi-encrypted DMs', 'Orochi E2EE capability', 'Encrypted message tags', 'Channel encryption policy', 'Account device-key publishing', 'Stable device-key identity', 'Key transparency status', 'Ephemeral room TTL', 'Ciphertext-only vault/search'],
   },
   {
     phase: 'Phase 4',
@@ -59,9 +59,9 @@ const phases: Phase[] = [
     phase: 'Phase 6',
     title: 'Time-native',
     state: 'active',
-    date: '2026-07-09',
-    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, review history, channel directory dedupe, review text search, active-target vault search, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, vault anchor jumps, a 20-command palette grammar batch, and J/K transcript navigation into view.',
-    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Catch-up review history', 'Review text search', 'Active-target vault search', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home', 'Reviewed span recall', 'Hydrated context trails', 'Vault context trails', 'Vault anchor jumps', 'Command grammar examples', 'Selected-command status', 'Join/open aliases', 'Goto-at jump', 'Targeted at jump', 'Search/find grammar', 'Home command', 'Preferences command', 'Shortcuts command', 'Reader command', 'Density commands', 'Width commands', 'Motion commands', 'Timed mute', 'Quiet on/off', 'J/K transcript nav'],
+    date: '2026-07-16',
+    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, a global Search Center with saved queries and archived-result hydration, room rhythm, review handoffs, reader memory, transcript jumps, command grammar, and J/K navigation into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Global Search Center', 'Saved search queries', 'Archived-result hydration', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Catch-up review history', 'Review text search', 'Active-target vault search', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home', 'Reviewed span recall', 'Hydrated context trails', 'Vault context trails', 'Vault anchor jumps', 'Command grammar examples', 'Selected-command status', 'Join/open aliases', 'Goto-at jump', 'Targeted at jump', 'Search/find grammar', 'Home command', 'Preferences command', 'Shortcuts command', 'Reader command', 'Density commands', 'Width commands', 'Motion commands', 'Timed mute', 'Quiet on/off', 'J/K transcript nav'],
   },
   {
     phase: 'Phase 7',
@@ -75,9 +75,9 @@ const phases: Phase[] = [
     phase: 'Phase 8',
     title: 'Torii entry',
     state: 'active',
-    date: '2026-07-11',
-    summary: 'Fold the master roadmap product-entry work into Onyx and the main site: rich invite previews, topic and reader handoff, instant guest entry, native onboarding, install guidance, release checks, and a stricter public glossary.',
-    items: ['Rich invite route', 'Invite Open Graph metadata', 'Instant guest identity', 'Invite moment handoff', 'Invite topic metadata', 'Invite reader metadata', 'Copyable canonical invite', 'Invite first-run runway', 'App topic handoff', 'App reader handoff', 'Native onboarding forms', 'Account claim flow', 'In-session guest claim prompt', 'Client brand unification', 'Install guide', 'Install release checks', 'Wrapper link contract', 'Generated public sitemap', 'Public glossary', 'Brand glossary cleanup'],
+    date: '2026-07-16',
+    summary: 'Fold the master roadmap product-entry work into Onyx and the main site: rich invite previews, topic and reader handoff, instant guest entry, native onboarding, safe remembered-identity switching, install guidance, release checks, and a stricter public glossary.',
+    items: ['Rich invite route', 'Invite Open Graph metadata', 'Instant guest identity', 'Invite moment handoff', 'Invite topic metadata', 'Invite reader metadata', 'Copyable canonical invite', 'Invite first-run runway', 'App topic handoff', 'App reader handoff', 'Native onboarding forms', 'Remembered identity switcher', 'Capability-labelled sign-in', 'Account claim flow', 'In-session guest claim prompt', 'Client brand unification', 'Install guide', 'Install release checks', 'Wrapper link contract', 'Generated public sitemap', 'Public glossary', 'Brand glossary cleanup'],
   },
   {
     phase: 'Phase 9',
@@ -123,9 +123,9 @@ const phases: Phase[] = [
     phase: 'Phase 14',
     title: 'Roaming',
     state: 'active',
-    date: '2026-07-09',
-    summary: 'Generalize offline-first behavior into read, compose, search, PWA install clarity, moderation drafts, desktop packaging, installed-app readiness, update recovery, and portable local-state/follow/preference/account handoff transfer.',
-    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Offline reviewed recall', 'Offline search gating', 'Local-memory mode status', 'Outbox count status', 'Offline draft counts', 'Offline topic drafts', 'Installable manifest', 'PWA shortcuts', 'Install screenshots', 'Launch handler', 'Installed app readiness', 'Service worker readiness', 'App shell refresh action', 'Wrapper readiness matrix', 'Wrapper contract', 'Portable vault export', 'Portable vault import', 'Reviewed catch-up transfer', 'Room draft transfer', 'Topic draft transfer', 'Followed conversation transfer', 'Account handoff transfer', 'Preference handoff transfer', 'Full offline-first UX', 'Desktop packaging path'],
+    date: '2026-07-16',
+    summary: 'Generalize offline-first behavior into read, compose, search, bounded device-memory retention, PWA install clarity, moderation drafts, update recovery, and portable local-state transfer including saved searches and retention policy.',
+    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Offline reviewed recall', 'Offline search gating', 'Local-memory mode status', 'Device-memory retention controls', 'Bounded vault pruning', 'Outbox count status', 'Offline draft counts', 'Offline topic drafts', 'Installable manifest', 'PWA shortcuts', 'Install screenshots', 'Launch handler', 'Installed app readiness', 'Service worker readiness', 'App shell refresh action', 'Wrapper readiness matrix', 'Wrapper contract', 'Portable vault export', 'Portable vault import', 'Reviewed catch-up transfer', 'Room draft transfer', 'Topic draft transfer', 'Followed conversation transfer', 'Saved search transfer', 'Retention policy transfer', 'Account handoff transfer', 'Preference handoff transfer', 'Full offline-first UX', 'Desktop packaging path'],
   },
 ];
 
@@ -230,7 +230,7 @@ export default function RoadmapRoute() {
             place to return to: followed catch-up, scheduled room events, local
             memory previews, quiet room activity, home return recaps, Spotlight
             handoff, room rhythm heatlines, event context, review-from-start
-            handoffs, review history, review text search, channel directory dedupe, reader digest notes, shareable moment links, reader memory context, moment search handoff,
+            handoffs, review history, a global Search Center, saved queries, archived-result hydration, channel directory dedupe, reader digest notes, shareable moment links, reader memory context, moment search handoff,
             reader transcript jumps, digest review handoff, review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, vault anchor jumps, and
             command grammar for goto, search, time jumps, reading projections, J/K transcript navigation, and quieter activity surfaces.
           </p>
@@ -239,10 +239,10 @@ export default function RoadmapRoute() {
           <span class="label">open surfaces</span>
           <h3>Keep tightening</h3>
           <div class="data-list data-list--compact">
-            <div class="data-row"><div><strong>Catch-up Home</strong><span>Continue richer cross-room review handoffs on the return screen.</span></div></div>
+            <div class="data-row"><div><strong>Search Center</strong><span>Device memory is globally reachable, saved queries are portable, and archived results hydrate their transcript context.</span></div></div>
             <div class="data-row"><div><strong>Reader mode</strong><span>Carry reviewed anchors into richer cross-room handoffs.</span></div></div>
             <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue remaining dense-surface pass/fix evidence.</a></span></div></div>
-            <div class="data-row"><div><strong>Torii entry</strong><span><a href="/invite?join=%23root">Rich invite entry</a> and install guidance now anchor the first-run path.</span></div></div>
+            <div class="data-row"><div><strong>Torii entry</strong><span><a href="/invite?join=%23root">Rich invite entry</a>, remembered identities, and capability-labelled sign-in now anchor the first-run path.</span></div></div>
             <div class="data-row"><div><strong>Public contracts</strong><span><a href="/glossary/">Glossary</a>, <a href="/integrations/">integrations</a>, and <a href="/agents/">agent safety</a> now carry site-level roadmap contracts.</span></div></div>
             <div class="data-row"><div><strong>Master roadmap fold-in</strong><span>Track onboarding, calm presets, media presence, app surfaces, local intelligence, and offline roaming here.</span></div></div>
           </div>

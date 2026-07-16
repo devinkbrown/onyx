@@ -9,6 +9,7 @@ import { TimeScrubber } from './TimeScrubber';
 const initialState = store.getInitialState();
 
 beforeEach(() => {
+  localStorage.clear();
   store.setState({
     ...initialState,
     activeView: { kind: 'channel', channel: '#root' },
@@ -108,6 +109,44 @@ describe('TimeScrubber accessibility', () => {
 
     await waitFor(() => {
       expect(status).toHaveTextContent(/copied/i);
+      expect(screen.getByRole('button', { name: 'Copy moment link for #root' })).toHaveTextContent('Copied');
     });
+  });
+
+  it('shows and announces clipboard rejection without persisting the moment link', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      hours: Array.from({ length: 24 }, () => 0),
+      totals: { messages: 0 },
+    }), { status: 200 })));
+    const writeText = vi.fn().mockRejectedValue(new DOMException('denied'));
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+    render(() => <TimeScrubber />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy moment link for #root' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copy moment link for #root' })).toHaveTextContent('Copy failed');
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Could not copy moment link for #root. Clipboard access is unavailable.',
+      );
+    });
+    expect(localStorage.getItem('onyx:last-copied-moment')).toBeNull();
+  });
+
+  it('shows and announces an unavailable clipboard without false success', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      hours: Array.from({ length: 24 }, () => 0),
+      totals: { messages: 0 },
+    }), { status: 200 })));
+    vi.stubGlobal('navigator', {});
+
+    render(() => <TimeScrubber />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy moment link for #root' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copy moment link for #root' })).toHaveTextContent('Copy failed');
+      expect(screen.getByRole('status')).toHaveTextContent(/clipboard access is unavailable/i);
+    });
+    expect(localStorage.getItem('onyx:last-copied-moment')).toBeNull();
   });
 });

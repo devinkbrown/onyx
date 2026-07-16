@@ -14,10 +14,9 @@
  * The two constraints compose by *stricter-wins*: a message is pruned if the
  * count cap would drop it OR the age cutoff would drop it (set union).
  *
- * This is the testable core a future `saveMessages` / prune path would consume.
- * It is intentionally NOT wired into `historyVault.ts` (a shared file); it only
- * exports pure functions and never opens the DB, so it is safe to unit-test
- * without `fake-indexeddb`.
+ * `historyVault.ts` consumes this policy in its save/prune path. The selection
+ * logic stays pure and IndexedDB-free; the only browser boundary here is the
+ * small best-effort localStorage reader/writer used by Preferences.
  */
 import { VAULT_KEEP } from './historyVault';
 
@@ -25,8 +24,11 @@ import { VAULT_KEEP } from './historyVault';
 export const RETENTION_MAX_KEEP = 5000;
 /** Hard ceiling on the age cutoff (~10 years); larger values clamp down. */
 export const RETENTION_MAX_AGE_DAYS = 3650;
+/** Browser-local persistence key for the device vault policy. */
+export const RETENTION_POLICY_STORAGE_KEY = 'onyx:vault-retention-policy';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const policyListeners = new Set<(policy: RetentionPolicy) => void>();
 
 /** A configurable retention policy. All fields are validated before use. */
 export interface RetentionPolicy {
@@ -83,6 +85,46 @@ export function sanitizeRetentionPolicy(policy: RetentionPolicy): RetentionPolic
   if (maxAgeDays !== undefined) out.maxAgeDays = maxAgeDays;
 
   return out;
+}
+
+/** Read the device's persisted policy, falling back safely when storage is unavailable or invalid. */
+export function readRetentionPolicy(): RetentionPolicy {
+  const fallback: RetentionPolicy = { keep: VAULT_KEEP };
+  try {
+    const raw = globalThis.localStorage?.getItem(RETENTION_POLICY_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return fallback;
+    return sanitizeRetentionPolicy(parsed as RetentionPolicy);
+  } catch {
+    return fallback;
+  }
+}
+
+/** Observe policy writes made by Preferences or portable import. */
+export function subscribeRetentionPolicy(
+  listener: (policy: RetentionPolicy) => void,
+): () => void {
+  policyListeners.add(listener);
+  return () => policyListeners.delete(listener);
+}
+
+/** Persist a sanitized policy. Returns false when browser storage rejects the write. */
+export function writeRetentionPolicy(policy: RetentionPolicy): boolean {
+  const safe = sanitizeRetentionPolicy(policy);
+  for (const listener of policyListeners) {
+    try {
+      listener(safe);
+    } catch {
+      // One mounted consumer must not prevent policy persistence.
+    }
+  }
+  try {
+    globalThis.localStorage?.setItem(RETENTION_POLICY_STORAGE_KEY, JSON.stringify(safe));
+    return globalThis.localStorage !== undefined;
+  } catch {
+    return false;
+  }
 }
 
 /** The effective keep-count for a channel: its override, else the default. */

@@ -1,8 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
-import { parseWatchTogetherProp, type WatchTogetherActivity } from './watchTogether';
+import {
+  normalizeWatchTogetherActivity,
+  parseWatchTogetherProp,
+  WATCH_NICK_MAX_LENGTH,
+  WATCH_PARTICIPANT_MAX_COUNT,
+  WATCH_PROP_MAX_LENGTH,
+  WATCH_SECONDS_MAX,
+  WATCH_TITLE_MAX_LENGTH,
+  WATCH_URL_MAX_LENGTH,
+  type WatchTogetherActivity,
+} from './watchTogether';
 import {
   acceptHandoff,
+  cancelHandoff,
   createWatchSession,
   handoff,
   isWatchHost,
@@ -63,6 +74,49 @@ describe('createWatchSession', () => {
     expect(createWatchSession({ host: 'a', title: 't', durationSeconds: Number.NaN, nowMs: T0 }).activity.durationSeconds).toBeNull();
     expect(createWatchSession({ host: 'a', title: 't', durationSeconds: 12.9, nowMs: T0 }).activity.durationSeconds).toBe(12);
   });
+
+  it('accepts exact local field boundaries and rejects or bounds one-over values', () => {
+    const urlPrefix = 'https://example.test/';
+    const exactUrl = `${urlPrefix}${'u'.repeat(WATCH_URL_MAX_LENGTH - urlPrefix.length)}`;
+    const exactHost = 'h'.repeat(WATCH_NICK_MAX_LENGTH);
+    const exact = createWatchSession({
+      host: exactHost,
+      title: 't'.repeat(WATCH_TITLE_MAX_LENGTH),
+      url: exactUrl,
+      durationSeconds: WATCH_SECONDS_MAX,
+      nowMs: T0,
+    });
+
+    expect(exact.activity).toMatchObject({
+      host: exactHost,
+      title: 't'.repeat(WATCH_TITLE_MAX_LENGTH),
+      url: exactUrl,
+      durationSeconds: WATCH_SECONDS_MAX,
+      participants: [exactHost],
+    });
+
+    const oneOver = createWatchSession({
+      host: 'h'.repeat(WATCH_NICK_MAX_LENGTH + 1),
+      title: 't'.repeat(WATCH_TITLE_MAX_LENGTH + 1),
+      url: `${exactUrl}x`,
+      durationSeconds: WATCH_SECONDS_MAX + 1,
+      nowMs: T0,
+    });
+    expect(oneOver.activity.title).toHaveLength(WATCH_TITLE_MAX_LENGTH);
+    expect(oneOver.activity.host).toBeNull();
+    expect(oneOver.activity.participants).toEqual([]);
+    expect(oneOver.activity.url).toBeNull();
+    expect(oneOver.activity.durationSeconds).toBeNull();
+  });
+
+  it.each(['javascript:alert(1)', 'data:text/html,bad', 'file:///etc/passwd'])(
+    'does not publish an unsafe local URL scheme: %s',
+    (url) => {
+      const session = createWatchSession({ host: 'alice', title: 'Unsafe', url, nowMs: T0 });
+      expect(session.activity.url).toBeNull();
+      expect(parseWatchTogetherProp(serializeWatchTogetherProp(session.activity))?.url).toBeNull();
+    },
+  );
 });
 
 describe('serialize / parse round-trip', () => {
@@ -89,6 +143,118 @@ describe('serialize / parse round-trip', () => {
     s = handoff(s, 'bob', T0 + 11_000, 'alice');
     const wire = serializeWatchTogetherProp(s.activity);
     expect(parseWatchTogetherProp(wire)).toEqual(s.activity);
+  });
+
+  it('normalizes adversarial encoded size while preserving host and handoff authority', () => {
+    const participants = [
+      'host',
+      'target',
+      ...Array.from(
+        { length: WATCH_PARTICIPANT_MAX_COUNT + 20 },
+        (_, index) => `${index.toString(36)}-${'😀'.repeat(28)}`,
+      ),
+    ];
+    const activity: WatchTogetherActivity = {
+      title: '🔥'.repeat(WATCH_TITLE_MAX_LENGTH),
+      url: `https://example.test/${'%'.repeat(WATCH_URL_MAX_LENGTH - 21)}`,
+      host: 'host',
+      state: 'handoff',
+      positionSeconds: WATCH_SECONDS_MAX + 1,
+      durationSeconds: Number.POSITIVE_INFINITY,
+      participants,
+      handoffTo: 'target',
+    };
+
+    const normalized = normalizeWatchTogetherActivity(activity);
+    const wire = serializeWatchTogetherProp(activity);
+    const parsed = parseWatchTogetherProp(wire);
+
+    expect(wire.length).toBeLessThanOrEqual(WATCH_PROP_MAX_LENGTH);
+    expect(parsed).toEqual(normalized);
+    expect(parsed?.url).toBeNull();
+    expect(parsed?.positionSeconds).toBeNull();
+    expect(parsed?.durationSeconds).toBeNull();
+    expect(parsed?.state).toBe('handoff');
+    expect(parsed?.participants.some((nick) => nick.toLowerCase() === 'host')).toBe(true);
+    expect(parsed?.participants.some((nick) => nick.toLowerCase() === 'target')).toBe(true);
+  });
+
+  it('keeps a URL-derived fallback title within the title render bound', () => {
+    const prefix = 'https://example.test/';
+    const url = `${prefix}${'u'.repeat(WATCH_URL_MAX_LENGTH - prefix.length)}`;
+    const activity: WatchTogetherActivity = {
+      title: '',
+      url,
+      host: 'alice',
+      state: 'paused',
+      positionSeconds: 0,
+      durationSeconds: null,
+      participants: ['alice'],
+      handoffTo: null,
+    };
+
+    const normalized = normalizeWatchTogetherActivity(activity);
+    expect(normalized.title).toHaveLength(WATCH_TITLE_MAX_LENGTH);
+    expect(normalized.title).toBe(url.slice(0, WATCH_TITLE_MAX_LENGTH));
+    expect(parseWatchTogetherProp(serializeWatchTogetherProp(activity))).toEqual(normalized);
+  });
+
+  it('case-insensitively deduplicates and caps rosters while reserving late authority nicks', () => {
+    const participants = [
+      'alice',
+      'ALICE',
+      ...Array.from({ length: WATCH_PARTICIPANT_MAX_COUNT }, (_, index) => `p${index}`),
+      'bob',
+      'BOB',
+    ];
+    const activity: WatchTogetherActivity = {
+      title: 'Crowded room',
+      url: null,
+      host: 'Alice',
+      state: 'handoff',
+      positionSeconds: 10,
+      durationSeconds: 20,
+      participants,
+      handoffTo: 'Bob',
+    };
+
+    const parsed = parseWatchTogetherProp(serializeWatchTogetherProp(activity));
+    expect(parsed?.participants).toHaveLength(WATCH_PARTICIPANT_MAX_COUNT);
+    expect(new Set(parsed?.participants.map((nick) => nick.toLowerCase())).size)
+      .toBe(WATCH_PARTICIPANT_MAX_COUNT);
+    expect(parsed?.participants.some((nick) => nick.toLowerCase() === 'alice')).toBe(true);
+    expect(parsed?.participants.some((nick) => nick.toLowerCase() === 'bob')).toBe(true);
+    expect(parsed).toMatchObject({ host: 'Alice', state: 'handoff', handoffTo: 'Bob' });
+  });
+
+  it('fails an unpreservable handoff closed to paused with no target', () => {
+    const base: WatchTogetherActivity = {
+      title: 'Unsafe handoff',
+      url: 'https://example.test/v',
+      host: 'alice',
+      state: 'handoff',
+      positionSeconds: 10,
+      durationSeconds: 20,
+      participants: ['alice'],
+      handoffTo: 'missing-target',
+    };
+
+    expect(parseWatchTogetherProp(serializeWatchTogetherProp(base))).toMatchObject({
+      host: 'alice',
+      state: 'paused',
+      handoffTo: null,
+      participants: ['alice'],
+    });
+
+    const invalidNick = {
+      ...base,
+      participants: ['alice', 'bad,target'],
+      handoffTo: 'bad,target',
+    };
+    expect(parseWatchTogetherProp(serializeWatchTogetherProp(invalidNick))).toMatchObject({
+      state: 'paused',
+      handoffTo: null,
+    });
   });
 });
 
@@ -181,6 +347,12 @@ describe('seek (host-only)', () => {
     expect(seek(s, -50, T0, 'alice').activity.positionSeconds).toBe(0);
   });
 
+  it('caps positions at the exact exported seconds boundary', () => {
+    const s = createWatchSession({ host: 'alice', title: 'Long-running', nowMs: T0 });
+    expect(seek(s, WATCH_SECONDS_MAX, T0, 'alice').activity.positionSeconds).toBe(WATCH_SECONDS_MAX);
+    expect(seek(s, WATCH_SECONDS_MAX + 1, T0, 'alice').activity.positionSeconds).toBe(WATCH_SECONDS_MAX);
+  });
+
   it('is a no-op for a non-host or an unchanged position', () => {
     const s = host();
     expect(seek(s, 100, T0, 'bob')).toBe(s);
@@ -199,9 +371,28 @@ describe('join / leave', () => {
     expect(join(withBob, '   ', T0)).toBe(withBob); // blank no-op
   });
 
-  it('leave removes a non-host participant without touching playback', () => {
+  it('allows the exact final roster slot and fails closed once the cap is full', () => {
+    const almostFull = createWatchSessionWith({
+      participants: Array.from(
+        { length: WATCH_PARTICIPANT_MAX_COUNT - 1 },
+        (_, index) => index === 0 ? 'alice' : `p${index}`,
+      ),
+    });
+    const full = join(almostFull, 'last', T0);
+    expect(full.activity.participants).toHaveLength(WATCH_PARTICIPANT_MAX_COUNT);
+    expect(full.activity.participants.at(-1)).toBe('last');
+    expect(join(full, 'overflow', T0)).toBe(full);
+  });
+
+  it('rejects local participant nicks that would split or truncate on the wire', () => {
+    const s = host();
+    expect(join(s, 'bad,nick', T0)).toBe(s);
+    expect(join(s, 'n'.repeat(WATCH_NICK_MAX_LENGTH + 1), T0)).toBe(s);
+  });
+
+  it('leave removes a non-host participant case-insensitively without touching playback', () => {
     const s = join(play(host(), T0, 'alice'), 'bob', T0);
-    const left = leave(s, 'bob', T0 + 5_000);
+    const left = leave(s, 'BOB', T0 + 5_000);
     expect(left.activity.participants).toEqual(['alice']);
     expect(left.activity.state).toBe('playing');
   });
@@ -210,16 +401,17 @@ describe('join / leave', () => {
     let s = join(host(), 'bob', T0);
     s = handoff(s, 'bob', T0, 'alice');
     const left = leave(s, 'bob', T0 + 1_000);
-    expect(left.activity.handoffTo).toBeNull();
+    expect(left.activity).toMatchObject({
+      host: 'alice',
+      state: 'paused',
+      participants: ['alice'],
+      handoffTo: null,
+    });
   });
 
-  it('host leaving vacates the host slot and freezes playback', () => {
+  it('fails a host leave closed until ownership is handed off', () => {
     const s = play(join(host(), 'bob', T0), T0, 'alice');
-    const left = leave(s, 'alice', T0 + 4_000);
-    expect(left.activity.host).toBeNull();
-    expect(left.activity.state).toBe('paused');
-    expect(left.activity.positionSeconds).toBe(4);
-    expect(left.activity.participants).toEqual(['bob']);
+    expect(leave(s, 'ALICE', T0 + 4_000)).toBe(s);
   });
 
   it('leave is a no-op for an absent participant', () => {
@@ -270,6 +462,17 @@ describe('handoff / acceptHandoff', () => {
     const s: WatchSession = createWatchSessionWith({ host: 'alice', state: 'handoff', handoffTo: 'bob', participants: ['alice'] });
     const accepted = acceptHandoff(s, T0, 'bob');
     expect(accepted.activity.participants).toContain('bob');
+  });
+
+  it('lets only the current host cancel a pending handoff into a paused session', () => {
+    let pending = join(host(), 'bob', T0);
+    pending = handoff(pending, 'bob', T0, 'alice');
+
+    expect(cancelHandoff(pending, T0 + 100, 'mallory')).toBe(pending);
+    const cancelled = cancelHandoff(pending, T0 + 200, 'ALICE');
+    expect(cancelled.activity).toMatchObject({ state: 'paused', handoffTo: null, host: 'alice' });
+    expect(cancelled.anchorMs).toBe(T0 + 200);
+    expect(cancelHandoff(cancelled, T0 + 300, 'alice')).toBe(cancelled);
   });
 });
 

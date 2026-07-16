@@ -196,6 +196,154 @@ describe('frame cadence cap', () => {
     expect(engine.targetFps).toBeLessThan(engine.frameCapFps);
     engine.dispose();
   });
+
+  it('caps actual paints, restores full cadence on activity, and throttles input bursts', () => {
+    const raf = installControlledAnimationFrame();
+    const now = vi.spyOn(performance, 'now').mockReturnValue(0);
+    const variant = createVariant();
+    const engine = new BackgroundEngine({ canvas: createCanvas(), variant });
+
+    try {
+      engine.start();
+      expect(variant.frame).toHaveBeenCalledTimes(1);
+
+      raf.runNext(20);
+      expect(variant.frame).toHaveBeenCalledTimes(1);
+      raf.runNext(34);
+      expect(variant.frame).toHaveBeenCalledTimes(2);
+
+      // The long-idle loop still paints, but at the decelerated cadence.
+      raf.runNext(20_000);
+      expect(variant.frame).toHaveBeenCalledTimes(3);
+
+      now.mockReturnValue(20_001);
+      window.dispatchEvent(new Event('pointerdown'));
+      raf.runNext(20_002);
+      expect(variant.frame).toHaveBeenCalledTimes(4);
+
+      // A burst inside the throttle window must not repeatedly clear the cap.
+      now.mockReturnValue(20_010);
+      window.dispatchEvent(new Event('pointerdown'));
+      raf.runNext(20_011);
+      expect(variant.frame).toHaveBeenCalledTimes(4);
+    } finally {
+      engine.dispose();
+      now.mockRestore();
+      raf.restore();
+    }
+  });
+});
+
+describe('BackgroundEngine lifecycle', () => {
+  it.each([
+    { label: 'solid variant', kind: 'solid' as const, staticMode: false },
+    { label: 'static animated variant', kind: 'animated' as const, staticMode: true },
+  ])('repaints a $label after resize clears the bitmap', ({ kind, staticMode }) => {
+    const variant = { ...createVariant(), kind };
+    const engine = new BackgroundEngine({ canvas: createCanvas(), variant, staticMode });
+
+    engine.start();
+    const framesAtStart = (variant.frame as ReturnType<typeof vi.fn>).mock.calls.length;
+    window.dispatchEvent(new Event('resize'));
+
+    expect(variant.frame).toHaveBeenCalledTimes(framesAtStart + 1);
+    engine.setQuality('med');
+    expect(variant.frame).toHaveBeenCalledTimes(framesAtStart + 2);
+    engine.dispose();
+  });
+
+  it('defers a frozen resize repaint while hidden and flushes it on visibility return', () => {
+    const hidden = Object.getOwnPropertyDescriptor(document, 'hidden');
+    const variant = { ...createVariant(), kind: 'solid' as const };
+    const engine = new BackgroundEngine({ canvas: createCanvas(), variant });
+
+    try {
+      setDocumentHidden(false);
+      engine.start();
+      const framesAtStart = (variant.frame as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      setDocumentHidden(true);
+      window.dispatchEvent(new Event('resize'));
+      expect(variant.frame).toHaveBeenCalledTimes(framesAtStart);
+
+      setDocumentHidden(false);
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(variant.frame).toHaveBeenCalledTimes(framesAtStart + 1);
+    } finally {
+      engine.dispose();
+      restoreDocumentHidden(hidden);
+    }
+  });
+
+  it.each(['activity', 'resize', 'visibility'] as const)(
+    'resets accumulated FPS-guard evidence on %s',
+    (resetKind) => {
+      const hidden = Object.getOwnPropertyDescriptor(document, 'hidden');
+      const raf = installControlledAnimationFrame();
+      const now = vi.spyOn(performance, 'now').mockReturnValue(0);
+      const variant = createVariant();
+      const engine = new BackgroundEngine({
+        canvas: createCanvas(),
+        variant,
+        targetFps: 60,
+        fpsGuardFrames: 2,
+      });
+
+      try {
+        setDocumentHidden(false);
+        engine.start();
+        engine.renderFrame(100); // one low-FPS strike
+        now.mockReturnValue(101);
+
+        if (resetKind === 'activity') {
+          window.dispatchEvent(new Event('keydown'));
+        } else if (resetKind === 'resize') {
+          window.dispatchEvent(new Event('resize'));
+        } else {
+          setDocumentHidden(true);
+          document.dispatchEvent(new Event('visibilitychange'));
+          setDocumentHidden(false);
+          document.dispatchEvent(new Event('visibilitychange'));
+        }
+
+        engine.renderFrame(200); // fresh baseline, not a second strike
+        engine.renderFrame(300); // one strike in the new evidence window
+        expect(engine.quality).toBe('high');
+      } finally {
+        engine.dispose();
+        now.mockRestore();
+        raf.restore();
+        restoreDocumentHidden(hidden);
+      }
+    },
+  );
+
+  it('removes every activity and lifecycle listener with the same callback and options', () => {
+    const windowAdd = vi.spyOn(window, 'addEventListener');
+    const windowRemove = vi.spyOn(window, 'removeEventListener');
+    const documentAdd = vi.spyOn(document, 'addEventListener');
+    const documentRemove = vi.spyOn(document, 'removeEventListener');
+    const variant = { ...createVariant(), kind: 'solid' as const };
+    const engine = new BackgroundEngine({ canvas: createCanvas(), variant });
+
+    try {
+      engine.start();
+      engine.dispose();
+
+      for (const event of ['resize', 'pointerdown', 'keydown', 'wheel', 'touchstart']) {
+        expectSymmetricListener(windowAdd.mock.calls, windowRemove.mock.calls, event);
+      }
+      for (const event of ['visibilitychange', 'scroll']) {
+        expectSymmetricListener(documentAdd.mock.calls, documentRemove.mock.calls, event);
+      }
+    } finally {
+      engine.dispose();
+      windowAdd.mockRestore();
+      windowRemove.mockRestore();
+      documentAdd.mockRestore();
+      documentRemove.mockRestore();
+    }
+  });
 });
 
 describe('static-frame theme refresh', () => {
@@ -606,4 +754,60 @@ function create2dContext(): CanvasRenderingContext2D {
     createRadialGradient: vi.fn(() => gradient),
     measureText: vi.fn(() => ({ width: 0 }) as TextMetrics),
   } as unknown as CanvasRenderingContext2D;
+}
+
+function installControlledAnimationFrame(): {
+  runNext(time: number): void;
+  restore(): void;
+} {
+  const originalRequest = globalThis.requestAnimationFrame;
+  const originalCancel = globalThis.cancelAnimationFrame;
+  const callbacks = new Map<number, FrameRequestCallback>();
+  let nextId = 1;
+
+  globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+    const id = nextId;
+    nextId += 1;
+    callbacks.set(id, callback);
+    return id;
+  }) as typeof requestAnimationFrame;
+  globalThis.cancelAnimationFrame = ((id: number) => {
+    callbacks.delete(id);
+  }) as typeof cancelAnimationFrame;
+
+  return {
+    runNext(time) {
+      const next = callbacks.entries().next().value as [number, FrameRequestCallback] | undefined;
+      if (!next) throw new Error('No animation frame is scheduled');
+      callbacks.delete(next[0]);
+      next[1](time);
+    },
+    restore() {
+      callbacks.clear();
+      globalThis.requestAnimationFrame = originalRequest;
+      globalThis.cancelAnimationFrame = originalCancel;
+    },
+  };
+}
+
+function setDocumentHidden(hidden: boolean): void {
+  Object.defineProperty(document, 'hidden', { configurable: true, value: hidden });
+}
+
+function restoreDocumentHidden(descriptor: PropertyDescriptor | undefined): void {
+  if (descriptor) Object.defineProperty(document, 'hidden', descriptor);
+  else Reflect.deleteProperty(document, 'hidden');
+}
+
+function expectSymmetricListener(
+  addedCalls: readonly (readonly unknown[])[],
+  removedCalls: readonly (readonly unknown[])[],
+  event: string,
+): void {
+  const added = addedCalls.find((call) => call[0] === event);
+  const removed = removedCalls.find((call) => call[0] === event);
+  expect(added, `${event} listener was not attached`).toBeDefined();
+  expect(removed, `${event} listener was not removed`).toBeDefined();
+  expect(removed?.[1]).toBe(added?.[1]);
+  expect(removed?.[2]).toBe(added?.[2]);
 }

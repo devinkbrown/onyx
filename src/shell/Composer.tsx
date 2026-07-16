@@ -576,6 +576,19 @@ export function Composer(props: ComposerProps): JSX.Element {
       const content = [baseContent, ...urls].filter(Boolean).join('\n').trim();
       if (!content) return;
 
+      // Real IRC commands are intentionally never replayed from the offline
+      // outbox: their authority and meaning can change before reconnect. Keep
+      // that safety boundary visible at the composer, though. Previously the
+      // store silently ignored an offline slash command while this component
+      // still cleared the textarea and persisted draft, losing the user's
+      // input. Text-only conveniences such as /shrug have already expanded to
+      // ordinary text above and remain safe to queue.
+      if (isOffline() && content.startsWith('/')) {
+        setComposerError("Commands can't be queued. Reconnect to run this command.");
+        focusTextarea();
+        return;
+      }
+
       getState().sendMessage(t, content);
       resetAfterSend(t);
     } finally {
@@ -595,7 +608,11 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   function clearTopic(): void {
     const view = activeView();
-    if (view.kind === 'channel') getState().setActiveChannelTopic(view.channel, null);
+    if (view.kind !== 'channel') return;
+    getState().openChannelConversation(view.channel, null);
+    // The clear chip unmounts as soon as the whole-room view becomes active.
+    // Move focus to the stable message input instead of leaving it on <body>.
+    focusTextarea();
   }
 
   return (

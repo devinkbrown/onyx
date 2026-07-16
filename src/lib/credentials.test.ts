@@ -7,9 +7,13 @@ import {
   exportAccountHandoffs,
   getAuthSecret,
   importAccountHandoffs,
+  listRememberedIdentities,
   loadCredentials,
   parseAccountHandoffs,
+  removeCredentials,
+  removeRememberedIdentity,
   saveCredentials,
+  selectRememberedIdentity,
   storeMeshToken,
   storeSessionToken,
   type AccountHandoff,
@@ -214,6 +218,28 @@ describe('credentials persistence', () => {
     expect(stored?.tokenExpiry).toBeUndefined();
   });
 
+  it('fails closed for a token with an invalid expiry', () => {
+    writeStoredCredentials({
+      version: 2,
+      activeKey: 'irc.example|alice',
+      entries: {
+        'irc.example|alice': {
+          nick: 'Alice',
+          server: 'irc.example',
+          password: 'pw',
+          meshToken: 'must-not-resume',
+          tokenExpiry: 'not-a-date',
+          savedAt: NOW.toISOString(),
+        },
+      },
+    });
+
+    expect(listRememberedIdentities()).toMatchObject([
+      { nick: 'Alice', access: 'sign-in' },
+    ]);
+    expect(loadCredentials()?.meshToken).toBeUndefined();
+  });
+
   it('records a tokenExpiry when a mesh token is stored with an expiry, and purges it', () => {
     saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
     // 1_800_000_000s = 2027-01-15T08:00:00Z — well after the frozen NOW.
@@ -322,10 +348,128 @@ describe('credentials persistence', () => {
     });
   });
 
+  it('lists multiple identities without exposing secrets or sensitive URL parts', () => {
+    writeStoredCredentials({
+      version: 2,
+      activeKey: 'wss://alice:server-secret@chat.example/ws?token=url-secret|alice',
+      entries: {
+        'wss://alice:server-secret@chat.example/ws?token=url-secret|alice': {
+          nick: 'Alice',
+          server: 'wss://alice:server-secret@chat.example/ws?token=url-secret#fragment',
+          password: 'password-secret',
+          sessionToken: 'session-secret',
+          savedAt: '2026-07-09T00:00:00.000Z',
+        },
+        'wss://second.example|bob': {
+          nick: 'Bob',
+          server: 'wss://second.example',
+          password: 'bob-password',
+          savedAt: '2026-07-08T00:00:00.000Z',
+        },
+        'wss://third.example|carol': {
+          nick: 'Carol',
+          server: 'wss://third.example',
+          meshToken: 'token-without-sasl-secret',
+          savedAt: '2026-07-07T00:00:00.000Z',
+        },
+      },
+    });
+
+    const identities = listRememberedIdentities();
+    const serialized = JSON.stringify(identities);
+
+    expect(identities).toHaveLength(3);
+    expect(identities[0]).toMatchObject({
+      nick: 'Alice',
+      server: 'wss://chat.example/ws',
+      active: true,
+      access: 'resume',
+    });
+    expect(identities.find((identity) => identity.nick === 'Bob')).toMatchObject({
+      server: 'wss://second.example',
+      access: 'sign-in',
+    });
+    expect(identities.find((identity) => identity.nick === 'Carol')).toMatchObject({
+      access: 'identity-only',
+    });
+    expect(serialized).not.toContain('password-secret');
+    expect(serialized).not.toContain('session-secret');
+    expect(serialized).not.toContain('server-secret');
+    expect(serialized).not.toContain('url-secret');
+    expect(identities.every((identity) => identity.id.startsWith('saved-'))).toBe(true);
+  });
+
+  it('bounds durable remembered identities while preserving the active entry', () => {
+    for (let index = 0; index < 14; index += 1) {
+      saveCredentials({
+        nick: `User${index}`,
+        server: `wss://node-${index}.example`,
+        password: `password-${index}`,
+      });
+    }
+
+    const identities = listRememberedIdentities();
+    const stored = JSON.parse(localStorage.getItem(CREDENTIALS_KEY) ?? '{}') as {
+      entries?: Record<string, unknown>;
+    };
+
+    expect(identities).toHaveLength(12);
+    expect(identities[0]).toMatchObject({ nick: 'User13', active: true });
+    expect(Object.keys(stored.entries ?? {})).toHaveLength(12);
+  });
+
+  it('selects and removes identities through opaque picker ids', () => {
+    saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'alice-pw' });
+    saveCredentials({ nick: 'Bob', server: 'irc2.example', password: 'bob-pw' });
+    const alice = listRememberedIdentities().find((identity) => identity.nick === 'Alice');
+    const bob = listRememberedIdentities().find((identity) => identity.nick === 'Bob');
+    expect(alice).toBeDefined();
+    expect(bob).toBeDefined();
+
+    expect(selectRememberedIdentity(alice!.id)).toMatchObject({
+      nick: 'Alice',
+      password: 'alice-pw',
+    });
+    expect(listRememberedIdentities()[0]).toMatchObject({ nick: 'Alice', active: true });
+    expect(localStorage.getItem(SAVED_NICK_KEY)).toBe('Alice');
+
+    expect(removeRememberedIdentity(alice!.id)).toBe(true);
+    expect(loadCredentials('irc.example', 'Alice')).toBeNull();
+    expect(listRememberedIdentities()).toMatchObject([
+      { id: bob!.id, nick: 'Bob', active: true },
+    ]);
+    expect(removeRememberedIdentity('saved-does-not-exist')).toBe(false);
+  });
+
   it('clears all persisted credential and legacy nick state', () => {
     saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
 
     clearCredentials();
+
+    expect(localStorage.getItem(CREDENTIALS_KEY)).toBeNull();
+    expect(localStorage.getItem(SAVED_NICK_KEY)).toBeNull();
+    expect(loadCredentials()).toBeNull();
+  });
+
+  it('removes one account without forgetting the remaining saved identities', () => {
+    saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'alice-pw' });
+    saveCredentials({ nick: 'Bob', server: 'irc2.example', password: 'bob-pw' });
+
+    removeCredentials('IRC2.EXAMPLE/', 'bob');
+
+    expect(loadCredentials('irc2.example', 'Bob')).toBeNull();
+    expect(loadCredentials('irc.example', 'alice')).toMatchObject({
+      nick: 'Alice',
+      password: 'alice-pw',
+    });
+    expect(loadCredentials()).toMatchObject({ nick: 'Alice' });
+    expect(localStorage.getItem(SAVED_NICK_KEY)).toBe('Alice');
+  });
+
+  it('removes the credential store and saved nick after forgetting its last account', () => {
+    saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
+
+    removeCredentials('irc.example', 'Alice');
 
     expect(localStorage.getItem(CREDENTIALS_KEY)).toBeNull();
     expect(localStorage.getItem(SAVED_NICK_KEY)).toBeNull();

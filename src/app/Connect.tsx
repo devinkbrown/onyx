@@ -50,7 +50,16 @@ import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
 import { Mascot } from '@/components/brand/Mascot';
-import { loadCredentials, type SavedCredentials } from '@/lib/credentials';
+import {
+  listRememberedIdentities,
+  removeCredentials,
+  removeRememberedIdentity,
+  saveCredentials,
+  selectRememberedIdentity,
+  storeMeshToken,
+  type RememberedIdentity,
+  type SavedCredentials,
+} from '@/lib/credentials';
 import { initialNode, selectBestNode, type IrcNode } from './nodes';
 
 // ── Deep-water atmosphere — depth, azure currents, bioluminescence ───────────
@@ -349,7 +358,8 @@ export function Connect(props: ConnectProps): JSX.Element {
   // ── Shared form state ──────────────────────────────────────────────────────
   const [nick, setNick] = createSignal(suggestedGuestNick);
   const [password, setPassword] = createSignal('');
-  const [staySignedIn, setStaySignedIn] = createSignal(true);
+  // Persisting an account password is an explicit private-device choice.
+  const [staySignedIn, setStaySignedIn] = createSignal(false);
 
   // Register-only fields
   const [email, setEmail] = createSignal('');
@@ -383,6 +393,8 @@ export function Connect(props: ConnectProps): JSX.Element {
 
   // ── Remembered identity (one-tap resume) ───────────────────────────────────
   const [saved, setSaved] = createSignal<SavedCredentials | null>(null);
+  const [rememberedIdentities, setRememberedIdentities] = createSignal<RememberedIdentity[]>([]);
+  const [selectedIdentityId, setSelectedIdentityId] = createSignal<string | null>(null);
   const [resumeDismissed, setResumeDismissed] = createSignal(false);
 
   // ── Automatic node selection (no server picker) ────────────────────────────
@@ -394,14 +406,32 @@ export function Connect(props: ConnectProps): JSX.Element {
       setChosenNode(node);
       setRouting(false);
     });
-    // Surface a remembered identity if one exists. Pre-fill the nick so guest /
-    // sign-in start from a familiar place.
-    const creds = loadCredentials();
-    if (creds) {
-      setSaved(creds);
-      if (!nick()) setNick(creds.nick);
-    }
+    // Surface the bounded remembered-identity catalogue (active + 11 newest).
+    // It contains only sanitized metadata; selecting an entry is the narrow
+    // seam that loads its private authentication material.
+    refreshRememberedIdentities(undefined, true);
   });
+
+  function refreshRememberedIdentities(preferredId?: string, prefillNick = false): void {
+    const available = listRememberedIdentities();
+    const selected = available.find((identity) => identity.id === preferredId)
+      ?? available.find((identity) => identity.active)
+      ?? available[0];
+
+    if (!selected) {
+      setRememberedIdentities([]);
+      setSelectedIdentityId(null);
+      setSaved(null);
+      return;
+    }
+
+    const credentials = selectRememberedIdentity(selected.id);
+    const refreshed = credentials ? listRememberedIdentities() : available;
+    setRememberedIdentities(refreshed);
+    setSelectedIdentityId(credentials ? selected.id : null);
+    setSaved(credentials);
+    if (prefillNick && credentials && !nick()) setNick(credentials.nick);
+  }
 
   // ── Store reads ─────────────────────────────────────────────────────────────
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -592,19 +622,71 @@ export function Connect(props: ConnectProps): JSX.Element {
   }
 
   // ── Connect action (shared by guest / sign-in / post-register) ──────────────
-  function doConnect(n: string, pass: string): void {
+  function doConnect(n: string, pass: string, resumeCredentials?: SavedCredentials): void {
     setAttempted(true);
     setReclaimOpen(false);
     const node = chosenNode();
-    getState().connect({
-      url:  node.wss,
-      nick: n,
-      password: pass.trim() || undefined,
-      realname: `${n} (Onyx)`,
-    });
-    // staySignedIn: the store persists session tokens via saveCredentials /
-    // loadCredentials internally. The toggle communicates intent in the UI.
-    void staySignedIn;
+    // A mesh token is portable, so keep today's latency-selected node. A lone
+    // local token is bound to its issuing node and must return there to resume.
+    const url = resumeCredentials?.sessionToken && !resumeCredentials.meshToken
+      ? resumeCredentials.server
+      : node.wss;
+    const password = pass || undefined;
+    const remember = staySignedIn();
+    const remembered = saved();
+    const forgetIdentity = (): void => {
+      removeCredentials(url, n);
+      if (remembered?.nick.trim().toLowerCase() === n.trim().toLowerCase()) {
+        removeCredentials(remembered.server, remembered.nick);
+      }
+      refreshRememberedIdentities();
+    };
+
+    // A one-time resume with persistence disabled still needs a temporary entry
+    // because store.connect synchronously loads resume tokens by exact url+nick.
+    // Stage it, let connect capture it into IRCClient options, then remove it.
+    if (remember || resumeCredentials) {
+      saveCredentials({
+        nick: n,
+        server: url,
+        password,
+      });
+      // When the fastest node changed, saveCredentials created a fresh entry.
+      // Carry the mesh-sealed token into it before store.connect performs its
+      // exact (url,nick) lookup; never copy the node-local token across nodes.
+      if (resumeCredentials?.meshToken) {
+        const expiryMs = resumeCredentials.tokenExpiry
+          ? new Date(resumeCredentials.tokenExpiry).getTime()
+          : Number.NaN;
+        storeMeshToken(
+          resumeCredentials.meshToken,
+          Number.isFinite(expiryMs) ? Math.floor(expiryMs / 1000) : undefined,
+        );
+      }
+      if (remember) refreshRememberedIdentities();
+    }
+
+    // A normal manual sign-in with persistence off must not inherit a stale
+    // token from a previous saved session. Only the explicit Resume action gets
+    // the stage-connect-forget ordering above.
+    if (!remember && !resumeCredentials) forgetIdentity();
+
+    try {
+      getState().connect({
+        url,
+        nick: n,
+        // Passwords are opaque credentials. Trimming changes the SASL secret and
+        // makes valid leading/trailing whitespace impossible to authenticate.
+        password,
+        realname: `${n} (Onyx)`,
+      });
+    } finally {
+      if (!remember && resumeCredentials) {
+        // Turning the switch off means this identity should no longer remain on
+        // the device. Removal happens after connect's synchronous token lookup.
+        forgetIdentity();
+      }
+    }
   }
 
   function handleSubmit(event: SubmitEvent): void {
@@ -714,7 +796,7 @@ export function Connect(props: ConnectProps): JSX.Element {
   // ── GHOST reclaim ───────────────────────────────────────────────────────────
   function handleReclaim(event: SubmitEvent): void {
     event.preventDefault();
-    const pass = reclaimPassword().trim();
+    const pass = reclaimPassword();
     if (!pass) return;
     // Evict the stale session, then retry the connection under the desired nick.
     getState().ghost(nickTrimmed(), pass);
@@ -723,12 +805,81 @@ export function Connect(props: ConnectProps): JSX.Element {
     doConnect(nickTrimmed(), password());
   }
 
-  // ── Session resume (one-tap) ────────────────────────────────────────────────
-  function handleResume(): void {
-    const creds = saved();
-    if (!creds) return;
-    setNick(creds.nick);
-    doConnect(creds.nick, creds.password ?? '');
+  // ── Remembered identity switcher ───────────────────────────────────────────
+  const selectedIdentity = createMemo(() => {
+    const id = selectedIdentityId();
+    return rememberedIdentities().find((identity) => identity.id === id) ?? null;
+  });
+
+  function handleIdentitySelect(identity: RememberedIdentity): void {
+    const credentials = selectRememberedIdentity(identity.id);
+    if (!credentials) {
+      refreshRememberedIdentities();
+      return;
+    }
+    setRememberedIdentities(listRememberedIdentities());
+    setSelectedIdentityId(identity.id);
+    setSaved(credentials);
+    setNick(credentials.nick);
+    setPassword('');
+    switchMode('signin');
+  }
+
+  function handleRememberedAction(): void {
+    const identity = selectedIdentity();
+    if (!identity) return;
+    const credentials = selectRememberedIdentity(identity.id);
+    if (!credentials) {
+      refreshRememberedIdentities();
+      return;
+    }
+
+    const current = listRememberedIdentities().find((item) => item.id === identity.id);
+    if (!current || current.access !== identity.access) {
+      // Storage can be edited in another tab. Never execute an action under a
+      // stale capability label (especially "Resume").
+      refreshRememberedIdentities(identity.id);
+      return;
+    }
+
+    setRememberedIdentities(listRememberedIdentities());
+    setSelectedIdentityId(identity.id);
+    setSaved(credentials);
+    setNick(credentials.nick);
+
+    if (identity.access === 'identity-only') {
+      setPassword('');
+      switchMode('signin');
+      return;
+    }
+
+    if (typeof credentials.password !== 'string' || credentials.password.length === 0) {
+      refreshRememberedIdentities(identity.id);
+      return;
+    }
+    doConnect(credentials.nick, credentials.password, credentials);
+  }
+
+  function handleForgetRemembered(identity: RememberedIdentity): void {
+    if (!removeRememberedIdentity(identity.id)) return;
+    const wasSelected = selectedIdentityId() === identity.id;
+    if (wasSelected && nick().trim().toLowerCase() === identity.nick.trim().toLowerCase()) {
+      setNick('');
+      setPassword('');
+    }
+    refreshRememberedIdentities(wasSelected ? undefined : selectedIdentityId() ?? undefined, wasSelected);
+  }
+
+  function rememberedActionLabel(identity: RememberedIdentity): string {
+    if (identity.access === 'resume') return 'Resume';
+    if (identity.access === 'sign-in') return 'Sign in';
+    return 'Use identity';
+  }
+
+  function rememberedStatus(identity: RememberedIdentity): string {
+    if (identity.access === 'resume') return 'Session ready';
+    if (identity.access === 'sign-in') return 'Saved sign-in';
+    return 'Identity only';
   }
 
   // ── Disconnect ──────────────────────────────────────────────────────────────
@@ -740,8 +891,11 @@ export function Connect(props: ConnectProps): JSX.Element {
     getState().disconnect();
   }
 
-  const showResume = createMemo(() =>
-    !resumeDismissed() && !!saved() && !attempted() && mode() !== 'register'
+  const showRememberedIdentities = createMemo(() =>
+    !resumeDismissed()
+      && rememberedIdentities().length > 0
+      && !attempted()
+      && mode() !== 'register'
   );
   const showReclaim = createMemo(() => formPhase() === 'error' && nickInUse());
   const inVerifyStep = createMemo(() => registerPhase() === 'verifying');
@@ -788,35 +942,82 @@ export function Connect(props: ConnectProps): JSX.Element {
                 )}
               </Show>
 
-              {/* Session resume — one-tap welcome back */}
-              <Show when={showResume()}>
-                <div class="conn-resume" role="region" aria-label="Resume session">
-                  <div class="conn-resume-body">
-                    <span class="conn-resume-eyebrow">Welcome back</span>
-                    <span class="conn-resume-nick">
-                      Resume as <b>{saved()!.nick}</b>
+              {/* Remembered identities — secret-free metadata + guarded actions */}
+              <Show when={showRememberedIdentities()}>
+                <section class="conn-identities" aria-labelledby="conn-identities-title">
+                  <div class="conn-identities-head">
+                    <div>
+                      <span class="conn-resume-eyebrow">Welcome back</span>
+                      <h2 id="conn-identities-title" class="conn-identities-title">
+                        Remembered identities
+                      </h2>
+                    </div>
+                    <span class="conn-identities-count" aria-label={`${rememberedIdentities().length} remembered identities`}>
+                      {rememberedIdentities().length}
                     </span>
                   </div>
+
+                  <div class="conn-identities-list" role="list">
+                    <For each={rememberedIdentities()}>
+                      {(identity) => (
+                        <div
+                          class="conn-identity"
+                          role="listitem"
+                          data-selected={selectedIdentityId() === identity.id ? 'true' : 'false'}
+                          data-access={identity.access}
+                        >
+                          <button
+                            type="button"
+                            class="conn-identity-select"
+                            aria-label={`Select ${identity.nick} on ${identity.server}`}
+                            aria-pressed={selectedIdentityId() === identity.id ? 'true' : 'false'}
+                            onClick={() => handleIdentitySelect(identity)}
+                          >
+                            <span class="conn-identity-nick">{identity.nick}</span>
+                            <span class="conn-identity-server">{identity.server}</span>
+                            <span class="conn-identity-status">{rememberedStatus(identity)}</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="conn-identity-forget"
+                            aria-label={`Forget ${identity.nick} on ${identity.server}`}
+                            onClick={() => handleForgetRemembered(identity)}
+                          >
+                            Forget
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+
                   <div class="conn-resume-actions">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={!isFormReady()}
-                      onClick={handleResume}
-                      data-testid="conn-resume"
-                    >
-                      Resume
-                    </Button>
+                    <Show when={selectedIdentity()} keyed>
+                      {(identity) => (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={!isFormReady()}
+                          onClick={handleRememberedAction}
+                          data-testid={identity.access === 'resume'
+                            ? 'conn-resume'
+                            : identity.access === 'sign-in'
+                              ? 'conn-remembered-signin'
+                              : 'conn-identity-use'}
+                        >
+                          {rememberedActionLabel(identity)}
+                        </Button>
+                      )}
+                    </Show>
                     <button
                       type="button"
                       class="conn-resume-dismiss"
-                      aria-label="Dismiss resume"
+                      aria-label="Dismiss remembered identities"
                       onClick={() => setResumeDismissed(true)}
                     >
                       Not now
                     </button>
                   </div>
-                </div>
+                </section>
               </Show>
 
               <ClaimPath mode={mode()} onRegister={() => switchMode('register')} />
@@ -1067,7 +1268,9 @@ export function Connect(props: ConnectProps): JSX.Element {
                           Stay signed in
                         </label>
                         <p class="conn-toggle-description" id="conn-session-desc">
-                          Mints a SESSION token so you reconnect instantly — no re-login
+                          Off by default. When enabled, Onyx stores your account password in this
+                          browser so it can sign in and request a SESSION token on reconnect. Use
+                          only on a private device.
                         </p>
                       </div>
                       <label class="conn-toggle-switch">

@@ -14,13 +14,27 @@
  *    reply metadata survive; functions/Sets never enter a ChatMessage.
  */
 import type { ChatMessage } from '@/lib/irc/types';
+import { clearAllTopicReads } from '@/lib/topics/topicReadLedger';
 import { effectiveKeep, resolvePolicyForChannel, type RetentionPolicy } from './retentionPolicy';
+import { boundedSearchField, boundedSearchQuery } from './searchBounds';
 
 const DB_NAME = 'onyx-vault';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE = 'messages';
 const OUTBOX = 'outbox';
 export const VAULT_KEEP = 400;
+/**
+ * Global work cap for one cross-conversation search pass. Per-target retention
+ * alone is not a global bound: a device can remember thousands of targets.
+ * Search reads the newest rows first through the v3 `by_time` index and never
+ * materializes or embeds more than this many rows for one query.
+ */
+export const VAULT_SEARCH_SCAN_MAX = 4096;
+/**
+ * Hard device-local ceiling for queued sends. A full queue rejects new work;
+ * it never evicts an older message the user is still expecting to send.
+ */
+export const OUTBOX_MAX_ENTRIES = 100;
 /** Queued sends older than this are dropped, not fired into a stale room. */
 export const OUTBOX_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -29,12 +43,27 @@ export const OUTBOX_MAX_AGE_MS = 24 * 60 * 60 * 1000;
  * exhausting CPU/memory before the retention prune ever runs. A legitimate
  * export holds at most VAULT_KEEP rows per target; the raw ceiling adds generous
  * headroom (4x) before `parseVaultExport` stops iterating a single target's
- * message array, and `MAX_EXPORT_TARGETS` bounds the conversation count. These
- * bound the WORK done validating untrusted JSON — the real per-target retention
- * cap is still enforced downstream by `saveMessages`/`pruneTarget`.
+ * message array, `MAX_EXPORT_TARGETS` bounds the conversation count, and the
+ * aggregate ceiling prevents the product of those two valid-looking dimensions
+ * from becoming millions of row validations. These bound the WORK done parsing
+ * untrusted JSON — the real per-target retention cap is still enforced
+ * downstream by `saveMessages`/`pruneTarget`.
  */
 export const MAX_EXPORT_TARGETS = 4096;
 export const MAX_EXPORT_RAW_MESSAGES = 4 * VAULT_KEEP;
+/** Global validation-work ceiling across every target in one portable blob. */
+export const MAX_EXPORT_TOTAL_RAW_MESSAGES = 16 * 1024;
+export const MAX_VAULT_TARGET_LENGTH = 512;
+export const MAX_VAULT_MESSAGE_ID_LENGTH = 512;
+export const MAX_VAULT_SENDER_LENGTH = 256;
+export const MAX_VAULT_MESSAGE_TEXT_LENGTH = 64 * 1024;
+export const MAX_VAULT_MESSAGE_TYPE_LENGTH = 16;
+export const MAX_VAULT_TIMESTAMP_LENGTH = 64;
+export const MAX_VAULT_TOPIC_LENGTH = 512;
+export const MAX_VAULT_REACTIONS = 64;
+export const MAX_VAULT_REACTION_USERS = 128;
+export const MAX_VAULT_REACTION_FIELD_LENGTH = 128;
+export const MAX_VAULT_REPLY_TEXT_LENGTH = 4096;
 
 /**
  * Fields that hold a DECRYPTED or otherwise transient view of a message and must
@@ -80,7 +109,16 @@ export interface OutboxEntry {
   seq: number;
 }
 
+/** Metadata-only outbox invalidation; message text is deliberately excluded. */
+export type OutboxChange =
+  | Readonly<{ kind: 'queued' }>
+  | Readonly<{ kind: 'deleted' }>
+  | Readonly<{ kind: 'cleared' }>;
+
+export type OutboxListener = (change: OutboxChange) => void;
+
 let _outboxSeq = 0;
+const _outboxListeners = new Set<OutboxListener>();
 
 const RETENTION_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -103,6 +141,22 @@ export function getRetentionPolicy(): RetentionPolicy | null {
   return _retentionPolicy;
 }
 
+/**
+ * Apply a policy to the live vault and immediately prune every stored target.
+ * This is the destructive boundary used by startup, Preferences, and portable
+ * import; callers can await it before hydrating or reporting completion.
+ */
+export async function applyRetentionPolicy(policy: RetentionPolicy | null): Promise<boolean> {
+  _retentionPolicy = policy;
+  const db = await openVault();
+  if (!db) return false;
+  const targets = await storedTargetKeys(db);
+  for (const target of targets) {
+    await pruneTarget(db, target, policy);
+  }
+  return true;
+}
+
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
 function openVault(): Promise<IDBDatabase | null> {
@@ -113,9 +167,15 @@ function openVault(): Promise<IDBDatabase | null> {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
+        let messageStore: IDBObjectStore | null;
         if (!db.objectStoreNames.contains(STORE)) {
-          const store = db.createObjectStore(STORE, { keyPath: ['target_key', 'id'] });
-          store.createIndex('by_target_time', ['target_key', 'time']);
+          messageStore = db.createObjectStore(STORE, { keyPath: ['target_key', 'id'] });
+          messageStore.createIndex('by_target_time', ['target_key', 'time']);
+        } else {
+          messageStore = req.transaction?.objectStore(STORE) ?? null;
+        }
+        if (messageStore && !messageStore.indexNames.contains('by_time')) {
+          messageStore.createIndex('by_time', 'time');
         }
         if (!db.objectStoreNames.contains(OUTBOX)) {
           db.createObjectStore(OUTBOX, { keyPath: 'id' });
@@ -144,6 +204,32 @@ function openVault(): Promise<IDBDatabase | null> {
  */
 function targetKeyRange(key: string): IDBKeyRange {
   return IDBKeyRange.bound([key], [key, []]);
+}
+
+/** Collect unique conversation keys without materializing stored message rows. */
+function storedTargetKeys(db: IDBDatabase): Promise<string[]> {
+  return new Promise((resolve) => {
+    try {
+      const keys = new Set<string>();
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).openKeyCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) {
+          resolve([...keys]);
+          return;
+        }
+        const primaryKey = cursor.primaryKey;
+        if (Array.isArray(primaryKey) && typeof primaryKey[0] === 'string') {
+          keys.add(primaryKey[0]);
+        }
+        cursor.continue();
+      };
+      req.onerror = () => resolve([...keys]);
+    } catch {
+      resolve([]);
+    }
+  });
 }
 
 export function serializeMessage(target: string, msg: ChatMessage): StoredMessage {
@@ -181,13 +267,15 @@ export async function saveMessages(target: string, msgs: readonly ChatMessage[])
     // exactly VAULT_KEEP (identical to before); a per-channel override widens or
     // narrows it so a larger override isn't defeated by the batch pre-trim.
     const keep = _retentionPolicy ? effectiveKeep(_retentionPolicy, target) : VAULT_KEEP;
-    const tail = msgs.slice(-keep);
+    // `slice(-0)` is `slice(0)`, so zero needs an explicit empty tail or a
+    // zero-retention policy would briefly write the entire input batch.
+    const tail = keep === 0 ? [] : msgs.slice(-keep);
     const tx = db.transaction(STORE, 'readwrite');
     const store = tx.objectStore(STORE);
     for (const m of tail) store.put(serializeMessage(target, m));
     const committed = await txDone(tx);
     if (!committed) return false;
-    void pruneTarget(db, target.toLowerCase());
+    await pruneTarget(db, target.toLowerCase(), _retentionPolicy);
     return true;
   } catch {
     /* quota / private mode — the vault is best-effort */
@@ -273,16 +361,30 @@ export async function exportVault(): Promise<VaultExportSnapshot> {
   try {
     const tx = db.transaction(STORE, 'readonly');
     const store = tx.objectStore(STORE);
-    const rows = await new Promise<StoredMessage[]>((resolve) => {
-      const req = store.getAll();
-      req.onsuccess = () => resolve((req.result ?? []) as StoredMessage[]);
-      req.onerror = () => resolve([]);
+    const rows = await new Promise<unknown[]>((resolve) => {
+      const out: unknown[] = [];
+      const req = store.index('by_time').openCursor(null, 'prev');
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor || out.length >= MAX_EXPORT_TOTAL_RAW_MESSAGES) {
+          resolve(out);
+          return;
+        }
+        out.push(cursor.value);
+        cursor.continue();
+      };
+      req.onerror = () => resolve(out);
     });
-    const grouped = new Map<string, StoredMessage[]>();
+    const grouped = new Map<string, ChatMessage[]>();
     for (const row of rows) {
-      const target = row.target_key || row.target.toLowerCase();
+      if (!isRecord(row)) continue;
+      const normalizedTarget = normalizeVaultTarget(row.target_key, '');
+      if (normalizedTarget === null) continue;
+      const target = normalizedTarget.toLowerCase();
+      const message = reviveExportMessage(row, target);
+      if (message === null) continue;
       const group = grouped.get(target) ?? [];
-      group.push(row);
+      group.push(message);
       grouped.set(target, group);
     }
     snapshot.targets = [...grouped.entries()]
@@ -291,8 +393,7 @@ export async function exportVault(): Promise<VaultExportSnapshot> {
         target,
         messages: messages
           .slice()
-          .sort((a, b) => a.time - b.time)
-          .map(deserializeMessage),
+          .sort((a, b) => a.time.getTime() - b.time.getTime() || a.id.localeCompare(b.id)),
       }));
     return snapshot;
   } catch {
@@ -304,22 +405,45 @@ export async function exportVault(): Promise<VaultExportSnapshot> {
  * Merge a portable vault snapshot into the local IndexedDB vault.
  *
  * Callers SHOULD pass a `parseVaultExport`-validated snapshot; some importers
- * (Discord/Slack/IRC-log conversions) construct the shape directly. To uphold
- * the vault's never-throw contract this defends the one field it iterates: a
- * missing or non-array `targets` degrades to an honest empty result rather than
- * throwing a `TypeError` into the UI. Per-entry shape is still trusted here, but
- * `serializeMessage` strips `plaintext`, so no decrypted body can leak even from
- * an unvalidated blob.
+ * (Discord/Slack/IRC-log conversions) construct the shape directly. This final
+ * storage boundary therefore repeats the same target/row/field/work validation
+ * before writing. Success counters are exact surviving imported ids after the
+ * destination retention policy prunes, not merely attempted writes.
  */
 export async function importVault(snapshot: VaultExportSnapshot): Promise<{ targets: number; messages: number }> {
   let targetCount = 0;
   let messageCount = 0;
   if (!Array.isArray(snapshot?.targets)) return { targets: 0, messages: 0 };
-  for (const entry of snapshot.targets) {
-    if (!Array.isArray(entry?.messages) || entry.messages.length === 0) continue;
-    await saveMessages(entry.target, entry.messages);
+  let remainingMessageWork = MAX_EXPORT_TOTAL_RAW_MESSAGES;
+  for (const rawEntry of snapshot.targets.slice(0, MAX_EXPORT_TARGETS)) {
+    if (remainingMessageWork <= 0) break;
+    if (!isRecord(rawEntry) || !Array.isArray(rawEntry.messages)) continue;
+    const normalizedTarget = normalizeVaultTarget(rawEntry.target, '');
+    if (normalizedTarget === null) continue;
+    const target = normalizedTarget.toLowerCase();
+    const targetWork = Math.min(MAX_EXPORT_RAW_MESSAGES, remainingMessageWork);
+    const rawMessages = rawEntry.messages.slice(-targetWork);
+    remainingMessageWork -= rawMessages.length;
+    const revived = dedupMessagesById(
+      rawMessages
+        .map((message) => reviveExportMessage(message, target))
+        .filter((message): message is ChatMessage => message !== null),
+    );
+    const keep = _retentionPolicy ? effectiveKeep(_retentionPolicy, target) : VAULT_KEEP;
+    const retained = keep === 0 ? [] : revived.slice(-keep);
+    if (retained.length === 0) continue;
+    // Only report rows that actually committed. Import controls surface these
+    // counters as a success message, so counting a quota/private-mode failure
+    // would tell the user their history was restored when IndexedDB contains
+    // nothing.
+    const committed = await saveMessages(target, retained);
+    if (!committed) continue;
+    const candidateIds = new Set(retained.map((message) => message.id));
+    const survivors = (await loadRecent(target, keep))
+      .filter((message) => candidateIds.has(message.id)).length;
+    if (survivors === 0) continue;
     targetCount += 1;
-    messageCount += entry.messages.length;
+    messageCount += survivors;
   }
   return { targets: targetCount, messages: messageCount };
 }
@@ -344,26 +468,56 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function normalizeVaultTarget(raw: unknown, fallback: string): string | null {
+  let candidate = fallback;
+  if (typeof raw === 'string') {
+    // Check the raw length before trimming so a hostile multi-megabyte target
+    // cannot force an unbounded allocation merely to decide that it is blank.
+    if (raw.length > MAX_VAULT_TARGET_LENGTH) return null;
+    if (raw.trim()) candidate = raw;
+  }
+  if (candidate.length === 0 || candidate.length > MAX_VAULT_TARGET_LENGTH) return null;
+  const trimmed = candidate.trim();
+  if (!trimmed || /[\u0000\r\n\t ]/u.test(trimmed)) return null;
+  return trimmed;
+}
+
+function isBoundedWireToken(value: unknown, maxLength: number, allowEmpty = false): value is string {
+  return typeof value === 'string'
+    && (allowEmpty || value.length > 0)
+    && value.length <= maxLength
+    && !/[\u0000-\u0020\u007f]/u.test(value);
+}
+
 function reviveExportMessage(raw: unknown, fallbackTarget: string): ChatMessage | null {
   if (!isRecord(raw)) return null;
   const id = raw.id;
   const from = raw.from;
   const text = raw.text;
   const type = raw.type;
-  const target = typeof raw.target === 'string' && raw.target.trim() ? raw.target : fallbackTarget;
+  const target = normalizeVaultTarget(raw.target, fallbackTarget);
   if (
-    typeof id !== 'string' ||
-    typeof from !== 'string' ||
+    !isBoundedWireToken(id, MAX_VAULT_MESSAGE_ID_LENGTH) ||
+    !isBoundedWireToken(from, MAX_VAULT_SENDER_LENGTH, true) ||
     typeof text !== 'string' ||
+    text.length > MAX_VAULT_MESSAGE_TEXT_LENGTH ||
     typeof type !== 'string' ||
+    type.length > MAX_VAULT_MESSAGE_TYPE_LENGTH ||
     !MESSAGE_TYPES.has(type) ||
-    !target.trim()
+    target === null
   ) {
     return null;
   }
 
   const rawTime = raw.time;
-  const time = rawTime instanceof Date ? rawTime : new Date(typeof rawTime === 'number' || typeof rawTime === 'string' ? rawTime : NaN);
+  const time = rawTime instanceof Date
+    ? rawTime
+    : new Date(
+        typeof rawTime === 'number'
+        || (typeof rawTime === 'string' && rawTime.length <= MAX_VAULT_TIMESTAMP_LENGTH)
+          ? rawTime
+          : NaN,
+      );
   if (Number.isNaN(time.getTime())) return null;
 
   const message: ChatMessage = {
@@ -375,7 +529,10 @@ function reviveExportMessage(raw: unknown, fallbackTarget: string): ChatMessage 
     target,
   };
   if (typeof raw.highlight === 'boolean') message.highlight = raw.highlight;
-  if (typeof raw.topic === 'string' || raw.topic === null) message.topic = raw.topic;
+  if (
+    raw.topic === null
+    || (typeof raw.topic === 'string' && raw.topic.length <= MAX_VAULT_TOPIC_LENGTH)
+  ) message.topic = raw.topic;
   if (typeof raw.edited === 'boolean') message.edited = raw.edited;
   if (typeof raw.deleted === 'boolean') message.deleted = raw.deleted;
   if (typeof raw.redacted === 'boolean') message.redacted = raw.redacted;
@@ -383,14 +540,29 @@ function reviveExportMessage(raw: unknown, fallbackTarget: string): ChatMessage 
   if (typeof raw.encrypted === 'boolean') message.encrypted = raw.encrypted;
   if (Array.isArray(raw.reactions)) {
     message.reactions = raw.reactions
+      .slice(0, MAX_VAULT_REACTIONS)
       .filter(isRecord)
       .map((reaction) => ({
-        emoji: typeof reaction.emoji === 'string' ? reaction.emoji : '',
-        users: Array.isArray(reaction.users) ? reaction.users.filter((user): user is string => typeof user === 'string') : [],
+        emoji: isBoundedWireToken(reaction.emoji, MAX_VAULT_REACTION_FIELD_LENGTH)
+          ? reaction.emoji
+          : '',
+        users: Array.isArray(reaction.users)
+          ? reaction.users
+              .slice(0, MAX_VAULT_REACTION_USERS)
+              .filter((user): user is string => (
+                isBoundedWireToken(user, MAX_VAULT_REACTION_FIELD_LENGTH)
+              ))
+          : [],
       }))
       .filter((reaction) => reaction.emoji.length > 0);
   }
-  if (isRecord(raw.replyTo) && typeof raw.replyTo.id === 'string' && typeof raw.replyTo.from === 'string' && typeof raw.replyTo.text === 'string') {
+  if (
+    isRecord(raw.replyTo)
+    && isBoundedWireToken(raw.replyTo.id, MAX_VAULT_MESSAGE_ID_LENGTH)
+    && isBoundedWireToken(raw.replyTo.from, MAX_VAULT_SENDER_LENGTH, true)
+    && typeof raw.replyTo.text === 'string'
+    && raw.replyTo.text.length <= MAX_VAULT_REPLY_TEXT_LENGTH
+  ) {
     message.replyTo = { id: raw.replyTo.id, from: raw.replyTo.from, text: raw.replyTo.text };
   }
   return message;
@@ -416,23 +588,34 @@ export function parseVaultExport(raw: unknown): VaultExportSnapshot | null {
   if (!isRecord(raw) || raw.kind !== 'onyx-vault' || raw.version !== 1 || !Array.isArray(raw.targets)) {
     return null;
   }
-  const exportedAt = typeof raw.exportedAt === 'string' && !Number.isNaN(Date.parse(raw.exportedAt))
+  const exportedAt = typeof raw.exportedAt === 'string'
+    && raw.exportedAt.length <= MAX_VAULT_TIMESTAMP_LENGTH
+    && !Number.isNaN(Date.parse(raw.exportedAt))
     ? raw.exportedAt
     : new Date().toISOString();
   const targets: VaultExportTarget[] = [];
+  let remainingMessageWork = MAX_EXPORT_TOTAL_RAW_MESSAGES;
   // Bound the conversation count so a blob with millions of target entries can
   // never force unbounded work before the per-target validation even begins.
   const rawTargets = raw.targets.slice(0, MAX_EXPORT_TARGETS);
   for (const targetRaw of rawTargets) {
-    if (!isRecord(targetRaw) || typeof targetRaw.target !== 'string' || !targetRaw.target.trim() || !Array.isArray(targetRaw.messages)) {
+    if (remainingMessageWork <= 0) break;
+    const normalizedTarget = isRecord(targetRaw)
+      ? normalizeVaultTarget(targetRaw.target, '')
+      : null;
+    if (!isRecord(targetRaw) || normalizedTarget === null || !Array.isArray(targetRaw.messages)) {
       continue;
     }
-    const target = targetRaw.target.toLowerCase();
+    const target = normalizedTarget.toLowerCase();
     // Keep only the newest-tail slice of the raw rows before reviving. An export
     // is chronological (see exportVault), so the tail is the most recent history
     // — exactly what retention keeps — and the ceiling caps revive work per
     // target regardless of how the untrusted array is ordered.
-    const rawMessages = targetRaw.messages.slice(-MAX_EXPORT_RAW_MESSAGES);
+    const targetWork = Math.min(MAX_EXPORT_RAW_MESSAGES, remainingMessageWork);
+    const rawMessages = targetRaw.messages.slice(-targetWork);
+    // Invalid rows still consume validation work; a blob cannot place garbage
+    // first to make the parser inspect an unbounded number of later rows.
+    remainingMessageWork -= rawMessages.length;
     const revived = rawMessages
       .map((message) => reviveExportMessage(message, target))
       .filter((message): message is ChatMessage => message !== null);
@@ -446,13 +629,17 @@ export function parseVaultExport(raw: unknown): VaultExportSnapshot | null {
   };
 }
 
-async function pruneTarget(db: IDBDatabase, key: string): Promise<void> {
+async function pruneTarget(
+  db: IDBDatabase,
+  key: string,
+  policy: RetentionPolicy | null = _retentionPolicy,
+): Promise<void> {
   // Resolve the bound for this target. With no policy: keep === VAULT_KEEP and no
   // cutoff, so the cursor loop below is byte-for-byte the flat tail-slice prune.
   let keep = VAULT_KEEP;
   let cutoffMs: number | null = null;
-  if (_retentionPolicy) {
-    const resolved = resolvePolicyForChannel(_retentionPolicy, key);
+  if (policy) {
+    const resolved = resolvePolicyForChannel(policy, key);
     keep = resolved.keep;
     if (resolved.maxAgeDays !== undefined) {
       cutoffMs = Date.now() - resolved.maxAgeDays * RETENTION_DAY_MS;
@@ -487,30 +674,60 @@ export interface VaultSearchHit {
   message: ChatMessage;
 }
 
+/** Read a globally bounded newest-first slice without materializing the full DB. */
+async function readRecentSearchRows(
+  db: IDBDatabase,
+  requestedLimit = VAULT_SEARCH_SCAN_MAX,
+): Promise<StoredMessage[]> {
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(VAULT_SEARCH_SCAN_MAX, Math.max(0, Math.floor(requestedLimit)))
+    : VAULT_SEARCH_SCAN_MAX;
+  if (limit === 0) return [];
+  return await new Promise<StoredMessage[]>((resolve) => {
+    try {
+      const rows: StoredMessage[] = [];
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).index('by_time').openCursor(null, 'prev');
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor || rows.length >= limit) {
+          resolve(rows);
+          return;
+        }
+        rows.push(cursor.value as StoredMessage);
+        cursor.continue();
+      };
+      req.onerror = () => resolve(rows);
+      tx.onabort = () => resolve(rows);
+    } catch {
+      resolve([]);
+    }
+  });
+}
+
 /**
  * Search EVERY remembered conversation on this device (Roadmap Phase 1.3).
  * Case-insensitive substring match on message text and sender, newest first.
- * A full-store scan is fine at vault scale (≤ VAULT_KEEP rows per target).
+ * Search is globally capped in addition to per-target retention; the newest
+ * remembered rows are scanned first.
  */
 export async function searchVault(query: string, limit = 80): Promise<VaultSearchHit[]> {
-  const q = query.trim().toLocaleLowerCase();
+  const q = boundedSearchQuery(query).toLocaleLowerCase();
   if (!q) return [];
   const db = await openVault();
   if (!db) return [];
   try {
-    const tx = db.transaction(STORE, 'readonly');
-    const store = tx.objectStore(STORE);
-    const rows = await new Promise<StoredMessage[]>((resolve) => {
-      const req = store.getAll();
-      req.onsuccess = () => resolve((req.result ?? []) as StoredMessage[]);
-      req.onerror = () => resolve([]);
-    });
+    const rows = await readRecentSearchRows(db);
     return rows
       .filter((r) => {
-        if (r.deleted || r.redacted) return false;
+        // Encrypted vault rows contain ciphertext envelopes only. They cannot
+        // produce a useful local-text match and must not be passed onward to an
+        // optional embedding provider; loaded transient plaintext is searched
+        // separately by the live conversation surface.
+        if (r.deleted || r.redacted || r.encrypted) return false;
         return (
-          r.text.toLocaleLowerCase().includes(q) ||
-          r.from.toLocaleLowerCase().includes(q)
+          boundedSearchField(r.text).toLocaleLowerCase().includes(q)
+          || boundedSearchField(r.from).toLocaleLowerCase().includes(q)
         );
       })
       .sort((a, b) => b.time - a.time)
@@ -522,24 +739,18 @@ export async function searchVault(query: string, limit = 80): Promise<VaultSearc
 }
 
 /**
- * Read EVERY remembered, non-tombstoned message on this device as
- * VaultSearchHits (Roadmap v3.0 — semantic search reuses this scan). A full
- * getAll is fine at vault scale (≤ VAULT_KEEP rows per target). Deleted and
- * redacted rows are excluded, matching {@link searchVault}.
+ * Read a globally bounded newest-first slice of non-tombstoned messages on this
+ * device as VaultSearchHits (semantic/hybrid search reuse this scan). Deleted,
+ * redacted, and ciphertext-only encrypted rows are excluded, matching
+ * {@link searchVault}.
  */
-export async function readAllVaultHits(): Promise<VaultSearchHit[]> {
+export async function readAllVaultHits(limit = VAULT_SEARCH_SCAN_MAX): Promise<VaultSearchHit[]> {
   const db = await openVault();
   if (!db) return [];
   try {
-    const tx = db.transaction(STORE, 'readonly');
-    const store = tx.objectStore(STORE);
-    const rows = await new Promise<StoredMessage[]>((resolve) => {
-      const req = store.getAll();
-      req.onsuccess = () => resolve((req.result ?? []) as StoredMessage[]);
-      req.onerror = () => resolve([]);
-    });
+    const rows = await readRecentSearchRows(db, limit);
     return rows
-      .filter((r) => !r.deleted && !r.redacted)
+      .filter((r) => !r.deleted && !r.redacted && !r.encrypted)
       .map((r) => ({ target: r.target_key, message: deserializeMessage(r) }));
   } catch {
     return [];
@@ -548,8 +759,68 @@ export async function readAllVaultHits(): Promise<VaultSearchHit[]> {
 
 // ── Offline outbox (Roadmap Phase 2.5) ───────────────────────────────────────
 
+function isSafeOutboxTarget(target: unknown): target is string {
+  return (
+    typeof target === 'string' &&
+    target.length > 0 &&
+    target === target.trim() &&
+    !/[\u0000\r\n\t ]/.test(target)
+  );
+}
+
+/**
+ * Rebuild an entry from an untrusted IndexedDB row. Returning a fresh object
+ * strips unknown fields; invalid routing/order metadata is rejected rather than
+ * guessed, because replaying a damaged row to the wrong target is worse than
+ * leaving it unsent.
+ */
+function parseOutboxEntry(raw: unknown): OutboxEntry | null {
+  if (!isRecord(raw)) return null;
+  const { id, target_key: targetKey, target, text, queued_at: queuedAt, seq } = raw;
+  if (
+    typeof id !== 'string' ||
+    id.length === 0 ||
+    id !== id.trim() ||
+    !isSafeOutboxTarget(target) ||
+    typeof targetKey !== 'string' ||
+    targetKey !== target.toLowerCase() ||
+    typeof text !== 'string' ||
+    text.length === 0 ||
+    typeof queuedAt !== 'number' ||
+    !Number.isSafeInteger(queuedAt) ||
+    queuedAt < 0 ||
+    typeof seq !== 'number' ||
+    !Number.isSafeInteger(seq) ||
+    seq < 0
+  ) {
+    return null;
+  }
+  return { id, target_key: targetKey, target, text, queued_at: queuedAt, seq };
+}
+
+function notifyOutbox(change: OutboxChange): void {
+  // Snapshot so a listener can safely subscribe/unsubscribe during delivery.
+  for (const listener of [..._outboxListeners]) {
+    try {
+      listener(change);
+    } catch {
+      // Observers are advisory. A broken view must never turn a committed write
+      // into an apparent persistence failure or prevent other views refreshing.
+    }
+  }
+}
+
+/** Subscribe to committed outbox invalidations. Returns an idempotent cleanup. */
+export function subscribeOutbox(listener: OutboxListener): () => void {
+  _outboxListeners.add(listener);
+  return () => {
+    _outboxListeners.delete(listener);
+  };
+}
+
 /** Queue a message composed while offline; it sends on reconnect. */
 export async function queueOutbox(target: string, text: string): Promise<OutboxEntry | null> {
+  if (!isSafeOutboxTarget(target) || typeof text !== 'string' || text.length === 0) return null;
   const db = await openVault();
   if (!db) return null;
   const entry: OutboxEntry = {
@@ -562,8 +833,25 @@ export async function queueOutbox(target: string, text: string): Promise<OutboxE
   };
   try {
     const tx = db.transaction(OUTBOX, 'readwrite');
-    tx.objectStore(OUTBOX).put(entry);
-    await txDone(tx);
+    const store = tx.objectStore(OUTBOX);
+    let inserted = false;
+    const count = store.count();
+    count.onsuccess = () => {
+      // Count every physical row, including a corrupt one loadOutbox would hide:
+      // corruption must not become an escape hatch around the hard bound.
+      if (count.result >= OUTBOX_MAX_ENTRIES) return;
+      try {
+        // `add`, not `put`: even an astronomically unlikely id collision cannot
+        // overwrite an existing user's queued message.
+        store.add(entry);
+        inserted = true;
+      } catch {
+        // The transaction will either abort or commit without the entry.
+      }
+    };
+    const committed = await txDone(tx);
+    if (!committed || !inserted) return null;
+    notifyOutbox({ kind: 'queued' });
     return entry;
   } catch {
     return null;
@@ -579,12 +867,60 @@ export async function loadOutbox(): Promise<OutboxEntry[]> {
     const store = tx.objectStore(OUTBOX);
     const rows = await new Promise<OutboxEntry[]>((resolve) => {
       const req = store.getAll();
-      req.onsuccess = () => resolve((req.result ?? []) as OutboxEntry[]);
+      req.onsuccess = () => resolve(
+        (req.result ?? [])
+          .map(parseOutboxEntry)
+          .filter((entry): entry is OutboxEntry => entry !== null),
+      );
       req.onerror = () => resolve([]);
     });
-    return rows.sort((a, b) => a.queued_at - b.queued_at || a.seq - b.seq);
+    return rows.sort((a, b) => (
+      a.queued_at - b.queued_at ||
+      a.seq - b.seq ||
+      a.id.localeCompare(b.id)
+    ));
   } catch {
     return [];
+  }
+}
+
+function physicalStoreCount(db: IDBDatabase, storeName: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(storeName, 'readonly');
+      const request = tx.objectStore(storeName).count();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+      tx.onabort = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+function physicalOutboxCount(db: IDBDatabase): Promise<number | null> {
+  return physicalStoreCount(db, OUTBOX);
+}
+
+/**
+ * Discard every queued send without touching remembered message history.
+ * Success requires the clear transaction to commit, the physical object store
+ * to be empty (including corrupt rows hidden by `loadOutbox`), and a sanitized
+ * empty read-back. Only then is the metadata-only invalidation published.
+ */
+export async function clearOutbox(): Promise<boolean> {
+  const db = await openVault();
+  if (!db) return false;
+  try {
+    const tx = db.transaction(OUTBOX, 'readwrite');
+    tx.objectStore(OUTBOX).clear();
+    if (!await txDone(tx)) return false;
+    if (await physicalOutboxCount(db) !== 0) return false;
+    if ((await loadOutbox()).length !== 0) return false;
+    notifyOutbox({ kind: 'cleared' });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -594,24 +930,55 @@ export async function deleteOutboxEntry(id: string): Promise<void> {
   if (!db) return;
   try {
     const tx = db.transaction(OUTBOX, 'readwrite');
-    tx.objectStore(OUTBOX).delete(id);
-    await txDone(tx);
+    const store = tx.objectStore(OUTBOX);
+    let existed = false;
+    const lookup = store.getKey(id);
+    lookup.onsuccess = () => {
+      existed = lookup.result !== undefined;
+    };
+    store.delete(id);
+    const committed = await txDone(tx);
+    if (committed && existed) notifyOutbox({ kind: 'deleted' });
   } catch {
     /* best-effort */
   }
 }
 
 /** Wipe the whole vault (preferences "forget this device"). */
-export async function clearVault(): Promise<void> {
+export async function clearVault(): Promise<boolean> {
+  // Topic cursors are device-local transcript memory too. Clear them even when
+  // IndexedDB is unavailable so "forget this device" has one consistent
+  // privacy boundary across the vault and localStorage.
+  const topicReadsCleared = clearAllTopicReads();
+  const indexedDbAvailable = typeof indexedDB !== 'undefined';
   const db = await openVault();
-  if (!db) return;
+  // An unavailable/blocked IndexedDB handle is not evidence that persisted
+  // message rows are absent. A browser with no IndexedDB implementation has no
+  // vault to wipe and remains a successful no-op; an implementation that was
+  // present but failed to open cannot be verified.
+  if (!db) return !indexedDbAvailable && topicReadsCleared;
   try {
     const tx = db.transaction([STORE, OUTBOX], 'readwrite');
+    const outbox = tx.objectStore(OUTBOX);
+    let outboxHadRows = false;
+    const count = outbox.count();
+    count.onsuccess = () => {
+      outboxHadRows = count.result > 0;
+    };
     tx.objectStore(STORE).clear();
-    tx.objectStore(OUTBOX).clear();
-    await txDone(tx);
+    outbox.clear();
+    const committed = await txDone(tx);
+    if (!committed) return false;
+    const [messageCount, outboxCount, sanitizedOutbox] = await Promise.all([
+      physicalStoreCount(db, STORE),
+      physicalOutboxCount(db),
+      loadOutbox(),
+    ]);
+    const outboxVerified = outboxCount === 0 && sanitizedOutbox.length === 0;
+    if (outboxHadRows && outboxVerified) notifyOutbox({ kind: 'cleared' });
+    return messageCount === 0 && outboxVerified && topicReadsCleared;
   } catch {
-    /* best-effort */
+    return false;
   }
 }
 
@@ -632,4 +999,6 @@ function txDone(tx: IDBTransaction): Promise<boolean> {
 export function _resetVaultForTests(): void {
   dbPromise = null;
   _retentionPolicy = null;
+  _outboxSeq = 0;
+  _outboxListeners.clear();
 }

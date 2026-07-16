@@ -113,6 +113,32 @@ describe('Popover controlled and empty states', () => {
   });
 });
 
+describe('Tooltip description boundaries', () => {
+  it('preserves caller-owned aria-describedby while the tooltip opens and closes', () => {
+    vi.useFakeTimers();
+    render(() => (
+      <>
+        <span id="room-help">Room-specific help</span>
+        <Tooltip content="Open room" openDelay={0}>
+          <button type="button" aria-describedby="room-help">Room</button>
+        </Tooltip>
+      </>
+    ));
+
+    const button = screen.getByRole('button', { name: 'Room' });
+    fireEvent.focusIn(button);
+    vi.runAllTimers();
+
+    const tooltip = screen.getByRole('tooltip');
+    expect(button.getAttribute('aria-describedby')?.split(/\s+/u)).toEqual(['room-help', tooltip.id]);
+
+    fireEvent.focusOut(button);
+
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(button.getAttribute('aria-describedby')).toBe('room-help');
+  });
+});
+
 describe('Tabs controlled and keyboard boundaries', () => {
   it('uses controlled value without mutating selection on click', () => {
     const onValueChange = vi.fn();

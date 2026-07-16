@@ -16,6 +16,11 @@ import {
 } from '@/lib/extensions/clientActions';
 import { setVaultMode, vaultSearchMode } from '@/shell/search/useMessageSearch';
 import { setTranslationTarget, translationTarget } from '@/lib/intelligence/translateMessage';
+import {
+  readReviewHistory,
+  recordReviewHistory,
+  type ReviewHistoryEntry,
+} from '@/lib/notifications/reviewHistory';
 import type { DMConversation, Server } from '@/lib/store/store';
 import { THEME_IDS } from '@/theme';
 import { buildCommands } from './commands';
@@ -57,6 +62,25 @@ function server(): Server {
     nick: 'kain',
     account: 'kain',
     connected: true,
+  };
+}
+
+function review(
+  target: string,
+  reviewedAt: string,
+  overrides: Partial<ReviewHistoryEntry> = {},
+): ReviewHistoryEntry {
+  return {
+    target,
+    name: target,
+    kind: target.startsWith('#') ? 'channel' : 'dm',
+    firstMessageId: `${target}-anchor`,
+    firstAt: '2026-07-09T08:15:00.000Z',
+    reviewedAt,
+    messageCount: 4,
+    mentionCount: 1,
+    preview: `deployment preview in ${target}`,
+    ...overrides,
   };
 }
 
@@ -332,9 +356,73 @@ describe('buildCommands', () => {
     expect(command?.hint).toBe('#forge');
   });
 
+  it('lists bounded reviewed anchors newest-first and makes target and preview searchable', () => {
+    for (let index = 0; index < 7; index += 1) {
+      recordReviewHistory(review(
+        `#review-${index}`,
+        `2026-07-09T08:0${index}:00.000Z`,
+      ));
+    }
+
+    expect(readReviewHistory()).toHaveLength(5);
+    const commands = buildCommands(getState()).filter((entry) => entry.id.startsWith('review:'));
+    expect(commands.map((entry) => entry.title)).toEqual([
+      'Reopen reviewed #review-6',
+      'Reopen reviewed #review-5',
+      'Reopen reviewed #review-4',
+      'Reopen reviewed #review-3',
+      'Reopen reviewed #review-2',
+    ]);
+    expect(commands[0]?.keywords).toEqual(expect.arrayContaining([
+      'review',
+      '#review-6',
+      'deployment preview in #review-6',
+    ]));
+  });
+
+  it('reopens a reviewed anchor through exact-id vault travel', () => {
+    recordReviewHistory(review('#forge', '2026-07-09T09:00:00.000Z', {
+      firstMessageId: 'forge-exact-id',
+      preview: 'handoff packet approved',
+    }));
+    const openVaultResult = vi.fn();
+    const travelTo = vi.fn();
+    setState({ openVaultResult, travelTo });
+
+    const command = buildCommands(getState(), 'review #forge')
+      .find((entry) => entry.id === 'review:channel:#forge:forge-exact-id');
+    expect(command?.title).toBe('Reopen reviewed #forge');
+    expect(command?.keywords).toContain('handoff packet approved');
+    command?.run();
+
+    expect(openVaultResult).toHaveBeenCalledWith('#forge', 'forge-exact-id');
+    expect(travelTo).toHaveBeenCalledWith(
+      '#forge',
+      new Date('2026-07-09T08:15:00.000Z'),
+      'forge-exact-id',
+    );
+  });
+
+  it('focuses an exact reviewed id but refuses time travel for an invalid date', () => {
+    recordReviewHistory(review('aoi', '2026-07-09T09:00:00.000Z', {
+      firstMessageId: 'dm-exact-id',
+      firstAt: 'not-a-date',
+    }));
+    const openVaultResult = vi.fn();
+    const travelTo = vi.fn();
+    setState({ openVaultResult, travelTo });
+
+    buildCommands(getState(), 'review aoi')
+      .find((entry) => entry.id === 'review:dm:aoi:dm-exact-id')
+      ?.run();
+
+    expect(openVaultResult).toHaveBeenCalledWith('aoi', 'dm-exact-id');
+    expect(travelTo).not.toHaveBeenCalled();
+  });
+
   it('sets the vault search mode to semantic, exact, and hybrid', () => {
     const semantic = buildCommands(getState(), 'vault semantic').find((entry) => entry.id === 'grammar:vault:semantic');
-    expect(semantic?.title).toBe('Search device memory by meaning');
+    expect(semantic?.title).toBe('Search device memory by related terms');
     expect(semantic?.keywords).toContain('semantic');
     semantic?.run();
     expect(vaultSearchMode()).toBe('semantic');
@@ -345,7 +433,7 @@ describe('buildCommands', () => {
     expect(vaultSearchMode()).toBe('exact');
 
     const hybrid = buildCommands(getState(), 'vault hybrid').find((entry) => entry.id === 'grammar:vault:hybrid');
-    expect(hybrid?.title).toBe('Search device memory by text, then meaning');
+    expect(hybrid?.title).toBe('Search device memory by text, then related terms');
     expect(hybrid?.keywords).toContain('hybrid');
     hybrid?.run();
     expect(vaultSearchMode()).toBe('hybrid');
@@ -353,7 +441,7 @@ describe('buildCommands', () => {
 
   it('recognizes hybrid aliases in the vault grammar', () => {
     const combined = buildCommands(getState(), 'vault combined').find((entry) => entry.id === 'grammar:vault:hybrid');
-    expect(combined?.title).toBe('Search device memory by text, then meaning');
+    expect(combined?.title).toBe('Search device memory by text, then related terms');
     combined?.run();
     expect(vaultSearchMode()).toBe('hybrid');
   });
@@ -366,12 +454,12 @@ describe('buildCommands', () => {
     expect(vaultSearchMode()).toBe('exact');
 
     const fromExact = buildCommands(getState(), 'vault mode').find((entry) => entry.id === 'grammar:vault:toggle');
-    expect(fromExact?.title).toContain('semantic');
+    expect(fromExact?.title).toContain('related terms');
     fromExact?.run();
     expect(vaultSearchMode()).toBe('semantic');
 
     const fromSemantic = buildCommands(getState(), 'vault mode').find((entry) => entry.id === 'grammar:vault:toggle');
-    expect(fromSemantic?.title).toContain('hybrid');
+    expect(fromSemantic?.title).toContain('text, then related terms');
     fromSemantic?.run();
     expect(vaultSearchMode()).toBe('hybrid');
   });
@@ -629,6 +717,53 @@ describe('buildCommands', () => {
     });
     open.mockRestore();
   });
+
+  it('audits an extension copy only after the clipboard write succeeds', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    writeClientExtensionActionsForTests([
+      {
+        id: 'branch.copy',
+        title: 'Copy release branch',
+        capability: 'copy-text',
+        text: 'release/onyx',
+      },
+    ]);
+
+    const command = buildCommands(getState()).find((entry) => entry.id === 'extension:branch.copy');
+    await command?.run();
+
+    expect(writeText).toHaveBeenCalledWith('release/onyx');
+    expect(readClientExtensionAudit()[0]).toMatchObject({
+      id: 'branch.copy',
+      detail: 'Copied 12 characters',
+    });
+  });
+
+  it.each(['unavailable', 'rejected'] as const)(
+    'does not persist a fallback payload or audit a %s extension copy',
+    async (mode) => {
+      const writeText = vi.fn().mockRejectedValue(new Error('clipboard denied'));
+      Object.defineProperty(navigator, 'clipboard', {
+        value: mode === 'unavailable' ? undefined : { writeText },
+        configurable: true,
+      });
+      writeClientExtensionActionsForTests([
+        {
+          id: 'secret.copy',
+          title: 'Copy deploy token',
+          capability: 'copy-text',
+          text: 'do-not-persist-this',
+        },
+      ]);
+
+      const command = buildCommands(getState()).find((entry) => entry.id === 'extension:secret.copy');
+      await command?.run();
+
+      expect(readClientExtensionAudit()).toEqual([]);
+      expect(localStorage.getItem('onyx:last-copied-node-address')).toBeNull();
+    },
+  );
 
   describe('schedule message grammar', () => {
     const FIXED_NOW = Date.parse('2026-07-12T12:00:00Z');

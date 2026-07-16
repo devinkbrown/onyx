@@ -90,6 +90,29 @@ describe('searchVaultSemantic', () => {
     expect(ids).not.toContain('hidden');
   });
 
+  it('does not pass encrypted vault envelopes to an embedding provider', async () => {
+    await saveMessages('mika', [
+      msg('plain', 'remembered public phrase', { target: 'mika' }),
+      msg('cipher', 'TSUMUGI1 opaque-envelope-token', {
+        target: 'mika',
+        encrypted: true,
+      }),
+    ]);
+    const embedded: string[] = [];
+    const provider: EmbeddingProvider = {
+      dim: 2,
+      embed(text: string): Float32Array {
+        embedded.push(text);
+        return new Float32Array([1, 0]);
+      },
+    };
+
+    const hits = await searchVaultSemantic('remembered', { provider });
+
+    expect(hits.map((hit) => hit.message.id)).toEqual(['plain']);
+    expect(embedded.some((text) => text.includes('opaque-envelope-token'))).toBe(false);
+  });
+
   it('filters out zero-similarity hits by default', async () => {
     await saveMessages('#ops', [
       msg('match', 'incident postmortem scheduled'),

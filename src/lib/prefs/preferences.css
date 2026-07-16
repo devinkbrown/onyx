@@ -161,7 +161,13 @@
 :root[data-reduce-transparency='true'] .pref-segments,
 :root[data-prefers-reduced-transparency='true'] .pref-segments,
 :root[data-reduce-transparency='true'] .pref-toggle,
-:root[data-prefers-reduced-transparency='true'] .pref-toggle {
+:root[data-prefers-reduced-transparency='true'] .pref-toggle,
+:root[data-reduce-transparency='true'] .onyx-message-search__saved,
+:root[data-prefers-reduced-transparency='true'] .onyx-message-search__saved,
+:root[data-reduce-transparency='true'] .onyx-message-search__recall,
+:root[data-prefers-reduced-transparency='true'] .onyx-message-search__recall,
+:root[data-reduce-transparency='true'] .onyx-message-search__history-off,
+:root[data-prefers-reduced-transparency='true'] .onyx-message-search__history-off {
   background: var(--stone) !important;
   border-color: var(--seam) !important;
   -webkit-backdrop-filter: none !important;
@@ -184,7 +190,10 @@
   :root:not([data-reduce-transparency='false']) .shell-composer,
   :root:not([data-reduce-transparency='false']) .shell-members,
   :root:not([data-reduce-transparency='false']) .pref-segments,
-  :root:not([data-reduce-transparency='false']) .pref-toggle {
+  :root:not([data-reduce-transparency='false']) .pref-toggle,
+  :root:not([data-reduce-transparency='false']) .onyx-message-search__saved,
+  :root:not([data-reduce-transparency='false']) .onyx-message-search__recall,
+  :root:not([data-reduce-transparency='false']) .onyx-message-search__history-off {
     background: var(--stone) !important;
     border-color: var(--seam) !important;
     -webkit-backdrop-filter: none !important;
@@ -344,7 +353,7 @@
   outline-offset: 2px;
 }
 
-.pref-segment[aria-pressed='true'] {
+.pref-segment[aria-checked='true'] {
   color: var(--ink);
   background: var(--lapis-bright);
   font-weight: 700;
@@ -412,11 +421,11 @@
   transition: transform var(--dur) var(--ease);
 }
 
-.pref-toggle[aria-pressed='true'] .pref-switch {
+.pref-toggle[aria-checked='true'] .pref-switch {
   background: var(--lapis-bright);
 }
 
-.pref-toggle[aria-pressed='true'] .pref-switch::after {
+.pref-toggle[aria-checked='true'] .pref-switch::after {
   transform: translateX(16px);
   background: var(--ink);
 }
@@ -549,6 +558,60 @@
   font-size: 0.68rem;
 }
 
+.pref-vault-retention {
+  padding: var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 24%, var(--line));
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 9%, transparent), transparent 58%),
+    color-mix(in oklab, var(--ink) 32%, transparent);
+}
+
+.pref-vault-retention__scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pref-vault-retention__scope::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 15%, transparent);
+}
+
+.pref-vault-retention__controls {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+  padding-left: var(--space-3);
+  border-left: 2px solid color-mix(in oklab, var(--lapis-bright) 35%, var(--line));
+}
+
+.pref-vault-retention .pref-segments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+}
+
+.pref-vault-retention__boundary {
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--stone) 55%, transparent);
+  color: var(--washi-dim);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
 .pref-json-input {
   width: 100%;
   min-height: 118px;
@@ -564,6 +627,67 @@
 .pref-json-input:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 2px;
+}
+
+.pref-extension-review {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--gold-bright) 42%, var(--line));
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--gold) 8%, var(--ink) 42%);
+}
+
+.pref-extension-review h4,
+.pref-extension-review p {
+  margin: 0;
+}
+
+.pref-extension-review h4 {
+  color: var(--washi);
+  font: 700 0.76rem var(--font-mono);
+}
+
+.pref-extension-review p {
+  color: var(--washi-mute);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.pref-extension-review__rows {
+  display: grid;
+  gap: 6px;
+}
+
+.pref-extension-review__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 48%, transparent);
+}
+
+.pref-extension-review__title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--washi);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.pref-extension-review__capability {
+  color: var(--gold-bright);
+  font: 700 0.66rem var(--font-mono);
+}
+
+.pref-extension-review__detail {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--washi-dim);
+  font: 0.7rem var(--font-mono);
 }
 
 .pref-audit-clear {

@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   BrowserTranslatorAdapter,
+  MAX_TRANSLATION_RESULT_LENGTH,
+  MAX_TRANSLATION_SOURCE_LENGTH,
   NoopTranslator,
   TRANSLATION_PROVENANCE,
   TRANSLATION_TARGETS,
@@ -100,6 +102,15 @@ describe('buildTranslationRequest', () => {
 
     expect(request).toEqual({ sourceText: '  hola  ', targetLang: 'en', passthrough: false });
   });
+
+  it('bounds source text before it can reach the local model', () => {
+    const source = 'a'.repeat(MAX_TRANSLATION_SOURCE_LENGTH + 128);
+
+    const request = buildTranslationRequest({ text: source }, 'ja');
+
+    expect(request.sourceText).toHaveLength(MAX_TRANSLATION_SOURCE_LENGTH);
+    expect(request.sourceText).toBe(source.slice(0, MAX_TRANSLATION_SOURCE_LENGTH));
+  });
 });
 
 describe('applyTranslationResult', () => {
@@ -122,6 +133,17 @@ describe('applyTranslationResult', () => {
     expect(next.text).toBe('hola');
     expect(next.lang).toBe('es');
   });
+
+  it('bounds transient model output without mutating the source message', () => {
+    const translated = 'b'.repeat(MAX_TRANSLATION_RESULT_LENGTH + 128);
+    const original: TranslatableMessage = { text: 'hola', lang: 'es' };
+
+    const next = applyTranslationResult(original, translated, 'en');
+
+    expect(next.translation?.translated).toHaveLength(MAX_TRANSLATION_RESULT_LENGTH);
+    expect(next.translation?.translated).toBe(translated.slice(0, MAX_TRANSLATION_RESULT_LENGTH));
+    expect(original.translation).toBeUndefined();
+  });
 });
 
 describe('translateMessage orchestration', () => {
@@ -141,6 +163,24 @@ describe('translateMessage orchestration', () => {
     expect(result.translation?.translated).toBe('hello');
     expect(result.translation?.targetLang).toBe('en');
     expect(translator.calls).toEqual([['hola', 'en']]);
+  });
+
+  it('bounds both the local model request and its transient result', async () => {
+    const source = 'a'.repeat(MAX_TRANSLATION_SOURCE_LENGTH + 64);
+    const translated = 'b'.repeat(MAX_TRANSLATION_RESULT_LENGTH + 64);
+    const translator: Translator & { calls: string[] } = {
+      calls: [],
+      translate(text: string): Promise<string> {
+        this.calls.push(text);
+        return Promise.resolve(translated);
+      },
+    };
+
+    const result = await translateMessage(translator, { text: source }, 'fr');
+
+    expect(translator.calls).toEqual([source.slice(0, MAX_TRANSLATION_SOURCE_LENGTH)]);
+    expect(result.translation?.translated).toBe(translated.slice(0, MAX_TRANSLATION_RESULT_LENGTH));
+    expect(result.text).toBe(source);
   });
 
   it('returns the original message unchanged on passthrough (never calls the model)', async () => {
@@ -255,5 +295,26 @@ describe('BrowserTranslatorAdapter (gated, no live model)', () => {
 
     expect(out).toBe('hello!');
     expect(created).toEqual([{ sourceLanguage: 'en', targetLanguage: 'ja' }]);
+  });
+
+  it('bounds direct browser-adapter requests and responses', async () => {
+    const received: string[] = [];
+    const source = 'a'.repeat(MAX_TRANSLATION_SOURCE_LENGTH + 32);
+    const translated = 'b'.repeat(MAX_TRANSLATION_RESULT_LENGTH + 32);
+    (globalThis as { Translator?: unknown }).Translator = {
+      create() {
+        return {
+          translate(text: string) {
+            received.push(text);
+            return translated;
+          },
+        };
+      },
+    };
+
+    const out = await createBrowserTranslator().translate(source, 'fr');
+
+    expect(received).toEqual([source.slice(0, MAX_TRANSLATION_SOURCE_LENGTH)]);
+    expect(out).toBe(translated.slice(0, MAX_TRANSLATION_RESULT_LENGTH));
   });
 });

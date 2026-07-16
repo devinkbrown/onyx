@@ -2,6 +2,7 @@
 import { createRoot } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Channel, ChatMessage } from '@/lib/irc/types';
+import type { VaultSearchHit } from '@/lib/vault/historyVault';
 import { setState } from '@/lib/store';
 import { store } from '@/lib/store/store';
 import { resetPreferences } from '@/lib/prefs/preferences';
@@ -9,8 +10,8 @@ import { closeMessageSearch, openMessageSearch, setVaultMode, useMessageSearch }
 
 // The vault (device-memory) search fetch is exercised through a spy so we can
 // assert *when* it runs against the fake timer, independent of IndexedDB.
-const searchVaultMock = vi.fn<(query: string) => Promise<never[]>>(async () => []);
-const searchVaultSemanticMock = vi.fn<(query: string) => Promise<never[]>>(async () => []);
+const searchVaultMock = vi.fn<(query: string) => Promise<VaultSearchHit[]>>(async () => []);
+const searchVaultSemanticMock = vi.fn<(query: string) => Promise<VaultSearchHit[]>>(async () => []);
 
 vi.mock('@/lib/vault/historyVault', () => ({
   searchVault: (query: string) => searchVaultMock(query),
@@ -102,6 +103,43 @@ describe('useMessageSearch — vault debounce isolation', () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(searchVaultMock).toHaveBeenCalledTimes(1);
     expect(searchVaultMock).toHaveBeenCalledWith('needle');
+
+    dispose();
+  });
+
+  it('does not let an in-flight vault query repopulate results after search closes', async () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([['#root', channel('#root', [])]]),
+    });
+
+    let resolveSearch!: (hits: VaultSearchHit[]) => void;
+    searchVaultMock.mockReturnValueOnce(new Promise((resolve) => {
+      resolveSearch = resolve;
+    }));
+
+    let dispose!: () => void;
+    let search!: ReturnType<typeof useMessageSearch>;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      search = useMessageSearch();
+      openMessageSearch();
+      search.setQuery('needle');
+    });
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(searchVaultMock).toHaveBeenCalledWith('needle');
+
+    closeMessageSearch();
+    resolveSearch([{
+      target: '#archive',
+      message: message('late', 'Mira', 'needle from a stale request', 2, '#archive'),
+    }]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(search.isOpen()).toBe(false);
+    expect(search.vaultResults()).toEqual([]);
 
     dispose();
   });

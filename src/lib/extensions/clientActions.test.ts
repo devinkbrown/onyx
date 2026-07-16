@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearClientExtensionAudit,
   clearClientExtensionActions,
   exportClientExtensionActionManifest,
   normalizeClientExtensionAction,
+  normalizeClientExtensionActions,
   parseClientExtensionActionManifest,
+  previewClientExtensionAction,
   readClientExtensionAudit,
   readClientExtensionActions,
   recordClientExtensionActionRun,
@@ -16,6 +18,10 @@ import {
 describe('client extension actions', () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('normalizes only capability-scoped safe actions', () => {
@@ -61,8 +67,8 @@ describe('client extension actions', () => {
     });
   });
 
-  it('imports, exports, and clears reviewed extension action manifests', () => {
-    const imported = parseClientExtensionActionManifest(JSON.stringify({
+  it('parses reviewed manifests without persistence, then saves and exports v1 explicitly', () => {
+    const parsed = parseClientExtensionActionManifest(JSON.stringify({
       version: 1,
       actions: [
         { id: 'open.status', title: 'Open status', capability: 'open-url', url: '/status/', keywords: ['status'] },
@@ -71,12 +77,55 @@ describe('client extension actions', () => {
       ],
     }));
 
+    expect(parsed).toHaveLength(2);
+    expect(readClientExtensionActions()).toEqual([]);
+
+    const imported = saveClientExtensionActions(parsed ?? []);
     expect(imported).toHaveLength(2);
     expect(readClientExtensionActions().map((action) => action.id)).toEqual(['open.status', 'copy.room']);
-    expect(exportClientExtensionActionManifest()).toContain('"actions"');
+    expect(JSON.parse(exportClientExtensionActionManifest())).toMatchObject({ version: 1 });
 
     clearClientExtensionActions();
     expect(readClientExtensionActions()).toEqual([]);
+  });
+
+  it('fails closed for unsupported object versions while retaining legacy-array parsing', () => {
+    const action = { id: 'copy.room', title: 'Copy room', capability: 'copy-text', text: '#root' };
+
+    expect(parseClientExtensionActionManifest('{not-json')).toBeNull();
+    expect(parseClientExtensionActionManifest(JSON.stringify({ version: 2, actions: [action] }))).toBeNull();
+    expect(parseClientExtensionActionManifest(JSON.stringify({ actions: [action] }))).toBeNull();
+    expect(parseClientExtensionActionManifest(JSON.stringify([action]))).toEqual([
+      expect.objectContaining({ id: 'copy.room', text: '#root' }),
+    ]);
+    expect(readClientExtensionActions()).toEqual([]);
+  });
+
+  it('produces payload-safe previews without copied plaintext, URL paths, queries, or credentials', () => {
+    const actions = normalizeClientExtensionActions([
+      {
+        id: 'open.secret',
+        title: 'Open private build',
+        capability: 'open-url',
+        url: 'https://user:password@example.test/private?token=url-secret',
+      },
+      {
+        id: 'copy.secret',
+        title: 'Copy deploy token',
+        capability: 'copy-text',
+        text: 'super-secret-token',
+      },
+    ]);
+
+    const previews = actions.map(previewClientExtensionAction);
+    expect(previews).toEqual([
+      { title: 'Open private build', capability: 'open-url', detail: 'https://example.test' },
+      { title: 'Copy deploy token', capability: 'copy-text', detail: '18 characters' },
+    ]);
+    expect(JSON.stringify(previews)).not.toContain('password');
+    expect(JSON.stringify(previews)).not.toContain('/private');
+    expect(JSON.stringify(previews)).not.toContain('url-secret');
+    expect(JSON.stringify(previews)).not.toContain('super-secret-token');
   });
 
   it('saves only normalized manifest entries', () => {
@@ -88,6 +137,22 @@ describe('client extension actions', () => {
 
     expect(saved).toHaveLength(1);
     expect(readClientExtensionActions()[0]).toMatchObject({ id: 'copy.branch', text: 'main' });
+  });
+
+  it('reports storage failure and does not claim an unverified commit', () => {
+    writeClientExtensionActionsForTests([
+      { id: 'copy.old', title: 'Copy old', capability: 'copy-text', text: 'old' },
+    ]);
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+
+    const saved = saveClientExtensionActions([
+      { id: 'copy.new', title: 'Copy new', capability: 'copy-text', text: 'new' },
+    ]);
+
+    expect(saved).toBeNull();
+    expect(readClientExtensionActions().map((action) => action.id)).toEqual(['copy.old']);
   });
 
   it('records bounded payload-safe action audit entries', () => {

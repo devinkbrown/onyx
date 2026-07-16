@@ -37,7 +37,27 @@ describe('MessageText Block-Kit-lite', () => {
     fireEvent.click(approve);
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('approve'));
-    expect(screen.getByRole('button', { name: 'Copy value for Approve' })).toHaveTextContent('Copied');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Copy value for Approve' })).toHaveTextContent('Copied'));
+    expect(screen.getByRole('status')).toHaveTextContent('Approve value copied.');
+  });
+
+  it.each(['unavailable', 'rejected'] as const)('reports a %s clipboard write instead of claiming success', async (mode) => {
+    const writeText = vi.fn().mockRejectedValue(new Error('clipboard denied'));
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: mode === 'unavailable' ? undefined : { writeText },
+    });
+
+    render(() => (
+      <MessageText
+        text={'[onyx:block] {"buttons":[{"label":"Copy token","value":"secret"}]}' }
+      />
+    ));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy value for Copy token' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Copy value for Copy token' })).toHaveTextContent('Copy failed'));
+    expect(screen.getByRole('status')).toHaveTextContent('Copy token value could not be copied.');
   });
 });
 

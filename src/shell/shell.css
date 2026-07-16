@@ -728,6 +728,72 @@
   background: color-mix(in oklab, var(--ink) 42%, transparent);
 }
 
+.shell-watch-together__controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 0;
+  flex: none;
+}
+
+.shell-watch-together__ctl,
+.shell-watch-together__join {
+  min-height: 28px;
+  padding: 4px 8px;
+  color: var(--washi);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shell-watch-together__ctl:hover,
+.shell-watch-together__ctl:focus-visible,
+.shell-watch-together__join:hover,
+.shell-watch-together__join:focus-visible {
+  color: var(--ink);
+  border-color: var(--lapis-bright);
+  background: var(--lapis-bright);
+}
+
+.shell-watch-together__accept {
+  flex: none;
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 44%, var(--seam));
+}
+
+.shell-watch-together__seek {
+  width: clamp(72px, 9vw, 116px);
+  accent-color: var(--lapis-bright);
+}
+
+.shell-watch-together__handoff-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--washi-dim);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.shell-watch-together__handoff-select {
+  width: clamp(76px, 8vw, 108px);
+  min-height: 28px;
+  padding: 3px 20px 3px 6px;
+  color: var(--washi);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-sm);
+  background: var(--stone-2);
+  font: inherit;
+  font-size: 10px;
+  text-transform: none;
+}
+
 .shell-watch-together__open {
   flex: none;
   color: var(--lapis-bright);
@@ -1903,9 +1969,37 @@
 }
 
 .shell-topic-card-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
   font-family: var(--font-mono);
   font-size: 0.66rem;
   color: var(--washi-mute);
+}
+
+.shell-topic-card-unread {
+  padding: 0.08rem 0.35rem;
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 58%, transparent);
+  border-radius: var(--r-pill);
+  color: var(--lapis-bright);
+  font-weight: 800;
+}
+
+@media (pointer: coarse) {
+  .shell-topic-card-main,
+  .shell-topic-card-follow {
+    min-height: 44px;
+  }
+}
+
+@media (forced-colors: active) {
+  .shell-topic-card-unread {
+    border-color: Highlight;
+    color: Highlight;
+    forced-color-adjust: auto;
+  }
 }
 
 .shell-topic-card-preview {
@@ -4144,6 +4238,8 @@
   .shell-watch-together {
     min-height: 38px;
     padding: 6px 10px;
+    column-gap: 6px;
+    flex-wrap: wrap;
   }
 
   .shell-watch-together__label,
@@ -4153,6 +4249,16 @@
 
   .shell-watch-together__title {
     font-size: 11px;
+  }
+
+  .shell-watch-together__controls {
+    order: 3;
+    width: 100%;
+  }
+
+  .shell-watch-together__seek {
+    flex: 1 1 64px;
+    max-width: 100px;
   }
 
   /* Bigger tap target for the member toggle in the ribbon */
@@ -4490,6 +4596,12 @@
   gap: 10px;
 }
 
+.shell-disconnected-banner--online {
+  background: color-mix(in oklab, var(--ok) 14%, var(--ink));
+  border-bottom-color: var(--ok);
+  color: var(--ok);
+}
+
 /* ── Rich messaging — new token styles ─────────────────────────────────────────
    These extend .shell-msg-text without duplicating any existing rules.
    All colors reference design tokens; no hardcoded values.
@@ -4796,6 +4908,84 @@
   color: var(--washi-mute);
   font-family: var(--font-mono);
   font-size: 0.62rem;
+}
+
+.shell-msg-blockkit-confirm {
+  display: grid;
+  gap: 14px;
+}
+
+.shell-msg-blockkit-confirm__preview {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.shell-msg-blockkit-confirm__preview > div {
+  display: grid;
+  gap: 4px;
+}
+
+.shell-msg-blockkit-confirm__preview dt {
+  color: var(--washi-mute);
+  font: 800 0.66rem var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.shell-msg-blockkit-confirm__preview dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.shell-msg-blockkit-confirm__preview code,
+.shell-msg-blockkit-confirm__preview pre {
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  padding: 9px 10px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 72%, var(--stone));
+  color: var(--washi);
+  font: 0.78rem/1.45 var(--font-mono);
+  white-space: pre-wrap;
+}
+
+.shell-msg-blockkit-confirm__warning {
+  margin: 0;
+  color: var(--gold-bright);
+  font-size: 0.78rem;
+}
+
+.shell-msg-blockkit-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.shell-msg-blockkit-confirm__actions button {
+  min-height: 36px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--stone-2);
+  color: var(--washi);
+  font: 700 0.76rem var(--font-mono);
+  cursor: pointer;
+}
+
+.shell-msg-blockkit-confirm__actions button:hover,
+.shell-msg-blockkit-confirm__actions button:focus-visible {
+  border-color: var(--lapis-bright);
+  color: var(--lapis-bright);
+}
+
+.shell-msg-blockkit-confirm__actions .shell-msg-blockkit-confirm__send {
+  border-color: color-mix(in oklab, var(--gold-bright) 66%, var(--line));
+  background: color-mix(in oklab, var(--gold-bright) 16%, var(--stone));
+  color: var(--washi);
 }
 
 @media (prefers-reduced-motion: reduce) {

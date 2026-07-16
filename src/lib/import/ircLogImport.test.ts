@@ -19,6 +19,20 @@ describe('normalizeIrcChannelTarget', () => {
   it('returns an empty target for a missing name', () => {
     expect(normalizeIrcChannelTarget('   ')).toBe('');
   });
+
+  it('leaves an already-normalized target unchanged', () => {
+    expect(normalizeIrcChannelTarget('#dev')).toBe('#dev');
+  });
+
+  it('makes collision-looking raw labels visibly share one normalized target', () => {
+    expect(normalizeIrcChannelTarget('#Ops Room!')).toBe('#ops-room');
+    expect(normalizeIrcChannelTarget('ops---room')).toBe('#ops-room');
+  });
+
+  it('rejects labels that collapse to empty or punctuation-only targets', () => {
+    expect(normalizeIrcChannelTarget('!!!')).toBe('');
+    expect(normalizeIrcChannelTarget('___')).toBe('');
+  });
 });
 
 describe('parseIrcLog — supported formats', () => {
@@ -143,6 +157,17 @@ describe('parseIrcLog — date handling', () => {
   it('ignores an invalid baseDate and uses the synthetic date', () => {
     const result = parseIrcLog('14:05 <alice> old export', { channel: '#dev', baseDate: 'not-a-date' });
     expect(result!.snapshot.targets[0]!.messages[0]!.time.toISOString()).toBe('2000-01-01T14:05:00.000Z');
+  });
+
+  it('rejects impossible full calendar dates instead of normalizing them into another month', () => {
+    const result = parseIrcLog(
+      '2025-02-30 14:05:00\t<alice>\timpossible\n2025-02-28 14:06:00\t<bob>\tvalid',
+      { channel: '#dev' },
+    );
+
+    expect(result!.summary.skipped).toBe(1);
+    expect(result!.snapshot.targets[0]!.messages.map((message) => message.text)).toEqual(['valid']);
+    expect(result!.snapshot.targets[0]!.messages[0]!.time.toISOString()).toBe('2025-02-28T14:06:00.000Z');
   });
 });
 

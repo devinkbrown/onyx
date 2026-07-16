@@ -68,6 +68,7 @@ export function pwaReadiness(): PwaReadinessItem[] {
   const standalone = standaloneMode();
   const hasServiceWorker = typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
   const controlled = hasServiceWorker && Boolean(navigator.serviceWorker.controller);
+  const hasDurableStorage = storageReady();
 
   return [
     {
@@ -92,8 +93,8 @@ export function pwaReadiness(): PwaReadinessItem[] {
     {
       key: 'storage',
       label: 'Local state',
-      state: storageReady() ? 'ready' : 'unavailable',
-      detail: storageReady()
+      state: hasDurableStorage ? 'ready' : 'unavailable',
+      detail: hasDurableStorage
         ? 'IndexedDB and localStorage are available for vault, drafts, and portable transfer.'
         : 'Local storage is unavailable; vault recall, drafts, and portable transfer cannot be durable.',
     },

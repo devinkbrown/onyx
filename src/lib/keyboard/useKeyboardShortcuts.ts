@@ -230,13 +230,24 @@ function navigateNextUnread(): void {
     unreadTargets.find((target) => targets.indexOf(target) > currentIndex) ??
     unreadTargets[0];
   if (!next) return;
+  const targetKey = next.kind === 'channel' ? next.channel.toLowerCase() : next.nick.toLowerCase();
+  // Capture the authoritative boundary before navigate() marks the target read.
+  // This turns N into an exact reading handoff instead of merely opening the
+  // conversation at its tail.
+  const firstUnread = state.firstUnreadId.get(targetKey) ?? null;
   state.navigate(next);
+  if (firstUnread) state.focusMessage(firstUnread);
 }
 
 function toggleActiveFollow(): void {
-  const view = getState().activeView;
+  const state = getState();
+  const view = state.activeView;
   if (view.kind === 'channel') {
-    toggleFollow(view.channel);
+    // Topic filters are conversation boundaries in the Time-Native Venue.
+    // Match the visible follow control: U follows the selected topic when one
+    // is active, otherwise it follows the room.
+    const topic = state.activeChannelTopics.get(view.channel.toLowerCase()) ?? null;
+    toggleFollow(view.channel, topic);
   } else if (view.kind === 'dm') {
     toggleFollow(view.nick);
   }

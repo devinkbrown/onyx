@@ -39,4 +39,20 @@ describe('fuzzyMatch', () => {
       { start: 7, end: 8 },
     ]);
   });
+
+  it('maps Unicode case-fold expansions back to original title offsets', () => {
+    const title = 'İstanbul room';
+    const match = fuzzyMatch('sta', title);
+
+    expect(match?.ranges).toEqual([{ start: 1, end: 4 }]);
+    expect(title.slice(match!.ranges[0]!.start, match!.ranges[0]!.end)).toBe('sta');
+  });
+
+  it('keeps astral-character highlight ranges on whole UTF-16 code points', () => {
+    const title = '🚀 launch room';
+    const match = fuzzyMatch('🚀', title);
+
+    expect(match?.ranges).toEqual([{ start: 0, end: 2 }]);
+    expect(title.slice(match!.ranges[0]!.start, match!.ranges[0]!.end)).toBe('🚀');
+  });
 });

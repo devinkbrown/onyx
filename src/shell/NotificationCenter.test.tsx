@@ -26,9 +26,16 @@ afterEach(() => cleanup());
 
 describe('<NotificationCenter>', () => {
   it('shows the empty state when there are no notifications', () => {
-    const { getByTestId, getByText } = render(() => <NotificationCenter />);
-    fireEvent.click(getByTestId('ribbon-bell'));
-    expect(screen.getByRole('dialog', { name: 'Notification inbox' })).toBeInTheDocument();
+    const { getByText } = render(() => <NotificationCenter />);
+    const trigger = screen.getByRole('button', { name: 'Inbox' });
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(within(trigger).queryByRole('button')).toBeNull();
+
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole('dialog', { name: 'Notification inbox' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger).toHaveAttribute('aria-controls', dialog.id);
     expect(getByText(/Nothing yet/)).toBeInTheDocument();
   });
 
@@ -43,30 +50,58 @@ describe('<NotificationCenter>', () => {
       ],
       readNotificationIds: new Set(['d']),
     });
-    const { getByTestId } = render(() => <NotificationCenter />);
-    expect(getByTestId('ribbon-bell').textContent).toContain('3');
+    render(() => <NotificationCenter />);
+    expect(screen.getByRole('button', { name: 'Inbox — 3 unread notifications' })).toBeInTheDocument();
   });
 
   it('clicking a mention marks it read and navigates to the channel', () => {
     store.setState({
       notifications: [note({ id: 'm1', type: 'mention', from: 'trev', channel: '#root', text: 'ping kain' })],
     });
-    const { getByTestId, getByText } = render(() => <NotificationCenter />);
-    fireEvent.click(getByTestId('ribbon-bell'));
+    const { getByText } = render(() => <NotificationCenter />);
+    const trigger = screen.getByRole('button', { name: 'Inbox — 1 unread notification' });
+    fireEvent.click(trigger);
     fireEvent.click(getByText('ping kain'));
     expect(store.getState().readNotificationIds.has('m1')).toBe(true);
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveAccessibleName('Inbox');
+    expect(screen.queryByRole('dialog', { name: 'Notification inbox' })).toBeNull();
   });
 
   it('clicking a followed conversation notification marks it read and navigates to the channel', () => {
     store.setState({
-      notifications: [note({ id: 'f1', type: 'follow', from: 'trev', channel: '#root', text: 'quiet update' })],
+      notifications: [
+        note({
+          id: 'f1',
+          type: 'follow',
+          from: 'trev',
+          channel: '#root',
+          topic: ' roadmap ',
+          text: 'quiet update',
+        }),
+      ],
+      channelProps: new Map([['#root', { 'orochi.topics': 'roadmap' }]]),
     });
     const { getByTestId, getByText } = render(() => <NotificationCenter />);
     fireEvent.click(getByTestId('ribbon-bell'));
     fireEvent.click(getByText('quiet update'));
     expect(store.getState().readNotificationIds.has('f1')).toBe(true);
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+    expect(store.getState().activeChannelTopics.get('#root')).toBe('roadmap');
+  });
+
+  it('ignores an invalid topic on a followed conversation notification', () => {
+    store.setState({
+      notifications: [
+        note({ id: 'f2', type: 'follow', from: 'trev', channel: '#root', topic: 'bad,topic', text: 'quiet update' }),
+      ],
+    });
+    const { getByTestId, getByText } = render(() => <NotificationCenter />);
+    fireEvent.click(getByTestId('ribbon-bell'));
+    fireEvent.click(getByText('quiet update'));
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+    expect(store.getState().activeChannelTopics.has('#root')).toBe(false);
   });
 
   it('dismiss removes a notification; mark-all clears the badge', () => {

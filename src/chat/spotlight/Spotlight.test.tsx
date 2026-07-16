@@ -2,6 +2,7 @@
 import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Channel } from '@/lib/irc/types';
+import { recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import { setState } from '@/lib/store';
 import { store } from '@/lib/store/store';
 import { Spotlight, SpotlightProvider } from './index';
@@ -120,6 +121,39 @@ describe('Spotlight', () => {
 
     expect(screen.getByText('Go to #forge')).toBeInTheDocument();
     expect(screen.queryByText('Go to #lapis')).not.toBeInTheDocument();
+  });
+
+  it('finds a reviewed anchor by preview and runs exact-id recall', async () => {
+    recordReviewHistory({
+      target: '#forge',
+      name: '#forge',
+      kind: 'channel',
+      firstMessageId: 'reviewed-exact-id',
+      firstAt: '2026-07-09T08:15:00.000Z',
+      reviewedAt: '2026-07-09T09:00:00.000Z',
+      messageCount: 3,
+      mentionCount: 1,
+      preview: 'handoff packet approved',
+    });
+    const openVaultResult = vi.fn();
+    const travelTo = vi.fn();
+    setState({ openVaultResult, travelTo });
+    renderSpotlight();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const input = screen.getByRole('combobox', { name: 'Command search' });
+    fireEvent.input(input, { target: { value: 'handoff approved' } });
+
+    const recall = await screen.findByRole('option', { name: /Reopen reviewed #forge/ });
+    fireEvent.click(recall);
+
+    expect(openVaultResult).toHaveBeenCalledWith('#forge', 'reviewed-exact-id');
+    expect(travelTo).toHaveBeenCalledWith(
+      '#forge',
+      new Date('2026-07-09T08:15:00.000Z'),
+      'reviewed-exact-id',
+    );
+    expect(screen.queryByRole('dialog', { name: 'Command palette' })).not.toBeInTheDocument();
   });
 
   it('runs the active command on Enter and closes on Escape', () => {

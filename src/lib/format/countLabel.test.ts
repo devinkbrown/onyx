@@ -87,6 +87,7 @@ describe('countLabel', () => {
   it('appends a simple s even when the singular already has a suffix', () => {
     expect(countLabel(2, 'class')).toBe('2 classs');
     expect(countLabel(0, 'status')).toBe('0 statuss');
+    expect(countLabel(0, 'saved search', 'saved searches')).toBe('0 saved searches');
   });
 
   it('pluralizes signed zero and numeric wrappers as non-singular counts', () => {

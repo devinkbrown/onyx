@@ -8,13 +8,15 @@
  */
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
-import { createRoot } from 'solid-js';
+import { createRoot, createSignal, For } from 'solid-js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatMessage } from '@/lib/irc/types';
+import { setTranslationTarget } from '@/lib/intelligence/translateMessage';
 import { store } from '@/lib/store/store';
 import { closeMessageSearch, useMessageSearch } from '@/shell/search/useMessageSearch';
 import {
   MessageMenu,
+  loadedMessageTranslationSource,
   messageMenuCapabilities,
   suggestSearchQueryFromMessage,
   suggestTopicLabelFromMessage,
@@ -24,11 +26,25 @@ import {
 const initialState = store.getInitialState();
 
 beforeEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   cleanup();
   store.setState(initialState, true);
   closeMessageSearch();
+  setTranslationTarget('');
   localStorage.clear();
 });
+
+function localStorageValues(): string[] {
+  const values: string[] = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key === null) continue;
+    const value = localStorage.getItem(key);
+    if (value !== null) values.push(value);
+  }
+  return values;
+}
 
 function input(overrides: Partial<CapabilityInput> = {}): CapabilityInput {
   const { msg: msgOverride, ...rest } = overrides;
@@ -236,7 +252,468 @@ describe('suggestSearchQueryFromMessage', () => {
   });
 });
 
+describe('loadedMessageTranslationSource', () => {
+  it('uses transient plaintext for a loaded E2EE row', () => {
+    expect(loadedMessageTranslationSource({
+      text: 'e2ee:v1:ciphertext-envelope',
+      plaintext: 'private hello',
+      encrypted: true,
+    })).toBe('private hello');
+  });
+
+  it('never returns ciphertext for a locked E2EE row', () => {
+    expect(loadedMessageTranslationSource({
+      text: 'e2ee:v1:ciphertext-envelope',
+      encrypted: true,
+    })).toBeNull();
+  });
+
+  it('rejects deleted, redacted, and empty rows', () => {
+    expect(loadedMessageTranslationSource({ text: 'gone', deleted: true })).toBeNull();
+    expect(loadedMessageTranslationSource({ text: 'gone', redacted: true })).toBeNull();
+    expect(loadedMessageTranslationSource({ text: '   ' })).toBeNull();
+  });
+});
+
 describe('<MessageMenu>', () => {
+  it('translates a loaded message once on this device, keeps it transient, and dismisses it', async () => {
+    setTranslationTarget('fr');
+    let resolveTranslation: ((value: string) => void) | undefined;
+    const pendingTranslation = new Promise<string>((resolve) => {
+      resolveTranslation = resolve;
+    });
+    const translate = vi.fn(() => pendingTranslation);
+    const create = vi.fn(() => ({ translate }));
+    const fetch = vi.fn();
+    vi.stubGlobal('Translator', { create });
+    vi.stubGlobal('fetch', fetch);
+    const msg: ChatMessage = {
+      id: 'm-translate',
+      from: 'alice',
+      text: 'Hello from the loaded row.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+    const original = { ...msg };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    const action = screen.getByRole('menuitem', {
+      name: 'Translate message from alice on this device',
+    });
+    fireEvent.click(action);
+    fireEvent.click(action);
+
+    await waitFor(() => expect(translate).toHaveBeenCalledTimes(1));
+    expect(action).toBeDisabled();
+    expect(screen.getByText('Translating on this device…')).toHaveAttribute('role', 'status');
+    resolveTranslation?.('Bonjour depuis la ligne chargée.');
+
+    const output = await screen.findByText('Bonjour depuis la ligne chargée.');
+    expect(output).toHaveAttribute('role', 'status');
+    expect(screen.getByLabelText(/Translation for message from alice provenance: This device/i)).toBeInTheDocument();
+    expect(create).toHaveBeenCalledWith({ targetLanguage: 'fr' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(msg).toEqual(original);
+    expect(localStorageValues()).not.toContain('Hello from the loaded row.');
+    expect(localStorageValues()).not.toContain('Bonjour depuis la ligne chargée.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss translation for message from alice' }));
+    expect(screen.queryByText('Bonjour depuis la ligne chargée.')).toBeNull();
+  });
+
+  it('gates the action with an accessible note when the browser local Translator API is unavailable', () => {
+    vi.stubGlobal('Translator', undefined);
+    const msg: ChatMessage = {
+      id: 'm-translate-unavailable',
+      from: 'alice',
+      text: 'Translate me locally.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+
+    expect(screen.queryByRole('menuitem', { name: /translate message from alice/i })).toBeNull();
+    const note = screen.getByRole('note');
+    expect(note).toHaveTextContent('On-device translation is unavailable in this browser.');
+    expect(screen.queryByText(/external/i)).toBeNull();
+  });
+
+  it('copies exactly a successful transient translation with a keyboard-accessible action', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    vi.stubGlobal('Translator', {
+      create: () => ({ translate: () => Promise.resolve('Exact translated output.') }),
+    });
+    const msg: ChatMessage = {
+      id: 'm-translation-copy',
+      from: 'alice',
+      text: 'Original loaded text.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    expect(screen.queryByRole('button', { name: /copy translated text/i })).toBeNull();
+    fireEvent.click(screen.getByRole('menuitem', { name: /translate message from alice on this device/i }));
+    await screen.findByText('Exact translated output.');
+
+    const copy = screen.getByRole('button', {
+      name: 'Copy translated text for message from alice',
+    });
+    copy.focus();
+    expect(document.activeElement).toBe(copy);
+    fireEvent.click(copy);
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText).toHaveBeenCalledWith('Exact translated output.');
+    expect(writeText).not.toHaveBeenCalledWith('Original loaded text.');
+    expect(await screen.findByText('Translation copied.')).toHaveAttribute('role', 'status');
+    expect(localStorageValues()).not.toContain('Exact translated output.');
+
+    setTranslationTarget('de');
+    await waitFor(() => {
+      expect(screen.queryByText('Exact translated output.')).toBeNull();
+      expect(screen.queryByText('Translation copied.')).toBeNull();
+    });
+  });
+
+  it('reports a rejected translation copy without a false success or persistence fallback', async () => {
+    const writeText = vi.fn().mockRejectedValue(new DOMException('denied'));
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    vi.stubGlobal('Translator', {
+      create: () => ({ translate: () => Promise.resolve('Rejected-copy translation.') }),
+    });
+    const msg: ChatMessage = {
+      id: 'm-translation-copy-rejected',
+      from: 'alice',
+      text: 'Original rejected-copy text.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: /translate message from alice on this device/i }));
+    await screen.findByText('Rejected-copy translation.');
+    fireEvent.click(screen.getByRole('button', { name: /copy translated text for message from alice/i }));
+
+    const failure = await screen.findByText(
+      'Could not copy translation. Clipboard access is unavailable.',
+    );
+    expect(failure).toHaveAttribute('role', 'status');
+    expect(screen.queryByText('Translation copied.')).toBeNull();
+    expect(writeText).toHaveBeenCalledWith('Rejected-copy translation.');
+    expect(localStorageValues()).not.toContain('Rejected-copy translation.');
+  });
+
+  it('reports unavailable clipboard access without claiming translation copy success', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+    });
+    vi.stubGlobal('Translator', {
+      create: () => ({ translate: () => Promise.resolve('Unavailable-copy translation.') }),
+    });
+    const msg: ChatMessage = {
+      id: 'm-translation-copy-unavailable',
+      from: 'alice',
+      text: 'Original unavailable-copy text.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: /translate message from alice on this device/i }));
+    await screen.findByText('Unavailable-copy translation.');
+    const copy = screen.getByRole('button', { name: /copy translated text for message from alice/i });
+    expect(copy).toBeEnabled();
+    fireEvent.click(copy);
+
+    expect(await screen.findByText(
+      'Could not copy translation. Clipboard access is unavailable.',
+    )).toHaveAttribute('role', 'status');
+    expect(screen.queryByText('Translation copied.')).toBeNull();
+    expect(localStorageValues()).not.toContain('Unavailable-copy translation.');
+  });
+
+  it('bounds concurrent on-device work across loaded message rows', async () => {
+    const resolvers: Array<(value: string) => void> = [];
+    const translate = vi.fn(() => new Promise<string>((resolve) => {
+      resolvers.push(resolve);
+    }));
+    vi.stubGlobal('Translator', { create: () => ({ translate }) });
+    const messages: ChatMessage[] = ['aki', 'mina', 'noa', 'ren', 'sora'].map((from, index) => ({
+      id: `m-concurrent-${index}`,
+      from,
+      text: `Loaded message ${index}`,
+      time: new Date(`2026-07-08T12:00:0${index}Z`),
+      type: 'msg',
+      target: '#general',
+    }));
+
+    render(() => (
+      <div>
+        <For each={messages}>
+          {(msg) => (
+            <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+          )}
+        </For>
+      </div>
+    ));
+
+    for (const from of ['aki', 'mina', 'noa', 'ren']) {
+      fireEvent.click(screen.getByRole('menuitem', {
+        name: `Translate message from ${from} on this device`,
+      }));
+    }
+    fireEvent.click(screen.getByRole('menuitem', {
+      name: 'Translate message from sora on this device',
+    }));
+
+    await waitFor(() => expect(translate).toHaveBeenCalledTimes(4));
+    expect(await screen.findByText('On-device translation is busy. Retry in a moment.')).toHaveAttribute(
+      'role',
+      'status',
+    );
+    expect(screen.getByRole('button', {
+      name: 'Retry translating message from sora on this device',
+    })).toBeInTheDocument();
+
+    for (const resolve of resolvers) resolve('Done locally.');
+    await waitFor(() => expect(screen.getAllByText('Done locally.')).toHaveLength(4));
+  });
+
+  it('announces local model rejection and provides retry and dismiss controls', async () => {
+    const translate = vi.fn()
+      .mockRejectedValueOnce(new Error('model load failed'))
+      .mockResolvedValueOnce('Hello after retry.');
+    vi.stubGlobal('Translator', { create: () => ({ translate }) });
+    const msg: ChatMessage = {
+      id: 'm-translate-retry',
+      from: 'alice',
+      text: 'Hola después del reintento.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: /translate message from alice on this device/i }));
+
+    const error = await screen.findByText('On-device translation failed. Retry when the local model is ready.');
+    expect(error).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('button', { name: /dismiss translation for message from alice/i })).toBeInTheDocument();
+    const retry = screen.getByRole('button', { name: /retry translating message from alice on this device/i });
+    fireEvent.click(retry);
+
+    expect(await screen.findByText('Hello after retry.')).toHaveAttribute('role', 'status');
+    expect(translate).toHaveBeenCalledTimes(2);
+  });
+
+  it('translates only transient plaintext for loaded E2EE rows and never mutates the message', async () => {
+    const translate = vi.fn().mockResolvedValue('Private hello translated.');
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    vi.stubGlobal('Translator', { create: () => ({ translate }) });
+    const msg: ChatMessage = {
+      id: 'm-translate-e2ee',
+      from: 'alice',
+      text: 'e2ee:v1:ciphertext-envelope',
+      plaintext: 'private hello',
+      encrypted: true,
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: 'alice',
+    };
+    const original = { ...msg };
+
+    render(() => (
+      <MessageMenu msg={msg} target="alice" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: /translate message from alice on this device/i }));
+
+    expect(await screen.findByText('Private hello translated.')).toBeInTheDocument();
+    expect(translate).toHaveBeenCalledWith('private hello');
+    expect(translate).not.toHaveBeenCalledWith('e2ee:v1:ciphertext-envelope');
+    expect(screen.queryByText('e2ee:v1:ciphertext-envelope')).toBeNull();
+    expect(msg).toEqual(original);
+    fireEvent.click(screen.getByRole('button', { name: /copy translated text for message from alice/i }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('Private hello translated.'));
+    expect(writeText).not.toHaveBeenCalledWith('private hello');
+    expect(writeText).not.toHaveBeenCalledWith('e2ee:v1:ciphertext-envelope');
+    expect(localStorageValues()).not.toContain('private hello');
+    expect(localStorageValues()).not.toContain('Private hello translated.');
+  });
+
+  it('never offers translation or shows ciphertext for a locked E2EE row', () => {
+    const create = vi.fn();
+    vi.stubGlobal('Translator', { create });
+    const msg: ChatMessage = {
+      id: 'm-translate-e2ee-locked',
+      from: 'alice',
+      text: 'e2ee:v1:locked-ciphertext-envelope',
+      encrypted: true,
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: 'alice',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="alice" selfNick="bob" canEdit={false} menuOpen />
+    ));
+
+    expect(screen.queryByRole('menuitem', { name: /translate message from alice/i })).toBeNull();
+    expect(screen.queryByRole('note')).toBeNull();
+    expect(screen.queryByText('e2ee:v1:locked-ciphertext-envelope')).toBeNull();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('discards stale completion when a loaded row is replaced', async () => {
+    let resolveTranslation: ((value: string) => void) | undefined;
+    const pendingTranslation = new Promise<string>((resolve) => {
+      resolveTranslation = resolve;
+    });
+    const translate = vi.fn(() => pendingTranslation);
+    vi.stubGlobal('Translator', { create: () => ({ translate }) });
+    const first: ChatMessage = {
+      id: 'm-stale-first',
+      from: 'alice',
+      text: 'Old loaded text.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+    const replacement: ChatMessage = {
+      ...first,
+      id: 'm-stale-replacement',
+      from: 'mina',
+      text: 'Replacement loaded text.',
+    };
+    const [msg, setMsg] = createSignal(first);
+
+    render(() => (
+      <MessageMenu msg={msg()} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: /translate message from alice on this device/i }));
+    await waitFor(() => expect(translate).toHaveBeenCalledTimes(1));
+
+    setMsg(replacement);
+    await waitFor(() => {
+      expect(screen.getByRole('group', { name: 'Actions for message from mina' })).toBeInTheDocument();
+    });
+    resolveTranslation?.('Stale translated output.');
+    await Promise.resolve();
+
+    expect(screen.queryByText('Stale translated output.')).toBeNull();
+    expect(screen.getByRole('menuitem', { name: /translate message from mina on this device/i })).toBeEnabled();
+  });
+
+  it('clears pending copy feedback when its successful translation row is replaced', async () => {
+    let resolveClipboard: (() => void) | undefined;
+    const writeText = vi.fn(() => new Promise<void>((resolve) => {
+      resolveClipboard = resolve;
+    }));
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    vi.stubGlobal('Translator', {
+      create: () => ({ translate: () => Promise.resolve('Translation awaiting copy.') }),
+    });
+    const first: ChatMessage = {
+      id: 'm-copy-stale-first',
+      from: 'alice',
+      text: 'First loaded text.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+    const replacement: ChatMessage = {
+      ...first,
+      id: 'm-copy-stale-replacement',
+      from: 'mina',
+      text: 'Replacement loaded text.',
+    };
+    const [msg, setMsg] = createSignal(first);
+
+    render(() => (
+      <MessageMenu msg={msg()} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: /translate message from alice on this device/i }));
+    await screen.findByText('Translation awaiting copy.');
+    fireEvent.click(screen.getByRole('button', { name: /copy translated text for message from alice/i }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('Translation awaiting copy.'));
+    expect(screen.getByText('Copying translation…')).toHaveAttribute('role', 'status');
+
+    setMsg(replacement);
+    await waitFor(() => {
+      expect(screen.getByRole('group', { name: 'Actions for message from mina' })).toBeInTheDocument();
+      expect(screen.queryByText('Copying translation…')).toBeNull();
+    });
+    resolveClipboard?.();
+    await Promise.resolve();
+
+    expect(screen.queryByText('Translation copied.')).toBeNull();
+    expect(screen.queryByRole('button', { name: /copy translated text for message from mina/i })).toBeNull();
+    expect(localStorageValues()).not.toContain('Translation awaiting copy.');
+  });
+
+  it('ignores completion after the loaded row unmounts', async () => {
+    let resolveTranslation: ((value: string) => void) | undefined;
+    const pendingTranslation = new Promise<string>((resolve) => {
+      resolveTranslation = resolve;
+    });
+    const translate = vi.fn(() => pendingTranslation);
+    vi.stubGlobal('Translator', { create: () => ({ translate }) });
+    const msg: ChatMessage = {
+      id: 'm-unmount',
+      from: 'alice',
+      text: 'Unmount before completion.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    const view = render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: /translate message from alice on this device/i }));
+    await waitFor(() => expect(translate).toHaveBeenCalledTimes(1));
+
+    view.unmount();
+    resolveTranslation?.('Unmounted translated output.');
+    await Promise.resolve();
+
+    expect(screen.queryByText('Unmounted translated output.')).toBeNull();
+    expect(localStorageValues()).not.toContain('Unmounted translated output.');
+  });
+
   it('copies a shareable moment link for channel messages', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {
@@ -269,7 +746,89 @@ describe('<MessageMenu>', () => {
       expect(writeText).toHaveBeenCalledWith(
         expect.stringContaining('/app?join=%23general&at=2026-07-08T12%3A00%3A00.000Z'),
       );
+      expect(screen.getByRole('status')).toHaveTextContent('Moment link copied.');
     });
+  });
+
+  it('reports accessible success after copying message text', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const msg: ChatMessage = {
+      id: 'm-copy',
+      from: 'alice',
+      text: 'copy this text',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy text from message from alice' }));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('copy this text');
+      expect(screen.getByRole('status')).toHaveTextContent('Message text copied.');
+    });
+  });
+
+  it('reports rejected clipboard writes without a persistence fallback', async () => {
+    const writeText = vi.fn().mockRejectedValue(new DOMException('denied'));
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const msg: ChatMessage = {
+      id: 'm-copy-denied',
+      from: 'alice',
+      text: 'do not persist this',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy text from message from alice' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Could not copy message text. Clipboard access is unavailable.',
+      );
+    });
+    expect(localStorage.getItem('onyx:last-copied-moment')).toBeNull();
+  });
+
+  it('reports an unavailable clipboard when copying a moment without saving it locally', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+    });
+    const msg: ChatMessage = {
+      id: 'm-moment-unavailable',
+      from: 'alice',
+      text: 'moment without clipboard',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy moment link for message from alice' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Could not copy moment link. Clipboard access is unavailable.',
+      );
+    });
+    expect(localStorage.getItem('onyx:last-copied-moment')).toBeNull();
   });
 
   it('opens message search prefilled from a selected moment', () => {

@@ -100,7 +100,7 @@ export function TopicChip(props: TopicChipProps): JSX.Element {
 
 export function TopicFilterBar(props: TopicFilterBarProps): JSX.Element {
   return (
-    <div class="topic-filter-bar" role="tablist" aria-label="Topic filters">
+    <div class="topic-filter-bar" role="group" aria-label="Topic filters">
       <button
         type="button"
         class="topic-chip topic-chip--all"
@@ -111,14 +111,17 @@ export function TopicFilterBar(props: TopicFilterBarProps): JSX.Element {
         All
       </button>
       <For each={props.topics}>
-        {(topic) => (
-          <TopicChip
-            label={topic}
-            unread={props.unreadCounts?.get(topic.toLowerCase()) ?? 0}
-            active={props.active === topic}
-            onClick={() => props.onSelect(topic)}
-          />
-        )}
+        {(topic) => {
+          const active = () => props.active?.toLowerCase() === topic.toLowerCase();
+          return (
+            <TopicChip
+              label={topic}
+              unread={props.unreadCounts?.get(topic.toLowerCase()) ?? 0}
+              active={active()}
+              onClick={() => props.onSelect(topic)}
+            />
+          );
+        }}
       </For>
     </div>
   );

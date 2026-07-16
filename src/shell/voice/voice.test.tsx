@@ -27,6 +27,10 @@ import { CallStatusAnnouncer } from './CallStatusAnnouncer';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const initialState = store.getInitialState();
+const displayMediaDescriptor = Object.getOwnPropertyDescriptor(
+  navigator.mediaDevices,
+  'getDisplayMedia',
+);
 
 function makeChannelUser(nick: string, modes: string[] = []): ChannelUser {
   return { nick, modes: new Set(modes) };
@@ -100,6 +104,26 @@ function seedVoiceStore(
     },
     true,
   );
+}
+
+function setDisplayCapture(method?: MediaDevices['getDisplayMedia']): void {
+  if (method) {
+    Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', {
+      configurable: true,
+      writable: true,
+      value: method,
+    });
+  } else {
+    Reflect.deleteProperty(navigator.mediaDevices, 'getDisplayMedia');
+  }
+}
+
+function restoreDisplayCapture(): void {
+  if (displayMediaDescriptor) {
+    Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', displayMediaDescriptor);
+  } else {
+    Reflect.deleteProperty(navigator.mediaDevices, 'getDisplayMedia');
+  }
 }
 
 // ── VoiceStage ────────────────────────────────────────────────────────────────
@@ -176,6 +200,39 @@ describe('VoiceStage', () => {
 
     // Assert — no video elements (hasVideo false, no streams)
     expect(queryAllByTestId('tile-video')).toHaveLength(0);
+  });
+
+  it('keeps roster-only cross-node participants in the screenshare filmstrip without duplicates', () => {
+    // Arrange — Alice is a decoded peer while differently-cased Alice and bob
+    // also arrive through the mesh-wide room roster.
+    const screenStream = {
+      getTracks: () => [],
+      getVideoTracks: () => [],
+    } as unknown as MediaStream;
+    seedVoiceStore([makePeer('alice')], [], {
+      screenshareActive: true,
+      screenshareStream: screenStream,
+      raisedHands: new Set(['BoB']),
+    });
+    store.setState({
+      voiceChannelParticipants: new Map([['#media', new Set(['self', 'Alice', 'bob'])]]),
+      speakingNicks: new Set(['Alice']),
+      mutedNicks: new Set(['BOB']),
+    });
+
+    // Act
+    const { getAllByTestId, getByTestId } = render(() => <VoiceStage />);
+
+    // Assert — one self screenshare primary plus one tile per remote identity.
+    expect(getByTestId('voice-stage')).toHaveAttribute('data-layout', 'screenshare');
+    const tiles = getAllByTestId('participant-tile');
+    expect(tiles).toHaveLength(3);
+    expect(tiles.filter(tile => tile.dataset.nick?.toLowerCase() === 'self')).toHaveLength(1);
+    expect(tiles.filter(tile => tile.dataset.nick?.toLowerCase() === 'alice')).toHaveLength(1);
+    expect(tiles.filter(tile => tile.dataset.nick?.toLowerCase() === 'bob')).toHaveLength(1);
+    expect(tiles.find(tile => tile.dataset.nick === 'self')?.className).toContain('voice-tile--screenshare');
+    expect(tiles.find(tile => tile.dataset.nick === 'alice')).toHaveAttribute('aria-label', 'alice, speaking');
+    expect(tiles.find(tile => tile.dataset.nick === 'bob')).toHaveAttribute('aria-label', 'bob, hand raised, muted');
   });
 });
 
@@ -376,10 +433,12 @@ describe('ParticipantTile', () => {
 describe('VoiceBar', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+    restoreDisplayCapture();
   });
 
   afterEach(() => {
     cleanup();
+    restoreDisplayCapture();
   });
 
   it('does not render when callState is idle', () => {
@@ -488,18 +547,88 @@ describe('VoiceBar', () => {
     expect(muteBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('screenshare button shows active state when screenshareActive', () => {
-    // Arrange
-    const fakeStream = { getTracks: () => [] } as unknown as MediaStream;
-    seedVoiceStore([], [], { screenshareActive: true, screenshareStream: fakeStream });
+  it('disables unavailable screen sharing with an exact accessible label and no invocation', () => {
+    // Arrange — server media is ready, but this browser cannot capture a display.
+    seedVoiceStore([]);
+    store.setState({ mediaAvailable: true });
+    setDisplayCapture();
+    const startSpy = vi.spyOn(store.getState().voice, 'startScreenshare').mockResolvedValue();
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
     const btn = getByTestId('screenshare-button');
+    fireEvent.click(btn);
 
     // Assert
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('aria-label', 'Screen sharing unavailable');
+    expect(btn).toHaveAttribute('title', 'Screen sharing unavailable');
+    expect(btn).toHaveAttribute('aria-pressed', 'false');
+    expect(startSpy).not.toHaveBeenCalled();
+    startSpy.mockRestore();
+  });
+
+  it('starts screen sharing immediately when browser and server media are available', () => {
+    // Arrange
+    seedVoiceStore([]);
+    store.setState({ mediaAvailable: true });
+    setDisplayCapture(vi.fn().mockResolvedValue({} as MediaStream));
+    const startSpy = vi.spyOn(store.getState().voice, 'startScreenshare').mockResolvedValue();
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    const btn = getByTestId('screenshare-button');
+    fireEvent.click(btn);
+
+    // Assert
+    expect(btn).toBeEnabled();
+    expect(btn).toHaveAttribute('aria-label', 'Share screen');
+    expect(btn).toHaveAttribute('title', 'Share screen');
+    expect(startSpy).toHaveBeenCalledOnce();
+    startSpy.mockRestore();
+  });
+
+  it('always keeps active screen sharing stoppable when capabilities disappear', () => {
+    // Arrange
+    const fakeStream = { getTracks: () => [] } as unknown as MediaStream;
+    seedVoiceStore([], [], { screenshareActive: true, screenshareStream: fakeStream });
+    store.setState({ mediaAvailable: true });
+    setDisplayCapture(vi.fn().mockResolvedValue({} as MediaStream));
+    const stopSpy = vi.spyOn(store.getState().voice, 'stopScreenshare').mockImplementation(() => {});
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    const btn = getByTestId('screenshare-button');
+    setDisplayCapture();
+    store.setState({ mediaAvailable: false });
+    fireEvent.click(btn);
+
+    // Assert
+    expect(btn).toBeEnabled();
     expect(btn).toHaveAttribute('aria-pressed', 'true');
     expect(btn).toHaveAttribute('aria-label', 'Stop sharing screen');
+    expect(btn).toHaveAttribute('title', 'Stop sharing screen');
+    expect(stopSpy).toHaveBeenCalledOnce();
+    stopSpy.mockRestore();
+  });
+
+  it('keeps the screenshare control in place while server availability changes', () => {
+    // Arrange
+    seedVoiceStore([]);
+    setDisplayCapture(vi.fn().mockResolvedValue({} as MediaStream));
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    const btn = getByTestId('screenshare-button');
+    const originalClass = btn.className;
+    store.setState({ mediaAvailable: true });
+
+    // Assert — capability state changes the action, not its toolbar footprint.
+    expect(getByTestId('screenshare-button')).toBe(btn);
+    expect(btn.className).toBe(originalClass);
+    expect(btn.closest('[role="group"]')).toHaveAttribute('aria-label', 'Media controls');
+    expect(btn).toBeEnabled();
+    expect(btn).toHaveAttribute('aria-label', 'Share screen');
   });
 
   it('shows the call channel name in the identity zone', () => {
@@ -673,7 +802,7 @@ describe('VoiceBar', () => {
     expect(timer).toHaveAttribute('aria-label', 'Call duration: 1m 5s');
   });
 
-  it('shows the participant count (self + peers)', () => {
+  it('shows the participant count without roster data (self + peers)', () => {
     // Arrange — self + 2 peers = 3
     seedVoiceStore([makePeer('alice'), makePeer('bob')]);
 
@@ -682,6 +811,23 @@ describe('VoiceBar', () => {
     const count = getByTestId('participant-count');
 
     // Assert
+    expect(count).toHaveAttribute('aria-label', '3 in call');
+    expect(count.textContent).toContain('3');
+  });
+
+  it('counts the case-insensitive union of self, decoded peers, and cross-node roster members', () => {
+    // Arrange — Alice is the same identity as decoded peer alice; bob is
+    // roster-only and must still be included.
+    seedVoiceStore([makePeer('alice')]);
+    store.setState({
+      voiceChannelParticipants: new Map([['#media', new Set(['self', 'Alice', 'bob'])]]),
+    });
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    const count = getByTestId('participant-count');
+
+    // Assert — self + alice + bob, with no duplicate for Alice/alice.
     expect(count).toHaveAttribute('aria-label', '3 in call');
     expect(count.textContent).toContain('3');
   });

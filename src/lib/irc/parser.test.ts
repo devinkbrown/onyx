@@ -220,8 +220,18 @@ describe('standard replies + SESSION notes', () => {
   it('extracts a SESSION TOKEN', () => {
     expect(parseSessionTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc123'))).toBe('abc123');
   });
+  it('extracts a SESSION TOKEN from the current server NOTICE envelope', () => {
+    expect(parseSessionTokenNote(
+      parseIRCMessage(':srv.example NOTICE onyx :SESSION TOKEN abc123'),
+    )).toBe('abc123');
+  });
   it('extracts a SESSION MTOKEN (mesh)', () => {
     expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION MTOKEN :m3sh'))).toBe('m3sh');
+  });
+  it('extracts a SESSION MTOKEN from the current server NOTICE envelope', () => {
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(':srv.example NOTICE onyx :SESSION MTOKEN m3sh'),
+    )).toBe('m3sh');
   });
   it('does not confuse TOKEN and MTOKEN', () => {
     expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc'))).toBeNull();

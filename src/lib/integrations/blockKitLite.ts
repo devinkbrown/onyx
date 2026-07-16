@@ -13,6 +13,11 @@ export type BlockKitLiteSelectNotifyAction = {
 
 export type BlockKitLiteAction = BlockKitLiteSendAction | BlockKitLiteSelectNotifyAction;
 
+export type PreparedBlockKitAction = {
+  target: string;
+  text: string;
+};
+
 export type BlockKitLiteButton = {
   label: string;
   url: string | null;
@@ -92,10 +97,52 @@ function safeTarget(value: unknown): string | null {
 }
 
 function safeActionValue(value: unknown): string | null {
-  const text = trimText(value, MAX_ACTION_VALUE);
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  // Inspect the complete input before bounding it. Truncating first could hide a
+  // CRLF payload placed just beyond MAX_ACTION_VALUE from the confirmation-time
+  // revalidation pass.
+  if (/[\r\n]/.test(normalized) || normalized.startsWith('/')) return null;
+  const text = normalized.slice(0, MAX_ACTION_VALUE);
   if (!text) return null;
-  if (/[\r\n]/.test(text) || text.startsWith('/')) return null;
   return text;
+}
+
+/**
+ * Revalidate and normalize an attacker-authored action into the exact plaintext
+ * a confirmation dialog may preview. Call this once when staging and again at
+ * confirmation; only an identical second result is safe to dispatch.
+ */
+export function prepareBlockKitAction(
+  action: BlockKitLiteAction,
+  origin: string,
+  selectedValue?: string,
+): PreparedBlockKitAction | null {
+  const normalizedOrigin = safeTarget(origin);
+  const normalizedTarget = safeTarget(action.target);
+  // The trusted render origin must already be canonical. Never let trimming or
+  // normalization turn an otherwise mismatched attacker target into a match.
+  if (!normalizedOrigin || normalizedOrigin !== origin || normalizedTarget !== normalizedOrigin) return null;
+
+  let text: string | null;
+  if (action.type === 'send') {
+    text = safeActionValue(action.value);
+  } else if (action.type === 'select-notify') {
+    const selected = safeActionValue(selectedValue);
+    if (!selected) return null;
+    if (action.value === null) {
+      text = selected;
+    } else {
+      const prefix = safeActionValue(action.value);
+      if (!prefix) return null;
+      text = safeActionValue(`${prefix}: ${selected}`);
+    }
+  } else {
+    return null;
+  }
+
+  return text ? { target: normalizedOrigin, text } : null;
 }
 
 function readAction(raw: unknown): BlockKitLiteAction | null {
