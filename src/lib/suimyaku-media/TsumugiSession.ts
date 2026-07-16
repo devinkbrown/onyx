@@ -13,6 +13,8 @@
  *   const pt = await v.decrypt(ct);
  */
 
+import { ReplayGuard } from './replayWindow';
+
 const CURVE    = 'P-256' as const;
 const GCM_ALG  = 'AES-GCM';
 const GCM_LEN  = 256;
@@ -30,7 +32,7 @@ export class TsumugiSession {
   private receiveKey: AesGcmKey | null = null;
   private readonly sendIvPrefix = crypto.getRandomValues(new Uint8Array(IV_PREFIX_LEN));
   private sendIvCounter = 0;
-  private readonly seenReceiveIvs = new Set<string>();
+  private readonly replayGuard = new ReplayGuard();
   private ratchetEpoch = 0;
   private destroyed = false;
 
@@ -96,7 +98,7 @@ export class TsumugiSession {
     this.sendKey = await deriveGcmKey(hkdfKey, salt, `${info}:media:${localDirection}`);
     this.receiveKey = await deriveGcmKey(hkdfKey, salt, `${info}:media:${peerDirection}`);
     this.ratchetEpoch = 0;
-    this.seenReceiveIvs.clear();
+    this.replayGuard.clear();
   }
 
   /**
@@ -120,7 +122,7 @@ export class TsumugiSession {
       this.sendKey = sendKey;
       this.receiveKey = receiveKey;
       this.ratchetEpoch = nextEpoch;
-      this.seenReceiveIvs.clear();
+      this.replayGuard.clear();
     } finally {
       new Uint8Array(sendKeyBytes).fill(0);
       new Uint8Array(receiveKeyBytes).fill(0);
@@ -131,7 +133,7 @@ export class TsumugiSession {
   destroy(): void {
     this.sendKey = null;
     this.receiveKey = null;
-    this.seenReceiveIvs.clear();
+    this.replayGuard.clear();
     this.ratchetEpoch = 0;
     this.destroyed = true;
   }
@@ -151,13 +153,12 @@ export class TsumugiSession {
   }
 
   private rememberReceiveIv(iv: Uint8Array): void {
-    const key = ivKey(iv);
-    if (this.seenReceiveIvs.has(key)) throw new Error('TsumugiSession: replayed frame');
-    this.seenReceiveIvs.add(key);
+    if (!this.replayGuard.mayAccept(iv)) throw new Error('TsumugiSession: replayed frame');
+    this.replayGuard.commit(iv);
   }
 
   private hasSeenReceiveIv(iv: Uint8Array): boolean {
-    return this.seenReceiveIvs.has(ivKey(iv));
+    return !this.replayGuard.mayAccept(iv);
   }
 
   private get encryptKey(): AesGcmKey {
@@ -297,12 +298,6 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a[i]! ^ b[i]!;
   return diff === 0;
-}
-
-function ivKey(iv: Uint8Array): string {
-  let out = '';
-  for (let i = 0; i < IV_LEN; i++) out += iv[i]!.toString(16).padStart(2, '0');
-  return out;
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {

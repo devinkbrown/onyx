@@ -94,6 +94,23 @@ describe('TsumugiSession — IV monotonicity + replay guard', () => {
     expect(text(await b.decrypt(ct))).toBe('genuine');
   });
 
+  it('keeps pairwise replay protection bounded across a long session', async () => {
+    const [a, b] = await handshakePair();
+    const total = REPLAY_WINDOW_BITS + 64;
+    let first: Uint8Array | null = null;
+    let last: Uint8Array | null = null;
+
+    for (let index = 0; index < total; index += 1) {
+      const frame = await a.encrypt(bytes(`pair-${index}`));
+      first ??= frame;
+      last = frame;
+      expect(text(await b.decrypt(frame))).toBe(`pair-${index}`);
+    }
+
+    await expect(b.decrypt(last!)).rejects.toThrow(/replayed/);
+    await expect(b.decrypt(first!)).rejects.toThrow(/replayed/);
+  });
+
   it('rejects a too-short frame', async () => {
     const [, b] = await handshakePair();
     await expect(b.decrypt(new Uint8Array(12 + 15))).rejects.toThrow(/too short/);
