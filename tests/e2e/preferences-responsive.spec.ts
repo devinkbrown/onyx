@@ -134,7 +134,7 @@ test('contains enlarged preference controls and leaves a usable mobile tab strip
   });
 
   expect(geometry.bodyScrollWidth).toBe(geometry.bodyClientWidth);
-  expect(geometry.navPosition).toBe('static');
+  expect(geometry.navPosition).toBe('sticky');
   expect(geometry.tabsClientWidth).toBeGreaterThanOrEqual(geometry.widestTab);
   expect(geometry.segmentsScrollWidth).toBe(geometry.segmentsClientWidth);
 });
@@ -188,6 +188,28 @@ test('keeps categories and final controls reachable in a short 200% text split',
   expect(initialGeometry.bodyScrollHeight).toBeGreaterThan(initialGeometry.bodyClientHeight);
   expect(initialGeometry.bodyScrollWidth).toBe(initialGeometry.bodyClientWidth);
   expect(initialGeometry.tabsScrollWidth).toBeGreaterThan(initialGeometry.tabsClientWidth);
+
+  await body.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  const stickyGeometry = await page.evaluate(() => {
+    const sheetBody = document.querySelector<HTMLElement>('.onyx-sheet__body')!;
+    const nav = document.querySelector<HTMLElement>('.pref-category-nav')!;
+    const bodyRect = sheetBody.getBoundingClientRect();
+    const navRect = nav.getBoundingClientRect();
+    return {
+      bodyTop: bodyRect.top,
+      bodyBottom: bodyRect.bottom,
+      navTop: navRect.top,
+      navBottom: navRect.bottom,
+    };
+  });
+  expect(stickyGeometry.navTop).toBeGreaterThanOrEqual(stickyGeometry.bodyTop);
+  expect(stickyGeometry.navBottom).toBeLessThanOrEqual(stickyGeometry.bodyBottom);
+
+  await body.evaluate((element) => {
+    element.scrollTop = 0;
+  });
 
   await accessibility.evaluate((element) => {
     element.scrollIntoView({ block: 'nearest', inline: 'end' });
