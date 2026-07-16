@@ -21,6 +21,7 @@ describe('ChannelBrowser', () => {
   afterEach(cleanup);
 
   it('shows each listed channel only once after duplicate LIST rows', () => {
+    store.setState({ channelListLoading: true });
     feed(':server.test 322 me #general 2 :Launch room');
     feed(':server.test 322 me #General 5 :');
     feed(':server.test 322 me #random 1 :Off-topic');
@@ -51,6 +52,7 @@ describe('ChannelBrowser', () => {
     // The mesh streams rows from multiple nodes, so arrival order is not
     // stable. Rows tied on user count must fall back to a name sort or the
     // directory reshuffles between refreshes for identical data.
+    store.setState({ channelListLoading: true });
     feed(':server.test 322 me #zebra 5 :');
     feed(':server.test 322 me #alpha 5 :');
     feed(':server.test 322 me #mango 5 :');
@@ -70,6 +72,7 @@ describe('ChannelBrowser', () => {
   it('announces the debounced result count through a polite status region', () => {
     vi.useFakeTimers();
     try {
+      store.setState({ channelListLoading: true });
       feed(':server.test 322 me #general 2 :Launch room');
       feed(':server.test 322 me #random 1 :Off-topic');
       feed(':server.test 323 me :End of LIST');
@@ -97,6 +100,7 @@ describe('ChannelBrowser', () => {
   it('announces the empty directory to assistive tech', () => {
     vi.useFakeTimers();
     try {
+      store.setState({ channelListLoading: true });
       feed(':server.test 323 me :End of LIST');
       store.setState({ showChannelBrowser: true });
 
