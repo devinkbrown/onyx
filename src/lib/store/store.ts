@@ -3,6 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { parseStringArray, parseEmojiArray } from './persistParse';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
+import { parseChannelFolders } from './channelFoldersPersistence';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
@@ -11649,12 +11650,10 @@ function _loadTopicHistory(): Record<string, string[]> {
 const FOLDERS_KEY = 'onyx:channel-folders';
 
 function _loadChannelFolders(): ChannelFolder[] {
-  const DEFAULT: ChannelFolder[] = [{ id: 'default', name: 'TEXT CHANNELS', channels: [], collapsed: false }];
-  if (typeof window === 'undefined') return DEFAULT;
+  if (typeof window === 'undefined') return parseChannelFolders(null);
   try {
-    const raw = localStorage.getItem(FOLDERS_KEY);
-    return raw ? (JSON.parse(raw) as ChannelFolder[]) : DEFAULT;
-  } catch { return DEFAULT; }
+    return parseChannelFolders(localStorage.getItem(FOLDERS_KEY));
+  } catch { return parseChannelFolders(null); }
 }
 
 function _saveChannelFolders(folders: ChannelFolder[]): void {
