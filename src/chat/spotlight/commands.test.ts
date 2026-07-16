@@ -789,6 +789,7 @@ describe('buildCommands', () => {
       setState({
         channels: new Map([['#forge', channel('#forge')]]),
         activeView: { kind: 'channel', channel: '#forge' },
+        server: server(),
       });
 
       const command = buildCommands(getState(), 'schedule 15m: ship the release').find((entry) =>
@@ -803,6 +804,7 @@ describe('buildCommands', () => {
         channel: '#forge',
         text: 'ship the release',
         sendAt: FIXED_NOW + 15 * 60_000,
+        owner: { serverUrl: 'ircs://ircx.us:6697', identity: 'kain' },
       });
     });
 
@@ -810,6 +812,7 @@ describe('buildCommands', () => {
       setState({
         dms: new Map([['aoi', dm('aoi')]]),
         activeView: { kind: 'dm', nick: 'aoi' },
+        server: server(),
       });
 
       const command = buildCommands(getState(), 'schedule in 2h: coffee?').find((entry) =>
@@ -824,6 +827,7 @@ describe('buildCommands', () => {
         channel: 'aoi',
         text: 'coffee?',
         sendAt: FIXED_NOW + 2 * 3_600_000,
+        owner: { serverUrl: 'ircs://ircx.us:6697', identity: 'kain' },
       });
     });
 
