@@ -122,6 +122,22 @@ function offlineNavigationFallback(pathname) {
   return caches.match(fallbackPath).then((cached) => cached ?? unavailable());
 }
 
+function cacheSuccessfulShellNavigation(pathname, response) {
+  const fallbackPath = navigationFallbackPath(pathname);
+  if (fallbackPath === null
+    || response?.ok !== true
+    || typeof response.clone !== 'function') return Promise.resolve();
+  let clone;
+  try {
+    clone = response.clone();
+  } catch {
+    return Promise.resolve();
+  }
+  return caches.open(CACHE_NAME)
+    .then((cache) => cache.put(fallbackPath, clone))
+    .catch(() => undefined);
+}
+
 function enableNavigationPreload() {
   try {
     const navigationPreload = self.registration?.navigationPreload;
@@ -206,12 +222,14 @@ self.addEventListener('fetch', (event) => {
 
   // For navigation requests, try network then fall back to cached index
   if (request.mode === 'navigate') {
-    event.respondWith(
-      Promise.resolve(event.preloadResponse)
-        .catch(() => undefined)
-        .then((preloaded) => preloaded ?? fetch(request))
-        .catch(() => offlineNavigationFallback(url.pathname))
-    );
+    const loaded = Promise.resolve(event.preloadResponse)
+      .catch(() => undefined)
+      .then((preloaded) => preloaded ?? fetch(request));
+    const cacheWork = loaded
+      .then((response) => cacheSuccessfulShellNavigation(url.pathname, response))
+      .catch(() => undefined);
+    if (typeof event.waitUntil === 'function') event.waitUntil(cacheWork);
+    event.respondWith(loaded.catch(() => offlineNavigationFallback(url.pathname)));
     return;
   }
 

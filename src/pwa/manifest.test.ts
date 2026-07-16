@@ -465,16 +465,28 @@ describe('PWA manifest', () => {
     expect(enableNavigationPreload).toHaveBeenCalledTimes(2);
 
     let navigationWork: Promise<unknown> | undefined;
-    const preloadedResponse = { source: 'navigation-preload' };
+    let navigationCacheWork: Promise<unknown> | undefined;
+    const navigationClone = { source: 'navigation-cache-clone' };
+    const preloadedResponse = {
+      source: 'navigation-preload',
+      ok: true,
+      clone: vi.fn(() => navigationClone),
+    };
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app' },
       preloadResponse: Promise.resolve(preloadedResponse),
       respondWith: (work: Promise<unknown>) => {
         navigationWork = work;
       },
+      waitUntil: (work: Promise<unknown>) => {
+        navigationCacheWork = work;
+      },
     });
     await expect(navigationWork).resolves.toBe(preloadedResponse);
+    await navigationCacheWork;
     expect(networkFetch).not.toHaveBeenCalled();
+    expect(preloadedResponse.clone).toHaveBeenCalledOnce();
+    expect(put).toHaveBeenCalledWith('/app/', navigationClone);
 
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app?join=%23root' },
