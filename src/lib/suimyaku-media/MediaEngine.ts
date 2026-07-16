@@ -15,6 +15,10 @@ import { PeerRegistry } from './PeerRegistry';
 import { KaguraCodec, type KaguraCodecTag, decodeKaguraFrame, encodeKaguraFrame } from './kaguraFrame';
 import { appendMediaMac, importMediaMacKey } from './mediaMac';
 import { MediaStreamRouter, mediaStreamId } from './mediaStream';
+import {
+  constrainHighResolutionQuality,
+  highResolutionCapability,
+} from './mediaCapabilities';
 import type { IRCMessage } from '../irc/types';
 import type {
   CallState, VoiceCallState, MediaKind,
@@ -150,11 +154,12 @@ function msgpackArray1(a: string): Uint8Array {
 }
 
 function videoProfileFor(kind: MediaKind, quality: StreamQuality = '4k60', broadcast = false): VideoCaptureProfile {
+  const effectiveQuality = constrainHighResolutionQuality(quality, highResolutionCapability.current());
   if (kind === 'screen') {
-    if (quality === '1080p60' || quality === 'auto') return SCREEN_PROFILE_1080P60;
+    if (effectiveQuality === '1080p60' || effectiveQuality === 'auto') return SCREEN_PROFILE_1080P60;
     return SCREEN_PROFILE_4K60;
   }
-  if (kind === 'video' && broadcast && quality === '4k60') return CAMERA_PROFILE_4K60;
+  if (kind === 'video' && broadcast && effectiveQuality === '4k60') return CAMERA_PROFILE_4K60;
   return CAMERA_PROFILE;
 }
 
@@ -292,6 +297,11 @@ export class SuimyakuMediaEngine {
     this.registry.onPeerStateChanged = s => this.cb.onPeerState?.(s);
     this.registry.onPeerLeft         = n => this.cb.onPeerLeft(n);
     this.registry.onPeerSpeaking     = (n, s) => this.cb.onPeerSpeaking?.(n, s);
+
+    // This is deliberately fire-and-forget. A first call never waits on a
+    // browser capability advisory; once cached, later 4K capture choices may
+    // conservatively use the existing 1080p profile instead.
+    highResolutionCapability.prime();
   }
 
   setClient(client: IRCClient | null) {
@@ -414,13 +424,18 @@ export class SuimyakuMediaEngine {
     return this.cb.enableVideoCalls?.() ?? true;
   }
 
-  private async capture(kind: MediaKind, quality: StreamQuality = '4k60', broadcast = false): Promise<MediaStream> {
+  private async capture(
+    kind: MediaKind,
+    quality: StreamQuality = '4k60',
+    broadcast = false,
+    selectedProfile?: VideoCaptureProfile,
+  ): Promise<MediaStream> {
     if (this.localStream && this.localKind === kind) return this.localStream;
     if (this.localStream) this.releaseMedia();
     if (!this.mediaAllowed(kind)) throw new Error(`${kind} media is disabled`);
     const devs = navigator.mediaDevices;
     if (!devs) throw new Error('Media devices unavailable');
-    const profile = videoProfileFor(kind, quality, broadcast);
+    const profile = selectedProfile ?? videoProfileFor(kind, quality, broadcast);
     const settings = this.cb.getMediaSettings?.();
     const audio: boolean | MediaTrackConstraints = kind === 'screen'
       ? true
@@ -1155,7 +1170,7 @@ export class SuimyakuMediaEngine {
     if (!target) { this.cb.onError('No active room for screen share'); return; }
     try {
       const profile = videoProfileFor('screen');
-      await this.capture('screen');
+      await this.capture('screen', '4k60', false, profile);
       this.setActiveRoom(target);
       this.mediaframeCmd(target, 'VIDEO_JOIN',
         `${profile.width} ${profile.height} ${profile.quality} ${profile.fps} screen`);
@@ -1170,8 +1185,8 @@ export class SuimyakuMediaEngine {
   async startBroadcast(channel: string, kind: 'camera' | 'screen', quality: StreamQuality = '4k60') {
     try {
       const mediaKind: MediaKind = kind === 'screen' ? 'screen' : 'video';
-      const stream = await this.capture(mediaKind, quality, true);
       const profile = videoProfileFor(mediaKind, quality, true);
+      const stream = await this.capture(mediaKind, quality, true, profile);
       await this.ensureWasm();
       this.setActiveRoom(channel);
       if (stream.getAudioTracks().length > 0) {
