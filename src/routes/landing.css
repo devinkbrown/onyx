@@ -146,6 +146,18 @@
   }
 }
 
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .r-status {
+    padding-block: 6px;
+  }
+
+  .r-status .enter {
+    min-height: 44px;
+    padding: 6px 10px;
+    border-radius: 8px;
+  }
+}
+
 /* Shared focus ring */
 .r a:focus-visible, .r button:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 3px; border-radius: var(--r-sm); }
 
