@@ -52,6 +52,12 @@ describe('public asset delivery policy', () => {
     expect(config).toContain('add_header_inherit merge;');
   });
 
+  it('denies framing from the inherited response-header policy', () => {
+    expect(config.match(/^add_header Content-Security-Policy "frame-ancestors 'none'" always;$/gm)).toHaveLength(1);
+    expect(config.match(/^add_header X-Frame-Options "DENY" always;$/gm)).toHaveLength(1);
+    expect(config).toContain('browsers ignore\n# frame-ancestors in a meta CSP');
+  });
+
   it('does not turn missing fingerprints into long-lived negative cache entries', () => {
     expect(config).toContain('location @onyx_public_asset_not_found {');
     expect(config).toMatch(/location @onyx_public_asset_not_found \{\s+return 404;\s+\}/);
