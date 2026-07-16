@@ -42,6 +42,7 @@ import {
   type DiscordImportOptions,
   type DiscordImportResult,
 } from './discordImport';
+import { createBoundedAbort, type BoundedAbort } from '@/lib/net/boundedAbort';
 
 /** Same-origin proxy prefix; forwards to https://discord.com/api/v10/… */
 const PROXY_BASE = '/discord-import';
@@ -71,6 +72,9 @@ const GUILD_CATEGORY_TYPE = 4;
 
 /** Default floor between requests (ms) — comfortably under Discord's budget. */
 const DEFAULT_MIN_INTERVAL_MS = 320;
+/** Bound one proxy response, including body streaming, so FIFO cannot deadlock. */
+export const DISCORD_REQUEST_TIMEOUT_MS = 20_000;
+const MAX_DISCORD_REQUEST_TIMEOUT_MS = 120_000;
 
 /** Hard ceiling on 429 re-enqueues before we give up (avoids a runaway loop). */
 const MAX_429_RETRIES = 5;
@@ -99,6 +103,8 @@ export const DISCORD_MISSING_CONTENT_INTENT_MESSAGE =
   'Discord returned messages with no text. Your bot is missing the MESSAGE CONTENT INTENT. Enable the "MESSAGE CONTENT INTENT" toggle in your bot\'s dashboard (Discord Developer Portal → your app → Bot → Privileged Gateway Intents), then try again.';
 
 export const DISCORD_CANCELLED_MESSAGE = 'Discord import cancelled.';
+export const DISCORD_TIMEOUT_MESSAGE =
+  'Discord took too long to respond. Check your connection and try the import again.';
 
 /** Discriminated failure kinds so the UI can branch without string matching. */
 export type DiscordImportErrorKind = 'auth' | 'empty-content' | 'network' | 'aborted';
@@ -334,6 +340,8 @@ export interface DiscordRestClientOptions {
   fetchImpl?: typeof fetch;
   /** Cancels in-flight and queued requests. */
   signal?: AbortSignal;
+  /** Per-response deadline, including streamed JSON body (default 20 seconds). */
+  requestTimeoutMs?: number;
   /** Floor between requests in ms (default 320). */
   minIntervalMs?: number;
   /** Injectable clock/sleep/jitter for deterministic tests. */
@@ -354,6 +362,7 @@ export class DiscordRestClient {
   #token: string;
   readonly #fetch: typeof fetch;
   readonly #signal: AbortSignal | undefined;
+  readonly #requestTimeoutMs: number;
   readonly #minIntervalMs: number;
   readonly #now: () => number;
   readonly #sleep: (ms: number) => Promise<void>;
@@ -368,6 +377,10 @@ export class DiscordRestClient {
     this.#token = options.token;
     this.#fetch = options.fetchImpl ?? ((...args) => fetch(...args));
     this.#signal = options.signal;
+    const requestTimeoutMs = options.requestTimeoutMs ?? DISCORD_REQUEST_TIMEOUT_MS;
+    this.#requestTimeoutMs = Number.isFinite(requestTimeoutMs)
+      ? Math.max(1, Math.min(MAX_DISCORD_REQUEST_TIMEOUT_MS, Math.floor(requestTimeoutMs)))
+      : DISCORD_REQUEST_TIMEOUT_MS;
     this.#minIntervalMs = options.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS;
     this.#now = options.now ?? (() => Date.now());
     this.#sleep = options.sleep ?? defaultSleep;
@@ -392,8 +405,8 @@ export class DiscordRestClient {
     }
     const params = new URLSearchParams({ limit: String(PAGE_LIMIT) });
     if (before) params.set('before', before);
-    const res = await this.#request(`channels/${channelId}/messages?${params.toString()}`);
-    const data = await readBoundedJson(res);
+    const request = await this.#request(`channels/${channelId}/messages?${params.toString()}`);
+    const data = await this.#readResponseJson(request);
     // Bound a single (hostile or oversized) page by construction, not just the loop.
     return Array.isArray(data) ? data.slice(0, PAGE_LIMIT) : [];
   }
@@ -417,8 +430,8 @@ export class DiscordRestClient {
     if (!isSnowflake(guildId)) {
       throw new DiscordImportError('Invalid Discord server id.', 'network');
     }
-    const res = await this.#request(`guilds/${guildId}/${resource}`);
-    const data = await readBoundedJson(res);
+    const request = await this.#request(`guilds/${guildId}/${resource}`);
+    const data = await this.#readResponseJson(request);
     return Array.isArray(data) ? data.slice(0, MAX_GUILD_RESOURCE_ITEMS) : [];
   }
 
@@ -440,8 +453,8 @@ export class DiscordRestClient {
     }
     const params = new URLSearchParams({ limit: String(PIN_PAGE_LIMIT) });
     if (before) params.set('before', before);
-    const res = await this.#request(`channels/${channelId}/messages/pins?${params.toString()}`);
-    const data = await readBoundedJson(res);
+    const request = await this.#request(`channels/${channelId}/messages/pins?${params.toString()}`);
+    const data = await this.#readResponseJson(request);
     // Bound a single (hostile or oversized) page by construction, not just the loop.
     const items = isRecord(data) && Array.isArray(data.items) ? data.items.slice(0, PIN_PAGE_LIMIT) : [];
     const hasMore = isRecord(data) && data.has_more === true;
@@ -449,7 +462,7 @@ export class DiscordRestClient {
   }
 
   /** Serialize a request through the FIFO chain (single-flight, global pause). */
-  #request(path: string): Promise<Response> {
+  #request(path: string): Promise<{ response: Response; abort: BoundedAbort }> {
     const run = this.#chain.then(() => this.#doRequest(path));
     // Keep the chain alive regardless of this request's outcome.
     this.#chain = run.then(
@@ -459,21 +472,31 @@ export class DiscordRestClient {
     return run;
   }
 
-  async #doRequest(path: string, attempt = 0): Promise<Response> {
+  async #doRequest(
+    path: string,
+    attempt = 0,
+  ): Promise<{ response: Response; abort: BoundedAbort }> {
     if (this.#signal?.aborted) throw new DiscordImportError(DISCORD_CANCELLED_MESSAGE, 'aborted');
 
     const wait = this.#nextAllowedAt - this.#now();
     if (wait > 0) await this.#sleep(wait);
+    if (this.#signal?.aborted) throw new DiscordImportError(DISCORD_CANCELLED_MESSAGE, 'aborted');
 
+    const abort = createBoundedAbort(this.#requestTimeoutMs, this.#signal);
     let res: Response;
     try {
       res = await this.#fetch(`${PROXY_BASE}/${path}`, {
         method: 'GET',
         headers: { Authorization: `Bot ${this.#token}`, Accept: 'application/json' },
-        signal: this.#signal,
+        signal: abort.signal,
       });
     } catch (err) {
-      if (this.#signal?.aborted) throw new DiscordImportError(DISCORD_CANCELLED_MESSAGE, 'aborted');
+      const cause = abort.cause();
+      abort.dispose();
+      if (cause === 'caller' || this.#signal?.aborted) {
+        throw new DiscordImportError(DISCORD_CANCELLED_MESSAGE, 'aborted');
+      }
+      if (cause === 'timeout') throw new DiscordImportError(DISCORD_TIMEOUT_MESSAGE, 'network');
       throw new DiscordImportError('Could not reach Discord. Check your connection and try again.', 'network');
     }
 
@@ -481,18 +504,39 @@ export class DiscordRestClient {
 
     if (res.status === 429) {
       if (attempt >= MAX_429_RETRIES) {
+        abort.dispose();
         throw new DiscordImportError('Discord rate limit exceeded — try again later.', 'network');
       }
-      await this.#sleep(await this.#retryAfterMs(res));
+      await this.#sleep(await this.#retryAfterMs({ response: res, abort }));
       return this.#doRequest(path, attempt + 1);
     }
     if (res.status === 401 || res.status === 403) {
+      abort.dispose();
       throw new DiscordImportError(DISCORD_AUTH_MESSAGE, 'auth');
     }
     if (!res.ok) {
+      abort.dispose();
       throw new DiscordImportError(`Discord request failed (status ${res.status}).`, 'network');
     }
-    return res;
+    return { response: res, abort };
+  }
+
+  async #readResponseJson(
+    request: { response: Response; abort: BoundedAbort },
+    maxBytes = MAX_REST_RESPONSE_BYTES,
+  ): Promise<unknown> {
+    try {
+      return await readBoundedJson(request.response, maxBytes);
+    } catch (error) {
+      const cause = request.abort.cause();
+      if (cause === 'caller' || this.#signal?.aborted) {
+        throw new DiscordImportError(DISCORD_CANCELLED_MESSAGE, 'aborted');
+      }
+      if (cause === 'timeout') throw new DiscordImportError(DISCORD_TIMEOUT_MESSAGE, 'network');
+      throw error;
+    } finally {
+      request.abort.dispose();
+    }
   }
 
   /** Advance the pacing floor from the just-seen response's rate-limit headers. */
@@ -508,13 +552,17 @@ export class DiscordRestClient {
   }
 
   /** Milliseconds to sleep for a 429: max(Retry-After header, body.retry_after) + jitter. */
-  async #retryAfterMs(res: Response): Promise<number> {
-    const headerSec = Number(res.headers.get('Retry-After'));
+  async #retryAfterMs(request: { response: Response; abort: BoundedAbort }): Promise<number> {
+    const headerSec = Number(request.response.headers.get('Retry-After'));
     let bodySec = 0;
     try {
-      const body = await readBoundedJson(res, MAX_RETRY_RESPONSE_BYTES);
+      const body = await this.#readResponseJson(request, MAX_RETRY_RESPONSE_BYTES);
       if (isRecord(body) && typeof body.retry_after === 'number') bodySec = body.retry_after;
-    } catch {
+    } catch (error) {
+      if (error instanceof DiscordImportError
+        && (error.kind === 'aborted' || error.message === DISCORD_TIMEOUT_MESSAGE)) {
+        throw error;
+      }
       /* no/invalid body — rely on the header */
     }
     const sec = Math.max(Number.isFinite(headerSec) ? headerSec : 0, bodySec, 0);

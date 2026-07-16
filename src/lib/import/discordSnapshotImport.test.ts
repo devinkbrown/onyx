@@ -4,7 +4,9 @@ import {
   DiscordRestClient,
   DiscordImportError,
   DISCORD_AUTH_MESSAGE,
+  DISCORD_CANCELLED_MESSAGE,
   DISCORD_MISSING_CONTENT_INTENT_MESSAGE,
+  DISCORD_TIMEOUT_MESSAGE,
   isSnowflake,
   snowflakeToMs,
   normalizeRestMessage,
@@ -25,6 +27,39 @@ function fakeRes(status: number, body: unknown, headers: Record<string, string> 
     status,
     headers: new Headers(headers),
     json: async () => body,
+  } as unknown as Response;
+}
+
+function disableModernAbortSignals(): () => void {
+  const timeoutDescriptor = Object.getOwnPropertyDescriptor(AbortSignal, 'timeout');
+  const anyDescriptor = Object.getOwnPropertyDescriptor(AbortSignal, 'any');
+  Object.defineProperty(AbortSignal, 'timeout', { configurable: true, writable: true, value: undefined });
+  Object.defineProperty(AbortSignal, 'any', { configurable: true, writable: true, value: undefined });
+  return () => {
+    if (timeoutDescriptor) Object.defineProperty(AbortSignal, 'timeout', timeoutDescriptor);
+    else Reflect.deleteProperty(AbortSignal, 'timeout');
+    if (anyDescriptor) Object.defineProperty(AbortSignal, 'any', anyDescriptor);
+    else Reflect.deleteProperty(AbortSignal, 'any');
+  };
+}
+
+function hangingBodyResponse(signal: AbortSignal): Response {
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers(),
+    body: {
+      getReader: () => ({
+        read: () => new Promise<never>((_resolve, reject) => {
+          if (signal.aborted) {
+            reject(signal.reason);
+            return;
+          }
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        }),
+        cancel: async () => undefined,
+      }),
+    },
   } as unknown as Response;
 }
 
@@ -195,6 +230,59 @@ describe('DiscordRestClient', () => {
     expect(url).toBe('/discord-import/channels/123/messages?limit=100');
     expect(init?.method).toBe('GET');
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bot SECRET_TOKEN');
+  });
+
+  it('times out a stalled response body instead of deadlocking the import FIFO', async () => {
+    const restoreAbortSignals = disableModernAbortSignals();
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = vi.fn<FetchFn>(async (_input, init) =>
+        hangingBodyResponse(init!.signal!),
+      );
+      const client = new DiscordRestClient({
+        token: 't',
+        fetchImpl,
+        sleep: noSleep,
+        requestTimeoutMs: 25,
+      });
+
+      const pending = client.getChannelMessages('123');
+      const rejected = expect(pending).rejects.toMatchObject({
+        kind: 'network',
+        message: DISCORD_TIMEOUT_MESSAGE,
+      });
+      await vi.advanceTimersByTimeAsync(25);
+
+      await rejected;
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      restoreAbortSignals();
+    }
+  });
+
+  it('keeps in-flight caller cancellation distinct from a request timeout', async () => {
+    const controller = new AbortController();
+    const fetchImpl = vi.fn<FetchFn>(async (_input, init) =>
+      hangingBodyResponse(init!.signal!),
+    );
+    const client = new DiscordRestClient({
+      token: 't',
+      fetchImpl,
+      signal: controller.signal,
+      sleep: noSleep,
+      requestTimeoutMs: 60_000,
+    });
+
+    const pending = client.getChannelMessages('123');
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    controller.abort(new DOMException('User cancelled', 'AbortError'));
+
+    await expect(pending).rejects.toMatchObject({
+      kind: 'aborted',
+      message: DISCORD_CANCELLED_MESSAGE,
+    });
   });
 
   it('waits the minInterval floor between requests', async () => {
