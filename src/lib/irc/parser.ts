@@ -468,6 +468,37 @@ export function buildSessionResumeLine(token: string): string {
   return formatIRCLine('SESSION', 'RESUME', token);
 }
 
+export const MAX_MONITOR_NUMERIC_TARGETS = 256;
+export const MAX_MONITOR_NUMERIC_TARGET_LENGTH = 512;
+const MAX_MONITOR_NUMERIC_LIST_LENGTH = MAX_MONITOR_NUMERIC_TARGETS
+  * (MAX_MONITOR_NUMERIC_TARGET_LENGTH + 1);
+const MAX_MONITOR_NUMERIC_LIMIT = 1_000_000;
+const MAX_MONITOR_NUMERIC_DESCRIPTION_LENGTH = 1024;
+
+/** Parse one bounded server-owned MONITOR target list without partial results. */
+function parseMonitorTargets(value: string): string[] {
+  if (!value) return [];
+  if (value.length > MAX_MONITOR_NUMERIC_LIST_LENGTH) return [];
+  const rawTargets = value.split(',');
+  if (rawTargets.length > MAX_MONITOR_NUMERIC_TARGETS) return [];
+
+  const targets: string[] = [];
+  const seen = new Set<string>();
+  for (const rawTarget of rawTargets) {
+    const target = rawTarget.trim();
+    if (
+      !target
+      || target.length > MAX_MONITOR_NUMERIC_TARGET_LENGTH
+      || /[\s,\u0000-\u001f\u007f]/u.test(target)
+    ) return [];
+    const key = target.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    targets.push(target);
+  }
+  return targets;
+}
+
 export function parseMonitorNumeric(msg: IRCMessage): {
   kind: 'online' | 'offline' | 'full';
   targets: string[];
@@ -475,20 +506,22 @@ export function parseMonitorNumeric(msg: IRCMessage): {
   description?: string;
 } | null {
   if (msg.command === '730' || msg.command === '731') {
-    const targets = (msg.params[1] ?? msg.params[0] ?? '')
-      .split(',')
-      .map(t => t.trim())
-      .filter(Boolean);
+    const targets = parseMonitorTargets(msg.params[1] ?? msg.params[0] ?? '');
     return { kind: msg.command === '730' ? 'online' : 'offline', targets };
   }
   if (msg.command === '734') {
-    const limit = Number.parseInt(msg.params[1] ?? '', 10);
+    const rawLimit = msg.params[1] ?? '';
+    const parsedLimit = /^(?:0|[1-9]\d*)$/u.test(rawLimit) ? Number(rawLimit) : NaN;
+    const limit = Number.isSafeInteger(parsedLimit) && parsedLimit <= MAX_MONITOR_NUMERIC_LIMIT
+      ? parsedLimit
+      : undefined;
     const targetParam = msg.params.length >= 4 ? msg.params[2]! : '';
     return {
       kind: 'full',
-      targets: targetParam.split(',').map(t => t.trim()).filter(Boolean),
-      limit: Number.isFinite(limit) ? limit : undefined,
-      description: msg.params[msg.params.length - 1] ?? '',
+      targets: parseMonitorTargets(targetParam),
+      limit,
+      description: (msg.params[msg.params.length - 1] ?? '')
+        .slice(0, MAX_MONITOR_NUMERIC_DESCRIPTION_LENGTH),
     };
   }
   return null;

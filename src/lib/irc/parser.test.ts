@@ -14,6 +14,7 @@ import {
   parseSessionTokenNote,
   parseSessionMeshTokenNote,
   buildSessionResumeLine,
+  MAX_MONITOR_NUMERIC_TARGETS,
   parseMonitorNumeric,
   parseAccountInfo,
 } from './parser';
@@ -261,6 +262,31 @@ describe('parseMonitorNumeric', () => {
     expect(parseMonitorNumeric(parseIRCMessage(':srv 731 onyx :dave'))).toMatchObject({
       kind: 'offline', targets: ['dave'],
     });
+  });
+  it('deduplicates and bounds server-owned target lists', () => {
+    expect(parseMonitorNumeric(parseIRCMessage(':srv 730 onyx :Bob,bob,carol'))).toMatchObject({
+      kind: 'online', targets: ['Bob', 'carol'],
+    });
+    const tooMany = Array.from(
+      { length: MAX_MONITOR_NUMERIC_TARGETS + 1 },
+      (_, index) => `nick-${index}`,
+    ).join(',');
+    expect(parseMonitorNumeric(parseIRCMessage(`:srv 730 onyx :${tooMany}`))).toMatchObject({
+      kind: 'online', targets: [],
+    });
+    expect(parseMonitorNumeric(parseIRCMessage(`:srv 731 onyx :${'x'.repeat(513)}`))).toMatchObject({
+      kind: 'offline', targets: [],
+    });
+  });
+  it('parses only strict bounded MONLISTFULL fields', () => {
+    expect(parseMonitorNumeric(
+      parseIRCMessage(':srv 734 onyx 128 bob,carol :Monitor list is full'),
+    )).toMatchObject({
+      kind: 'full', targets: ['bob', 'carol'], limit: 128,
+    });
+    expect(parseMonitorNumeric(
+      parseIRCMessage(':srv 734 onyx 128junk bob :Monitor list is full'),
+    )).toMatchObject({ kind: 'full', targets: ['bob'], limit: undefined });
   });
   it('non-monitor numerics return null', () => {
     expect(parseMonitorNumeric(parseIRCMessage(':srv 001 onyx :hi'))).toBeNull();
