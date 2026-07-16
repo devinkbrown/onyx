@@ -4222,6 +4222,44 @@
   border-top: 1px solid var(--seam-faint);
 }
 
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .shell-member-card {
+    gap: 8px;
+  }
+
+  .shell-member-card-head {
+    align-items: flex-start;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+
+  .shell-member-card .onyx-avatar {
+    width: 44px;
+    height: 44px;
+    flex: none;
+    font-size: 14px;
+  }
+
+  .shell-member-card-nick {
+    font-size: 16px;
+  }
+
+  .shell-member-card-account,
+  .shell-member-card-role {
+    font-size: 12px;
+  }
+
+  .shell-member-card-badges,
+  .shell-member-card-actions,
+  .shell-member-card-mod {
+    gap: 4px;
+  }
+
+  .shell-member-card-mod {
+    padding-top: 8px;
+  }
+}
+
 /* ── Home / empty state ── */
 .shell-home {
   flex: 1;

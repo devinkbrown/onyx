@@ -340,6 +340,41 @@
   }
 }
 
+/* A short mobile viewport also has a fixed navigation rail. Keep bottom-sheet
+   popovers in the remaining safe region and replace rem-scaled panel padding
+   with a compact, scroll-owned frame at extreme zoom. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyx-popover__panel,
+  .onyx-popover[data-placement='top'] .onyx-popover__panel {
+    --onyx-popover-edge-top: max(8px, env(safe-area-inset-top, 0px));
+    --onyx-popover-edge-bottom: calc(
+      var(--mnav-h, 56px)
+      + env(safe-area-inset-bottom, 0px)
+      + 8px
+    );
+
+    left: max(8px, env(safe-area-inset-left, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+    bottom: var(--onyx-popover-edge-bottom);
+    width: auto;
+    max-height: calc(
+      100svh
+      - var(--onyx-popover-edge-top)
+      - var(--onyx-popover-edge-bottom)
+      - 8px
+    );
+    padding: 8px;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .onyx-popover__panel .onyx-button {
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+}
+
 .onyx-sheet,
 .onyx-modal {
   position: fixed;
