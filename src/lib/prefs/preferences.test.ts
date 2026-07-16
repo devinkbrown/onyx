@@ -10,8 +10,8 @@ import {
   loadPreferences,
   openPreferences,
   parsePreferencesSnapshot,
+  preferenceOpenRequest,
   preferences,
-  requestedPreferenceCategory,
   resetPreferences,
   setPreference,
   type Preferences,
@@ -345,13 +345,20 @@ describe('preferences store', () => {
     });
 
     it('exposes category-specific opens without making the request sticky', () => {
+      const initialSequence = preferenceOpenRequest().sequence;
       openPreferences('history');
       expect(isPreferencesOpen()).toBe(true);
-      expect(requestedPreferenceCategory()).toBe('history');
+      expect(preferenceOpenRequest()).toEqual({
+        category: 'history',
+        sequence: initialSequence + 1,
+      });
 
       closePreferences();
       openPreferences();
-      expect(requestedPreferenceCategory()).toBeNull();
+      expect(preferenceOpenRequest()).toEqual({
+        category: null,
+        sequence: initialSequence + 2,
+      });
     });
   });
 });

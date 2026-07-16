@@ -456,6 +456,14 @@ describe('PreferencesPanel', () => {
       expect(screen.getByRole('tabpanel')).toHaveAccessibleName('History & data');
     });
 
+    selectPreferenceCategory('Accessibility');
+    openPreferences('history');
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /^History & data/ })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('tabpanel')).toHaveAccessibleName('History & data');
+    });
+
     closePreferences();
     openPreferences();
 

@@ -153,8 +153,8 @@ import { CLOCKS,
   closePreferences,
   isPreferencesOpen,
   openPreferences,
+  preferenceOpenRequest,
   preferences,
-  requestedPreferenceCategory,
   resetPreferences,
   setPreference,
   type Density,
@@ -2923,9 +2923,9 @@ export function PreferencesPanel(): JSX.Element {
   }
 
   createEffect(() => {
+    const request = preferenceOpenRequest();
     if (!isPreferencesOpen()) return;
-    const requested = requestedPreferenceCategory();
-    if (requested !== null) selectCategory(requested);
+    if (request.category !== null) selectCategory(request.category);
   });
 
   return (

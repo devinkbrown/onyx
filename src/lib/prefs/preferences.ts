@@ -197,7 +197,14 @@ export function applyPreferences(prefs: Preferences = preferences()): void {
 
 const [preferences, setPreferencesSignal] = createSignal<Preferences>(loadPreferences());
 const [open, setOpen] = createSignal(false);
-const [requestedCategory, setRequestedCategory] = createSignal<PreferenceCategory | null>(null);
+export type PreferenceOpenRequest = Readonly<{
+  category: PreferenceCategory | null;
+  sequence: number;
+}>;
+const [openRequest, setOpenRequest] = createSignal<PreferenceOpenRequest>({
+  category: null,
+  sequence: 0,
+});
 
 /** Accessor for the whole preferences object. */
 export { preferences };
@@ -205,13 +212,14 @@ export { preferences };
 /** Panel open-state accessor (gates `<PreferencesPanel/>`). */
 export const isPreferencesOpen: Accessor<boolean> = open;
 
-/** Optional category requested by a category-specific Preferences entry point. */
-export const requestedPreferenceCategory: Accessor<PreferenceCategory | null> = requestedCategory;
+/** Latest open request; sequence makes repeated category deep links observable. */
+export const preferenceOpenRequest: Accessor<PreferenceOpenRequest> = openRequest;
 
 export function openPreferences(category?: PreferenceCategory): void {
-  // Clear an earlier deep-link request on ordinary opens so a normal reopen
-  // retains the category already selected in the mounted panel.
-  setRequestedCategory(category ?? null);
+  setOpenRequest((previous) => ({
+    category: category ?? null,
+    sequence: previous.sequence + 1,
+  }));
   setOpen(true);
 }
 
