@@ -194,11 +194,11 @@ describe('RoadmapRoute', () => {
     render(() => <RoadmapRoute />);
     const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
 
-    expect(hrefs).toContain('/stats');
-    expect(hrefs).toContain('/status');
-    expect(hrefs).toContain('/app');
+    expect(hrefs).toContain('/stats/');
+    expect(hrefs).toContain('/status/');
+    expect(hrefs).toContain('/app/');
     expect(hrefs).toContain('/accessibility/');
-    expect(hrefs).toContain('/invite?join=%23root');
+    expect(hrefs).toContain('/invite/?join=%23root');
     expect(hrefs).toContain('/glossary/');
     expect(hrefs).toContain('/integrations/');
     expect(hrefs).toContain('/agents/');

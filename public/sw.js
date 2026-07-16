@@ -184,7 +184,7 @@ self.addEventListener('push', (event) => {
       title: `Message from ${dmFrom}`,
       body: data.text ?? '',
       tag: `onyx-dm-${dmFrom}`,
-      url: '/app',
+      url: '/app/',
     };
   }
   const rawTag = boundedPushString(data.tag, PUSH_TAG_MAX);

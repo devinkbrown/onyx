@@ -35,9 +35,9 @@ export interface InviteLinkSpec {
 export interface InviteLinkOpts {
   /** Network label carried into the resolved card (e.g. "IRCXNet"). */
   network: string;
-  /** Origin for the shareable landing link, e.g. "https://eshmaki.me/invite". */
+  /** Origin for the shareable landing link, e.g. "https://eshmaki.me/invite/". */
   origin: string;
-  /** Origin/path the in-app deep-link points at, e.g. "/app". */
+  /** Origin/path the in-app deep-link points at, e.g. "/app/". */
   appOrigin: string;
 }
 

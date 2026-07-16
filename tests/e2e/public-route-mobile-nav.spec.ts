@@ -2,9 +2,9 @@ import { expect, test } from '@playwright/test';
 
 const routes = [
   { path: '/about/', navName: 'About page navigation', target: '#accessibility' },
-  { path: '/roadmap/', navName: 'Primary', target: '/about' },
-  { path: '/status/', navName: 'Primary', target: '/roadmap' },
-  { path: '/stats/', navName: 'Primary', target: '/status' },
+  { path: '/roadmap/', navName: 'Primary', target: '/about/' },
+  { path: '/status/', navName: 'Primary', target: '/roadmap/' },
+  { path: '/stats/', navName: 'Primary', target: '/status/' },
 ] as const;
 
 test.describe('public route mobile navigation', () => {
@@ -16,6 +16,13 @@ test.describe('public route mobile navigation', () => {
 
       const nav = page.getByRole('navigation', { name: route.navName });
       await expect(nav).toBeVisible();
+
+      const authoredPublicLinks = await nav.locator('a[href^="/"]').evaluateAll((links) =>
+        links.map((link) => link.getAttribute('href') ?? ''),
+      );
+      expect(authoredPublicLinks.filter((href) =>
+        /^\/(?:app|about|appearance|invite|roadmap|status|stats)(?:\?|#|$)/.test(href),
+      )).toEqual([]);
 
       const target = nav.locator(`a[href="${route.target}"]`);
       await expect(target).toBeAttached();

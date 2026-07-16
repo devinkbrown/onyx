@@ -4,7 +4,7 @@ import { test, expect, chromium, type Browser } from '@playwright/test';
 // Rich invite e2e — the create → consume round-trip a user actually runs.
 //
 // A user opens a channel's "Share invite" affordance, Onyx builds a canonical
-// `<origin>/invite?join=…` link, and the recipient lands on the /invite route
+// `<origin>/invite/?join=…` link, and the recipient lands on the /invite/ route
 // which renders a preview of exactly that room. Two halves, two harnesses:
 //
 //   • CONSUME side (static): the /invite landing route is a PURE route — it reads
@@ -21,14 +21,14 @@ import { test, expect, chromium, type Browser } from '@playwright/test';
 //     then open it in a fresh page and assert the landing preview names the room.
 //
 // Configure the connected half via env (defaults match voice.spec):
-//   ONYX_APP  default http://localhost:5174/app
+//   ONYX_APP  default http://localhost:5174/app/
 //   ONYX_WS   default wss://127.0.0.1:7080
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── CONSUME side — static /invite landing route (preview baseURL) ────────────
 test.describe('Onyx /invite landing preview (consume side)', () => {
   test('a channel invite renders that room and hands off to the app', async ({ page }) => {
-    await page.goto('/invite?join=%23general');
+    await page.goto('/invite/?join=%23general');
 
     // The observable success signal: the landing page names the exact room.
     await expect(page.locator('h1')).toContainText('#general');
@@ -36,11 +36,11 @@ test.describe('Onyx /invite landing preview (consume side)', () => {
 
     // The primary CTA deep-links into the app carrying the validated join param.
     const openCta = page.getByRole('link', { name: /Open invite in Onyx/i });
-    await expect(openCta).toHaveAttribute('href', '/app?join=%23general');
+    await expect(openCta).toHaveAttribute('href', '/app/?join=%23general');
   });
 
   test('a rich invite preserves room, suggested name, and topic', async ({ page }) => {
-    await page.goto('/invite?join=%23design&as=river&topic=roadmap');
+    await page.goto('/invite/?join=%23design&as=river&topic=roadmap');
 
     await expect(page.locator('h1')).toContainText('#design');
     // Suggested guest name + named-conversation topic both surface for the recipient.
@@ -49,15 +49,15 @@ test.describe('Onyx /invite landing preview (consume side)', () => {
 
     // App handoff carries every validated field so the room opens the same way.
     const openCta = page.getByRole('link', { name: /Open invite in Onyx/i });
-    await expect(openCta).toHaveAttribute('href', /\/app\?.*join=%23design/);
+    await expect(openCta).toHaveAttribute('href', /\/app\/\?.*join=%23design/);
     await expect(openCta).toHaveAttribute('href', /as=river/);
     await expect(openCta).toHaveAttribute('href', /topic=roadmap/);
   });
 
   test('a bare invite degrades to a network-only preview (no phantom room)', async ({ page }) => {
-    await page.goto('/invite');
+    await page.goto('/invite/');
 
-    await expect(page.locator('h1')).toContainText('IRCXNet');
+    await expect(page.locator('h1')).toContainText('Onyx');
     // Fallback copy tells the recipient to pick a room rather than naming a fake one.
     await expect(page.getByText(/Choose a room from Home/i).first()).toBeVisible();
   });
@@ -65,9 +65,9 @@ test.describe('Onyx /invite landing preview (consume side)', () => {
   test('an invalid room param is rejected, not reflected (no injection)', async ({ page }) => {
     // A comma is a JOIN-list / CRLF-smuggling vector — buildInviteCard drops it,
     // so the landing route must fall back to the network-only preview.
-    await page.goto('/invite?join=%23bad%2Cevil');
+    await page.goto('/invite/?join=%23bad%2Cevil');
 
-    await expect(page.locator('h1')).toContainText('IRCXNet');
+    await expect(page.locator('h1')).toContainText('Onyx');
     await expect(page.locator('h1')).not.toContainText('evil');
   });
 
@@ -75,14 +75,14 @@ test.describe('Onyx /invite landing preview (consume side)', () => {
     const errors: string[] = [];
     page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
     page.on('pageerror', (e) => errors.push(String(e)));
-    await page.goto('/invite?join=%23general&as=river');
+    await page.goto('/invite/?join=%23general&as=river');
     await page.waitForLoadState('networkidle');
     expect(errors).toEqual([]);
   });
 });
 
 // ── CREATE side — build a real invite in-app, then consume it ────────────────
-const APP = process.env.ONYX_APP ?? 'http://localhost:5174/app';
+const APP = process.env.ONYX_APP ?? 'http://localhost:5174/app/';
 const WS = process.env.ONYX_WS ?? 'wss://127.0.0.1:7080';
 const STORE_TIMEOUT = 25_000;
 const CONNECT_TIMEOUT = 45_000;
@@ -183,7 +183,7 @@ test.describe('invite create → consume round-trip (connected DEV build)', () =
       const shareValue = dialog
         .locator('section[aria-labelledby="chset-invite-heading"] .shell-chset-modes-mono')
         .first();
-      await expect(shareValue).toContainText('/invite?');
+      await expect(shareValue).toContainText('/invite/?');
       const shareUrl = (await shareValue.innerText()).trim();
       expect(shareUrl, 'share link targets this room').toContain('join=');
       expect(shareUrl, 'share link carries the suggested name').toContain('as=river');

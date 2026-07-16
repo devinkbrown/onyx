@@ -12,7 +12,7 @@ afterEach(() => {
 
 describe('InviteRoute', () => {
   it('renders a rich invite from query params and hands off to the app', () => {
-    window.history.pushState({}, '', '/invite?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release%20train&reader=1&as=yuki');
+    window.history.pushState({}, '', '/invite/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release%20train&reader=1&as=yuki');
 
     render(() => <InviteRoute />);
 
@@ -26,7 +26,7 @@ describe('InviteRoute', () => {
     expect(screen.getAllByText('yuki').length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: /open invite in onyx/i })).toHaveAttribute(
       'href',
-      '/app?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki',
+      '/app/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki',
     );
   });
 
@@ -50,7 +50,7 @@ describe('InviteRoute', () => {
       resolveCopy = resolve;
     });
     const writeClipboardText = vi.spyOn(clipboard, 'writeClipboardText').mockReturnValue(pending);
-    window.history.pushState({}, '', '/invite?join=%23general');
+    window.history.pushState({}, '', '/invite/?join=%23general');
     render(() => <InviteRoute />);
 
     const copy = screen.getByRole('button', { name: 'Copy invite link' });

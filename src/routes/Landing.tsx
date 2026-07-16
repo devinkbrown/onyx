@@ -55,12 +55,12 @@ export default function Landing() {
         <nav aria-label="Primary">
           <a class="hideable" href="#community">Who's here</a>
           <a class="hideable" href="#rooms">Rooms</a>
-          <a class="hideable" href="/stats">Stats</a>
-          <a class="hideable" href="/status">Status</a>
-          <a class="hideable" href="/roadmap">Roadmap</a>
+          <a class="hideable" href="/stats/">Stats</a>
+          <a class="hideable" href="/status/">Status</a>
+          <a class="hideable" href="/roadmap/">Roadmap</a>
           <a class="hideable" href="#join">Join</a>
           <span class="live hideable"><i aria-hidden="true" />network online</span>
-          <a class="enter" href="/app">Open Onyx</a>
+          <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
 
@@ -77,7 +77,7 @@ export default function Landing() {
               It's open, it's yours, and there's no account to rent and no ads to dodge.
             </p>
             <div class="r-cta">
-              <a class="r-btn primary" href="/app">Open Onyx &rarr;</a>
+              <a class="r-btn primary" href="/app/">Open Onyx &rarr;</a>
               <a class="r-btn ghost" href="#community">See who's around</a>
             </div>
             <div class="r-ticker">
@@ -101,7 +101,7 @@ export default function Landing() {
             <span class="r-eyebrow">live pulse</span>
             <h2 class="r-title" id="live-heading">The network<br />is visible</h2>
           </div>
-          <a class="r-live-link" href="/status">Open status</a>
+          <a class="r-live-link" href="/status/">Open status</a>
         </div>
         <p class="r-lede">
           Public telemetry is part of the front door: room activity, mesh health,
@@ -152,7 +152,7 @@ export default function Landing() {
           </article>
         </div>
         <div class="r-cta">
-          <a class="r-btn ghost" href="/stats">Open channel stats &rarr;</a>
+          <a class="r-btn ghost" href="/stats/">Open channel stats &rarr;</a>
         </div>
       </section>
 
@@ -182,28 +182,28 @@ export default function Landing() {
             <span class="k">text</span>
             <h4>#root</h4>
             <p>Where the network lives day to day — questions, builds, late-night tangents. Open Onyx and you're in the conversation in seconds.</p>
-            <a class="more" href="/app">Drop in &rarr;</a>
+            <a class="more" href="/app/">Drop in &rarr;</a>
           </article>
           <article class="r-card">
             <span class="k">voice</span>
             <h4>Voice stages</h4>
             <p>Hop into a room and just talk — spatial audio, screen-share, raise-hand. Encrypted end to end; the server only forwards, it never listens.</p>
-            <a class="more" href="/app">Join a stage &rarr;</a>
+            <a class="more" href="/app/">Join a stage &rarr;</a>
           </article>
           <article class="r-card">
             <span class="k">browse</span>
             <h4>Room directory</h4>
             <p>The whole network in one list. Sort by what's busy, peek at topics, and follow the lights to wherever your people happen to be tonight.</p>
-            <a class="more" href="/app">Browse rooms &rarr;</a>
+            <a class="more" href="/app/">Browse rooms &rarr;</a>
           </article>
           <article class="r-card">
             <span class="k">dm</span>
             <h4>Quiet corners</h4>
             <p>Private messages and small groups for the side conversations. Same network, same name, no separate app — just a calmer current.</p>
-            <a class="more" href="/app">Say hi &rarr;</a>
+            <a class="more" href="/app/">Say hi &rarr;</a>
           </article>
         </div>
-        <div class="r-cta"><a class="r-btn ghost" href="/stats">See which rooms are busiest &rarr;</a></div>
+        <div class="r-cta"><a class="r-btn ghost" href="/stats/">See which rooms are busiest &rarr;</a></div>
       </section>
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
@@ -228,7 +228,7 @@ export default function Landing() {
             </div>
           </div>
         </div>
-        <div class="r-cta"><a class="r-btn primary" href="/app">Open Onyx &rarr;</a><a class="r-btn ghost" href="/about">Read more</a></div>
+        <div class="r-cta"><a class="r-btn primary" href="/app/">Open Onyx &rarr;</a><a class="r-btn ghost" href="/about/">Read more</a></div>
       </section>
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
@@ -266,7 +266,7 @@ export default function Landing() {
             <span class="r-eyebrow">run your own</span>
             <h2 class="r-title" id="sovereign-heading">Or raise<br />your own shore</h2>
             <p class="r-lede">Sovereignty is the whole point. Stand up your own Orochi node, peer it into the network, and own a slice of the mesh outright — your rooms, your rules, still part of the wider tide.</p>
-            <div class="r-cta"><a class="r-btn ghost" href="/about">How to run a node &rarr;</a></div>
+            <div class="r-cta"><a class="r-btn ghost" href="/about/">How to run a node &rarr;</a></div>
           </div>
           <svg class="r-meshvis" viewBox="0 0 600 360" role="img" aria-label="Several nodes joined by azure currents into one connected network">
             <g fill="none" stroke="var(--lapis)" stroke-width="1.3">
@@ -310,9 +310,9 @@ export default function Landing() {
             <div class="logo"><Mascot variant="mark" />ONYX</div>
             <p>A warm, open home on the Onyx mesh — real rooms, real people, encrypted media, and a name that's yours to keep. Built in the open.</p>
           </div>
-          <div class="col"><h5>Community</h5><a href="#community">Who's here</a><a href="#rooms">Rooms</a><a href="#join">Join</a><a href="/app">Open Onyx</a></div>
-          <div class="col"><h5>Network</h5><a href="/about">The network</a><a href="/stats">Channel stats</a><a href="/status">Mesh status</a><a href="/roadmap">Roadmap</a></div>
-          <div class="col"><h5>Get in</h5><a href="/app">Drop into #root</a><a href="/app">Browse rooms</a><a href="/about">Build a client</a><a href="/about">Read more</a></div>
+          <div class="col"><h5>Community</h5><a href="#community">Who's here</a><a href="#rooms">Rooms</a><a href="#join">Join</a><a href="/app/">Open Onyx</a></div>
+          <div class="col"><h5>Network</h5><a href="/about/">The network</a><a href="/stats/">Channel stats</a><a href="/status/">Mesh status</a><a href="/roadmap/">Roadmap</a></div>
+          <div class="col"><h5>Get in</h5><a href="/app/">Drop into #root</a><a href="/app/">Browse rooms</a><a href="/about/">Build a client</a><a href="/about/">Read more</a></div>
         </div>
         <div class="base"><span><Mascot variant="mark" /> Onyx — on the open mesh</span><span>Open IRC · made for people · 2026</span></div>
       </footer>

@@ -164,7 +164,7 @@ describe('PWA manifest', () => {
     openWindow.mockClear();
     clickWork = undefined;
     click!({
-      notification: { close: vi.fn(), data: { url: '/app' } },
+      notification: { close: vi.fn(), data: { url: '/app/' } },
       waitUntil: (work: Promise<unknown>) => {
         clickWork = work;
       },
@@ -172,7 +172,7 @@ describe('PWA manifest', () => {
     await clickWork;
     expect(prefixClient.navigate).not.toHaveBeenCalled();
     expect(prefixClient.focus).not.toHaveBeenCalled();
-    expect(openWindow).toHaveBeenCalledWith('/app');
+    expect(openWindow).toHaveBeenCalledWith('/app/');
   });
 
   it('keeps install and activation alive without substituting shells for offline document routes', async () => {

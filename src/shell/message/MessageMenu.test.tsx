@@ -779,7 +779,7 @@ describe('<MessageMenu>', () => {
 
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(
-        expect.stringContaining('/app?join=%23general&at=2026-07-08T12%3A00%3A00.000Z'),
+        expect.stringContaining('/app/?join=%23general&at=2026-07-08T12%3A00%3A00.000Z'),
       );
       expect(screen.getByRole('status')).toHaveTextContent('Moment link copied.');
     });

@@ -1065,9 +1065,9 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
       id: 'action:theme-studio',
       section: 'Actions',
       title: 'Open Theme Studio',
-      hint: '/appearance',
+      hint: '/appearance/',
       keywords: ['theme', 'studio', 'custom', 'tokens', 'editor', 'create theme'],
-      run: () => navigateTo('/appearance'),
+      run: () => navigateTo('/appearance/'),
     },
     {
       id: 'action:toggle-member-list',

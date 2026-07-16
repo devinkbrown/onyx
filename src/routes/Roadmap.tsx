@@ -135,7 +135,7 @@ export default function RoadmapRoute() {
   setPageMeta(
     'Onyx roadmap — what shipped and what is next',
     'Track the public Onyx roadmap across memory, reach, privacy, presence, operations, and the time-native client work next.',
-    '/roadmap',
+    '/roadmap/',
   );
   return (
     <main class="r data-page roadmap-page">
@@ -154,11 +154,11 @@ export default function RoadmapRoute() {
         </a>
         <nav aria-label="Primary">
           <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="/stats">Stats</a>
-          <a class="hideable" href="/status">Status</a>
-          <a class="hideable" href="/roadmap" aria-current="page">Roadmap</a>
-          <a class="hideable" href="/about">About</a>
-          <a class="enter" href="/app">Open Onyx</a>
+          <a class="hideable" href="/stats/">Stats</a>
+          <a class="hideable" href="/status/">Status</a>
+          <a class="hideable" href="/roadmap/" aria-current="page">Roadmap</a>
+          <a class="hideable" href="/about/">About</a>
+          <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
 
@@ -242,7 +242,7 @@ export default function RoadmapRoute() {
             <div class="data-row"><div><strong>Search Center</strong><span>Device memory is globally reachable, saved queries are portable, and archived results hydrate their transcript context.</span></div></div>
             <div class="data-row"><div><strong>Reader mode</strong><span>Carry reviewed anchors into richer cross-room handoffs.</span></div></div>
             <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue remaining dense-surface pass/fix evidence.</a></span></div></div>
-            <div class="data-row"><div><strong>Torii entry</strong><span><a href="/invite?join=%23root">Rich invite entry</a>, remembered identities, and capability-labelled sign-in now anchor the first-run path.</span></div></div>
+            <div class="data-row"><div><strong>Torii entry</strong><span><a href="/invite/?join=%23root">Rich invite entry</a>, remembered identities, and capability-labelled sign-in now anchor the first-run path.</span></div></div>
             <div class="data-row"><div><strong>Public contracts</strong><span><a href="/glossary/">Glossary</a>, <a href="/integrations/">integrations</a>, and <a href="/agents/">agent safety</a> now carry site-level roadmap contracts.</span></div></div>
             <div class="data-row"><div><strong>Master roadmap fold-in</strong><span>Track onboarding, calm presets, media presence, app surfaces, local intelligence, and offline roaming here.</span></div></div>
           </div>

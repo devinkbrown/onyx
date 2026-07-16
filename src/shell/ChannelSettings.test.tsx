@@ -227,7 +227,7 @@ describe('ChannelSettings — Share invite a11y', () => {
     expect(share).toHaveBeenCalledWith(expect.objectContaining({
       title: '#general on Onyx',
       text: 'Join #general on Onyx.',
-      url: expect.stringContaining('/invite?join=%23general'),
+      url: expect.stringContaining('/invite/?join=%23general'),
     }));
   });
 

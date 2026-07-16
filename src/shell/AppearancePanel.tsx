@@ -150,7 +150,7 @@ export function AppearancePanel(): JSX.Element {
           </section>
 
           {/* ── Deep customization ── */}
-          <a class="ap-panel-studio" href="/appearance">
+          <a class="ap-panel-studio" href="/appearance/">
             Open the full Theme Studio →
           </a>
         </div>

@@ -277,8 +277,8 @@ describe('About page — source structure', () => {
     expect(srcContains('href="/"')).toBe(true);
   });
 
-  it('Open Onyx link points to /app', () => {
-    expect(srcContains('href="/app"')).toBe(true);
+  it('Open Onyx links point to the canonical app route', () => {
+    expect(srcContains('href="/app/"')).toBe(true);
   });
 
   it('nav links include in-page anchors for protocol, media, mesh', () => {

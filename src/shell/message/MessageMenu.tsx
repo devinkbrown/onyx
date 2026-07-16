@@ -59,7 +59,7 @@ export type MessageMenuCapabilities = {
   canCopy: boolean;
   /** Open message search prefilled from this line. */
   canSearchText: boolean;
-  /** Copy a shareable `/app?join=...&at=...` link for channel messages. */
+  /** Copy a shareable `/app/?join=...&at=...` link for channel messages. */
   canCopyMoment: boolean;
   /** Start a named conversation from this message; channel messages only. */
   canStartTopic: boolean;

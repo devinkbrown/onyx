@@ -21,7 +21,7 @@ export default function About() {
   setPageMeta(
     'About Onyx — open protocol, sovereign mesh',
     'Learn how Onyx, Suimyaku media, and the open mesh work together without closed-platform lock-in.',
-    '/about',
+    '/about/',
   );
   return (
     <main class="r ab-ocean">
@@ -55,7 +55,7 @@ export default function About() {
           <a class="hideable" href="#mesh">Mesh</a>
           <a class="hideable" href="#accessibility">Accessibility</a>
           <span class="live hideable"><i aria-hidden="true" />mesh online</span>
-          <a class="enter" href="/app">Open Onyx</a>
+          <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
 
@@ -711,7 +711,7 @@ export default function About() {
               <div><span class="c">SESSION TOKEN</span></div>
               <div><span class="o">← NOTE SESSION TOKEN </span><span class="h">:&lt;token&gt;</span></div>
             </div>
-            <a class="more" href="/app">open a session in Onyx →</a>
+            <a class="more" href="/app/">open a session in Onyx →</a>
           </article>
 
           <article class="ab-dev-card">
@@ -738,7 +738,7 @@ export default function About() {
               <div><span class="o"># start — sessions survive USR2 upgrade</span></div>
               <div><span class="c">systemctl start orochi</span></div>
             </div>
-            <a class="more" href="/app">explore the network →</a>
+            <a class="more" href="/app/">explore the network →</a>
           </article>
         </div>
       </section>
@@ -777,13 +777,13 @@ export default function About() {
           <div class="col">
             <h5>Network</h5>
             <a href="#mesh">The mesh</a>
-            <a href="/app">Auto-routing</a>
+            <a href="/app/">Auto-routing</a>
             <a href="/">Landing</a>
           </div>
           <div class="col">
             <h5>Commons</h5>
-            <a href="/app">Open Onyx</a>
-            <a href="/app">Join #root</a>
+            <a href="/app/">Open Onyx</a>
+            <a href="/app/">Join #root</a>
             <a href="#developer">Build a client</a>
             <a href="#developer">Run a node</a>
           </div>

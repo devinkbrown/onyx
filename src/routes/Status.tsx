@@ -17,7 +17,7 @@ export default function StatusRoute() {
   setPageMeta(
     'Onyx status — mesh health',
     'Public Onyx mesh health, node uptime, peer latency, users online, and backup readiness.',
-    '/status',
+    '/status/',
   );
   const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus, { initialValue: null });
   const [backups, { refetch: refetchBackups }] = createResource(fetchBackupManifest, { initialValue: null });
@@ -65,12 +65,12 @@ export default function StatusRoute() {
         </a>
         <nav aria-label="Primary">
           <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="/stats">Stats</a>
-          <a class="hideable" href="/status" aria-current="page">Status</a>
-          <a class="hideable" href="/roadmap">Roadmap</a>
-          <a class="hideable" href="/about">About</a>
+          <a class="hideable" href="/stats/">Stats</a>
+          <a class="hideable" href="/status/" aria-current="page">Status</a>
+          <a class="hideable" href="/roadmap/">Roadmap</a>
+          <a class="hideable" href="/about/">About</a>
           <span class="live hideable" data-feed-state={feedState()}><i aria-hidden="true" />{feedLabel()}</span>
-          <a class="enter" href="/app">Open Onyx</a>
+          <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
 
@@ -164,13 +164,13 @@ export default function StatusRoute() {
           <span class="label">activity</span>
           <h2>Rooms and graph history</h2>
           <p>Move from node health into public room activity, daily message bars, and room handoff links.</p>
-          <div class="r-cta"><a class="r-btn ghost" href="/stats">Open stats &rarr;</a></div>
+          <div class="r-cta"><a class="r-btn ghost" href="/stats/">Open stats &rarr;</a></div>
         </article>
         <aside class="data-card">
           <span class="label">plan</span>
           <h3>Roadmap context</h3>
           <p>See how status, stats, and backup readiness fit into the operations phase.</p>
-          <div class="r-cta"><a class="r-btn ghost" href="/roadmap">Open roadmap &rarr;</a></div>
+          <div class="r-cta"><a class="r-btn ghost" href="/roadmap/">Open roadmap &rarr;</a></div>
         </aside>
       </section>
 

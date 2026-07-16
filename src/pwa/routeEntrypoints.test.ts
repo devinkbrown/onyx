@@ -10,6 +10,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const materializer = join(root, 'tools', 'materialize-route-entrypoints.mjs');
 const baseDocument = readFileSync(join(root, 'index.html'), 'utf8');
 const routeTable = readFileSync(join(root, 'src', 'index.tsx'), 'utf8');
+const fallbackSitemap = readFileSync(join(root, 'public', 'sitemap.xml'), 'utf8');
 
 const expected = {
   app: {
@@ -96,6 +97,22 @@ describe('SPA route entrypoint materializer', () => {
         .toBe(meta.title);
       expect(document.querySelector('meta[name="twitter:description"]')?.getAttribute('content'), route)
         .toBe(meta.description);
+    }
+  });
+
+  it('keeps the fallback sitemap on the same final public route canonicals', () => {
+    const locations = [...fallbackSitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
+      .map((match) => match[1])
+      .filter((location): location is string => location !== undefined);
+
+    expect(locations.length).toBeGreaterThan(1);
+    expect(new Set(locations).size).toBe(locations.length);
+    for (const location of locations) {
+      const url = new URL(location);
+      expect(url.origin, location).toBe('https://eshmaki.me');
+      expect(url.search, location).toBe('');
+      expect(url.hash, location).toBe('');
+      expect(url.pathname === '/' || url.pathname.endsWith('/'), location).toBe(true);
     }
   });
 

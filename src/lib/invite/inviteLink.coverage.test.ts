@@ -6,8 +6,8 @@ import { buildInviteLink } from './inviteLink';
 
 const OPTS = {
   network: 'IRCXNet',
-  origin: 'https://eshmaki.me/invite',
-  appOrigin: '/app',
+  origin: 'https://eshmaki.me/invite/',
+  appOrigin: '/app/',
 } as const;
 
 function parseShareUrl(shareUrl: string) {
@@ -38,7 +38,7 @@ describe('rich invite link coverage', () => {
     expect(link).toEqual({
       card: parsed,
       shareUrl: `${OPTS.origin}?join=%23help&at=2026-07-10T08%3A30%3A00.000Z&topic=onboarding&reader=1&as=Guest_7`,
-      appHref: '/app?join=%23help&at=2026-07-10T08%3A30%3A00.000Z&topic=onboarding&reader=1&as=Guest_7',
+      appHref: '/app/?join=%23help&at=2026-07-10T08%3A30%3A00.000Z&topic=onboarding&reader=1&as=Guest_7',
       hasChannel: true,
     });
     expect(parsed).toEqual({
@@ -138,7 +138,7 @@ describe('rich invite link coverage', () => {
     expect(link.shareUrl).not.toContain('bad');
     expect(link.appHref).not.toContain('bad');
     expect(link.shareUrl).toBe(`${OPTS.origin}?at=2026-07-10T08%3A30%3A00.000Z&as=Guest`);
-    expect(link.appHref).toBe('/app?at=2026-07-10T08%3A30%3A00.000Z&as=Guest');
+    expect(link.appHref).toBe('/app/?at=2026-07-10T08%3A30%3A00.000Z&as=Guest');
   });
 
   it('drops an invalid Date value instead of throwing', () => {

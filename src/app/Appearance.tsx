@@ -114,7 +114,7 @@ export default function Appearance() {
       <Background id={previewBgId()} />
 
       <header class="ap-bar">
-        <a class="ap-back" href="/app">← back to app</a>
+        <a class="ap-back" href="/app/">← back to app</a>
         <span class="ap-tag">◆ · appearance</span>
         <a class="ap-home" href="/">home</a>
       </header>

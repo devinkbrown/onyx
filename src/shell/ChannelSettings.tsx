@@ -177,8 +177,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
   const inviteOrigin = createMemo(() =>
     typeof window !== 'undefined'
-      ? `${window.location.origin}/invite`
-      : 'https://eshmaki.me/invite',
+      ? `${window.location.origin}/invite/`
+      : 'https://eshmaki.me/invite/',
   );
   const memberCount = createMemo(() => channel()?.users.size ?? 0);
   const inviteLink = createMemo(() =>
@@ -187,7 +187,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
         channel: channel()?.name ?? local.channel,
         guestName: invitePreferredNick(),
       },
-      { network: networkName(), origin: inviteOrigin(), appOrigin: '/app' },
+      { network: networkName(), origin: inviteOrigin(), appOrigin: '/app/' },
     ),
   );
 

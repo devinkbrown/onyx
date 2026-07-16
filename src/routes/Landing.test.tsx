@@ -55,7 +55,7 @@ describe('Landing', () => {
 
   it('exposes a primary entry point into the app', () => {
     const { getAllByRole } = render(() => <Landing />);
-    const enter = getAllByRole('link').filter((a) => a.getAttribute('href') === '/app');
+    const enter = getAllByRole('link').filter((a) => a.getAttribute('href') === '/app/');
     expect(enter.length).toBeGreaterThan(0);
   });
 
@@ -63,9 +63,9 @@ describe('Landing', () => {
     const { getAllByRole } = render(() => <Landing />);
     const hrefs = getAllByRole('link').map((a) => a.getAttribute('href'));
 
-    expect(hrefs).toContain('/stats');
-    expect(hrefs).toContain('/status');
-    expect(hrefs).toContain('/roadmap');
+    expect(hrefs).toContain('/stats/');
+    expect(hrefs).toContain('/status/');
+    expect(hrefs).toContain('/roadmap/');
   });
 
   it('surfaces live public telemetry on the root website', () => {

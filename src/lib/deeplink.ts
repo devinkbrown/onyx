@@ -2,7 +2,7 @@
 /**
  * deeplink.ts — website → app handoff helpers.
  *
- * The community site links into the app as `/app?join=%23channelname`. The
+ * The community site links into the app as `/app/?join=%23channelname`. The
  * raw search-param value is untrusted input: it is URI-decoded, then validated
  * against IRC channel-name rules before it is allowed anywhere near a JOIN.
  *
@@ -69,7 +69,7 @@ const AT_PARAM_FUTURE_SLACK_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Parse and validate an `?at=` search-param value into a Date — the "time
- * travel" deep link (`/app?join=%23chan&at=...`). Accepts epoch seconds,
+ * travel" deep link (`/app/?join=%23chan&at=...`). Accepts epoch seconds,
  * epoch milliseconds, or an ISO-8601 date/datetime. Out-of-range or malformed
  * values return null; a bad link must never break the connect flow.
  */
@@ -99,9 +99,9 @@ export function parseAtParam(raw: string | string[] | null | undefined): Date | 
   return new Date(ms);
 }
 
-export function buildMomentLink(channel: string, at: Date, href = 'https://onyx.local/app'): string {
+export function buildMomentLink(channel: string, at: Date, href = 'https://onyx.local/app/'): string {
   const url = new URL(href);
-  url.pathname = '/app';
+  url.pathname = '/app/';
   url.hash = '';
   url.search = '';
   url.searchParams.set('join', channel);

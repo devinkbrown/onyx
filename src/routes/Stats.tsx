@@ -38,12 +38,12 @@ function PageChrome(props: {
         </a>
         <nav aria-label="Primary">
           <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="/stats" aria-current="page">Stats</a>
-          <a class="hideable" href="/status">Status</a>
-          <a class="hideable" href="/roadmap">Roadmap</a>
-          <a class="hideable" href="/about">About</a>
+          <a class="hideable" href="/stats/" aria-current="page">Stats</a>
+          <a class="hideable" href="/status/">Status</a>
+          <a class="hideable" href="/roadmap/">Roadmap</a>
+          <a class="hideable" href="/about/">About</a>
           <span class="live hideable" data-feed-state={props.feedState}><i aria-hidden="true" />{label()}</span>
-          <a class="enter" href="/app">Open Onyx</a>
+          <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
       {props.children}
@@ -67,7 +67,7 @@ export function roomDeepLink(channel: string, lastActiveUnixSec = 0): string {
   if (lastActiveUnixSec > 0 && Number.isFinite(ms) && ms <= MAX_TIME_MS) {
     params.set('at', new Date(ms).toISOString());
   }
-  return `/app?${params.toString()}`;
+  return `/app/?${params.toString()}`;
 }
 
 function ChannelRow(props: { channel: StatsChannel; nowMs: number }) {
@@ -107,7 +107,7 @@ export default function StatsRoute() {
   setPageMeta(
     'Onyx stats — live room activity',
     'See public Onyx room activity, network message trends, people online, and channel sparklines.',
-    '/stats',
+    '/stats/',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
   const [nowMs, setNowMs] = createSignal(Date.now());

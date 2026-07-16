@@ -64,7 +64,7 @@ describe('buildMomentLink', () => {
       'https://chat.example/about?old=1#section',
     );
 
-    expect(link).toBe('https://chat.example/app?join=%23general&at=2026-06-30T12%3A00%3A00.000Z');
+    expect(link).toBe('https://chat.example/app/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z');
   });
 });
 

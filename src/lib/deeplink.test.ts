@@ -225,12 +225,12 @@ describe('buildMomentLink', () => {
         new Date('2026-07-08T18:30:00.000Z'),
         'https://onyx.example/stats?from=old#pulse',
       ),
-    ).toBe('https://onyx.example/app?join=%23root&at=2026-07-08T18%3A30%3A00.000Z');
+    ).toBe('https://onyx.example/app/?join=%23root&at=2026-07-08T18%3A30%3A00.000Z');
   });
 
   it('round-trips the channel and moment through URL search params', () => {
     const moment = new Date('2026-07-08T18:30:00.000Z');
-    const link = buildMomentLink('#ops-room', moment, 'https://onyx.example/app?utm=drop');
+    const link = buildMomentLink('#ops-room', moment, 'https://onyx.example/app/?utm=drop');
     const params = new URL(link).searchParams;
 
     expect(parseJoinParam(params.get('join'))).toBe('#ops-room');
@@ -251,7 +251,7 @@ describe('buildMomentLink', () => {
 
   it('round-trips the exact latest parseAtParam future boundary', () => {
     const boundary = new Date(FIXED_NOW.getTime() + DAY_MS);
-    const params = new URL(buildMomentLink('#root', boundary, 'https://onyx.example/app')).searchParams;
+    const params = new URL(buildMomentLink('#root', boundary, 'https://onyx.example/app/')).searchParams;
 
     expect(parseAtParam(params.get('at'))?.toISOString()).toBe(boundary.toISOString());
   });
@@ -264,7 +264,7 @@ describe('buildMomentLink', () => {
     );
     const url = new URL(link);
 
-    expect(url.pathname).toBe('/app');
+    expect(url.pathname).toBe('/app/');
     expect(url.hash).toBe('');
     expect([...url.searchParams.keys()]).toEqual(['join', 'at']);
     expect(parseJoinParam(url.searchParams.get('join'))).toBe('#fresh');

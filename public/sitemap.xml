@@ -6,47 +6,47 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://eshmaki.me/stats</loc>
+    <loc>https://eshmaki.me/stats/</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://eshmaki.me/status</loc>
+    <loc>https://eshmaki.me/status/</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://eshmaki.me/accessibility</loc>
+    <loc>https://eshmaki.me/accessibility/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://eshmaki.me/guides</loc>
+    <loc>https://eshmaki.me/guides/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://eshmaki.me/community</loc>
+    <loc>https://eshmaki.me/community/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://eshmaki.me/roadmap</loc>
+    <loc>https://eshmaki.me/roadmap/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://eshmaki.me/invite</loc>
+    <loc>https://eshmaki.me/invite/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://eshmaki.me/install</loc>
+    <loc>https://eshmaki.me/install/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://eshmaki.me/about</loc>
+    <loc>https://eshmaki.me/about/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>

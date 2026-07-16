@@ -74,7 +74,7 @@ export function ServerRail(props: ServerRailProps): JSX.Element {
       <div class="shell-rail-bottom">
         {/* Appearance link */}
         <a
-          href="/appearance"
+          href="/appearance/"
           class="shell-rail-entry"
           aria-label="Appearance settings"
           title="Appearance"

@@ -22,9 +22,9 @@ function currentOrigin(): string {
 function appHrefFromInvite(url: string): string {
   try {
     const parsed = new URL(url);
-    return parsed.search ? `/app${parsed.search}` : '/app';
+    return parsed.search ? `/app/${parsed.search}` : '/app/';
   } catch {
-    return '/app';
+    return '/app/';
   }
 }
 
@@ -97,11 +97,11 @@ export default function InviteRoute() {
         </a>
         <nav aria-label="Primary">
           <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="/stats">Stats</a>
-          <a class="hideable" href="/status">Status</a>
-          <a class="hideable" href="/roadmap">Roadmap</a>
-          <a class="hideable" href="/about">About</a>
-          <a class="enter" href="/app">Open Onyx</a>
+          <a class="hideable" href="/stats/">Stats</a>
+          <a class="hideable" href="/status/">Status</a>
+          <a class="hideable" href="/roadmap/">Roadmap</a>
+          <a class="hideable" href="/about/">About</a>
+          <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
 

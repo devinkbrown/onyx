@@ -307,7 +307,7 @@ export function Connect(props: ConnectProps): JSX.Element {
   // ── Mode ──────────────────────────────────────────────────────────────────
   const [mode, setMode] = createSignal<Mode>('guest');
 
-  // Website → app handoff: /app?join=%23channel (+ optional &at=<moment> for
+  // Website → app handoff: /app/?join=%23channel (+ optional &at=<moment> for
   // time travel). Validated before it goes anywhere near a JOIN; a bad link is
   // simply ignored.
   const deepLinkJoin = parseJoinParam(

@@ -44,14 +44,14 @@ describe('StatsRoute', () => {
     expect(screen.getByText('stats current')).toHaveAttribute('data-feed-state', 'current');
     expect(screen.getByLabelText(/#root recent activity/i)).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /open/i }).some((a) =>
-      a.getAttribute('href')?.startsWith('/app?join=%23root&at='),
+      a.getAttribute('href')?.startsWith('/app/?join=%23root&at='),
     )).toBe(true);
   });
 
   it('builds channel deep links with optional time-travel moments', () => {
-    expect(roomDeepLink('#root')).toBe('/app?join=%23root');
+    expect(roomDeepLink('#root')).toBe('/app/?join=%23root');
     expect(roomDeepLink('#root', Date.parse('2026-07-08T12:00:00.000Z') / 1000)).toBe(
-      '/app?join=%23root&at=2026-07-08T12%3A00%3A00.000Z',
+      '/app/?join=%23root&at=2026-07-08T12%3A00%3A00.000Z',
     );
   });
 
@@ -60,8 +60,8 @@ describe('StatsRoute', () => {
     // the Date past JS's ±8.64e15 ms bound; toISOString() would throw RangeError
     // and crash the whole Stats render. The link must degrade to a plain join.
     expect(() => roomDeepLink('#root', 1e17)).not.toThrow();
-    expect(roomDeepLink('#root', 1e17)).toBe('/app?join=%23root');
-    expect(roomDeepLink('#root', Number.POSITIVE_INFINITY)).toBe('/app?join=%23root');
+    expect(roomDeepLink('#root', 1e17)).toBe('/app/?join=%23root');
+    expect(roomDeepLink('#root', Number.POSITIVE_INFINITY)).toBe('/app/?join=%23root');
   });
 
   it('keeps the stats page shell visible while the feed is pending', () => {

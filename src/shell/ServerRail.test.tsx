@@ -101,7 +101,7 @@ describe('<ServerRail>', () => {
     expect(appearance.tagName).toBe('A');
     expect(appearance).toHaveClass('shell-rail-entry');
     // A native href keeps it in the tab order (SC 2.1.1) so the focus ring lands.
-    expect(appearance).toHaveAttribute('href', '/appearance');
+    expect(appearance).toHaveAttribute('href', '/appearance/');
   });
 
   it('exposes Disconnect as a native button with an accessible name', () => {
