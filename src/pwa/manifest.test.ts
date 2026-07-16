@@ -355,7 +355,8 @@ describe('PWA manifest', () => {
     const listeners = new Map<string, (event: Record<string, unknown>) => void>();
     const add = vi.fn<(url: string) => Promise<void>>(async () => undefined);
     const put = vi.fn(async () => undefined);
-    const cache = { add, put };
+    const currentCacheMatch = vi.fn<(url: string) => Promise<unknown>>(async () => ({ cached: true }));
+    const cache = { add, match: currentCacheMatch, put };
     const match = vi.fn<(key: unknown) => Promise<unknown>>(async (key) => ({ fallback: key }));
     const deleteCache = vi.fn(async () => {
       throw new Error('stale cache is unavailable');
@@ -449,6 +450,19 @@ describe('PWA manifest', () => {
     expect(deleteCache).not.toHaveBeenCalledWith('onyx-shell-__BUILD_VERSION__');
     expect(claim).toHaveBeenCalledOnce();
     expect(enableNavigationPreload).toHaveBeenCalledOnce();
+
+    deleteCache.mockClear();
+    currentCacheMatch.mockResolvedValueOnce(undefined);
+    activateWork = undefined;
+    listeners.get('activate')?.({
+      waitUntil: (work: Promise<unknown>) => {
+        activateWork = work;
+      },
+    });
+    await expect(activateWork).resolves.toBeUndefined();
+    expect(deleteCache).not.toHaveBeenCalled();
+    expect(claim).toHaveBeenCalledTimes(2);
+    expect(enableNavigationPreload).toHaveBeenCalledTimes(2);
 
     let navigationWork: Promise<unknown> | undefined;
     const preloadedResponse = { source: 'navigation-preload' };

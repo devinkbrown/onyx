@@ -138,14 +138,21 @@ function enableNavigationPreload() {
 }
 
 function clearStaleShellCaches() {
-  return caches.keys()
-    .then((keys) => Promise.all(
-      keys
-        // This worker shares an origin with public and operational surfaces.
-        // Never erase caches owned by another application.
-        .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
-        .map((key) => Promise.resolve(caches.delete(key)).catch(() => false))
-    ))
+  return caches.open(CACHE_NAME)
+    .then((current) => Promise.all(PRECACHE_URLS.map((url) => current.match(url))))
+    .then((entries) => {
+      // A best-effort install may activate with one shell URL missing. Keep the
+      // previous Onyx cache as the only available offline fallback until a
+      // later complete deployment can safely retire it.
+      if (!entries.every(Boolean)) return undefined;
+      return caches.keys().then((keys) => Promise.all(
+        keys
+          // This worker shares an origin with public and operational surfaces.
+          // Never erase caches owned by another application.
+          .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+          .map((key) => Promise.resolve(caches.delete(key)).catch(() => false))
+      ));
+    })
     // Cache Storage can be unavailable or partially corrupted. Cleanup must
     // not brick activation of a worker whose fresh shell already installed.
     .catch(() => undefined);
