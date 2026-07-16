@@ -561,6 +561,76 @@
   gap: 0.55rem;
 }
 
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .voice-pip {
+    width: calc(100vw - 24px);
+    max-height: calc(100svh - 24px);
+    overflow-y: auto;
+    border-radius: 8px;
+  }
+
+  .voice-pip__handle {
+    min-width: 0;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .voice-pip__title {
+    gap: 4px;
+  }
+
+  .voice-pip__kicker {
+    font-size: 14px;
+    letter-spacing: 0.08em;
+  }
+
+  .voice-pip__target {
+    font-size: 24px;
+  }
+
+  .voice-pip__status {
+    gap: 6px;
+    font-size: 14px;
+  }
+
+  .voice-pip__status::before {
+    width: 8px;
+    height: 8px;
+  }
+
+  .voice-pip__body {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .voice-pip__participants {
+    min-width: 0;
+    min-height: 40px;
+    overflow: hidden;
+  }
+
+  .voice-pip__participant {
+    margin-left: -8px;
+  }
+
+  .voice-pip__participant .onyx-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .voice-pip__more {
+    width: 40px;
+    height: 40px;
+    margin-left: 4px;
+    font-size: 14px;
+  }
+
+  .voice-pip__actions {
+    gap: 8px;
+  }
+}
+
 @keyframes voice-call-ring {
   0% {
     opacity: 0.8;
