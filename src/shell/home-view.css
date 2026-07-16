@@ -1,6 +1,8 @@
 /* HomeView — the connected community home (deep-water language) */
 .home {
   height: 100%;
+  min-height: 0;
+  flex: 1 1 0;
   overflow-y: auto;
   display: flex;
   justify-content: center;
@@ -925,6 +927,59 @@
   .home-review-history__preview {
     max-width: 100%;
     white-space: normal;
+  }
+}
+
+/* The connected shell stacks transient banners above Home. At 400% zoom Home
+   must own only the remaining height, then scroll its actions clear of the
+   fixed mobile navigation instead of shrinking under overflowing siblings. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .home {
+    scroll-padding-block:
+      8px
+      calc(var(--mnav-h, 56px) + env(safe-area-inset-bottom, 0px) + 8px);
+  }
+
+  .home-inner {
+    padding:
+      8px
+      max(8px, env(safe-area-inset-right, 0px))
+      calc(var(--mnav-h, 56px) + env(safe-area-inset-bottom, 0px) + 8px)
+      max(8px, env(safe-area-inset-left, 0px));
+  }
+
+  .home-masthead {
+    margin-bottom: 12px;
+  }
+
+  .home-kicker {
+    margin-bottom: 4px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+  }
+
+  .home-title {
+    margin-bottom: 6px;
+    font-size: 24px;
+  }
+
+  .home-sub {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+
+  .home-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .home-cta,
+  .home-action {
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 16px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

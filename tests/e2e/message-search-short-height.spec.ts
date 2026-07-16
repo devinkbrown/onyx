@@ -49,7 +49,7 @@ test('keeps message search usable at 400% short reflow', async ({ page, browserN
     });
   });
 
-  await page.getByRole('button', { name: 'Search device memory' }).evaluate((button) => button.click());
+  await page.getByRole('button', { name: 'Search device memory' }).click();
   const search = page.locator('.onyx-message-search');
   const surface = search.locator('.onyx-message-search__surface');
   const input = page.getByRole('searchbox', { name: 'Search messages' });
