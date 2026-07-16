@@ -14,15 +14,20 @@ for (const nick of nicks) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     serviceWorkers: 'block',
+    // This is a roster/state probe, not a motion test. Honor the product's
+    // reduced-motion path so its infinite water/scene animations cannot starve
+    // Playwright action frames when multiple browser probes share the host.
+    reducedMotion: 'reduce',
   });
   const page = await context.newPage();
+  probes.push({ context, nick, page });
   page.on('pageerror', (error) => errs.push({ nick, error: String(error).slice(0, 200) }));
   await page.goto(`${origin}/app/`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await page.getByTestId('connect-screen').waitFor({ state: 'visible', timeout: 30_000 });
   await page.getByPlaceholder('your-nick').fill(nick);
   await page.getByPlaceholder('#root').fill(channel);
   await page.getByRole('button', { name: 'Connect to Onyx as a guest' }).click();
-  probes.push({ context, nick, page });
+  console.log(`${nick} connect submitted with an ordinary click`);
 }
 
 try {
@@ -70,7 +75,6 @@ for (let elapsedMs = 0; elapsedMs <= durationMs; elapsedMs += sampleMs) {
 console.log('final member rows:', JSON.stringify(Object.fromEntries(finalMembers), null, 1));
 console.log('errors:', errs.length ? errs : 'none');
 console.log('transient roster failures:', failures.length ? failures : 'none');
-for (const { context } of probes) await context.close().catch(() => {});
 await browser.close();
 
 if (failures.length > 0 || errs.length > 0) process.exitCode = 1;
