@@ -20,6 +20,10 @@ export function PresenceHeatline(props: PresenceHeatlineProps): JSX.Element {
   const [pulse, { refetch }] = createResource(
     () => props.channel(),
     async (channel) => (channel ? fetchChannelPulse(channel) : null),
+    // Activity stats are optional ribbon decoration. Seed a resolved value and
+    // read `latest` below so a slow stats endpoint cannot suspend the shared
+    // AppShell boundary (which would also remove the live member list).
+    { initialValue: null },
   );
 
   // The current UTC hour must stay reactive so the "now" marker advances across
@@ -36,7 +40,7 @@ export function PresenceHeatline(props: PresenceHeatlineProps): JSX.Element {
   }, REFRESH_MS);
   onCleanup(() => clearInterval(timer));
 
-  const hours = createMemo(() => pulse()?.hours ?? null);
+  const hours = createMemo(() => pulse.latest?.hours ?? null);
   const peak = createMemo(() => {
     const h = hours();
     return h ? Math.max(1, ...h) : 1;
@@ -52,7 +56,7 @@ export function PresenceHeatline(props: PresenceHeatlineProps): JSX.Element {
       <div
         class="shell-ribbon-heatline"
         role="img"
-        aria-label={`24-hour activity: ${pulse()?.total ?? 0} messages, busiest around ${busiestHour(hours())}:00 UTC`}
+        aria-label={`24-hour activity: ${pulse.latest?.total ?? 0} messages, busiest around ${busiestHour(hours())}:00 UTC`}
         title="Activity by hour (UTC) — the current hour is marked"
       >
         <Index each={hours()!}>

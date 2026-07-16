@@ -16,6 +16,7 @@
 import 'fake-indexeddb/auto';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { IDBFactory } from 'fake-indexeddb';
+import { Suspense } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { _resetNamesBurstsForTests, store } from '@/lib/store/store';
 import { parseIRCMessage } from '@/lib/irc/parser';
@@ -1160,6 +1161,37 @@ describe('AppShell', () => {
         expect(within(memberList!).getByText('Guest42', { exact: true })).toBeInTheDocument();
         expect(within(memberList!).getByText('Alice', { exact: true })).toBeInTheDocument();
         expect(within(memberList!).getByText('Bob', { exact: true })).toBeInTheDocument();
+      });
+    });
+
+    it('keeps the populated member list mounted while optional timeline data is pending', async () => {
+      // Arrange — a slow or unavailable stats endpoint must never suspend the
+      // connected AppShell. In particular, the authoritative NAMES roster is
+      // unrelated to the optional timeline request and must remain usable.
+      stubMobileViewport(false);
+      seedStore('#general');
+      setPreference('timeScrubber', true);
+      vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+
+      // Act
+      const { container } = render(() => (
+        <Suspense fallback={<p data-testid="shell-suspended">Loading shell</p>}>
+          <AppShell />
+        </Suspense>
+      ));
+
+      // Assert
+      // MessageView has its own short IndexedDB hydration resource, so wait for
+      // that required data to settle. The deliberately unresolved network
+      // request must not keep or return the shell to the fallback afterward.
+      await waitFor(() => {
+        expect(screen.queryByTestId('shell-suspended')).not.toBeInTheDocument();
+        expect(container.querySelector('[data-testid="app-shell"]')).toBeInTheDocument();
+        const roster = screen.getByRole('region', { name: 'Channel members in #general' });
+        expect(roster).toBeInTheDocument();
+        expect(within(roster).getByText('alice', { exact: true })).toBeInTheDocument();
+        expect(within(roster).getByText('bob', { exact: true })).toBeInTheDocument();
+        expect(within(roster).getByText('carol', { exact: true })).toBeInTheDocument();
       });
     });
 
