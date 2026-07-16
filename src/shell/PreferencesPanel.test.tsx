@@ -171,10 +171,24 @@ type PreferenceCategoryLabel =
   | 'App & tools'
   | 'Accessibility';
 
+type TransferToolLabel =
+  | 'Portable vault'
+  | 'Discord JSON'
+  | 'Discord package'
+  | 'Discord bot'
+  | 'Slack JSON'
+  | 'IRC log';
+
 function selectPreferenceCategory(category: PreferenceCategoryLabel): HTMLElement {
   const tab = screen.getByRole('tab', { name: new RegExp(`^${category}`) });
   fireEvent.click(tab);
   return tab;
+}
+
+function selectTransferTool(tool: TransferToolLabel): HTMLElement {
+  const button = screen.getByRole('button', { name: tool });
+  fireEvent.click(button);
+  return button;
 }
 
 function renderPreferences(category: PreferenceCategoryLabel = 'Display') {
@@ -258,6 +272,84 @@ describe('PreferencesPanel', () => {
     expect(screen.queryByRole('button', { name: 'Clear local history' })).not.toBeInTheDocument();
   });
 
+  it('shows one bounded transfer workflow while keeping every route mounted', () => {
+    renderPreferences('Import & export');
+
+    const routeNav = screen.getByRole('navigation', { name: 'Import and export tools' });
+    const routeButtons = within(routeNav).getAllByRole('button');
+    expect(routeButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Portable vault',
+      'Discord JSON',
+      'Discord package',
+      'Discord bot',
+      'Slack JSON',
+      'IRC log',
+    ]);
+    expect(screen.getByRole('button', { name: 'Portable vault' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Portable vault' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('region', { name: 'Portable vault' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Discord JSON' })).not.toBeInTheDocument();
+
+    expect(document.getElementById('pref-transfer-panel-discord-json')).toHaveAttribute('hidden');
+    selectTransferTool('Discord JSON');
+
+    expect(screen.getByRole('button', { name: 'Discord JSON' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('region', { name: 'Import from Discord' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Import from Discord' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Portable vault' })).not.toBeInTheDocument();
+    expect(document.getElementById('pref-transfer-panel-portable')).toHaveAttribute('hidden');
+  });
+
+  it('preserves staged transfer state and roves focus between desktop routes', async () => {
+    renderPreferences('Import & export');
+    await stageEmptyPortableImport();
+    const stagedReview = screen.getByRole('group', { name: 'Review import' });
+    const portable = screen.getByRole('button', { name: 'Portable vault' });
+    portable.focus();
+
+    fireEvent.keyDown(portable, { key: 'ArrowDown' });
+
+    const discord = screen.getByRole('button', { name: 'Discord JSON' });
+    expect(discord).toHaveFocus();
+    expect(discord).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByRole('group', { name: 'Review import' })).not.toBeInTheDocument();
+    expect(within(document.getElementById('pref-transfer-panel-portable')!).getByRole('group', {
+      name: 'Review import',
+      hidden: true,
+    })).toBe(stagedReview);
+
+    fireEvent.keyDown(discord, { key: 'ArrowUp' });
+
+    expect(portable).toHaveFocus();
+    expect(portable).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('group', { name: 'Review import' })).toBe(stagedReview);
+  });
+
+  it('uses horizontal transfer-route keys on mobile', () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(max-width: 42rem)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }) as MediaQueryList));
+    renderPreferences('Import & export');
+    const portable = screen.getByRole('button', { name: 'Portable vault' });
+    portable.focus();
+
+    fireEvent.keyDown(portable, { key: 'ArrowDown' });
+    expect(portable).toHaveFocus();
+    expect(portable).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.keyDown(portable, { key: 'ArrowRight' });
+    const discord = screen.getByRole('button', { name: 'Discord JSON' });
+    expect(discord).toHaveFocus();
+    expect(discord).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('preserves a staged portable import while navigating through mounted categories', async () => {
     renderPreferences('Import & export');
     await stageEmptyPortableImport();
@@ -323,14 +415,14 @@ describe('PreferencesPanel', () => {
   });
 
   it('uses horizontal arrow keys on mobile and disposes its responsive listener', () => {
-    let categoryTabsListener: ((event: MediaQueryListEvent) => void) | undefined;
+    const responsiveListeners: Array<(event: MediaQueryListEvent) => void> = [];
     const removeEventListener = vi.fn();
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
       matches: query === '(max-width: 42rem)',
       media: query,
       onchange: null,
       addEventListener: (type: string, listener: (event: MediaQueryListEvent) => void) => {
-        if (query === '(max-width: 42rem)' && type === 'change') categoryTabsListener = listener;
+        if (query === '(max-width: 42rem)' && type === 'change') responsiveListeners.push(listener);
       },
       removeEventListener,
       addListener: () => undefined,
@@ -352,11 +444,15 @@ describe('PreferencesPanel', () => {
     expect(conversation).toHaveFocus();
     expect(conversation).toHaveAttribute('aria-selected', 'true');
 
-    categoryTabsListener?.({ matches: false } as MediaQueryListEvent);
+    for (const listener of responsiveListeners) {
+      listener({ matches: false } as MediaQueryListEvent);
+    }
     expect(tablist).toHaveAttribute('aria-orientation', 'vertical');
 
     view.unmount();
-    expect(removeEventListener).toHaveBeenCalledWith('change', categoryTabsListener);
+    for (const listener of responsiveListeners) {
+      expect(removeEventListener).toHaveBeenCalledWith('change', listener);
+    }
   });
 
   it('fully reveals a category selected with mobile arrow navigation', async () => {

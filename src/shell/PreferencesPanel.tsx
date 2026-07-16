@@ -208,6 +208,17 @@ const PREFERENCE_CATEGORIES = [
 ] as const;
 const MOBILE_CATEGORY_TABS_QUERY = '(max-width: 42rem)';
 
+type TransferTool = 'portable' | 'discord-json' | 'discord-package' | 'discord-bot' | 'slack' | 'irc-log';
+
+const TRANSFER_TOOLS = [
+  { id: 'portable', label: 'Portable vault', summary: 'Move Onyx device data' },
+  { id: 'discord-json', label: 'Discord JSON', summary: 'DiscordChatExporter files' },
+  { id: 'discord-package', label: 'Discord package', summary: 'Official data request' },
+  { id: 'discord-bot', label: 'Discord bot', summary: 'Import through this deployment' },
+  { id: 'slack', label: 'Slack JSON', summary: 'Workspace export files' },
+  { id: 'irc-log', label: 'IRC log', summary: 'Plain-text client logs' },
+] as const satisfies ReadonlyArray<{ id: TransferTool; label: string; summary: string }>;
+
 function resetAllPreferences(): void {
   resetPreferences();
   resetSceneMotion();
@@ -2959,6 +2970,167 @@ function PreferenceCategoryNavigation(props: {
   );
 }
 
+/**
+ * The transfer category contains six independent, stateful workflows. Keep all
+ * six mounted so staged files, reviews, and async status survive navigation,
+ * while exposing only one bounded workspace at a time.
+ */
+function TransferToolWorkspace(): JSX.Element {
+  const [activeTool, setActiveTool] = createSignal<TransferTool>('portable');
+  const [horizontalTools, setHorizontalTools] = createSignal(false);
+  const buttons: (HTMLButtonElement | undefined)[] = [];
+  let toolsQuery: MediaQueryList | undefined;
+
+  const handleToolsQueryChange = (event: MediaQueryListEvent): void => {
+    setHorizontalTools(event.matches);
+  };
+
+  function revealActiveTool(tool: TransferTool): void {
+    if (!horizontalTools()) return;
+    queueMicrotask(() => {
+      const index = TRANSFER_TOOLS.findIndex((candidate) => candidate.id === tool);
+      buttons[index]?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+    });
+  }
+
+  function selectTool(tool: TransferTool): void {
+    setActiveTool(tool);
+    revealActiveTool(tool);
+  }
+
+  function selectToolAt(index: number): void {
+    const tool = TRANSFER_TOOLS[index];
+    if (!tool) return;
+    selectTool(tool.id);
+    buttons[index]?.focus({ preventScroll: true });
+  }
+
+  function onToolKeyDown(event: KeyboardEvent, index: number): void {
+    const last = TRANSFER_TOOLS.length - 1;
+    switch (event.key) {
+      case 'ArrowRight':
+        if (!horizontalTools()) return;
+        event.preventDefault();
+        selectToolAt(index === last ? 0 : index + 1);
+        break;
+      case 'ArrowLeft':
+        if (!horizontalTools()) return;
+        event.preventDefault();
+        selectToolAt(index === 0 ? last : index - 1);
+        break;
+      case 'ArrowDown':
+        if (horizontalTools()) return;
+        event.preventDefault();
+        selectToolAt(index === last ? 0 : index + 1);
+        break;
+      case 'ArrowUp':
+        if (horizontalTools()) return;
+        event.preventDefault();
+        selectToolAt(index === 0 ? last : index - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        selectToolAt(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        selectToolAt(last);
+        break;
+    }
+  }
+
+  onMount(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    toolsQuery = window.matchMedia(MOBILE_CATEGORY_TABS_QUERY);
+    setHorizontalTools(toolsQuery.matches);
+    toolsQuery.addEventListener('change', handleToolsQueryChange);
+  });
+
+  onCleanup(() => {
+    toolsQuery?.removeEventListener('change', handleToolsQueryChange);
+  });
+
+  return (
+    <div class="pref-transfer-workspace">
+      <nav class="pref-transfer-tools" aria-label="Import and export tools">
+        <p class="pref-transfer-tools__eyebrow">Choose a route</p>
+        <div class="pref-transfer-tools__list">
+          <For each={TRANSFER_TOOLS}>
+            {(tool, index) => {
+              const selected = () => activeTool() === tool.id;
+              return (
+                <button
+                  ref={(element) => (buttons[index()] = element)}
+                  type="button"
+                  class="pref-transfer-tool"
+                  id={`pref-transfer-tool-${tool.id}`}
+                  aria-controls={`pref-transfer-panel-${tool.id}`}
+                  aria-label={tool.label}
+                  aria-describedby={`pref-transfer-tool-summary-${tool.id}`}
+                  aria-expanded={selected()}
+                  tabindex={selected() ? 0 : -1}
+                  onClick={() => selectTool(tool.id)}
+                  onKeyDown={(event) => onToolKeyDown(event, index())}
+                >
+                  <span class="pref-transfer-tool__label">{tool.label}</span>
+                  <span class="pref-transfer-tool__summary" id={`pref-transfer-tool-summary-${tool.id}`}>
+                    {tool.summary}
+                  </span>
+                </button>
+              );
+            }}
+          </For>
+        </div>
+      </nav>
+
+      <div class="pref-transfer-tool-content" data-testid="transfer-tool-content">
+        <section
+          class="pref-transfer-tool-panel"
+          id="pref-transfer-panel-portable"
+          hidden={activeTool() !== 'portable'}
+        >
+          <PortableVaultControls />
+        </section>
+        <section
+          class="pref-transfer-tool-panel"
+          id="pref-transfer-panel-discord-json"
+          hidden={activeTool() !== 'discord-json'}
+        >
+          <DiscordImportControls />
+        </section>
+        <section
+          class="pref-transfer-tool-panel"
+          id="pref-transfer-panel-discord-package"
+          hidden={activeTool() !== 'discord-package'}
+        >
+          <DiscordPackageImportControls />
+        </section>
+        <section
+          class="pref-transfer-tool-panel"
+          id="pref-transfer-panel-discord-bot"
+          hidden={activeTool() !== 'discord-bot'}
+        >
+          <DiscordBotImportControls />
+        </section>
+        <section
+          class="pref-transfer-tool-panel"
+          id="pref-transfer-panel-slack"
+          hidden={activeTool() !== 'slack'}
+        >
+          <SlackImportControls />
+        </section>
+        <section
+          class="pref-transfer-tool-panel"
+          id="pref-transfer-panel-irc-log"
+          hidden={activeTool() !== 'irc-log'}
+        >
+          <IrcLogImportControls />
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function AppearanceLauncher(): JSX.Element {
   function openAppearanceFromPreferences(): void {
     // Keep Preferences mounted beneath the nested Appearance Sheet. The shared
@@ -3222,12 +3394,7 @@ export function PreferencesPanel(): JSX.Element {
               title="Import & export"
               description="Move portable conversation data into or out of this browser."
             />
-            <PortableVaultControls />
-            <DiscordImportControls />
-            <DiscordPackageImportControls />
-            <DiscordBotImportControls />
-            <SlackImportControls />
-            <IrcLogImportControls />
+            <TransferToolWorkspace />
           </section>
 
           <section

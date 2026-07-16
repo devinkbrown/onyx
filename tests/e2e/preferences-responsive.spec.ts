@@ -24,6 +24,10 @@ async function renderNarrowPreferences(
       </p>
     `
     : '';
+  const transferRows = Array.from(
+    { length: 40 },
+    (_, index) => `<p class="pref-desc">Portable transfer detail ${index + 1}: device-local data remains bounded and reviewable.</p>`,
+  ).join('');
   await page.setViewportSize({ width, height });
   await page.setContent(`
     <!doctype html>
@@ -72,6 +76,29 @@ async function renderNarrowPreferences(
                 <li>Create an application at <a href="https://discord.com/developers/applications">discord.com/developers</a>, then add a Bot to it.</li>
               </ol>
             </section>
+            <div class="pref-transfer-workspace">
+              <nav class="pref-transfer-tools" aria-label="Import and export tools">
+                <p class="pref-transfer-tools__eyebrow">Choose a route</p>
+                <div class="pref-transfer-tools__list">
+                  <button class="pref-transfer-tool" aria-expanded="true">
+                    <span class="pref-transfer-tool__label">Portable vault</span>
+                    <span class="pref-transfer-tool__summary">Move Onyx device data</span>
+                  </button>
+                  <button class="pref-transfer-tool" aria-expanded="false">Discord JSON</button>
+                  <button class="pref-transfer-tool" aria-expanded="false">Discord package</button>
+                  <button class="pref-transfer-tool" aria-expanded="false">Discord bot</button>
+                  <button class="pref-transfer-tool" aria-expanded="false">Slack JSON</button>
+                  <button class="pref-transfer-tool" aria-expanded="false">IRC log</button>
+                </div>
+              </nav>
+              <div class="pref-transfer-tool-content">
+                <section class="pref-transfer-tool-panel" role="region" aria-label="Portable vault">
+                  <h3 class="pref-label">Portable vault</h3>
+                  ${transferRows}
+                  <button type="button">Export vault</button>
+                </section>
+              </div>
+            </div>
             ${longImportFeedback}
             <button type="button" data-last-preference>Final preference action</button>
           </section>
@@ -240,3 +267,69 @@ test('keeps categories and final controls reachable in a short 200% text split',
   expect(bodyBox).not.toBeNull();
   expect(finalBox!.y + finalBox!.height).toBeLessThanOrEqual(bodyBox!.y + bodyBox!.height);
 });
+
+for (const viewport of [
+  { label: 'desktop', width: 1440, height: 900 },
+  { label: 'mobile', width: 390, height: 844 },
+] as const) {
+  test(`${viewport.label}: bounds the active transfer workflow without page overflow`, async ({ page }) => {
+    await renderNarrowPreferences(page, {
+      width: viewport.width,
+      height: viewport.height,
+      rootFontSize: 16,
+    });
+
+    const geometry = await page.evaluate(() => {
+      const sheetBody = document.querySelector<HTMLElement>('.onyx-sheet__body')!;
+      const workspace = document.querySelector<HTMLElement>('.pref-transfer-workspace')!;
+      const routeList = document.querySelector<HTMLElement>('.pref-transfer-tools__list')!;
+      const content = document.querySelector<HTMLElement>('.pref-transfer-tool-content')!;
+      const bodyRect = sheetBody.getBoundingClientRect();
+      const workspaceRect = workspace.getBoundingClientRect();
+      return {
+        viewportHeight: window.innerHeight,
+        documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        bodyOverflow: sheetBody.scrollWidth - sheetBody.clientWidth,
+        workspaceLeft: workspaceRect.left,
+        workspaceRight: workspaceRect.right,
+        bodyLeft: bodyRect.left,
+        bodyRight: bodyRect.right,
+        routeListClientWidth: routeList.clientWidth,
+        routeListScrollWidth: routeList.scrollWidth,
+        contentClientHeight: content.clientHeight,
+        contentScrollHeight: content.scrollHeight,
+        contentOverflowY: getComputedStyle(content).overflowY,
+      };
+    });
+
+    expect(geometry.documentOverflow).toBeLessThanOrEqual(1);
+    expect(geometry.bodyOverflow).toBeLessThanOrEqual(1);
+    expect(geometry.workspaceLeft).toBeGreaterThanOrEqual(geometry.bodyLeft);
+    expect(geometry.workspaceRight).toBeLessThanOrEqual(geometry.bodyRight);
+    expect(geometry.contentClientHeight).toBeLessThanOrEqual(geometry.viewportHeight * 0.59);
+    expect(geometry.contentScrollHeight).toBeGreaterThan(geometry.contentClientHeight);
+    expect(geometry.contentOverflowY).toBe('auto');
+
+    const lastRoute = page.getByRole('button', { name: 'IRC log', exact: true });
+    await lastRoute.evaluate((element) => {
+      element.scrollIntoView({ block: 'nearest', inline: 'end' });
+      (element as HTMLElement).focus();
+    });
+    await expect(lastRoute).toBeFocused();
+
+    const routeGeometry = await page.locator('.pref-transfer-tools__list').evaluate((element) => {
+      const last = element.lastElementChild as HTMLElement;
+      const listRect = element.getBoundingClientRect();
+      const routeRect = last.getBoundingClientRect();
+      return {
+        listLeft: listRect.left,
+        listRight: listRect.right,
+        routeLeft: routeRect.left,
+        routeRight: routeRect.right,
+      };
+    });
+    expect(routeGeometry.routeLeft).toBeGreaterThanOrEqual(routeGeometry.listLeft);
+    expect(routeGeometry.routeRight).toBeLessThanOrEqual(routeGeometry.listRight);
+    expect(geometry.routeListScrollWidth).toBeGreaterThanOrEqual(geometry.routeListClientWidth);
+  });
+}

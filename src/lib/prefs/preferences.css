@@ -321,6 +321,194 @@
   display: none;
 }
 
+/* ── Import/export route workspace ────────────────────────────────────────
+   Six stateful transfer paths share one compact bay. The rail carries route
+   identity; only the selected workflow occupies the bounded scroll viewport. */
+
+.pref-transfer-workspace {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 10.5rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 22%, var(--line));
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 8%, transparent), transparent 46%),
+    color-mix(in oklab, var(--ink) 36%, transparent);
+}
+
+.pref-transfer-tools {
+  min-width: 0;
+  padding: var(--space-2) 0 var(--space-2) var(--space-1);
+}
+
+.pref-transfer-tools__eyebrow {
+  margin: 0 0 var(--space-2) var(--space-2);
+  color: var(--lapis-bright);
+  font: 700 0.6rem/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pref-transfer-tools__list {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--line);
+}
+
+.pref-transfer-tool {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: transparent;
+  color: var(--washi-dim);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.pref-transfer-tool::before {
+  content: '';
+  position: absolute;
+  inset: 5px auto 5px calc(-1 * var(--space-2) - 1px);
+  width: 2px;
+  border-radius: var(--r-pill);
+  background: transparent;
+}
+
+.pref-transfer-tool:hover,
+.pref-transfer-tool:focus-visible {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
+}
+
+.pref-transfer-tool:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.pref-transfer-tool[aria-expanded='true'] {
+  color: var(--washi);
+  background: linear-gradient(90deg, color-mix(in oklab, var(--lapis) 20%, transparent), transparent);
+}
+
+.pref-transfer-tool[aria-expanded='true']::before {
+  background: var(--lapis-bright);
+  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 44%, transparent);
+}
+
+.pref-transfer-tool__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.76rem;
+  font-weight: 720;
+  line-height: 1.25;
+}
+
+.pref-transfer-tool__summary {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--washi-mute);
+  font: 0.6rem/1.35 var(--font-mono);
+}
+
+.pref-transfer-tool-content {
+  min-width: 0;
+  max-height: min(58svh, 42rem);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 46%, transparent);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.pref-transfer-tool-content:focus-within {
+  border-color: color-mix(in oklab, var(--lapis-bright) 44%, var(--line));
+}
+
+.pref-transfer-tool-panel {
+  min-width: 0;
+}
+
+.pref-transfer-tool-panel[hidden] {
+  display: none;
+}
+
+@media (max-width: 42rem) {
+  .pref-transfer-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    padding: var(--space-1);
+  }
+
+  .pref-transfer-tools {
+    padding: var(--space-1);
+  }
+
+  .pref-transfer-tools__eyebrow {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .pref-transfer-tools__list {
+    display: flex;
+    gap: var(--space-1);
+    min-width: 0;
+    overflow-x: auto;
+    padding: 0 0 var(--space-1);
+    border-left: 0;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: thin;
+  }
+
+  .pref-transfer-tool {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: min(14rem, 78vw);
+    min-height: 2.75rem;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    scroll-snap-align: center;
+  }
+
+  .pref-transfer-tool::before,
+  .pref-transfer-tool[aria-expanded='true']::before {
+    display: none;
+  }
+
+  .pref-transfer-tool[aria-expanded='true'] {
+    border-color: color-mix(in oklab, var(--lapis-bright) 68%, var(--line));
+    background: color-mix(in oklab, var(--lapis) 24%, var(--ink));
+  }
+
+  .pref-transfer-tool__summary {
+    display: none;
+  }
+
+  .pref-transfer-tool-content {
+    max-height: min(56svh, 34rem);
+    padding: var(--space-3);
+    scrollbar-gutter: auto;
+  }
+}
+
 .pref-group {
   display: flex;
   flex-direction: column;
