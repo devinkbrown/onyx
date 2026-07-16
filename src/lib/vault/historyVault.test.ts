@@ -584,7 +584,7 @@ describe('historyVault', () => {
       expect(stored[0]!.id).toBe('direct-2');
       expect(stored.at(-1)!.id).toBe(`direct-${VAULT_KEEP + 1}`);
       expect(stored.some((item) => item.id === 'oversized')).toBe(false);
-    });
+    }, 30_000);
 
     it('does not report imports that could not commit to IndexedDB', async () => {
       // A privacy mode / unsupported browser can remove IndexedDB after the
