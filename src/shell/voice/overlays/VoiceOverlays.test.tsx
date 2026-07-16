@@ -8,6 +8,7 @@ import { CaptionsOverlay } from './CaptionsOverlay';
 import { IncomingCallOverlay } from './IncomingCallOverlay';
 import { OutgoingCallOverlay } from './OutgoingCallOverlay';
 import { VoicePip } from '../VoicePip';
+import * as clipboard from '@/lib/clipboard/writeClipboardText';
 
 const initialState = store.getInitialState();
 
@@ -221,7 +222,51 @@ describe('voice overlays', () => {
     const copied = writeText.mock.calls[0]?.[0] as string;
     expect(copied).toContain('Aki: Signal is clean.');
     expect(copied).toContain('Ren: Copy the whole transcript.');
-    expect(screen.getByText('Copied')).toBeTruthy();
+    expect(await screen.findByText('Copied')).toBeTruthy();
+  });
+
+  it('reports caption copy failure without claiming success', async () => {
+    vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(false);
+    store.setState({
+      mediaTranscripts: new Map([
+        ['#voice', [{ nick: 'Aki', text: 'Signal is clean.', time: new Date('2026-06-19T12:00:00Z') }]],
+      ]),
+    });
+    store.getState().setVoiceCallState({ callState: 'in_call', callChannel: '#voice', captionsEnabled: true });
+    render(() => <CaptionsOverlay />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy live caption transcript' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Clipboard unavailable');
+    expect(screen.queryByText('Copied')).toBeNull();
+  });
+
+  it('guards rapid caption copies and ignores completion after unmount', async () => {
+    let resolveCopy: (copied: boolean) => void = () => {};
+    const pending = new Promise<boolean>((resolve) => {
+      resolveCopy = resolve;
+    });
+    const writeClipboardText = vi.spyOn(clipboard, 'writeClipboardText').mockReturnValue(pending);
+    store.setState({
+      mediaTranscripts: new Map([
+        ['#voice', [{ nick: 'Aki', text: 'Signal is clean.', time: new Date('2026-06-19T12:00:00Z') }]],
+      ]),
+    });
+    store.getState().setVoiceCallState({ callState: 'in_call', callChannel: '#voice', captionsEnabled: true });
+    const view = render(() => <CaptionsOverlay />);
+
+    const copy = screen.getByRole('button', { name: 'Copy live caption transcript' });
+    fireEvent.click(copy);
+    fireEvent.click(copy);
+    expect(writeClipboardText).toHaveBeenCalledOnce();
+    expect(copy).toBeDisabled();
+    expect(copy).toHaveAttribute('aria-busy', 'true');
+    view.unmount();
+
+    resolveCopy(true);
+    await pending;
+    await Promise.resolve();
+    expect(screen.queryByText('Copied')).toBeNull();
   });
 
   it('exposes an accessible unavailable state without offering an external fallback', () => {

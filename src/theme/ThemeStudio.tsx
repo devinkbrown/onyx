@@ -64,6 +64,7 @@ import { exportThemeSeed, parseThemeSeed } from './seedTransfer';
 import { pickScreenColor, supportsEyeDropper } from './eyeDropper';
 import { useStore, getState } from '@/lib/store';
 import { backgroundOptions } from '@/backgrounds';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -618,6 +619,11 @@ export function ThemeStudio(props: ThemeStudioProps) {
   const [exportCopied, setExportCopied] = createSignal(false);
   const [seedCopied, setSeedCopied] = createSignal(false);
   const [shareCopied, setShareCopied] = createSignal(false);
+  const [exportCopyBusy, setExportCopyBusy] = createSignal(false);
+  const [seedCopyBusy, setSeedCopyBusy] = createSignal(false);
+  const [shareCopyBusy, setShareCopyBusy] = createSignal(false);
+  const [seedCopyFailure, setSeedCopyFailure] = createSignal<string | null>(null);
+  const [footerCopyFailure, setFooterCopyFailure] = createSignal<string | null>(null);
   const [eyeDropperBusy, setEyeDropperBusy] = createSignal(false);
   const [eyeDropperStatus, setEyeDropperStatus] = createSignal<{
     message: string;
@@ -632,6 +638,9 @@ export function ThemeStudio(props: ThemeStudioProps) {
   let shareTimer: ReturnType<typeof setTimeout> | undefined;
   let saveInputRef: HTMLInputElement | undefined;
   let eyeDropperEpoch = 0;
+  let exportCopyEpoch = 0;
+  let seedCopyEpoch = 0;
+  let shareCopyEpoch = 0;
   let disposed = false;
 
   // ── Factory state ──
@@ -655,6 +664,23 @@ export function ThemeStudio(props: ThemeStudioProps) {
   createEffect(() => {
     themeId(); // track
     eyeDropperEpoch += 1;
+    exportCopyEpoch += 1;
+    seedCopyEpoch += 1;
+    shareCopyEpoch += 1;
+    if (copyTimer !== undefined) clearTimeout(copyTimer);
+    if (seedTimer !== undefined) clearTimeout(seedTimer);
+    if (shareTimer !== undefined) clearTimeout(shareTimer);
+    copyTimer = undefined;
+    seedTimer = undefined;
+    shareTimer = undefined;
+    setExportCopied(false);
+    setSeedCopied(false);
+    setShareCopied(false);
+    setExportCopyBusy(false);
+    setSeedCopyBusy(false);
+    setShareCopyBusy(false);
+    setSeedCopyFailure(null);
+    setFooterCopyFailure(null);
     setEyeDropperBusy(false);
     setEyeDropperStatus(null);
     setOverrides({});
@@ -674,6 +700,9 @@ export function ThemeStudio(props: ThemeStudioProps) {
   onCleanup(() => {
     disposed = true;
     eyeDropperEpoch += 1;
+    exportCopyEpoch += 1;
+    seedCopyEpoch += 1;
+    shareCopyEpoch += 1;
     const map = overrides();
     for (const prop of Object.keys(map)) {
       removeVar(prop);
@@ -780,14 +809,33 @@ export function ThemeStudio(props: ThemeStudioProps) {
    * locally through the factory, so it re-passes AA on their machine by
    * construction rather than trusting baked-in hex off the wire.
    */
-  const handleExportSeed = (): void => {
+  const handleExportSeed = async (): Promise<void> => {
+    if (seedCopyBusy()) return;
+    const epoch = ++seedCopyEpoch;
     const json = exportThemeSeed(activeThemeMeta()?.label ?? 'Custom', seed());
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(json).catch(() => undefined);
-    }
-    setSeedCopied(true);
     if (seedTimer !== undefined) clearTimeout(seedTimer);
-    seedTimer = setTimeout(() => setSeedCopied(false), 2200);
+    setSeedCopied(false);
+    setSeedCopyFailure(null);
+    setSeedCopyBusy(true);
+    let copied: boolean;
+    try {
+      copied = await writeClipboardText(json);
+    } catch {
+      copied = false;
+    }
+    if (disposed || epoch !== seedCopyEpoch) return;
+    setSeedCopyBusy(false);
+    if (!copied) {
+      setSeedCopyFailure('Theme seed copy failed. Clipboard access may be blocked in this browser.');
+      return;
+    }
+
+    setSeedCopied(true);
+    seedTimer = setTimeout(() => {
+      if (disposed || epoch !== seedCopyEpoch) return;
+      setSeedCopied(false);
+      seedTimer = undefined;
+    }, 2200);
   };
 
   /**
@@ -960,7 +1008,9 @@ export function ThemeStudio(props: ThemeStudioProps) {
     applyVar('color-scheme', baseScheme());
   };
 
-  const handleExport = (): void => {
+  const handleExport = async (): Promise<void> => {
+    if (exportCopyBusy()) return;
+    const epoch = ++exportCopyEpoch;
     const id = themeId();
     const base: ThemeId = schemeCorrectedBase(
       isCustomThemeId(id) ? (getCustomTheme(id)?.base ?? THEME_IDS[0]!) : (id as ThemeId),
@@ -974,13 +1024,29 @@ export function ThemeStudio(props: ThemeStudioProps) {
     };
     const json = JSON.stringify(blob, null, 2);
 
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(json).catch(() => undefined);
+    if (copyTimer !== undefined) clearTimeout(copyTimer);
+    setExportCopied(false);
+    setFooterCopyFailure(null);
+    setExportCopyBusy(true);
+    let copied: boolean;
+    try {
+      copied = await writeClipboardText(json);
+    } catch {
+      copied = false;
+    }
+    if (disposed || epoch !== exportCopyEpoch) return;
+    setExportCopyBusy(false);
+    if (!copied) {
+      setFooterCopyFailure('Theme export copy failed. Clipboard access may be blocked in this browser.');
+      return;
     }
 
     setExportCopied(true);
-    if (copyTimer !== undefined) clearTimeout(copyTimer);
-    copyTimer = setTimeout(() => setExportCopied(false), 2200);
+    copyTimer = setTimeout(() => {
+      if (disposed || epoch !== exportCopyEpoch) return;
+      setExportCopied(false);
+      copyTimer = undefined;
+    }, 2200);
   };
 
   // The active theme, when it is a saved custom theme — the only thing that can
@@ -994,16 +1060,34 @@ export function ThemeStudio(props: ThemeStudioProps) {
 
   // Copy a share link for the current custom theme to the clipboard. Guards a
   // missing Clipboard API and shows brief "copied" feedback on success.
-  const handleShare = (): void => {
+  const handleShare = async (): Promise<void> => {
+    if (shareCopyBusy()) return;
     const theme = shareableTheme();
     if (!theme) return;
-    if (typeof navigator === 'undefined' || !navigator.clipboard) return;
-
-    navigator.clipboard.writeText(themeShareUrl(theme, location.origin)).catch(() => undefined);
+    const epoch = ++shareCopyEpoch;
+    if (shareTimer !== undefined) clearTimeout(shareTimer);
+    setShareCopied(false);
+    setFooterCopyFailure(null);
+    setShareCopyBusy(true);
+    let copied: boolean;
+    try {
+      copied = await writeClipboardText(themeShareUrl(theme, location.origin));
+    } catch {
+      copied = false;
+    }
+    if (disposed || epoch !== shareCopyEpoch) return;
+    setShareCopyBusy(false);
+    if (!copied) {
+      setFooterCopyFailure('Theme share-link copy failed. Clipboard access may be blocked in this browser.');
+      return;
+    }
 
     setShareCopied(true);
-    if (shareTimer !== undefined) clearTimeout(shareTimer);
-    shareTimer = setTimeout(() => setShareCopied(false), 2200);
+    shareTimer = setTimeout(() => {
+      if (disposed || epoch !== shareCopyEpoch) return;
+      setShareCopied(false);
+      shareTimer = undefined;
+    }, 2200);
   };
 
   const handleImport = (): void => {
@@ -1257,10 +1341,16 @@ export function ThemeStudio(props: ThemeStudioProps) {
                     size="sm"
                     class="ts-seed-btn"
                     data-copied={seedCopied() ? 'true' : undefined}
-                    onClick={handleExportSeed}
+                    disabled={seedCopyBusy()}
+                    aria-busy={seedCopyBusy()}
+                    onClick={() => void handleExportSeed()}
                     data-testid="ts-export-seed"
                   >
-                    {seedCopied() ? '[✓ seed copied]' : '[export seed]'}
+                    {seedCopyBusy()
+                      ? '[copying seed…]'
+                      : seedCopied()
+                        ? '[✓ seed copied]'
+                        : '[export seed]'}
                   </Button>
                 </Tooltip>
                 <Tooltip content="Paste a portable seed JSON — validated fail-closed, then generated." placement="top">
@@ -1270,6 +1360,13 @@ export function ThemeStudio(props: ThemeStudioProps) {
                 </Tooltip>
               </div>
             </div>
+            <Show when={seedCopyFailure()}>
+              {(failure) => (
+                <p class="ts-error" role="alert" data-testid="ts-seed-copy-error">
+                  {failure()}
+                </p>
+              )}
+            </Show>
             <p class="ts-factory__hint">
               One seed → a whole coherent palette, AA-clean by construction.
               After the first generate, the knobs re-generate live.
@@ -1534,6 +1631,14 @@ export function ThemeStudio(props: ThemeStudioProps) {
             )}
           </Show>
 
+          <Show when={footerCopyFailure()}>
+            {(failure) => (
+              <span class="ts-error" role="alert" data-testid="ts-copy-error">
+                {failure()}
+              </span>
+            )}
+          </Show>
+
           <Show when={shareableTheme()}>
             <Tooltip
               content={shareCopied() ? 'Link copied to clipboard!' : 'Copy a shareable link to this custom theme.'}
@@ -1542,12 +1647,12 @@ export function ThemeStudio(props: ThemeStudioProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleShare}
+                disabled={shareCopyBusy()}
+                aria-busy={shareCopyBusy()}
+                onClick={() => void handleShare()}
                 data-testid="ts-share-btn"
               >
-                <Show when={shareCopied()} fallback="[share link]">
-                  [copied!]
-                </Show>
+                {shareCopyBusy() ? '[copying link…]' : shareCopied() ? '[copied!]' : '[share link]'}
               </Button>
             </Tooltip>
           </Show>
@@ -1570,12 +1675,12 @@ export function ThemeStudio(props: ThemeStudioProps) {
             <Button
               variant="primary"
               size="sm"
-              onClick={handleExport}
+              disabled={exportCopyBusy()}
+              aria-busy={exportCopyBusy()}
+              onClick={() => void handleExport()}
               data-testid="ts-export-btn"
             >
-              <Show when={exportCopied()} fallback="[export]">
-                [copied!]
-              </Show>
+              {exportCopyBusy() ? '[copying…]' : exportCopied() ? '[copied!]' : '[export]'}
             </Button>
           </Tooltip>
         </div>

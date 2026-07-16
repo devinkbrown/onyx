@@ -11,6 +11,7 @@ import {
 } from '@/lib/intelligence/translateMessage';
 import { useStore } from '@/lib/store';
 import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 
 import './voice-overlays.css';
 
@@ -54,6 +55,9 @@ function transcriptLine(line: CaptionLine): string {
 
 export function CaptionsOverlay() {
   const [copyState, setCopyState] = createSignal<'idle' | 'copied' | 'blocked'>('idle');
+  const [copying, setCopying] = createSignal(false);
+  let copyEpoch = 0;
+  let disposed = false;
   const lines = useStore((state) => {
     // Captions are opt-in: the VoiceBar toggle drives state.voice.captionsEnabled
     // (default off). Honour it so toggling actually shows/hides the overlay.
@@ -67,15 +71,22 @@ export function CaptionsOverlay() {
 
   const visibleLines = createMemo(() => lines().slice(-3));
   const transcriptText = createMemo(() => lines().map(transcriptLine).join('\n'));
-  const copyTranscript = async () => {
+  const copyTranscript = async (): Promise<void> => {
+    if (copying()) return;
     const text = transcriptText();
     if (!text) return;
+    const epoch = ++copyEpoch;
+    setCopying(true);
+    setCopyState('idle');
+    let copied: boolean;
     try {
-      await navigator.clipboard.writeText(text);
-      setCopyState('copied');
+      copied = await writeClipboardText(text);
     } catch {
-      setCopyState('blocked');
+      copied = false;
     }
+    if (disposed || epoch !== copyEpoch) return;
+    setCopyState(copied ? 'copied' : 'blocked');
+    setCopying(false);
   };
 
   // On-device translation: gated on the browser Translator probe, target from the stored
@@ -89,11 +100,15 @@ export function CaptionsOverlay() {
   // Component runs once; invalidate async completions when their caption leaves the
   // live window, the target changes, or the overlay unmounts. The map is deliberately
   // transient and bounded to the three visible captions.
-  let disposed = false;
   let observedTarget: string | undefined;
   createEffect(() => {
     const currentTarget = target();
     const currentKeys = new Set(visibleLines().map(captionKey));
+    if (currentKeys.size === 0) {
+      copyEpoch += 1;
+      setCopying(false);
+      setCopyState('idle');
+    }
     if (observedTarget === undefined) {
       observedTarget = currentTarget;
     } else if (currentTarget !== observedTarget) {
@@ -113,6 +128,7 @@ export function CaptionsOverlay() {
   });
   onCleanup(() => {
     disposed = true;
+    copyEpoch += 1;
     activeTranslations.clear();
   });
 
@@ -161,12 +177,17 @@ export function CaptionsOverlay() {
               class="voice-captions__copy"
               type="button"
               aria-label="Copy live caption transcript"
+              disabled={copying()}
+              aria-busy={copying()}
               onClick={() => void copyTranscript()}
             >
-              Copy transcript
+              {copying() ? 'Copying…' : 'Copy transcript'}
             </button>
             <Show when={copyState() !== 'idle'}>
-              <span class="voice-captions__copy-state" aria-live="polite">
+              <span
+                class="voice-captions__copy-state"
+                role={copyState() === 'blocked' ? 'alert' : 'status'}
+              >
                 {copyState() === 'copied' ? 'Copied' : 'Clipboard unavailable'}
               </span>
             </Show>

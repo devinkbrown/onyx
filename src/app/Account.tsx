@@ -33,6 +33,7 @@ import {
   createMemo,
   createSignal,
   For,
+  onCleanup,
   Show,
   splitProps,
   type JSX,
@@ -44,6 +45,7 @@ import { ModalShell } from '@/primitives/index';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 
 export interface AccountPanelProps {
   open: boolean;
@@ -180,13 +182,72 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   const [totpCode, setTotpCode] = createSignal('');
   const [claimHost, setClaimHost] = createSignal('');
   const [copiedField, setCopiedField] = createSignal<string | null>(null);
+  const [copyingField, setCopyingField] = createSignal<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = createSignal<{
+    message: string;
+    failure: boolean;
+  } | null>(null);
+  let copyEpoch = 0;
+  let copyTimer: ReturnType<typeof setTimeout> | undefined;
+  let disposed = false;
 
-  const copyField = (field: string, value: string) => {
-    void navigator.clipboard?.writeText(value).then(() => {
-      setCopiedField(field);
-      setTimeout(() => setCopiedField((cur) => (cur === field ? null : cur)), 1400);
-    });
+  const clearCopyTimer = (): void => {
+    if (copyTimer !== undefined) clearTimeout(copyTimer);
+    copyTimer = undefined;
   };
+
+  const copyField = async (field: 'secret' | 'otpauth', value: string): Promise<void> => {
+    if (copyingField()) return;
+    const epoch = ++copyEpoch;
+    clearCopyTimer();
+    setCopiedField(null);
+    setCopyFeedback(null);
+    setCopyingField(field);
+    let copied: boolean;
+    try {
+      copied = await writeClipboardText(value);
+    } catch {
+      copied = false;
+    }
+    if (disposed || epoch !== copyEpoch) return;
+    setCopyingField(null);
+    if (!copied) {
+      setCopyFeedback({
+        message: 'Clipboard copy failed. Select the authenticator value manually.',
+        failure: true,
+      });
+      return;
+    }
+
+    setCopiedField(field);
+    setCopyFeedback({
+      message: field === 'secret'
+        ? 'Authenticator secret copied to clipboard.'
+        : 'Authenticator link copied to clipboard.',
+      failure: false,
+    });
+    copyTimer = setTimeout(() => {
+      if (disposed || epoch !== copyEpoch) return;
+      setCopiedField((current) => (current === field ? null : current));
+      setCopyFeedback(null);
+      copyTimer = undefined;
+    }, 1400);
+  };
+
+  createEffect(() => {
+    if (local.open) return;
+    copyEpoch += 1;
+    clearCopyTimer();
+    setCopiedField(null);
+    setCopyingField(null);
+    setCopyFeedback(null);
+  });
+
+  onCleanup(() => {
+    disposed = true;
+    copyEpoch += 1;
+    clearCopyTimer();
+  });
 
   // Danger zone — drop requires typing the account name + password.
   const [dropConfirm, setDropConfirm] = createSignal('');
@@ -629,17 +690,41 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                     </p>
                     <div class="acct-totp-row">
                       <code class="acct-totp-secret">{secret()}</code>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => copyField('secret', secret())}>
-                        {copiedField() === 'secret' ? 'Copied' : 'Copy secret'}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={copyingField() !== null}
+                        aria-busy={copyingField() === 'secret'}
+                        onClick={() => void copyField('secret', secret())}
+                      >
+                        {copyingField() === 'secret' ? 'Copying…' : copiedField() === 'secret' ? 'Copied' : 'Copy secret'}
                       </Button>
                       <Show when={totp().otpauth}>
                         {(uri) => (
-                          <Button type="button" variant="ghost" size="sm" onClick={() => copyField('otpauth', uri())}>
-                            {copiedField() === 'otpauth' ? 'Copied' : 'Copy otpauth link'}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={copyingField() !== null}
+                            aria-busy={copyingField() === 'otpauth'}
+                            onClick={() => void copyField('otpauth', uri())}
+                          >
+                            {copyingField() === 'otpauth' ? 'Copying…' : copiedField() === 'otpauth' ? 'Copied' : 'Copy otpauth link'}
                           </Button>
                         )}
                       </Show>
                     </div>
+                    <Show when={copyFeedback()}>
+                      {(feedback) => (
+                        <p
+                          class="acct-totp-note"
+                          role={feedback().failure ? 'alert' : 'status'}
+                        >
+                          {feedback().message}
+                        </p>
+                      )}
+                    </Show>
                   </div>
                 )}
               </Show>

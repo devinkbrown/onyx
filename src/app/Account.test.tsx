@@ -18,6 +18,7 @@ import { cleanup, render, screen, fireEvent, waitFor } from '@solidjs/testing-li
 import { AccountPanel } from './Account';
 import { store, getState, type Server } from '@/lib/store';
 import * as dmCipher from '@/lib/e2ee/dmCipher';
+import * as clipboard from '@/lib/clipboard/writeClipboardText';
 
 const initialState = store.getInitialState();
 
@@ -59,6 +60,7 @@ afterEach(() => {
   // Restore any spies — the store is a module singleton, so an un-restored
   // vi.spyOn on a state action would leak into the next test.
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('Account panel — guest state', () => {
@@ -101,10 +103,74 @@ describe('Account panel — guest state', () => {
 });
 
 describe('Account panel — signed in', () => {
+  function seedTotpEnrollment(): void {
+    store.setState({
+      totp: {
+        status: 'pending',
+        secret: 'JBSWY3DPEHPK3PXP',
+        otpauth: 'otpauth://totp/Onyx:alice?secret=JBSWY3DPEHPK3PXP',
+        error: null,
+        busy: false,
+      },
+    });
+  }
+
   it('shows the account name and fetches ACCOUNTINFO on open', () => {
     const { client } = renderPanel({ account: 'alice' });
     expect(screen.getAllByText('alice').length).toBeGreaterThan(0);
     expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
+  });
+
+  it('reports authenticator copy success only after the shared write resolves', async () => {
+    seedTotpEnrollment();
+    let resolveCopy: (copied: boolean) => void = () => {};
+    const pending = new Promise<boolean>((resolve) => {
+      resolveCopy = resolve;
+    });
+    const writeClipboardText = vi.spyOn(clipboard, 'writeClipboardText').mockReturnValue(pending);
+    renderPanel({ account: 'alice' });
+
+    const copy = screen.getByRole('button', { name: 'Copy secret' });
+    fireEvent.click(copy);
+    fireEvent.click(copy);
+
+    expect(writeClipboardText).toHaveBeenCalledOnce();
+    expect(writeClipboardText).toHaveBeenCalledWith('JBSWY3DPEHPK3PXP');
+    expect(copy).toBeDisabled();
+    expect(copy).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByText('Authenticator secret copied to clipboard.')).not.toBeInTheDocument();
+    resolveCopy(true);
+    expect(await screen.findByText('Authenticator secret copied to clipboard.')).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('button', { name: 'Copied' })).not.toBeDisabled();
+  });
+
+  it('does not claim an authenticator value was copied when every pathway fails', async () => {
+    seedTotpEnrollment();
+    vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(false);
+    renderPanel({ account: 'alice' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy otpauth link' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Clipboard copy failed');
+    expect(screen.queryByRole('button', { name: 'Copied' })).not.toBeInTheDocument();
+  });
+
+  it('ignores a secret copy completion after the account panel unmounts', async () => {
+    seedTotpEnrollment();
+    let resolveCopy: (copied: boolean) => void = () => {};
+    const pending = new Promise<boolean>((resolve) => {
+      resolveCopy = resolve;
+    });
+    vi.spyOn(clipboard, 'writeClipboardText').mockReturnValue(pending);
+    const view = renderPanel({ account: 'alice' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy secret' }));
+    view.unmount();
+    resolveCopy(true);
+    await pending;
+    await Promise.resolve();
+
+    expect(screen.queryByText('Authenticator secret copied to clipboard.')).not.toBeInTheDocument();
   });
 
   it('exposes dense account sections as named regions', () => {

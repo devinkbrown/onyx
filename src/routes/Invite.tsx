@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './data-pages.css';
-import { createEffect, createMemo, createSignal, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { buildInviteCard, inviteDescription, inviteTitle } from '@/lib/invite/inviteCard';
 import { setPageMeta } from './pageMeta';
 
@@ -37,6 +38,9 @@ function formatMoment(at: Date): string {
 
 export default function InviteRoute() {
   const [copyState, setCopyState] = createSignal<'idle' | 'copied' | 'failed'>('idle');
+  const [copyBusy, setCopyBusy] = createSignal(false);
+  let copyEpoch = 0;
+  let disposed = false;
   const card = createMemo(() => buildInviteCard(currentParams(), {
     network: NETWORK_NAME,
     origin: currentOrigin(),
@@ -49,13 +53,31 @@ export default function InviteRoute() {
     setPageMeta(title(), description(), card().url);
   });
 
+  onCleanup(() => {
+    disposed = true;
+    copyEpoch += 1;
+  });
+
   async function copyInvite(): Promise<void> {
+    if (copyBusy()) return;
+    const epoch = ++copyEpoch;
+    setCopyBusy(true);
+    setCopyState('idle');
+    let copied: boolean;
     try {
-      await navigator.clipboard.writeText(card().url);
-      setCopyState('copied');
+      copied = await writeClipboardText(card().url);
     } catch {
-      setCopyState('failed');
+      copied = false;
     }
+    if (disposed || epoch !== copyEpoch) return;
+    setCopyState(copied ? 'copied' : 'failed');
+    setCopyBusy(false);
+  }
+
+  function copyButtonLabel(): string {
+    if (copyBusy()) return 'Copying invite…';
+    if (copyState() === 'copied') return 'Copied invite';
+    return 'Copy invite link';
   }
 
   return (
@@ -93,13 +115,22 @@ export default function InviteRoute() {
         <p class="sub">{description()}</p>
         <div class="r-cta">
           <a class="r-btn primary" href={appHref()}>Open invite in Onyx</a>
-          <button type="button" class="r-btn ghost" onClick={() => void copyInvite()}>
-            {copyState() === 'copied' ? 'Copied invite' : 'Copy invite link'}
+          <button
+            type="button"
+            class="r-btn ghost"
+            disabled={copyBusy()}
+            aria-busy={copyBusy()}
+            onClick={() => void copyInvite()}
+          >
+            {copyButtonLabel()}
           </button>
           <a class="r-btn ghost" href="/guides/">Read the quick guides</a>
         </div>
+        <Show when={copyState() === 'copied'}>
+          <p class="invite-copy-status" role="status">Invite link copied to clipboard.</p>
+        </Show>
         <Show when={copyState() === 'failed'}>
-          <p class="invite-copy-status" role="status">Copy failed. The canonical invite is listed below.</p>
+          <p class="invite-copy-status" role="alert">Copy failed. The canonical invite is listed below.</p>
         </Show>
       </section>
 

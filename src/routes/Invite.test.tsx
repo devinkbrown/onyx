@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@solidjs/testing-library';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 
+import * as clipboard from '@/lib/clipboard/writeClipboardText';
 import InviteRoute from './Invite';
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe('InviteRoute', () => {
   it('renders a rich invite from query params and hands off to the app', () => {
@@ -36,5 +42,55 @@ describe('InviteRoute', () => {
     expect(document.querySelector('meta[property="og:url"]')?.getAttribute('content')).toContain(
       '/invite?join=%23root',
     );
+  });
+
+  it('announces copy success only after the shared clipboard write resolves', async () => {
+    let resolveCopy: (copied: boolean) => void = () => {};
+    const pending = new Promise<boolean>((resolve) => {
+      resolveCopy = resolve;
+    });
+    const writeClipboardText = vi.spyOn(clipboard, 'writeClipboardText').mockReturnValue(pending);
+    window.history.pushState({}, '', '/invite?join=%23general');
+    render(() => <InviteRoute />);
+
+    const copy = screen.getByRole('button', { name: 'Copy invite link' });
+    expect(writeClipboardText).not.toHaveBeenCalled();
+    fireEvent.click(copy);
+    fireEvent.click(copy);
+
+    expect(writeClipboardText).toHaveBeenCalledOnce();
+    expect(copy).toBeDisabled();
+    expect(copy).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByText('Invite link copied to clipboard.')).not.toBeInTheDocument();
+    resolveCopy(true);
+    expect(await screen.findByText('Invite link copied to clipboard.')).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('button', { name: 'Copied invite' })).not.toBeDisabled();
+  });
+
+  it('keeps truthful failure feedback when no clipboard pathway succeeds', async () => {
+    vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(false);
+    render(() => <InviteRoute />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy invite link' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Copy failed');
+    expect(screen.queryByRole('button', { name: 'Copied invite' })).not.toBeInTheDocument();
+  });
+
+  it('ignores a clipboard completion delivered after the invite route unmounts', async () => {
+    let resolveCopy: (copied: boolean) => void = () => {};
+    const pending = new Promise<boolean>((resolve) => {
+      resolveCopy = resolve;
+    });
+    vi.spyOn(clipboard, 'writeClipboardText').mockReturnValue(pending);
+    const view = render(() => <InviteRoute />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy invite link' }));
+    view.unmount();
+    resolveCopy(true);
+    await pending;
+    await Promise.resolve();
+
+    expect(screen.queryByText('Invite link copied to clipboard.')).not.toBeInTheDocument();
   });
 });
