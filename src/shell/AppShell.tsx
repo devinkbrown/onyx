@@ -90,6 +90,7 @@ import {
 } from '@/lib/a11y/mediaPrefs';
 import { makeReducedDataSignal } from '@/lib/a11y/reducedData';
 import { scheduleBackgroundTask, type CancelBackgroundTask } from '@/lib/backgroundTask';
+import { createVirtualKeyboardOverlayController } from '@/lib/mobile/virtualKeyboardOverlay';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
 
@@ -371,13 +372,19 @@ export function AppShell(props: AppShellProps): JSX.Element {
   onMount(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
     const mq = window.matchMedia('(max-width: 900px)');
+    const keyboardOverlay = createVirtualKeyboardOverlayController();
     setIsMobile(mq.matches);
+    keyboardOverlay?.setMobile(mq.matches);
     const onChange = (e: MediaQueryListEvent): void => {
       setIsMobile(e.matches);
+      keyboardOverlay?.setMobile(e.matches);
       if (!e.matches) closeActiveMobileDrawer(false);
     };
     mq.addEventListener('change', onChange);
-    onCleanup(() => mq.removeEventListener('change', onChange));
+    onCleanup(() => {
+      mq.removeEventListener('change', onChange);
+      keyboardOverlay?.dispose();
+    });
   });
 
   onMount(() => {

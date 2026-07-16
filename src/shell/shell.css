@@ -4110,7 +4110,12 @@
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
     /* Sit above the fixed bottom tab bar; clear the notch up top. */
-    height: calc(100svh - var(--mnav-h) - env(safe-area-inset-bottom, 0px));
+    height: calc(
+      100svh
+      - var(--mnav-h)
+      - env(safe-area-inset-bottom, 0px)
+      - var(--shell-virtual-keyboard-inset, 0px)
+    );
     padding-top: env(safe-area-inset-top, 0px);
   }
 
@@ -4120,7 +4125,11 @@
   .shell-sidebar {
     position: fixed;
     top: 0;
-    bottom: calc(var(--mnav-h) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(
+      var(--mnav-h)
+      + env(safe-area-inset-bottom, 0px)
+      + var(--shell-virtual-keyboard-inset, 0px)
+    );
     left: 0;
     z-index: 90;
     width: min(300px, 86vw);
@@ -4148,7 +4157,11 @@
   .shell-members {
     position: fixed;
     top: 0;
-    bottom: calc(var(--mnav-h) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(
+      var(--mnav-h)
+      + env(safe-area-inset-bottom, 0px)
+      + var(--shell-virtual-keyboard-inset, 0px)
+    );
     right: 0;
     z-index: 90;
     width: min(290px, 84vw);
@@ -4366,7 +4379,7 @@
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: var(--shell-virtual-keyboard-inset, 0px);
     z-index: 95;
     height: calc(var(--mnav-h, 54px) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
