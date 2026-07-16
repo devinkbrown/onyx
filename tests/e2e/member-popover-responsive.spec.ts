@@ -10,11 +10,28 @@ const shellCss = readFileSync(
   'utf8',
 );
 
-test('contains member details and actions at 200% text', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 568 });
+const VIEWPORT_WIDTH = 320;
+const SAFE_INLINE = 24;
+
+test('contains member details and actions at 200% text', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Safe-area inset override uses the Chromium DevTools protocol.');
+  await page.setViewportSize({ width: VIEWPORT_WIDTH, height: 568 });
+  const session = await page.context().newCDPSession(page);
+  await session.send('Emulation.setSafeAreaInsetsOverride', {
+    insets: {
+      top: 0,
+      topMax: 0,
+      right: SAFE_INLINE,
+      rightMax: SAFE_INLINE,
+      bottom: 0,
+      bottomMax: 0,
+      left: SAFE_INLINE,
+      leftMax: SAFE_INLINE,
+    },
+  });
   await page.setContent(`
     <!doctype html>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <span class="onyx-popover">
       <div class="onyx-popover__panel" role="dialog" aria-label="Member details for alice">
         <div class="shell-member-card">
@@ -71,9 +88,13 @@ test('contains member details and actions at 200% text', async ({ page }) => {
     return {
       panel: [panel.clientWidth, panel.scrollWidth],
       card: [card.clientWidth, card.scrollWidth],
+      panelLeft: panel.getBoundingClientRect().left,
+      panelRight: panel.getBoundingClientRect().right,
     };
   });
 
   expect(geometry.panel[1]).toBe(geometry.panel[0]);
   expect(geometry.card[1]).toBe(geometry.card[0]);
+  expect(geometry.panelLeft).toBeGreaterThanOrEqual(SAFE_INLINE);
+  expect(geometry.panelRight).toBeLessThanOrEqual(VIEWPORT_WIDTH - SAFE_INLINE);
 });

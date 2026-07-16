@@ -318,15 +318,23 @@
   .onyx-popover[data-placement='top'] .onyx-popover__panel {
     position: fixed;
     inset: auto;
-    left: 50%;
-    right: auto;
+    left: max(4vw, env(safe-area-inset-left, 0px));
+    right: max(4vw, env(safe-area-inset-right, 0px));
     top: auto;
     bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
-    transform: translateX(-50%);
+    width: min(
+      26rem,
+      calc(
+        100vw
+        - max(4vw, env(safe-area-inset-left, 0px))
+        - max(4vw, env(safe-area-inset-right, 0px))
+      )
+    );
+    margin-inline: auto;
+    transform: none;
     translate: none;
-    width: min(92vw, 26rem);
     min-width: 0;
-    max-width: 92vw;
+    max-width: none;
     max-height: 72svh;
     overflow: auto;
   }
