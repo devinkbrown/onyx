@@ -22,7 +22,8 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
-import { useStore, getState, selectOwnedScheduledMessageCount } from '@/lib/store';
+import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
+import { useStore, getState, selectDeviceMemoryOwner, selectOwnedScheduledMessageCount } from '@/lib/store';
 import { searchEmojis } from '@/lib/emoji/emoji';
 import {
   completeSlashCommand,
@@ -95,6 +96,10 @@ export function Composer(props: ComposerProps): JSX.Element {
   const replyingTo = useStore((s) => s.replyingTo);
   const editingMessage = useStore((s) => s.editingMessage);
   const scheduledCount = useStore(selectOwnedScheduledMessageCount);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
 
   const [text, setText] = createSignal('');
   const [attachments, setAttachments] = createSignal<ComposerAttachment[]>([]);
@@ -114,8 +119,23 @@ export function Composer(props: ComposerProps): JSX.Element {
   let emojiSearchRef: HTMLInputElement | undefined;
   let scheduleFirstRef: HTMLButtonElement | undefined;
   const previewUrls = new Set<string>();
+  let attachmentScopeKey: string | undefined;
+  let activeUpload: AbortController | null = null;
+
+  function clearAttachments(): void {
+    setAttachments((items) => {
+      for (const item of items) {
+        if (!item.previewUrl) continue;
+        URL.revokeObjectURL(item.previewUrl);
+        previewUrls.delete(item.previewUrl);
+      }
+      return [];
+    });
+  }
 
   onCleanup(() => {
+    activeUpload?.abort();
+    activeUpload = null;
     for (const url of previewUrls) URL.revokeObjectURL(url);
     previewUrls.clear();
   });
@@ -127,6 +147,25 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (view.kind === 'channel') return view.channel;
     if (view.kind === 'dm') return view.nick;
     return null;
+  });
+
+  createEffect(() => {
+    const owner = memoryOwner();
+    const nextScopeKey = JSON.stringify([
+      owner ? deviceMemoryOwnerKey(owner) : null,
+      target()?.toLowerCase() ?? null,
+    ]);
+    if (attachmentScopeKey === undefined) {
+      attachmentScopeKey = nextScopeKey;
+      return;
+    }
+    if (nextScopeKey === attachmentScopeKey) return;
+    attachmentScopeKey = nextScopeKey;
+    activeUpload?.abort();
+    activeUpload = null;
+    clearAttachments();
+    setComposerError(null);
+    setDragActive(false);
   });
 
   const activeEditing = createMemo(() => {
@@ -477,7 +516,7 @@ export function Composer(props: ComposerProps): JSX.Element {
     addFiles(Array.from(e.dataTransfer?.files ?? []));
   }
 
-  async function uploadPendingAttachments(): Promise<string[] | null> {
+  async function uploadPendingAttachments(signal: AbortSignal): Promise<string[] | null> {
     const uploaded: string[] = [];
     // Production default: same-origin '/upload' (nginx proxies it to the
     // nexus-upload service). Dev has no default — uploads surface a config
@@ -487,6 +526,7 @@ export function Composer(props: ComposerProps): JSX.Element {
       (import.meta.env.PROD ? '/upload' : '');
 
     for (const item of attachments()) {
+      if (signal.aborted) return null;
       if (item.uploadedUrl) {
         uploaded.push(item.uploadedUrl);
         continue;
@@ -501,12 +541,15 @@ export function Composer(props: ComposerProps): JSX.Element {
       try {
         const result = await uploadFile(item.file, {
           mediaUrl,
+          signal,
           onProgress: (progress) => {
+            if (signal.aborted) return;
             updateAttachment(item.id, {
               progress: progress.percent,
             });
           },
         });
+        if (signal.aborted) return null;
         updateAttachment(item.id, {
           status: 'uploaded',
           progress: 100,
@@ -514,6 +557,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         });
         uploaded.push(result.url);
       } catch (error) {
+        if (signal.aborted) return null;
         const message = error instanceof UploadError ? error.message : 'Upload failed.';
         updateAttachment(item.id, {
           status: 'error',
@@ -532,15 +576,7 @@ export function Composer(props: ComposerProps): JSX.Element {
     getState().sendTypingStop(t); // we just sent — stop the typing signal
     setComposerText('', false);
     getState().clearComposerDraft(t);
-    setAttachments((items) => {
-      for (const item of items) {
-        if (item.previewUrl) {
-          URL.revokeObjectURL(item.previewUrl);
-          previewUrls.delete(item.previewUrl);
-        }
-      }
-      return [];
-    });
+    clearAttachments();
     setEmojiOpen(false);
     setEmojiQuery('');
     queueMicrotask(() => {
@@ -580,9 +616,18 @@ export function Composer(props: ComposerProps): JSX.Element {
     }
 
     setIsSending(true);
+    const upload = new AbortController();
+    activeUpload?.abort();
+    activeUpload = upload;
+    const sendScopeKey = attachmentScopeKey;
     try {
-      const urls = await uploadPendingAttachments();
+      const urls = await uploadPendingAttachments(upload.signal);
       if (!urls) return;
+      if (
+        upload.signal.aborted
+        || sendScopeKey !== attachmentScopeKey
+        || target()?.toLowerCase() !== t.toLowerCase()
+      ) return;
 
       const baseContent = expandSlashTextCommand(text().trim());
       const content = [baseContent, ...urls].filter(Boolean).join('\n').trim();
@@ -604,6 +649,7 @@ export function Composer(props: ComposerProps): JSX.Element {
       getState().sendMessage(t, content);
       resetAfterSend(t);
     } finally {
+      if (activeUpload === upload) activeUpload = null;
       setIsSending(false);
     }
   }

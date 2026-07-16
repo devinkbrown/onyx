@@ -13,7 +13,7 @@
  * AAA pattern; descriptive names.
  */
 
-import { cleanup, fireEvent, render } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
@@ -66,6 +66,29 @@ describe('Composer accessibility', () => {
     expect(getByRole('button', { name: 'Attach files' })).toBeDefined();
     expect(getByRole('button', { name: 'Insert emoji' })).toBeDefined();
     expect(getByRole('button', { name: 'Send message' })).toBeDefined();
+  });
+
+  it('releases a local attachment preview when the account owner changes', async () => {
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:alice-private');
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    seedActiveChannel();
+    const { getByLabelText, getByText, queryByText } = render(() => <Composer />);
+    const input = getByLabelText('Choose files to attach') as HTMLInputElement;
+    const file = new File(['private'], 'alice-private.png', { type: 'image/png' });
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    fireEvent.change(input);
+    expect(getByText('alice-private.png')).toBeDefined();
+    expect(createObjectURL).toHaveBeenCalledWith(file);
+
+    const current = store.getState().server;
+    store.setState({
+      ourNick: 'bob',
+      server: current ? { ...current, nick: 'bob', account: 'bob' } : null,
+    });
+
+    await waitFor(() => expect(queryByText('alice-private.png')).toBeNull());
+    expect(revokeObjectURL).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:alice-private');
   });
 
   it('previews an unlocked encrypted reply from transient plaintext only', () => {
