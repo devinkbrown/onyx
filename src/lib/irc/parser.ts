@@ -335,16 +335,26 @@ export function selectSaslMechanism(
 
 export const MAX_STANDARD_REPLY_PARAMS = 32;
 export const MAX_STANDARD_REPLY_TOKEN_LENGTH = 4 * 1024;
+const MAX_STANDARD_REPLY_TEGAMI_LENGTH = 128 * 1024;
 
 export function parseStandardReply(msg: IRCMessage): StandardReply | null {
   if (msg.command !== 'NOTE' && msg.command !== 'FAIL' && msg.command !== 'WARN') return null;
   if (msg.params.length === 0 || msg.params.length > MAX_STANDARD_REPLY_PARAMS) return null;
   const command = msg.params[0]!;
   const code = msg.params[1] ?? '';
+  // Orochi's offline TEGAMI delivery predates standard-reply framing and puts
+  // `from <nick> :<text>` in the apparent code slot. Preserve the vault's
+  // bounded 64 KiB message path without granting the larger ceiling to error
+  // codes, notifications, or other standard replies.
+  const codeLimit = msg.command === 'NOTE'
+    && command.toUpperCase() === 'TEGAMI'
+    && msg.params.length === 2
+    ? MAX_STANDARD_REPLY_TEGAMI_LENGTH
+    : MAX_STANDARD_REPLY_TOKEN_LENGTH;
   if (
     !command
     || command.length > MAX_STANDARD_REPLY_TOKEN_LENGTH
-    || code.length > MAX_STANDARD_REPLY_TOKEN_LENGTH
+    || code.length > codeLimit
   ) return null;
 
   const description = msg.params.length > 2 ? msg.params[msg.params.length - 1]! : '';
