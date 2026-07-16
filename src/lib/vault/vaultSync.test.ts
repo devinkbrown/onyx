@@ -15,7 +15,12 @@ import { store } from '@/lib/store';
 import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import * as vault from './historyVault';
-import { _resetVaultSyncForTests, initVaultSync } from './vaultSync';
+import {
+  VAULT_SYNC_TARGET_CACHE_CAP,
+  _resetVaultSyncForTests,
+  _vaultSyncCacheSizesForTests,
+  initVaultSync,
+} from './vaultSync';
 
 const { _resetVaultForTests, loadRecent, saveMessages, searchVault } = vault;
 
@@ -129,6 +134,7 @@ describe('vaultSync', () => {
     setChannel('#room', []);
     store.setState({ ourNick: 'bob', server: server('bob') });
     setChannel('#room', []);
+    expect(_vaultSyncCacheSizesForTests().hydrated).toBe(1);
     resolveAlice([msg('alice-owned', 1000)]);
     await pendingAlice;
     await Promise.resolve();
@@ -141,6 +147,40 @@ describe('vaultSync', () => {
 
     expect(store.getState().channels.get('#room')?.messages.map((message) => message.id))
       .toEqual(['alice-owned']);
+  });
+
+  it('releases closed-room cache keys while leaving their persisted history intact', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    initVaultSync();
+    setChannel('#closed', [msg('remembered', 1000, '#closed')]);
+    expect(_vaultSyncCacheSizesForTests()).toEqual({ hydrated: 1, persisted: 0, pending: 1 });
+
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(_vaultSyncCacheSizesForTests()).toEqual({ hydrated: 1, persisted: 1, pending: 0 });
+
+    store.setState({ channels: new Map() });
+    expect(_vaultSyncCacheSizesForTests()).toEqual({ hydrated: 0, persisted: 0, pending: 0 });
+    vi.useRealTimers();
+    expect((await loadOwnedRecent('#closed')).map((message) => message.id)).toEqual(['remembered']);
+  });
+
+  it('hard-bounds live hydration and persistence watermarks', async () => {
+    vi.spyOn(vault, 'loadRecent').mockResolvedValue([]);
+    vi.spyOn(vault, 'saveMessages').mockResolvedValue(true);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    initVaultSync();
+
+    const channels = new Map<string, Channel>();
+    for (let index = 0; index <= VAULT_SYNC_TARGET_CACHE_CAP; index += 1) {
+      const name = `#bounded-${index}`;
+      channels.set(name, makeChannel(name, [msg(`m-${index}`, index, name)]));
+    }
+    store.setState({ channels });
+    expect(_vaultSyncCacheSizesForTests().hydrated).toBe(VAULT_SYNC_TARGET_CACHE_CAP);
+
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(_vaultSyncCacheSizesForTests().persisted).toBe(VAULT_SYNC_TARGET_CACHE_CAP);
+    expect(_vaultSyncCacheSizesForTests().pending).toBe(0);
   });
 
   it('merges hydration UNDER live messages without duplicating ids', async () => {

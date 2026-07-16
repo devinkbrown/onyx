@@ -27,6 +27,8 @@ import {
 } from './historyVault';
 
 const FLUSH_MS = 1500;
+/** Maximum live owner/target watermarks retained by one long-lived tab. */
+export const VAULT_SYNC_TARGET_CACHE_CAP = 512;
 
 const _pendingFlush = new Map<string, ReturnType<typeof setTimeout>>();
 /** Per-target signature of the last set of rows durably written (see
@@ -35,6 +37,38 @@ const _pendingFlush = new Map<string, ReturnType<typeof setTimeout>>();
 const _lastPersistedSig = new Map<string, string>();
 const _hydrated = new Set<string>();
 let _unsubscribers: Array<() => void> = [];
+
+function rememberHydratedTarget(key: string): void {
+  _hydrated.delete(key);
+  _hydrated.add(key);
+  while (_hydrated.size > VAULT_SYNC_TARGET_CACHE_CAP) {
+    const oldest = _hydrated.values().next().value;
+    if (oldest === undefined) break;
+    _hydrated.delete(oldest);
+  }
+}
+
+function wasHydrated(key: string): boolean {
+  if (!_hydrated.has(key)) return false;
+  rememberHydratedTarget(key);
+  return true;
+}
+
+function rememberPersistedSignature(key: string, signature: string): void {
+  _lastPersistedSig.delete(key);
+  _lastPersistedSig.set(key, signature);
+  while (_lastPersistedSig.size > VAULT_SYNC_TARGET_CACHE_CAP) {
+    const oldest = _lastPersistedSig.keys().next().value;
+    if (oldest === undefined) break;
+    _lastPersistedSig.delete(oldest);
+  }
+}
+
+function persistedSignature(key: string): string | undefined {
+  const signature = _lastPersistedSig.get(key);
+  if (signature !== undefined) rememberPersistedSignature(key, signature);
+  return signature;
+}
 
 /**
  * Rows we actually persist: everything EXCEPT the optimistic offline outbox
@@ -91,6 +125,32 @@ function ownedTargetKey(context: DeviceMemoryContext, target: string): string {
   return `${deviceMemoryOwnerKey(context.owner) ?? ''}\n${target.toLowerCase()}`;
 }
 
+function liveOwnedTargetKeys(context: DeviceMemoryContext): Set<string> {
+  const state = getState();
+  const live = new Set<string>();
+  for (const key of state.channels.keys()) live.add(ownedTargetKey(context, key));
+  for (const key of state.dms.keys()) live.add(ownedTargetKey(context, key));
+  return live;
+}
+
+/** Drop room/identity keys once they no longer belong to the live owner buffers. */
+function reconcileLiveTargetCaches(context: DeviceMemoryContext): void {
+  const live = liveOwnedTargetKeys(context);
+  for (const key of _hydrated) {
+    if (!live.has(key)) _hydrated.delete(key);
+  }
+  for (const key of _lastPersistedSig.keys()) {
+    // A captured write may still be waiting for its debounce. Keep its watermark
+    // until the write settles, then the completion path re-checks live ownership.
+    if (!live.has(key) && !_pendingFlush.has(key)) _lastPersistedSig.delete(key);
+  }
+}
+
+function isOwnedTargetLive(key: string): boolean {
+  const context = captureDeviceMemoryContext();
+  return context !== null && liveOwnedTargetKeys(context).has(key);
+}
+
 function scheduleFlush(
   context: DeviceMemoryContext,
   target: string,
@@ -100,15 +160,20 @@ function scheduleFlush(
   const key = ownedTargetKey(context, targetKey);
   const rows = persistableRows(messages);
   const nextSig = bufferSignature(rows);
-  if (_lastPersistedSig.get(key) === nextSig) return;
+  if (persistedSignature(key) === nextSig) return;
   const existing = _pendingFlush.get(key);
   if (existing) clearTimeout(existing);
   _pendingFlush.set(
     key,
     setTimeout(() => {
       _pendingFlush.delete(key);
-      const prevSig = _lastPersistedSig.get(key);
-      if (prevSig === nextSig) return; // already durable — nothing new to write
+      const prevSig = persistedSignature(key);
+      if (prevSig === nextSig) {
+        // Already durable — but do not let a now-closed owner/target survive only
+        // because another coalesced timer observed the same watermark.
+        if (!isOwnedTargetLive(key)) _lastPersistedSig.delete(key);
+        return;
+      }
 
       // Claim the watermark OPTIMISTICALLY so a burst of store updates for this
       // target coalesces onto one in-flight write instead of stampeding the DB.
@@ -119,13 +184,15 @@ function scheduleFlush(
       // rows are retried on the next store change instead of being silently and
       // permanently dropped. System lines (joins/quits) are conversation too;
       // only optimistic outbox placeholders are held back (persistableRows).
-      _lastPersistedSig.set(key, nextSig);
+      rememberPersistedSignature(key, nextSig);
       void saveMessages(targetKey, rows, context.owner).then((committed) => {
-        if (committed) return;
-        if (_lastPersistedSig.get(key) === nextSig) {
+        if (!committed && _lastPersistedSig.get(key) === nextSig) {
           if (prevSig === undefined) _lastPersistedSig.delete(key);
-          else _lastPersistedSig.set(key, prevSig);
+          else rememberPersistedSignature(key, prevSig);
         }
+        // Owner changes and closed conversations must not leave their private
+        // target identifiers resident after this captured write has settled.
+        if (!isOwnedTargetLive(key)) _lastPersistedSig.delete(key);
       });
     }, FLUSH_MS),
   );
@@ -134,8 +201,8 @@ function scheduleFlush(
 async function hydrate(context: DeviceMemoryContext, target: string, dm = false): Promise<void> {
   const targetKey = target.toLowerCase();
   const key = ownedTargetKey(context, targetKey);
-  if (_hydrated.has(key)) return;
-  _hydrated.add(key);
+  if (wasHydrated(key)) return;
+  rememberHydratedTarget(key);
   // DM classification covers the complete retained target, independent of the
   // bounded rows hydration returns. Run both together; privacy remains unknown
   // (and server SEARCH stays blocked) until the full scan proves it plain.
@@ -165,9 +232,9 @@ export function initVaultSync(): void {
         if (!preferences().localHistory) return;
         const context = captureDeviceMemoryContext();
         if (!context) return;
+        reconcileLiveTargetCaches(context);
         for (const [key, ch] of channels) {
-          const ownedKey = ownedTargetKey(context, key);
-          if (!_hydrated.has(ownedKey)) void hydrate(context, key);
+          void hydrate(context, key);
           if (ch.messages.length > 0) scheduleFlush(context, key, ch.messages);
         }
       },
@@ -178,9 +245,9 @@ export function initVaultSync(): void {
         if (!preferences().localHistory) return;
         const context = captureDeviceMemoryContext();
         if (!context) return;
+        reconcileLiveTargetCaches(context);
         for (const [key, dm] of dms) {
-          const ownedKey = ownedTargetKey(context, key);
-          if (!_hydrated.has(ownedKey)) void hydrate(context, key, true);
+          void hydrate(context, key, true);
           if (dm.messages.length > 0) scheduleFlush(context, key, dm.messages);
         }
       },
@@ -196,4 +263,17 @@ export function _resetVaultSyncForTests(): void {
   _pendingFlush.clear();
   _lastPersistedSig.clear();
   _hydrated.clear();
+}
+
+/** Test hook: expose counts without leaking retained owner/target identifiers. */
+export function _vaultSyncCacheSizesForTests(): {
+  hydrated: number;
+  persisted: number;
+  pending: number;
+} {
+  return {
+    hydrated: _hydrated.size,
+    persisted: _lastPersistedSig.size,
+    pending: _pendingFlush.size,
+  };
 }
