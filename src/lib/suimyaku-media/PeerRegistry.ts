@@ -54,8 +54,17 @@ type PeerPannerNode = PannerNode | StereoPannerNode;
 // Max concurrent peers tracked before we start refusing new entries.
 // Bounds memory growth from a flood of spurious MEDIA commands.
 const MAX_PEERS = 64;
+export const MAX_PEER_VIDEO_WIDTH = 3840;
+export const MAX_PEER_VIDEO_HEIGHT = 2160;
+export const MAX_PEER_VIDEO_FPS = 60;
 const SPATIAL_FALLBACK_SPREAD = 0.6;
 const SPATIAL_ROLLOFF_FACTOR = 1;
+
+function boundedEvenDimension(value: number, fallback: number, maximum: number): number {
+  const candidate = Number.isFinite(value) ? Math.trunc(value) : fallback;
+  const clamped = Math.max(2, Math.min(maximum, candidate));
+  return clamped - (clamped % 2);
+}
 
 // -------------------------------------------------------------------
 // Registry — creates, tracks, and tears down per-peer state
@@ -251,8 +260,13 @@ export class PeerRegistry {
   setVideoParams(nick: string, width: number, height: number, kind: MediaKind, fps = 60): void {
     const pm = this.getOrCreate(nick, null, kind);
     if (this.isDetached(pm)) return;
+    const safeWidth = boundedEvenDimension(width, this.videoW, MAX_PEER_VIDEO_WIDTH);
+    const safeHeight = boundedEvenDimension(height, this.videoH, MAX_PEER_VIDEO_HEIGHT);
+    const safeFps = Number.isFinite(fps)
+      ? Math.max(1, Math.min(MAX_PEER_VIDEO_FPS, Math.trunc(fps)))
+      : MAX_PEER_VIDEO_FPS;
     if (kind === 'screen') {
-      if (pm.screenW !== width || pm.screenH !== height) {
+      if (pm.screenW !== safeWidth || pm.screenH !== safeHeight) {
         this.safeDestroy(pm.screenVidDec);
         pm.screenVidDec  = null;
         pm.screenCanvas  = null;
@@ -260,20 +274,20 @@ export class PeerRegistry {
         this.safeStopStream(pm.screenStream);
         pm.screenStream  = null;
       }
-      pm.screenW   = width;
-      pm.screenH   = height;
-      pm.screenFps = fps;
+      pm.screenW   = safeWidth;
+      pm.screenH   = safeHeight;
+      pm.screenFps = safeFps;
     } else {
-      if (pm.videoW !== width || pm.videoH !== height) {
+      if (pm.videoW !== safeWidth || pm.videoH !== safeHeight) {
         this.safeDestroy(pm.vidDec);
         pm.vidDec       = null;
         pm.vidCanvas    = null;
         pm.vidImageData  = null;
         pm.state.canvas = null;
       }
-      pm.videoW   = width;
-      pm.videoH   = height;
-      pm.videoFps = fps;
+      pm.videoW   = safeWidth;
+      pm.videoH   = safeHeight;
+      pm.videoFps = safeFps;
     }
     pm.state.kind     = kind;
     pm.state.hasVideo = true;

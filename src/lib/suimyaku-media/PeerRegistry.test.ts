@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it, vi } from 'vitest';
 
-import { PeerRegistry, type PeerMedia } from './PeerRegistry';
+import {
+  MAX_PEER_VIDEO_FPS,
+  MAX_PEER_VIDEO_HEIGHT,
+  MAX_PEER_VIDEO_WIDTH,
+  PeerRegistry,
+  type PeerMedia,
+} from './PeerRegistry';
 import type { OpcodecWasm } from './OpcodecWasm';
 import type { SpatialAudioPosition } from './spatialAudio';
 
@@ -179,5 +185,22 @@ describe('PeerRegistry', () => {
     expect(overflow.audCtx).toBeNull();
     expect(registry.get('overflow-video')).toBeUndefined();
     expect(onPeerStateChanged).toHaveBeenCalledTimes(64);
+  });
+
+  it('bounds video dimensions and frame rate at the registry boundary', () => {
+    const registry = createRegistry();
+
+    registry.setVideoParams('camera', Number.POSITIVE_INFINITY, 999_999, 'video', 10_000);
+    registry.setVideoParams('screen', 999_999, Number.NaN, 'screen', Number.NaN);
+
+    const camera = registry.get('camera');
+    expect(camera?.videoW).toBe(1280);
+    expect(camera?.videoH).toBe(MAX_PEER_VIDEO_HEIGHT);
+    expect(camera?.videoFps).toBe(MAX_PEER_VIDEO_FPS);
+
+    const screen = registry.get('screen');
+    expect(screen?.screenW).toBe(MAX_PEER_VIDEO_WIDTH);
+    expect(screen?.screenH).toBe(720);
+    expect(screen?.screenFps).toBe(MAX_PEER_VIDEO_FPS);
   });
 });

@@ -11,7 +11,12 @@ import { TsumugiGroup } from './TsumugiGroup';
 import { TsumugiIdentity } from './TsumugiIdentity';
 import { ChunkAssembler } from './ChunkAssembler';
 import { TeardownGuard } from './teardownGuard';
-import { PeerRegistry } from './PeerRegistry';
+import {
+  MAX_PEER_VIDEO_FPS,
+  MAX_PEER_VIDEO_HEIGHT,
+  MAX_PEER_VIDEO_WIDTH,
+  PeerRegistry,
+} from './PeerRegistry';
 import { KaguraCodec, type KaguraCodecTag, decodeKaguraFrame, encodeKaguraFrame } from './kaguraFrame';
 import { appendMediaMac, importMediaMacKey } from './mediaMac';
 import { MediaStreamRouter, mediaStreamId } from './mediaStream';
@@ -192,11 +197,18 @@ function parseVideoJoinPayload(payload: string): VideoCaptureProfile {
   const height = Number.parseInt(hRaw ?? '', 10);
   const quality = Number.parseInt(qRaw ?? '', 10);
   const fps = Number.parseInt(fpsRaw ?? '', 10);
+  const boundedEven = (value: number, fallbackValue: number, maximum: number): number => {
+    if (!Number.isFinite(value) || value <= 0) return fallbackValue;
+    const clamped = Math.max(2, Math.min(maximum, Math.trunc(value)));
+    return clamped - (clamped % 2);
+  };
   return {
-    width: Number.isFinite(width) && width > 0 ? width : fallback.width,
-    height: Number.isFinite(height) && height > 0 ? height : fallback.height,
+    width: boundedEven(width, fallback.width, MAX_PEER_VIDEO_WIDTH),
+    height: boundedEven(height, fallback.height, MAX_PEER_VIDEO_HEIGHT),
     quality: Number.isFinite(quality) ? Math.max(0, Math.min(100, quality)) : fallback.quality,
-    fps: Number.isFinite(fps) && fps > 0 ? Math.max(1, Math.min(60, fps)) : fallback.fps,
+    fps: Number.isFinite(fps) && fps > 0
+      ? Math.max(1, Math.min(MAX_PEER_VIDEO_FPS, fps))
+      : fallback.fps,
     profile: screenShare ? 'screen' : 'camera',
     screenShare,
   };

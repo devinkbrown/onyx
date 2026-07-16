@@ -3,6 +3,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SuimyakuMediaEngine } from './MediaEngine';
 import { OpcodecWasm } from './OpcodecWasm';
+import {
+  MAX_PEER_VIDEO_FPS,
+  MAX_PEER_VIDEO_HEIGHT,
+  MAX_PEER_VIDEO_WIDTH,
+  type PeerMedia,
+} from './PeerRegistry';
 import type { SuimyakuMediaCallbacks } from './types';
 
 function callbacks(overrides: Partial<SuimyakuMediaCallbacks> = {}): SuimyakuMediaCallbacks {
@@ -167,5 +173,18 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
     engine.handleMediaMessage('server', '#room', 'HANGUP', '');
     expect(engine.getPresenceList()).toEqual([]);
     expect(internals.negotiatedBitrate.size).toBe(0);
+  });
+
+  it('clamps hostile VIDEO_JOIN capture geometry before peer allocation', () => {
+    const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
+    engine.handleMediaMessage('alice', '#room', 'VIDEO_JOIN', '999999 999999 200 999 true');
+
+    const internals = engine as unknown as {
+      registry: { get(nick: string): PeerMedia | undefined };
+    };
+    const peer = internals.registry.get('alice');
+    expect(peer?.screenW).toBe(MAX_PEER_VIDEO_WIDTH);
+    expect(peer?.screenH).toBe(MAX_PEER_VIDEO_HEIGHT);
+    expect(peer?.screenFps).toBe(MAX_PEER_VIDEO_FPS);
   });
 });
