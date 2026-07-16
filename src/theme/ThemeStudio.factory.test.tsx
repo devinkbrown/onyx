@@ -88,6 +88,21 @@ describe('Factory controls', () => {
     const bake = screen.getByTestId('ts-bake') as HTMLButtonElement;
     expect(bake.disabled).toBe(true);
   });
+
+  it('does not save a theme while an input method owns Enter', () => {
+    mountStudio();
+    fireEvent.click(screen.getByTestId('ts-generate'));
+    fireEvent.click(screen.getByTestId('ts-save-btn'));
+    const name = screen.getByRole('textbox', { name: 'Theme name' });
+    fireEvent.input(name, { target: { value: 'Composed theme' } });
+
+    fireEvent.keyDown(name, { key: 'Enter', keyCode: 229, isComposing: true });
+
+    expect(screen.getByRole('textbox', { name: 'Theme name' })).toBeTruthy();
+
+    fireEvent.keyDown(name, { key: 'Enter' });
+    expect(screen.queryByRole('textbox', { name: 'Theme name' })).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

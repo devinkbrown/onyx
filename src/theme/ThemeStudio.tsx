@@ -43,6 +43,7 @@ import { Button } from '../primitives/Button';
 import { FormField } from '../primitives/FormField';
 import { Tabs } from '../primitives/Tabs';
 import { Tooltip } from '../primitives/Tooltip';
+import { keyboardEventIsClaimed } from '../primitives/focusTrap';
 
 import { useTheme } from './ThemeProvider';
 import { THEMES, THEME_IDS, type ThemeId, type TokenMap } from './themes';
@@ -1608,6 +1609,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
                 spellcheck={false}
                 onInput={(e) => setSaveName((e.currentTarget as HTMLInputElement).value)}
                 onKeyDown={(e) => {
+                  if (keyboardEventIsClaimed(e)) return;
                   if (e.key === 'Enter') { e.preventDefault(); confirmSave(); }
                   else if (e.key === 'Escape') { e.preventDefault(); setSaving(false); }
                 }}
