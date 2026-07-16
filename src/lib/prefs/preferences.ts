@@ -99,6 +99,8 @@ const STORAGE_KEY = 'onyx:preferences';
 const LEGACY_STORAGE_KEY = 'ruri:preferences';
 /** Older store-level high-contrast toggle; read-only for migration. */
 const LEGACY_HIGH_CONTRAST_KEY = 'onyx:high-contrast';
+/** Fixed-schema preferences are tiny; reject quota-sized storage before parsing. */
+export const MAX_PREFERENCES_STORAGE_CHARS = 16 * 1024;
 
 function hasStorage(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
@@ -148,6 +150,9 @@ export function loadPreferences(): Preferences {
     // Current key first, then fall back to the legacy key (read-old-write-new)
     // so prefs saved under the previous brand survive one load after the rebrand.
     const serialized = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (serialized && serialized.length > MAX_PREFERENCES_STORAGE_CHARS) {
+      return { ...DEFAULT_PREFERENCES };
+    }
     parsed = JSON.parse(serialized ?? '{}');
   } catch {
     return { ...DEFAULT_PREFERENCES };

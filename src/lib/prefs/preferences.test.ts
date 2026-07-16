@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   DEFAULT_PREFERENCES,
@@ -8,6 +8,7 @@ import {
   closePreferences,
   isPreferencesOpen,
   loadPreferences,
+  MAX_PREFERENCES_STORAGE_CHARS,
   openPreferences,
   parsePreferencesSnapshot,
   preferenceOpenRequest,
@@ -153,6 +154,15 @@ describe('preferences store', () => {
     it('returns defaults for corrupt JSON', () => {
       localStorage.setItem(STORAGE_KEY, '{not json');
       expect(loadPreferences()).toEqual(DEFAULT_PREFERENCES);
+    });
+
+    it('rejects oversized stored preferences before parsing', () => {
+      localStorage.setItem(STORAGE_KEY, `{${'x'.repeat(MAX_PREFERENCES_STORAGE_CHARS)}}`);
+      const parse = vi.spyOn(JSON, 'parse');
+
+      expect(loadPreferences()).toEqual(DEFAULT_PREFERENCES);
+      expect(parse).not.toHaveBeenCalled();
+      parse.mockRestore();
     });
 
     it('migrates the old high-contrast storage key when preferences are absent', () => {

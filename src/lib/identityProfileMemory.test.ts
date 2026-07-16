@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
@@ -8,6 +8,7 @@ import {
   LEGACY_IDENTITY_PROFILE_STORAGE_KEYS,
   loadIdentityProfileMemory,
   MAX_CUSTOM_STATUS_LENGTH,
+  MAX_IDENTITY_PROFILE_STORAGE_CHARS,
   MAX_SELF_BANNER_URL_LENGTH,
   saveIdentityProfileMemory,
 } from './identityProfileMemory';
@@ -73,5 +74,15 @@ describe('account-scoped identity profile memory', () => {
 
     expect(saveIdentityProfileMemory(emptyIdentityProfileMemory(), alice)).toBe(true);
     expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it('rejects oversized owner profile storage before parsing', () => {
+    const key = deviceMemoryStorageKey(IDENTITY_PROFILE_STORAGE_KEY, alice)!;
+    localStorage.setItem(key, `{${'x'.repeat(MAX_IDENTITY_PROFILE_STORAGE_CHARS)}}`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(loadIdentityProfileMemory(alice)).toEqual(emptyIdentityProfileMemory());
+    expect(parse).not.toHaveBeenCalled();
+    parse.mockRestore();
   });
 });

@@ -8,6 +8,8 @@ export const MAX_SELF_DISPLAY_NAME_LENGTH = 128;
 export const MAX_SELF_BIO_LENGTH = 2_048;
 export const MAX_SELF_PRONOUNS_LENGTH = 64;
 export const MAX_SELF_BANNER_URL_LENGTH = 2_048;
+/** The fixed owner-profile schema serializes below 5 KiB at its field limits. */
+export const MAX_IDENTITY_PROFILE_STORAGE_CHARS = 16 * 1024;
 
 export const LEGACY_IDENTITY_PROFILE_STORAGE_KEYS = [
   'onyx:custom-status',
@@ -145,6 +147,9 @@ export function loadIdentityProfileMemory(owner: DeviceMemoryOwner): IdentityPro
   purgeLegacyIdentityProfileMemory();
   try {
     const raw = store.getItem(key);
+    if (raw && raw.length > MAX_IDENTITY_PROFILE_STORAGE_CHARS) {
+      return emptyIdentityProfileMemory();
+    }
     return raw ? parseIdentityProfileMemory(JSON.parse(raw) as unknown) : emptyIdentityProfileMemory();
   } catch {
     return emptyIdentityProfileMemory();
