@@ -45,6 +45,7 @@ const MAX_MEDIA_TRACKED_PEERS = 64;
 const MAX_MEDIA_NICK_LENGTH = 128;
 const MAX_MEDIA_CHANNEL_LENGTH = 256;
 const MAX_MEDIA_SUBTYPE_LENGTH = 512;
+const MAX_PENDING_WASM_FRAMES = 8;
 
 function validMediaToken(value: string, maxLength: number): boolean {
   return value.length > 0
@@ -228,6 +229,15 @@ export class SuimyakuMediaEngine {
 
   private wasm:      OpcodecWasm | null = null;
   private wasmReady  = false;
+  private wasmPromise: Promise<OpcodecWasm> | null = null;
+  private wasmFrameFlushScheduled = false;
+  private pendingWasmFrames = new Map<string, {
+    nick: string;
+    channel: string;
+    ftype: string;
+    frame: Uint8Array;
+    generation: number;
+  }>();
 
   private localStream: MediaStream | null = null;
   private localKind:   MediaKind | null   = null;
@@ -427,13 +437,23 @@ export class SuimyakuMediaEngine {
   // WASM bootstrap
   // ----------------------------------------------------------------
 
-  private async ensureWasm(): Promise<OpcodecWasm> {
-    if (this.wasm) return this.wasm;
-    const w = await OpcodecWasm.load(WASM_URL);
-    this.wasm = w;
-    this.wasmReady = true;
-    this.registry.setWasm(w);
-    return w;
+  private ensureWasm(): Promise<OpcodecWasm> {
+    if (this.wasm) return Promise.resolve(this.wasm);
+    if (!this.wasmPromise) {
+      this.wasmPromise = OpcodecWasm.load(WASM_URL)
+        .then((wasm) => {
+          this.wasm = wasm;
+          this.wasmReady = true;
+          this.registry.setWasm(wasm);
+          this.wasmPromise = null;
+          return wasm;
+        })
+        .catch((error: unknown) => {
+          this.wasmPromise = null;
+          throw error;
+        });
+    }
+    return this.wasmPromise;
   }
 
   // ----------------------------------------------------------------
@@ -1732,17 +1752,63 @@ export class SuimyakuMediaEngine {
     }
   }
 
+  private queueFrameUntilWasm(
+    nick: string,
+    channel: string,
+    ftype: string,
+    frame: Uint8Array,
+  ): void {
+    const mediaKind = ftype === 'AUDIO' ? 'audio' : 'video';
+    const key = `${nick.toLowerCase()}:${mediaKind}`;
+    const existing = this.pendingWasmFrames.get(key);
+    // A retained keyframe is more useful than a later delta frame while the
+    // decoder is booting. Audio/latest keyframes still replace older entries.
+    if (!(existing?.ftype === 'KEYFRAME' && ftype === 'FRAME')) {
+      this.pendingWasmFrames.delete(key);
+      while (this.pendingWasmFrames.size >= MAX_PENDING_WASM_FRAMES) {
+        const oldest = this.pendingWasmFrames.keys().next().value as string | undefined;
+        if (!oldest) break;
+        this.pendingWasmFrames.delete(oldest);
+      }
+      this.pendingWasmFrames.set(key, {
+        nick,
+        channel,
+        ftype,
+        frame,
+        generation: this.callGuard.capture(),
+      });
+    }
+    if (this.wasmFrameFlushScheduled) return;
+    this.wasmFrameFlushScheduled = true;
+    void this.ensureWasm()
+      .then(() => {
+        const queued = [...this.pendingWasmFrames.values()];
+        this.pendingWasmFrames.clear();
+        for (const pending of queued) {
+          if (!this.callGuard.isCurrent(pending.generation)) continue;
+          this.dispatchFrame(pending.nick, pending.channel, pending.ftype, pending.frame);
+        }
+      })
+      .catch(() => {
+        this.pendingWasmFrames.clear();
+      })
+      .finally(() => {
+        this.wasmFrameFlushScheduled = false;
+      });
+  }
+
   private dispatchFrame(nick: string, channel: string, ftype: string, frame: Uint8Array) {
     if (!this.wasmReady) {
-      this.ensureWasm().then(() => this.dispatchFrame(nick, channel, ftype, frame));
+      this.queueFrameUntilWasm(nick, channel, ftype, frame);
       return;
     }
     const kind: MediaKind = ftype === 'AUDIO' ? 'voice' : 'video';
     const pm = this.registry.getOrCreate(nick, channel, kind);
 
     const onErr = (type: MediaKind, err: unknown) => {
-      const count = (this.registry.decodeErrors.get(nick) ?? 0) + 1;
-      this.registry.decodeErrors.set(nick, count);
+      const peerKey = nick.toLowerCase();
+      const count = (this.registry.decodeErrors.get(peerKey) ?? 0) + 1;
+      this.registry.decodeErrors.set(peerKey, count);
       this.cb.onDecodeError?.(nick, type, err);
       if (count > 5) this.registry.reset(nick);
     };
@@ -1830,6 +1896,7 @@ export class SuimyakuMediaEngine {
     // so a late handshake/group-key promise can't resurrect key material into
     // an idle engine or bleed a previous call's group key into the next call.
     this.callGuard.bump();
+    this.pendingWasmFrames.clear();
     for (const vs of this.tsumugiSessions.values()) vs.destroy();
     this.tsumugiSessions.clear();
     this.pendingTsumugiPeers.clear();

@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { SuimyakuMediaEngine } from './MediaEngine';
+import { OpcodecWasm } from './OpcodecWasm';
 import type { SuimyakuMediaCallbacks } from './types';
 
 function callbacks(overrides: Partial<SuimyakuMediaCallbacks> = {}): SuimyakuMediaCallbacks {
@@ -104,6 +105,26 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
     engine.handleMediaMessage('Alice', '#room', 'TSUMUGI_DATA', oversized);
 
     expect(engine.getPeers().size).toBe(0);
+  });
+
+  it('shares codec startup and bounds frames retained while WASM loads', () => {
+    const load = vi.spyOn(OpcodecWasm, 'load')
+      .mockReturnValue(new Promise<OpcodecWasm>(() => {}));
+    const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
+
+    for (let index = 0; index < 32; index += 1) {
+      engine.handleMediaMessage(`peer-${index}`, '#room', 'AUDIO', 'YQ==');
+    }
+
+    const internals = engine as unknown as {
+      pendingWasmFrames: Map<string, unknown>;
+    };
+    expect(load).toHaveBeenCalledOnce();
+    expect(internals.pendingWasmFrames.size).toBe(8);
+
+    engine.handleMediaMessage('server', '#room', 'HANGUP', '');
+    expect(internals.pendingWasmFrames.size).toBe(0);
+    load.mockRestore();
   });
 
   it('bounds channel roster creation before firing near-capacity state', () => {
