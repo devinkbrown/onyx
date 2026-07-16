@@ -61,6 +61,22 @@ echo "==> normalising static asset permissions"
 find dist -type d -exec chmod 0755 {} +
 find dist -type f -exec chmod 0644 {} +
 
+# nginx runs as `http` on the production host. The checkout lives below kain's
+# private home directory, so world traversal must stay disabled; grant only the
+# web-service account execute/traverse permission on that one parent. If this
+# ACL is lost, every otherwise-valid route becomes a misleading nginx 404.
+# Reassert it on every deploy so a home-directory permission repair cannot
+# silently take the freshly-built site offline. Other hosts can override the
+# account with ONYX_WEB_USER; hosts without that account need no ACL change.
+WEB_USER="${ONYX_WEB_USER:-http}"
+LIVE_PARENT="$(dirname "$(pwd)")"
+if id -u "${WEB_USER}" >/dev/null 2>&1; then
+  command -v setfacl >/dev/null 2>&1 \
+    || { echo "FAIL: setfacl is required to grant ${WEB_USER} traverse access to ${LIVE_PARENT}"; exit 1; }
+  echo "==> ensuring ${WEB_USER} can traverse ${LIVE_PARENT}"
+  setfacl -m "u:${WEB_USER}:--x" "${LIVE_PARENT}"
+fi
+
 echo "==> syncing dist/ -> out/ (live)"
 mkdir -p out
 rsync -a --delete dist/ out/
