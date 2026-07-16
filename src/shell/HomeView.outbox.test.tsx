@@ -10,6 +10,17 @@ import { _resetVaultForTests, loadOutbox, queueOutbox } from '@/lib/vault/histor
 import { HomeView } from './HomeView';
 
 const initialState = store.getInitialState();
+const OWNER = { serverUrl: 'wss://example.test', identity: 'kain' } as const;
+const server = {
+  id: 'home-outbox',
+  name: 'Onyx',
+  network: 'Onyx',
+  url: OWNER.serverUrl,
+  icon: '',
+  nick: 'kain',
+  account: 'kain',
+  connected: false,
+};
 
 describe('HomeView queued-send journal', () => {
   beforeEach(() => {
@@ -22,6 +33,7 @@ describe('HomeView queued-send journal', () => {
       activeView: { kind: 'home' },
       connectionStatus: 'disconnected',
       ourNick: 'kain',
+      server,
     }, true);
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
   });
@@ -36,7 +48,7 @@ describe('HomeView queued-send journal', () => {
     render(() => <HomeView />);
     expect(screen.queryByRole('heading', { name: 'Queued on this device' })).not.toBeInTheDocument();
 
-    await queueOutbox('#private-room', 'sensitive body stays in the conversation');
+    await queueOutbox('#private-room', 'sensitive body stays in the conversation', OWNER);
 
     expect(await screen.findByRole('heading', { name: 'Queued on this device' })).toBeInTheDocument();
     expect(screen.getByText('#private-room')).toBeInTheDocument();
@@ -45,7 +57,7 @@ describe('HomeView queued-send journal', () => {
   });
 
   it('reopens a persisted queue entry after reload and restores its pending row', async () => {
-    const entry = await queueOutbox('#reloaded', 'remember this');
+    const entry = await queueOutbox('#reloaded', 'remember this', OWNER);
     render(() => <HomeView />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open queued message for #reloaded' }));
@@ -59,7 +71,7 @@ describe('HomeView queued-send journal', () => {
   });
 
   it('requires confirmation before removing one queued send', async () => {
-    await queueOutbox('#keep', 'remove after confirmation');
+    await queueOutbox('#keep', 'remove after confirmation', OWNER);
     render(() => <HomeView />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove queued message for #keep' }));
@@ -74,7 +86,7 @@ describe('HomeView queued-send journal', () => {
   });
 
   it('offers an explicit retry only while connected', async () => {
-    await queueOutbox('#room', 'retry me');
+    await queueOutbox('#room', 'retry me', OWNER);
     const flushSpy = vi.spyOn(store.getState(), 'flushOutbox').mockImplementation(() => {});
     render(() => <HomeView />);
 

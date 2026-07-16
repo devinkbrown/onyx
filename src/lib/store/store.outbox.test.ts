@@ -22,6 +22,18 @@ import {
 } from '@/lib/vault/historyVault';
 
 const initialState = store.getInitialState();
+const ALICE_OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
+
+const server = (account: string | null) => ({
+  id: `outbox-${account ?? 'guest'}`,
+  name: 'Onyx',
+  network: 'Onyx',
+  url: 'wss://example.test',
+  icon: '',
+  nick: account ?? 'guest',
+  account,
+  connected: true,
+});
 
 const channel = (name: string): Channel => ({
   name,
@@ -72,6 +84,7 @@ beforeEach(() => {
     {
       ...initialState,
       ourNick: 'me',
+      server: server('alice'),
       connectionStatus: 'disconnected',
       client: null,
       channels: new Map([['#room', channel('#room')]]),
@@ -145,7 +158,7 @@ describe('offline outbox', () => {
   });
 
   it('reopens a persisted queued send and restores its placeholder after reload', async () => {
-    const entry = await queueOutbox('#reloaded', 'survived the reload');
+    const entry = await queueOutbox('#reloaded', 'survived the reload', ALICE_OWNER);
     expect(entry).not.toBeNull();
     expect(store.getState().channels.has('#reloaded')).toBe(false);
 
@@ -188,8 +201,37 @@ describe('offline outbox', () => {
     expect((await loadOutbox()).length).toBe(1); // still queued for the retry
   });
 
+  it('holds Alice rows while Bob is connected, then sends them as Alice', async () => {
+    store.getState().sendMessage('#room', 'Alice only');
+    await until(async () => (await loadOutbox()).length === 1);
+
+    const bobSendRaw = vi.fn(() => true);
+    store.setState({
+      connectionStatus: 'connected',
+      client: mockClient(bobSendRaw),
+      ourNick: 'bob',
+      server: server('bob'),
+    });
+    store.getState().flushOutbox();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(bobSendRaw).not.toHaveBeenCalledWith('PRIVMSG', '#room', 'Alice only');
+    expect(await loadOutbox()).toHaveLength(1);
+
+    const aliceSendRaw = vi.fn(() => true);
+    store.setState({
+      client: mockClient(aliceSendRaw),
+      ourNick: 'alice',
+      server: server('alice'),
+    });
+    store.getState().flushOutbox();
+    await until(async () => (await loadOutbox()).length === 0);
+
+    expect(aliceSendRaw).toHaveBeenCalledWith('PRIVMSG', '#room', 'Alice only');
+  });
+
   it('expires entries older than a day instead of sending them', async () => {
-    const entry = await queueOutbox('#room', 'stale message');
+    const entry = await queueOutbox('#room', 'stale message', ALICE_OWNER);
     // Backdate it via a direct re-put of the same id.
     const db = await new Promise<IDBDatabase>((res) => {
       const r = indexedDB.open('onyx-vault');

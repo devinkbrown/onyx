@@ -108,6 +108,13 @@ export interface VaultExportSnapshot {
   targets: VaultExportTarget[];
 }
 
+export interface OutboxOwner {
+  /** Exact WebSocket endpoint that owned the composing session. */
+  serverUrl: string;
+  /** Lowercased account name, or guest nick when no account was authenticated. */
+  identity: string;
+}
+
 export interface OutboxEntry {
   /** Stable id; the buffer's pending placeholder reuses it as `outbox:<id>`. */
   id: string;
@@ -119,6 +126,8 @@ export interface OutboxEntry {
   queued_at: number;
   /** Same-millisecond ordering tiebreaker (monotonic within a session). */
   seq: number;
+  /** Legacy/malformed rows are preserved as ownerless and never auto-sent. */
+  owner: OutboxOwner | null;
 }
 
 /** Metadata-only outbox invalidation; message text is deliberately excluded. */
@@ -864,6 +873,22 @@ function isSafeOutboxTarget(target: unknown): target is string {
   );
 }
 
+function parseOutboxOwner(value: unknown): OutboxOwner | null {
+  if (!isRecord(value)) return null;
+  const { serverUrl, identity } = value;
+  if (
+    typeof serverUrl !== 'string'
+    || serverUrl.length === 0
+    || serverUrl.length > 2_048
+    || serverUrl !== serverUrl.trim()
+    || typeof identity !== 'string'
+    || identity.length === 0
+    || identity.length > 256
+    || identity !== identity.trim()
+  ) return null;
+  return { serverUrl, identity: identity.toLowerCase() };
+}
+
 /**
  * Rebuild an entry from an untrusted IndexedDB row. Returning a fresh object
  * strips unknown fields; invalid routing/order metadata is rejected rather than
@@ -891,7 +916,15 @@ function parseOutboxEntry(raw: unknown): OutboxEntry | null {
   ) {
     return null;
   }
-  return { id, target_key: targetKey, target, text, queued_at: queuedAt, seq };
+  return {
+    id,
+    target_key: targetKey,
+    target,
+    text,
+    queued_at: queuedAt,
+    seq,
+    owner: parseOutboxOwner(raw.owner),
+  };
 }
 
 function notifyOutbox(change: OutboxChange): void {
@@ -915,8 +948,14 @@ export function subscribeOutbox(listener: OutboxListener): () => void {
 }
 
 /** Queue a message composed while offline; it sends on reconnect. */
-export async function queueOutbox(target: string, text: string): Promise<OutboxEntry | null> {
+export async function queueOutbox(
+  target: string,
+  text: string,
+  owner?: OutboxOwner,
+): Promise<OutboxEntry | null> {
   if (!isSafeOutboxTarget(target) || typeof text !== 'string' || text.length === 0) return null;
+  const safeOwner = owner === undefined ? null : parseOutboxOwner(owner);
+  if (owner !== undefined && !safeOwner) return null;
   const db = await openVault();
   if (!db) return null;
   const entry: OutboxEntry = {
@@ -926,6 +965,7 @@ export async function queueOutbox(target: string, text: string): Promise<OutboxE
     text,
     queued_at: Date.now(),
     seq: ++_outboxSeq,
+    owner: safeOwner,
   };
   try {
     const tx = db.transaction(OUTBOX, 'readwrite');

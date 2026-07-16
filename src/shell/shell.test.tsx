@@ -1421,10 +1421,18 @@ describe('AppShell', () => {
         composerDrafts: { '#general': 'room draft', alice: 'private draft' },
         connectionStatus: 'disconnected',
         networkName: 'IRCXNet',
+        server: {
+          id: 'home-memory', name: 'IRCXNet', network: 'IRCXNet',
+          url: 'wss://example.test', icon: '', nick: 'testuser',
+          account: 'testuser', connected: false,
+        },
       }, true);
       saveChannelTopicDrafts({ '#general': 'topic draft', alice: 'ignored non-channel draft' });
 
-      await queueOutbox('#general', 'queued while offline');
+      await queueOutbox('#general', 'queued while offline', {
+        serverUrl: 'wss://example.test',
+        identity: 'testuser',
+      });
 
       render(() => <AppShell />);
 

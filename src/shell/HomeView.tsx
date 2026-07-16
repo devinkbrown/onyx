@@ -183,6 +183,10 @@ export function HomeView(): JSX.Element {
   const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
   const ourNick = useStore((s) => s.ourNick);
+  const serverUrl = useStore((s) => s.server?.url.trim() ?? '');
+  const accountIdentity = useStore((s) =>
+    (s.server?.account ?? s.ourNick).trim().toLowerCase(),
+  );
 
   const [stats] = createResource(fetchStatsIndex, { initialValue: null });
   const [reviewHistory, setReviewHistory] = createSignal<ReviewHistoryEntry[]>(readReviewHistory());
@@ -204,7 +208,13 @@ export function HomeView(): JSX.Element {
     () => loadChannelTopicDrafts(),
     { initialValue: {} },
   );
-  const queuedEntries = createMemo<OutboxEntry[]>(() => outboxEntries.latest ?? []);
+  const queuedEntries = createMemo<OutboxEntry[]>(() => {
+    const owner = { serverUrl: serverUrl(), identity: accountIdentity() };
+    if (!owner.serverUrl || !owner.identity) return [];
+    return (outboxEntries.latest ?? []).filter((entry) =>
+      entry.owner?.serverUrl === owner.serverUrl && entry.owner.identity === owner.identity,
+    );
+  });
   const queuedSendCount = createMemo(() => queuedEntries().length);
   const roomDraftCount = createMemo(() => channelDraftCount(composerDrafts()));
   const topicDraftCount = createMemo(() => Object.keys(topicDrafts.latest ?? {}).length);

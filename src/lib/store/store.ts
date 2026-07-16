@@ -28,7 +28,7 @@ import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
-import { OUTBOX_MAX_AGE_MS, classifyVaultDmSearchPrivacy, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
+import { OUTBOX_MAX_AGE_MS, classifyVaultDmSearchPrivacy, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry, type OutboxOwner } from '@/lib/vault/historyVault';
 import { getVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
 import {
@@ -3328,6 +3328,19 @@ function _sameScheduledMessageOwner(
   return actual?.serverUrl === expected.serverUrl && actual.identity === expected.identity;
 }
 
+function _outboxOwner(state: Pick<OnyxState, 'server' | 'ourNick'>): OutboxOwner | null {
+  return _scheduledMessageOwner(state);
+}
+
+function _sameOutboxOwner(actual: OutboxOwner | null, expected: OutboxOwner | null): boolean {
+  return Boolean(
+    actual
+    && expected
+    && actual.serverUrl === expected.serverUrl
+    && actual.identity === expected.identity,
+  );
+}
+
 export type State = OnyxState;
 
 type ActionKey = {
@@ -3359,6 +3372,7 @@ function deliverChatMessage(
   target: string,
   text: string,
 ): boolean | Promise<boolean> {
+  const generation = _accountGeneration;
   const { ourNick, replyingTo } = get();
   const waitForServerEcho = client.negotiatedCaps.has('echo-message');
   const targetIsChannel = target.length > 0 && (client.isupport.CHANTYPES ?? '#&').includes(target[0]!);
@@ -3384,6 +3398,7 @@ function deliverChatMessage(
     const encryptedKind: E2eeMessageKind | null = client.negotiatedCaps.has(E2EE_CAP) ? 'mls' : null;
     const encryptedOutboundTags = encryptedKind ? { ...outboundTags, ...e2eeMessageTag(encryptedKind) } : outboundTags;
     return sealDmTrusted(target, peerKey, text).then((outcome) => {
+      if (generation !== _accountGeneration || client !== get().client) return false;
       if (outcome.status === 'key-changed') {
         // SECURITY — fail closed on a possible machine-in-the-middle.
         void get()._flagPeerKeyChange(target, peerKey);
@@ -4038,10 +4053,15 @@ export const store = createStore<OnyxState>()(
 
     flushOutbox() {
       if (_outboxFlushActive) return;
+      const start = get();
+      const owner = _outboxOwner(start);
+      const client = start.client;
+      const generation = _accountGeneration;
+      if (!owner || !client || start.connectionStatus !== 'connected') return;
       _outboxFlushActive = true;
       void (async () => {
         try {
-          const entries = await loadOutbox();
+          const entries = (await loadOutbox()).filter((entry) => _sameOutboxOwner(entry.owner, owner));
           if (entries.length === 0) return;
           const dropPlaceholder = (e: OutboxEntry): void => {
             set(s => {
@@ -4067,10 +4087,12 @@ export const store = createStore<OnyxState>()(
           let waiting = 0;
           for (const e of entries) {
             const st = get();
-            if (st.connectionStatus !== 'connected' || !st.client) {
-              waiting += 1;
-              continue;
-            }
+            if (
+              generation !== _accountGeneration
+              || st.client !== client
+              || !_sameOutboxOwner(_outboxOwner(st), owner)
+            ) return;
+            if (st.connectionStatus !== 'connected') { waiting += 1; continue; }
             if (Date.now() - e.queued_at > OUTBOX_MAX_AGE_MS) {
               await deleteOutboxEntry(e.id);
               dropPlaceholder(e);
@@ -4088,7 +4110,7 @@ export const store = createStore<OnyxState>()(
 
             // Keep both durable and UI state byte-for-byte intact until the
             // client explicitly admits every frame for this logical message.
-            const admitted = await deliverChatMessage(set, get, st.client, e.target, e.text);
+            const admitted = await deliverChatMessage(set, get, client, e.target, e.text);
             if (!admitted) {
               waiting += 1;
               continue;
@@ -4133,6 +4155,7 @@ export const store = createStore<OnyxState>()(
           });
           return;
         }
+        if (!_sameOutboxOwner(entry.owner, _outboxOwner(get()))) return;
 
         const placeholderId = `outbox:${entry.id}`;
         // openVaultResult creates a local channel/DM shell when the target is
@@ -4161,6 +4184,7 @@ export const store = createStore<OnyxState>()(
       void (async () => {
         const entry = (await loadOutbox()).find((candidate) => candidate.id === id);
         if (!entry) return;
+        if (!_sameOutboxOwner(entry.owner, _outboxOwner(get()))) return;
         await deleteOutboxEntry(entry.id);
         if ((await loadOutbox()).some((candidate) => candidate.id === entry.id)) {
           get().addToast({
@@ -4610,7 +4634,13 @@ export const store = createStore<OnyxState>()(
           });
           return;
         }
-        void queueOutbox(target, text).then((entry) => {
+        const owner = _outboxOwner(get());
+        if (!owner) {
+          get().addToast({ variant: 'error', title: 'Offline', description: 'Reconnect before queueing a message for this identity.' });
+          return;
+        }
+        void queueOutbox(target, text, owner).then((entry) => {
+          if (!_sameOutboxOwner(owner, _outboxOwner(get()))) return;
           if (!entry) {
             get().addToast({ variant: 'error', title: 'Offline', description: 'Message could not be queued on this device.' });
             return;

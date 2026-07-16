@@ -45,6 +45,9 @@ import {
 } from './historyVault';
 import { SEARCH_CORPUS_TEXT_MAX } from './searchBounds';
 
+const OUTBOX_OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
+const queueOwnedOutbox = (target: string, text: string) => queueOutbox(target, text, OUTBOX_OWNER);
+
 // ── Compile-time plaintext-at-rest partition guard ───────────────────────────
 // Every ChatMessage field must be consciously classified as either PERSISTED
 // (safe at rest) or omitted (OMIT_AT_REST). PersistedKey is an explicit ledger,
@@ -624,10 +627,11 @@ describe('historyVault', () => {
 
   describe('outbox', () => {
     it('queues, loads oldest-first, and deletes', async () => {
-      const first = await queueOutbox('#Room', 'first message');
-      const second = await queueOutbox('trev', 'second message');
+      const first = await queueOwnedOutbox('#Room', 'first message');
+      const second = await queueOwnedOutbox('trev', 'second message');
       expect(first?.target_key).toBe('#room');
       expect(first?.target).toBe('#Room');
+      expect(first?.owner).toEqual(OUTBOX_OWNER);
 
       const loaded = await loadOutbox();
       expect(loaded.map((e) => e.text)).toEqual(['first message', 'second message']);
@@ -645,12 +649,12 @@ describe('historyVault', () => {
         queued_at: 1000 + i,
         seq: i,
       })));
-      const finalSlot = await queueOutbox('#room', 'fills the final slot');
+      const finalSlot = await queueOwnedOutbox('#room', 'fills the final slot');
       expect(finalSlot).not.toBeNull();
 
       const listener = vi.fn();
       subscribeOutbox(listener);
-      await expect(queueOutbox('#room', 'must not displace anything')).resolves.toBeNull();
+      await expect(queueOwnedOutbox('#room', 'must not displace anything')).resolves.toBeNull();
 
       const loaded = await loadOutbox();
       expect(loaded).toHaveLength(OUTBOX_MAX_ENTRIES);
@@ -682,6 +686,7 @@ describe('historyVault', () => {
         text: 'keep',
         queued_at: 200,
         seq: 2,
+        owner: null,
       });
       expect('secret' in (loaded.find((entry) => entry.id === 'good') as unknown as Record<string, unknown>)).toBe(false);
     });
@@ -694,12 +699,12 @@ describe('historyVault', () => {
       const stopThrowing = subscribeOutbox(throwing);
       const stopHeard = subscribeOutbox(heard);
 
-      const first = await queueOutbox('#room', 'sensitive queued text');
+      const first = await queueOwnedOutbox('#room', 'sensitive queued text');
       expect(first).not.toBeNull();
       expect(await loadOutbox()).toHaveLength(1); // listener failure did not undo persistence
       await deleteOutboxEntry(first!.id);
       await deleteOutboxEntry(first!.id); // deleting a missing id is not a change
-      await queueOutbox('#room', 'another secret');
+      await queueOwnedOutbox('#room', 'another secret');
       await clearVault();
 
       expect(heard.mock.calls.map(([change]) => change)).toEqual([
@@ -715,13 +720,13 @@ describe('historyVault', () => {
       stopHeard();
       stopHeard(); // cleanup is idempotent
       stopThrowing();
-      await queueOutbox('#room', 'after unsubscribe');
+      await queueOwnedOutbox('#room', 'after unsubscribe');
       expect(heard).toHaveBeenCalledTimes(4);
       expect(throwing).toHaveBeenCalledTimes(4);
     });
 
     it('clears only the committed outbox and publishes a metadata-only invalidation', async () => {
-      await queueOutbox('#private', 'queued plaintext must not publish');
+      await queueOwnedOutbox('#private', 'queued plaintext must not publish');
       await putRawOutboxRows([{
         id: 'corrupt-hidden-row',
         target_key: '#wrong',
@@ -745,7 +750,7 @@ describe('historyVault', () => {
     });
 
     it('does not publish or claim an outbox clear when its transaction aborts', async () => {
-      const entry = await queueOutbox('#room', 'keep after bulk clear failure');
+      const entry = await queueOwnedOutbox('#room', 'keep after bulk clear failure');
       const listener = vi.fn();
       const stop = subscribeOutbox(listener);
       const realClear = IDBObjectStore.prototype.clear;
@@ -767,7 +772,7 @@ describe('historyVault', () => {
       // @ts-expect-error — deliberately removing the global
       delete globalThis.indexedDB;
       _resetVaultForTests();
-      expect(await queueOutbox('#room', 'x')).toBeNull();
+      expect(await queueOwnedOutbox('#room', 'x')).toBeNull();
       expect(await loadOutbox()).toEqual([]);
       await expect(deleteOutboxEntry('nope')).resolves.toBeUndefined();
       await expect(clearOutbox()).resolves.toBe(false);
@@ -790,7 +795,7 @@ describe('historyVault', () => {
       });
 
       try {
-        await expect(queueOutbox('#room', 'not durable')).resolves.toBeNull();
+        await expect(queueOwnedOutbox('#room', 'not durable')).resolves.toBeNull();
         expect(await loadOutbox()).toEqual([]);
         expect(listener).not.toHaveBeenCalled();
       } finally {
@@ -799,7 +804,7 @@ describe('historyVault', () => {
     });
 
     it('does not publish or lose the row when a delete transaction aborts', async () => {
-      const entry = await queueOutbox('#room', 'keep after failed delete');
+      const entry = await queueOwnedOutbox('#room', 'keep after failed delete');
       const listener = vi.fn();
       subscribeOutbox(listener);
       const realDelete = IDBObjectStore.prototype.delete;
@@ -822,7 +827,7 @@ describe('historyVault', () => {
     });
 
     it('does not publish or partially clear when the clear transaction aborts', async () => {
-      const entry = await queueOutbox('#room', 'keep after failed clear');
+      const entry = await queueOwnedOutbox('#room', 'keep after failed clear');
       await saveMessages('#room', [msg('keep', 1000)]);
       const listener = vi.fn();
       subscribeOutbox(listener);
@@ -867,7 +872,7 @@ describe('historyVault', () => {
     it('erases every target, the outbox, and device-local topic read state', async () => {
       await saveMessages('#alpha', [msg('a', 1000)]);
       await saveMessages('#beta', [msg('b', 2000)]);
-      await queueOutbox('#alpha', 'queued line');
+      await queueOwnedOutbox('#alpha', 'queued line');
       markTopicRead('#alpha', 'roadmap', { id: 'a', time: new Date(1000) });
       await expect(clearVault()).resolves.toBe(true);
       expect(await loadRecent('#alpha')).toEqual([]);
@@ -878,7 +883,7 @@ describe('historyVault', () => {
 
     it('does not report success when a committed clear leaves physical message rows behind', async () => {
       await saveMessages('#alpha', [msg('keep', 1000)]);
-      await queueOutbox('#alpha', 'discarded independently');
+      await queueOwnedOutbox('#alpha', 'discarded independently');
       const realClear = IDBObjectStore.prototype.clear;
       const clear = vi.spyOn(IDBObjectStore.prototype, 'clear').mockImplementation(function (
         this: IDBObjectStore,
