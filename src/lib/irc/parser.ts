@@ -333,16 +333,32 @@ export function selectSaslMechanism(
   return null;
 }
 
+export const MAX_STANDARD_REPLY_PARAMS = 32;
+export const MAX_STANDARD_REPLY_TOKEN_LENGTH = 4 * 1024;
+
 export function parseStandardReply(msg: IRCMessage): StandardReply | null {
   if (msg.command !== 'NOTE' && msg.command !== 'FAIL' && msg.command !== 'WARN') return null;
-  const [command, code, ...rest] = msg.params;
-  if (!command) return null;
-  const description = rest.length > 0 ? rest[rest.length - 1]! : '';
-  const context = rest.length > 1 ? rest.slice(0, -1) : [];
+  if (msg.params.length === 0 || msg.params.length > MAX_STANDARD_REPLY_PARAMS) return null;
+  const command = msg.params[0]!;
+  const code = msg.params[1] ?? '';
+  if (
+    !command
+    || command.length > MAX_STANDARD_REPLY_TOKEN_LENGTH
+    || code.length > MAX_STANDARD_REPLY_TOKEN_LENGTH
+  ) return null;
+
+  const description = msg.params.length > 2 ? msg.params[msg.params.length - 1]! : '';
+  if (description.length > MAX_STANDARD_REPLY_TOKEN_LENGTH) return null;
+  const context: string[] = [];
+  for (let index = 2; index < msg.params.length - 1; index += 1) {
+    const value = msg.params[index]!;
+    if (value.length > MAX_STANDARD_REPLY_TOKEN_LENGTH) return null;
+    context.push(value);
+  }
   return {
     kind: msg.command,
     command: command.toUpperCase(),
-    code: (code ?? '').toUpperCase(),
+    code: code.toUpperCase(),
     context,
     description,
   };

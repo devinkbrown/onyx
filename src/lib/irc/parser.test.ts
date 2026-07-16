@@ -11,6 +11,8 @@ import {
   normalizeCase,
   selectSaslMechanism,
   parseStandardReply,
+  MAX_STANDARD_REPLY_PARAMS,
+  MAX_STANDARD_REPLY_TOKEN_LENGTH,
   parseSessionTokenNote,
   parseSessionMeshTokenNote,
   buildSessionResumeLine,
@@ -228,6 +230,16 @@ describe('standard replies + SESSION notes', () => {
   });
   it('ignores non standard-reply commands', () => {
     expect(parseStandardReply(parseIRCMessage(':srv PRIVMSG #c :hi'))).toBeNull();
+  });
+  it('rejects unbounded parameter and token work', () => {
+    const params = Array.from(
+      { length: MAX_STANDARD_REPLY_PARAMS + 1 },
+      (_, index) => `value-${index}`,
+    ).join(' ');
+    expect(parseStandardReply(parseIRCMessage(`:srv NOTE ${params}`))).toBeNull();
+    expect(parseStandardReply(parseIRCMessage(
+      `:srv FAIL SEARCH RATE_LIMITED :${'x'.repeat(MAX_STANDARD_REPLY_TOKEN_LENGTH + 1)}`,
+    ))).toBeNull();
   });
   it('extracts a SESSION TOKEN', () => {
     expect(parseSessionTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc123'))).toBe('abc123');
