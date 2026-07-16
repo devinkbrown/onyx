@@ -142,6 +142,7 @@ function cacheSuccessfulShellNavigation(pathname, response) {
   }
   return caches.open(CACHE_NAME)
     .then((cache) => cache.put(fallbackPath, clone))
+    .then(() => clearStaleShellCaches())
     .catch(() => undefined);
 }
 

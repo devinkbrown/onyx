@@ -488,6 +488,9 @@ describe('PWA manifest', () => {
     expect(networkFetch).not.toHaveBeenCalled();
     expect(preloadedResponse.clone).toHaveBeenCalledOnce();
     expect(put).toHaveBeenCalledWith('/app/', navigationClone);
+    expect(deleteCache).toHaveBeenCalledOnce();
+    expect(deleteCache).toHaveBeenCalledWith('onyx-shell-old-build');
+    expect(deleteCache).not.toHaveBeenCalledWith('public-site-cache');
 
     const redirectedClone = vi.fn(() => ({ source: 'unsafe-clone' }));
     navigationCacheWork = undefined;
