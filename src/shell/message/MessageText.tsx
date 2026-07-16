@@ -869,7 +869,14 @@ export type MessageTextProps = {
  */
 function LinkPreviewCard(props: { url: string }): JSX.Element {
   const [local] = splitProps(props, ['url']);
-  const [preview] = createResource(() => local.url, fetchLinkPreview);
+  const [preview] = createResource(
+    () => local.url,
+    fetchLinkPreview,
+    // A preview is optional decoration for an already-renderable message. Keep
+    // its network wait out of the route Suspense boundary so one URL can never
+    // blank the transcript, composer, or roster.
+    { initialValue: null },
+  );
   const [thumbnailFailed, setThumbnailFailed] = createSignal(false);
 
   // Defense in depth at the sink: the card's canonical URL is extracted by the
@@ -879,7 +886,7 @@ function LinkPreviewCard(props: { url: string }): JSX.Element {
   // is not credential-free http(s), so a dangerous scheme or URL userinfo never
   // reaches the anchor.
   const safe = createMemo(() => {
-    const p = preview();
+    const p = preview.latest;
     return p && isAutoLoadableHttpUrl(p.url) ? p : null;
   });
 

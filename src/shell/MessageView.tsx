@@ -894,6 +894,10 @@ export function MessageView(props: MessageViewProps): JSX.Element {
         hasAnchor: hasReviewedAnchor(entry, localMessages),
       };
     },
+    // Reader-memory hydration is an additive local projection. Seed an empty
+    // value and read `latest` so a slow IndexedDB transaction cannot suspend
+    // the live conversation shell during a mode/view change.
+    { initialValue: null },
   );
   const readerHydratedTrail = createMemo(() => {
     const entry = readerReviewedSpan();
@@ -902,11 +906,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const readerAnchorSource = createMemo(() => {
     const entry = readerReviewedSpan();
     const visibleMessages = messages();
-    if (entry && readerVaultContext()?.hasAnchor && !hasReviewedAnchor(entry, visibleMessages)) return 'vault';
+    if (entry && readerVaultContext.latest?.hasAnchor && !hasReviewedAnchor(entry, visibleMessages)) return 'vault';
     return reviewedAnchorSource(entry, visibleMessages, null);
   });
   const readerReviewedTrail = createMemo(() =>
-    mergeReviewedContextTrails(readerHydratedTrail(), readerVaultContext()?.trail ?? null),
+    mergeReviewedContextTrails(readerHydratedTrail(), readerVaultContext.latest?.trail ?? null),
   );
 
   // ── scroll state ──
@@ -1020,7 +1024,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   async function jumpToReviewedSpan(entry: ReviewHistoryEntry): Promise<void> {
     const state = getState();
     const visibleMessages = messages();
-    const cachedVault = readerVaultContext();
+    const cachedVault = readerVaultContext.latest;
     if (!hasReviewedAnchor(entry, visibleMessages)) {
       const localMessages = cachedVault?.messages ?? await loadRecent(entry.target, 80);
       if (hasReviewedAnchor(entry, localMessages)) {

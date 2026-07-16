@@ -9,6 +9,7 @@
  */
 
 import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { Suspense } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LinkPreview } from '@/lib/preview/linkPreview';
 
@@ -37,6 +38,28 @@ function preview(overrides: Partial<LinkPreview>): LinkPreview {
 describe('MessageText link-preview scheme guard', () => {
   beforeEach(() => fetchLinkPreview.mockReset());
   afterEach(() => vi.restoreAllMocks());
+
+  it('keeps message content mounted while an optional preview is pending', async () => {
+    let resolvePreview!: (value: LinkPreview | null) => void;
+    const pendingPreview = new Promise<LinkPreview | null>((resolve) => {
+      resolvePreview = resolve;
+    });
+    fetchLinkPreview.mockReturnValue(pendingPreview);
+
+    render(() => (
+      <Suspense fallback={<p data-testid="message-suspended">Loading conversation</p>}>
+        <p>Stable transcript</p>
+        <MessageText text="look at https://ok.example/page please" />
+      </Suspense>
+    ));
+
+    expect(screen.queryByTestId('message-suspended')).not.toBeInTheDocument();
+    expect(screen.getByText('Stable transcript')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'https://ok.example/page' })).toBeInTheDocument();
+
+    resolvePreview(null);
+    await pendingPreview;
+  });
 
   it('drops a preview whose canonical URL is a javascript: scheme (no card)', async () => {
     fetchLinkPreview.mockResolvedValue(preview({ url: 'javascript:alert(1)', title: 'evil' }));
