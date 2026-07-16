@@ -28,6 +28,11 @@ import {
   saveIdentityProfileMemory,
 } from '@/lib/identityProfileMemory';
 import { loadTopicHistory, saveTopicHistory } from '@/lib/topics/topicHistory';
+import {
+  emptyChannelNavigationMemory,
+  loadChannelNavigationMemory,
+  saveChannelNavigationMemory,
+} from '@/lib/channelNavigationMemory';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import {
   MAX_TOPIC_READ_ENTRIES,
@@ -499,6 +504,27 @@ describe('portableTransfer', () => {
     expect(await clearVault()).toBe(true);
     expect(loadTopicHistory(alice)).toEqual({});
     expect(loadTopicHistory(bob)).toEqual({});
+  });
+
+  it('keeps channel navigation device-only and retains it across clear local history', async () => {
+    const alice = { serverUrl: 'wss://portable.example/ws', identity: 'alice' } as const;
+    const bob = { serverUrl: 'wss://portable.example/ws', identity: 'bob' } as const;
+    saveChannelNavigationMemory({
+      ...emptyChannelNavigationMemory(),
+      pinnedChannels: new Set(['#alice-private-navigation']),
+    }, alice);
+    saveChannelNavigationMemory({
+      ...emptyChannelNavigationMemory(),
+      pinnedChannels: new Set(['#bob-private-navigation']),
+    }, bob);
+
+    const serialized = JSON.stringify(await exportPortableTransfer(alice));
+    expect(serialized).not.toContain('#alice-private-navigation');
+    expect(serialized).not.toContain('#bob-private-navigation');
+
+    expect(await clearVault()).toBe(true);
+    expect(loadChannelNavigationMemory(alice).pinnedChannels).toEqual(new Set(['#alice-private-navigation']));
+    expect(loadChannelNavigationMemory(bob).pinnedChannels).toEqual(new Set(['#bob-private-navigation']));
   });
 
   it('rejects a local-history-disabled import when the privacy clear does not commit', async () => {

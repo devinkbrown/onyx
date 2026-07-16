@@ -10,26 +10,36 @@
  *  - the toggle REPLACES the Set (fresh reference, previous untouched) so
  *    `useStore` subscribers actually fire;
  *  - keys are normalized case-insensitively;
- *  - state persists under `onyx:pinned-channels` / `onyx:followed-channels`;
- *  - the load-on-init path reconstructs the Set from localStorage.
+ *  - state persists in the active owner's channel-navigation namespace.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { CHANNEL_NAVIGATION_STORAGE_KEY, loadChannelNavigationMemory } from '@/lib/channelNavigationMemory';
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   store,
-  _loadPinnedChannels,
-  _loadFollowedChannels,
   selectIsChannelPinned,
   selectIsChannelFollowed,
+  type Server,
 } from './store';
 
 const initialState = store.getInitialState();
-const PINNED_KEY = 'onyx:pinned-channels';
-const FOLLOWED_KEY = 'onyx:followed-channels';
+const owner = { serverUrl: 'wss://navigation.test/ws', identity: 'alice' } as const;
+const server: Server = {
+  id: 'navigation-test',
+  name: 'Navigation',
+  network: 'Navigation',
+  url: owner.serverUrl,
+  icon: '',
+  nick: owner.identity,
+  account: owner.identity,
+  connected: true,
+};
 
 beforeEach(() => {
   store.setState(initialState, true);
   localStorage.clear();
+  store.setState({ server, ourNick: owner.identity, pinnedChannels: new Set(), followedChannels: new Set() });
 });
 
 describe('togglePinChannel', () => {
@@ -95,13 +105,16 @@ describe('selectors', () => {
 });
 
 describe('persistence round-trip', () => {
-  it('persists pinned + followed sets under their onyx keys', () => {
+  it('persists pinned + followed sets under the owner navigation key', () => {
     store.getState().togglePinChannel('#Pin1');
     store.getState().togglePinChannel('#Pin2');
     store.getState().toggleFollowChannel('#Fol1');
 
-    expect(JSON.parse(localStorage.getItem(PINNED_KEY)!)).toEqual(['#pin1', '#pin2']);
-    expect(JSON.parse(localStorage.getItem(FOLLOWED_KEY)!)).toEqual(['#fol1']);
+    const key = deviceMemoryStorageKey(CHANNEL_NAVIGATION_STORAGE_KEY, owner)!;
+    expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({
+      pinnedChannels: ['#pin1', '#pin2'],
+      followedChannels: ['#fol1'],
+    });
   });
 
   it('un-pinning rewrites the persisted list', () => {
@@ -109,26 +122,17 @@ describe('persistence round-trip', () => {
     store.getState().togglePinChannel('#b');
     store.getState().togglePinChannel('#a');
 
-    expect(JSON.parse(localStorage.getItem(PINNED_KEY)!)).toEqual(['#b']);
+    expect([...loadChannelNavigationMemory(owner).pinnedChannels]).toEqual(['#b']);
   });
 
-  it('reloads the Set from localStorage on init (load-on-init path)', () => {
-    localStorage.setItem(PINNED_KEY, JSON.stringify(['#alpha', '#beta']));
-    localStorage.setItem(FOLLOWED_KEY, JSON.stringify(['#gamma']));
+  it('reloads both Sets through the owner-scoped boundary', () => {
+    store.getState().togglePinChannel('#alpha');
+    store.getState().togglePinChannel('#beta');
+    store.getState().toggleFollowChannel('#gamma');
+    const navigation = loadChannelNavigationMemory(owner);
 
-    const pinned = _loadPinnedChannels();
-    const followed = _loadFollowedChannels();
-
-    expect(pinned).toBeInstanceOf(Set);
-    expect([...pinned]).toEqual(['#alpha', '#beta']);
-    expect([...followed]).toEqual(['#gamma']);
-  });
-
-  it('load returns an empty Set for missing or malformed storage', () => {
-    expect(_loadPinnedChannels().size).toBe(0); // missing
-    localStorage.setItem(PINNED_KEY, '{not json');
-    expect(_loadPinnedChannels().size).toBe(0); // malformed
-    localStorage.setItem(FOLLOWED_KEY, JSON.stringify({ not: 'an array' }));
-    expect(_loadFollowedChannels().size).toBe(0); // wrong shape
+    expect(navigation.pinnedChannels).toBeInstanceOf(Set);
+    expect([...navigation.pinnedChannels]).toEqual(['#alpha', '#beta']);
+    expect([...navigation.followedChannels]).toEqual(['#gamma']);
   });
 });

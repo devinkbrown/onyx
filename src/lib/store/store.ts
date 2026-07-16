@@ -10,7 +10,14 @@ import {
   parseStringRecord,
 } from './persistParse';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
-import { parseChannelFolders } from './channelFoldersPersistence';
+import {
+  emptyChannelNavigationMemory,
+  loadChannelNavigationMemory,
+  normalizeNavigationChannel,
+  parseChannelNavigationMemory,
+  saveChannelNavigationMemory,
+  type ChannelNavigationMemory,
+} from '@/lib/channelNavigationMemory';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
@@ -761,9 +768,9 @@ export interface OnyxState {
   closeFriendsPanel(): void;
 
   // ── Pinned / followed channels ───────────────────────────────────────
-  /** Channels pinned to the top of their server group (persisted 'onyx:pinned-channels'). Keys lower-cased. */
+  /** Channels pinned to the top of their server group in owner-scoped navigation memory. */
   pinnedChannels: Set<string>;
-  /** Channels the user follows for Home digests / softer notify tier (persisted 'onyx:followed-channels'). Keys lower-cased. */
+  /** Channels followed for Home digests / softer notify tier in owner-scoped navigation memory. */
   followedChannels: Set<string>;
   /** Toggle a channel's pinned state, replacing the Set immutably and persisting. */
   togglePinChannel(channel: string): void;
@@ -2768,6 +2775,8 @@ function _resetAccountBoundState(
       mutedDMs: new Set(),
       userNotes: new Map(),
       topicHistory: {},
+      ...emptyChannelNavigationMemory(),
+      nsfwAcknowledged: new Set(),
       customStatus: '',
       customStatusExpiry: null,
       showCustomStatus: false,
@@ -3585,6 +3594,47 @@ function _loadOwnedTopicHistory(
   return owner ? loadTopicHistory(owner) : {};
 }
 
+function _channelNavigationMemory(
+  state: Pick<OnyxState,
+    | 'pinnedChannels'
+    | 'followedChannels'
+    | 'starredChannels'
+    | 'channelFolders'
+    | 'channelOrder'
+    | 'nsfwChannels'
+    | 'forumChannels'>,
+): ChannelNavigationMemory {
+  return {
+    pinnedChannels: state.pinnedChannels,
+    followedChannels: state.followedChannels,
+    starredChannels: state.starredChannels,
+    channelFolders: state.channelFolders,
+    channelOrder: state.channelOrder,
+    nsfwChannels: state.nsfwChannels,
+    forumChannels: state.forumChannels,
+  };
+}
+
+function _loadOwnedChannelNavigation(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): ChannelNavigationMemory {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadChannelNavigationMemory(owner) : emptyChannelNavigationMemory();
+}
+
+function _saveOwnedChannelNavigation(
+  state: OnyxState,
+  owner: DeviceMemoryOwner,
+  patch: Partial<ChannelNavigationMemory>,
+): ChannelNavigationMemory {
+  const navigation = parseChannelNavigationMemory({
+    ..._channelNavigationMemory(state),
+    ...patch,
+  });
+  saveChannelNavigationMemory(navigation, owner);
+  return navigation;
+}
+
 /** Project the active owner's device-local status without retaining the old self key. */
 function _syncOwnCustomStatusActivity(get: GetFn, set: SetFn, previousNick?: string): void {
   const { customStatus, ourNick } = get();
@@ -3884,8 +3934,8 @@ export const store = createStore<OnyxState>()(
     // Contact lists are private and load only after a server owner exists.
     friends: new Map(),
     showFriendsPanel: false,
-    pinnedChannels: _loadPinnedChannels(),
-    followedChannels: _loadFollowedChannels(),
+    pinnedChannels: new Set(),
+    followedChannels: new Set(),
     // Contact moderation is private per identity and loads only after the
     // active server owner exists.
     ignoredUsers: new Set(),
@@ -4261,6 +4311,7 @@ export const store = createStore<OnyxState>()(
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: newNick }),
               topicHistory: _loadOwnedTopicHistory({ server, ourNick: newNick }),
+              ..._loadOwnedChannelNavigation({ server, ourNick: newNick }),
               ..._loadOwnedIdentityProfile({ server, ourNick: newNick }),
             };
           });
@@ -4348,6 +4399,7 @@ export const store = createStore<OnyxState>()(
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
               userNotes: _loadOwnedUserNotes({ server: srv, ourNick: get().ourNick }),
               topicHistory: _loadOwnedTopicHistory({ server: srv, ourNick: get().ourNick }),
+              ..._loadOwnedChannelNavigation({ server: srv, ourNick: get().ourNick }),
               ..._loadOwnedIdentityProfile({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
@@ -6613,23 +6665,27 @@ export const store = createStore<OnyxState>()(
 
     // ── Pinned / followed channels ────────────────────────────────────────
     togglePinChannel(channel) {
-      const key = channel.toLowerCase();
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeNavigationChannel(channel);
+      if (!owner || !key) return;
       set(s => {
         const pinnedChannels = new Set(s.pinnedChannels);
         if (pinnedChannels.has(key)) pinnedChannels.delete(key);
         else pinnedChannels.add(key);
-        _savePinnedChannels(pinnedChannels);
-        return { pinnedChannels };
+        const navigation = _saveOwnedChannelNavigation(s, owner, { pinnedChannels });
+        return { pinnedChannels: navigation.pinnedChannels };
       });
     },
     toggleFollowChannel(channel) {
-      const key = channel.toLowerCase();
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeNavigationChannel(channel);
+      if (!owner || !key) return;
       set(s => {
         const followedChannels = new Set(s.followedChannels);
         if (followedChannels.has(key)) followedChannels.delete(key);
         else followedChannels.add(key);
-        _saveFollowedChannels(followedChannels);
-        return { followedChannels };
+        const navigation = _saveOwnedChannelNavigation(s, owner, { followedChannels });
+        return { followedChannels: navigation.followedChannels };
       });
     },
 
@@ -7451,6 +7507,7 @@ export const store = createStore<OnyxState>()(
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
               topicHistory: _loadOwnedTopicHistory({ server, ourNick: s.ourNick }),
+              ..._loadOwnedChannelNavigation({ server, ourNick: s.ourNick }),
               ..._loadOwnedIdentityProfile({ server, ourNick: s.ourNick }),
             };
           });
@@ -7599,11 +7656,14 @@ export const store = createStore<OnyxState>()(
             set(s => {
               const channels = new Map(s.channels);
               channels.delete(key);
-              const channelFolders = s.channelFolders.map(f => ({
+              let channelFolders = s.channelFolders.map(f => ({
                 ...f,
                 channels: f.channels.filter(c => c.toLowerCase() !== key),
               }));
-              _saveChannelFolders(channelFolders);
+              const owner = selectDeviceMemoryOwner(s);
+              if (owner) {
+                channelFolders = _saveOwnedChannelNavigation(s, owner, { channelFolders }).channelFolders;
+              }
               const active = s.activeView;
               const next: ActiveView = active.kind === 'channel' && active.channel.toLowerCase() === key
                 ? { kind: 'home' }
@@ -7687,11 +7747,14 @@ export const store = createStore<OnyxState>()(
             const channels = new Map(s.channels);
             if (isSelf) {
               channels.delete(key);
-              const channelFolders = s.channelFolders.map(folder => ({
+              let channelFolders = s.channelFolders.map(folder => ({
                 ...folder,
                 channels: folder.channels.filter(channel => channel.toLowerCase() !== key),
               }));
-              _saveChannelFolders(channelFolders);
+              const owner = selectDeviceMemoryOwner(s);
+              if (owner) {
+                channelFolders = _saveOwnedChannelNavigation(s, owner, { channelFolders }).channelFolders;
+              }
               const activeChannelTopics = new Map(s.activeChannelTopics);
               activeChannelTopics.delete(key);
               const activeView = s.activeView.kind === 'channel'
@@ -8657,6 +8720,7 @@ export const store = createStore<OnyxState>()(
                 watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
                 userNotes: _loadOwnedUserNotes({ server, ourNick: newNick }),
                 topicHistory: _loadOwnedTopicHistory({ server, ourNick: newNick }),
+                ..._loadOwnedChannelNavigation({ server, ourNick: newNick }),
                 ..._loadOwnedIdentityProfile({ server, ourNick: newNick }),
               };
             });
@@ -9867,6 +9931,7 @@ export const store = createStore<OnyxState>()(
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
                 userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
                 topicHistory: _loadOwnedTopicHistory({ server, ourNick: s.ourNick }),
+                ..._loadOwnedChannelNavigation({ server, ourNick: s.ourNick }),
                 ..._loadOwnedIdentityProfile({ server, ourNick: s.ourNick }),
                 passkeyBusy: false,
                 passkeyError: null,
@@ -9908,6 +9973,7 @@ export const store = createStore<OnyxState>()(
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
               topicHistory: _loadOwnedTopicHistory({ server, ourNick: s.ourNick }),
+              ..._loadOwnedChannelNavigation({ server, ourNick: s.ourNick }),
               ..._loadOwnedIdentityProfile({ server, ourNick: s.ourNick }),
             };
           });
@@ -10636,23 +10702,29 @@ export const store = createStore<OnyxState>()(
     }),
 
     // ── Starred channels ──────────────────────────────────────────────────
-    starredChannels: (() => {
-      if (typeof window === 'undefined') return new Set<string>();
-      try { return new Set(parseStringArray(localStorage.getItem('onyx:starred'))); }
-      catch { return new Set<string>(); }
-    })(),
-    starChannel: (ch) => set(s => {
-      const next = new Set(s.starredChannels);
-      next.add(ch);
-      if (typeof window !== 'undefined') localStorage.setItem('onyx:starred', JSON.stringify([...next]));
-      return { starredChannels: next };
-    }),
-    unstarChannel: (ch) => set(s => {
-      const next = new Set(s.starredChannels);
-      next.delete(ch);
-      if (typeof window !== 'undefined') localStorage.setItem('onyx:starred', JSON.stringify([...next]));
-      return { starredChannels: next };
-    }),
+    starredChannels: new Set(),
+    starChannel: (ch) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const channel = normalizeNavigationChannel(ch);
+      if (!owner || !channel) return;
+      set(s => {
+        const starredChannels = new Set(s.starredChannels);
+        starredChannels.add(channel);
+        const navigation = _saveOwnedChannelNavigation(s, owner, { starredChannels });
+        return { starredChannels: navigation.starredChannels };
+      });
+    },
+    unstarChannel: (ch) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const channel = normalizeNavigationChannel(ch);
+      if (!owner || !channel) return;
+      set(s => {
+        const starredChannels = new Set(s.starredChannels);
+        starredChannels.delete(channel);
+        const navigation = _saveOwnedChannelNavigation(s, owner, { starredChannels });
+        return { starredChannels: navigation.starredChannels };
+      });
+    },
 
     // ── Custom emoji ──────────────────────────────────────────────────────
     customEmoji: (() => {
@@ -11193,50 +11265,75 @@ export const store = createStore<OnyxState>()(
     toggleFocusMode: () => set(s => ({ focusMode: !s.focusMode })),
 
     // ── Channel folders ───────────────────────────────────────────────────────
-    channelFolders: _loadChannelFolders(),
+    channelFolders: emptyChannelNavigationMemory().channelFolders,
     setChannelFolders: (folders) => {
-      set({ channelFolders: folders });
-      _saveChannelFolders(folders);
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const navigation = _saveOwnedChannelNavigation(s, owner, { channelFolders: folders });
+        return { channelFolders: navigation.channelFolders };
+      });
     },
-    addChannelToFolder: (channel, folderId) => set(s => {
-      const folders = s.channelFolders.map(f => ({
-        ...f,
-        channels: f.channels.filter(c => c.toLowerCase() !== channel.toLowerCase()),
-      }));
-      const updated = folders.map(f =>
-        f.id === folderId ? { ...f, channels: [...f.channels, channel] } : f
-      );
-      _saveChannelFolders(updated);
-      return { channelFolders: updated };
-    }),
-    toggleFolderCollapsed: (folderId) => set(s => {
-      const updated = s.channelFolders.map(f =>
-        f.id === folderId ? { ...f, collapsed: !f.collapsed } : f
-      );
-      _saveChannelFolders(updated);
-      return { channelFolders: updated };
-    }),
-    createFolder: (name) => set(s => {
-      const id = `folder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      const updated = [...s.channelFolders, { id, name, channels: [], collapsed: false }];
-      _saveChannelFolders(updated);
-      return { channelFolders: updated };
-    }),
-    deleteFolder: (folderId) => set(s => {
-      const toDelete = s.channelFolders.find(f => f.id === folderId);
-      if (!toDelete) return {};
-      const orphans = toDelete.channels;
-      const updated = s.channelFolders
-        .filter(f => f.id !== folderId)
-        .map((f, i) => i === 0 ? { ...f, channels: [...f.channels, ...orphans] } : f);
-      _saveChannelFolders(updated);
-      return { channelFolders: updated };
-    }),
-    renameFolder: (folderId, name) => set(s => {
-      const updated = s.channelFolders.map(f => f.id === folderId ? { ...f, name } : f);
-      _saveChannelFolders(updated);
-      return { channelFolders: updated };
-    }),
+    addChannelToFolder: (channel, folderId) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const channelKey = normalizeNavigationChannel(channel);
+      if (!owner || !channelKey) return;
+      set(s => {
+        const folders = s.channelFolders.map(f => ({
+          ...f,
+          channels: f.channels.filter(c => c.toLowerCase() !== channelKey),
+        }));
+        const channelFolders = folders.map(f =>
+          f.id === folderId ? { ...f, channels: [...f.channels, channelKey] } : f
+        );
+        const navigation = _saveOwnedChannelNavigation(s, owner, { channelFolders });
+        return { channelFolders: navigation.channelFolders };
+      });
+    },
+    toggleFolderCollapsed: (folderId) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const channelFolders = s.channelFolders.map(f =>
+          f.id === folderId ? { ...f, collapsed: !f.collapsed } : f
+        );
+        const navigation = _saveOwnedChannelNavigation(s, owner, { channelFolders });
+        return { channelFolders: navigation.channelFolders };
+      });
+    },
+    createFolder: (name) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const id = `folder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const channelFolders = [...s.channelFolders, { id, name, channels: [], collapsed: false }];
+        const navigation = _saveOwnedChannelNavigation(s, owner, { channelFolders });
+        return { channelFolders: navigation.channelFolders };
+      });
+    },
+    deleteFolder: (folderId) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const toDelete = s.channelFolders.find(f => f.id === folderId);
+        if (!toDelete) return {};
+        const orphans = toDelete.channels;
+        const channelFolders = s.channelFolders
+          .filter(f => f.id !== folderId)
+          .map((f, i) => i === 0 ? { ...f, channels: [...f.channels, ...orphans] } : f);
+        const navigation = _saveOwnedChannelNavigation(s, owner, { channelFolders });
+        return { channelFolders: navigation.channelFolders };
+      });
+    },
+    renameFolder: (folderId, name) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const channelFolders = s.channelFolders.map(f => f.id === folderId ? { ...f, name } : f);
+        const navigation = _saveOwnedChannelNavigation(s, owner, { channelFolders });
+        return { channelFolders: navigation.channelFolders };
+      });
+    },
 
     // ── Favorite emojis ───────────────────────────────────────────────────────
     favoriteEmojis: _loadFavoriteEmojis(),
@@ -11447,19 +11544,19 @@ export const store = createStore<OnyxState>()(
     exitSelectMode: () => set({ isSelectMode: false, selectedMessages: new Set() }),
 
     // ── Forum channels ────────────────────────────────────────────────────
-    forumChannels: _loadForumChannels(),
-    toggleForumChannel: (channel) => set(s => {
-      const next = new Set(s.forumChannels);
-      const key = channel.toLowerCase();
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('onyx:forum-channels', JSON.stringify([...next]));
-        }
-      } catch {}
-      return { forumChannels: next };
-    }),
+    forumChannels: new Set(),
+    toggleForumChannel: (channel) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeNavigationChannel(channel);
+      if (!owner || !key) return;
+      set(s => {
+        const forumChannels = new Set(s.forumChannels);
+        if (forumChannels.has(key)) forumChannels.delete(key);
+        else forumChannels.add(key);
+        const navigation = _saveOwnedChannelNavigation(s, owner, { forumChannels });
+        return { forumChannels: navigation.forumChannels };
+      });
+    },
     forumPosts: {},
     addForumPost: (channel, post) => set(s => {
       const key = channel.toLowerCase();
@@ -11871,32 +11968,46 @@ export const store = createStore<OnyxState>()(
     },
 
     // ── Channel ordering (drag reorder) ───────────────────────────────────────
-    channelOrder: _loadChannelOrder(),
+    channelOrder: [],
     setChannelOrder: (order) => {
-      if (typeof window !== 'undefined') {
-        try { localStorage.setItem('onyx:channel-order', JSON.stringify(order)); } catch {}
-      }
-      set({ channelOrder: order });
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const navigation = _saveOwnedChannelNavigation(s, owner, { channelOrder: order });
+        return { channelOrder: navigation.channelOrder };
+      });
     },
 
     // ── NSFW channels ─────────────────────────────────────────────────────────
-    nsfwChannels: _loadNsfwChannels(),
+    nsfwChannels: new Set(),
     nsfwAcknowledged: new Set<string>(),
-    markChannelNsfw: (channel) => set(s => {
-      const next = new Set(s.nsfwChannels);
-      next.add(channel.toLowerCase());
-      _saveNsfwChannels(next);
-      return { nsfwChannels: next };
-    }),
-    unmarkChannelNsfw: (channel) => set(s => {
-      const next = new Set(s.nsfwChannels);
-      next.delete(channel.toLowerCase());
-      _saveNsfwChannels(next);
-      return { nsfwChannels: next };
-    }),
+    markChannelNsfw: (channel) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeNavigationChannel(channel);
+      if (!owner || !key) return;
+      set(s => {
+        const nsfwChannels = new Set(s.nsfwChannels);
+        nsfwChannels.add(key);
+        const navigation = _saveOwnedChannelNavigation(s, owner, { nsfwChannels });
+        return { nsfwChannels: navigation.nsfwChannels };
+      });
+    },
+    unmarkChannelNsfw: (channel) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeNavigationChannel(channel);
+      if (!owner || !key) return;
+      set(s => {
+        const nsfwChannels = new Set(s.nsfwChannels);
+        nsfwChannels.delete(key);
+        const navigation = _saveOwnedChannelNavigation(s, owner, { nsfwChannels });
+        return { nsfwChannels: navigation.nsfwChannels };
+      });
+    },
     acknowledgeNsfw: (channel) => set(s => {
+      const key = normalizeNavigationChannel(channel);
+      if (!selectDeviceMemoryOwner(s) || !key) return {};
       const next = new Set(s.nsfwAcknowledged);
-      next.add(channel.toLowerCase());
+      next.add(key);
       return { nsfwAcknowledged: next };
     }),
 
@@ -12935,44 +13046,6 @@ function _saveBookmarks(bookmarks: ChatMessage[]): void {
   }
 }
 
-// ── Pinned / followed channels persistence ────────────────────────────────────
-// Storage keys are inlined (not module consts) so the load-on-init calls in the
-// store initializer are not blocked by a const still in its temporal dead zone.
-
-function _loadChannelSet(storageKey: string): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    return new Set(parseStringArray(localStorage.getItem(storageKey)).map((channel) => channel.toLowerCase()));
-  } catch {
-    return new Set();
-  }
-}
-
-function _saveChannelSet(storageKey: string, channels: Set<string>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(storageKey, JSON.stringify([...channels]));
-  } catch {
-    // Storage quota exceeded or unavailable — silently degrade
-  }
-}
-
-export function _loadPinnedChannels(): Set<string> {
-  return _loadChannelSet('onyx:pinned-channels');
-}
-
-export function _loadFollowedChannels(): Set<string> {
-  return _loadChannelSet('onyx:followed-channels');
-}
-
-function _savePinnedChannels(channels: Set<string>): void {
-  _saveChannelSet('onyx:pinned-channels', channels);
-}
-
-function _saveFollowedChannels(channels: Set<string>): void {
-  _saveChannelSet('onyx:followed-channels', channels);
-}
-
 // ── Nick color overrides persistence ─────────────────────────────────────────
 
 function _loadNickColorOverrides(): Map<string, string> {
@@ -13116,22 +13189,6 @@ function _saveFavoriteEmojis(emojis: string[]): void {
   try { localStorage.setItem('onyx:fav-emojis', JSON.stringify(emojis)); } catch {}
 }
 
-// ── Channel folders persistence ───────────────────────────────────────────────
-
-const FOLDERS_KEY = 'onyx:channel-folders';
-
-function _loadChannelFolders(): ChannelFolder[] {
-  if (typeof window === 'undefined') return parseChannelFolders(null);
-  try {
-    return parseChannelFolders(localStorage.getItem(FOLDERS_KEY));
-  } catch { return parseChannelFolders(null); }
-}
-
-function _saveChannelFolders(folders: ChannelFolder[]): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders)); } catch {}
-}
-
 // ── UI font persistence ────────────────────────────────────────────────────────
 function _loadUiFont(): string { return typeof window !== 'undefined' ? (localStorage.getItem('onyx:ui-font') ?? 'system-ui') : 'system-ui'; }
 
@@ -13180,15 +13237,6 @@ function _saveBackground(id: string): void {
 // ── High contrast mode persistence ───────────────────────────────────────────
 function _loadHighContrast(): boolean { return typeof window !== 'undefined' && localStorage.getItem('onyx:high-contrast') === '1'; }
 
-function _loadForumChannels(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    return new Set(parseStringArray(localStorage.getItem('onyx:forum-channels')));
-  } catch {
-    return new Set();
-  }
-}
-
 // ── Soft ignore persistence ───────────────────────────────────────────────────
 function _loadSoftIgnoreList(): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -13230,35 +13278,6 @@ function _loadDisplayFontSize(): number {
   const v = parseInt(raw, 10);
   if (v === 12 || v === 14 || v === 16 || v === 18 || v === 20) return v;
   return 16;
-}
-
-// ── Channel order persistence ─────────────────────────────────────────────────
-function _loadChannelOrder(): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    return parseStringArray(localStorage.getItem('onyx:channel-order'));
-  } catch {
-    return [];
-  }
-}
-
-// ── NSFW channels persistence ─────────────────────────────────────────────────
-function _loadNsfwChannels(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    return new Set(parseStringArray(localStorage.getItem('onyx:nsfw-channels')));
-  } catch {
-    return new Set();
-  }
-}
-
-function _saveNsfwChannels(channels: Set<string>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem('onyx:nsfw-channels', JSON.stringify([...channels]));
-  } catch {
-    // ignore quota errors
-  }
 }
 
 // ── Clean leave on deliberate page unload ─────────────────────────────────────
