@@ -107,6 +107,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     const memberTrigger = action instanceof HTMLElement
       ? action.closest('.onyx-popover')?.querySelector<HTMLButtonElement>('.onyx-popover__trigger')
       : null;
+    if (memberTrigger?.getAttribute('aria-expanded') === 'true') memberTrigger.click();
     memberTrigger?.focus({ preventScroll: true });
     getState().whois(local.user.nick);
   }

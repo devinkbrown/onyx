@@ -234,4 +234,20 @@ describe('MemberList accessibility', () => {
     expect(screen.queryByRole('dialog', { name: 'Member details for bob' })).toBeNull();
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
+
+  it('closes member details before handing Profile focus to the WHOIS sheet', () => {
+    seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
+
+    render(() => <MemberList />);
+
+    const trigger = screen.getByRole('button', { name: /Open member details for bob, Voice/ });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'View profile of bob' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Member details for bob' })).toBeNull();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
+    expect(store.getState().showWhois).toBe(true);
+    expect(store.getState().whoisNick).toBe('bob');
+  });
 });
