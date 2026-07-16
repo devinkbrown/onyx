@@ -46,6 +46,30 @@ function parseIsupportPositiveInt(value: string): number | null {
     : null;
 }
 
+function parseIsupportChannelTypes(value: string): string | null {
+  if (
+    value.length === 0
+    || value.length > 16
+    // Keep routing to the interoperable channel sigils Onyx supports. Letting
+    // letters or nick-special characters into this set can reclassify DMs as
+    // rooms throughout the client.
+    || !/^[#&+!]+$/u.test(value)
+    || new Set(value).size !== value.length
+  ) return null;
+  return value;
+}
+
+function parseIsupportChannelModes(value: string): string[] | null {
+  const groups = value.split(',');
+  if (
+    groups.length !== 4
+    || groups.some((group) => group.length > 64 || !/^[A-Za-z]*$/u.test(group))
+  ) return null;
+  const modes = groups.join('');
+  if (new Set(modes).size !== modes.length) return null;
+  return groups;
+}
+
 function parseAdvertisedCap(token: string): { name: string; value: string } | null {
   const eqIdx = token.indexOf('=');
   const name = eqIdx === -1 ? token : token.slice(0, eqIdx);
@@ -1271,14 +1295,20 @@ export class IRCClient {
           break;
         }
         case 'NETWORK':
-          this.isupport.NETWORK = val;
+          if (val && val.length <= 256) this.isupport.NETWORK = val;
           break;
-        case 'CHANTYPES':
-          this.isupport.CHANTYPES = val;
+        case 'CHANTYPES': {
+          const parsed = parseIsupportChannelTypes(val);
+          if (parsed !== null) this.isupport.CHANTYPES = parsed;
           break;
-        case 'CASEMAPPING':
-          this.isupport.CASEMAPPING = val;
+        }
+        case 'CASEMAPPING': {
+          const parsed = val.toLowerCase();
+          if (parsed === 'ascii' || parsed === 'rfc1459' || parsed === 'strict-rfc1459') {
+            this.isupport.CASEMAPPING = parsed;
+          }
           break;
+        }
         case 'NICKLEN': {
           const parsed = parseIsupportPositiveInt(val);
           if (parsed !== null) this.isupport.NICKLEN = parsed;
@@ -1306,9 +1336,11 @@ export class IRCClient {
           if (parsed !== null) this.isupport.MODES = parsed;
           break;
         }
-        case 'CHANMODES':
-          this.isupport.CHANMODES = val.split(',');
+        case 'CHANMODES': {
+          const parsed = parseIsupportChannelModes(val);
+          if (parsed !== null) this.isupport.CHANMODES = parsed;
           break;
+        }
         case 'IRCX':
           this.isupport.IRCX = true;
           break;

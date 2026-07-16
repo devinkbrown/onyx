@@ -128,6 +128,25 @@ describe('IRCClient ISUPPORT bounds', () => {
     feed(client, `:server 005 onyx NETWORK=${'x'.repeat(1025)} lowercase=bad :supported`);
     expect(client.isupport.NETWORK).toBe('Onyx');
   });
+
+  it('retains valid structural features after ambiguous updates', () => {
+    const { client } = makeClient();
+    feed(client, ':server 005 onyx NETWORK=Orochi CHANTYPES=#& CASEMAPPING=strict-rfc1459 CHANMODES=beI,k,lf,imnst :supported');
+    expect(client.isupport).toMatchObject({
+      NETWORK: 'Orochi',
+      CHANTYPES: '#&',
+      CASEMAPPING: 'strict-rfc1459',
+      CHANMODES: ['beI', 'k', 'lf', 'imnst'],
+    });
+
+    feed(client, ':server 005 onyx NETWORK CHANTYPES=ab CASEMAPPING=unknown CHANMODES=beI,k,lf :supported');
+    expect(client.isupport).toMatchObject({
+      NETWORK: 'Orochi',
+      CHANTYPES: '#&',
+      CASEMAPPING: 'strict-rfc1459',
+      CHANMODES: ['beI', 'k', 'lf', 'imnst'],
+    });
+  });
 });
 
 describe('IRCClient binary media plane', () => {
