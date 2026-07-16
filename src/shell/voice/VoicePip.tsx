@@ -25,7 +25,10 @@ type PipParticipantSummary = {
   speaking: number;
 };
 
-const storageKey = 'onyx-voice-pip-position';
+export const VOICE_PIP_POSITION_STORAGE_KEY = 'onyx:voice-pip-position';
+export const LEGACY_VOICE_PIP_POSITION_STORAGE_KEY = 'onyx-voice-pip-position';
+const MAX_STORED_POSITION_BYTES = 256;
+const MAX_STORED_COORDINATE = 100_000;
 const margin = 12;
 const PIP_VISIBLE_PARTICIPANT_MAX = 5;
 
@@ -42,12 +45,43 @@ function fallbackPosition() {
   };
 }
 
+function parseStoredPosition(raw: string | null): PipPosition | null {
+  if (!raw || raw.length > MAX_STORED_POSITION_BYTES) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+  const { x, y } = parsed as Record<string, unknown>;
+  if (
+    typeof x !== 'number'
+    || !Number.isFinite(x)
+    || Math.abs(x) > MAX_STORED_COORDINATE
+    || typeof y !== 'number'
+    || !Number.isFinite(y)
+    || Math.abs(y) > MAX_STORED_COORDINATE
+  ) return null;
+  return { x, y };
+}
+
 function readPosition(): PipPosition {
   if (typeof window === 'undefined') return fallbackPosition();
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? '') as Partial<PipPosition>;
-    if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-      return { x: parsed.x, y: parsed.y };
+    const current = parseStoredPosition(
+      window.localStorage.getItem(VOICE_PIP_POSITION_STORAGE_KEY),
+    );
+    const legacy = current
+      ? null
+      : parseStoredPosition(window.localStorage.getItem(LEGACY_VOICE_PIP_POSITION_STORAGE_KEY));
+    window.localStorage.removeItem(LEGACY_VOICE_PIP_POSITION_STORAGE_KEY);
+    const position = current ?? legacy;
+    if (position) {
+      if (!current) {
+        window.localStorage.setItem(VOICE_PIP_POSITION_STORAGE_KEY, JSON.stringify(position));
+      }
+      return position;
     }
   } catch {
     return fallbackPosition();
@@ -58,7 +92,8 @@ function readPosition(): PipPosition {
 function savePosition(position: PipPosition) {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(storageKey, JSON.stringify(position));
+    window.localStorage.removeItem(LEGACY_VOICE_PIP_POSITION_STORAGE_KEY);
+    window.localStorage.setItem(VOICE_PIP_POSITION_STORAGE_KEY, JSON.stringify(position));
   } catch {}
 }
 

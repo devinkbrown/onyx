@@ -7,7 +7,11 @@ import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
 import { CaptionsOverlay } from './CaptionsOverlay';
 import { IncomingCallOverlay } from './IncomingCallOverlay';
 import { OutgoingCallOverlay } from './OutgoingCallOverlay';
-import { VoicePip } from '../VoicePip';
+import {
+  LEGACY_VOICE_PIP_POSITION_STORAGE_KEY,
+  VOICE_PIP_POSITION_STORAGE_KEY,
+  VoicePip,
+} from '../VoicePip';
 import * as clipboard from '@/lib/clipboard/writeClipboardText';
 
 const initialState = store.getInitialState();
@@ -420,6 +424,54 @@ describe('voice overlays', () => {
     store.setState({ activeView: { kind: 'channel', channel: '#voice' } });
 
     expect(screen.queryByTestId('voice-pip')).toBeNull();
+  });
+
+  it('migrates a valid legacy PIP position into the onyx namespace', () => {
+    window.localStorage.setItem(
+      LEGACY_VOICE_PIP_POSITION_STORAGE_KEY,
+      JSON.stringify({ x: 48, y: 64 }),
+    );
+    store.setState({
+      activeView: { kind: 'channel', channel: '#general' },
+      ourNick: 'onyx',
+    });
+    store.getState().setVoiceCallState({ callState: 'in_call', callChannel: '#voice' });
+
+    render(() => <VoicePip />);
+
+    expect(window.localStorage.getItem(LEGACY_VOICE_PIP_POSITION_STORAGE_KEY)).toBeNull();
+    expect(JSON.parse(window.localStorage.getItem(VOICE_PIP_POSITION_STORAGE_KEY) ?? 'null'))
+      .toEqual({ x: 48, y: 64 });
+    expect(screen.getByTestId('voice-pip')).toHaveStyle({
+      '--voice-pip-x': '48px',
+      '--voice-pip-y': '64px',
+    });
+  });
+
+  it('rejects oversized and malformed persisted PIP positions', () => {
+    window.localStorage.setItem(
+      VOICE_PIP_POSITION_STORAGE_KEY,
+      JSON.stringify({ x: 1e100, y: 40 }),
+    );
+    window.localStorage.setItem(LEGACY_VOICE_PIP_POSITION_STORAGE_KEY, '{broken');
+    store.setState({
+      activeView: { kind: 'channel', channel: '#general' },
+      ourNick: 'onyx',
+    });
+    store.getState().setVoiceCallState({ callState: 'in_call', callChannel: '#voice' });
+
+    render(() => <VoicePip />);
+
+    const pip = screen.getByTestId('voice-pip');
+    expect(pip.getAttribute('style')).not.toContain('e+100');
+    expect(window.localStorage.getItem(LEGACY_VOICE_PIP_POSITION_STORAGE_KEY)).toBeNull();
+    const persisted = JSON.parse(
+      window.localStorage.getItem(VOICE_PIP_POSITION_STORAGE_KEY) ?? 'null',
+    ) as { x: number; y: number };
+    expect(Number.isFinite(persisted.x)).toBe(true);
+    expect(Number.isFinite(persisted.y)).toBe(true);
+    expect(Math.abs(persisted.x)).toBeLessThanOrEqual(window.innerWidth);
+    expect(Math.abs(persisted.y)).toBeLessThanOrEqual(window.innerHeight);
   });
 
   it('keeps PIP avatars bounded while reporting the full deduplicated room and speaker totals', () => {
