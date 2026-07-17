@@ -225,8 +225,9 @@ export function orderChronologically(list: ChatMessage[]): ChatMessage[] {
 export function buildReaderMemoryContext(
   target: string,
   sourceMessages: readonly ChatMessage[],
+  isChannel = target.startsWith('#'),
 ): ReaderMemoryContext | null {
-  if (!target.startsWith('#')) return null;
+  if (!isChannel) return null;
 
   const readable = sourceMessages.filter(isReadableMessage);
   if (readable.length === 0) return null;
@@ -863,8 +864,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const sinceDigest = createMemo(() => {
     const dividerId = unreadDividerId();
     if (!dividerId) return null;
+    if (activeView().kind !== 'channel') return null;
     const channel = activeTarget();
-    if (!channel || !channel.startsWith('#')) return null;
+    if (!channel) return null;
     const indexById = allIndexById();
     const dividerIndex = indexById.get(dividerId) ?? -1;
     if (dividerIndex < 0) return null;
@@ -892,7 +894,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const readerMemoryContext = createMemo(() => {
     const prefs = preferences();
     if (!prefs.readerMode || !prefs.localHistory) return null;
-    return buildReaderMemoryContext(activeTarget(), messages());
+    return buildReaderMemoryContext(activeTarget(), messages(), activeView().kind === 'channel');
   });
   const readerReviewedSpan = createMemo(() => {
     const context = readerMemoryContext();
@@ -1029,11 +1031,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
 
   function reviewUnreadBoundary(): void {
     const target = activeTarget();
-    if (!target) return;
+    if (!target || activeView().kind !== 'channel') return;
     const dividerId = unreadDividerId();
     const digest = sinceDigest();
     const divider = dividerId ? allMessages().find((message) => message.id === dividerId) : null;
-    if (target.startsWith('#') && dividerId && digest && divider) {
+    if (dividerId && digest && divider) {
       const owner = memoryOwner();
       if (owner) {
         const indexById = allIndexById();

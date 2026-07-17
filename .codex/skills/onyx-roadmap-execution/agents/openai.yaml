@@ -1,0 +1,4 @@
+interface:
+  display_name: "Onyx Roadmap Execution"
+  short_description: "Run a stage-gated Onyx roadmap slice safely."
+  default_prompt: "Execute the next Onyx-only roadmap slice with evidence, tests, and release gates."

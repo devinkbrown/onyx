@@ -589,6 +589,40 @@ describe('AppShell', () => {
       });
     });
 
+    it('keeps a valid non-hash channel in reader and reviewed-anchor handoffs', () => {
+      setPreference('readerMode', true);
+      setPreference('localHistory', true);
+      const channel = makeChannel(
+        '&ops',
+        [
+          makeMessage('ops-old', 'alice', 'Old ops note', '&ops'),
+          makeMessage('ops-new', 'bob', 'New ops handoff', '&ops'),
+        ],
+        [makeUser('alice'), makeUser('bob')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('&ops', channel);
+      store.setState({
+        ...initialState,
+        server: memoryServer,
+        channels,
+        activeView: { kind: 'channel', channel: '&ops' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        viewUnreadDividerId: new Map([['&ops', 'ops-new']]),
+      }, true);
+
+      render(() => <AppShell />);
+
+      const digest = screen.getByRole('region', { name: 'Since you left' });
+      expect(within(digest).getByText('1 message across 1 channel')).toBeInTheDocument();
+      fireEvent.click(within(digest).getByRole('button', { name: 'Review new messages' }));
+      expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
+        target: '&ops', kind: 'channel', firstMessageId: 'ops-new',
+      });
+      expect(screen.getByRole('region', { name: 'Device memory context' })).toHaveTextContent('&ops');
+    });
+
     it('shows device-memory context in reader mode', () => {
       const scrollIntoView = vi.fn();
       const travelToSpy = vi.spyOn(store.getState(), 'travelTo');

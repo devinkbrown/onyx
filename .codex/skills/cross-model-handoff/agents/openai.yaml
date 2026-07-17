@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cross-Model Handoff"
+  short_description: "Coordinate Codex integration with bounded Claude reviews."
+  default_prompt: "Prepare a safe Codex and Claude handoff for this Onyx task."

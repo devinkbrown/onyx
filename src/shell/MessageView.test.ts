@@ -5,6 +5,7 @@ import type { ChatMessage } from '@/lib/irc/types';
 import type { ReviewHistoryEntry } from '@/lib/notifications/reviewHistory';
 import {
   buildReviewedContextTrail,
+  buildReaderMemoryContext,
   hasReviewedAnchor,
   mergeReviewedContextTrails,
   orderChronologically,
@@ -37,6 +38,14 @@ function review(firstMessageId: string): ReviewHistoryEntry {
 }
 
 describe('reviewed reader context trails', () => {
+  it('keeps a valid non-hash channel eligible when the active view identifies it as a channel', () => {
+    const context = buildReaderMemoryContext('&ops', [
+      { ...message('ops-a', 'alice', 'handoff', 0), target: '&ops' },
+    ], true);
+
+    expect(context).toMatchObject({ target: '&ops', lineCount: 1, voiceCount: 1 });
+  });
+
   it('builds neighboring readable context around the reviewed anchor', () => {
     const trail = buildReviewedContextTrail(review('anchor'), [
       { ...message('system', 'server', 'join', 0), type: 'join' },
