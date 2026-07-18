@@ -61,7 +61,7 @@ describe('remembered session roster restoration', () => {
     receive(':example.test 433 * kain :Nickname is already in use');
     receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
     store.getState().client?.updateResumeTokens({ sessionToken: 'resume-token' });
-    receive(':example.test 001 kain_ :Welcome to IRCXNet');
+    receive(':example.test 001 kain_ :Welcome to Onyx');
 
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME resume-token\r\n');
 
@@ -104,7 +104,7 @@ describe('remembered session roster restoration', () => {
     receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
     expect(store.getState().bookmarks).toEqual([]);
 
-    receive(':example.test 001 kain_ :Welcome to IRCXNet');
+    receive(':example.test 001 kain_ :Welcome to Onyx');
     expect(store.getState().bookmarks.map((message) => message.id)).toEqual(['kain-private-bookmark']);
   });
 
@@ -121,7 +121,7 @@ describe('remembered session roster restoration', () => {
     FakeWebSocket.latest?.onopen?.(new Event('open'));
 
     receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
-    receive(':example.test 001 kain :Welcome to IRCXNet');
+    receive(':example.test 001 kain :Welcome to Onyx');
 
     expect([...store.getState().friends.keys()]).toEqual(['friend-one']);
     expect(store.getState().watchList.map((entry) => entry.nick)).toEqual(['watch-one']);
@@ -147,7 +147,7 @@ describe('remembered session roster restoration', () => {
 
     store.getState().connect({ url: kain.serverUrl, nick: kain.identity });
     FakeWebSocket.latest?.onopen?.(new Event('open'));
-    receive(':example.test 001 kain :Welcome to IRCXNet');
+    receive(':example.test 001 kain :Welcome to Onyx');
     expect(store.getState().selfBio).toBe('Kain draft');
 
     receive(':kain!webchat@example NICK mika');
@@ -170,7 +170,7 @@ describe('remembered session roster restoration', () => {
     receive(':example.test 433 * kain :Nickname is already in use');
     receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
     store.getState().client?.updateResumeTokens({ sessionToken: 'resume-token' });
-    receive(':example.test 001 kain_ :Welcome to IRCXNet');
+    receive(':example.test 001 kain_ :Welcome to Onyx');
 
     receive(':example.test 353 kain_ = #fabricated :intruder mallory');
     expect(store.getState().channels.has('#fabricated')).toBe(false);
@@ -202,7 +202,7 @@ describe('remembered session roster restoration', () => {
     });
     FakeWebSocket.latest?.onopen?.(new Event('open'));
     receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
-    receive(':example.test 001 kain :Welcome to IRCXNet');
+    receive(':example.test 001 kain :Welcome to Onyx');
     receive(':kain!webchat@example JOIN #root');
     receive(':example.test 353 kain = #root :@kain trev');
     receive(':example.test 366 kain #root :End of NAMES list');
@@ -234,7 +234,7 @@ describe('remembered session roster restoration', () => {
     FakeWebSocket.latest?.onopen?.(new Event('open'));
 
     receive(':example.test 433 * kain :Nickname is already in use');
-    receive(':example.test 001 kain_ :Welcome to IRCXNet');
+    receive(':example.test 001 kain_ :Welcome to Onyx');
 
     expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME remembered-token\r\n');
     expect(store.getState().server?.account).toBeNull();
@@ -260,7 +260,7 @@ describe('remembered session roster restoration', () => {
     storeSessionToken('stale-token');
     store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
     FakeWebSocket.latest?.onopen?.(new Event('open'));
-    receive(':example.test 001 kain :Welcome to IRCXNet');
+    receive(':example.test 001 kain :Welcome to Onyx');
     expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME stale-token\r\n');
 
     receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
@@ -280,7 +280,7 @@ describe('remembered session roster restoration', () => {
   it('does not promote an ordinary guest from an unsolicited SESSION token note', () => {
     store.getState().connect({ url: 'wss://example.test', nick: 'Guest42' });
     FakeWebSocket.latest?.onopen?.(new Event('open'));
-    receive(':example.test 001 Guest42 :Welcome to IRCXNet');
+    receive(':example.test 001 Guest42 :Welcome to Onyx');
 
     receive(':example.test NOTE SESSION TOKEN :unsolicited-token');
 
@@ -293,7 +293,7 @@ describe('remembered session roster restoration', () => {
     storeMeshToken('remembered-mesh');
     store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
     FakeWebSocket.latest?.onopen?.(new Event('open'));
-    receive(':example.test 001 kain :Welcome to IRCXNet');
+    receive(':example.test 001 kain :Welcome to Onyx');
     expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME remembered-mesh\r\n');
     receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME remembered-mesh\r\n');
@@ -336,7 +336,7 @@ describe('remembered session roster restoration', () => {
     expect(store.getState().nickAliases).toEqual([]);
 
     receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
-    receive(':example.test 001 kain_ :Welcome to IRCXNet');
+    receive(':example.test 001 kain_ :Welcome to Onyx');
     expect(store.getState().nickAliases).toEqual(['KainAway']);
 
     receive(':example.test 433 kain_ kain :Nickname is still in use');

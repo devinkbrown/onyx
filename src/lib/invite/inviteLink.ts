@@ -33,7 +33,7 @@ export interface InviteLinkSpec {
 }
 
 export interface InviteLinkOpts {
-  /** Network label carried into the resolved card (e.g. "IRCXNet"). */
+  /** Network label carried into the resolved card (e.g. "Onyx"). */
   network: string;
   /** Origin for the shareable landing link, e.g. "https://eshmaki.me/invite/". */
   origin: string;

@@ -279,7 +279,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   }
 
   // ── The rail is hidden when fewer than 3 servers are present.
-  //    We only have one IRCXNet network for now, so the rail collapses.
+  //    We only have one Onyx network for now, so the rail collapses.
   //    Per blueprint #16: "collapse the server rail when <3 servers".
   const CONNECTED_SERVERS = 1;
   const showRail = createMemo(() => CONNECTED_SERVERS >= 3);

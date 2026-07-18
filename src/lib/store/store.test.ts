@@ -177,7 +177,7 @@ describe('vanilla store', () => {
       receive(':example.test 903 alice :SASL authentication successful');
 
       expect(store.getState().server).toBeNull();
-      receive(':example.test 001 alice :Welcome to IRCXNet');
+      receive(':example.test 001 alice :Welcome to Onyx');
 
       expect(store.getState()).toMatchObject({
         status: 'connected',

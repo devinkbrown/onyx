@@ -616,8 +616,8 @@ describe('server status buffer (serverLog)', () => {
   });
 
   it('captures the 001 welcome', () => {
-    feed(':irc.example 001 me :Welcome to the IRCXNet network, me');
-    expect(log().some(m => /Welcome to the IRCXNet network/.test(m.text))).toBe(true);
+    feed(':irc.example 001 me :Welcome to the Onyx network, me');
+    expect(log().some(m => /Welcome to the Onyx network/.test(m.text))).toBe(true);
   });
 
   it('surfaces an otherwise-unhandled server numeric instead of dropping it', () => {

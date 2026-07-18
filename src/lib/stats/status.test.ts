@@ -32,7 +32,7 @@ describe('normalizeStatus', () => {
   it('accepts the Orochi public status shape', () => {
     const status = normalizeStatus({
       generated_at: 1783500000,
-      network: 'IRCXNet',
+      network: 'Onyx',
       node: 'eshmaki.me',
       uptime_seconds: 93784,
       users_online: 12,

@@ -89,7 +89,7 @@ describe('MEDIA presence via the IRCX EVENT plane', () => {
 
   it('subscribes to the MEDIA event plane on registration (001)', () => {
     const client = seedChannel('#root');
-    feed(':eshmaki.me 001 me :Welcome to IRCXNet');
+    feed(':eshmaki.me 001 me :Welcome to Onyx');
     const sub = client.sendRaw.mock.calls.find(
       (c: unknown[]) => c[0] === 'EVENT' && c[1] === 'ADD' && c[2] === 'MEDIA',
     );

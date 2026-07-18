@@ -5,7 +5,7 @@ import { buildInviteCard } from './inviteCard';
 import { buildInviteLink } from './inviteLink';
 
 const OPTS = {
-  network: 'IRCXNet',
+  network: 'Onyx',
   origin: 'https://eshmaki.me/invite/',
   appOrigin: '/app/',
 } as const;

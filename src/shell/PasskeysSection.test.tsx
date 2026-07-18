@@ -39,7 +39,7 @@ function seedServer(account: string) {
   return {
     id: 'ircxnet',
     name: 'eshmaki.me',
-    network: 'IRCXNet',
+    network: 'Onyx',
     url: 'wss://eshmaki.me',
     icon: '#000',
     nick: account,

@@ -112,7 +112,7 @@ function seedStore(channelName: string): void {
     activeView: { kind: 'channel', channel: channelName.toLowerCase() },
     connectionStatus: 'connected',
     ourNick: 'testuser',
-    networkName: 'IRCXNet',
+    networkName: 'Onyx',
   }, true);
 }
 
@@ -1079,7 +1079,7 @@ describe('AppShell', () => {
       seedStore('#general');
       store.setState({
         server: {
-          id: 'ircxnet', name: 'eshmaki.me', network: 'IRCXNet',
+          id: 'ircxnet', name: 'eshmaki.me', network: 'Onyx',
           url: 'wss://eshmaki.me', icon: '#000', nick: 'alice',
           account: 'alice', connected: true,
         },
@@ -1819,7 +1819,7 @@ describe('AppShell', () => {
         channels,
         activeView: { kind: 'home' },
         connectionStatus: 'connected',
-        networkName: 'IRCXNet',
+        networkName: 'Onyx',
         channelLastActivity: new Map([['#general', new Date('2025-01-01T12:02:00Z').getTime()]]),
       }, true);
 
@@ -1918,9 +1918,9 @@ describe('AppShell', () => {
         activeView: { kind: 'home' },
         composerDrafts: { '#general': 'room draft', alice: 'private draft' },
         connectionStatus: 'disconnected',
-        networkName: 'IRCXNet',
+        networkName: 'Onyx',
         server: {
-          id: 'home-memory', name: 'IRCXNet', network: 'IRCXNet',
+          id: 'home-memory', name: 'Onyx', network: 'Onyx',
           url: 'wss://example.test', icon: '', nick: 'testuser',
           account: 'testuser', connected: false,
         },
@@ -1952,7 +1952,7 @@ describe('AppShell', () => {
       const eventAt = Math.floor(Date.now() / 1000) + 3600;
       vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
         generated_at: Math.floor(Date.now() / 1000),
-        network: 'IRCXNet',
+        network: 'Onyx',
         node: 'eshmaki.me',
         users_online: 8,
         network_days: [],
@@ -1984,7 +1984,7 @@ describe('AppShell', () => {
         channels,
         activeView: { kind: 'home' },
         connectionStatus: 'connected',
-        networkName: 'IRCXNet',
+        networkName: 'Onyx',
         channelProps: new Map([['#general', { 'ocean.event': `${eventAt}|Office hours` }]]),
       }, true);
       const travelToSpy = vi.spyOn(store.getState(), 'travelTo').mockImplementation(() => {});
@@ -2028,7 +2028,7 @@ describe('AppShell', () => {
         channels,
         activeView: { kind: 'home' },
         connectionStatus: 'connected',
-        networkName: 'IRCXNet',
+        networkName: 'Onyx',
         ourNick: 'testuser',
       }, true);
 

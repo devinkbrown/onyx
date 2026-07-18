@@ -38,7 +38,7 @@ export function ServerRail(props: ServerRailProps): JSX.Element {
     return total;
   });
 
-  // The rail renders a single IRCXNet server entry (one connected network).
+  // The rail renders a single Onyx server entry (one connected network).
   // When fewer than 3 servers are present it hides itself via AppShell.
   return (
     <nav

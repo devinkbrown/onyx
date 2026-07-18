@@ -14,13 +14,13 @@ import {
 describe('normalizeIndex', () => {
   it('returns null when the external feed has no channel list', () => {
     expect(normalizeIndex(null)).toBeNull();
-    expect(normalizeIndex({ network: 'IRCXNet' })).toBeNull();
+    expect(normalizeIndex({ network: 'Onyx' })).toBeNull();
   });
 
   it('normalizes network metadata, day totals, channels, and sparse spark values', () => {
     const index = normalizeIndex({
       generated_at: 1783500000,
-      network: 'IRCXNet',
+      network: 'Onyx',
       node: 'eshmaki.me',
       users_online: 12,
       network_days: [
@@ -46,7 +46,7 @@ describe('normalizeIndex', () => {
 
     expect(index).toEqual({
       generated_at: 1783500000,
-      network: 'IRCXNet',
+      network: 'Onyx',
       node: 'eshmaki.me',
       users_online: 12,
       network_days: [

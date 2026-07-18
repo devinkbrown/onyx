@@ -173,7 +173,7 @@ function StudioPreview() {
         {/* Channel rail */}
         <div class="ts-pv-side">
           <div class="ts-pv-side__server">
-            <span class="ts-pv-side__sigil">◆</span>ircxnet
+            <span class="ts-pv-side__sigil">◆</span>onyx
           </div>
           <div class="ts-pv-side__group">channels</div>
           <div class="ts-pv-chan" data-active="true">

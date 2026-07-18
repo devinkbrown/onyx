@@ -5,7 +5,7 @@ import { buildInviteCard } from './inviteCard';
 import { buildInviteLink } from './inviteLink';
 
 const OPTS = {
-  network: 'IRCXNet',
+  network: 'Onyx',
   origin: 'https://eshmaki.me/invite/',
   appOrigin: '/app/',
 } as const;
@@ -18,7 +18,7 @@ describe('buildInviteLink', () => {
     expect(link.shareUrl).toBe('https://eshmaki.me/invite/?join=%23general');
     expect(link.appHref).toBe('/app/?join=%23general');
     expect(link.card.channel).toBe('#general');
-    expect(link.card.network).toBe('IRCXNet');
+    expect(link.card.network).toBe('Onyx');
   });
 
   it('carries a preferred nick, moment, topic and reader mode into both links', () => {
