@@ -28,3 +28,11 @@ Add or update a co-located regression test. Update route materialization wheneve
 Run focused tests, then `pnpm typecheck`, `pnpm lint`, and `pnpm test`. Run the relevant Playwright/browser journey for UI work. Only `./deploy.sh` may write `out/`; do not deploy unless the user asks or the current release task explicitly authorizes it.
 
 Use `cross-model-handoff` for independent evidence or review when the slice has meaningful UI, security, wire, or architecture risk.
+
+## Gotchas
+
+Real production failures in these priority areas; guard whichever the slice touches.
+
+- Nicklist/roster (priority 1): an overlapping or late `NAMES` 353 must APPEND to the roster, never REPLACE it — a replacing fold collapsed `#root` to 2 members in production. Only a burst the client itself initiated (reconnect/reconcile) may replace. Confirm the roster folds against the exotic `PREFIX=(YQqov)*!.@+` learned from 005 so prefixed nicks are not mangled or dropped.
+- E2EE DM (priority 4, security boundary): never silently downgrade a failed DM seal to plaintext. A DM that fails to open stays a locked placeholder; plaintext must never reach the outbox, the store, or the vault.
+- Message render (priority 1, browser rendering): the render path is the XSS sink — parse raw line to typed tokens then render as JSX text nodes; never `innerHTML` / `dangerouslySetInnerHTML`.
