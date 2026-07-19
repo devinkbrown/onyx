@@ -15,8 +15,12 @@
  * stay visible while reconnecting (not only when `connected`) — unreads already
  * on-device are local truth. When the live map is empty (true cold return before
  * JOINs land), Home paints the last ranked catch-up snapshot from device memory
- * (`catchUpMemory`) and enriches recaps from the vault. Device memory also loads
- * vault previews for recently-left + auto-join rooms not yet in the live map.
+ * (`catchUpMemory`) and enriches recaps from the vault. Before the network is
+ * connected, an owner-scoped vault enumeration (`exportVault`) also paints
+ * "Catch up from this device" cards that open exact retained rows — never
+ * inventing unreads/membership the live server alone can establish. Device
+ * memory also loads vault previews for recently-left + auto-join rooms not yet
+ * in the live map.
  *
  * Reader handoff (A13): catch-up review paths (open / review-from-start /
  * resume-at-unread / reopen-reviewed) enable readerMode so the Time-Native
@@ -61,6 +65,7 @@ import {
 import { followed } from '@/lib/notifications/followed';
 import {
   buildHomeMemory,
+  buildHomeMemoryFromVault,
   collectHomeMemoryTargets,
   type HomeMemoryItem,
 } from '@/lib/notifications/homeMemory';
@@ -89,6 +94,7 @@ import { loadChannelTopicDrafts } from '@/lib/channel/topicDrafts';
 import {
   loadOutbox,
   loadRecent,
+  exportVault,
   subscribeOutbox,
   deviceMemoryOwnerKey,
   type OutboxEntry,
@@ -109,6 +115,8 @@ const HOME_RECAP_VOICE_LIMIT = 2;
 const HOME_SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
 const HOME_RHYTHM_LIMIT = 4;
 const HOME_BOOST_LIMIT = 4;
+/** Cap on owner-scoped vault enumeration cards during cold return. */
+const HOME_MEMORY_LIMIT = 4;
 
 type HomeCatchUpRecap = {
   item: CatchUpItem;
@@ -571,7 +579,7 @@ export function HomeView(): JSX.Element {
     const items = await buildHomeMemory(
       source.targets,
       (target) => loadRecent(target, 24, source.owner),
-      4,
+      HOME_MEMORY_LIMIT,
     );
     return { ownerKey: deviceMemoryOwnerKey(source.owner) ?? '', items };
   }, { initialValue: null });
@@ -580,7 +588,39 @@ export function HomeView(): JSX.Element {
     const currentOwnerKey = owner ? deviceMemoryOwnerKey(owner) : null;
     return homeMemory.latest?.ownerKey === currentOwnerKey ? homeMemory.latest.items : [];
   });
+  // Before the live room map exists (and while not fully connected), enumerate
+  // literal rows retained for the current owner. Device evidence only — never
+  // server unread/membership. Owner-keyed so a late reply from a prior identity
+  // cannot paint after the account switches.
+  const coldMemorySource = createMemo(() => {
+    const owner = memoryOwner();
+    const ownerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    return preferences().localHistory
+      && connectionStatus() !== 'connected'
+      && owner
+      && ownerKey
+      ? { owner, ownerKey }
+      : null;
+  });
+  const [coldHomeMemory] = createResource(coldMemorySource, async (source) => ({
+    ownerKey: source.ownerKey,
+    items: buildHomeMemoryFromVault(
+      (await exportVault(source.owner)).targets,
+      HOME_MEMORY_LIMIT,
+    ),
+  }), { initialValue: null });
+  const coldRememberedRooms = createMemo<HomeMemoryItem[]>(() => {
+    const source = coldMemorySource();
+    return source && coldHomeMemory.latest?.ownerKey === source.ownerKey
+      ? coldHomeMemory.latest.items
+      : [];
+  });
+  const coldRememberedCount = createMemo(() =>
+    coldRememberedRooms().reduce((total, item) => total + item.count, 0),
+  );
   const openMemory = (item: HomeMemoryItem) => void getState().joinChannel(item.target);
+  const openColdMemory = (item: HomeMemoryItem) =>
+    getState().openVaultResult(item.target, item.lastMessageId);
   const quietActivity = createMemo<QuietActivityItem[]>(
     () => buildQuietActivity(channels().values(), channelLastActivity(), nowMs()),
     [],
@@ -843,6 +883,51 @@ export function HomeView(): JSX.Element {
               </ul>
             </section>
           )}
+        </Show>
+
+        {/* Owner-scoped vault enumeration while offline/connecting — literal
+            retained rows, not invented unreads. Retires once connected. */}
+        <Show when={coldRememberedRooms().length > 0}>
+          <section class="home-catchup" aria-label="Device-local catch-up">
+            <div class="home-catchup-head">
+              <h3 class="home-section-label">Catch up from this device</h3>
+              <span class="home-catchup-summary">
+                {coldRememberedCount()} remembered{' '}
+                {coldRememberedCount() === 1 ? 'message' : 'messages'}
+              </span>
+            </div>
+            <div class="home-memory-grid">
+              <For each={coldRememberedRooms()}>
+                {(item) => (
+                  <button
+                    type="button"
+                    class="home-memory-card"
+                    onClick={() => openColdMemory(item)}
+                    aria-label={`Open ${item.target} from device memory, ${item.count} remembered ${item.count === 1 ? 'message' : 'messages'}`}
+                  >
+                    <span class="home-memory-card-head">
+                      <span class="home-memory-room">{item.target}</span>
+                      <span class="home-memory-when">
+                        {relTime(Math.floor(item.lastAt.getTime() / 1000), nowMs())}
+                      </span>
+                    </span>
+                    <span class="home-memory-preview">
+                      <b>{item.lastFrom}</b>: {item.preview}
+                    </span>
+                    <span class="home-memory-foot">
+                      <span>
+                        {item.count} remembered {item.count === 1 ? 'message' : 'messages'}
+                      </span>
+                      <span>
+                        {item.participants.length}{' '}
+                        {item.participants.length === 1 ? 'voice' : 'voices'}
+                      </span>
+                    </span>
+                  </button>
+                )}
+              </For>
+            </div>
+          </section>
         </Show>
 
         {/* Catch-up: live buffers when rooms exist (incl. reconnect); otherwise

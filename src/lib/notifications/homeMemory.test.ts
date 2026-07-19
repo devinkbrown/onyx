@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import type { ChatMessage } from '@/lib/irc/types';
 import {
   buildHomeMemory,
+  buildHomeMemoryFromVault,
   collectHomeMemoryTargets,
   summarizeHomeMemory,
 } from './homeMemory';
@@ -33,9 +34,20 @@ describe('summarizeHomeMemory', () => {
       target: '#room',
       count: 2,
       participants: ['mira', 'kai'],
+      lastMessageId: expect.any(String),
       lastFrom: 'kai',
       preview: 'latest line',
     });
+  });
+
+  test('pins lastMessageId to the newest readable row', () => {
+    const summary = summarizeHomeMemory('#room', [
+      msg({ id: 'older', text: 'first', time: new Date(base.getTime() + 1000) }),
+      msg({ id: 'newest', text: 'last', time: new Date(base.getTime() + 3000) }),
+      msg({ id: 'middle', text: 'mid', time: new Date(base.getTime() + 2000) }),
+    ]);
+
+    expect(summary?.lastMessageId).toBe('newest');
   });
 
   test('ignores system, deleted, redacted, and pending rows', () => {
@@ -52,6 +64,14 @@ describe('summarizeHomeMemory', () => {
   test('does not expose ciphertext for encrypted vaulted DMs', () => {
     const summary = summarizeHomeMemory('mira', [
       msg({ encrypted: true, text: 'tsumugi:v1:opaque-ciphertext' }),
+    ]);
+
+    expect(summary?.preview).toBe('Encrypted message');
+  });
+
+  test('does not expose a vault envelope when a legacy row lacks its flag', () => {
+    const summary = summarizeHomeMemory('mira', [
+      msg({ text: 'TSUMUGI1 opaque-ciphertext' }),
     ]);
 
     expect(summary?.preview).toBe('Encrypted message');
@@ -86,6 +106,52 @@ describe('buildHomeMemory', () => {
     );
 
     expect(out.map((item) => item.target)).toEqual(['#new']);
+  });
+
+  test('summarizes an owner-scoped vault snapshot without live target state', () => {
+    const out = buildHomeMemoryFromVault([
+      {
+        target: '#older',
+        messages: [msg({ id: 'older-1', target: '#older', time: new Date(base.getTime() + 1000) })],
+      },
+      {
+        target: 'mira',
+        messages: [msg({ id: 'dm-2', target: 'mira', time: new Date(base.getTime() + 5000) })],
+      },
+    ]);
+
+    expect(out.map((item) => [item.target, item.lastMessageId])).toEqual([
+      ['mira', 'dm-2'],
+      ['#older', 'older-1'],
+    ]);
+  });
+
+  test('caps vault enumeration and never invents unread/membership fields', () => {
+    const out = buildHomeMemoryFromVault(
+      [
+        {
+          target: '#a',
+          messages: [msg({ id: 'a-1', target: '#a', time: new Date(base.getTime() + 1000) })],
+        },
+        {
+          target: '#b',
+          messages: [msg({ id: 'b-1', target: '#b', time: new Date(base.getTime() + 2000) })],
+        },
+        {
+          target: '#c',
+          messages: [msg({ id: 'c-1', target: '#c', time: new Date(base.getTime() + 3000) })],
+        },
+      ],
+      2,
+    );
+
+    expect(out).toHaveLength(2);
+    expect(out.map((item) => item.target)).toEqual(['#c', '#b']);
+    for (const item of out) {
+      expect(item).not.toHaveProperty('unread');
+      expect(item).not.toHaveProperty('highlights');
+      expect(item).not.toHaveProperty('followed');
+    }
   });
 });
 

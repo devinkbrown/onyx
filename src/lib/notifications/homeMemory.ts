@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { ChatMessage } from '@/lib/irc/types';
+import { isEnvelope } from '@/lib/e2ee/dmCipher';
 
 export interface HomeMemoryItem {
   target: string;
   count: number;
   participants: readonly string[];
   lastAt: Date;
+  /** Exact retained row opened by a device-memory catch-up card. */
+  lastMessageId: string;
   lastFrom: string;
   preview: string;
+}
+
+export interface HomeMemoryVaultTarget {
+  target: string;
+  messages: readonly ChatMessage[];
 }
 
 const SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
@@ -38,6 +46,7 @@ export function summarizeHomeMemory(target: string, messages: readonly ChatMessa
     count: readable.length,
     participants,
     lastAt: last.time,
+    lastMessageId: last.id,
     lastFrom: last.from,
     preview: previewText(last),
   };
@@ -72,23 +81,38 @@ export function collectHomeMemoryTargets(
   return out;
 }
 
+/**
+ * Summarize an owner-scoped vault enumeration without inferring membership,
+ * unread state, or mentions that only the live server can establish.
+ */
+export function buildHomeMemoryFromVault(
+  targets: readonly HomeMemoryVaultTarget[],
+  limit = 4,
+): HomeMemoryItem[] {
+  return targets
+    .map(({ target, messages }) => summarizeHomeMemory(target, messages))
+    .filter((item): item is HomeMemoryItem => item !== null)
+    .sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime() || a.target.localeCompare(b.target))
+    .slice(0, Math.max(0, limit));
+}
+
 export async function buildHomeMemory(
   targets: readonly string[],
   loadRecent: (target: string) => Promise<readonly ChatMessage[]>,
   limit = 4,
 ): Promise<HomeMemoryItem[]> {
-  const summaries = await Promise.all(
-    targets.map(async (target) => summarizeHomeMemory(target, await loadRecent(target))),
+  const vaultedTargets = await Promise.all(
+    targets.map(async (target) => ({ target, messages: await loadRecent(target) })),
   );
-
-  return summaries
-    .filter((item): item is HomeMemoryItem => item !== null)
-    .sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime() || a.target.localeCompare(b.target))
-    .slice(0, limit);
+  return buildHomeMemoryFromVault(vaultedTargets, limit);
 }
 
 function previewText(message: ChatMessage): string {
-  if (message.encrypted && !message.plaintext) return 'Encrypted message';
+  // Fail closed on ciphertext: honor the encrypted flag and detect legacy vault
+  // rows that stored a TSUMUGI1 envelope without setting `encrypted`.
+  if ((message.encrypted || isEnvelope(message.text)) && !message.plaintext) {
+    return 'Encrypted message';
+  }
 
   const text = (message.plaintext ?? message.text).replace(/\s+/g, ' ').trim();
   if (!text) return message.type === 'action' ? 'Action message' : 'Message';
