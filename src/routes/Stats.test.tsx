@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@solidjs/testing-library';
+import { fireEvent, render, screen, within } from '@solidjs/testing-library';
 import { Suspense } from 'solid-js';
 
 import StatsRoute, { roomDeepLink } from './Stats';
@@ -79,6 +79,30 @@ describe('StatsRoute', () => {
     expect(await screen.findByText('stats incomplete')).toHaveAttribute('data-feed-state', 'partial');
     expect(screen.getAllByText('partial public room index').length).toBeGreaterThan(0);
     expect(screen.getByText(/duplicate day rows were omitted/i)).toBeInTheDocument();
+  });
+
+  it('filters to active rooms and changes the room ranking without refetching', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      generated_at: Math.floor(Date.now() / 1000),
+      network_days: [],
+      channels: [
+        { channel: '#quiet', messages: 90, last_active: 100, spark: [1] },
+        { channel: '#root', messages: 42, present: 2, last_active: 200, spark: [8, 8] },
+      ],
+    }), { status: 200 })));
+
+    render(() => <StatsRoute />);
+
+    await screen.findAllByText('#quiet');
+    expect(screen.getByText(/showing 2 of 2 rooms/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Active rooms' }));
+    const rooms = document.querySelector<HTMLElement>('.data-list');
+    expect(rooms).not.toBeNull();
+    expect(within(rooms!).getByText('#root')).toBeInTheDocument();
+    expect(within(rooms!).queryByText('#quiet')).not.toBeInTheDocument();
+    expect(screen.getByText(/showing 1 of 2 rooms/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Pulse' }));
+    expect(screen.getByRole('button', { name: 'Pulse' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('omits the moment (never throws) when last_active is an out-of-range outlier', () => {

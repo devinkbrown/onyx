@@ -71,6 +71,16 @@ function activityLabel(channel: StatsChannel, nowMs: number): string {
   return `last active ${relTime(channel.last_active, nowMs)}`;
 }
 
+type RoomSort = 'messages' | 'pulse' | 'presence' | 'recent';
+type RoomScope = 'all' | 'active';
+
+const roomSortLabels: Record<RoomSort, string> = {
+  messages: 'Messages',
+  pulse: 'Pulse',
+  presence: 'Presence',
+  recent: 'Most recent',
+};
+
 // JS Date can only represent ±8.64e15 ms; toISOString() throws RangeError past it.
 const MAX_TIME_MS = 8.64e15;
 
@@ -136,6 +146,8 @@ export default function StatsRoute() {
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
   const [nowMs, setNowMs] = createSignal(Date.now());
+  const [roomSort, setRoomSort] = createSignal<RoomSort>('messages');
+  const [roomScope, setRoomScope] = createSignal<RoomScope>('all');
   const timer = setInterval(() => {
     setNowMs(Date.now());
     void refetchStats();
@@ -150,7 +162,25 @@ export default function StatsRoute() {
   const totalDayMessages = createMemo(() => days().reduce((sum, day) => sum + day.messages, 0));
   const dailyAverage = createMemo(() => days().length === 0 ? 0 : Math.round(totalDayMessages() / days().length));
   const latestDay = createMemo(() => days()[days().length - 1] ?? null);
+  const previousDay = createMemo(() => days()[days().length - 2] ?? null);
+  const tideDelta = createMemo(() => (latestDay()?.messages ?? 0) - (previousDay()?.messages ?? 0));
   const activeRooms = createMemo(() => channels().filter((channel) => channel.present > 0 || channel.active_users > 0).length);
+  const visibleChannels = createMemo(() => {
+    const scoped = roomScope() === 'active'
+      ? channels().filter((channel) => channel.present > 0 || channel.active_users > 0)
+      : channels();
+    const sort = roomSort();
+    return [...scoped].sort((left, right) => {
+      const delta = sort === 'pulse'
+        ? roomPulse(right) - roomPulse(left)
+        : sort === 'presence'
+          ? (right.present || right.active_users) - (left.present || left.active_users)
+          : sort === 'recent'
+            ? right.last_active - left.last_active
+            : right.messages - left.messages;
+      return delta || left.channel.localeCompare(right.channel);
+    });
+  });
   const feedState = createMemo<PublicFeedFreshness | 'partial' | 'unavailable'>(() => {
     const data = stats.latest;
     if (!data) return 'unavailable';
@@ -194,9 +224,15 @@ export default function StatsRoute() {
                   <span class="note">{data().channels_complete ? 'complete public room index' : 'partial public room index'}</span>
                 </div>
                 <div class="data-metric">
-                  <span class="label">daily rhythm</span>
-                  <span class="value">{formatCount(dailyAverage())}</span>
-                  <span class="note">average messages per exported day</span>
+                  <span class="label">latest tide</span>
+                  <span class="value">{formatCount(latestDay()?.messages ?? dailyAverage())}</span>
+                  <span class="note">
+                    {previousDay()
+                      ? tideDelta() === 0
+                        ? 'level with previous export'
+                        : `${tideDelta() > 0 ? '+' : ''}${formatCount(tideDelta())} vs previous export`
+                      : 'first exported day in this feed'}
+                  </span>
                 </div>
               </div>
             </>
@@ -291,10 +327,24 @@ export default function StatsRoute() {
       <section class="r-wrap r-section" aria-labelledby="rooms-heading">
         <span class="r-eyebrow">rooms</span>
         <h2 class="r-title" id="rooms-heading">Room by room,<br />in the open</h2>
-        <p class="stats-section-note">Ranked by tracked message volume. Pulse is the sum of the room’s recent exported samples; presence is a current or recently active count.</p>
+        <p class="stats-section-note">Choose how to read the public index. Pulse is the sum of a room’s recent exported samples; presence is a current or recently active count.</p>
+        <div class="stats-room-controls" aria-label="Room list controls">
+          <div class="stats-control-group" role="group" aria-label="Room scope">
+            <button type="button" classList={{ 'is-active': roomScope() === 'all' }} aria-pressed={roomScope() === 'all'} onClick={() => setRoomScope('all')}>All rooms</button>
+            <button type="button" classList={{ 'is-active': roomScope() === 'active' }} aria-pressed={roomScope() === 'active'} onClick={() => setRoomScope('active')}>Active rooms</button>
+          </div>
+          <div class="stats-control-group" role="group" aria-label="Sort rooms">
+            <For each={Object.entries(roomSortLabels) as [RoomSort, string][]}>
+              {([value, label]) => (
+                <button type="button" classList={{ 'is-active': roomSort() === value }} aria-pressed={roomSort() === value} onClick={() => setRoomSort(value)}>{label}</button>
+              )}
+            </For>
+          </div>
+          <p class="stats-result-count">Showing {formatCount(visibleChannels().length)} of {formatCount(channels().length)} rooms · sorted by {roomSortLabels[roomSort()].toLowerCase()}</p>
+        </div>
         <div class="data-list">
-          <Show when={channels().length > 0} fallback={<div class="data-empty">No public rooms have reached the stats feed yet.</div>}>
-            <For each={channels().slice(0, 18)}>
+          <Show when={visibleChannels().length > 0} fallback={<div class="data-empty">No rooms match this view. Switch back to all rooms to see the full public index.</div>}>
+            <For each={visibleChannels().slice(0, 18)}>
               {(channel, index) => <ChannelRow channel={channel} nowMs={nowMs()} rank={index() + 1} />}
             </For>
           </Show>
