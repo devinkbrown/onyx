@@ -57,6 +57,20 @@ function barHeight(day: NetworkDay, max: number): string {
   return String(Math.max(3, Math.round((day.messages / max) * 100)));
 }
 
+function formatCount(value: number): string {
+  return value.toLocaleString('en-US');
+}
+
+function roomPulse(channel: StatsChannel): number {
+  return channel.spark.reduce((sum, point) => sum + point, 0);
+}
+
+function activityLabel(channel: StatsChannel, nowMs: number): string {
+  if (channel.present > 0) return `${channel.present} present now`;
+  if (channel.active_users > 0) return `${channel.active_users} active recently`;
+  return `last active ${relTime(channel.last_active, nowMs)}`;
+}
+
 // JS Date can only represent ±8.64e15 ms; toISOString() throws RangeError past it.
 const MAX_TIME_MS = 8.64e15;
 
@@ -71,34 +85,44 @@ export function roomDeepLink(channel: string, lastActiveUnixSec = 0): string {
   return `/app/?${params.toString()}`;
 }
 
-function ChannelRow(props: { channel: StatsChannel; nowMs: number }) {
+function ChannelRow(props: { channel: StatsChannel; nowMs: number; rank: number }) {
   const c = () => props.channel;
   const active = () => c().present || c().active_users;
   const maxSpark = createMemo(() => Math.max(0, ...c().spark));
   return (
-    <article class="data-row">
-      <div>
-        <strong>{c().channel}</strong>
+    <article class="data-row data-room-row">
+      <span class="data-room-rank" aria-label={`Rank ${props.rank}`}>{String(props.rank).padStart(2, '0')}</span>
+      <div class="data-room-copy">
+        <div class="data-room-heading">
+          <strong>{c().channel}</strong>
+          <span>{activityLabel(c(), props.nowMs)}</span>
+        </div>
         <p>{c().topic || 'No topic set yet.'}</p>
       </div>
-      <div class="channel-spark" aria-label={`${c().channel} recent activity`}>
-        <Show when={c().spark.length > 0} fallback={<span class="channel-spark-empty">no trend</span>}>
-          <span class="channel-spark-bars" aria-hidden="true">
-            <For each={c().spark.slice(-14)}>
-              {(n) => (
-                <i
-                  style={{
-                    '--h': String(maxSpark() <= 0
-                      ? 3
-                      : Math.max(3, Math.round((n / maxSpark()) * 100))),
-                  }}
-                />
-              )}
-            </For>
-          </span>
-        </Show>
-        <span class="num">{active() > 0 ? `${active()} present` : relTime(c().last_active, props.nowMs)}</span>
-        <a class="data-action" href={roomDeepLink(c().channel, c().last_active)}>Open</a>
+      <div class="data-room-telemetry">
+        <div class="channel-spark" aria-label={`${c().channel} recent activity`}>
+          <Show when={c().spark.length > 0} fallback={<span class="channel-spark-empty">no recent pulse</span>}>
+            <span class="channel-spark-bars" aria-hidden="true">
+              <For each={c().spark.slice(-18)}>
+                {(n) => (
+                  <i
+                    style={{
+                      '--h': String(maxSpark() <= 0
+                        ? 3
+                        : Math.max(3, Math.round((n / maxSpark()) * 100))),
+                    }}
+                  />
+                )}
+              </For>
+            </span>
+          </Show>
+        </div>
+        <dl class="data-room-numbers">
+          <div><dt>messages</dt><dd>{formatCount(c().messages)}</dd></div>
+          <div><dt>pulse</dt><dd>{formatCount(roomPulse(c()))}</dd></div>
+          <div><dt>present</dt><dd>{formatCount(active())}</dd></div>
+        </dl>
+        <a class="data-action" href={roomDeepLink(c().channel, c().last_active)}>Open room</a>
       </div>
     </article>
   );
@@ -123,6 +147,10 @@ export default function StatsRoute() {
   const busiest = createMemo(() => channels()[0] ?? null);
   const days = createMemo(() => stats.latest?.network_days ?? []);
   const maxDay = createMemo(() => Math.max(0, ...days().map((d) => d.messages)));
+  const totalDayMessages = createMemo(() => days().reduce((sum, day) => sum + day.messages, 0));
+  const dailyAverage = createMemo(() => days().length === 0 ? 0 : Math.round(totalDayMessages() / days().length));
+  const latestDay = createMemo(() => days()[days().length - 1] ?? null);
+  const activeRooms = createMemo(() => channels().filter((channel) => channel.present > 0 || channel.active_users > 0).length);
   const feedState = createMemo<PublicFeedFreshness | 'partial' | 'unavailable'>(() => {
     const data = stats.latest;
     if (!data) return 'unavailable';
@@ -143,29 +171,35 @@ export default function StatsRoute() {
         </p>
         <Show when={stats.latest} fallback={<div class="data-empty">Stats are waiting for the next exported feed.</div>}>
           {(data) => (
-            <div class="data-summary" aria-label="Network summary">
-              <div class="data-metric">
-                <span class="label">people online</span>
-                <span class="value">{data().users_online.toLocaleString('en-US')}</span>
-                <span class="note">mesh-wide presence</span>
+            <>
+              <div class="stats-ledger" aria-label="Live feed ledger">
+                <span class="stats-ledger-mark" data-state={feedState()} aria-hidden="true" />
+                <p><strong>{data().network || 'Onyx'} activity ledger</strong> · {data().node || 'network export'} · refreshed {relTime(data().generated_at, nowMs())}</p>
+                <button type="button" class="stats-refresh" onClick={() => void refetchStats()}>Refresh data</button>
               </div>
-              <div class="data-metric">
-                <span class="label">rooms tracked</span>
-                <span class="value">{data().channels.length.toLocaleString('en-US')}</span>
-                <span class="note">
-                  {data().channels_complete
-                    ? `updated ${relTime(data().generated_at, nowMs())}`
-                    : 'incomplete room index'}
-                </span>
+              <div class="data-summary stats-summary" aria-label="Network summary">
+                <div class="data-metric stats-primary-metric">
+                  <span class="label">people online</span>
+                  <span class="value">{formatCount(data().users_online)}</span>
+                  <span class="note">authoritative network presence</span>
+                </div>
+                <div class="data-metric">
+                  <span class="label">rooms alive</span>
+                  <span class="value">{formatCount(activeRooms())}</span>
+                  <span class="note">{formatCount(data().channels.length)} rooms tracked</span>
+                </div>
+                <div class="data-metric">
+                  <span class="label">in the current index</span>
+                  <span class="value">{formatCount(totalMessages())}</span>
+                  <span class="note">{data().channels_complete ? 'complete public room index' : 'partial public room index'}</span>
+                </div>
+                <div class="data-metric">
+                  <span class="label">daily rhythm</span>
+                  <span class="value">{formatCount(dailyAverage())}</span>
+                  <span class="note">average messages per exported day</span>
+                </div>
               </div>
-              <div class="data-metric">
-                <span class="label">messages counted</span>
-                <span class="value">{totalMessages().toLocaleString('en-US')}</span>
-                <span class="note">
-                  {data().channels_complete ? 'current public index' : 'partial public index'}
-                </span>
-              </div>
-            </div>
+            </>
           )}
         </Show>
       </section>
@@ -174,7 +208,10 @@ export default function StatsRoute() {
 
       <section class="r-wrap r-section data-grid" aria-label="Activity detail">
         <article class="data-card">
-          <span class="label">last exported days</span>
+          <div class="stats-card-heading">
+            <span class="label">last exported days</span>
+            <span class="stats-card-quiet">{days().length} samples</span>
+          </div>
           <h2>Network tide</h2>
           <Show when={days().length > 0} fallback={<p>No daily series has been exported yet.</p>}>
             <figure class="data-chart" aria-labelledby="network-tide-caption">
@@ -188,6 +225,11 @@ export default function StatsRoute() {
                     />
                   )}
                 </For>
+              </div>
+              <div class="stats-chart-caption" aria-hidden="true">
+                <span>{days()[0]?.date ?? '—'}</span>
+                <strong>{latestDay() ? `${formatCount(latestDay()!.messages)} messages` : '—'}</strong>
+                <span>{latestDay()?.date ?? '—'}</span>
               </div>
               <figcaption id="network-tide-caption" class="sr-only">
                 Daily message totals, oldest to newest.
@@ -206,12 +248,15 @@ export default function StatsRoute() {
           <p>
             The bars are the network-wide message total per exported day, oldest to newest.
             {!stats.latest?.network_days_complete ? ' Some malformed or duplicate day rows were omitted. ' : ' '}
-            They come from the same data that powers channel history.
+            The strongest bar is the busiest exported day, not a forecast.
           </p>
         </article>
 
         <aside class="data-card">
-          <span class="label">busiest room</span>
+          <div class="stats-card-heading">
+            <span class="label">busiest room</span>
+            <span class="stats-card-quiet">all tracked activity</span>
+          </div>
           <Show when={busiest()} fallback={<h3>No rooms yet</h3>}>
             {(room) => (
               <>
@@ -222,6 +267,11 @@ export default function StatsRoute() {
                     <span class="label">messages</span>
                     <span class="value">{room().messages.toLocaleString('en-US')}</span>
                     <span class="note">tracked total</span>
+                  </div>
+                  <div class="data-metric">
+                    <span class="label">activity pulse</span>
+                    <span class="value">{formatCount(roomPulse(room()))}</span>
+                    <span class="note">recent exported intervals</span>
                   </div>
                   <div class="data-metric">
                     <span class="label">present</span>
@@ -240,11 +290,14 @@ export default function StatsRoute() {
 
       <section class="r-wrap r-section" aria-labelledby="rooms-heading">
         <span class="r-eyebrow">rooms</span>
-        <h2 class="r-title" id="rooms-heading">Where people<br />are talking</h2>
+        <h2 class="r-title" id="rooms-heading">Room by room,<br />in the open</h2>
+        <p class="stats-section-note">Ranked by tracked message volume. Pulse is the sum of the room’s recent exported samples; presence is a current or recently active count.</p>
         <div class="data-list">
-          <For each={channels().slice(0, 12)}>
-            {(channel) => <ChannelRow channel={channel} nowMs={nowMs()} />}
-          </For>
+          <Show when={channels().length > 0} fallback={<div class="data-empty">No public rooms have reached the stats feed yet.</div>}>
+            <For each={channels().slice(0, 18)}>
+              {(channel, index) => <ChannelRow channel={channel} nowMs={nowMs()} rank={index() + 1} />}
+            </For>
+          </Show>
         </div>
       </section>
     </PageChrome>

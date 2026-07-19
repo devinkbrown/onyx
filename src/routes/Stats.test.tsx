@@ -46,6 +46,9 @@ describe('StatsRoute', () => {
     expect(chart.querySelector('.data-bars')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByText('stats current')).toHaveAttribute('data-feed-state', 'current');
     expect(screen.getByLabelText(/#root recent activity/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /refresh data/i })).toBeInTheDocument();
+    expect(screen.getByText(/activity ledger/i)).toBeInTheDocument();
+    expect(screen.getByText('pulse')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /open/i }).some((a) =>
       a.getAttribute('href')?.startsWith('/app/?join=%23root&at='),
     )).toBe(true);
@@ -74,7 +77,7 @@ describe('StatsRoute', () => {
     render(() => <StatsRoute />);
 
     expect(await screen.findByText('stats incomplete')).toHaveAttribute('data-feed-state', 'partial');
-    expect(screen.getAllByText('partial public index').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('partial public room index').length).toBeGreaterThan(0);
     expect(screen.getByText(/duplicate day rows were omitted/i)).toBeInTheDocument();
   });
 
