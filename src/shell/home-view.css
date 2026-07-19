@@ -1041,6 +1041,11 @@
   font-size: 0.72rem;
   font-weight: 650;
 }
+.home-catchup-source {
+  color: var(--text-muted, var(--fg-muted));
+  font-weight: 400;
+}
+
 .home-catchup-summary,
 .home-catchup-clear {
   font-family: var(--font-mono);
