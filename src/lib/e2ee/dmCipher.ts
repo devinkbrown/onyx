@@ -130,18 +130,41 @@ export function deviceKeys(): Promise<DeviceKeys | null> {
         false, // private key never leaves WebCrypto
         ['deriveKey', 'deriveBits'],
       );
-      await new Promise<void>((resolve) => {
-        const tx = db.transaction(STORE, 'readwrite');
-        tx.objectStore(STORE).put(kp, KEY_ID);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
+      // Fail closed if the identity key cannot be durable: an ephemeral-only
+      // device key would mint a new public point after reload and silently
+      // orphan every prior envelope sealed under the discarded identity.
+      const persisted = await new Promise<boolean>((resolve) => {
+        let settled = false;
+        const finish = (ok: boolean) => {
+          if (settled) return;
+          settled = true;
+          resolve(ok);
+        };
+        try {
+          const tx = db.transaction(STORE, 'readwrite');
+          tx.objectStore(STORE).put(kp, KEY_ID);
+          tx.oncomplete = () => finish(true);
+          tx.onerror = () => finish(false);
+          tx.onabort = () => finish(false);
+        } catch {
+          finish(false);
+        }
       });
+      if (!persisted) return null;
       return { keyPair: kp, publicB64: await exportPublicB64(kp) };
     } catch {
       return null;
     }
   })();
-  return _devicePromise;
+  // Do not permanently cache a hard failure — a transient IDB abort should not
+  // freeze the tab into "no E2EE" for the rest of the session after recovery.
+  // Identity-check the promise so a later successful retry is not wiped by a
+  // stale failure settling after a fresh attempt already started.
+  const pending = _devicePromise;
+  void pending.then((keys) => {
+    if (keys === null && _devicePromise === pending) _devicePromise = null;
+  });
+  return pending;
 }
 
 /** Test hook — drop the cached device promise (a fresh IDBFactory follows). */

@@ -603,17 +603,18 @@
   font-weight: 600;
 }
 
-/* Quiet activity — ambient already-read rooms; demoted vs catch-up strata */
+/* Quiet activity — ambient already-read rooms; demoted vs catch-up strata.
+   Demotion is size/weight/chrome only — never whole-section opacity (AA +
+   meaning-not-by-opacity alone). */
 .home-quiet {
-  margin: 0 0 34px;
-  opacity: 0.92;
+  margin: 0 0 var(--gap-section);
 }
 .home-quiet-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--gap-row);
+  margin-bottom: var(--space-3);
 }
 .home-quiet-head .home-section-label {
   margin: 0;
@@ -1021,17 +1022,21 @@
 }
 
 /* ── Catch up — "what did I miss" across joined rooms + DMs ───────────────────
-   A9 strata: Needs you strongest → Followed next → Quiet demoted.
+   A9 strata residual hierarchy (thesis-first):
+     Needs you  → gold surface band, solid unread seal, largest type
+     Followed   → lapis instrument rail, mid type, no gold competition
+     Quiet      → collapsed ambient tail, demoted by size/weight/chrome only
+                  (never whole-section opacity — AA + meaning-not-by-opacity)
    Weight is visual only; structure + a11y labels stay stable. */
 .home-catchup {
-  margin: 4px 0 28px;
+  margin: var(--space-1) 0 var(--gap-section);
 }
 .home-catchup-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: var(--gap-row);
+  margin-bottom: var(--space-3);
 }
 .home-catchup-head .home-section-label {
   margin: 0;
@@ -1041,9 +1046,20 @@
   font-size: 0.72rem;
   font-weight: 650;
 }
+/* Provenance kicker (live / offline recall) — demoted mono meta under the
+   mention gold count. Real Onyx mute token only; never --text-muted/--fg-muted. */
 .home-catchup-source {
-  color: var(--text-muted, var(--fg-muted));
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
   font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+/* Clear-all sits under the head as a secondary action — never competes with
+   the Needs-you band that follows. */
+.home-catchup .mark-caught-up {
+  margin: 0 0 var(--space-3);
 }
 
 .home-catchup-summary,
@@ -1059,14 +1075,15 @@
 .home-catchup-tier {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 12px;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 .home-catchup-tier:first-of-type {
   margin-top: 0;
 }
 .home-catchup-tier-label {
   margin: 0;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -1082,17 +1099,20 @@
    Label text stays on the audited --washi-dim token (AA small text). Hierarchy
    is size/weight + gold surface chrome — never a decorative token on body text. */
 .home-catchup-tier--attention {
-  gap: 8px;
-  padding: 12px 12px 10px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2);
   border-radius: var(--r-md);
   background:
     linear-gradient(
       180deg,
-      color-mix(in oklab, var(--gold) 10%, transparent),
-      transparent 70%
+      color-mix(in oklab, var(--gold) 12%, transparent),
+      transparent 72%
     ),
     color-mix(in oklab, var(--stone) 55%, transparent);
-  border: 1px solid color-mix(in oklab, var(--gold) 28%, var(--line));
+  border: 1px solid color-mix(in oklab, var(--gold) 32%, var(--line));
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--gold) 14%, transparent),
+    0 1px 0 color-mix(in oklab, var(--ink) 22%, transparent);
 }
 .home-catchup-tier--attention .home-catchup-tier-label {
   font-size: 0.78rem;
@@ -1102,7 +1122,7 @@
 }
 .home-catchup-tier--attention .home-catchup-item {
   min-height: 48px;
-  padding: 12px 16px;
+  padding: var(--space-3) var(--space-4);
   border-left-width: 3px;
   border-left-color: var(--gold-bright);
   background: color-mix(in oklab, var(--gold) 8%, var(--stone));
@@ -1124,10 +1144,15 @@
   font-weight: 650;
 }
 
-/* ── Stratum: Followed — next weight, lapis instrument chrome ─────────────── */
+/* ── Stratum: Followed — next weight, lapis instrument chrome ───────────────
+   Grouped by a quiet left rail + faint wash — never a full gold panel, so
+   Needs you stays the single primary focus on the surface. */
 .home-catchup-tier--followed {
-  gap: 7px;
-  padding: 4px 2px 0;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-1) var(--space-3);
+  border-left: 2px solid color-mix(in oklab, var(--lapis-bright) 48%, transparent);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: color-mix(in oklab, var(--lapis) 5%, transparent);
 }
 .home-catchup-tier--followed .home-catchup-tier-label {
   font-size: 0.74rem;
@@ -1149,16 +1174,19 @@
   font-weight: 600;
 }
 
-/* ── Stratum: Quiet — demoted, collapsed ambient tail ─────────────────────── */
+/* ── Stratum: Quiet — demoted, collapsed ambient tail ───────────────────────
+   Demotion is size + weight + quieter chrome. No opacity veil on the section
+   (that would drop washi-dim below AA and encode meaning by opacity alone). */
 .home-catchup-quiet,
 .home-catchup-tier--quiet {
-  margin-top: 12px;
-  opacity: 0.88;
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--seam-faint);
 }
 .home-catchup-quiet > summary,
 .home-catchup-tier--quiet > summary {
   cursor: pointer;
-  padding: 4px 0;
+  padding: var(--space-1) 0;
   user-select: none;
   /* Keep washi-dim (AA) for the summary text; quiet is demoted via size/weight
      and item chrome, not by dropping below 4.5:1. */
@@ -1167,13 +1195,26 @@
   letter-spacing: 0.04em;
   color: var(--washi-dim);
 }
+.home-catchup-quiet > summary:hover,
+.home-catchup-tier--quiet > summary:hover,
+.home-catchup-quiet > summary:focus-visible,
+.home-catchup-tier--quiet > summary:focus-visible {
+  color: var(--washi);
+  outline: none;
+}
+.home-catchup-quiet > summary:focus-visible,
+.home-catchup-tier--quiet > summary:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 .home-catchup-quiet[open] > summary,
 .home-catchup-tier--quiet[open] > summary {
-  margin-bottom: 6px;
+  margin-bottom: var(--space-2);
 }
 .home-catchup-tier--quiet .home-catchup-item {
   min-height: 40px;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   border-left-width: 1px;
   border-left-color: var(--line);
   background: color-mix(in oklab, var(--stone) 70%, transparent);
@@ -1198,7 +1239,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 .home-catchup-item {
   width: 100%;
@@ -1277,14 +1318,14 @@
 }
 /* Resume — reading handoff band (between Followed weight and Quiet demotion) */
 .home-resume {
-  margin-top: 18px;
+  margin-top: var(--space-5);
 }
 .home-resume-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--gap-row);
+  margin-bottom: var(--space-3);
 }
 .home-resume-head .home-section-label {
   margin: 0;
@@ -1376,27 +1417,29 @@
   color: var(--gold-bright);
   font-weight: 500;
 }
+/* Recaps sit under the tier strata — gold is a soft wash, not a second
+   "Needs you" panel. Primary action on each card is still the Open seal. */
 .home-recap-strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 8px;
-  margin-top: 10px;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 .home-recap-card {
   min-width: 0;
   min-height: 150px;
   display: grid;
   grid-template-rows: auto auto minmax(2.8em, 1fr) auto;
-  gap: 8px;
-  padding: 12px 13px;
+  gap: var(--space-2);
+  padding: var(--space-3);
   background:
     linear-gradient(
       145deg,
-      color-mix(in oklab, var(--gold) 9%, transparent),
-      transparent 44%
+      color-mix(in oklab, var(--gold) 5%, transparent),
+      transparent 42%
     ),
     color-mix(in oklab, var(--stone) 78%, transparent);
-  border: 1px solid color-mix(in oklab, var(--line) 80%, var(--gold));
+  border: 1px solid color-mix(in oklab, var(--line) 88%, var(--gold));
   border-radius: var(--r-md);
 }
 .home-recap-card__head,

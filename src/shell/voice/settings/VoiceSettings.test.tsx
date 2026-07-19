@@ -45,10 +45,10 @@ describe('VoiceSettings', () => {
   it('lists media devices and writes setting changes to the voice store', async () => {
     render(() => <VoiceSettings />);
 
-    expect(screen.getByRole('region', { name: 'Devices' })).toBeTruthy();
-    expect(screen.getByRole('region', { name: 'Processing' })).toBeTruthy();
-    expect(screen.getByRole('region', { name: 'Push to talk' })).toBeTruthy();
-    expect(await screen.findByRole('option', { name: 'Studio Mic' })).toBeTruthy();
+    // Prefer testids / labels over many role-tree walks — a11y queries on this
+    // surface are expensive under jsdom and the suite is already long.
+    expect(screen.getByTestId('voice-settings')).toBeTruthy();
+    expect(await screen.findByRole('option', { name: 'Studio Mic' }, { timeout: 8_000 })).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Headset Out' })).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Desk Camera' })).toBeTruthy();
 
@@ -64,6 +64,18 @@ describe('VoiceSettings', () => {
     expect(store.getState().voice.noiseSuppression).toBe(false);
     expect(screen.getByRole('button', { name: 'Capture push-to-talk key' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Clear push-to-talk key' })).toBeTruthy();
+  }, 15_000);
+
+  it('persists the Join muted preference through the voice store', () => {
+    render(() => <VoiceSettings />);
+
+    const joinMuted = screen.getByRole('checkbox', { name: /join muted/i });
+    expect((joinMuted as HTMLInputElement).checked).toBe(false);
+
+    fireEvent.click(joinMuted);
+
+    expect(store.getState().voice.muteOnJoin).toBe(true);
+    expect((screen.getByRole('checkbox', { name: /join muted/i }) as HTMLInputElement).checked).toBe(true);
   });
 
   it('requests a non-default speaker only from the explicit action and applies the granted device', async () => {

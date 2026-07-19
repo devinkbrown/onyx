@@ -230,6 +230,16 @@ describe('messageAccessibleLabel (dense transcript a11y)', () => {
     expect(messageAccessibleLabel(edited)).toContain('(edited)');
   });
 
+  it('surfaces mention state that the visual chrome paints only as a colour bar', () => {
+    const mention: ChatMessage = {
+      ...message('m9', 'heidi', 'hey @me look at this', 0),
+      highlight: true,
+    };
+    const label = messageAccessibleLabel(mention);
+    expect(label).toContain('(mention)');
+    expect(label).toContain('hey @me look at this');
+  });
+
   it('formats CTCP ACTION lines like the visible MsgBody', () => {
     const action: ChatMessage = {
       ...message('m8', 'grace', 'waves', 0),

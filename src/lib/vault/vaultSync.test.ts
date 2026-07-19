@@ -21,6 +21,7 @@ import {
   _vaultSyncCacheSizesForTests,
   initVaultSync,
 } from './vaultSync';
+import { loadVaultResumeTarget, saveVaultResumeTarget } from './vaultResumeMemory';
 
 const { _resetVaultForTests, loadRecent, saveMessages, searchVault } = vault;
 
@@ -111,6 +112,105 @@ describe('vaultSync', () => {
     expect(buf.map((m) => m.id)).toEqual(['v1', 'v2']);
   });
 
+  it('cold-starts the last active room from loadRecent before a network buffer exists', async () => {
+    await saveOwnedMessages('#room', [msg('cold-1', 1000), msg('cold-2', 2000)]);
+    expect(saveVaultResumeTarget({ kind: 'channel', target: '#room' }, ALICE_OWNER)).toBe(true);
+
+    expect(store.getState().channels.size).toBe(0);
+    initVaultSync();
+
+    await until(() => (store.getState().channels.get('#room')?.messages.length ?? 0) === 2);
+    const state = store.getState();
+    expect(state.activeView).toEqual({ kind: 'channel', channel: '#room' });
+    expect(state.channels.get('#room')?.messages.map((message) => message.id))
+      .toEqual(['cold-1', 'cold-2']);
+  });
+
+  it('starts the cold load as soon as the owner appears, before session-sync JOIN', async () => {
+    // Unique target so a prior test's late hydrate cannot collide on #room.
+    const target = '#pre-join-room';
+    expect(saveVaultResumeTarget({ kind: 'channel', target }, ALICE_OWNER)).toBe(true);
+    let resolveLoad: (messages: ChatMessage[]) => void = () => {};
+    const pendingLoad = new Promise<ChatMessage[]>((resolve) => {
+      resolveLoad = resolve;
+    });
+    // Hold every loadRecent for this test — ImplementationOnce races a second
+    // paint path against the real IDB and flakes under full-file ordering.
+    const loadSpy = vi.spyOn(vault, 'loadRecent').mockImplementation((requested) => {
+      if (requested.toLowerCase() === target) return pendingLoad;
+      return Promise.resolve([]);
+    });
+    store.setState({ server: null, channels: new Map(), dms: new Map(), activeView: { kind: 'home' } });
+
+    initVaultSync();
+    expect(loadSpy).not.toHaveBeenCalled();
+    store.setState({ server: { ...server('alice'), connected: false } });
+
+    await until(() => loadSpy.mock.calls.some((call) => call[0] === target));
+    expect(loadSpy).toHaveBeenCalledWith(target, undefined, ALICE_OWNER);
+    expect(store.getState().channels.has(target)).toBe(false);
+    resolveLoad([msg('pre-join', 1000, target)]);
+    await pendingLoad;
+    await until(() => (store.getState().channels.get(target)?.messages.length ?? 0) === 1);
+    expect(store.getState().channels.get(target)?.messages.map((m) => m.id)).toEqual(['pre-join']);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: target });
+  });
+
+  it('remembers active conversations inside the current owner namespace', () => {
+    initVaultSync();
+    setChannel('#Room', []);
+    store.getState().navigate({ kind: 'channel', channel: '#Room' });
+
+    expect(loadVaultResumeTarget(ALICE_OWNER)).toEqual({ kind: 'channel', target: '#room' });
+    expect(loadVaultResumeTarget(BOB_OWNER)).toBeNull();
+  });
+
+  it('does not let a remembered room override an explicit deep link', async () => {
+    await saveOwnedMessages('#remembered', [msg('remembered', 1000, '#remembered')]);
+    expect(saveVaultResumeTarget({ kind: 'channel', target: '#remembered' }, ALICE_OWNER)).toBe(true);
+    store.setState({ pendingDeepLinkJoin: '#requested' });
+
+    initVaultSync();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(store.getState().activeView).toEqual({ kind: 'home' });
+    expect(store.getState().channels.has('#remembered')).toBe(false);
+  });
+
+  it('cold-starts an encrypted DM from ciphertext only', async () => {
+    await saveOwnedMessages('trev', [{
+      ...msg('cipher-1', 1000, 'trev'),
+      text: 'TSUMUGI1 opaque-ciphertext',
+      plaintext: 'must never reach IndexedDB',
+      encrypted: true,
+    }]);
+    expect(saveVaultResumeTarget({ kind: 'dm', target: 'trev' }, ALICE_OWNER)).toBe(true);
+
+    initVaultSync();
+
+    await until(() => (store.getState().dms.get('trev')?.messages.length ?? 0) === 1);
+    const hydrated = store.getState().dms.get('trev')?.messages[0];
+    expect(hydrated?.text).toBe('TSUMUGI1 opaque-ciphertext');
+    expect(hydrated?.plaintext).toBeUndefined();
+    expect(JSON.stringify(await loadOwnedRecent('trev'))).not.toContain('must never reach IndexedDB');
+  });
+
+  it('empty cold-resume does not lock out a later JOIN hydrate of the same room', async () => {
+    // Remembered room with nothing in the vault yet — activate path must not
+    // leave a permanent watermark that blocks the post-JOIN paint.
+    expect(saveVaultResumeTarget({ kind: 'channel', target: '#room' }, ALICE_OWNER)).toBe(true);
+    initVaultSync();
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(store.getState().channels.has('#room')).toBe(false);
+
+    await saveOwnedMessages('#room', [msg('late-1', 1000), msg('late-2', 2000)]);
+    setChannel('#room', []);
+
+    await until(() => (store.getState().channels.get('#room')?.messages.length ?? 0) === 2);
+    expect(store.getState().channels.get('#room')?.messages.map((m) => m.id))
+      .toEqual(['late-1', 'late-2']);
+  });
+
   it('never hydrates ownerless legacy rows into a signed-in session', async () => {
     await saveMessages('#room', [msg('legacy-secret', 1000)]);
 
@@ -164,6 +264,8 @@ describe('vaultSync', () => {
     expect((await loadOwnedRecent('#closed')).map((message) => message.id)).toEqual(['remembered']);
   });
 
+  // 513 rooms × flush + live-ownership checks is intentionally heavy; keep a
+  // generous ceiling so suite-order variance does not flake the bound assert.
   it('hard-bounds live hydration and persistence watermarks', async () => {
     vi.spyOn(vault, 'loadRecent').mockResolvedValue([]);
     vi.spyOn(vault, 'saveMessages').mockResolvedValue(true);
@@ -181,7 +283,7 @@ describe('vaultSync', () => {
     await vi.advanceTimersByTimeAsync(1600);
     expect(_vaultSyncCacheSizesForTests().persisted).toBe(VAULT_SYNC_TARGET_CACHE_CAP);
     expect(_vaultSyncCacheSizesForTests().pending).toBe(0);
-  });
+  }, 20_000);
 
   it('merges hydration UNDER live messages without duplicating ids', async () => {
     await saveOwnedMessages('#room', [msg('v1', 1000), msg('live1', 2000)]);

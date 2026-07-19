@@ -68,7 +68,10 @@ const JUMP_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
 function normalizeChannel(input: string): string {
   const trimmed = input.trim();
   if (!trimmed) return '';
-  return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  // Preserve already-typed channel types (`#`, `&`, …). Only bare names get a
+  // default `#` prefix — never rewrite `&ops` into `#&ops`.
+  if (trimmed.startsWith('#') || trimmed.startsWith('&')) return trimmed;
+  return `#${trimmed}`;
 }
 
 function activeTarget(state: Pick<State, 'activeView'>): string | null {
@@ -128,9 +131,28 @@ function parseTargetedTimeArg(value: string): { target: string; expr: string } |
   const trimmed = value.trim();
   const match = /^([#&][^\s,]+)\s+(.+)$/i.exec(trimmed);
   if (!match) return null;
+  const expr = match[2]?.trim() ?? '';
+  if (!expr) return null;
   return {
     target: normalizeChannel(match[1] ?? ''),
-    expr: match[2]?.trim() ?? '',
+    expr,
+  };
+}
+
+/**
+ * Docs teach channel-first forms: `#general at: last friday` and
+ * `#general at yesterday 3pm`. Distinct from `at #general <expr>` (verb-first)
+ * and from `at: <expr>` (active conversation). Requires whitespace after
+ * `at`/`at:` so `at:last` fails closed.
+ */
+function parseChannelFirstTimeArg(query: string): { target: string; expr: string } | null {
+  const match = /^([#&][^\s,]+)\s+at:?\s+(.+)$/i.exec(query.trim());
+  if (!match) return null;
+  const expr = match[2]?.trim() ?? '';
+  if (!expr) return null;
+  return {
+    target: normalizeChannel(match[1] ?? ''),
+    expr,
   };
 }
 
@@ -281,7 +303,9 @@ function readSpotlightQuery(): string {
 function timeJumpCommands(state: CommandState, query: string): SpotlightCommand[] {
   const commands: SpotlightCommand[] = [];
   const atArg = commandArg(query, 'at');
-  const targetTime = atArg ? parseTargetedTimeArg(atArg) : null;
+  // Verb-first (`at #room <expr>`) or channel-first (`#room at: <expr>`).
+  const targetTime =
+    (atArg ? parseTargetedTimeArg(atArg) : null) ?? parseChannelFirstTimeArg(query);
   if (targetTime) {
     const at = parseTimeExpr(targetTime.expr);
     if (!at) return [];

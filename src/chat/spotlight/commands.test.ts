@@ -251,6 +251,70 @@ describe('buildCommands', () => {
     expect(travelTo).toHaveBeenCalledWith('#forge', new Date('2026-07-08T09:00:00.000Z'));
   });
 
+  it('jumps the active conversation via at: yesterday 3pm (docs flagship)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 8, 12, 0, 0, 0));
+    const travelTo = vi.fn();
+    setState({
+      activeView: { kind: 'channel', channel: '#lapis' },
+      channels: new Map([['#lapis', channel('#lapis')]]),
+      travelTo,
+    });
+
+    const command = buildCommands(getState(), 'at: yesterday 3pm')
+      .find((entry) => entry.id.startsWith('action:time-jump:#lapis:'));
+
+    expect(command?.title).toContain('Jump to');
+    command?.run();
+    expect(travelTo).toHaveBeenCalledWith('#lapis', new Date(2026, 6, 7, 15, 0, 0, 0));
+  });
+
+  it('accepts channel-first "#room at: <expr>" (docs form) and am/pm clocks', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 8, 12, 0, 0, 0));
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    const travelTo = vi.fn();
+    setState({ joinChannel, navigate, travelTo });
+
+    const colon = buildCommands(getState(), '#forge at: last friday')
+      .find((entry) => entry.id.startsWith('action:time-jump:#forge:'));
+    expect(colon?.title).toContain('Jump #forge to');
+    colon?.run();
+    expect(joinChannel).toHaveBeenCalledWith('#forge');
+    expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
+    // 2026-07-08 Wed → last friday = 2026-07-03 midnight local
+    expect(travelTo).toHaveBeenCalledWith('#forge', new Date(2026, 6, 3, 0, 0, 0, 0));
+
+    joinChannel.mockClear();
+    navigate.mockClear();
+    travelTo.mockClear();
+
+    const spaced = buildCommands(getState(), '#forge at yesterday 3pm')
+      .find((entry) => entry.id.startsWith('action:time-jump:#forge:'));
+    expect(spaced).toBeDefined();
+    spaced?.run();
+    expect(travelTo).toHaveBeenCalledWith('#forge', new Date(2026, 6, 7, 15, 0, 0, 0));
+  });
+
+  it('preserves & channel targets in time-jump grammar', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 8, 12, 0, 0, 0));
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    const travelTo = vi.fn();
+    setState({ joinChannel, navigate, travelTo });
+
+    const command = buildCommands(getState(), 'at &ops yesterday 3pm')
+      .find((entry) => entry.id.startsWith('action:time-jump:&ops:'));
+
+    expect(command).toBeDefined();
+    command?.run();
+    expect(joinChannel).toHaveBeenCalledWith('&ops');
+    expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '&ops' });
+    expect(travelTo).toHaveBeenCalledWith('&ops', new Date(2026, 6, 7, 15, 0, 0, 0));
+  });
+
   it('builds a leave command that parts a named channel through partChannel', () => {
     const partChannel = vi.fn();
     setState({

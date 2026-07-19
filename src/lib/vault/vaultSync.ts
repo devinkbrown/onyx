@@ -6,10 +6,10 @@
  *    vault's copy renders immediately — the server's CHATHISTORY replay then
  *    merges on top (the store's history merge dedupes by msgid, and locally
  *    generated ids never collide with server msgids).
- *  · COLD PAINT: the last-active room (activeView) is hydrated FIRST so local
- *    scrollback paints before the network answers CHATHISTORY. init also
- *    paints any buffers that already landed while retention applied — JOINs
- *    must not wait for a later map mutation that may never come.
+ *  · COLD PAINT: the last-active room is remembered owner-scoped and hydrated
+ *    as soon as the device-memory owner appears — before session-sync JOIN or
+ *    CHATHISTORY. Live buffers that already exist also paint on init (JOIN may
+ *    beat retention.finally), with the active room prioritized.
  *  · PERSIST: buffer changes flush to IndexedDB, debounced per target.
  *
  * Everything is preference-gated (prefs.localHistory) and best-effort.
@@ -18,6 +18,7 @@ import {
   captureDeviceMemoryContext,
   getState,
   isDeviceMemoryContextCurrent,
+  selectDeviceMemoryOwner,
   store,
   type DeviceMemoryContext,
 } from '@/lib/store';
@@ -29,6 +30,11 @@ import {
   loadRecent,
   saveMessages,
 } from './historyVault';
+import {
+  loadVaultResumeTarget,
+  saveVaultResumeTarget,
+  type VaultResumeTarget,
+} from './vaultResumeMemory';
 
 const FLUSH_MS = 1500;
 /** Maximum live owner/target watermarks retained by one long-lived tab. */
@@ -156,8 +162,9 @@ function isOwnedTargetLive(key: string): boolean {
 }
 
 /**
- * Last-active conversation the UI is showing — the cold-start paint target.
- * Home/status/voice-only views are not room buffers and return null.
+ * Last-active conversation the UI is showing — the cold-start paint target
+ * among already-materialized buffers. Home/status/voice-only views are not
+ * room buffers and return null.
  */
 function activeRoomTarget(
   state: ReturnType<typeof getState> = getState(),
@@ -221,7 +228,12 @@ function scheduleFlush(
   );
 }
 
-async function hydrate(context: DeviceMemoryContext, target: string, dm = false): Promise<void> {
+async function hydrate(
+  context: DeviceMemoryContext,
+  target: string,
+  dm = false,
+  activate?: VaultResumeTarget['kind'],
+): Promise<void> {
   const targetKey = target.toLowerCase();
   const key = ownedTargetKey(context, targetKey);
   if (wasHydrated(key)) return;
@@ -239,6 +251,30 @@ async function hydrate(context: DeviceMemoryContext, target: string, dm = false)
     _hydrated.delete(key);
     return;
   }
+  if (local.length === 0) {
+    // Cold-resume of an empty vault must not lock out a later JOIN hydrate
+    // once rows land (import / first CHATHISTORY flush). Live empty shells
+    // keep the watermark so map churn does not thrash IndexedDB.
+    if (activate) _hydrated.delete(key);
+    return;
+  }
+
+  if (activate) {
+    // A deep link chosen during the IndexedDB read wins. Merge only when its
+    // target now exists; otherwise make normal JOIN hydration retryable.
+    if (getState().pendingDeepLinkJoin) {
+      const state = getState();
+      if (state.channels.has(targetKey) || state.dms.has(targetKey)) {
+        getState().hydrateHistory(targetKey, local);
+      } else {
+        _hydrated.delete(key);
+      }
+      return;
+    }
+    getState().hydrateHistory(targetKey, local, { activate });
+    return;
+  }
+
   // Buffer may have closed while IndexedDB was in flight — drop the watermark
   // so a later rejoin can paint from the vault again.
   const state = getState();
@@ -247,8 +283,44 @@ async function hydrate(context: DeviceMemoryContext, target: string, dm = false)
     _hydrated.delete(key);
     return;
   }
-  if (local.length === 0) return;
   getState().hydrateHistory(targetKey, local);
+}
+
+/** Persist the active room pointer (metadata only — never message bodies). */
+function rememberActiveConversation(): void {
+  if (!preferences().localHistory) return;
+  const state = getState();
+  const owner = selectDeviceMemoryOwner(state);
+  if (!owner) return;
+  if (state.activeView.kind === 'channel') {
+    const target = state.activeView.channel.toLowerCase();
+    if (state.channels.has(target)) {
+      saveVaultResumeTarget({ kind: 'channel', target }, owner);
+    }
+  } else if (state.activeView.kind === 'dm') {
+    const target = state.activeView.nick.toLowerCase();
+    if (state.dms.has(target)) saveVaultResumeTarget({ kind: 'dm', target }, owner);
+  }
+}
+
+/**
+ * Cold resume: materialize the last-active room from the vault before any
+ * network buffer exists. Deep links and already-live state win.
+ */
+function hydrateRememberedConversation(): void {
+  if (!preferences().localHistory) return;
+  const context = captureDeviceMemoryContext();
+  if (!context) return;
+  const state = getState();
+  if (
+    state.pendingDeepLinkJoin
+    || state.activeView.kind !== 'home'
+    || state.channels.size > 0
+    || state.dms.size > 0
+  ) return;
+  const resume = loadVaultResumeTarget(context.owner);
+  if (!resume) return;
+  void hydrate(context, resume.target, resume.kind === 'dm', resume.kind);
 }
 
 /**
@@ -302,13 +374,26 @@ export function initVaultSync(): void {
         syncLiveBuffers();
       },
     ),
+    // Owner identity becomes known at connect (before JOINs). Kick cold resume
+    // one microtask later so a brief nick/account alias cannot address the wrong
+    // namespace.
+    store.subscribe(
+      (s) => {
+        const owner = selectDeviceMemoryOwner(s);
+        return owner ? deviceMemoryOwnerKey(owner) : null;
+      },
+      () => {
+        queueMicrotask(hydrateRememberedConversation);
+      },
+    ),
     // Navigating to a remembered room must prioritize its vault paint even when
     // the channels/dms maps themselves did not change (e.g. switching between
-    // already-joined rooms after a multi-JOIN restore).
+    // already-joined rooms after a multi-JOIN restore). Also persist the pointer.
     store.subscribe(
       (s) => s.activeView,
       () => {
         if (!preferences().localHistory) return;
+        rememberActiveConversation();
         const context = captureDeviceMemoryContext();
         if (!context) return;
         const active = activeRoomTarget();
@@ -317,9 +402,10 @@ export function initVaultSync(): void {
     ),
   ];
 
-  // Cold-start: JOINs may already have created empty buffers while retention
-  // applied (init runs in applyRetentionPolicy.finally). Subscribers do not
-  // fireImmediately, so paint whatever is live now — active room first.
+  // Cold-start: remember pointer, paint last room before network if blank,
+  // then paint whatever buffers JOINs already created while retention applied.
+  rememberActiveConversation();
+  hydrateRememberedConversation();
   syncLiveBuffers();
 }
 

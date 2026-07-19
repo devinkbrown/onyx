@@ -249,8 +249,33 @@ describe('E2EE DMs', () => {
     const toast = store.getState().toasts.at(-1)!;
     expect(toast.variant).toBe('error');
     expect(toast.title).toBe('Encryption unavailable');
+    // Do not coach the user into disabling E2EE as the recovery path.
+    expect(toast.description).not.toMatch(/turn off|unencrypt/i);
 
     // And no plaintext echo leaked into the local DM buffer either.
+    expect(dmMsgs('trev')).toHaveLength(0);
+  });
+
+  it('drops a sealed result when the peer key changes before socket admission', async () => {
+    const mine = await deviceKeys();
+    const original = await makePeer(mine!.publicB64);
+    const rotated = await makePeer(mine!.publicB64);
+    const send = vi.fn((_line: string) => true);
+    store.setState({ connectionStatus: 'connected', client: mockClient() });
+    store.getState().client!.send = send;
+    const sendRaw = store.getState().client!.sendRaw as ReturnType<typeof vi.fn>;
+    store.setState({ peerDmKeys: new Map([['trev', original.publicB64]]) });
+
+    store.getState().sendMessage('trev', 'never seal to a stale key');
+    // Directory rotates while sealDmTrusted is in flight — admit nothing under
+    // the stale key, and surface the live key for the key-change warning.
+    store.setState({ peerDmKeys: new Map([['trev', rotated.publicB64]]) });
+
+    await until(() => send.mock.calls.length > 0 || store.getState().peerKeyChanges.has('trev'));
+
+    expect(send).not.toHaveBeenCalled();
+    expect(sendRaw).not.toHaveBeenCalledWith('PRIVMSG', 'trev', 'never seal to a stale key');
+    expect(store.getState().peerKeyChanges.get('trev')?.newKey).toBe(rotated.publicB64);
     expect(dmMsgs('trev')).toHaveLength(0);
   });
 });

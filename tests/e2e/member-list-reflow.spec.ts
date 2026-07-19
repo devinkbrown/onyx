@@ -198,3 +198,11 @@ test('keeps the member drawer dense and keyboard-scrollable at 400% zoom', async
   expect(geometry.outlineStyle).not.toBe('none');
   expect(geometry.outlineWidth).toBeGreaterThanOrEqual(2);
 });
+
+
+test('keeps away presence and mention rows non-colour-only under forced-colors', () => {
+  expect(shellCss).toContain('Dense roster: forced-colors away signal');
+  expect(shellCss).toContain('.shell-member-presence--away');
+  expect(shellCss).toContain('Dense transcript: forced-colors mention signal');
+  expect(shellCss).toContain('.shell-msg-group--highlight');
+});

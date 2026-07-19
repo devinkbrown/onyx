@@ -156,8 +156,9 @@ function clipped(text: string, max: number): string {
  * computation for assistive tech. The label must therefore:
  *  - never fall back to E2EE ciphertext (SC 1.3.1 + privacy boundary);
  *  - match MsgBody's deleted / locked / action display text;
- *  - surface pending ("queued") and edited states that the visual chrome only
- *    paints via CSS or an aria-hidden timestamp (SC 1.3.1 / 4.1.2).
+ *  - surface pending ("queued"), edited, and mention states that the visual
+ *    chrome only paints via CSS colour bars or an aria-hidden timestamp
+ *    (SC 1.3.1 / 1.4.1 / 4.1.2).
  */
 export function messageAccessibleLabel(msg: ChatMessage): string {
   const locked = Boolean(msg.encrypted && msg.plaintext === undefined);
@@ -176,6 +177,9 @@ export function messageAccessibleLabel(msg: ChatMessage): string {
   const flags: string[] = [];
   if (msg.pending) flags.push('queued');
   if (msg.edited && !msg.deleted && !msg.redacted) flags.push('edited');
+  // Mentions paint a left-edge colour bar only — surface the state in text so AT
+  // and non-colour users get the same "this names you" signal (SC 1.3.1 / 1.4.1).
+  if (msg.highlight && !msg.deleted && !msg.redacted) flags.push('mention');
   const flagSuffix = flags.length > 0 ? ` (${flags.join(', ')})` : '';
 
   return `${msg.from} at ${fmtTime(msg.time)}${flagSuffix}: ${clipped(body, 120)}`;
@@ -635,6 +639,15 @@ type ThreadPanelProps = {
   messages: ChatMessage[];
 };
 
+/** Visible body for thread rows — same deleted/locked/action rules as MsgBody,
+ *  so the side panel never paints E2EE ciphertext or withdrawn text. */
+function threadDisplayText(msg: ChatMessage): string {
+  if (msg.deleted || msg.redacted) return '[message deleted]';
+  if (msg.encrypted && msg.plaintext === undefined) return LOCKED_PLACEHOLDER;
+  if (msg.type === 'action') return `* ${msg.from} ${msg.plaintext ?? msg.text}`;
+  return msg.encrypted ? (msg.plaintext ?? LOCKED_PLACEHOLDER) : msg.text;
+}
+
 export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
   const [local] = splitProps(props, ['parentId', 'messages']);
 
@@ -649,12 +662,16 @@ export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
       {/* Parent message */}
       <Show when={parent()}>
         {(p) => (
-          <article class="shell-thread-msg" aria-label={`Thread parent from ${p().from}`} style={{ 'margin-bottom': '12px' }}>
+          <article
+            class="shell-thread-msg"
+            aria-label={`Thread parent: ${messageAccessibleLabel(p())}`}
+            style={{ 'margin-bottom': '12px' }}
+          >
             <div class="shell-thread-msg-meta">
               <span class="shell-thread-msg-from">{p().from}</span>
-              <span>{fmtTime(p().time)}</span>
+              <time dateTime={p().time.toISOString()} aria-hidden="true">{fmtTime(p().time)}</time>
             </div>
-            <p class="shell-thread-msg-text">{p().text}</p>
+            <p class="shell-thread-msg-text">{threadDisplayText(p())}</p>
           </article>
         )}
       </Show>
@@ -671,12 +688,15 @@ export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
         >
           <For each={threadMessages()}>
             {(msg) => (
-              <article class="shell-thread-msg" aria-label={`Thread reply from ${msg.from}`}>
+              <article
+                class="shell-thread-msg"
+                aria-label={`Thread reply: ${messageAccessibleLabel(msg)}`}
+              >
                 <div class="shell-thread-msg-meta">
                   <span class="shell-thread-msg-from">{msg.from}</span>
-                  <span>{fmtTime(msg.time)}</span>
+                  <time dateTime={msg.time.toISOString()} aria-hidden="true">{fmtTime(msg.time)}</time>
                 </div>
-                <p class="shell-thread-msg-text">{msg.text}</p>
+                <p class="shell-thread-msg-text">{threadDisplayText(msg)}</p>
               </article>
             )}
           </For>
@@ -1832,11 +1852,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     menuOpen={menuOpen()}
                     onMenuOpenChange={setMenuOpen}
                   />
-                  <div class="shell-msg-avatar" style={{ '--nick-tint': nickTint(msg.from) }}>
+                  <div class="shell-msg-avatar" style={{ '--nick-tint': nickTint(msg.from) }} aria-hidden="true">
                     <Avatar
                       name={msg.from}
                       size="sm"
                       owner={msg.from === selfNick()}
+                      aria-hidden="true"
                     />
                   </div>
                   <div class="shell-msg-body">

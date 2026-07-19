@@ -375,6 +375,8 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    // Opening settings as op auto-fetches ACCESS LIST; ignore that for webhook asserts.
+    client.sendRaw.mockClear();
     fireEvent.input(screen.getByLabelText('Webhook name'), { target: { value: 'deploy' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create webhook' }));
     fireEvent.click(screen.getByRole('button', { name: 'List webhooks' }));

@@ -32,7 +32,7 @@ it in **Preferences → History & data → Local history** ("Remember conversati
 on this device"). Turning it **off** stops new saves and erases what is already
 stored in this browser's vault — the toggle wipes the database as it flips, and
 tells you when erasure could not be verified.
-(`src/shell/PreferencesPanel.tsx:561`, `:546`, `:573`)
+(`src/shell/PreferencesPanel.tsx:561`, `:547`, `:573`)
 
 ## Searching your history
 
@@ -122,13 +122,13 @@ palette (**Cmd/Ctrl-K**) use the time grammar `at:` — for example
 `at: yesterday 3pm` for the current room, or `#general at: last friday` to
 target a channel by name. (`src/chat/spotlight/commands.ts:281`) Shared invite
 and stats links carry the same `?at=` parameter, so opening one lands you at the
-referenced moment. (`src/app/Connect.tsx:322`, `src/routes/Stats.tsx:63`)
+referenced moment. (`src/app/Connect.tsx:322`, `src/routes/Stats.tsx:64`)
 
 When the server supports history replay, Onyx asks it for a window around that
 moment. When it doesn't — or when you're offline with local history on — Onyx
 falls back to the local vault, pulling the remembered messages nearest the
 timestamp and landing on the closest one.
-(`src/lib/store/store.ts:5508`, `src/lib/vault/historyVault.ts:533`)
+(`src/lib/store/store.ts:5591`, `src/lib/vault/historyVault.ts:533`)
 
 ## Privacy: encrypted DMs never hit the vault as plaintext
 

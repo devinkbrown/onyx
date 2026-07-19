@@ -386,7 +386,14 @@ self.addEventListener('push', (event) => {
       renotify: Boolean(rawTag),
       data: { url: targetUrl },
       vibrate: [100, 50, 100],
-    })
+    }).catch(() =>
+      // A failed rich notification must not drop the push silently — try a
+      // minimal fallback so the user still learns something arrived.
+      self.registration.showNotification(title || 'Onyx', {
+        body: body || 'You have a new message.',
+        data: { url: targetUrl },
+      }).catch(() => undefined)
+    )
   );
 });
 

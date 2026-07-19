@@ -436,6 +436,12 @@ export function Connect(props: ConnectProps): JSX.Element {
       if (!selectionActive) return;
       setChosenNode(node);
       setRouting(false);
+    }).catch(() => {
+      // Probe failures already fall back inside selectBestNode; an unexpected
+      // rejection must still unblock the form with the initial node rather
+      // than leave routing=true forever.
+      if (!selectionActive) return;
+      setRouting(false);
     });
     // Surface the bounded remembered-identity catalogue (active + 11 newest).
     // It contains only sanitized metadata; selecting an entry is the narrow

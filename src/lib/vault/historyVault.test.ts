@@ -34,6 +34,7 @@ import {
   loadAround,
   loadOutbox,
   loadRecent,
+  markOutboxWireAdmitted,
   parseVaultExport,
   queueOutbox,
   readAllVaultHits,
@@ -197,6 +198,24 @@ describe('historyVault', () => {
       });
       expect(hydrated.replyTo?.text).toBe(LOCKED_PLACEHOLDER);
     });
+
+    it('deserializeMessage strips smuggled OMIT_AT_REST fields (fail-closed load)', () => {
+      // A hostile/legacy row that somehow carried plaintext past serialize must
+      // still never re-enter the UI via loadRecent / loadAround / search.
+      const smuggled = {
+        ...serializeMessage('trev', msg('cipher', 1000, {
+          target: 'trev',
+          text: 'TSUMUGI1 opaque-ciphertext',
+          encrypted: true,
+        })),
+        plaintext: 'must-not-hydrate',
+      } as ReturnType<typeof serializeMessage> & { plaintext: string };
+
+      const back = deserializeMessage(smuggled);
+      expect(back.text).toBe('TSUMUGI1 opaque-ciphertext');
+      expect(back.plaintext).toBeUndefined();
+      expect('plaintext' in back).toBe(false);
+    });
   });
 
   describe('saveMessages / loadRecent', () => {
@@ -280,6 +299,23 @@ describe('historyVault', () => {
       const loaded = await loadAround('#room', new Date('2026-06-30T12:00:00.000Z'), 3);
 
       expect(loaded.map((m) => m.id)).toEqual(['m1150', 'm1159', 'm1202']);
+    });
+
+    it('loadAround returns ciphertext only — never decrypted DM plaintext', async () => {
+      await saveMessages('trev', [{
+        ...msg('dm-cipher', Date.parse('2026-06-30T12:00:00.000Z'), {
+          target: 'trev',
+          text: 'TSUMUGI1 opaque-ciphertext',
+          encrypted: true,
+        }),
+        plaintext: 'must never reach IndexedDB or time-travel hydrate',
+      }]);
+
+      const loaded = await loadAround('trev', new Date('2026-06-30T12:00:00.000Z'), 5);
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0]!.text).toBe('TSUMUGI1 opaque-ciphertext');
+      expect(loaded[0]!.plaintext).toBeUndefined();
+      expect(JSON.stringify(loaded)).not.toContain('must never reach');
     });
 
     it('returns [] for an unknown target', async () => {
@@ -820,8 +856,22 @@ describe('historyVault', () => {
       const loaded = await loadOutbox();
       expect(loaded.map((e) => e.text)).toEqual(['first message', 'second message']);
 
-      await deleteOutboxEntry(first!.id);
+      await expect(deleteOutboxEntry(first!.id)).resolves.toBe(true);
       expect((await loadOutbox()).map((e) => e.id)).toEqual([second!.id]);
+    });
+
+    it('marks wire admission durably so a reload cannot re-send', async () => {
+      const entry = await queueOwnedOutbox('#room', 'already on the wire');
+      expect(entry).not.toBeNull();
+      expect(entry!.wire_admitted).toBeUndefined();
+
+      await expect(markOutboxWireAdmitted(entry!.id)).resolves.toBe(true);
+      const [marked] = await loadOutbox();
+      expect(marked).toMatchObject({ id: entry!.id, wire_admitted: true, text: 'already on the wire' });
+
+      // Idempotent — a second mark must not fail or clear the flag.
+      await expect(markOutboxWireAdmitted(entry!.id)).resolves.toBe(true);
+      await expect(markOutboxWireAdmitted('missing-id')).resolves.toBe(false);
     });
 
     it('rejects new entries at the hard cap without evicting existing messages', async () => {
@@ -958,7 +1008,7 @@ describe('historyVault', () => {
       _resetVaultForTests();
       expect(await queueOwnedOutbox('#room', 'x')).toBeNull();
       expect(await loadOutbox()).toEqual([]);
-      await expect(deleteOutboxEntry('nope')).resolves.toBeUndefined();
+      await expect(deleteOutboxEntry('nope')).resolves.toBe(false);
       await expect(clearOutbox()).resolves.toBe(false);
     });
 
@@ -1002,7 +1052,7 @@ describe('historyVault', () => {
       });
 
       try {
-        await expect(deleteOutboxEntry(entry!.id)).resolves.toBeUndefined();
+        await expect(deleteOutboxEntry(entry!.id)).resolves.toBe(false);
         expect((await loadOutbox()).map((row) => row.id)).toEqual([entry!.id]);
         expect(listener).not.toHaveBeenCalled();
       } finally {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import {
   buildSessionResumeLine,
+  isValidSessionCredential,
   parseCHANLIMIT,
   parseIRCMessage,
   formatIRCLine,
@@ -296,7 +297,16 @@ export class IRCClient {
   modeToPrefix: Record<string, string> = { Y: '*', Q: '!', q: '.', a: '&', o: '@', h: '%', v: '+' };
 
   constructor(opts: IRCClientOptions) {
-    this.opts = opts;
+    // Fail-closed at construction: a caller-supplied bearer that would not
+    // survive isValidSessionCredential must never sit in opts. Construction-
+    // time garbage used to only be refused at SESSION RESUME send time; drop
+    // it here so updateResumeTokens merges, clearResumeTokens, and any mid-
+    // session inspection all see the same sanitized view.
+    this.opts = {
+      ...opts,
+      sessionToken: isValidSessionCredential(opts.sessionToken) ? opts.sessionToken : undefined,
+      meshToken: isValidSessionCredential(opts.meshToken) ? opts.meshToken : undefined,
+    };
     this._attribution = new AccountAttribution(this, opts.url);
     // Save before any nick mutations (433 collision appends '_')
     this._authNick = opts.nick;
@@ -582,14 +592,21 @@ export class IRCClient {
    * would silently fail and the session would come back as brand-new.
    *
    * Only the provided fields are merged, so a lone `TOKEN` note never clobbers a
-   * held `MTOKEN` (and vice versa). Immutable: a new opts object is assigned.
+   * held `MTOKEN` (and vice versa). Invalid values are refused fail-closed —
+   * the previously held bearer for that field is left intact rather than
+   * replaced with garbage that would become a multi-word / control-bearing
+   * `SESSION RESUME` on the next 001. Immutable: a new opts object is assigned.
    */
   updateResumeTokens(tokens: { sessionToken?: string; meshToken?: string }): void {
-    this.opts = {
-      ...this.opts,
-      ...(tokens.sessionToken !== undefined ? { sessionToken: tokens.sessionToken } : {}),
-      ...(tokens.meshToken !== undefined ? { meshToken: tokens.meshToken } : {}),
-    };
+    const next: { sessionToken?: string; meshToken?: string } = {};
+    if (tokens.sessionToken !== undefined && isValidSessionCredential(tokens.sessionToken)) {
+      next.sessionToken = tokens.sessionToken;
+    }
+    if (tokens.meshToken !== undefined && isValidSessionCredential(tokens.meshToken)) {
+      next.meshToken = tokens.meshToken;
+    }
+    if (next.sessionToken === undefined && next.meshToken === undefined) return;
+    this.opts = { ...this.opts, ...next };
   }
 
   /**
@@ -1015,7 +1032,15 @@ export class IRCClient {
   private _sendSessionCommandsAfterAuthentication(): void {
     if (this._sessionCommandsSent || !this._registered || !this._loggedIn) return;
     this._sessionCommandsSent = true;
-    const resumeToken = this.opts.meshToken || this.opts.sessionToken;
+    // Prefer a valid mesh token; fall through to a valid local token. Never
+    // emit SESSION RESUME with an empty / whitespace / control-bearing value
+    // even if construction-time opts were poisoned — formatIRCLine would only
+    // strip CR/LF, not refuse the atom.
+    const resumeToken = isValidSessionCredential(this.opts.meshToken)
+      ? this.opts.meshToken
+      : isValidSessionCredential(this.opts.sessionToken)
+        ? this.opts.sessionToken
+        : null;
     if (resumeToken) this.send(buildSessionResumeLine(resumeToken));
     this.sendRaw('SESSION', 'TOKEN');
   }

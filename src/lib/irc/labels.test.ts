@@ -44,4 +44,15 @@ describe('isValidLabel', () => {
     expect(isValidLabel('bad\tlabel')).toBe(false);
     expect(isValidLabel('has\0null')).toBe(false);
   });
+
+  it('measures the IRCv3 64-byte bound in UTF-8 bytes, not JS string length', () => {
+    // 'é' is one JS code unit (U+00E9) but two UTF-8 bytes. 33 of them = 66
+    // bytes — over the cap — while `.length === 33` would falsely pass a
+    // code-unit check.
+    const multiByte = 'é'.repeat(33);
+    expect(multiByte.length).toBeLessThanOrEqual(MAX_LABEL_BYTES);
+    expect(isValidLabel(multiByte)).toBe(false);
+    // 32 × 'é' = 64 bytes exactly — still legal.
+    expect(isValidLabel('é'.repeat(32))).toBe(true);
+  });
 });

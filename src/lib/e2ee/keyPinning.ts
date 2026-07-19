@@ -94,6 +94,26 @@ function openPinsDb(): Promise<IDBDatabase | null> {
 /** ok:false means the store could not be read at all — callers MUST fail closed. */
 type PinRead = { ok: true; key: string | null } | { ok: false };
 
+/**
+ * Serialize TOFU pin decisions per trust bucket. Concurrent first-contact
+ * seal/open for the same account must not both observe "no pin" and both win
+ * — only one presented key may establish the pin; the other re-reads as changed.
+ */
+const _pinChains = new Map<string, Promise<void>>();
+
+function withPinChain<T>(recordKey: string, fn: () => Promise<T>): Promise<T> {
+  const previous = _pinChains.get(recordKey) ?? Promise.resolve();
+  const run = previous.then(fn, fn);
+  _pinChains.set(
+    recordKey,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return run;
+}
+
 function readPin(account: string, owner?: DeviceMemoryOwner): Promise<PinRead> {
   const recordKey = pinRecordKey(account, owner);
   if (!recordKey) return Promise.resolve({ ok: false });
@@ -106,7 +126,18 @@ function readPin(account: string, owner?: DeviceMemoryOwner): Promise<PinRead> {
         get.onsuccess = () => {
           const val = get.result;
           db.close();
-          resolve({ ok: true, key: typeof val === 'string' ? val : null });
+          // Missing → first-use. A present but non-string value is corruption,
+          // not an empty pin: treating it as first-use would silently re-TOFU
+          // over a damaged trust record.
+          if (val === undefined) {
+            resolve({ ok: true, key: null });
+            return;
+          }
+          if (typeof val === 'string') {
+            resolve({ ok: true, key: val });
+            return;
+          }
+          resolve({ ok: false });
         };
         get.onerror = () => {
           db.close();
@@ -260,22 +291,26 @@ export async function sealDmTrusted(
   owner?: DeviceMemoryOwner,
 ): Promise<SealTrustedOutcome> {
   if (!isValidPeerPublicKey(presentedKey)) return { status: 'unavailable', envelope: null };
+  const recordKey = pinRecordKey(account, owner);
+  if (!recordKey) return { status: 'unavailable', envelope: null };
 
-  const verdict = await peerKeyStatus(account, presentedKey, owner);
-  if (verdict === 'unreadable') return { status: 'unavailable', envelope: null };
-  if (verdict === 'changed') {
-    const pinnedKey = (await pinnedPeerKey(account, owner)) ?? '';
-    return { status: 'key-changed', envelope: null, pinnedKey };
-  }
-  if (verdict === 'first-use') {
-    // TOFU: persist the pin BEFORE sealing. If we cannot persist it we cannot
-    // detect a future silent swap, so refuse rather than seal unverifiably.
-    if (!(await pinPeerKey(account, presentedKey, owner))) return { status: 'unavailable', envelope: null };
-  }
+  return withPinChain(recordKey, async () => {
+    const verdict = await peerKeyStatus(account, presentedKey, owner);
+    if (verdict === 'unreadable') return { status: 'unavailable', envelope: null };
+    if (verdict === 'changed') {
+      const pinnedKey = (await pinnedPeerKey(account, owner)) ?? '';
+      return { status: 'key-changed', envelope: null, pinnedKey };
+    }
+    if (verdict === 'first-use') {
+      // TOFU: persist the pin BEFORE sealing. If we cannot persist it we cannot
+      // detect a future silent swap, so refuse rather than seal unverifiably.
+      if (!(await pinPeerKey(account, presentedKey, owner))) return { status: 'unavailable', envelope: null };
+    }
 
-  const envelope = await sealDm(presentedKey, plaintext);
-  if (!envelope) return { status: 'unavailable', envelope: null };
-  return { status: 'sealed', envelope, keyStatus: verdict === 'first-use' ? 'first-use' : 'unchanged' };
+    const envelope = await sealDm(presentedKey, plaintext);
+    if (!envelope) return { status: 'unavailable', envelope: null };
+    return { status: 'sealed', envelope, keyStatus: verdict === 'first-use' ? 'first-use' : 'unchanged' };
+  });
 }
 
 /** Outcome of a trust-gated open. Only `opened` yields plaintext. */
@@ -311,21 +346,25 @@ export async function openDmTrusted(
 ): Promise<OpenTrustedOutcome> {
   if (!isEnvelope(envelope)) return { status: 'locked', reason: 'undecryptable' };
   if (!isValidPeerPublicKey(presentedKey)) return { status: 'locked', reason: 'unavailable' };
+  const recordKey = pinRecordKey(account, owner);
+  if (!recordKey) return { status: 'locked', reason: 'unavailable' };
 
-  const verdict = await peerKeyStatus(account, presentedKey, owner);
-  if (verdict === 'unreadable') return { status: 'locked', reason: 'unavailable' };
-  if (verdict === 'changed') return { status: 'locked', reason: 'key-changed' };
+  return withPinChain(recordKey, async () => {
+    const verdict = await peerKeyStatus(account, presentedKey, owner);
+    if (verdict === 'unreadable') return { status: 'locked', reason: 'unavailable' };
+    if (verdict === 'changed') return { status: 'locked', reason: 'key-changed' };
 
-  // Decrypt before establishing trust. On an unchanged pin this is the normal
-  // open; on first-use it also cryptographically confirms the key before pinning.
-  const plaintext = await openDm(presentedKey, envelope);
-  if (plaintext == null) return { status: 'locked', reason: 'undecryptable' };
+    // Decrypt before establishing trust. On an unchanged pin this is the normal
+    // open; on first-use it also cryptographically confirms the key before pinning.
+    const plaintext = await openDm(presentedKey, envelope);
+    if (plaintext == null) return { status: 'locked', reason: 'undecryptable' };
 
-  if (verdict === 'first-use') {
-    // Pin only a key we have just confirmed can produce a valid message.
-    if (!(await pinPeerKey(account, presentedKey, owner))) return { status: 'locked', reason: 'unavailable' };
-  }
-  return { status: 'opened', plaintext, keyStatus: verdict === 'first-use' ? 'first-use' : 'unchanged' };
+    if (verdict === 'first-use') {
+      // Pin only a key we have just confirmed can produce a valid message.
+      if (!(await pinPeerKey(account, presentedKey, owner))) return { status: 'locked', reason: 'unavailable' };
+    }
+    return { status: 'opened', plaintext, keyStatus: verdict === 'first-use' ? 'first-use' : 'unchanged' };
+  });
 }
 
 // ── safety number (out-of-band verification) ──────────────────────────────────

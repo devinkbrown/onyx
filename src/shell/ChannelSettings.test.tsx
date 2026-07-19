@@ -33,9 +33,9 @@ function testServer(account: string): Server {
   };
 }
 
-function makeChannel(name: string): Channel {
+function makeChannel(name: string, modes: string[] = []): Channel {
   const users = new Map<string, ChannelUser>();
-  users.set('me', { nick: 'me', modes: new Set() });
+  users.set('me', { nick: 'me', modes: new Set(modes) });
   return {
     name,
     topic: '',
@@ -58,9 +58,12 @@ function setServerTopic(topic: string): void {
   });
 }
 
-function seed(notify?: Map<string, NotifyLevel>): void {
+function seed(
+  notify?: Map<string, NotifyLevel>,
+  options?: { op?: boolean; client?: { sendRaw: ReturnType<typeof vi.fn> } },
+): void {
   const channels = new Map<string, Channel>();
-  channels.set('#general', makeChannel('#general'));
+  channels.set('#general', makeChannel('#general', options?.op ? ['o'] : []));
   store.setState(
     {
       ...initialState,
@@ -70,6 +73,7 @@ function seed(notify?: Map<string, NotifyLevel>): void {
       activeView: { kind: 'channel', channel: '#general' },
       connectionStatus: 'connected',
       channelNotify: notify ?? new Map(),
+      ...(options?.client ? { client: options.client as never } : {}),
     },
     true,
   );
@@ -371,5 +375,129 @@ describe('ChannelSettings — Share invite a11y', () => {
     const status = await screen.findByText(/Copy failed\. Select and copy the link shown above\./);
     expect(status).toHaveAttribute('role', 'status');
     expect(status).not.toHaveTextContent('copied');
+  });
+});
+
+describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
+  it('hides the ACCESS manager from non-ops', () => {
+    seed();
+    renderPanel();
+
+    expect(screen.getByRole('heading', { name: 'Roles & access' })).toBeInTheDocument();
+    expect(screen.getByText(/IRCX ACCESS grants founder/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add access entry' })).not.toBeInTheDocument();
+  });
+
+  it('lists committed ACCESS entries and refreshes on open for ops', () => {
+    const sendRaw = vi.fn(() => true);
+    seed(undefined, { op: true, client: { sendRaw } });
+    store.setState({
+      channelAccess: new Map([
+        [
+          '#general',
+          [
+            { level: 'HOST', mask: 'bob!*@*', setBy: 'alice', duration: 3600 },
+            { level: 'DENY', mask: '*!*@spam.example' },
+          ],
+        ],
+      ]),
+    });
+
+    renderPanel();
+
+    expect(sendRaw).toHaveBeenCalledWith('ACCESS', '#general', 'LIST');
+    const list = screen.getByRole('list', { name: 'Channel access entries' });
+    expect(list).toBeInTheDocument();
+    expect(list).toHaveTextContent('bob!*@*');
+    expect(list).toHaveTextContent('*!*@spam.example');
+    expect(list).toHaveTextContent('1 hour');
+    expect(list).toHaveTextContent('set by alice');
+  });
+
+  it('dispatches addChannelAccess with expanded nick mask', () => {
+    const sendRaw = vi.fn(() => true);
+    seed(undefined, { op: true, client: { sendRaw } });
+    const addSpy = vi.spyOn(store.getState(), 'addChannelAccess');
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('Role level'), { target: { value: 'VOICE' } });
+    fireEvent.input(screen.getByLabelText('Nick or hostmask'), { target: { value: 'carol' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add access entry' }));
+
+    expect(addSpy).toHaveBeenCalledWith('#general', 'VOICE', 'carol!*@*', undefined);
+  });
+
+  it('passes an optional timeout through to addChannelAccess', () => {
+    const sendRaw = vi.fn(() => true);
+    seed(undefined, { op: true, client: { sendRaw } });
+    const addSpy = vi.spyOn(store.getState(), 'addChannelAccess');
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('Role level'), { target: { value: 'DENY' } });
+    fireEvent.input(screen.getByLabelText('Nick or hostmask'), {
+      target: { value: 'bad!*@spam.example' },
+    });
+    fireEvent.input(screen.getByLabelText('Timeout seconds (optional)'), {
+      target: { value: '3600' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add access entry' }));
+
+    expect(addSpy).toHaveBeenCalledWith('#general', 'DENY', 'bad!*@spam.example', 3600);
+  });
+
+  it('surfaces a form error and skips the wire on empty mask', () => {
+    const sendRaw = vi.fn(() => true);
+    seed(undefined, { op: true, client: { sendRaw } });
+    const addSpy = vi.spyOn(store.getState(), 'addChannelAccess');
+
+    renderPanel();
+    sendRaw.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Add access entry' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/nick or hostmask/i);
+    expect(addSpy).not.toHaveBeenCalled();
+    // Opening the panel issues ACCESS LIST once; the invalid submit must not.
+    expect(sendRaw).not.toHaveBeenCalled();
+  });
+
+  it('does not request ACCESS LIST for non-ops', () => {
+    const sendRaw = vi.fn(() => true);
+    seed(undefined, { op: false, client: { sendRaw } });
+    renderPanel();
+    expect(sendRaw).not.toHaveBeenCalledWith('ACCESS', '#general', 'LIST');
+  });
+
+  it('removes an entry through deleteChannelAccess', () => {
+    const sendRaw = vi.fn(() => true);
+    seed(undefined, { op: true, client: { sendRaw } });
+    store.setState({
+      channelAccess: new Map([
+        ['#general', [{ level: 'HOST', mask: 'bob!*@*' }]],
+      ]),
+    });
+    const delSpy = vi.spyOn(store.getState(), 'deleteChannelAccess');
+
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove HOST access for bob!*@*' }));
+
+    expect(delSpy).toHaveBeenCalledWith('#general', 'HOST', 'bob!*@*');
+  });
+
+  it('updates the list reactively when the store commits ACCESS rows', () => {
+    const sendRaw = vi.fn(() => true);
+    seed(undefined, { op: true, client: { sendRaw } });
+    renderPanel();
+
+    expect(screen.getByTestId('chset-access-empty')).toBeInTheDocument();
+
+    store.setState({
+      channelAccess: new Map([
+        ['#general', [{ level: 'OWNER', mask: 'dana!*@*' }]],
+      ]),
+    });
+
+    const list = screen.getByRole('list', { name: 'Channel access entries' });
+    expect(list).toHaveTextContent('dana!*@*');
+    expect(list).toHaveTextContent('Owner');
   });
 });

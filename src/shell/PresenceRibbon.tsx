@@ -511,6 +511,25 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 <span class="shell-ribbon-action-label">Video</span>
               </button>
             </Show>
+            {/* Pins chip — one click to the shared pins drawer when the channel
+                has any. Buried-in-More is too quiet for a room-level signal. */}
+            <Show when={pinCount() > 0}>
+              <button
+                type="button"
+                class="shell-ribbon-iconbtn shell-ribbon-pins"
+                aria-label={`${pinCount()} pinned message${pinCount() === 1 ? '' : 's'}`}
+                title={`${pinCount()} pinned`}
+                data-testid="ribbon-pins"
+                onClick={() => getState().openPinnedMessages()}
+              >
+                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" />
+                  <path d="M12 14v6" />
+                </svg>
+                <span class="shell-ribbon-count">{pinCount()}</span>
+              </button>
+            </Show>
             {/* Member count is presence-as-place (stable roster trigger), not chrome. */}
             <Show when={memberCount() > 0}>
               <button
@@ -596,25 +615,8 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                     <p class="shell-ribbon-more-label shell-ribbon-more-label--in-menu" aria-hidden="true">
                       Channel
                     </p>
-                    <Show when={pinCount() > 0}>
-                      <button
-                        type="button"
-                        class="shell-ribbon-more-item"
-                        role="menuitem"
-                        aria-label={`${pinCount()} pinned message${pinCount() === 1 ? '' : 's'}`}
-                        data-testid="ribbon-pins"
-                        onClick={() => closeMoreThen(() => getState().openPinnedMessages())}
-                        onKeyDown={onMoreMenuKeyDown}
-                      >
-                        <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
-                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" />
-                          <path d="M12 14v6" />
-                        </svg>
-                        <span>Pinned messages</span>
-                        <span class="shell-ribbon-more-meta">{pinCount()}</span>
-                      </button>
-                    </Show>
+                    {/* Pins live on the Place cluster (one-click ribbon chip) when
+                        the channel has any — no second entry in More. */}
                     <button
                       type="button"
                       class="shell-ribbon-more-item"

@@ -29,6 +29,7 @@ describe('voice settings persistence boundary', () => {
       pushToTalk: true,
       pushToTalkKey: 'KeyV',
       cameraDeviceId: 'camera-1',
+      muteOnJoin: true,
     })).toEqual({
       inputDeviceId: 'mic-1',
       outputDeviceId: 'speaker-1',
@@ -40,7 +41,23 @@ describe('voice settings persistence boundary', () => {
       pushToTalk: true,
       pushToTalkKey: 'KeyV',
       cameraDeviceId: 'camera-1',
+      muteOnJoin: true,
     });
+  });
+
+  it('defaults muteOnJoin to false when absent (legacy onyx:voice-settings)', () => {
+    expect(sanitizeStoredVoiceSettings({
+      inputDeviceId: null,
+      outputDeviceId: null,
+      outputVolume: 80,
+      vadEnabled: true,
+      vadSensitivity: 'medium',
+      noiseSuppression: true,
+      echoCancellation: true,
+      pushToTalk: false,
+      pushToTalkKey: null,
+      cameraDeviceId: null,
+    }).muteOnJoin).toBe(false);
   });
 
   it('rejects invalid field types, non-finite numbers, and oversized identifiers', () => {

@@ -140,14 +140,16 @@ and open signal; `Spotlight.tsx` is the dialog; `commands.ts` builds the command
 set; `timeGrammar.ts` parses the natural-language time grammar; `fuzzy.ts` is the
 subsequence matcher + ranking.
 
-`timeGrammar.parseTimeExpr` (`src/chat/spotlight/timeGrammar.ts:279`) resolves a
-broad phrase set to an absolute instant: `N minutes/hours/days/weeks ago`
-(`:11`), weekday names — `tuesday`, `fri 08:30`, `last friday noon` (`:42`,
-`:229`), dayparts — `this morning/afternoon/evening/night` (`:209`), and
-`noon`/`midnight` (`:28`). Day arithmetic is done by adding whole days rather
-than 24h spans so a requested wall-clock hour survives DST transitions
-(`src/chat/spotlight/timeGrammar.ts:177`); anything it cannot parse returns
-`null` so callers fail closed.
+`timeGrammar.parseTimeExpr` (`src/chat/spotlight/timeGrammar.ts`) resolves a
+broad phrase set to an absolute instant: `N minutes/hours/days/weeks ago`,
+12-hour clocks (`3pm`, `9:05 a.m.`, `yesterday 3pm` — the docs flagship),
+weekday names (`tuesday`, `fri 08:30`, `last friday noon`), dayparts
+(`this morning`, `yesterday afternoon`, bare `morning`), and
+`noon`/`midnight`. Day arithmetic uses calendar `setDate` rather than 24h
+spans so a requested wall-clock hour survives DST transitions; anything it
+cannot parse returns `null` so callers fail closed. Channel-first jumps
+(`#room at: last friday`) and verb-first jumps (`at #room <expr>`,
+`at: <expr>`) both route through the same parser.
 
 ## Home & catch-up (`src/lib/catchup/`, `src/shell/HomeView.tsx`)
 

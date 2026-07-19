@@ -575,10 +575,11 @@ describe('navigate() reconciles the focused channel roster', () => {
     expect(names).toHaveLength(0);
   });
 
-  it('self-JOIN requests NAMES and keeps a mixed-case resume roster addressable', () => {
-    // Fresh page load of a logged-in account: channels arrive via replayed JOIN
-    // lines that may not carry a NAMES burst. The self-JOIN handler must request
-    // NAMES itself so the nicklist is never left empty.
+  it('self-JOIN arms NAMES without a second request and keeps mixed-case roster addressable', () => {
+    // A client-initiated JOIN already triggers the server's automatic 353/366.
+    // Sending an extra NAMES here re-armed expect mid-burst and collapsed mesh
+    // nicklists — so normal self-JOIN only arms the burst. Session reclaim still
+    // requests NAMES explicitly (covered in store.sessionRoster.test.ts).
     const client = makeClient();
     store.setState({
       ...initialState,
@@ -591,7 +592,7 @@ describe('navigate() reconciles the focused channel roster', () => {
     feed(':me JOIN #ResumeCase');
     feed(':irc 353 me = #ResumeCase :me Alice');
 
-    expect(client.sendRaw.mock.calls).toContainEqual(['NAMES', '#ResumeCase']);
+    expect(client.sendRaw.mock.calls.filter((c) => c[0] === 'NAMES')).toHaveLength(0);
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#resumecase' });
     expect([...store.getState().channels.get('#resumecase')?.users.keys() ?? []].sort()).toEqual(['alice', 'me']);
   });

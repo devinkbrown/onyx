@@ -48,6 +48,18 @@ import {
   type NotifyMode,
 } from '@/lib/notifications/channelNotifyMode';
 import {
+  ACCESS_LEVELS,
+  accessLevelHint,
+  accessLevelLabel,
+  formatAccessDuration,
+  normalizeAccessMask,
+  parseAccessDuration,
+  parseAccessLevel,
+  sortAccessEntries,
+  type AccessLevel,
+  type ChannelAccessEntry,
+} from '@/lib/irc/channelAccess';
+import {
   BRIDGE_STATUS_PROP,
   parseBridgeStatus,
 } from '@/lib/interop/bridgeStatus';
@@ -115,6 +127,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   const encryptionPolicy = useStore((s) => selectChannelEncryptionPolicy(local.channel)(s));
   const serviceNotices = useStore((s) => s.serviceNotices);
   const channelProps = useStore((s) => s.channelProps);
+  const channelAccessMap = useStore((s) => s.channelAccess);
+  const channelAccessLoadingSet = useStore((s) => s.channelAccessLoading);
   const isOp = useStore((s) => selectIsChannelOp(local.channel)(s));
   const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
@@ -378,6 +392,72 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     if (next === encryptionPolicy()) return;
     if (next !== 'off' && next !== 'optional' && next !== 'required') return;
     getState().setChannelEncryptionPolicy(channel()?.name ?? local.channel, next);
+  }
+
+  // ── IRCX ACCESS roles (persistent on-join ranks / deny / grant) ─────────
+  const accessKey = createMemo(() => local.channel.toLowerCase());
+  const accessEntries = createMemo(() =>
+    sortAccessEntries(channelAccessMap().get(accessKey()) ?? []),
+  );
+  const accessLoading = createMemo(() => channelAccessLoadingSet().has(accessKey()));
+  const [accessLevelDraft, setAccessLevelDraft] = createSignal<AccessLevel>('HOST');
+  const [accessMaskDraft, setAccessMaskDraft] = createSignal('');
+  const [accessTimeoutDraft, setAccessTimeoutDraft] = createSignal('');
+  const [accessFormError, setAccessFormError] = createSignal('');
+
+  // Ops pull a fresh LIST whenever the sheet opens on a connected channel.
+  // Non-ops do not: ACCESS LIST is operator-gated on the server (482).
+  createEffect(() => {
+    if (!local.open || !isOp() || !isConnected()) return;
+    getState().fetchChannelAccess(channel()?.name ?? local.channel);
+  });
+
+  createEffect(() => {
+    if (!local.open) {
+      setAccessMaskDraft('');
+      setAccessTimeoutDraft('');
+      setAccessFormError('');
+      setAccessLevelDraft('HOST');
+    }
+  });
+
+  function refreshAccessList(): void {
+    if (!isOp() || !isConnected()) return;
+    getState().fetchChannelAccess(channel()?.name ?? local.channel);
+  }
+
+  function submitAccessAdd(event: Event): void {
+    event.preventDefault();
+    if (!isOp() || !isConnected()) return;
+    const level = parseAccessLevel(accessLevelDraft());
+    const mask = normalizeAccessMask(accessMaskDraft());
+    if (!level || !mask) {
+      setAccessFormError('Enter a nick or hostmask (e.g. alice or alice!*@*).');
+      return;
+    }
+    const rawTimeout = accessTimeoutDraft().trim();
+    let timeout: number | undefined;
+    if (rawTimeout !== '') {
+      const parsed = parseAccessDuration(rawTimeout);
+      if (parsed === undefined) {
+        setAccessFormError('Timeout must be a whole number of seconds (or leave blank).');
+        return;
+      }
+      timeout = parsed;
+    }
+    setAccessFormError('');
+    getState().addChannelAccess(channel()?.name ?? local.channel, level, mask, timeout);
+    setAccessMaskDraft('');
+    setAccessTimeoutDraft('');
+  }
+
+  function removeAccessEntry(entry: ChannelAccessEntry): void {
+    if (!isOp() || !isConnected()) return;
+    getState().deleteChannelAccess(
+      channel()?.name ?? local.channel,
+      entry.level,
+      entry.mask,
+    );
   }
 
   // ── Incoming webhooks (WEBHOOK command) ─────────────────────────────────
@@ -703,6 +783,138 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 Apply retention
               </Button>
             </form>
+          </Show>
+        </section>
+
+        {/* ── Roles (IRCX ACCESS) ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-access-heading">
+          <h3 id="chset-access-heading" class="shell-chset-heading">Roles &amp; access</h3>
+
+          <Show
+            when={isOp()}
+            fallback={
+              <div class="shell-chset-readonly">
+                <p class="shell-chset-readonly-label">Persistent access list</p>
+                <p class="shell-chset-readonly-value">Managed by channel ops.</p>
+                <p class="shell-chset-hint">
+                  IRCX ACCESS grants founder/owner/host/voice on join, or deny/grant masks.
+                </p>
+              </div>
+            }
+          >
+            <div class="shell-chset-access">
+              <div class="shell-chset-inline-actions">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={!isConnected() || accessLoading()}
+                  aria-busy={accessLoading()}
+                  onClick={refreshAccessList}
+                >
+                  {accessLoading() ? 'Loading access list…' : 'Refresh list'}
+                </Button>
+              </div>
+
+              <Show
+                when={accessEntries().length > 0}
+                fallback={
+                  <p class="shell-chset-hint" data-testid="chset-access-empty">
+                    {accessLoading()
+                      ? 'Loading access entries…'
+                      : 'No ACCESS entries yet. Add a nick or hostmask below.'}
+                  </p>
+                }
+              >
+                <ul class="shell-chset-access-list" aria-label="Channel access entries">
+                  <For each={accessEntries()}>
+                    {(entry) => (
+                      <li class="shell-chset-access-row">
+                        <div class="shell-chset-access-meta">
+                          <span class="shell-chset-access-level">
+                            {accessLevelLabel(entry.level)}
+                          </span>
+                          <span class="shell-chset-access-mask shell-chset-modes-mono">
+                            {entry.mask}
+                          </span>
+                          <span class="shell-chset-access-extra">
+                            {formatAccessDuration(entry.duration)}
+                            <Show when={entry.setBy}>
+                              {(setter) => <> · set by {setter()}</>}
+                            </Show>
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={!isConnected()}
+                          aria-label={`Remove ${entry.level} access for ${entry.mask}`}
+                          onClick={() => removeAccessEntry(entry)}
+                        >
+                          Remove
+                        </Button>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </Show>
+
+              <form onSubmit={submitAccessAdd} class="shell-chset-param shell-chset-access-form">
+                <label class="shell-chset-label" for="chset-access-level">Role level</label>
+                <select
+                  id="chset-access-level"
+                  class="shell-chset-select"
+                  value={accessLevelDraft()}
+                  aria-describedby="chset-access-level-hint"
+                  onChange={(e) => {
+                    const next = parseAccessLevel(e.currentTarget.value);
+                    if (next) setAccessLevelDraft(next);
+                  }}
+                >
+                  <For each={[...ACCESS_LEVELS]}>
+                    {(level) => <option value={level}>{accessLevelLabel(level)}</option>}
+                  </For>
+                </select>
+                <p id="chset-access-level-hint" class="shell-chset-hint">
+                  {accessLevelHint(accessLevelDraft())}
+                </p>
+
+                <FormField
+                  id="chset-access-mask"
+                  label="Nick or hostmask"
+                  description="Bare nicks expand to nick!*@*. Full masks use nick!user@host."
+                  type="text"
+                  value={accessMaskDraft()}
+                  autocomplete="off"
+                  maxLength={128}
+                  onInput={(e) => setAccessMaskDraft(e.currentTarget.value)}
+                />
+
+                <FormField
+                  id="chset-access-timeout"
+                  label="Timeout seconds (optional)"
+                  description="Leave blank for a permanent entry."
+                  type="number"
+                  min="1"
+                  inputmode="numeric"
+                  value={accessTimeoutDraft()}
+                  onInput={(e) => setAccessTimeoutDraft(e.currentTarget.value)}
+                />
+
+                <Show when={accessFormError()}>
+                  {(err) => (
+                    <p class="shell-chset-hint shell-chset-access-error" role="alert">
+                      {err()}
+                    </p>
+                  )}
+                </Show>
+
+                <Button type="submit" variant="primary" size="sm" disabled={!isConnected()}>
+                  Add access entry
+                </Button>
+              </form>
+            </div>
           </Show>
         </section>
 

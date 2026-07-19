@@ -185,6 +185,11 @@ export interface OutboxEntry {
   seq: number;
   /** Legacy/malformed rows are preserved as ownerless and never auto-sent. */
   owner: OutboxOwner | null;
+  /**
+   * True after PRIVMSG was admitted to the wire but durable delete failed.
+   * Reload must never re-send these — only retry prune.
+   */
+  wire_admitted?: true;
 }
 
 /** Metadata-only outbox invalidation; message text is deliberately excluded. */
@@ -371,7 +376,17 @@ export function serializeMessage(
 }
 
 export function deserializeMessage(row: StoredMessage): ChatMessage {
-  const { target_key: _key, owner_key: _owner, time, ...rest } = row;
+  // Strip physical key material AND every omit-at-rest field. A hostile or
+  // legacy row that smuggled `plaintext` past serializeMessage must never
+  // re-enter the UI/store as decrypted body via loadRecent/loadAround/search.
+  const raw = row as StoredMessage & Record<string, unknown>;
+  const {
+    target_key: _key,
+    owner_key: _owner,
+    time,
+    ...rest
+  } = raw;
+  for (const key of OMIT_AT_REST) delete rest[key];
   const message = { ...rest, time: new Date(time) } as ChatMessage;
   if (message.replyTo) {
     message.replyTo = {
@@ -1098,6 +1113,8 @@ function parseOutboxEntry(raw: unknown): OutboxEntry | null {
     queued_at: queuedAt,
     seq,
     owner: parseOutboxOwner(raw.owner),
+    // Only the explicit true flag survives — never invent admission state.
+    ...(raw.wire_admitted === true ? { wire_admitted: true as const } : {}),
   };
 }
 
@@ -1234,10 +1251,50 @@ export async function clearOutbox(): Promise<boolean> {
   }
 }
 
-/** Remove one queued send (after it was fired, or expired). */
-export async function deleteOutboxEntry(id: string): Promise<void> {
+/**
+ * Persist wire-admission so a reload cannot double-send after a prune failure.
+ * Returns true only when the row is confirmed marked (or already marked).
+ */
+export async function markOutboxWireAdmitted(id: string): Promise<boolean> {
+  if (typeof id !== 'string' || id.length === 0 || id !== id.trim()) return false;
   const db = await openVault();
-  if (!db) return;
+  if (!db) return false;
+  try {
+    const tx = db.transaction(OUTBOX, 'readwrite');
+    const store = tx.objectStore(OUTBOX);
+    let marked = false;
+    const lookup = store.get(id);
+    lookup.onsuccess = () => {
+      const entry = parseOutboxEntry(lookup.result);
+      if (!entry) return;
+      if (entry.wire_admitted) {
+        marked = true;
+        return;
+      }
+      try {
+        store.put({ ...entry, wire_admitted: true as const });
+        marked = true;
+      } catch {
+        // Transaction will abort or commit without the mark.
+      }
+    };
+    const committed = await txDone(tx);
+    return committed && marked;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Remove one queued send (after it was fired, or expired).
+ * Returns true only when the durable row is confirmed gone (already absent or
+ * the delete transaction committed). Callers that already admitted the message
+ * to the wire MUST treat false as "do not re-admit" and retry prune later —
+ * never as permission to send again.
+ */
+export async function deleteOutboxEntry(id: string): Promise<boolean> {
+  const db = await openVault();
+  if (!db) return false;
   try {
     const tx = db.transaction(OUTBOX, 'readwrite');
     const store = tx.objectStore(OUTBOX);
@@ -1248,9 +1305,11 @@ export async function deleteOutboxEntry(id: string): Promise<void> {
     };
     store.delete(id);
     const committed = await txDone(tx);
-    if (committed && existed) notifyOutbox({ kind: 'deleted' });
+    if (!committed) return false;
+    if (existed) notifyOutbox({ kind: 'deleted' });
+    return true;
   } catch {
-    /* best-effort */
+    return false;
   }
 }
 

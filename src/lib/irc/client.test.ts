@@ -460,6 +460,60 @@ describe('IRCClient session-resume token lifecycle', () => {
     // Mesh token still preferred and intact.
     expect(sent).toContain('SESSION RESUME mesh-held\r\n');
   });
+
+  it('refuses to install an invalid resume token (fail-closed partial merge)', () => {
+    const { client, sent, feed001 } = makeLoggedInClient({ meshToken: 'mesh-held' });
+    // Hostile / buggy callers must not replace a good mesh token with garbage,
+    // and must not install a space-bearing local token that would become a
+    // colon-prefixed multi-word SESSION RESUME on the wire.
+    client.updateResumeTokens({ meshToken: 'mesh with spaces' });
+    client.updateResumeTokens({ sessionToken: 'tok\r\nPRIVMSG #x :pwned' });
+    client.updateResumeTokens({ sessionToken: '' });
+    client.updateResumeTokens({ sessionToken: 'x'.repeat(4 * 1024 + 1) });
+    feed001();
+    expect(sent).toContain('SESSION RESUME mesh-held\r\n');
+    expect(sent.some(line => line.startsWith('SESSION RESUME ') && line !== 'SESSION RESUME mesh-held\r\n'))
+      .toBe(false);
+  });
+
+  it('skips SESSION RESUME for construction-time invalid tokens', () => {
+    const { client, sent, feed001 } = makeLoggedInClient({
+      sessionToken: 'has space',
+      meshToken: 'also bad\n',
+    });
+    // Constructor sanitizes fail-closed: garbage never sits in opts.
+    expect((client as unknown as { opts: { sessionToken?: string; meshToken?: string } }).opts.sessionToken)
+      .toBeUndefined();
+    expect((client as unknown as { opts: { sessionToken?: string; meshToken?: string } }).opts.meshToken)
+      .toBeUndefined();
+    feed001();
+    expect(sent.some(line => line.startsWith('SESSION RESUME '))).toBe(false);
+    expect(sent).toContain('SESSION TOKEN\r\n');
+  });
+
+  it('falls through from an invalid mesh token to a valid local token', () => {
+    // Constructor drops the bad mesh preference; the valid local bearer remains
+    // and is the one emitted on SESSION RESUME.
+    const { client, sent, feed001 } = makeLoggedInClient({
+      sessionToken: 'local-ok',
+      meshToken: 'bad mesh',
+    });
+    expect((client as unknown as { opts: { meshToken?: string } }).opts.meshToken).toBeUndefined();
+    feed001();
+    expect(sent).toContain('SESSION RESUME local-ok\r\n');
+    expect(sent.some(line => line.includes('bad mesh'))).toBe(false);
+  });
+
+  it('clearResumeTokens forgets every bearer so the next 001 cannot resume', () => {
+    const { client, sent, feed001 } = makeLoggedInClient({
+      sessionToken: 'local-held',
+      meshToken: 'mesh-held',
+    });
+    client.clearResumeTokens();
+    feed001();
+    expect(sent.some(line => line.startsWith('SESSION RESUME '))).toBe(false);
+    expect(sent).toContain('SESSION TOKEN\r\n');
+  });
 });
 
 describe('IRCClient account-attribution wiring (ACCOUNTRESIDENCE)', () => {
@@ -579,5 +633,110 @@ describe('IRCClient labeled-response capability (Era 1 A7)', () => {
     feed(client, ':srv CAP * DEL :labeled-response');
     expect(client.negotiatedCaps.has('labeled-response')).toBe(false);
     expect(client.negotiatedCaps.has('batch')).toBe(true);
+  });
+});
+
+// ── onyx/session-sync (Era 2 B1 multi-device) ──────────────────────────────
+// Server-driven session reclaim: when ACKed the server auto-pushes JOIN +
+// NAMES/topic + CHATHISTORY for every live channel. The client must request
+// the cap when offered and expose sessionSyncActive so the store can suppress
+// its own blind rejoin storm (phone + desktop same account).
+describe('IRCClient onyx/session-sync capability (Era 2 B1)', () => {
+  function makeCapClient() {
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: () => {},
+    });
+    const { sent } = attachSocket(client);
+    return { client, sent };
+  }
+
+  it('requests onyx/session-sync and exposes sessionSyncActive only after CAP ACK', () => {
+    const { client, sent } = makeCapClient();
+    expect(client.sessionSyncActive).toBe(false);
+
+    feed(client, ':srv CAP * LS :batch message-tags onyx/session-sync labeled-response');
+    const req = sent.find((line) => typeof line === 'string' && line.startsWith('CAP REQ '));
+    expect(req).toBeDefined();
+    expect(String(req)).toContain('onyx/session-sync');
+    // Advertised alone does not activate reclaim — only CAP ACK does.
+    expect(client.sessionSyncActive).toBe(false);
+
+    feed(client, ':srv CAP * ACK :onyx/session-sync batch');
+    expect(client.negotiatedCaps.has('onyx/session-sync')).toBe(true);
+    expect(client.sessionSyncActive).toBe(true);
+  });
+
+  it('does not activate sessionSyncActive when the server NAKs session-sync', () => {
+    const { client } = makeCapClient();
+    feed(client, ':srv CAP * LS :onyx/session-sync batch message-tags');
+    feed(client, ':srv CAP * NAK :onyx/session-sync');
+    feed(client, ':srv CAP * ACK :batch message-tags');
+    expect(client.negotiatedCaps.has('onyx/session-sync')).toBe(false);
+    expect(client.sessionSyncActive).toBe(false);
+  });
+
+  it('drops sessionSyncActive on CAP DEL so reconnect can fall back to client rejoin', () => {
+    const { client } = makeCapClient();
+    feed(client, ':srv CAP * LS :onyx/session-sync batch');
+    feed(client, ':srv CAP * ACK :onyx/session-sync batch');
+    expect(client.sessionSyncActive).toBe(true);
+    feed(client, ':srv CAP * DEL :onyx/session-sync');
+    expect(client.sessionSyncActive).toBe(false);
+    expect(client.negotiatedCaps.has('batch')).toBe(true);
+  });
+
+  it('accepts onyx/session-sync via CAP NEW mid-connection', () => {
+    const { client, sent } = makeCapClient();
+    feed(client, ':srv CAP * LS :batch message-tags');
+    feed(client, ':srv CAP * ACK :batch message-tags');
+    expect(client.sessionSyncActive).toBe(false);
+
+    // Server enables session-sync after registration (mesh upgrade).
+    feed(client, ':srv CAP * NEW :onyx/session-sync');
+    const req = sent.find(
+      (line) =>
+        typeof line === 'string'
+        && line.startsWith('CAP REQ ')
+        && String(line).includes('onyx/session-sync'),
+    );
+    expect(req).toBeDefined();
+    feed(client, ':srv CAP * ACK :onyx/session-sync');
+    expect(client.sessionSyncActive).toBe(true);
+  });
+
+  it('clears sessionSyncActive on reconnect until CAP is re-ACK\'d', () => {
+    // connect() wipes negotiatedCaps; multi-device reclaim must re-negotiate
+    // every socket or the store would suppress rejoins without server reclaim.
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: () => {},
+    });
+    attachSocket(client);
+    feed(client, ':srv CAP * LS :onyx/session-sync');
+    feed(client, ':srv CAP * ACK :onyx/session-sync');
+    expect(client.sessionSyncActive).toBe(true);
+
+    class StubWS {
+      static OPEN = 1;
+      readyState = StubWS.OPEN;
+      binaryType = '';
+      onopen: ((e: Event) => void) | null = null;
+      onmessage: ((e: MessageEvent) => void) | null = null;
+      onclose: ((e: CloseEvent) => void) | null = null;
+      onerror: ((e: Event) => void) | null = null;
+      send = vi.fn();
+      close = vi.fn();
+    }
+    vi.stubGlobal('WebSocket', StubWS);
+    try {
+      expect(client.connect()).toBe(true);
+      expect(client.sessionSyncActive).toBe(false);
+      expect(client.negotiatedCaps.has('onyx/session-sync')).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

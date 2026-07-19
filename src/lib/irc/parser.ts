@@ -546,8 +546,19 @@ export function parseAccountInfo(text: string): AccountInfoFields | null {
 
 export const MAX_SESSION_CREDENTIAL_LENGTH = 4 * 1024;
 const MAX_SESSION_CREDENTIAL_NOTICE_LENGTH = MAX_SESSION_CREDENTIAL_LENGTH + 512;
+/** Bound `expires=` digits so a hostile notice cannot force BigInt-scale work. */
+const MAX_SESSION_EXPIRES_DIGITS = 16;
 
-function validSessionCredential(token: string | null | undefined): token is string {
+/**
+ * Fail-closed predicate for Onyx SESSION TOKEN / MTOKEN bearers.
+ *
+ * A resume credential is a single wire atom: non-empty, ≤4 KiB, and free of
+ * whitespace / C0 controls / DEL. Shared by the NOTE/NOTICE parsers, the live
+ * client's `updateResumeTokens`, and the post-001 SESSION RESUME send path so
+ * a hostile or buggy caller cannot install a multi-word or CRLF-laced token
+ * that would become a colon-prefixed param or a second wire command.
+ */
+export function isValidSessionCredential(token: string | null | undefined): token is string {
   return Boolean(
     token
     && token.length <= MAX_SESSION_CREDENTIAL_LENGTH
@@ -555,34 +566,120 @@ function validSessionCredential(token: string | null | undefined): token is stri
   );
 }
 
-function parseSessionCredential(msg: IRCMessage, kind: 'TOKEN' | 'MTOKEN'): string | null {
+/**
+ * A parsed SESSION TOKEN / MTOKEN bearer.
+ *
+ * Onyx Server emits mesh credentials as
+ * `SESSION MTOKEN <hex> expires=<unix-seconds>` (NOTICE body). Local TOKEN
+ * notes omit expiry. `expiresAt` is absolute unix seconds when advertised so
+ * the credentials store can purge stale portable state without decoding the
+ * sealed value (session-resume-anywhere blueprint).
+ */
+export interface SessionCredential {
+  token: string;
+  /** Absolute unix-seconds expiry when the server advertised one. */
+  expiresAt?: number;
+}
+
+/**
+ * Parse trailing `key=value` attrs after a session credential atom.
+ *
+ * Only `expires=<non-negative integer>` is consumed. Unknown `key=value`
+ * pairs are ignored for forward-compat. Any free-text (non `key=value`) atom
+ * fails closed — a multi-word free-form trailer used to be silently dropped
+ * by the old `(?:\s+.*)?` regex, which would also mask a broken token.
+ * Returns `null` on malformed attrs; `{}` when none are present.
+ */
+function parseSessionCredentialAttrs(rest: string): { expiresAt?: number } | null {
+  const trimmed = rest.trim();
+  if (!trimmed) return {};
+  let expiresAt: number | undefined;
+  for (const atom of trimmed.split(/\s+/u)) {
+    const eq = atom.indexOf('=');
+    if (eq <= 0 || eq === atom.length - 1) return null;
+    const key = atom.slice(0, eq).toLowerCase();
+    const value = atom.slice(eq + 1);
+    if (key === 'expires') {
+      if (expiresAt !== undefined) return null; // duplicate
+      if (!/^(?:0|[1-9]\d*)$/u.test(value)) return null;
+      if (value.length > MAX_SESSION_EXPIRES_DIGITS) return null;
+      const n = Number(value);
+      if (!Number.isSafeInteger(n) || n < 0) return null;
+      expiresAt = n;
+      continue;
+    }
+    // Unknown key=value: ignore (forward-compat with future attrs).
+  }
+  return expiresAt === undefined ? {} : { expiresAt };
+}
+
+/**
+ * Parse `<token>[ key=value…]` into a SessionCredential. Fail-closed on a
+ * multi-word free-text trailer (must be key=value attrs only).
+ */
+function parseSessionCredentialBody(body: string): SessionCredential | null {
+  const trimmed = body.trim();
+  if (!trimmed) return null;
+  const sp = trimmed.search(/\s/u);
+  const token = sp === -1 ? trimmed : trimmed.slice(0, sp);
+  const rest = sp === -1 ? '' : trimmed.slice(sp + 1);
+  if (!isValidSessionCredential(token)) return null;
+  const attrs = parseSessionCredentialAttrs(rest);
+  if (attrs === null) return null;
+  return { token, ...attrs };
+}
+
+function parseSessionCredential(msg: IRCMessage, kind: 'TOKEN' | 'MTOKEN'): SessionCredential | null {
   const reply = parseStandardReply(msg);
   if (reply?.kind === 'NOTE' && reply.command === 'SESSION' && reply.code === kind) {
-    return validSessionCredential(reply.description) ? reply.description : null;
+    // Standard-reply forms used by older deployments:
+    //   NOTE SESSION MTOKEN :<token>
+    //   NOTE SESSION MTOKEN <token> :expires=<unix>   (token in context)
+    //   NOTE SESSION MTOKEN :<token> expires=<unix>   (attrs in description)
+    if (reply.context.length > 0) {
+      const token = reply.context[0]!;
+      if (!isValidSessionCredential(token)) return null;
+      // Remaining context atoms + description are attribute candidates.
+      const attrParts = [...reply.context.slice(1)];
+      if (reply.description) attrParts.push(reply.description);
+      const attrs = parseSessionCredentialAttrs(attrParts.join(' '));
+      if (attrs === null) return null;
+      return { token, ...attrs };
+    }
+    return parseSessionCredentialBody(reply.description);
   }
 
   // Current Onyx Server emits session credentials as a traditional server NOTICE:
   //   :server NOTICE <nick> :SESSION TOKEN <token>
+  //   :server NOTICE <nick> :SESSION MTOKEN <token> expires=<unix>
   // while older deployments used NOTE SESSION TOKEN. Accept both envelopes;
   // the store applies the NOTICE result only inside its server-source trust gate.
   if (msg.command !== 'NOTICE') return null;
   const body = msg.params[msg.params.length - 1]?.trim() ?? '';
   if (body.length > MAX_SESSION_CREDENTIAL_NOTICE_LENGTH) return null;
-  const match = /^SESSION\s+(TOKEN|MTOKEN)\s+(\S+)(?:\s+.*)?$/i.exec(body);
+  const match = /^SESSION\s+(TOKEN|MTOKEN)\s+(\S+)((?:\s+\S+)*)$/i.exec(body);
   if (match?.[1]?.toUpperCase() !== kind) return null;
-  return validSessionCredential(match[2]) ? match[2] : null;
+  const token = match[2]!;
+  if (!isValidSessionCredential(token)) return null;
+  const attrs = parseSessionCredentialAttrs(match[3] ?? '');
+  if (attrs === null) return null;
+  return { token, ...attrs };
 }
 
-export function parseSessionTokenNote(msg: IRCMessage): string | null {
+export function parseSessionTokenNote(msg: IRCMessage): SessionCredential | null {
   return parseSessionCredential(msg, 'TOKEN');
 }
 
 /**
- * Parse `:server NOTE SESSION MTOKEN :<token>` — Onyx Server's mesh-sealed reclaim
- * token, emitted alongside the local TOKEN on mesh deployments. Usable to
- * reclaim/redirect the session from any node via `SESSION RESUME <mtoken>`.
+ * Parse Onyx Server's mesh-sealed reclaim token, emitted alongside the local
+ * TOKEN on mesh deployments. Wire forms:
+ *   `:server NOTICE <nick> :SESSION MTOKEN <hex> expires=<unix>`  (current)
+ *   `:server NOTE SESSION MTOKEN :<token>`                        (legacy)
+ * Usable to reclaim/redirect the session from any node via
+ * `SESSION RESUME <mtoken>`. When `expires=` is present it is absolute mesh
+ * wall-clock unix seconds (12h portable lifetime on Onyx Server).
  */
-export function parseSessionMeshTokenNote(msg: IRCMessage): string | null {
+export function parseSessionMeshTokenNote(msg: IRCMessage): SessionCredential | null {
   return parseSessionCredential(msg, 'MTOKEN');
 }
 

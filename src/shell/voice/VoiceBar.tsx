@@ -42,19 +42,27 @@ import {
 import { shortDuration } from '@/lib/time/relativeTime';
 import { createScreenWakeLockController } from '@/lib/screenWakeLock';
 import { createCallMediaSessionController } from '@/lib/callMediaSession';
-import { Avatar, Popover, Tooltip } from '@/primitives';
+import { Avatar, Popover, Sheet, Tooltip } from '@/primitives';
 import {
   MicIcon, MicOffIcon, DeafenIcon, DeafenOffIcon, CameraIcon, CameraOffIcon,
   ScreenShareIcon, ScreenShareStopIcon, CaptionsIcon, HandIcon, ReactionIcon,
   GridIcon, SpotlightIcon, SpatialAudioIcon, SettingsIcon, HangupIcon,
   ShieldIcon, LockIcon, LockOpenIcon, WarningIcon, StageIcon,
 } from './icons';
-import type { NetworkQualityTier } from '@/lib/cadence-media/types';
+import type { CallState, NetworkQualityTier } from '@/lib/cadence-media/types';
 import {
   resolveCallSecurity,
   type CallSecurityAffordance,
   type CallSecurityIcon,
 } from '@/lib/cadence-media/callSecurity';
+import { resolveCallPrivacy } from '@/lib/cadence-media/callPrivacy';
+import {
+  advanceConnectionQualityAction,
+  connectionQualityActionCopy,
+  consumeConnectionQualityAction,
+  INITIAL_CONNECTION_QUALITY_ACTION_STATE,
+  type ConnectionQualityActionState,
+} from '@/lib/cadence-media/connectionQualityAction';
 import { mergeVoiceParticipants } from './voiceParticipants';
 import './voice.css';
 
@@ -88,7 +96,10 @@ function SecurityIcon(props: { kind: CallSecurityIcon }) {
   }
 }
 
-function CallSecurityChip(props: { affordance: CallSecurityAffordance }) {
+function CallSecurityChip(props: {
+  affordance: CallSecurityAffordance;
+  onOpenPrivacy: () => void;
+}) {
   const a = () => props.affordance;
   const tone = () => {
     switch (a().level) {
@@ -104,22 +115,74 @@ function CallSecurityChip(props: { affordance: CallSecurityAffordance }) {
     }
   };
 
+  // Discoverable Privacy sheet (research R2): chip is a button, not a status
+  // ornament — keyboard and pointer both open the honest call-details panel.
   return (
-    <Tooltip content={a().detail} placement="top">
-      <span
-        class={`voice-sec voice-sec--${tone()}`}
-        role="status"
-        aria-label={a().detail}
+    <Tooltip content={`${a().detail} Open call privacy details.`} placement="top">
+      <button
+        type="button"
+        class={`voice-sec voice-sec--${tone()} voice-sec--button`}
+        aria-label={`${a().detail} Open call privacy details.`}
+        aria-haspopup="dialog"
         data-testid="call-security-chip"
         data-security-level={a().level}
         data-uses-padlock={a().usesPadlock ? 'true' : 'false'}
+        onClick={() => props.onOpenPrivacy()}
       >
         <span class="voice-sec__icon" aria-hidden="true" data-testid="call-security-icon">
           <SecurityIcon kind={a().icon} />
         </span>
         <span class="voice-sec__label">{a().label}</span>
-      </span>
+      </button>
     </Tooltip>
+  );
+}
+
+function CallPrivacySheet(props: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  callState: CallState;
+}) {
+  // Same inputs as the security chip — sheet + chip cannot disagree.
+  const details = createMemo(() => resolveCallPrivacy({ callState: props.callState }));
+
+  return (
+    <Sheet
+      open={props.open}
+      title={details()?.title ?? 'Call privacy'}
+      description="How this call is protected."
+      onOpenChange={props.onOpenChange}
+      closeLabel="Close call privacy"
+    >
+      <Show when={details()} keyed>
+        {(d) => (
+          <div class="voice-privacy" data-testid="call-privacy-sheet" data-privacy-level={d.level}>
+            <p class="voice-privacy__summary">{d.summary}</p>
+            <dl class="voice-privacy__facts">
+              <div class="voice-privacy__fact">
+                <dt>Media path</dt>
+                <dd data-testid="call-privacy-server-access">
+                  {d.serverCanAccessMedia
+                    ? 'Encrypted to this server — operators can access call media.'
+                    : 'End-to-end — only people in this call can hear or see.'}
+                </dd>
+              </div>
+              <div class="voice-privacy__fact">
+                <dt>Privacy code</dt>
+                <dd data-testid="call-privacy-epoch">
+                  <Show
+                    when={d.epochCode}
+                    fallback="Available when end-to-end media encryption is active."
+                  >
+                    {(code) => <span class="voice-privacy__code">{code()}</span>}
+                  </Show>
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
+      </Show>
+    </Sheet>
   );
 }
 
@@ -181,21 +244,35 @@ interface NetSample {
 }
 
 function ConnectionQualityPip() {
+  const cameraOn = useStore(s => s.voice.cameraOn);
   const [sample, setSample] = createSignal<NetSample | null>(null);
+  const [cqAction, setCqAction] = createSignal<ConnectionQualityActionState>(
+    INITIAL_CONNECTION_QUALITY_ACTION_STATE,
+  );
 
   let intervalId: ReturnType<typeof setInterval> | undefined;
 
   createEffect(() => {
     const poll = () => {
       const engine = getMountedCadenceMediaEngine();
-      if (!engine) return;
-      const s = engine.getNetworkStats();
+      // Optional on the mount surface — unit tests and half-mounted engines
+      // may only stub join/leave. Never throw from the quality tick.
+      const stats = engine && typeof engine.getNetworkStats === 'function'
+        ? engine.getNetworkStats()
+        : null;
+      if (!stats) return;
       setSample({
-        tier: s.tier,
-        suggestedBps: s.suggestedBps,
-        jitterMs: s.jitterMs,
-        lossRate: s.lossRate,
+        tier: stats.tier,
+        suggestedBps: stats.suggestedBps,
+        jitterMs: stats.jitterMs,
+        lossRate: stats.lossRate,
       });
+      // Research R6 — soft prompt only after pure hysteresis says so.
+      setCqAction(prev => advanceConnectionQualityAction(prev, {
+        nowMs: Date.now(),
+        tier: stats.tier,
+        cameraOn: cameraOn(),
+      }));
     };
     poll();
     intervalId = setInterval(poll, 1000);
@@ -204,46 +281,97 @@ function ConnectionQualityPip() {
     });
   });
 
-  return (
-    <Show when={sample()} keyed>
-      {(s) => {
-        const meta = TIER_META[s.tier];
-        const lossPct = (s.lossRate * 100).toFixed(s.lossRate < 0.01 ? 1 : 0);
-        const tooltip = [
-          `${meta.label} connection`,
-          s.suggestedBps > 0 ? formatBitrate(s.suggestedBps) : null,
-          `${Math.round(s.jitterMs)}ms jitter`,
-          `${lossPct}% loss`,
-        ].filter(Boolean).join(' · ');
+  // Camera off mid-poor-stretch must hide the prompt without waiting for poll.
+  createEffect(() => {
+    const on = cameraOn();
+    setCqAction(prev => advanceConnectionQualityAction(prev, {
+      nowMs: Date.now(),
+      tier: sample()?.tier ?? prev.stableTier ?? 0,
+      cameraOn: on,
+    }));
+  });
 
-        return (
-          <Tooltip content={tooltip} placement="top">
-            <span
-              class="voice-cq"
-              role="img"
-              aria-label={`Connection: ${meta.label}`}
-              data-testid="connection-quality"
-              style={{ '--cq-color': meta.color }}
-            >
-              <span class="voice-cq__bars" aria-hidden="true">
-                <For each={[1, 2, 3, 4] as const}>
-                  {(i) => (
-                    <span
-                      class={`voice-cq__bar ${i <= meta.bars ? 'voice-cq__bar--on' : 'voice-cq__bar--off'}`}
-                    />
-                  )}
-                </For>
-              </span>
-              <Show when={s.suggestedBps > 0}>
-                <span class="voice-cq__rate" aria-hidden="true">
-                  {formatBitrate(s.suggestedBps)}
+  const promptCopy = connectionQualityActionCopy('turn_off_camera');
+
+  const turnOffCamera = () => {
+    setCqAction(prev => consumeConnectionQualityAction(prev));
+    void getState().toggleVideo();
+  };
+
+  const dismissPrompt = () => {
+    setCqAction(prev => consumeConnectionQualityAction(prev));
+  };
+
+  return (
+    <div class="voice-cq-wrap">
+      <Show when={sample()} keyed>
+        {(s) => {
+          const meta = TIER_META[s.tier];
+          const lossPct = (s.lossRate * 100).toFixed(s.lossRate < 0.01 ? 1 : 0);
+          const tooltip = [
+            `${meta.label} connection`,
+            s.suggestedBps > 0 ? formatBitrate(s.suggestedBps) : null,
+            `${Math.round(s.jitterMs)}ms jitter`,
+            `${lossPct}% loss`,
+          ].filter(Boolean).join(' · ');
+
+          return (
+            <Tooltip content={tooltip} placement="top">
+              <span
+                class="voice-cq"
+                role="img"
+                aria-label={`Connection: ${meta.label}`}
+                data-testid="connection-quality"
+                data-cq-tier={String(s.tier)}
+                style={{ '--cq-color': meta.color }}
+              >
+                <span class="voice-cq__bars" aria-hidden="true">
+                  <For each={[1, 2, 3, 4] as const}>
+                    {(i) => (
+                      <span
+                        class={`voice-cq__bar ${i <= meta.bars ? 'voice-cq__bar--on' : 'voice-cq__bar--off'}`}
+                      />
+                    )}
+                  </For>
                 </span>
-              </Show>
-            </span>
-          </Tooltip>
-        );
-      }}
-    </Show>
+                <Show when={s.suggestedBps > 0}>
+                  <span class="voice-cq__rate" aria-hidden="true">
+                    {formatBitrate(s.suggestedBps)}
+                  </span>
+                </Show>
+              </span>
+            </Tooltip>
+          );
+        }}
+      </Show>
+
+      <Show when={cqAction().showTurnOffCamera}>
+        <div
+          class="voice-cq-prompt"
+          role="status"
+          data-testid="connection-quality-prompt"
+        >
+          <span class="voice-cq-prompt__msg">{promptCopy.message}</span>
+          <button
+            type="button"
+            class="voice-cq-prompt__action"
+            data-testid="connection-quality-turn-off-camera"
+            onClick={turnOffCamera}
+          >
+            {promptCopy.actionLabel}
+          </button>
+          <button
+            type="button"
+            class="voice-cq-prompt__dismiss"
+            aria-label={promptCopy.dismissLabel}
+            data-testid="connection-quality-dismiss"
+            onClick={dismissPrompt}
+          >
+            ×
+          </button>
+        </div>
+      </Show>
+    </div>
   );
 }
 
@@ -311,6 +439,7 @@ export function VoiceBar() {
 
   const [reactionsOpen, setReactionsOpen] = createSignal(false);
   const [reactionIndex, setReactionIndex] = createSignal(0);
+  const [privacyOpen, setPrivacyOpen] = createSignal(false);
   const [spatialOpen, setSpatialOpen] = createSignal(false);
   const [spatialDragging, setSpatialDragging] = createSignal(false);
   const [selectedSpatialNick, setSelectedSpatialNick] = createSignal<string | null>(null);
@@ -1141,12 +1270,22 @@ export function VoiceBar() {
         {/* Right: security honesty chip + connection quality */}
         <div class="voice-bar__right">
           <Show when={securityAffordance()} keyed>
-            {(affordance) => <CallSecurityChip affordance={affordance} />}
+            {(affordance) => (
+              <CallSecurityChip
+                affordance={affordance}
+                onOpenPrivacy={() => setPrivacyOpen(true)}
+              />
+            )}
           </Show>
           <ConnectionQualityPip />
         </div>
       </div>
 
+      <CallPrivacySheet
+        open={privacyOpen()}
+        onOpenChange={setPrivacyOpen}
+        callState={voice().callState}
+      />
     </Show>
   );
 }

@@ -42,6 +42,7 @@ import {
   loadAround,
   loadOutbox,
   loadRecent,
+  markOutboxWireAdmitted,
   queueOutbox,
   subscribeVerifiedDeviceHistoryClear,
   type DeviceMemoryOwner,
@@ -65,6 +66,8 @@ import {
   persistedReplyPreviewText,
   sanitizePersistedReplyPreviewText,
 } from '@/lib/e2ee/replyPrivacy';
+import { activeReplyForTarget } from '@/lib/composer/messageContext';
+import { removeMessageReactor, toggleMessageReactions } from '@/lib/reactions/toggleReaction';
 import { openDmTrusted, peerSafetyNumber, pinnedPeerKey, pinPeerKey, safetyNumber, sealDmTrusted } from '@/lib/e2ee/keyPinning';
 import {
   ENCRYPTION_POLICY_PROP,
@@ -78,6 +81,19 @@ import {
   type EncryptionPolicy,
 } from '@/lib/e2ee/policy';
 import { AI_POLICY_PROP, parseAiPolicyProp, type AiPolicy } from '@/lib/irc/aiPolicyProp';
+import {
+  MAX_ACCESS_LIST_CHANNELS,
+  MAX_ACCESS_LIST_ENTRIES,
+  normalizeAccessEntry,
+  normalizeAccessList,
+  normalizeAccessMask,
+  parseAccessDuration,
+  parseAccessLevel,
+  removeAccessEntry,
+  upsertAccessEntry,
+  type AccessLevel,
+  type ChannelAccessEntry,
+} from '@/lib/irc/channelAccess';
 import { preferences } from '@/lib/prefs/preferences';
 import { parseEventTime } from '@/lib/deeplink';
 import {
@@ -325,6 +341,12 @@ export interface VoiceState {
   pushToTalk: boolean;
   pushToTalkKey: string | null;
   cameraDeviceId: string | null;
+  /**
+   * Prefer joining channel/DM calls with the local mic muted (persisted).
+   * Applied by `joinVoiceChannel` after capture succeeds — never before the
+   * media path is ready, so a failed join does not leave a sticky mute.
+   */
+  muteOnJoin: boolean;
 
   // Screenshare
   screenshareActive: boolean;
@@ -395,6 +417,7 @@ function _saveVoiceSettings(voice: VoiceState): void {
     pushToTalk: voice.pushToTalk,
     pushToTalkKey: voice.pushToTalkKey,
     cameraDeviceId: voice.cameraDeviceId,
+    muteOnJoin: voice.muteOnJoin,
   };
   try {
     localStorage.setItem(VOICE_SETTINGS_KEY, JSON.stringify(saved));
@@ -1062,8 +1085,15 @@ export interface OnyxState {
   /** Explicitly cancel one persisted queued send and remove its pending placeholder. */
   discardQueuedSend(id: string): void;
 
-  /** Prepend locally-vaulted history (deduped by id) into a buffer */
-  hydrateHistory(target: string, msgs: ChatMessage[]): void;
+  /**
+   * Prepend locally-vaulted history (deduped by id) into a buffer.
+   * `activate` materializes a missing room/DM and focuses it — cold resume only.
+   */
+  hydrateHistory(
+    target: string,
+    msgs: ChatMessage[],
+    options?: { activate?: 'channel' | 'dm' },
+  ): void;
 
   /** Leave a channel */
   partChannel(channel: string): void;
@@ -1097,6 +1127,27 @@ export interface OnyxState {
   voiceMember(channel: string, nick: string, on: boolean): void;
   /** Request a WHOIS — `WHOIS <nick>`. */
   whois(nick: string): void;
+
+  /**
+   * IRCX ACCESS list for a channel (roles applied on join).
+   * Keyed lowercase channel name; populated by 803–805 LIST bursts and 801/802.
+   */
+  channelAccess: Map<string, ChannelAccessEntry[]>;
+  /** Channels with an in-flight ACCESS LIST request. */
+  channelAccessLoading: Set<string>;
+  /** Replace the committed ACCESS list for a channel (LIST end / tests). */
+  setChannelAccess(channel: string, entries: ChannelAccessEntry[]): void;
+  /** `ACCESS <#chan> LIST` — fold replies via 803–805. */
+  fetchChannelAccess(channel: string): void;
+  /** `ACCESS <#chan> ADD <level> <mask> [timeout]`. */
+  addChannelAccess(
+    channel: string,
+    level: AccessLevel,
+    mask: string,
+    timeoutSeconds?: number,
+  ): void;
+  /** `ACCESS <#chan> DELETE <level> <mask>`. */
+  deleteChannelAccess(channel: string, level: AccessLevel, mask: string): void;
 
   /** Navigate to a channel or DM */
   navigate(view: ActiveView): void;
@@ -3082,6 +3133,19 @@ export function _resetPasskeyStateForTests(): void {
 let _outboxRetries = 0;
 /** Serialize async outbox flushes so one durable row cannot be admitted twice. */
 let _outboxFlushActive = false;
+/**
+ * Outbox ids that were already admitted to the wire but whose durable rows
+ * could not be pruned (IndexedDB blocked/aborted). Never re-send these —
+ * only retry delete — or a reconnect double-delivers the same message.
+ */
+const _outboxWireAdmitted = new Set<string>();
+
+/** Isolate module-level outbox flush state between focused store tests. */
+export function _resetOutboxFlushForTests(): void {
+  _outboxRetries = 0;
+  _outboxFlushActive = false;
+  _outboxWireAdmitted.clear();
+}
 
 /** The message whose timestamp is closest to `at` (buffer is time-sorted). */
 function nearestMessageId(messages: readonly ChatMessage[], at: Date): string | null {
@@ -3170,19 +3234,26 @@ const _NAMES_BURST_TTL_MS = 15000;
  * Mark that we initiated a NAMES burst for `key` (lowercased channel): the next
  * 353 for it is authorized to REPLACE the roster. Call this immediately before
  * sending a NAMES, or on self-JOIN before the server's automatic NAMES lands.
+ *
+ * Critical: never re-arm `expect` while a burst is already `appending` /
+ * `expect`. A second NAMES (JOIN auto-NAMES + client NAMES, or navigate during
+ * the first reply) used to reset phase to `expect` mid-flight, so the next
+ * partial 353 REPLACED the full roster and both sides of a mesh looked
+ * desynced (half the nicks missing). Mid-burst we only refresh the TTL and
+ * keep the existing exclusion set.
  */
 function _beginNamesBurst(key: string): void {
-  _namesBursts.set(key, { phase: 'expect', at: _now(), excludedNicks: new Set() });
-}
-
-/**
- * True while a burst we know about is still arriving (and not expired). Used to
- * suppress a *new* NAMES send that would re-arm 'expect' mid-burst — the one
- * thing that could let a later 353 replace with a partial.
- */
-function _namesBurstActive(key: string): boolean {
-  const b = _namesBursts.get(key);
-  return b !== undefined && _now() - b.at < _NAMES_BURST_TTL_MS;
+  const existing = _recentNamesBurst(key);
+  if (existing && (existing.phase === 'expect' || existing.phase === 'appending')) {
+    _namesBursts.set(key, { ...existing, at: _now() });
+    return;
+  }
+  // Settled / absent / expired: authorize a fresh authoritative REPLACE.
+  _namesBursts.set(key, {
+    phase: 'expect',
+    at: _now(),
+    excludedNicks: existing?.excludedNicks ?? new Set(),
+  });
 }
 
 /** Return recent burst state, dropping bounded late-line protection after TTL. */
@@ -3415,6 +3486,41 @@ export function _resetBanListTransportForTests(): void {
   _clearBanListTransport();
 }
 
+// ── IRCX ACCESS list accumulator (module-level) ───────────────────────────────
+/** channel.toLowerCase() → entries while RPL_ACCESSENTRY (804) lines arrive */
+const _accessBuffer = new Map<string, ChannelAccessEntry[]>();
+
+function _clearAccessListTransport(): void {
+  _accessBuffer.clear();
+}
+
+/** Isolate module-level ACCESS LIST transport between focused store tests. */
+export function _resetAccessListTransportForTests(): void {
+  _clearAccessListTransport();
+}
+
+function _commitChannelAccess(
+  set: SetFn,
+  channel: string,
+  entries: readonly ChannelAccessEntry[],
+): void {
+  const key = _normalizeBanChannel(channel);
+  if (!key) return;
+  set((s) => {
+    const channelAccess = new Map(s.channelAccess);
+    channelAccess.delete(key);
+    channelAccess.set(key, normalizeAccessList(entries));
+    while (channelAccess.size > MAX_ACCESS_LIST_CHANNELS) {
+      const oldest = channelAccess.keys().next().value;
+      if (oldest === undefined) break;
+      channelAccess.delete(oldest);
+    }
+    const channelAccessLoading = new Set(s.channelAccessLoading);
+    channelAccessLoading.delete(key);
+    return { channelAccess, channelAccessLoading };
+  });
+}
+
 // ── Temp-ban timers (module-level) ─────────────────────────────────────────────
 /** A client-side temp-ban is best-effort; keep its authority and timer bounded. */
 export const MAX_TEMP_BAN_TIMERS = 128;
@@ -3576,6 +3682,11 @@ function _resetAccountBoundState(
 ): void {
   _invalidateAccountReplyContexts();
   _clearBanListTransport();
+  _clearAccessListTransport();
+  // Account identity changed — drop in-memory wire-admission marks so they
+  // cannot suppress a different owner's durable outbox rows.
+  _outboxWireAdmitted.clear();
+  _outboxRetries = 0;
   _nickAliasTryIdx = 0;
   set(s => {
     const ownKey = s.ourNick.toLowerCase();
@@ -3639,6 +3750,8 @@ function _resetAccountBoundState(
       ctcpTimeEnabled: DEFAULT_CTCP_CONFIG.timeEnabled,
       invisibleMode: false,
       banList: new Map(),
+      channelAccess: new Map(),
+      channelAccessLoading: new Set(),
       mutedDMs: new Set(),
       userNotes: new Map(),
       topicHistory: {},
@@ -4041,11 +4154,13 @@ function _refreshChannelRoster(get: GetFn, channel: string): void {
   if (st.connectionStatus !== 'connected' || !st.client) return;
   const chan = st.channels.get(key);
   if (!chan) return;
-  // Never stack a NAMES on top of a burst still arriving: a second request
-  // re-arms 'expect' mid-burst, which is exactly what lets an interleaved
-  // partial 353 replace the full roster. The in-flight burst already carries
-  // authoritative truth, so skipping is safe.
-  if (_namesBurstActive(key)) return;
+  // Never stack a focus/poll NAMES on a recent burst — in-flight (expect/
+  // appending) OR settled-within-TTL. Mid-burst re-arm flips the next partial
+  // 353 into a REPLACE; settled re-arm does the same for late mesh lines that
+  // still trail the first 366. After TTL the entry expires and refresh is free
+  // again. Deliberate re-NAMES (_beginNamesBurst / reconnect JOIN+NAMES) is a
+  // separate path and may re-arm a settled burst immediately.
+  if (_recentNamesBurst(key)) return;
   const now = _now();
   // _now() is a relative clock (performance.now()), so an absent entry must mean
   // "never refreshed" — not timestamp 0, which would wrongly throttle the first
@@ -4684,21 +4799,24 @@ function deliverChatMessage(
 ): boolean | Promise<boolean> {
   const generation = _accountGeneration;
   const { ourNick, replyingTo } = get();
+  // Only tag a reply when the armed parent belongs to THIS target. A reply
+  // armed in #ops must never leak +draft/reply onto a send into #general.
+  const activeReply = activeReplyForTarget(replyingTo, target);
   const waitForServerEcho = client.negotiatedCaps.has('echo-message');
   const useLabel = client.negotiatedCaps.has('labeled-response');
   const label = useLabel ? nextClientLabel() : null;
   const targetIsChannel = target.length > 0 && (client.isupport.CHANTYPES ?? '#&').includes(target[0]!);
   const activeTopic = targetIsChannel ? get().activeChannelTopics.get(target.toLowerCase()) ?? null : null;
   const topicTags = activeTopic ? topicMessageTag(activeTopic) ?? {} : {};
-  const baseTags = replyingTo
-    ? { ...topicTags, '+draft/reply': replyingTo.id }
+  const baseTags = activeReply
+    ? { ...topicTags, '+draft/reply': activeReply.id }
     : topicTags;
   const outboundTags = label ? { ...baseTags, label } : baseTags;
   const hasOutboundTags = Object.keys(outboundTags).length > 0;
-  const replySnapshot = replyingTo ? {
-    id: replyingTo.id,
-    from: replyingTo.from,
-    text: persistedReplyPreviewText(replyingTo),
+  const replySnapshot = activeReply ? {
+    id: activeReply.id,
+    from: activeReply.from,
+    text: persistedReplyPreviewText(activeReply),
   } : null;
 
   const commitLabeledOptimistic = (fields: {
@@ -4778,15 +4896,25 @@ function deliverChatMessage(
       }
       if (outcome.status !== 'sealed') {
         // SECURITY — never silently downgrade a designated E2EE DM to plaintext.
+        // Do not coach the user into turning E2EE off as the recovery path.
         get().addToast({
           variant: 'error',
           title: 'Encryption unavailable',
-          description: `Your message to ${target} was NOT sent — the encrypted DM could not be sealed. Try again, or turn off encrypted DMs for this conversation to send it unencrypted.`,
+          description: `Your message to ${target} was NOT sent — the encrypted DM could not be sealed. Try again.`,
         });
         get().addNotification({
           type: 'error',
           text: `Encryption unavailable — message to ${target} was not sent (the encrypted DM could not be sealed).`,
         });
+        return false;
+      }
+
+      // Directory may have rotated while sealDmTrusted was in flight. Never
+      // admit ciphertext under a key the live METADATA directory no longer
+      // claims — re-check and surface the live key for the key-change warning.
+      const livePeerKey = get().peerDmKeys.get(target.toLowerCase());
+      if (livePeerKey !== peerKey) {
+        if (livePeerKey) void get()._flagPeerKeyChange(target, livePeerKey);
         return false;
       }
 
@@ -4808,7 +4936,8 @@ function deliverChatMessage(
           ...(replySnapshot ? { replyTo: replySnapshot } : {}),
         }));
       }
-      if (replyingTo) set({ replyingTo: null });
+      // Only consume the armed reply when this send actually used it.
+      if (activeReply) set({ replyingTo: null });
       return true;
     });
   }
@@ -4853,7 +4982,9 @@ function deliverChatMessage(
     set(s => _addMessage(s, target, msg));
     if (targetIsChannel) get().updateChannelActivity(target);
   }
-  if (replyingTo) set({ replyingTo: null });
+  // Only consume the armed reply when this send actually used it — a send
+  // into a different conversation leaves the original reply armed.
+  if (activeReply) set({ replyingTo: null });
   return true;
 }
 
@@ -5193,37 +5324,47 @@ export const store = createStore<OnyxState>()(
         // is present and no password drives PLAIN/SCRAM.
         hasClientCert,
         onConnected() {
+          // A replaced client's queued WebSocket callback may already have been
+          // captured before destroy() detached its handlers. Only the client
+          // currently owned by the store may drive connection state.
+          if (get().client !== client) return;
           _clearReconnectCountdown();
           _reconnectAttempts = 0;
           set({ status: 'connected', connectionStatus: 'connected', reconnectIn: 0, autoReconnect: true, connectedAt: new Date() });
           get().addServerLog(hasRegistered ? 'Reconnected.' : `Connected to ${get().server?.url ?? 'server'}.`);
-          // On a RECONNECT, re-establish every channel the UI still shows.
-          // A session-resumed account is still in them server-side (JOIN is
-          // then a no-op our idempotent handler absorbs), but a GUEST's
-          // reconnect is a brand-new session — without the JOIN the server
-          // has no idea about these channels and silently rejects everything
-          // sent to them while the UI pretends all is well. NAMES then
-          // resyncs the roster either way (authoritative rebuild), catching
-          // members who came or went during the gap. Skipped on the first
-          // connect (its JOINs already pull fresh NAMES).
+          // On a RECONNECT without onyx/session-sync, re-establish every channel
+          // the UI still shows. A guest's reconnect is a brand-new session —
+          // without the JOIN the server has no idea about these channels and
+          // silently rejects everything sent to them while the UI pretends all
+          // is well. NAMES then resyncs the roster (authoritative rebuild),
+          // catching members who came or went during the gap.
+          //
+          // With onyx/session-sync ACKed, the server itself replays JOIN +
+          // NAMES/topic + CHATHISTORY for every live channel on the account
+          // session. A client-side JOIN/NAMES storm here would race that
+          // reclaim (multi-device / bouncer continuity) and is deliberately
+          // suppressed. Skipped on the first connect either way (its JOINs
+          // already pull fresh NAMES).
           if (hasRegistered) {
             setTimeout(() => {
-              const st = get();
-              if (st.connectionStatus !== 'connected') return;
-              const c = st.client;
-              if (!c) return;
-              for (const ch of st.channels.values()) {
-                c.sendRaw('JOIN', ch.name);
+              if (get().client !== client) return;
+              if (get().connectionStatus !== 'connected') return;
+              // Server-driven reclaim owns the channel list when session-sync
+              // is active; re-check after the delay in case CAP settled late.
+              if (client.sessionSyncActive) return;
+              for (const ch of get().channels.values()) {
+                client.sendRaw('JOIN', ch.name);
                 // Arm the burst so the reconciling NAMES' first 353 REPLACES
                 // (dropping members lost during the gap) instead of appending.
                 _beginNamesBurst(ch.name.toLowerCase());
-                c.sendRaw('NAMES', ch.name);
+                client.sendRaw('NAMES', ch.name);
               }
             }, 600);
           }
           hasRegistered = true;
         },
         onDisconnected(reason) {
+          if (get().client !== client) return;
           // A credential/mechanism failure is deterministic, not a transient
           // network flap. Retrying the same rejected SASL exchange used to burn
           // through the entire reconnect backoff before finally returning the
@@ -5239,6 +5380,7 @@ export const store = createStore<OnyxState>()(
           _clearPendingLabeledSends(set);
           _stopLatencyPing();
           _clearBanListTransport();
+          _clearAccessListTransport();
           _typingLastSent.clear();
           _pendingTravel = null;
           _resetServerSearchTransport();
@@ -5274,11 +5416,13 @@ export const store = createStore<OnyxState>()(
           }
         },
         onError(err) {
+          if (get().client !== client) return;
           set({ status: 'error' });
           get().addNotification({ type: 'error', text: err });
           get().addServerLog(err, '', 'error');
         },
         onNickChanged(newNick) {
+          if (get().client !== client) return;
           _addSessionRestoreIdentity(get, newNick);
           const previousOwner = selectDeviceMemoryOwner(get());
           const previousNick = get().ourNick;
@@ -5319,13 +5463,16 @@ export const store = createStore<OnyxState>()(
           }
         },
         onMessage(msg) {
+          if (get().client !== client) return;
           get()._handleMessage(msg);
         },
         onRaw(line, dir) {
+          if (get().client !== client) return;
           get().addRawLogEntry(dir, line);
         },
       });
       client.onCapChange = () => {
+        if (get().client !== client) return;
         // mediaAvailable is NOT a cap: MEDIA is exposed as a plain channel
         // command for any registered member (no advertised media cap), so it is
         // set on registration (001) / first media event, not here. Only mirror
@@ -5499,24 +5646,41 @@ export const store = createStore<OnyxState>()(
       // Time travel (?at= deep link / stats links): pull a window of history
       // AROUND the moment; the batch-close merge sorts the buffer and picks
       // the nearest message as the landing (timeTravelLandingId → feed scroll).
+      // Local vault paints FIRST whenever localHistory is on — instant landing
+      // before CHATHISTORY AROUND answers (or the only path when the cap is
+      // missing). Server AROUND may refine the landing later.
       const { client } = get();
       if (_serverSearchOwnsTarget(target)) return;
-      if (!hasChatHistoryCap(client)) {
-        if (!preferences().localHistory) return;
+      const key = target.toLowerCase();
+      const hasCap = hasChatHistoryCap(client);
+      if (preferences().localHistory) {
         const memoryContext = captureDeviceMemoryContext(get());
-        if (!memoryContext) return;
-        void loadAround(target, at, HISTORY_PAGE_SIZE, memoryContext.owner).then((localMsgs) => {
-          if (!isDeviceMemoryContextCurrent(memoryContext, get())) return;
-          if (localMsgs.length === 0) return;
-          get().hydrateHistory(target, localMsgs);
-          const landingId = preferredMessageId && localMsgs.some((message) => message.id === preferredMessageId)
-            ? preferredMessageId
-            : nearestMessageId(localMsgs, at);
-          if (landingId) set({ timeTravelLandingId: landingId });
-        });
+        if (memoryContext) {
+          void loadAround(target, at, HISTORY_PAGE_SIZE, memoryContext.owner).then((localMsgs) => {
+            if (!isDeviceMemoryContextCurrent(memoryContext, get())) return;
+            if (localMsgs.length === 0) return;
+            get().hydrateHistory(target, localMsgs);
+            // Still traveling to this moment? Server may have already landed.
+            const pending = _pendingTravel;
+            const stillTraveling = !hasCap
+              || (pending !== null
+                && pending.key === key
+                && pending.at.getTime() === at.getTime());
+            if (!stillTraveling) return;
+            if (hasCap && get().timeTravelLandingId) return;
+            const landingId = preferredMessageId && localMsgs.some((message) => message.id === preferredMessageId)
+              ? preferredMessageId
+              : nearestMessageId(localMsgs, at);
+            if (landingId) set({ timeTravelLandingId: landingId });
+          });
+        } else if (!hasCap) {
+          return;
+        }
+      } else if (!hasCap) {
         return;
       }
-      _pendingTravel = { key: target.toLowerCase(), at, preferredMessageId };
+      if (!hasCap) return;
+      _pendingTravel = { key, at, preferredMessageId };
       client?.sendRaw('CHATHISTORY', 'AROUND', target, `timestamp=${at.toISOString()}`, String(HISTORY_PAGE_SIZE));
     },
 
@@ -5564,6 +5728,7 @@ export const store = createStore<OnyxState>()(
           let sent = 0;
           let expired = 0;
           let waiting = 0;
+          let pruneFailed = 0;
           for (const e of entries) {
             const st = get();
             if (
@@ -5573,9 +5738,31 @@ export const store = createStore<OnyxState>()(
             ) return;
             if (st.connectionStatus !== 'connected') { waiting += 1; continue; }
             if (Date.now() - e.queued_at > OUTBOX_MAX_AGE_MS) {
-              await deleteOutboxEntry(e.id);
-              dropPlaceholder(e);
-              expired += 1;
+              // Expired rows are never sent. Only drop the placeholder when the
+              // durable delete commits — a failed prune must stay visible.
+              if (await deleteOutboxEntry(e.id)) {
+                _outboxWireAdmitted.delete(e.id);
+                dropPlaceholder(e);
+                expired += 1;
+              } else {
+                waiting += 1;
+                pruneFailed += 1;
+              }
+              continue;
+            }
+            // Already wire-admitted (this session or durable mark after a prior
+            // prune failure). Never re-admit — only retry IndexedDB delete.
+            if (e.wire_admitted || _outboxWireAdmitted.has(e.id)) {
+              _outboxWireAdmitted.add(e.id);
+              if (await deleteOutboxEntry(e.id)) {
+                _outboxWireAdmitted.delete(e.id);
+                if (!_hasPendingLabeledMessageId(`outbox:${e.id}`)) {
+                  dropPlaceholder(e);
+                }
+              } else {
+                waiting += 1;
+                pruneFailed += 1;
+              }
               continue;
             }
             // A channel message can only send once the join has landed; DMs go
@@ -5599,11 +5786,29 @@ export const store = createStore<OnyxState>()(
               waiting += 1;
               continue;
             }
-            await deleteOutboxEntry(e.id);
-            if (!_hasPendingLabeledMessageId(`outbox:${e.id}`)) {
-              dropPlaceholder(e);
+            // Mark wire-admitted BEFORE the delete attempt — memory first, then
+            // durable — so a later flush / reload cannot re-deliver.
+            _outboxWireAdmitted.add(e.id);
+            const durableMarked = await markOutboxWireAdmitted(e.id);
+            if (await deleteOutboxEntry(e.id)) {
+              _outboxWireAdmitted.delete(e.id);
+              if (!_hasPendingLabeledMessageId(`outbox:${e.id}`)) {
+                dropPlaceholder(e);
+              }
+              sent += 1;
+            } else {
+              // Message is on the wire; durable row is stuck. Count as sent for
+              // user feedback, keep placeholder if labeled echo is pending, and
+              // surface storage failure so the stuck row is not silent.
+              if (!_hasPendingLabeledMessageId(`outbox:${e.id}`)) {
+                dropPlaceholder(e);
+              }
+              sent += 1;
+              waiting += 1;
+              pruneFailed += 1;
+              // Reload double-send guard: retry durable mark if the first put failed.
+              if (!durableMarked) await markOutboxWireAdmitted(e.id);
             }
-            sent += 1;
           }
 
           if (sent > 0) {
@@ -5620,6 +5825,15 @@ export const store = createStore<OnyxState>()(
               description: 'Older than a day — dropped instead of sent.',
             });
           }
+          if (pruneFailed > 0) {
+            get().addToast({
+              variant: 'warning',
+              title: pruneFailed === 1
+                ? 'Queued message stuck on this device'
+                : `${pruneFailed} queued messages stuck on this device`,
+              description: 'Already sent, but device storage could not clear the local copy. Retry from Home if it reappears.',
+            });
+          }
           if (waiting > 0 && _outboxRetries < 5) {
             _outboxRetries += 1;
             // Still auto-retrying — not a terminal failure yet.
@@ -5629,16 +5843,32 @@ export const store = createStore<OnyxState>()(
             // Auto-retry budget exhausted: keep durable rows, surface chrome + toast.
             if (!get().outboxDeliveryFailed) {
               set({ outboxDeliveryFailed: true });
-              get().addToast({
-                variant: 'warning',
-                title: waiting === 1
-                  ? 'Queued message still waiting'
-                  : `${waiting} queued messages still waiting`,
-                description: 'Could not send yet. Open Home or retry from the composer.',
-              });
+              const deliveryWaiting = waiting - pruneFailed;
+              // pruneFailed already got an honest storage toast above — only
+              // toast "still waiting" for rows that never made it onto the wire.
+              if (deliveryWaiting > 0) {
+                get().addToast({
+                  variant: 'warning',
+                  title: deliveryWaiting === 1
+                    ? 'Queued message still waiting'
+                    : `${deliveryWaiting} queued messages still waiting`,
+                  description: 'Could not send yet. Open Home or retry from the composer.',
+                });
+              }
             }
           } else if (get().outboxDeliveryFailed) {
             set({ outboxDeliveryFailed: false });
+          }
+        } catch {
+          // Unexpected flush failure must never leave the outbox silent: mark
+          // delivery failed and toast so composer/Home chrome stays honest.
+          if (!get().outboxDeliveryFailed) {
+            set({ outboxDeliveryFailed: true });
+            get().addToast({
+              variant: 'warning',
+              title: 'Queued messages still waiting',
+              description: 'Could not finish sending from this device. Retry from Home or the composer.',
+            });
           }
         } finally {
           _outboxFlushActive = false;
@@ -5648,82 +5878,112 @@ export const store = createStore<OnyxState>()(
 
     openQueuedSend(id) {
       void (async () => {
-        const entry = (await loadOutbox()).find((candidate) => candidate.id === id);
-        if (!entry) {
-          get().addToast({
-            variant: 'warning',
-            title: 'Queued message unavailable',
-            description: 'It may already have been sent or removed.',
-          });
-          return;
-        }
-        if (!_sameOutboxOwner(entry.owner, _outboxOwner(get()))) return;
+        try {
+          const entry = (await loadOutbox()).find((candidate) => candidate.id === id);
+          if (!entry) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Queued message unavailable',
+              description: 'It may already have been sent or removed.',
+            });
+            return;
+          }
+          if (!_sameOutboxOwner(entry.owner, _outboxOwner(get()))) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Queued message unavailable',
+              description: 'It belongs to another signed-in identity on this device.',
+            });
+            return;
+          }
 
-        const placeholderId = `outbox:${entry.id}`;
-        // openVaultResult creates a local channel/DM shell when the target is
-        // absent, which is exactly the reload case where the original pending
-        // placeholder no longer exists in memory.
-        get().openVaultResult(entry.target, placeholderId);
-        set((state) => {
-          const existing = state.channels.get(entry.target_key)?.messages ??
-            state.dms.get(entry.target_key)?.messages ?? [];
-          if (existing.some((message) => message.id === placeholderId)) return {};
-          return _addMessage(state, entry.target, {
-            id: placeholderId,
-            time: new Date(entry.queued_at),
-            from: state.ourNick || 'you',
-            text: entry.text,
-            type: 'msg',
-            target: entry.target,
-            pending: true,
+          const placeholderId = `outbox:${entry.id}`;
+          // openVaultResult creates a local channel/DM shell when the target is
+          // absent, which is exactly the reload case where the original pending
+          // placeholder no longer exists in memory.
+          get().openVaultResult(entry.target, placeholderId);
+          set((state) => {
+            const existing = state.channels.get(entry.target_key)?.messages ??
+              state.dms.get(entry.target_key)?.messages ?? [];
+            if (existing.some((message) => message.id === placeholderId)) return {};
+            return _addMessage(state, entry.target, {
+              id: placeholderId,
+              time: new Date(entry.queued_at),
+              from: state.ourNick || 'you',
+              text: entry.text,
+              type: 'msg',
+              target: entry.target,
+              pending: true,
+            });
           });
-        });
-        get().focusMessage(placeholderId);
+          get().focusMessage(placeholderId);
+        } catch {
+          get().addToast({
+            variant: 'error',
+            title: 'Queued message unavailable',
+            description: 'This browser could not open the queued send from device storage.',
+          });
+        }
       })();
     },
 
     discardQueuedSend(id) {
       void (async () => {
-        const entry = (await loadOutbox()).find((candidate) => candidate.id === id);
-        if (!entry) return;
-        if (!_sameOutboxOwner(entry.owner, _outboxOwner(get()))) return;
-        await deleteOutboxEntry(entry.id);
-        if ((await loadOutbox()).some((candidate) => candidate.id === entry.id)) {
+        try {
+          const entry = (await loadOutbox()).find((candidate) => candidate.id === id);
+          if (!entry) return;
+          if (!_sameOutboxOwner(entry.owner, _outboxOwner(get()))) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Queued message kept',
+              description: 'It belongs to another signed-in identity on this device.',
+            });
+            return;
+          }
+          if (!await deleteOutboxEntry(entry.id)) {
+            get().addToast({
+              variant: 'error',
+              title: 'Queued message kept',
+              description: 'This browser could not remove it from device storage.',
+            });
+            return;
+          }
+          _outboxWireAdmitted.delete(entry.id);
+
+          set((state) => {
+            const placeholderId = `outbox:${entry.id}`;
+            const strip = (messages: ChatMessage[]) => messages.filter((message) => message.id !== placeholderId);
+            const channels = new Map(state.channels);
+            const channel = channels.get(entry.target_key);
+            if (channel) {
+              channels.set(entry.target_key, { ...channel, messages: strip(channel.messages) });
+              return { channels };
+            }
+            const dms = new Map(state.dms);
+            const dm = dms.get(entry.target_key);
+            if (dm) {
+              dms.set(entry.target_key, { ...dm, messages: strip(dm.messages) });
+              return { dms };
+            }
+            return {};
+          });
+          get().addToast({
+            variant: 'success',
+            title: 'Queued message removed',
+            description: `Nothing will be sent to ${entry.target}.`,
+          });
+          // If nothing owned remains, drop the failed-delivery chrome.
+          const owner = _outboxOwner(get());
+          const remaining = (await loadOutbox()).filter((row) => _sameOutboxOwner(row.owner, owner));
+          if (remaining.length === 0 && get().outboxDeliveryFailed) {
+            set({ outboxDeliveryFailed: false });
+          }
+        } catch {
           get().addToast({
             variant: 'error',
             title: 'Queued message kept',
             description: 'This browser could not remove it from device storage.',
           });
-          return;
-        }
-
-        set((state) => {
-          const placeholderId = `outbox:${entry.id}`;
-          const strip = (messages: ChatMessage[]) => messages.filter((message) => message.id !== placeholderId);
-          const channels = new Map(state.channels);
-          const channel = channels.get(entry.target_key);
-          if (channel) {
-            channels.set(entry.target_key, { ...channel, messages: strip(channel.messages) });
-            return { channels };
-          }
-          const dms = new Map(state.dms);
-          const dm = dms.get(entry.target_key);
-          if (dm) {
-            dms.set(entry.target_key, { ...dm, messages: strip(dm.messages) });
-            return { dms };
-          }
-          return {};
-        });
-        get().addToast({
-          variant: 'success',
-          title: 'Queued message removed',
-          description: `Nothing will be sent to ${entry.target}.`,
-        });
-        // If nothing owned remains, drop the failed-delivery chrome.
-        const owner = _outboxOwner(get());
-        const remaining = (await loadOutbox()).filter((row) => _sameOutboxOwner(row.owner, owner));
-        if (remaining.length === 0 && get().outboxDeliveryFailed) {
-          set({ outboxDeliveryFailed: false });
         }
       })();
     },
@@ -5769,30 +6029,69 @@ export const store = createStore<OnyxState>()(
       set({ timeTravelLandingId: messageId });
     },
 
-    hydrateHistory(target, localMsgs) {
+    hydrateHistory(target, localMsgs, options) {
       // Local-first scrollback (vault): renders instantly; the server's
       // CHATHISTORY replay later merges on top and dedupes by the same ids.
+      // Cold resume may materialize + activate a missing target so loadRecent
+      // paints before session-sync JOIN / CHATHISTORY. Without `activate`, a
+      // missing buffer is still a no-op (JOIN must create the shell first).
+      // Time-travel loadAround windows can interleave with live rows — always
+      // restore chronology after merge (same contract as chathistory batches).
       const key = target.toLowerCase();
+      let activatedView: ActiveView | null = null;
       set(s => {
         const merge = (existing: ChatMessage[]): ChatMessage[] => {
           const ids = new Set(existing.map(m => m.id));
           const fresh = localMsgs.filter(m => !ids.has(m.id));
-          return fresh.length === 0 ? existing : [...fresh, ...existing];
+          if (fresh.length === 0) return existing;
+          return [...fresh, ...existing].sort(
+            (a, b) => a.time.getTime() - b.time.getTime() || a.id.localeCompare(b.id),
+          );
         };
         const channels = new Map(s.channels);
         const c = channels.get(key);
         if (c) {
           channels.set(key, { ...c, messages: merge(c.messages) });
+          if (options?.activate === 'channel') {
+            activatedView = { kind: 'channel', channel: key };
+            return { channels, activeView: activatedView };
+          }
           return { channels };
         }
         const dms = new Map(s.dms);
         const dm = dms.get(key);
         if (dm) {
           dms.set(key, { ...dm, messages: merge(dm.messages) });
+          if (options?.activate === 'dm') {
+            activatedView = { kind: 'dm', nick: key };
+            return { dms, activeView: activatedView };
+          }
           return { dms };
+        }
+        if (options?.activate === 'channel') {
+          const channel = emptyChannel(target);
+          channels.set(key, { ...channel, messages: merge(channel.messages) });
+          activatedView = { kind: 'channel', channel: key };
+          return { channels, activeView: activatedView };
+        }
+        if (options?.activate === 'dm') {
+          dms.set(key, {
+            nick: target,
+            account: null,
+            unread: 0,
+            highlights: 0,
+            messages: merge([]),
+          });
+          activatedView = { kind: 'dm', nick: key };
+          return { dms, activeView: activatedView };
         }
         return {};
       });
+      // Session-sync JOINs arrive after the owner becomes known. Preserve the
+      // vault-selected conversation while those JOINs rebuild live rosters;
+      // an explicit ?join= request still wins in the JOIN handler.
+      const restore = _currentSessionRestore(get);
+      if (restore && activatedView) restore.preserveActiveView = activatedView;
       // E2EE: vaulted DMs are ciphertext at rest — decrypt the hydrated
       // envelopes once the buffer exists (peer key may already be known; if
       // not, the METADATA fetch on DM-open re-runs decryption).
@@ -5844,6 +6143,67 @@ export const store = createStore<OnyxState>()(
       if (!nick.trim()) return;
       // RFC order: INVITE <nick> <channel>
       get().client?.sendRaw('INVITE', nick, channel);
+    },
+
+    setChannelAccess(channel, entries) {
+      _commitChannelAccess(set, channel, entries);
+    },
+
+    fetchChannelAccess(channel) {
+      const key = _normalizeBanChannel(channel);
+      if (!key || !get().client || get().connectionStatus !== 'connected') return;
+      if (!get().channels.has(key)) return;
+      set((s) => {
+        const channelAccessLoading = new Set(s.channelAccessLoading);
+        channelAccessLoading.add(key);
+        return { channelAccessLoading };
+      });
+      // Drop any partial LIST buffer so a fresh 803/804/805 replaces cleanly.
+      _accessBuffer.delete(key);
+      get().client?.sendRaw('ACCESS', channel, 'LIST');
+    },
+
+    addChannelAccess(channel, level, mask, timeoutSeconds) {
+      const key = _normalizeBanChannel(channel);
+      const parsedLevel = parseAccessLevel(level);
+      const normalizedMask = normalizeAccessMask(mask);
+      if (
+        !key
+        || !parsedLevel
+        || !normalizedMask
+        || !get().client
+        || get().connectionStatus !== 'connected'
+      ) return;
+      const duration = timeoutSeconds === undefined
+        ? undefined
+        : parseAccessDuration(String(timeoutSeconds));
+      if (timeoutSeconds !== undefined && duration === undefined && timeoutSeconds !== 0) return;
+      if (duration !== undefined) {
+        get().client?.sendRaw(
+          'ACCESS',
+          channel,
+          'ADD',
+          parsedLevel,
+          normalizedMask,
+          String(duration),
+        );
+      } else {
+        get().client?.sendRaw('ACCESS', channel, 'ADD', parsedLevel, normalizedMask);
+      }
+    },
+
+    deleteChannelAccess(channel, level, mask) {
+      const key = _normalizeBanChannel(channel);
+      const parsedLevel = parseAccessLevel(level);
+      const normalizedMask = normalizeAccessMask(mask);
+      if (
+        !key
+        || !parsedLevel
+        || !normalizedMask
+        || !get().client
+        || get().connectionStatus !== 'connected'
+      ) return;
+      get().client?.sendRaw('ACCESS', channel, 'DELETE', parsedLevel, normalizedMask);
     },
 
     webhookCreate(channel, name) {
@@ -6177,6 +6537,10 @@ export const store = createStore<OnyxState>()(
             pending: true,
           };
           set(s => _addMessage(s, target, placeholder));
+        }).catch(() => {
+          // IndexedDB open/queue paths are fail-soft, but a rejected promise
+          // must never swallow the user's send with no chrome.
+          get().addToast({ variant: 'error', title: 'Offline', description: 'Message could not be queued on this device.' });
         });
         return;
       }
@@ -6745,7 +7109,14 @@ export const store = createStore<OnyxState>()(
 
     // ── messaging UX ──────────────────────────────────────────────────────
     setReplyingTo(msg) {
-      set({ replyingTo: msg });
+      // Reply and edit are mutually exclusive composer modes. Arming a reply
+      // dismisses any in-progress edit so the composer never shows both bars
+      // or treats Enter as an ambiguous "edit-or-reply" action.
+      if (!msg) {
+        set({ replyingTo: null });
+        return;
+      }
+      set({ replyingTo: msg, editingMessage: null });
     },
 
     // ── composer/attachments ──
@@ -6771,9 +7142,12 @@ export const store = createStore<OnyxState>()(
         return;
       }
       const current = conversationMessage(get(), msg.target, msg.id) ?? msg;
-      set({
-        editingMessage: hasEncryptedMessageBoundary(current) ? null : current,
-      });
+      if (hasEncryptedMessageBoundary(current)) {
+        set({ editingMessage: null });
+        return;
+      }
+      // Edit wins over reply — same mutual-exclusivity rule as setReplyingTo.
+      set({ editingMessage: current, replyingTo: null });
     },
 
     openChannelConversation(channel, requestedTopic) {
@@ -6866,28 +7240,12 @@ export const store = createStore<OnyxState>()(
       const { ourNick } = get();
       const key = target.toLowerCase();
 
+      // Case-insensitive nick match (PREFIX-learned nicks arrive mixed-case).
+      // Pure helper keeps optimistic toggle aligned with quietBoosts/toggleBoost.
       const toggleReaction = (messages: ChatMessage[]): ChatMessage[] =>
         messages.map(m => {
           if (m.id !== messageId) return m;
-          const existing: MessageReaction[] = m.reactions ?? [];
-          const rIdx = existing.findIndex(r => r.emoji === emoji);
-          let reactions: MessageReaction[];
-          if (rIdx >= 0) {
-            const r = existing[rIdx]!;
-            if (r.users.includes(ourNick)) {
-              // Remove user
-              const newUsers = r.users.filter(u => u !== ourNick);
-              reactions = newUsers.length
-                ? existing.map((r2, i) => i === rIdx ? { ...r2, users: newUsers } : r2)
-                : existing.filter((_, i) => i !== rIdx);
-            } else {
-              // Add user
-              reactions = existing.map((r2, i) => i === rIdx ? { ...r2, users: [...r2.users, ourNick] } : r2);
-            }
-          } else {
-            reactions = [...existing, { emoji, users: [ourNick] }];
-          }
-          return { ...m, reactions };
+          return { ...m, reactions: toggleMessageReactions(m.reactions, emoji, ourNick) };
         });
 
       set(s => {
@@ -6931,15 +7289,7 @@ export const store = createStore<OnyxState>()(
       const applyRemove = (messages: ChatMessage[]): ChatMessage[] =>
         messages.map(m => {
           if (m.id !== messageId) return m;
-          const existing: MessageReaction[] = m.reactions ?? [];
-          const rIdx = existing.findIndex(r => r.emoji === emoji);
-          if (rIdx < 0) return m;
-          const r = existing[rIdx]!;
-          const newUsers = r.users.filter(u => u.toLowerCase() !== reactionNick.toLowerCase());
-          const reactions = newUsers.length
-            ? existing.map((r2, i) => i === rIdx ? { ...r2, users: newUsers } : r2)
-            : existing.filter((_, i) => i !== rIdx);
-          return { ...m, reactions };
+          return { ...m, reactions: removeMessageReactor(m.reactions, emoji, reactionNick) };
         });
 
       set(s => {
@@ -8213,30 +8563,32 @@ export const store = createStore<OnyxState>()(
         }
 
         if (standard.kind === 'NOTE' && standard.command === 'SESSION' && standard.code === 'TOKEN') {
-          const token = parseSessionTokenNote(msg);
-          if (token && _canAcceptSessionToken(get)) {
+          const cred = parseSessionTokenNote(msg);
+          if (cred && _canAcceptSessionToken(get)) {
             _confirmRememberedSessionAccount(get, set);
             const canonicalNick = _saslAccount ?? undefined;
             const target = _liveCredentialTokenTarget(get, true);
-            if (target) storeSessionToken(token, undefined, canonicalNick, target);
+            if (target) storeSessionToken(cred.token, cred.expiresAt, canonicalNick, target);
             // Push the freshly-issued token into the LIVE client so an auto-reconnect
             // (same IRCClient instance) resumes with it, not the stale construction-time value.
-            get().client?.updateResumeTokens({ sessionToken: token });
+            get().client?.updateResumeTokens({ sessionToken: cred.token });
           }
           return;
         }
         if (standard.kind === 'NOTE' && standard.command === 'SESSION' && standard.code === 'MTOKEN') {
           // Mesh-sealed reclaim token: persist it so a reconnect that lands on a
           // different mesh node can still resume via SESSION RESUME <mtoken>
-          // (server.zig handleSession TOKEN → handleMeshReclaim).
-          const mtoken = parseSessionMeshTokenNote(msg);
-          if (mtoken && _canAcceptSessionToken(get)) {
+          // (server.zig handleSession TOKEN → handleMeshReclaim). When the server
+          // advertises `expires=<unix>` (portable 12h lifetime), pass it through
+          // so purgeExpiredTokens can drop stale MTOKENs without decoding them.
+          const cred = parseSessionMeshTokenNote(msg);
+          if (cred && _canAcceptSessionToken(get)) {
             _confirmRememberedSessionAccount(get, set);
             const target = _liveCredentialTokenTarget(get, false);
-            if (target) storeMeshToken(mtoken, undefined, target);
+            if (target) storeMeshToken(cred.token, cred.expiresAt, target);
             // Prefer the mesh token on the live client so a reconnect landing on a
             // different node resumes correctly (updateResumeTokens merges, not clobbers).
-            get().client?.updateResumeTokens({ meshToken: mtoken });
+            get().client?.updateResumeTokens({ meshToken: cred.token });
           }
           return;
         }
@@ -8929,14 +9281,15 @@ export const store = createStore<OnyxState>()(
             }
             // Fetch WHO data for away status
             get().client?.sendRaw('WHO', ch);
-            // Reconcile the member list from the authoritative server roster. A
-            // client-initiated JOIN already triggers an automatic NAMES burst,
-            // but a JOIN that arrives via session reclaim / sync replay (fresh
-            // page load of a logged-in account) does not reliably carry one — so
-            // the nicklist would be empty with nothing to refresh it. NAMES is
-            // authoritative + idempotent (throttled per channel), so requesting
-            // it here guarantees the roster however we ended up in the channel.
-            _refreshChannelRoster(get, ch);
+            // Roster: normal JOIN gets automatic 353/366 — only arm the burst so
+            // the first 353 may REPLACE. Do not send a second NAMES here (that
+            // re-armed mid-burst and collapsed nicklists under mesh multi-line
+            // NAMES). Session reclaim still needs an explicit NAMES.
+            if (_currentSessionRestore(get)) {
+              _refreshChannelRoster(get, ch);
+            } else {
+              _beginNamesBurst(key);
+            }
             _tryPendingDeepLinkTopicResolution(get, set, ch, { sawJoin: true });
           } else {
             // Someone else joined
@@ -9005,6 +9358,9 @@ export const store = createStore<OnyxState>()(
             // A pending/late NAMES reply is not proof that we are still joined.
             _namesBursts.delete(key);
             _lastRosterRefresh.delete(key);
+            // Drop any in-flight ACCESS LIST buffer for this room — 804/805
+            // after PART must not resurrect roles for a channel we left.
+            _accessBuffer.delete(key);
             if (get().rosterSyncing.has(key)) _setRestoreRosterSyncing(set, key, false);
             set(s => {
               const channels = new Map(s.channels);
@@ -9023,12 +9379,25 @@ export const store = createStore<OnyxState>()(
                 : active;
               const activeChannelTopics = new Map(s.activeChannelTopics);
               activeChannelTopics.delete(key);
+              // ACCESS is join-scoped; free the committed list + loading flag.
+              let channelAccess = s.channelAccess;
+              if (channelAccess.has(key)) {
+                channelAccess = new Map(channelAccess);
+                channelAccess.delete(key);
+              }
+              let channelAccessLoading = s.channelAccessLoading;
+              if (channelAccessLoading.has(key)) {
+                channelAccessLoading = new Set(channelAccessLoading);
+                channelAccessLoading.delete(key);
+              }
               const leftStage = s.stageChannel?.toLowerCase() === key;
               return {
                 channels,
                 channelFolders,
                 activeView: next,
                 activeChannelTopics,
+                channelAccess,
+                channelAccessLoading,
                 ...(leftStage
                   ? {
                       stageChannel: null,
@@ -9494,25 +9863,30 @@ export const store = createStore<OnyxState>()(
             !sender
           ) {
             // Current Onyx Server delivers fresh resume credentials via server
-            // NOTICEs (`SESSION TOKEN …` / `SESSION MTOKEN …`). Older nodes
-            // used NOTE standard replies, handled above. Keep both paths so a
-            // rolling mesh upgrade cannot strand reconnect state.
-            const sessionToken = parseSessionTokenNote(msg);
-            if (sessionToken && _canAcceptSessionToken(get)) {
+            // NOTICEs (`SESSION TOKEN …` / `SESSION MTOKEN … expires=<unix>`).
+            // Older nodes used NOTE standard replies, handled above. Keep both
+            // paths so a rolling mesh upgrade cannot strand reconnect state.
+            const sessionCred = parseSessionTokenNote(msg);
+            if (sessionCred && _canAcceptSessionToken(get)) {
               _confirmRememberedSessionAccount(get, set);
               const target = _liveCredentialTokenTarget(get, true);
               if (target) {
-                storeSessionToken(sessionToken, undefined, _saslAccount ?? undefined, target);
+                storeSessionToken(
+                  sessionCred.token,
+                  sessionCred.expiresAt,
+                  _saslAccount ?? undefined,
+                  target,
+                );
               }
-              get().client?.updateResumeTokens({ sessionToken });
+              get().client?.updateResumeTokens({ sessionToken: sessionCred.token });
               break;
             }
-            const sessionMeshToken = parseSessionMeshTokenNote(msg);
-            if (sessionMeshToken && _canAcceptSessionToken(get)) {
+            const meshCred = parseSessionMeshTokenNote(msg);
+            if (meshCred && _canAcceptSessionToken(get)) {
               _confirmRememberedSessionAccount(get, set);
               const target = _liveCredentialTokenTarget(get, false);
-              if (target) storeMeshToken(sessionMeshToken, undefined, target);
-              get().client?.updateResumeTokens({ meshToken: sessionMeshToken });
+              if (target) storeMeshToken(meshCred.token, meshCred.expiresAt, target);
+              get().client?.updateResumeTokens({ meshToken: meshCred.token });
               break;
             }
 
@@ -11919,7 +12293,124 @@ export const store = createStore<OnyxState>()(
           break;
         }
 
-        // ── IRCX access list numerics ───────────────────────────────────────
+        // ── IRCX ACCESS (801–805) ───────────────────────────────────────────
+        // Wire (onyx-server ircx_access_store):
+        //   801 me #chan HOST mask :ACCESS entry added
+        //   802 me #chan HOST mask :ACCESS entry deleted
+        //   803 me #chan :ACCESS list begins
+        //   804 me #chan HOST mask [setby [duration]]
+        //   805 me #chan :End of ACCESS list
+        case '801': {
+          const ch801 = params[1] ?? '';
+          const level801 = parseAccessLevel(params[2] ?? '');
+          const mask801 = params[3] ?? '';
+          const key801 = _normalizeBanChannel(ch801);
+          if (!key801 || !level801 || !get().channels.has(key801)) break;
+          const entry801 = normalizeAccessEntry({ level: level801, mask: mask801 });
+          if (!entry801) break;
+          set((s) => {
+            // Refuse allocating a new channel bucket past the map cap (existing
+            // keys still accept upserts so an active room's ADD is never dropped).
+            if (!s.channelAccess.has(key801) && s.channelAccess.size >= MAX_ACCESS_LIST_CHANNELS) {
+              return {};
+            }
+            const channelAccess = new Map(s.channelAccess);
+            const existing = channelAccess.get(key801) ?? [];
+            channelAccess.set(key801, upsertAccessEntry(existing, entry801));
+            return { channelAccess };
+          });
+          break;
+        }
+
+        case '802': {
+          const ch802 = params[1] ?? '';
+          const level802 = parseAccessLevel(params[2] ?? '');
+          const mask802 = params[3] ?? '';
+          const key802 = _normalizeBanChannel(ch802);
+          if (!key802 || !level802 || !get().channels.has(key802)) break;
+          const normalizedMask802 = normalizeAccessMask(mask802);
+          if (!normalizedMask802) break;
+          set((s) => {
+            const existing = s.channelAccess.get(key802);
+            if (!existing) return {};
+            const channelAccess = new Map(s.channelAccess);
+            channelAccess.set(
+              key802,
+              removeAccessEntry(existing, level802, normalizedMask802),
+            );
+            return { channelAccess };
+          });
+          break;
+        }
+
+        case '803': {
+          const ch803 = params[1] ?? '';
+          const key803 = _normalizeBanChannel(ch803);
+          if (!key803 || !get().channels.has(key803)) break;
+          if (!_accessBuffer.has(key803) && _accessBuffer.size >= MAX_ACCESS_LIST_CHANNELS) {
+            break;
+          }
+          _accessBuffer.set(key803, []);
+          set((s) => {
+            const channelAccessLoading = new Set(s.channelAccessLoading);
+            channelAccessLoading.add(key803);
+            return { channelAccessLoading };
+          });
+          break;
+        }
+
+        case '804': {
+          // :server 804 me #chan LEVEL mask [setby [duration]]
+          const ch804 = params[1] ?? '';
+          const level804 = params[2] ?? '';
+          const mask804 = params[3] ?? '';
+          const setBy804 = params[4];
+          const duration804 = params[5];
+          const key804 = _normalizeBanChannel(ch804);
+          if (!key804 || !get().channels.has(key804)) break;
+          let list804 = _accessBuffer.get(key804);
+          if (!list804) {
+            if (_accessBuffer.size >= MAX_ACCESS_LIST_CHANNELS) break;
+            list804 = [];
+            _accessBuffer.set(key804, list804);
+          }
+          if (list804.length >= MAX_ACCESS_LIST_ENTRIES) break;
+          const entry804 = normalizeAccessEntry({
+            level: level804,
+            mask: mask804,
+            setBy: setBy804,
+            // Leave duration as the raw wire token; normalizeAccessEntry parses.
+            duration: duration804,
+          });
+          if (entry804) {
+            // Buffer is mutable during a single LIST burst only (module-local).
+            const next = upsertAccessEntry(list804, entry804);
+            list804.length = 0;
+            list804.push(...next);
+          }
+          break;
+        }
+
+        case '805': {
+          const ch805 = params[1] ?? '';
+          const key805 = _normalizeBanChannel(ch805);
+          if (!key805) break;
+          const entries805 = _accessBuffer.get(key805) ?? [];
+          _accessBuffer.delete(key805);
+          if (!get().channels.has(key805)) {
+            set((s) => {
+              if (!s.channelAccessLoading.has(key805)) return {};
+              const channelAccessLoading = new Set(s.channelAccessLoading);
+              channelAccessLoading.delete(key805);
+              return { channelAccessLoading };
+            });
+            break;
+          }
+          _commitChannelAccess(set, ch805, entries805);
+          break;
+        }
+
+        // ── Legacy / services ACCESS notices (kept for older paths) ────────
         case '775': {
           // :server 775 ournick #channel mask level
           const ch775 = params[1] ?? '';
@@ -12613,6 +13104,10 @@ export const store = createStore<OnyxState>()(
       }
       return { banList };
     }),
+    // IRCX ACCESS roles — also exposed as top-level actions near channel
+    // management; initial empty maps live here so getInitialState() seeds them.
+    channelAccess: new Map(),
+    channelAccessLoading: new Set(),
     fetchBanList: (channel) => {
       get().client?.sendRaw('MODE', channel, '+b');
     },
@@ -14015,6 +14510,13 @@ export const store = createStore<OnyxState>()(
         return;
       }
 
+      // Join-muted (B2 / research R4): honour the persisted preference only
+      // after capture succeeds so a failed join never leaves a sticky mute.
+      const joinMuted = get().voice.muteOnJoin;
+      if (joinMuted) {
+        stream.getAudioTracks().forEach(t => { t.enabled = false; });
+      }
+
       get().setVoiceCallState({
         callState: 'in_call',
         callChannel: channel,
@@ -14022,6 +14524,7 @@ export const store = createStore<OnyxState>()(
         cameraOn: withVideo,
         cameraStream: withVideo ? stream : null,
         callStartedAt: Date.now(),
+        muted: joinMuted,
         // Fresh call — reset transient layout/overlay state.
         pinnedParticipant: null,
         handRaised: false,
@@ -14211,7 +14714,12 @@ export const store = createStore<OnyxState>()(
 
       void client;
       void getMountedCadenceMediaEngine()?.acceptIncomingCall();
-      get().setVoiceCallState({ callStartedAt: Date.now() });
+      // Honour join-muted for answered DMs the same way channel joins do.
+      const joinMuted = voice.muteOnJoin;
+      if (joinMuted) {
+        voice.localStream?.getAudioTracks().forEach(t => { t.enabled = false; });
+      }
+      get().setVoiceCallState({ callStartedAt: Date.now(), muted: joinMuted });
     },
 
     rejectDmCall() {

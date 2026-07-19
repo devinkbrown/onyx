@@ -59,6 +59,27 @@ async function peerSeal(peer: Awaited<ReturnType<typeof makePeer>>, myPublicB64:
   return `TSUMUGI1 ${toB64url(body)}`;
 }
 
+async function putRawPin(account: string, value: unknown): Promise<void> {
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open('onyx-key-pins', 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains('pins')) {
+        request.result.createObjectStore('pins');
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('pins', 'readwrite');
+    tx.objectStore('pins').put(value, account.toLowerCase());
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  db.close();
+}
+
 beforeEach(() => {
   globalThis.indexedDB = new IDBFactory();
   _resetDeviceKeysForTests();
@@ -84,6 +105,26 @@ describe('anti-MITM: a Byzantine node swaps the peer key mid-conversation', () =
     expect(await peerKeyStatus('Alice', impostor.publicB64)).toBe('changed');
   });
 
+  it('serializes concurrent first-contact seals so only one peer key can win TOFU', async () => {
+    const first = await makePeer();
+    const second = await makePeer();
+    const attempts = [
+      { key: first.publicB64, outcome: sealDmTrusted('Alice', first.publicB64, 'first secret') },
+      { key: second.publicB64, outcome: sealDmTrusted('Alice', second.publicB64, 'second secret') },
+    ];
+
+    const outcomes = await Promise.all(attempts.map(async (attempt) => ({
+      key: attempt.key,
+      outcome: await attempt.outcome,
+    })));
+    const sealed = outcomes.filter((attempt) => attempt.outcome.status === 'sealed');
+    const blocked = outcomes.filter((attempt) => attempt.outcome.status === 'key-changed');
+
+    expect(sealed).toHaveLength(1);
+    expect(blocked).toHaveLength(1);
+    expect(await pinnedPeerKey('Alice')).toBe(sealed[0]!.key);
+  });
+
   it('a first-contact envelope that does NOT decrypt never poisons the pin (open-then-pin)', async () => {
     // An attacker who can spoof a PRIVMSG origin but does not hold the private
     // half of the presented key cannot produce a valid envelope. A garbage
@@ -102,6 +143,28 @@ describe('anti-MITM: a Byzantine node swaps the peer key mid-conversation', () =
     const ok = await openDmTrusted('Alice', real.publicB64, good);
     expect(ok.status).toBe('opened');
     expect(await pinnedPeerKey('Alice')).toBe(real.publicB64);
+  });
+
+  it('serializes concurrent first-contact opens so only the pinned peer yields plaintext', async () => {
+    const first = await makePeer();
+    const second = await makePeer();
+    const mine = (await deviceKeys())!.publicB64;
+    const attempts = [
+      { key: first.publicB64, outcome: openDmTrusted('Alice', first.publicB64, await peerSeal(first, mine, 'first peer')) },
+      { key: second.publicB64, outcome: openDmTrusted('Alice', second.publicB64, await peerSeal(second, mine, 'second peer')) },
+    ];
+
+    const outcomes = await Promise.all(attempts.map(async (attempt) => ({
+      key: attempt.key,
+      outcome: await attempt.outcome,
+    })));
+    const opened = outcomes.filter((attempt) => attempt.outcome.status === 'opened');
+    const blocked = outcomes.filter((attempt) =>
+      attempt.outcome.status === 'locked' && attempt.outcome.reason === 'key-changed');
+
+    expect(opened).toHaveLength(1);
+    expect(blocked).toHaveLength(1);
+    expect(await pinnedPeerKey('Alice')).toBe(opened[0]!.key);
   });
 
   it('the receive path keeps an impostor-sealed DM LOCKED even though it decrypts under the impostor key', async () => {
@@ -172,6 +235,23 @@ describe('fail-closed when trust cannot be verified', () => {
     expect(sealed.envelope).toBeNull();
 
     const opened = await openDmTrusted('Alice', peer.publicB64, envelope);
+    expect(opened.status).toBe('locked');
+    if (opened.status === 'locked') expect(opened.reason).toBe('unavailable');
+  });
+
+  it('treats corrupt non-string pin records as unreadable, never as first use', async () => {
+    const sealPeer = await makePeer();
+    await putRawPin('Alice', { corrupted: true });
+
+    expect(await peerKeyStatus('Alice', sealPeer.publicB64)).toBe('unreadable');
+    const sealed = await sealDmTrusted('Alice', sealPeer.publicB64, 'never sent');
+    expect(sealed.status).toBe('unavailable');
+    expect(sealed.envelope).toBeNull();
+
+    const openPeer = await makePeer();
+    const mine = (await deviceKeys())!.publicB64;
+    await putRawPin('Bob', 42);
+    const opened = await openDmTrusted('Bob', openPeer.publicB64, await peerSeal(openPeer, mine, 'never opened'));
     expect(opened.status).toBe('locked');
     if (opened.status === 'locked') expect(opened.reason).toBe('unavailable');
   });

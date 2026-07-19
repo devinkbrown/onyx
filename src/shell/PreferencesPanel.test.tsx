@@ -863,8 +863,8 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Named Sheet dialog, UTC date/time fields, quick-date presets, target-specific jump and moment-copy actions, and ribbon/composer openers.')).toBeInTheDocument();
     expect(screen.getByText('Named review and host-control groups, bounded participant list, polite atomic outcome status, and focus restoration after confirmations.')).toBeInTheDocument();
     expect(screen.getByText('Named device-memory region, reviewed-span and context-trail groups, labelled transcript jumps, and cross-room peer-review handoffs.')).toBeInTheDocument();
-    expect(screen.getByText('Segmented radio groups and switch rows expose concise names, descriptions, keyboard roving, focus-visible outlines, and forced-colors selected states.')).toBeInTheDocument();
-    expect(screen.getByText('Named live log, focusable articles, state-aware accessible names (queued/edited/deleted/locked without ciphertext), and keyboard action-bar reveal.')).toBeInTheDocument();
+    expect(screen.getByText('Segmented radio groups and switch rows expose concise names, descriptions, keyboard roving, focus-visible outlines, forced-colors selected states, and dense-zoom reflow of category tabs.')).toBeInTheDocument();
+    expect(screen.getByText('Named live log, focusable articles, state-aware accessible names (queued/edited/deleted/locked/mention without ciphertext), decorative avatars, thread-panel body parity, and keyboard action-bar reveal.')).toBeInTheDocument();
     expect(screen.getByText('Mobile drawers')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Reduce transparency/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText('Flatten glassy overlays and translucent panels for stronger separation from the background.')).toBeInTheDocument();
@@ -886,7 +886,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Named settings Sheet, labelled device/processing/PTT regions, described selects, and target-specific PTT key actions.')).toBeInTheDocument();
     expect(screen.getByText('Named incoming/outgoing call dialogs with target-specific accept, decline, and cancel actions.')).toBeInTheDocument();
     expect(screen.getByText('Per-message action groups, named reaction/overflow triggers, labelled menus, and row-specific action names.')).toBeInTheDocument();
-    expect(screen.getByText('Channel-scoped member landmark, labelled role groups, named detail dialogs, and target-specific member actions.')).toBeInTheDocument();
+    expect(screen.getByText('Channel-scoped member landmark, labelled role groups, named detail dialogs, target-specific member actions, decorative avatars, and focus retention across MODE/PART.')).toBeInTheDocument();
     expect(screen.getByText('Labelled compact control group, described calm-mode radios, and pressed-state desktop/sound/push/DND toggles.')).toBeInTheDocument();
     expect(screen.getByText('Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.')).toBeInTheDocument();
     expect(screen.getByText('Bottom-nav trigger handoff, drawer-initial focus, Escape close, Tab trap, and trigger focus restore.')).toBeInTheDocument();

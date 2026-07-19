@@ -15,11 +15,14 @@
  * restore a passwordless/passkey account without rerunning SASL.
  *
  * On mesh deployments Onyx Server additionally emits:
- *   NOTE SESSION MTOKEN :<token>
- * a mesh-sealed reclaim token usable to resume the session from ANY node in the
- * mesh (server.zig handleSession TOKEN). It is longer than the 32-hex local
- * token; `SESSION RESUME <mtoken>` routes through handleMeshReclaim, which either
- * reclaims a detached session held locally or redirects to the owning node.
+ *   NOTICE <nick> :SESSION MTOKEN <token> expires=<unix-seconds>
+ * (legacy: NOTE SESSION MTOKEN :<token>) — a mesh-sealed reclaim token usable
+ * to resume the session from ANY node in the mesh (server.zig handleSession
+ * TOKEN). It is longer than the 32-hex local token; `SESSION RESUME <mtoken>`
+ * routes through handleMeshReclaim, which either reclaims a detached session
+ * held locally or redirects to the owning node. When `expires=` is present it
+ * is recorded as `tokenExpiry` so purgeExpiredTokens drops stale portable
+ * state without decoding the sealed value.
  *
  * When no token is present (first login or expired), a saved password can be
  * used for SASL PLAIN / SCRAM. The password is stored in plain text — same as
@@ -565,13 +568,14 @@ export function clearSessionToken(server?: string, nick?: string): void {
  * Persisted against the active credential entry; a no-op when no base
  * credentials exist (guest sessions).
  *
- * expiresAt — a Unix timestamp (seconds). When provided, it is recorded as the
- *   local tokenExpiry so purgeExpiredTokens evicts the token on the next
- *   read/write once it lapses. When omitted (the current MTOKEN path, which
- *   carries no expiry on the wire) the token has NO local expiry and lingers in
- *   localStorage until an explicit clearSessionToken / clearCredentials — the
- *   server still enforces its own expiry on any resume attempt, so a stale local
- *   copy is a housekeeping concern, not an auth-lifetime one.
+ * expiresAt — a Unix timestamp (seconds). When provided (current MTOKEN wire
+ *   form carries `expires=<unix>`), it is recorded as the local tokenExpiry so
+ *   purgeExpiredTokens evicts the token on the next read/write once it lapses.
+ *   When omitted (legacy MTOKEN notes without expiry) the token has NO local
+ *   expiry and lingers in localStorage until an explicit clearSessionToken /
+ *   clearCredentials — the server still enforces its own expiry on any resume
+ *   attempt, so a stale local copy is a housekeeping concern, not an
+ *   auth-lifetime one.
  */
 export function storeMeshToken(
   token: string,

@@ -40,5 +40,8 @@ describe('AccessibilityStatement', () => {
     expect(screen.getByText(/Preferences dense rows use segmented radio groups/i)).toBeInTheDocument();
     expect(screen.getByText(/Message transcript uses a named live log/i)).toBeInTheDocument();
     expect(screen.getByText(/without exposing E2EE ciphertext/i)).toBeInTheDocument();
+    expect(screen.getByText(/mention states/i)).toBeInTheDocument();
+    expect(screen.getByText(/thread-panel body parity/i)).toBeInTheDocument();
+    expect(screen.getByText(/focus retention across MODE\/PART/i)).toBeInTheDocument();
   });
 });

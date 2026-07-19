@@ -11,13 +11,14 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store } from './store';
+import { store, _resetOutboxFlushForTests } from './store';
 import { setPreference } from '@/lib/prefs/preferences';
 import type { Channel } from '@/lib/irc/types';
 import {
   OUTBOX_MAX_AGE_MS,
   _resetVaultForTests,
   loadOutbox,
+  markOutboxWireAdmitted,
   queueOutbox,
 } from '@/lib/vault/historyVault';
 
@@ -80,6 +81,7 @@ async function until(ok: () => boolean | Promise<boolean>, ms = 2000): Promise<v
 beforeEach(() => {
   globalThis.indexedDB = new IDBFactory();
   _resetVaultForTests();
+  _resetOutboxFlushForTests();
   store.setState(
     {
       ...initialState,
@@ -273,6 +275,66 @@ describe('offline outbox', () => {
     await until(async () => (await loadOutbox()).length === 0);
     expect(sendRaw).not.toHaveBeenCalled();
     expect(store.getState().toasts.some((t) => t.title.includes('expired'))).toBe(true);
+  });
+
+  it('does not re-send a row that only has a durable wire_admitted flag (cold flush)', async () => {
+    store.getState().sendMessage('#room', 'sent before reload');
+    await until(async () => (await loadOutbox()).length === 1);
+    const [entry] = await loadOutbox();
+    expect(entry).toBeTruthy();
+    await expect(markOutboxWireAdmitted(entry!.id)).resolves.toBe(true);
+
+    // Simulate a cold page load: module admission set is empty, durable flag remains.
+    _resetOutboxFlushForTests();
+    const sendRaw = vi.fn(() => true);
+    store.setState({ connectionStatus: 'connected', client: mockClient(sendRaw) });
+    store.getState().flushOutbox();
+
+    await until(async () => (await loadOutbox()).length === 0);
+    expect(sendRaw).not.toHaveBeenCalled();
+  });
+
+  it('does not double-send when durable prune fails after wire admission', async () => {
+    store.getState().sendMessage('#room', 'admit once only');
+    await until(async () => (await loadOutbox()).length === 1);
+    await until(() => (store.getState().channels.get('#room')?.messages.length ?? 0) === 1);
+
+    const sendRaw = vi.fn(() => true);
+    store.setState({ connectionStatus: 'connected', client: mockClient(sendRaw) });
+
+    const realDelete = IDBObjectStore.prototype.delete;
+    const del = vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function (
+      this: IDBObjectStore,
+      query: IDBValidKey | IDBKeyRange,
+    ): IDBRequest<undefined> {
+      const request = realDelete.call(this, query);
+      if (this.name === 'outbox') this.transaction.abort();
+      return request;
+    });
+
+    try {
+      store.getState().flushOutbox();
+      await until(() => sendRaw.mock.calls.length >= 1);
+      await new Promise((r) => setTimeout(r, 40));
+
+      expect(sendRaw).toHaveBeenCalledTimes(1);
+      expect(sendRaw).toHaveBeenCalledWith('PRIVMSG', '#room', 'admit once only');
+      expect(await loadOutbox()).toHaveLength(1);
+      expect(store.getState().toasts.some((t) => t.title.includes('stuck on this device'))).toBe(true);
+
+      // A second flush must only retry prune — never re-admit to the wire.
+      store.getState().flushOutbox();
+      await new Promise((r) => setTimeout(r, 40));
+      expect(sendRaw).toHaveBeenCalledTimes(1);
+      expect(await loadOutbox()).toHaveLength(1);
+    } finally {
+      del.mockRestore();
+    }
+
+    // Once storage works again, prune succeeds without a second PRIVMSG.
+    store.getState().flushOutbox();
+    await until(async () => (await loadOutbox()).length === 0);
+    expect(sendRaw).toHaveBeenCalledTimes(1);
   });
 });
 

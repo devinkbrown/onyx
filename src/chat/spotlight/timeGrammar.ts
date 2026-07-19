@@ -8,6 +8,9 @@ const WEEK_MS = 7 * DAY_MS;
 const DAYS_IN_WEEK = 7;
 
 const CLOCK_RE = /^(\d{1,2}):(\d{2})$/;
+// 12-hour wall clocks: "3pm", "3 pm", "3:30PM", "9:05 a.m.", "12am".
+// Hour must be 1–12; minutes optional; meridiem requires m (a/p alone rejected).
+const AMPM_RE = /^(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)$/i;
 const RELATIVE_RE =
   /^([1-9]\d*)\s*(m|minute|minutes|min|mins|h|hour|hours|hr|hrs|d|day|days|w|week|weeks)\s+ago$/i;
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(?:\s*(Z|[+-]\d{2}:?\d{2}))?)?$/i;
@@ -73,11 +76,39 @@ function parseClock(input: string): ClockParts | null {
   return { hour, minute };
 }
 
-// Resolve a clock argument that may be a numeric HH:MM or a named time
-// ("noon" / "midnight"). Returns null on anything else so callers fail closed.
+// Parse a 12-hour am/pm clock into 24-hour ClockParts. Fail-closed on hour
+// outside 1–12, minute outside 0–59, or a meridiem that is not a/p[.m.].
+function parseAmPmClock(input: string): ClockParts | null {
+  const match = AMPM_RE.exec(input);
+  if (!match) return null;
+
+  const rawHour = Number(match[1]);
+  const minute = match[2] === undefined ? 0 : Number(match[2]);
+  if (!Number.isInteger(rawHour) || !Number.isInteger(minute)) return null;
+  if (rawHour < 1 || rawHour > 12 || minute < 0 || minute > 59) return null;
+
+  const meridiem = (match[3] ?? '').toLowerCase().replace(/\./g, '');
+  const isPm = meridiem === 'pm';
+  // 12am → 00:xx, 1am–11am → 01–11; 12pm → 12:xx, 1pm–11pm → 13–23.
+  let hour = rawHour % 12;
+  if (isPm) hour += 12;
+  return { hour, minute };
+}
+
+// Resolve a clock argument that may be HH:MM, a 12-hour am/pm form, a named
+// time ("noon" / "midnight"), or a daypart ("morning" / "afternoon" / …).
+// Returns null on anything else so callers fail closed. Shared by keyword /
+// weekday / bare-clock branches — so "yesterday morning" and "last friday
+// afternoon" resolve without a second parser.
 function resolveClock(input: string): ClockParts | null {
   const normalized = input.trim().toLowerCase();
-  return NAMED_CLOCKS[normalized] ?? parseClock(normalized);
+  return (
+    NAMED_CLOCKS[normalized] ??
+    parseClock(normalized) ??
+    parseAmPmClock(normalized) ??
+    DAYPARTS[normalized] ??
+    null
+  );
 }
 
 function makeLocalDate(
@@ -288,7 +319,7 @@ export function parseTimeExpr(input: string, now?: number): Date | null {
   if (!trimmed) return null;
 
   const nowMs = validNow(now);
-  const clock = parseClock(trimmed);
+  const clock = resolveClock(trimmed);
   const parsed =
     parseKeyword(trimmed, nowMs) ??
     parseRelative(trimmed, nowMs) ??

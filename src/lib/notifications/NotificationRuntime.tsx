@@ -2,9 +2,10 @@
 import { onCleanup, onMount } from 'solid-js';
 
 import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
+import type { ChatMessage } from '@/lib/irc/types';
 import { clearLinkPreviewCache } from '@/lib/preview/linkPreview';
 import { getState, selectDeviceMemoryOwner, subscribe } from '@/lib/store';
-import type { Notification as StoreNotification } from '@/lib/store/store';
+import type { Notification as StoreNotification, OnyxState } from '@/lib/store/store';
 
 import {
   getDesktopNotificationPermission,
@@ -15,7 +16,10 @@ import {
 import { calmPreset, classifyNotification, type CalmContext } from './calmMode';
 import { shouldNotify } from './decision';
 import { isFollowed } from './followed';
-import { notificationBodyFor } from './notificationBody';
+import {
+  ENCRYPTED_NOTIFICATION_BODY,
+  notificationBodyFor,
+} from './notificationBody';
 
 const DESKTOP_THROTTLE_MS = 6000;
 const SOUND_THROTTLE_MS = 1500;
@@ -26,6 +30,8 @@ const MAX_TRACKED_TARGETS = 50;
 
 interface PendingDesktop {
   ids: string[];
+  /** Note ids whose OS body must stay private even if the DM row is pruned. */
+  privateBodyIds: Set<string>;
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -84,9 +90,28 @@ function titleFor(note: StoreNotification, targetLabel: string): string {
   return `${note.from ?? 'Someone'} mentioned you in ${targetLabel}`;
 }
 
-function bodyFor(note: StoreNotification): string {
-  // Fail closed on E2EE envelopes — never put ciphertext on a lock screen.
+function bodyFor(note: StoreNotification, privateBody: boolean): string {
+  // Fail closed: ciphertext envelopes AND decrypted E2EE DM plaintext must
+  // never land on a (possibly lock-screen) OS alert body.
+  if (privateBody) return ENCRYPTED_NOTIFICATION_BODY;
   return notificationBodyFor(note.text);
+}
+
+function messageMatchesNotification(message: ChatMessage, note: StoreNotification): boolean {
+  if (!note.from || message.from.toLowerCase() !== note.from.toLowerCase()) return false;
+  if (!message.encrypted && message.e2ee === undefined) return false;
+  const body = message.encrypted ? message.plaintext : message.text;
+  if (body === undefined) return false;
+  // Notification rows are bounded more tightly than live messages. Prefix
+  // matching preserves the privacy boundary when a decrypted body was clipped
+  // before entering the inbox.
+  return body === note.text || body.startsWith(note.text);
+}
+
+function hasEncryptedDirectMessageBoundary(note: StoreNotification, state: OnyxState): boolean {
+  if (note.type !== 'dm' || !note.from) return false;
+  const messages = state.dms.get(note.from.toLowerCase())?.messages;
+  return Boolean(messages?.some((message) => messageMatchesNotification(message, note)));
 }
 
 function calmAllowsNotification(note: StoreNotification): boolean {
@@ -134,7 +159,7 @@ export function NotificationRuntime(): null {
       seen = new Set(getState().notifications.map((note) => note.id));
     }
 
-    function showNote(note: StoreNotification, count = 1): void {
+    function showNote(note: StoreNotification, count = 1, privateBody = false): void {
       const target = notificationTarget(note);
       if (!target) return;
       const title = count > 1
@@ -147,7 +172,7 @@ export function NotificationRuntime(): null {
       let handle: DesktopNotificationHandle | null = null;
       handle = showDesktopNotification({
         title,
-        body: bodyFor(note),
+        body: bodyFor(note, privateBody),
         tag: `onyx-${target.key}`,
         onClick: () => {
           // Closing a browser notification and dispatching its click can race.
@@ -219,14 +244,29 @@ export function NotificationRuntime(): null {
         desktopThrottleMs: DESKTOP_THROTTLE_MS,
         soundThrottleMs: SOUND_THROTTLE_MS,
       });
-      if (decision.desktop) showNote(newest, liveNotes.length);
+      if (decision.desktop) {
+        // Prefer the sticky private-body mark captured at queue time so a
+        // pruned DM row cannot re-open a decrypted body on the flush path.
+        const privateBody = pending.privateBodyIds.has(newest.id)
+          || hasEncryptedDirectMessageBoundary(newest, state);
+        showNote(newest, liveNotes.length, privateBody);
+      }
     }
 
-    function queueCoalesced(note: StoreNotification, key: string, waitMs: number): void {
+    function queueCoalesced(
+      note: StoreNotification,
+      key: string,
+      waitMs: number,
+      privateBody: boolean,
+    ): void {
       const existing = pendingDesktop.get(key);
       if (existing) {
         if (!existing.ids.includes(note.id)) existing.ids.push(note.id);
-        if (existing.ids.length > MAX_TRACKED_NOTIFICATIONS) existing.ids.shift();
+        if (privateBody) existing.privateBodyIds.add(note.id);
+        if (existing.ids.length > MAX_TRACKED_NOTIFICATIONS) {
+          const removedId = existing.ids.shift();
+          if (removedId) existing.privateBodyIds.delete(removedId);
+        }
         pendingDesktop.delete(key);
         pendingDesktop.set(key, existing);
         return;
@@ -241,6 +281,7 @@ export function NotificationRuntime(): null {
       }
       pendingDesktop.set(key, {
         ids: [note.id],
+        privateBodyIds: new Set(privateBody ? [note.id] : []),
         timer: setTimeout(() => flushPending(key), waitMs),
       });
     }
@@ -258,6 +299,7 @@ export function NotificationRuntime(): null {
 
       const state = getState();
       const nowMs = Date.now();
+      const privateBody = hasEncryptedDirectMessageBoundary(note, state);
       const decision = shouldNotify({
         kind: note.type,
         isSelf: !!note.from && note.from.toLowerCase() === state.ourNick.toLowerCase(),
@@ -281,10 +323,15 @@ export function NotificationRuntime(): null {
       }
 
       if (decision.desktop) {
-        showNote(note);
+        showNote(note, 1, privateBody);
       } else if (decision.desktopReason === 'throttled') {
         const last = lastDesktopAt.get(target.key) ?? nowMs;
-        queueCoalesced(note, target.key, Math.max(250, DESKTOP_THROTTLE_MS - (nowMs - last)));
+        queueCoalesced(
+          note,
+          target.key,
+          Math.max(250, DESKTOP_THROTTLE_MS - (nowMs - last)),
+          privateBody,
+        );
       }
     }
 

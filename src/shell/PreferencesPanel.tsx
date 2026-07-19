@@ -329,7 +329,7 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Member list',
     status: 'checked',
-    note: 'Channel-scoped member landmark, labelled role groups, named detail dialogs, and target-specific member actions.',
+    note: 'Channel-scoped member landmark, labelled role groups, named detail dialogs, target-specific member actions, decorative avatars, and focus retention across MODE/PART.',
   },
   {
     surface: 'Notification controls',
@@ -359,12 +359,12 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Preferences dense rows',
     status: 'checked',
-    note: 'Segmented radio groups and switch rows expose concise names, descriptions, keyboard roving, focus-visible outlines, and forced-colors selected states.',
+    note: 'Segmented radio groups and switch rows expose concise names, descriptions, keyboard roving, focus-visible outlines, forced-colors selected states, and dense-zoom reflow of category tabs.',
   },
   {
     surface: 'Message transcript',
     status: 'checked',
-    note: 'Named live log, focusable articles, state-aware accessible names (queued/edited/deleted/locked without ciphertext), and keyboard action-bar reveal.',
+    note: 'Named live log, focusable articles, state-aware accessible names (queued/edited/deleted/locked/mention without ciphertext), decorative avatars, thread-panel body parity, and keyboard action-bar reveal.',
   },
   {
     surface: 'Mobile drawers',

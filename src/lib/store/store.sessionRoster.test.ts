@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { parseIRCMessage } from '@/lib/irc/parser';
+import { MAX_SESSION_CREDENTIAL_LENGTH, parseIRCMessage } from '@/lib/irc/parser';
 import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
 import { saveFriends, saveWatchList } from '@/lib/contactPresenceMemory';
 import { emptyIdentityProfileMemory, saveIdentityProfileMemory } from '@/lib/identityProfileMemory';
@@ -357,5 +357,343 @@ describe('remembered session roster restoration', () => {
 
     expect(loadCredentials(owner.serverUrl, owner.identity)?.sessionToken).toBe('canonical-token');
     expect(loadCredentials(owner.serverUrl, 'KainAway')).toBeNull();
+  });
+
+  it('reconnects with the mid-session mesh token pushed into the live client', () => {
+    // Remembered identity with password SASL (no construction-time resume token).
+    // The server mints TOKEN + MTOKEN mid-session; auto-reconnect reuses the same
+    // IRCClient, so the store must push those notes via updateResumeTokens or
+    // resume silently fails with an undefined construction-time token.
+    saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to Onyx');
+
+    expect(FakeWebSocket.latest?.send.mock.calls
+      .map(([line]) => line)
+      .filter(line => line.startsWith('SESSION RESUME '))).toEqual([]);
+
+    receive(':example.test NOTE SESSION TOKEN :local-fresh');
+    receive(':example.test NOTE SESSION MTOKEN :mesh-fresh');
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('local-fresh');
+    expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBe('mesh-fresh');
+
+    FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+    store.getState().reconnectNow();
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    // Reconnect resets _loggedIn; account proof must return before SESSION RESUME.
+    receive(':example.test 001 kain :Welcome back');
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+
+    // Mesh token is preferred over the local session token on resume.
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME mesh-fresh\r\n');
+    expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME local-fresh\r\n');
+  });
+
+  it('rejects an oversized SESSION TOKEN note without persisting or arming resume', () => {
+    saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to Onyx');
+
+    const oversized = 'x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH + 1);
+    receive(`:example.test NOTE SESSION TOKEN :${oversized}`);
+    receive(`:example.test NOTE SESSION MTOKEN :${oversized}`);
+
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBeUndefined();
+    expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBeUndefined();
+
+    FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+    store.getState().reconnectNow();
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 001 kain :Welcome back');
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+
+    const resumed = FakeWebSocket.latest?.send.mock.calls
+      .map(([line]) => line)
+      .filter(line => line.startsWith('SESSION RESUME ')) ?? [];
+    expect(resumed).toEqual([]);
+  });
+
+  it('accepts the NOTICE-envelope SESSION TOKEN form used by current servers', () => {
+    saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to Onyx');
+
+    // Current Onyx Server delivers fresh credentials as NOTICE <nick> :SESSION TOKEN …
+    // (not only the older NOTE standard-reply envelope).
+    receive(':example.test NOTICE kain :SESSION TOKEN notice-local');
+    receive(':example.test NOTICE kain :SESSION MTOKEN notice-mesh');
+
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('notice-local');
+    expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBe('notice-mesh');
+
+    FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+    store.getState().reconnectNow();
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 001 kain :Welcome back');
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME notice-mesh\r\n');
+  });
+
+  it('records MTOKEN expires= as tokenExpiry so portable state can purge', () => {
+    // Live Onyx Server: `SESSION MTOKEN <hex> expires=<unix>` (mesh wall clock,
+    // 12h portable lifetime). Without folding expires into tokenExpiry the
+    // credential lingers in localStorage past the portable window.
+    saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to Onyx');
+
+    // 1800000000 unix = 2027-01-15T08:00:00.000Z
+    receive(':example.test NOTICE kain :SESSION MTOKEN mesh-with-ttl expires=1800000000');
+
+    const creds = loadCredentials('wss://example.test', 'kain');
+    expect(creds?.meshToken).toBe('mesh-with-ttl');
+    expect(creds?.tokenExpiry).toBe('2027-01-15T08:00:00.000Z');
+
+    // Malformed expires must fail closed — do not install a bare token that
+    // would never purge (and must not clobber the good one above).
+    receive(':example.test NOTICE kain :SESSION MTOKEN evil-token expires=not-a-number');
+    expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBe('mesh-with-ttl');
+    expect(loadCredentials('wss://example.test', 'kain')?.tokenExpiry).toBe('2027-01-15T08:00:00.000Z');
+  });
+
+  it('WARN SESSION leaves the resume credential intact (retryable mesh path)', () => {
+    // Blueprint: ORIGIN_UNREACHABLE / TEMPORARILY_UNAVAILABLE / RESUME_CREDENTIAL_PRESERVED
+    // are WARN (retryable) and must NOT clear the stored bearer. Only FAIL SESSION
+    // is terminal.
+    saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to Onyx');
+    receive(':example.test NOTICE kain :SESSION TOKEN local-held');
+    receive(':example.test NOTICE kain :SESSION MTOKEN mesh-held expires=1800000000');
+
+    receive(':example.test WARN SESSION ORIGIN_UNREACHABLE :origin peer is partitioned');
+    receive(':example.test WARN SESSION RESUME_CREDENTIAL_PRESERVED :repeat SESSION TOKEN to replace it');
+
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('local-held');
+    expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBe('mesh-held');
+  });
+
+  it('ignores delayed close and error callbacks from a replaced IRC client', () => {
+    store.getState().connect({ url: 'wss://old.example.test', nick: 'kain' });
+    const oldSocket = FakeWebSocket.latest;
+    // Capture the live handlers BEFORE the second connect destroys the client
+    // and nulls the socket properties. A queued microtask or a held reference
+    // can still invoke these after ownership has moved to a new client.
+    const delayedClose = oldSocket?.onclose;
+    const delayedError = oldSocket?.onerror;
+    expect(delayedClose).toBeTypeOf('function');
+    expect(delayedError).toBeTypeOf('function');
+
+    store.getState().connect({ url: 'wss://new.example.test', nick: 'kain' });
+    const currentClient = store.getState().client;
+    expect(store.getState().connectionStatus).toBe('connecting');
+
+    delayedClose?.(new CloseEvent('close', { code: 1006 }));
+    delayedError?.(new Event('error'));
+
+    // The replacement connection must keep connecting; the stale close/error
+    // must not flip status, clear the new client, or surface a ghost notice.
+    expect(store.getState().client).toBe(currentClient);
+    expect(store.getState().status).toBe('connecting');
+    expect(store.getState().connectionStatus).toBe('connecting');
+    expect(store.getState().notifications).toEqual([]);
+  });
+
+  it('suppresses client JOIN/NAMES storm on reconnect when onyx/session-sync is active', () => {
+    vi.useFakeTimers();
+    try {
+      saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'kain',
+        password: 'remembered-secret',
+      });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+      receive(':example.test 001 kain :Welcome to Onyx');
+
+      // Seed a live channel so a non-session-sync reconnect would rejoin it.
+      receive(':kain!webchat@example JOIN #root');
+      receive(':example.test 353 kain = #root :@kain alice');
+      receive(':example.test 366 kain #root :End of NAMES list');
+      expect(store.getState().channels.has('#root')).toBe(true);
+
+      FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      // CAP ACK for session-sync lands before 001 on a real socket; re-arm it
+      // after connect() cleared negotiatedCaps so onConnected sees the reclaim.
+      store.getState().client?.negotiatedCaps.add('onyx/session-sync');
+      expect(store.getState().client?.sessionSyncActive).toBe(true);
+
+      const send = FakeWebSocket.latest?.send;
+      expect(send).toBeDefined();
+      send!.mockClear();
+
+      receive(':example.test 001 kain :Welcome back');
+      // hasRegistered is true → the 600 ms rejoin timer would fire without
+      // the session-sync gate.
+      vi.advanceTimersByTime(600);
+
+      const postReconnectJoins = send!.mock.calls
+        .map(([line]) => line)
+        .filter(line => line === 'JOIN #root\r\n' || line === 'NAMES #root\r\n');
+      // Server-driven session-sync owns channel reclaim; the client must not
+      // storm JOIN/NAMES on top of it (multi-device continuity).
+      expect(postReconnectJoins).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejoins live channels on reconnect when session-sync is not negotiated', () => {
+    vi.useFakeTimers();
+    try {
+      saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'kain',
+        password: 'remembered-secret',
+      });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+      receive(':example.test 001 kain :Welcome to Onyx');
+
+      receive(':kain!webchat@example JOIN #root');
+      receive(':example.test 353 kain = #root :@kain alice');
+      receive(':example.test 366 kain #root :End of NAMES list');
+
+      FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+
+      const send = FakeWebSocket.latest?.send;
+      expect(send).toBeDefined();
+      send!.mockClear();
+
+      receive(':example.test 001 kain :Welcome back');
+      vi.advanceTimersByTime(600);
+
+      // Without session-sync the client must re-JOIN and NAMES so a guest (or
+      // a node that only has classic IRC) does not keep a ghost channel UI.
+      expect(send).toHaveBeenCalledWith('JOIN #root\r\n');
+      expect(send).toHaveBeenCalledWith('NAMES #root\r\n');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('suppresses multi-channel JOIN/NAMES storm under session-sync (multi-device)', () => {
+    // Phone + desktop same account: many live rooms must not each fire a
+    // client-side JOIN/NAMES pair on reconnect when the server will reclaim.
+    vi.useFakeTimers();
+    try {
+      saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'kain',
+        password: 'remembered-secret',
+      });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+      receive(':example.test 001 kain :Welcome to Onyx');
+
+      for (const room of ['#root', '#staff', '#ops'] as const) {
+        receive(`:kain!webchat@example JOIN ${room}`);
+        receive(`:example.test 353 kain = ${room} :@kain`);
+        receive(`:example.test 366 kain ${room} :End of NAMES list`);
+      }
+      expect([...store.getState().channels.keys()].sort()).toEqual(['#ops', '#root', '#staff']);
+
+      FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      store.getState().client?.negotiatedCaps.add('onyx/session-sync');
+
+      const send = FakeWebSocket.latest?.send;
+      expect(send).toBeDefined();
+      send!.mockClear();
+
+      receive(':example.test 001 kain :Welcome back');
+      vi.advanceTimersByTime(600);
+
+      const storm = send!.mock.calls
+        .map(([line]) => line)
+        .filter(
+          (line: string) =>
+            line.startsWith('JOIN #') || line.startsWith('NAMES #'),
+        );
+      expect(storm).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores delayed onConnected-driven traffic from a replaced client', () => {
+    // A second connect() destroys the prior IRCClient. If a queued 001 from the
+    // old socket still invokes its onConnected closure, the identity guard must
+    // refuse to re-arm reconnect timers or mutate the replacement connection.
+    store.getState().connect({
+      url: 'wss://old.example.test',
+      nick: 'kain',
+      password: 'secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    // Capture the OLD client's message handler before ownership moves.
+    const oldSocket = FakeWebSocket.latest;
+    const oldOnMessage = oldSocket?.onmessage;
+    expect(oldOnMessage).toBeTypeOf('function');
+
+    store.getState().connect({
+      url: 'wss://new.example.test',
+      nick: 'kain',
+      password: 'secret',
+    });
+    const replacement = store.getState().client;
+    const newSocket = FakeWebSocket.latest;
+    expect(newSocket).not.toBe(oldSocket);
+    expect(store.getState().connectionStatus).toBe('connecting');
+
+    // Stale 001 on the destroyed client must not flip the store to connected
+    // under the replacement's identity.
+    oldOnMessage?.(new MessageEvent('message', {
+      data: ':old.example.test 001 kain :stale welcome',
+    }));
+
+    expect(store.getState().client).toBe(replacement);
+    expect(store.getState().connectionStatus).toBe('connecting');
+    expect(store.getState().status).toBe('connecting');
   });
 });

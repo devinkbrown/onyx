@@ -13,6 +13,11 @@ export interface StoredVoiceSettings {
   pushToTalk: boolean;
   pushToTalkKey: string | null;
   cameraDeviceId: string | null;
+  /**
+   * When true, channel/DM voice joins start with the local mic muted
+   * (research R4 / Era 2 B2 exit criterion "join muted option").
+   */
+  muteOnJoin: boolean;
 }
 
 export const DEFAULT_VOICE_SETTINGS: Readonly<StoredVoiceSettings> = Object.freeze({
@@ -26,6 +31,7 @@ export const DEFAULT_VOICE_SETTINGS: Readonly<StoredVoiceSettings> = Object.free
   pushToTalk: false,
   pushToTalkKey: null,
   cameraDeviceId: null,
+  muteOnJoin: false,
 });
 
 const MAX_DEVICE_ID_LENGTH = 512;
@@ -69,6 +75,7 @@ export function sanitizeStoredVoiceSettings(value: unknown): StoredVoiceSettings
     pushToTalk: booleanOr(value.pushToTalk, DEFAULT_VOICE_SETTINGS.pushToTalk),
     pushToTalkKey: nullableString(value.pushToTalkKey, MAX_KEY_CODE_LENGTH),
     cameraDeviceId: nullableString(value.cameraDeviceId, MAX_DEVICE_ID_LENGTH),
+    muteOnJoin: booleanOr(value.muteOnJoin, DEFAULT_VOICE_SETTINGS.muteOnJoin),
   };
 }
 

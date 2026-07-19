@@ -166,7 +166,12 @@ function MemberCard(props: MemberCardProps): JSX.Element {
       aria-describedby={`${cardId()}-role`}
     >
       <div class="shell-member-card-head">
-        <Avatar name={local.user.nick} size="md" owner={local.role.key === 'owner' || local.role.key === 'founder'} />
+        <Avatar
+          name={local.user.nick}
+          size="md"
+          owner={local.role.key === 'owner' || local.role.key === 'founder'}
+          aria-hidden="true"
+        />
         <div>
           <p class="shell-member-card-nick" id={`${cardId()}-nick`}>{local.user.nick}</p>
           <p class="shell-member-card-role" id={`${cardId()}-role`}>

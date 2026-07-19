@@ -22,7 +22,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { _resetNamesBurstsForTests, store } from './store';
+import { _beginNamesBurstForTests, _resetNamesBurstsForTests, store } from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 
 const initialState = store.getInitialState();
@@ -209,6 +209,48 @@ describe('NAMES roster reconcile — interleaved / late bursts never collapse', 
     expect(store.getState().activeChannelTopics.has('#self-kick')).toBe(false);
   });
 
+  it('re-arming NAMES mid-burst does not re-authorize REPLACE (JOIN+NAMES race)', () => {
+    // Production race: self-JOIN arms expect and the server auto-353 starts;
+    // a second _beginNamesBurst (explicit NAMES from an older code path) must
+    // NOT flip back to expect, or the next multi-line chunk replaces the full
+    // roster with a 2-nick partial — classic mesh nicklist desync.
+    const client = connect('me');
+    feed(':me!u@h JOIN #midburst');
+    // First 353 of the auto-NAMES (authoritative replace).
+    feed(':server 353 me = #midburst :me alice bob carol');
+    expect(roster('#midburst')).toEqual(['alice', 'bob', 'carol', 'me']);
+
+    // Simulate a second reconcile trying to re-arm while the burst is still open
+    // (JOIN auto-NAMES mid-flight + client NAMES). Must keep phase 'appending'.
+    _beginNamesBurstForTests('#midburst');
+    client.sendRaw('NAMES', '#midburst');
+
+    // Next 353 is a partial mesh chunk — must APPEND, not wipe to {dave,erin}.
+    feed(':server 353 me = #midburst :dave erin');
+    feed(':server 366 me #midburst :End of /NAMES list.');
+
+    expect(roster('#midburst')).toEqual(
+      ['alice', 'bob', 'carol', 'dave', 'erin', 'me'],
+    );
+  });
+
+  it('after 366 settles, a new client NAMES may REPLACE again (reconcile ghosts)', () => {
+    connect('me');
+    feed(':me!u@h JOIN #resettle');
+    feed(':server 353 me = #resettle :me alice ghost');
+    feed(':server 366 me #resettle :End of /NAMES list.');
+    expect(roster('#resettle')).toEqual(['alice', 'ghost', 'me']);
+
+    // Settled burst must not block a deliberate re-NAMES forever: arm + full list
+    // without ghost drops the stale member (authoritative replace). Focus/poll
+    // refresh stays suppressed while settled (see next test); this is the
+    // intentional re-arm path (reconnect / explicit reconcile).
+    _beginNamesBurstForTests('#resettle');
+    feed(':server 353 me = #resettle :me alice');
+    feed(':server 366 me #resettle :End of /NAMES list.');
+    expect(roster('#resettle')).toEqual(['alice', 'me']);
+  });
+
   it('an expired burst cannot promote a late partial 353 to roster replacement', () => {
     const now = vi.spyOn(performance, 'now').mockReturnValue(0);
     try {
@@ -234,11 +276,14 @@ describe('NAMES roster reconcile — interleaved / late bursts never collapse', 
       feed(':server 366 me #settled-focus :End of /NAMES list.');
 
       // Past the ordinary 8s focus throttle but still within the 15s window in
-      // which an interleaved mesh 353 can trail the first observed 366.
+      // which an interleaved mesh 353 can trail the first observed 366. Focus
+      // refresh must NOT re-arm expect / send NAMES, or the late partial would
+      // REPLACE the full roster with {bob}.
       now.mockReturnValue(9_000);
       store.getState().navigate({ kind: 'home' });
       store.getState().navigate({ kind: 'channel', channel: '#settled-focus' });
-      expect(client.sendRaw.mock.calls.filter((call) => call[0] === 'NAMES')).toHaveLength(1);
+      // JOIN does not send NAMES; focus refresh must stay suppressed while settled.
+      expect(client.sendRaw.mock.calls.filter((call) => call[0] === 'NAMES')).toHaveLength(0);
 
       feed(':server 353 me = #settled-focus :bob');
       expect(roster('#settled-focus')).toEqual(['alice', 'bob', 'carol', 'me']);

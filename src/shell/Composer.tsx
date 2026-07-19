@@ -43,6 +43,10 @@ import {
   activeReplyPreviewText,
   hasEncryptedMessageBoundary,
 } from '@/lib/e2ee/replyPrivacy';
+import {
+  activeReplyForTarget,
+  messageContextMatchesTarget,
+} from '@/lib/composer/messageContext';
 import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
 import {
   loadOutbox,
@@ -191,8 +195,12 @@ export function Composer(props: ComposerProps): JSX.Element {
     const edit = editingMessage();
     const t = target();
     if (!edit || !t || hasEncryptedMessageBoundary(edit)) return null;
-    return edit.target.toLowerCase() === t.toLowerCase() ? edit : null;
+    return messageContextMatchesTarget(edit, t) ? edit : null;
   });
+
+  // Reply banner is target-scoped the same way edit is: a reply armed in one
+  // room must not paint (or send as) a reply while the composer is elsewhere.
+  const activeReply = createMemo(() => activeReplyForTarget(replyingTo(), target()));
 
   createEffect(() => {
     const edit = editingMessage();
@@ -322,6 +330,7 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   let loadedTarget: string | null = null;
   let loadedEditId: string | null = null;
+  let focusedReplyId: string | null = null;
   createEffect(() => {
     const t = target();
     const edit = activeEditing();
@@ -330,15 +339,38 @@ export function Composer(props: ComposerProps): JSX.Element {
       if (loadedEditId !== edit.id) {
         loadedEditId = edit.id;
         setComposerText(edit.text, false);
+        // Land keyboard focus in the composer so edit is immediately typable.
+        focusTextarea(edit.text.length);
       }
       return;
     }
 
-    loadedEditId = null;
+    // Edit ended without the send path clearing loadedEditId first (Escape,
+    // mutual exclusivity with reply, encrypted reject). Restore the draft so
+    // the in-progress edit body does not silently become the room draft.
+    if (loadedEditId !== null) {
+      loadedEditId = null;
+      setComposerText(t ? getState().getComposerDraft(t) : '', false);
+      return;
+    }
+
     if (t !== loadedTarget) {
       loadedTarget = t;
       setComposerText(t ? getState().getComposerDraft(t) : '', false);
     }
+  });
+
+  // Focus the textarea when a matching reply is armed so the user can type
+  // immediately after clicking Reply (Discord/Slack comfort).
+  createEffect(() => {
+    const reply = activeReply();
+    if (!reply || activeEditing()) {
+      focusedReplyId = null;
+      return;
+    }
+    if (focusedReplyId === reply.id) return;
+    focusedReplyId = reply.id;
+    focusTextarea();
   });
 
   // ── auto-resize ──
@@ -449,6 +481,19 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (e.key === 'Escape' && scheduleOpen()) {
       e.preventDefault();
       closeSchedule();
+      return;
+    }
+
+    // Escape dismisses edit, then reply — after transient pickers — so a
+    // keyboard user can back out of composer context without the mouse.
+    if (e.key === 'Escape' && activeEditing()) {
+      e.preventDefault();
+      cancelEdit();
+      return;
+    }
+    if (e.key === 'Escape' && activeReply()) {
+      e.preventDefault();
+      cancelReply();
       return;
     }
 
@@ -645,6 +690,9 @@ export function Composer(props: ComposerProps): JSX.Element {
       }
       const content = text().trim();
       if (!content) return;
+      // Mark edit as intentionally finished BEFORE clearing store state so the
+      // load-effect does not restore the pre-edit draft over the empty send.
+      loadedEditId = null;
       getState().editMessage(t, edit.id, content);
       getState().setComposerEditingMessage(null);
       setComposerText('', false);
@@ -692,12 +740,19 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   function cancelReply(): void {
     getState().setReplyingTo(null);
+    focusedReplyId = null;
+    // Backing out of a reply is not "still composing" — clear the typing signal.
+    const t = target();
+    if (t) getState().sendTypingStop(t);
   }
 
   function cancelEdit(): void {
+    // Clear the load marker so the effect does not double-restore the draft.
+    loadedEditId = null;
     getState().setComposerEditingMessage(null);
     const t = target();
     setComposerText(t ? getState().getComposerDraft(t) : '', false);
+    if (t) getState().sendTypingStop(t);
   }
 
   function clearTopic(): void {
@@ -757,7 +812,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         )}
       </Show>
 
-      <Show when={replyingTo()}>
+      <Show when={activeReply()}>
         {(reply) => (
           <div class="shell-composer-context" role="status" aria-live="polite">
             <span class="shell-composer-context-label">replying to {reply().from}</span>

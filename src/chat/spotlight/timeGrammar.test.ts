@@ -26,6 +26,44 @@ describe('parseTimeExpr', () => {
     expectParsed('9:05', new Date(2026, 6, 8, 9, 5, 0, 0));
   });
 
+  it('parses 12-hour am/pm clocks as today', () => {
+    // Docs teach `at: yesterday 3pm` — bare and composed forms must resolve.
+    expectParsed('3pm', new Date(2026, 6, 8, 15, 0, 0, 0));
+    expectParsed('3 pm', new Date(2026, 6, 8, 15, 0, 0, 0));
+    expectParsed('3:30pm', new Date(2026, 6, 8, 15, 30, 0, 0));
+    expectParsed('3:30 PM', new Date(2026, 6, 8, 15, 30, 0, 0));
+    expectParsed('9AM', new Date(2026, 6, 8, 9, 0, 0, 0));
+    expectParsed('9:05 a.m.', new Date(2026, 6, 8, 9, 5, 0, 0));
+    expectParsed('11:59p.m.', new Date(2026, 6, 8, 23, 59, 0, 0));
+    // 12-hour edge: 12am is midnight, 12pm is noon.
+    expectParsed('12am', new Date(2026, 6, 8, 0, 0, 0, 0));
+    expectParsed('12:00am', new Date(2026, 6, 8, 0, 0, 0, 0));
+    expectParsed('12pm', new Date(2026, 6, 8, 12, 0, 0, 0));
+    expectParsed('12:30 pm', new Date(2026, 6, 8, 12, 30, 0, 0));
+  });
+
+  it('parses am/pm clocks on keywords, dayparts, and weekdays', () => {
+    expectParsed('today 3pm', new Date(2026, 6, 8, 15, 0, 0, 0));
+    expectParsed('yesterday 3pm', new Date(2026, 6, 7, 15, 0, 0, 0));
+    expectParsed('yesterday 9:15 am', new Date(2026, 6, 7, 9, 15, 0, 0));
+    // 2026-07-08 is Wednesday → monday is 2026-07-06, last friday is 2026-07-03.
+    expectParsed('monday 9am', new Date(2026, 6, 6, 9, 0, 0, 0));
+    expectParsed('last friday 6pm', new Date(2026, 6, 3, 18, 0, 0, 0));
+    expectParsed('fri 8:30am', new Date(2026, 6, 3, 8, 30, 0, 0));
+  });
+
+  it('parses dayparts on yesterday / today / weekdays (not only "this …")', () => {
+    // Same wall clocks as DAYPARTS (morning 09:00, afternoon 15:00, evening 20:00).
+    expectParsed('yesterday morning', new Date(2026, 6, 7, 9, 0, 0, 0));
+    expectParsed('yesterday afternoon', new Date(2026, 6, 7, 15, 0, 0, 0));
+    expectParsed('today evening', new Date(2026, 6, 8, 20, 0, 0, 0));
+    expectParsed('last friday afternoon', new Date(2026, 6, 3, 15, 0, 0, 0));
+    expectParsed('monday morning', new Date(2026, 6, 6, 9, 0, 0, 0));
+    // Bare daypart = today at that clock (mirrors bare "noon").
+    expectParsed('morning', new Date(2026, 6, 8, 9, 0, 0, 0));
+    expectParsed('afternoon', new Date(2026, 6, 8, 15, 0, 0, 0));
+  });
+
   it('parses relative expressions', () => {
     expectParsed('3h ago', new Date(NOW - 3 * 60 * 60 * 1000));
     expectParsed('2d ago', new Date(NOW - 2 * 24 * 60 * 60 * 1000));
@@ -125,6 +163,20 @@ describe('parseTimeExpr', () => {
     expect(parseTimeExpr('24:00', NOW)).toBeNull();
     expect(parseTimeExpr('12:60', NOW)).toBeNull();
     expect(parseTimeExpr('2026-07-01T09:45+99:99', NOW)).toBeNull();
+  });
+
+  it('rejects invalid am/pm clocks', () => {
+    expect(parseTimeExpr('0am', NOW)).toBeNull();
+    expect(parseTimeExpr('0pm', NOW)).toBeNull();
+    expect(parseTimeExpr('13pm', NOW)).toBeNull();
+    expect(parseTimeExpr('13am', NOW)).toBeNull();
+    expect(parseTimeExpr('12:60pm', NOW)).toBeNull();
+    expect(parseTimeExpr('3:60 am', NOW)).toBeNull();
+    expect(parseTimeExpr('3p', NOW)).toBeNull(); // require m / a.m. / p.m.
+    expect(parseTimeExpr('3', NOW)).toBeNull();
+    expect(parseTimeExpr('yesterday 13pm', NOW)).toBeNull();
+    expect(parseTimeExpr('monday 0am', NOW)).toBeNull();
+    expect(parseTimeExpr('3.30pm', NOW)).toBeNull(); // colon only, not European dot
   });
 
   it('rejects unsupported relative expressions', () => {

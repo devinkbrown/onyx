@@ -745,6 +745,60 @@ describe('VoiceBar', () => {
     expect(chip.querySelector('svg rect[width="14"]')).toBeNull();
   });
 
+  it('opens the Privacy sheet from the security chip with hop-only honesty', async () => {
+    seedVoiceStore([]);
+    const { getByTestId } = render(() => <VoiceBar />);
+
+    fireEvent.click(getByTestId('call-security-chip'));
+
+    // Sheet portals to document.body — query via screen, not the render root.
+    const sheet = await screen.findByTestId('call-privacy-sheet');
+    expect(sheet.getAttribute('data-privacy-level')).toBe('hop_protected');
+    expect(screen.getByTestId('call-privacy-server-access').textContent?.toLowerCase()).toContain(
+      'operators can access call media',
+    );
+    expect(screen.getByTestId('call-privacy-epoch').textContent?.toLowerCase()).toContain(
+      'end-to-end media encryption',
+    );
+    expect(screen.getByRole('dialog', { name: /call privacy/i })).toBeTruthy();
+  });
+
+  it('offers a turn-off-camera soft prompt after sustained poor CQ with camera on', async () => {
+    vi.useFakeTimers();
+    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+    setMountedCadenceMediaEngine({
+      getNetworkStats: () => ({
+        tier: 3 as const,
+        suggestedBps: 80_000,
+        jitterMs: 90,
+        lossRate: 0.12,
+      }),
+    } as never);
+
+    try {
+      seedVoiceStore([], [], { cameraOn: true });
+      render(() => <VoiceBar />);
+
+      // First sample arms hysteresis — no prompt yet.
+      expect(screen.queryByTestId('connection-quality-prompt')).toBeNull();
+
+      // 1 Hz poll + 2500 ms hold → need ≥3 interval ticks after the initial poll.
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(screen.getByTestId('connection-quality-prompt')).toBeTruthy();
+      expect(screen.getByTestId('connection-quality-turn-off-camera')).toBeTruthy();
+
+      const toggleVideo = vi.spyOn(store.getState(), 'toggleVideo').mockResolvedValue(undefined);
+      fireEvent.click(screen.getByTestId('connection-quality-turn-off-camera'));
+      expect(toggleVideo).toHaveBeenCalledOnce();
+      expect(screen.queryByTestId('connection-quality-prompt')).toBeNull();
+      toggleVideo.mockRestore();
+    } finally {
+      setMountedCadenceMediaEngine(null);
+      vi.useRealTimers();
+    }
+  });
+
   it('shows connecting security chip while ringing (no padlock)', () => {
     store.setState(
       {
@@ -1326,6 +1380,88 @@ describe('VoiceBar', () => {
 describe('store voice slice — in-call actions', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+  });
+
+  it('joinVoiceChannel honours muteOnJoin after capture succeeds', async () => {
+    const audioTrack = { enabled: true, stop: vi.fn() };
+    const stream = {
+      getAudioTracks: () => [audioTrack],
+      getVideoTracks: () => [],
+      getTracks: () => [audioTrack],
+    } as unknown as MediaStream;
+
+    const setMuted = vi.fn();
+    const engine = {
+      joinVoice: vi.fn(async () => undefined),
+      joinVideo: vi.fn(async () => undefined),
+      getLocalStream: vi.fn(() => stream),
+      setMuted,
+      leaveRoom: vi.fn(),
+      sendReaction: vi.fn(),
+      getNetworkStats: vi.fn(() => ({ tier: 0, suggestedBps: 0, jitterMs: 0, lossRate: 0 })),
+    };
+
+    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+    setMountedCadenceMediaEngine(engine as never);
+
+    try {
+      store.setState({
+        ...initialState,
+        client: { sendRaw: vi.fn() } as never,
+        ourNick: 'self',
+        voice: { ...initialState.voice, muteOnJoin: true, muted: false },
+      }, true);
+
+      await store.getState().joinVoiceChannel('#media', false);
+
+      expect(engine.joinVoice).toHaveBeenCalledWith('#media');
+      expect(audioTrack.enabled).toBe(false);
+      expect(store.getState().voice.callState).toBe('in_call');
+      expect(store.getState().voice.muted).toBe(true);
+      expect(setMuted).toHaveBeenCalledWith(true);
+    } finally {
+      setMountedCadenceMediaEngine(null);
+    }
+  });
+
+  it('joinVoiceChannel leaves muted false when muteOnJoin is off', async () => {
+    const audioTrack = { enabled: true, stop: vi.fn() };
+    const stream = {
+      getAudioTracks: () => [audioTrack],
+      getVideoTracks: () => [],
+      getTracks: () => [audioTrack],
+    } as unknown as MediaStream;
+
+    const setMuted = vi.fn();
+    const engine = {
+      joinVoice: vi.fn(async () => undefined),
+      joinVideo: vi.fn(async () => undefined),
+      getLocalStream: vi.fn(() => stream),
+      setMuted,
+      leaveRoom: vi.fn(),
+      sendReaction: vi.fn(),
+      getNetworkStats: vi.fn(() => ({ tier: 0, suggestedBps: 0, jitterMs: 0, lossRate: 0 })),
+    };
+
+    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+    setMountedCadenceMediaEngine(engine as never);
+
+    try {
+      store.setState({
+        ...initialState,
+        client: { sendRaw: vi.fn() } as never,
+        ourNick: 'self',
+        voice: { ...initialState.voice, muteOnJoin: false, muted: true },
+      }, true);
+
+      await store.getState().joinVoiceChannel('#media', false);
+
+      expect(store.getState().voice.muted).toBe(false);
+      expect(audioTrack.enabled).toBe(true);
+      expect(setMuted).toHaveBeenCalledWith(false);
+    } finally {
+      setMountedCadenceMediaEngine(null);
+    }
   });
 
   it('setCallLayout updates the layout', () => {

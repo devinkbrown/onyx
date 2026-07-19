@@ -228,6 +228,70 @@ describe('travelTo', () => {
     });
   });
 
+  it('paints the local vault while CHATHISTORY AROUND is still in flight', async () => {
+    const sendRaw = vi.fn();
+    await vault.saveMessages('#root', [
+      live('vault-near', '2026-06-30T12:00:30.000Z', 'local nearest'),
+      live('vault-far', '2026-06-30T12:10:00.000Z', 'local far'),
+    ], MEMORY_OWNER);
+    store.setState({ client: mockClient(sendRaw) });
+
+    store.getState().travelTo('#root', new Date('2026-06-30T12:00:00.000Z'));
+    expect(sendRaw).toHaveBeenCalledWith(
+      'CHATHISTORY', 'AROUND', '#root', 'timestamp=2026-06-30T12:00:00.000Z', '50',
+    );
+
+    // Instant local paint before any batch closes.
+    await waitForExpect(() => {
+      const ids = store.getState().channels.get('#root')!.messages.map((m) => m.id);
+      expect(ids).toContain('vault-near');
+      expect(ids).toContain('vault-far');
+      expect(store.getState().timeTravelLandingId).toBe('vault-near');
+    });
+
+    // Server AROUND may refine the landing.
+    feed('BATCH +tt-dual chathistory #root');
+    feed('@time=2026-06-30T12:00:00.000Z;msgid=server-exact :kain!k@h PRIVMSG #root :exact');
+    feed('BATCH -tt-dual');
+    expect(store.getState().timeTravelLandingId).toBe('server-exact');
+    // Batch merge is time-sorted: server exact (12:00:00) lands before the
+    // vault nearest (12:00:30), then far, then the live July buffer.
+    expect(store.getState().channels.get('#root')!.messages.map((m) => m.id)).toEqual([
+      'server-exact',
+      'vault-near',
+      'vault-far',
+      'live-1',
+      'live-2',
+    ]);
+  });
+
+  it('time-travels an encrypted DM from ciphertext only (no plaintext at rest)', async () => {
+    await vault.saveMessages('trev', [{
+      ...live('dm-cipher', '2026-06-30T12:00:00.000Z', 'TSUMUGI1 opaque-ciphertext', 'trev'),
+      encrypted: true,
+      plaintext: 'must never hydrate from disk',
+    }], MEMORY_OWNER);
+    store.setState({
+      client: mockClient(vi.fn(), vi.fn(), []),
+      dms: new Map([['trev', {
+        nick: 'trev',
+        account: null,
+        unread: 0,
+        highlights: 0,
+        messages: [],
+      }]]),
+    });
+
+    store.getState().travelTo('trev', new Date('2026-06-30T12:00:00.000Z'));
+    await waitForExpect(() => {
+      const row = store.getState().dms.get('trev')?.messages[0];
+      expect(row?.id).toBe('dm-cipher');
+      expect(row?.text).toBe('TSUMUGI1 opaque-ciphertext');
+      expect(row?.plaintext).toBeUndefined();
+      expect(store.getState().timeTravelLandingId).toBe('dm-cipher');
+    });
+  });
+
   it('rejects a late Alice local-history completion after 900 switches to Bob', async () => {
     let resolveAlice!: (messages: ChatMessage[]) => void;
     const pendingAlice = new Promise<ChatMessage[]>((resolve) => {

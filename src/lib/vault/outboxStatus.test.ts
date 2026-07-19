@@ -79,6 +79,46 @@ describe('outboxComposerChrome', () => {
       deliveryFailed: true,
     })).toBeNull();
   });
+
+  it('floors fractional counts so chip text never shows decimals', () => {
+    const chrome = outboxComposerChrome({ connected: false, queuedCount: 2.9 });
+    expect(chrome).toMatchObject({
+      kind: 'queued-offline',
+      count: 2,
+      label: 'Queued (2) · Will send on reconnect',
+    });
+  });
+
+  it('keeps offline reconnect labels even when deliveryFailed is sticky', () => {
+    // deliveryFailed is only meaningful while connected; offline chrome must
+    // not claim "Couldn't send — retry" with a dead socket.
+    const chrome = outboxComposerChrome({
+      connected: false,
+      queuedCount: 2,
+      deliveryFailed: true,
+    });
+    expect(chrome).toEqual({
+      kind: 'queued-offline',
+      count: 2,
+      label: 'Queued (2) · Will send on reconnect',
+      announcement: '2 messages queued. Will send on reconnect.',
+      tone: 'queued',
+      canRetry: false,
+    });
+  });
+
+  it('uses exact singular/plural labels for the online waiting path', () => {
+    expect(outboxComposerChrome({ connected: true, queuedCount: 1 })).toEqual({
+      kind: 'queued-online',
+      count: 1,
+      label: 'Queued (1) · Waiting to send',
+      announcement: '1 message still queued. Waiting to send.',
+      tone: 'warning',
+      canRetry: true,
+    });
+    expect(outboxComposerChrome({ connected: true, queuedCount: 4 })!.label)
+      .toBe('Queued (4) · Waiting to send');
+  });
 });
 
 describe('outboxHomeChrome', () => {
@@ -111,6 +151,22 @@ describe('outboxHomeChrome', () => {
     expect(chrome).toMatchObject({ showRetry: true, tone: 'error' });
     expect(chrome!.detail).toMatch(/could not be delivered/i);
   });
+
+  it('uses singular phrasing and keeps offline detail when deliveryFailed sticks', () => {
+    const singular = outboxHomeChrome({ connected: true, queuedCount: 1 });
+    expect(singular!.detail).toMatch(/^1 queued send /);
+
+    const offlineFailed = outboxHomeChrome({
+      connected: false,
+      queuedCount: 3,
+      deliveryFailed: true,
+    });
+    expect(offlineFailed).toMatchObject({
+      showRetry: false,
+      tone: 'queued',
+    });
+    expect(offlineFailed!.detail).toMatch(/will send when you reconnect/i);
+  });
 });
 
 describe('outboxEntryTiming / outboxEntryStatusLabel', () => {
@@ -132,11 +188,37 @@ describe('outboxEntryTiming / outboxEntryStatusLabel', () => {
     expect(outboxEntryStatusLabel(queuedAt, now)).toBe('queued · expires soon');
   });
 
+  it('treats the exact 10% remaining boundary as expiring soon', () => {
+    // expiresInMs === maxAge * 0.1 → still "soon" (inclusive bound).
+    const now = queuedAt + OUTBOX_MAX_AGE_MS * 0.9;
+    const timing = outboxEntryTiming(queuedAt, now);
+    expect(timing.expired).toBe(false);
+    expect(timing.expiringSoon).toBe(true);
+    expect(timing.expiresInMs).toBe(OUTBOX_MAX_AGE_MS * 0.1);
+    expect(outboxEntryStatusLabel(queuedAt, now)).toBe('queued · expires soon');
+  });
+
+  it('stays ordinary queued just outside the last 10% window', () => {
+    const now = queuedAt + OUTBOX_MAX_AGE_MS * 0.9 - 1;
+    const timing = outboxEntryTiming(queuedAt, now);
+    expect(timing.expired).toBe(false);
+    expect(timing.expiringSoon).toBe(false);
+    expect(outboxEntryStatusLabel(queuedAt, now)).toBe('queued');
+  });
+
   it('keeps ordinary rows as queued', () => {
     const now = queuedAt + 60_000;
     const timing = outboxEntryTiming(queuedAt, now);
     expect(timing.ageMs).toBe(60_000);
     expect(timing.expiringSoon).toBe(false);
+    expect(outboxEntryStatusLabel(queuedAt, now)).toBe('queued');
+  });
+
+  it('clamps future queuedAt clocks so age never goes negative', () => {
+    const now = queuedAt - 5_000;
+    const timing = outboxEntryTiming(queuedAt, now);
+    expect(timing.ageMs).toBe(0);
+    expect(timing.expired).toBe(false);
     expect(outboxEntryStatusLabel(queuedAt, now)).toBe('queued');
   });
 });

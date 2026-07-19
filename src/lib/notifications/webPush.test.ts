@@ -14,6 +14,12 @@ import {
 
 const initialState = store.getInitialState();
 
+/** Uncompressed P-256 point (0x04 ‖ 64 zero bytes) as unpadded base64url — valid shape only. */
+const VALID_VAPID_KEY = btoa(String.fromCharCode(4, ...new Uint8Array(64)))
+  .replace(/\+/g, '-')
+  .replace(/\//g, '_')
+  .replace(/=+$/u, '');
+
 function server(account: string): Server {
   return {
     id: 'local',
@@ -29,7 +35,7 @@ function server(account: string): Server {
 
 function client(
   sendRaw: ReturnType<typeof vi.fn> = vi.fn().mockReturnValue(true),
-  vapid = 'AQID',
+  vapid = VALID_VAPID_KEY,
 ): NonNullable<OnyxState['client']> {
   return {
     isupport: { VAPID: vapid },
@@ -309,6 +315,93 @@ describe('webPushActive', () => {
 });
 
 describe('web push operations', () => {
+  it('uses the VAPID key advertised by the current connection through ISUPPORT', async () => {
+    const sendRaw = vi.fn().mockReturnValue(true);
+    const currentClient = client(sendRaw);
+    const subscribe = vi.fn().mockResolvedValue(pushSubscription());
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(null),
+          subscribe,
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: currentClient,
+      // A prior connection's generic registry must not replace the current
+      // IRCClient's directly parsed 005 value.
+      serverFeatures: new Map([['VAPID', 'stale-key']]),
+    }, true);
+
+    await expect(enableWebPush()).resolves.toEqual({ ok: true });
+
+    const applicationServerKey = subscribe.mock.calls[0]?.[0]?.applicationServerKey as ArrayBuffer;
+    expect(Array.from(new Uint8Array(applicationServerKey))).toEqual([4, ...new Uint8Array(64)]);
+    expect(sendRaw).toHaveBeenCalledWith(
+      'WEBPUSH',
+      'SUBSCRIBE',
+      'https://push.example/sub',
+      'p256dh-key',
+      'auth-key',
+    );
+  });
+
+  it('fails closed on a non-P-256 VAPID ISUPPORT value before prompting', async () => {
+    const requestPermission = vi.fn().mockResolvedValue('granted');
+    const subscribe = vi.fn();
+    stubPushBrowser(
+      requestPermission,
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn(),
+          subscribe,
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      // Decodes, but is not an uncompressed P-256 point.
+      client: client(vi.fn().mockReturnValue(true), 'AQID'),
+      serverFeatures: new Map([['VAPID', VALID_VAPID_KEY]]),
+    }, true);
+
+    await expect(enableWebPush()).resolves.toEqual({
+      ok: false,
+      reason: 'Push is misconfigured on this server.',
+    });
+    expect(requestPermission).not.toHaveBeenCalled();
+    expect(subscribe).not.toHaveBeenCalled();
+  });
+
+  it('does not prompt or touch the service worker while disconnected', async () => {
+    const requestPermission = vi.fn().mockResolvedValue('granted');
+    const getSubscription = vi.fn();
+    const subscribe = vi.fn();
+    stubPushBrowser(
+      requestPermission,
+      Promise.resolve({ pushManager: { getSubscription, subscribe } }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'disconnected',
+      client: client(),
+    }, true);
+
+    await expect(enableWebPush()).resolves.toEqual({ ok: false, reason: 'Reconnect first.' });
+    expect(requestPermission).not.toHaveBeenCalled();
+    expect(getSubscription).not.toHaveBeenCalled();
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
+  });
+
   it('registers a complete subscription on the same account and client session', async () => {
     const sendRaw = vi.fn().mockReturnValue(true);
     const currentClient = client(sendRaw);
@@ -482,7 +575,7 @@ describe('web push operations', () => {
 
     await expect(enableWebPush()).resolves.toEqual({
       ok: false,
-      reason: 'Could not register push with the server. Try again.',
+      reason: 'The connection closed before push could be registered. Reconnect and try again.',
     });
     expect(sendRaw).toHaveBeenCalledWith(
       'WEBPUSH',
@@ -498,9 +591,10 @@ describe('web push operations', () => {
 
   it('refuses a malformed ISUPPORT VAPID key before requesting a subscription', async () => {
     const sendRaw = vi.fn().mockReturnValue(true);
+    const requestPermission = vi.fn().mockResolvedValue('granted');
     const subscribe = vi.fn();
     stubPushBrowser(
-      vi.fn().mockResolvedValue('granted'),
+      requestPermission,
       Promise.resolve({
         pushManager: {
           getSubscription: vi.fn(),
@@ -517,8 +611,9 @@ describe('web push operations', () => {
 
     await expect(enableWebPush()).resolves.toEqual({
       ok: false,
-      reason: 'This server advertised an invalid push key.',
+      reason: 'Push is misconfigured on this server.',
     });
+    expect(requestPermission).not.toHaveBeenCalled();
     expect(subscribe).not.toHaveBeenCalled();
     expect(sendRaw).not.toHaveBeenCalled();
   });
@@ -526,8 +621,6 @@ describe('web push operations', () => {
   it('subscribes with the raw ISUPPORT VAPID bytes (no key round-trip)', async () => {
     const sendRaw = vi.fn().mockReturnValue(true);
     const subscribe = vi.fn().mockResolvedValue(pushSubscription());
-    // Unpadded base64url for bytes [1, 2, 3]
-    const vapid = 'AQID';
     stubPushBrowser(
       vi.fn().mockResolvedValue('granted'),
       Promise.resolve({
@@ -541,7 +634,7 @@ describe('web push operations', () => {
       ...initialState,
       server: server('alice'),
       connectionStatus: 'connected',
-      client: client(sendRaw, vapid),
+      client: client(sendRaw, VALID_VAPID_KEY),
     }, true);
 
     await expect(enableWebPush()).resolves.toEqual({ ok: true });
@@ -550,7 +643,7 @@ describe('web push operations', () => {
       applicationServerKey: expect.any(ArrayBuffer),
     });
     const keyArg = subscribe.mock.calls[0]?.[0]?.applicationServerKey as ArrayBuffer;
-    expect(Array.from(new Uint8Array(keyArg))).toEqual([1, 2, 3]);
+    expect(Array.from(new Uint8Array(keyArg))).toEqual([4, ...new Uint8Array(64)]);
     expect(sendRaw).toHaveBeenCalledWith(
       'WEBPUSH',
       'SUBSCRIBE',

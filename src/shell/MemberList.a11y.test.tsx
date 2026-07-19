@@ -262,6 +262,19 @@ describe('MemberList accessibility', () => {
     expect(screen.getByText('~bob-account')).toBeInTheDocument();
   });
 
+  it('keeps the member-card avatar decorative so the nick is announced once', () => {
+    seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
+    render(() => <MemberList />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Open member details for bob, Voice/ }));
+    const card = screen.getByRole('region', { name: 'bob' });
+    const avatar = card.querySelector('.onyx-avatar');
+    expect(avatar).not.toBeNull();
+    expect(avatar).toHaveAttribute('aria-hidden', 'true');
+    // Role text is the description, not a second name on the avatar.
+    expect(card).toHaveAccessibleDescription(/Voice in #general/);
+  });
+
   it('opens a member dialog from a keyboard-operable button and closes on Escape', () => {
     seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
 

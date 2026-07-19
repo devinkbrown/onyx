@@ -61,6 +61,35 @@ function addFollow(topic?: string | null): void {
   });
 }
 
+function addDirectMessage(text: string): void {
+  store.getState().addNotification({
+    type: 'dm',
+    text,
+    from: 'alice',
+  });
+}
+
+function setEncryptedDirectMessage(plaintext: string): void {
+  store.setState({
+    dms: new Map([['alice', {
+      nick: 'alice',
+      account: 'alice',
+      unread: 1,
+      highlights: 1,
+      messages: [{
+        id: 'encrypted-dm',
+        time: new Date(),
+        from: 'alice',
+        text: 'TSUMUGI1 ciphertext stays private',
+        type: 'msg',
+        target: 'me',
+        encrypted: true,
+        plaintext,
+      }],
+    }]]),
+  });
+}
+
 function clickDesktopNotification(): void {
   const payload = vi.mocked(showDesktopNotification).mock.calls[0]?.[0];
   expect(payload).toBeDefined();
@@ -268,5 +297,47 @@ describe('NotificationRuntime coalesced policy', () => {
     expect(payload?.body).toBe('New encrypted message');
     expect(payload?.body).not.toContain('TSUMUGI1');
     expect(payload?.body).not.toContain('ciphertext');
+  });
+
+  it('never exposes a decrypted E2EE DM in the desktop notification body', () => {
+    const secret = 'private launch coordinates';
+    setEncryptedDirectMessage(secret);
+    render(() => <NotificationRuntime />);
+
+    addDirectMessage(secret);
+
+    const payload = vi.mocked(showDesktopNotification).mock.calls[0]?.[0];
+    expect(payload).toMatchObject({
+      title: 'Direct message from alice',
+      body: 'New encrypted message',
+    });
+    expect(JSON.stringify(payload)).not.toContain(secret);
+  });
+
+  it('keeps an E2EE body private after a coalesced alert loses its message row', () => {
+    render(() => <NotificationRuntime />);
+    addDirectMessage('ordinary first message');
+    const secret = 'private delayed coordinates';
+    setEncryptedDirectMessage(secret);
+    addDirectMessage(secret);
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+
+    store.setState({ dms: new Map() });
+    vi.advanceTimersByTime(6000);
+
+    expect(showDesktopNotification).toHaveBeenCalledTimes(2);
+    const payload = vi.mocked(showDesktopNotification).mock.calls[1]?.[0];
+    expect(payload?.body).toBe('New encrypted message');
+    expect(JSON.stringify(payload)).not.toContain(secret);
+  });
+
+  it('keeps plaintext DM bodies visible when no encrypted message boundary exists', () => {
+    render(() => <NotificationRuntime />);
+
+    addDirectMessage('ordinary direct message');
+
+    expect(vi.mocked(showDesktopNotification).mock.calls[0]?.[0].body).toBe(
+      'ordinary direct message',
+    );
   });
 });

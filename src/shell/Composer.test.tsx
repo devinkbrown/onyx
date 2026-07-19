@@ -168,6 +168,114 @@ describe('Composer accessibility', () => {
     expect(queryByText(/private edit|TSUMUGI1 edit-envelope/)).toBeNull();
   });
 
+  it('hides a reply banner when the armed parent belongs to another target', () => {
+    seedActiveChannel();
+    store.setState({
+      replyingTo: {
+        id: 'other-parent',
+        from: 'alice',
+        text: 'from #ops',
+        time: new Date(),
+        type: 'msg',
+        target: '#ops',
+      },
+    });
+
+    const { queryByText, queryByRole } = render(() => <Composer />);
+
+    expect(queryByText(/replying to alice/i)).toBeNull();
+    expect(queryByRole('button', { name: 'Cancel reply' })).toBeNull();
+    // Store keeps the reply armed so returning to #ops can still use it.
+    expect(store.getState().replyingTo).toMatchObject({ id: 'other-parent', target: '#ops' });
+  });
+
+  it('shows a matching reply banner and cancels it with Escape', () => {
+    seedActiveChannel();
+    store.setState({
+      replyingTo: {
+        id: 'room-parent',
+        from: 'alice',
+        text: 'parent body',
+        time: new Date(),
+        type: 'msg',
+        target: '#room',
+      },
+    });
+
+    const { getByRole, getByText, queryByText } = render(() => <Composer />);
+    expect(getByText(/replying to alice/i)).toBeDefined();
+    expect(getByText('parent body')).toBeDefined();
+
+    const textarea = getByRole('textbox', { name: /message #room/i });
+    fireEvent.keyDown(textarea, { key: 'Escape' });
+
+    expect(store.getState().replyingTo).toBeNull();
+    expect(queryByText(/replying to alice/i)).toBeNull();
+  });
+
+  it('cancels an edit with Escape and restores the room draft', () => {
+    seedActiveChannel();
+    store.getState().setComposerDraft('#room', 'saved draft');
+    store.setState({
+      editingMessage: {
+        id: 'edit-me',
+        from: 'me',
+        text: 'original message',
+        time: new Date(),
+        type: 'msg',
+        target: '#room',
+      },
+    });
+
+    const { getByRole, getByText, queryByText } = render(() => <Composer />);
+    // While editing, the textarea's accessible name is "Edit message".
+    const textarea = getByRole('textbox', { name: 'Edit message' }) as HTMLTextAreaElement;
+
+    expect(getByText(/^editing$/i)).toBeDefined();
+    expect(textarea.value).toBe('original message');
+    expect(getByRole('button', { name: 'Save edit' })).toBeDefined();
+
+    fireEvent.keyDown(textarea, { key: 'Escape' });
+
+    expect(store.getState().editingMessage).toBeNull();
+    expect(queryByText(/^editing$/i)).toBeNull();
+    expect(textarea.value).toBe('saved draft');
+    // After cancel, the accessible name returns to the room placeholder.
+    expect(getByRole('textbox', { name: /message #room/i })).toBeDefined();
+  });
+
+  it('drops the reply banner when an edit is armed (mutual exclusivity)', () => {
+    seedActiveChannel();
+    store.setState({
+      replyingTo: {
+        id: 'room-parent',
+        from: 'alice',
+        text: 'parent body',
+        time: new Date(),
+        type: 'msg',
+        target: '#room',
+      },
+    });
+
+    const { getByText, queryByText, getByRole } = render(() => <Composer />);
+    expect(getByText(/replying to alice/i)).toBeDefined();
+
+    store.getState().setComposerEditingMessage({
+      id: 'edit-me',
+      from: 'me',
+      text: 'mine',
+      time: new Date(),
+      type: 'msg',
+      target: '#room',
+    });
+
+    expect(queryByText(/replying to alice/i)).toBeNull();
+    expect(getByText(/^editing$/i)).toBeDefined();
+    expect(getByRole('button', { name: 'Save edit' })).toBeDefined();
+    expect(store.getState().replyingTo).toBeNull();
+  });
+
+
   it('exposes the slash-command popup as a labelled listbox of options', () => {
     // Arrange
     seedActiveChannel();
@@ -435,6 +543,17 @@ describe('Composer outbox status chrome', () => {
     expect(await screen.findByText(/Couldn't send/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try sending now' }));
     expect(flushSpy).toHaveBeenCalledOnce();
+  });
+
+  it('shows Queued (N) · Waiting to send when online with a remaining queue', async () => {
+    seedActiveChannel();
+    await queueOutbox('#room', 'waiting body stays private', owner);
+    // Connected + remaining queue, auto-retry not yet exhausted → waiting chrome.
+    render(() => <Composer />);
+
+    expect(await screen.findByText(/Queued \(1\) · Waiting to send/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try sending now' })).toBeInTheDocument();
+    expect(screen.queryByText('waiting body stays private')).not.toBeInTheDocument();
   });
 
   it('hides outbox chrome when online and the queue is empty', () => {

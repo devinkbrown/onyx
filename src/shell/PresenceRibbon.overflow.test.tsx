@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * PresenceRibbon.overflow.test.tsx — A8 place-strip compression.
+ * PresenceRibbon.overflow.test.tsx — A8 place-strip compression + B3 pins bar.
  *
- * Pins that secondary chrome lives behind a single More disclosure while
- * primary place signals (event, voice, jump-to-date, join) stay one click away.
+ * Secondary chrome lives behind a single More disclosure while primary place
+ * signals (event, voice, jump-to-date, join, pins count) stay one click away.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -84,6 +84,7 @@ describe('PresenceRibbon place-strip compression (A8)', () => {
     expect(screen.queryByTestId('ribbon-preferences')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-settings-gear')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-account-chip')).not.toBeInTheDocument();
+    // No pins prop → no pins chip (chip appears only when the channel has pins).
     expect(screen.queryByTestId('ribbon-pins')).not.toBeInTheDocument();
   });
 
@@ -103,18 +104,26 @@ describe('PresenceRibbon place-strip compression (A8)', () => {
     expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
   });
 
-  it('surfaces secondary actions only after opening More', () => {
+  it('surfaces pins on the primary strip and secondary actions only after More', () => {
     seedChannel();
     store.setState({
       channelProps: new Map([['#general', { PINS: 'msg-1,msg-2' }]]),
     });
+    const openPins = vi.spyOn(store.getState(), 'openPinnedMessages');
     render(() => <PresenceRibbon />);
 
-    expect(screen.queryByTestId('ribbon-pins')).not.toBeInTheDocument();
+    // B3 pins bar: one-click chip on Place cluster, not buried in More.
+    const pins = screen.getByTestId('ribbon-pins');
+    expect(pins).toBeInTheDocument();
+    expect(pins).toHaveAttribute('aria-label', '2 pinned messages');
+    fireEvent.click(pins);
+    expect(openPins).toHaveBeenCalledTimes(1);
+
     openMore();
     expect(screen.getByRole('dialog', { name: 'More channel and workspace actions' })).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-more-menu')).toBeInTheDocument();
-    expect(screen.getByTestId('ribbon-pins')).toBeInTheDocument();
+    // Pins are not duplicated inside More.
+    expect(screen.getAllByTestId('ribbon-pins')).toHaveLength(1);
     expect(screen.getByTestId('ribbon-preferences')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-settings-gear')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-account-chip')).toBeInTheDocument();

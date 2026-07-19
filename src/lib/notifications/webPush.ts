@@ -27,6 +27,30 @@ export function vapidKeyToBytes(b64url: string): Uint8Array {
   return out;
 }
 
+/**
+ * Validate the uncompressed P-256 public-key shape PushManager requires.
+ * ISUPPORT carries base64url without padding — reject standard-base64 aliases
+ * and any decode that is not a 65-byte uncompressed point (0x04 ‖ X ‖ Y).
+ */
+function applicationServerKeyFromIsupport(value: string): Uint8Array | null {
+  if (!/^[A-Za-z0-9_-]+$/u.test(value)) return null;
+  try {
+    const bytes = vapidKeyToBytes(value);
+    return bytes.length === 65 && bytes[0] === 0x04 ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+function applicationServerKeyBuffer(bytes: Uint8Array): ArrayBuffer {
+  // Slice so the BufferSource is exactly the key bytes even when the view
+  // sits on a larger ArrayBuffer (never hand PushManager a shared tail).
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+}
+
 export function webPushSupported(): boolean {
   return (
     typeof window !== 'undefined' &&
@@ -97,6 +121,20 @@ async function discardCreatedSubscription(subscription: PushSubscription | null)
   }
 }
 
+/**
+ * Drop a half-finished enable: clear the ownership claim first so a concurrent
+ * webPushActive() cannot treat an unregistered endpoint as working push, then
+ * retire any subscription this enable created. The expected-value guard on
+ * clearPushOwnerKey preserves a replacement owner's marker.
+ */
+async function rollBackFailedRegistration(
+  ownerKey: string,
+  createdSubscription: PushSubscription | null,
+): Promise<void> {
+  clearPushOwnerKey(ownerKey);
+  await discardCreatedSubscription(createdSubscription);
+}
+
 async function closeRegistrationNotifications(
   registration: ServiceWorkerRegistration,
   stillCurrent: () => boolean = () => true,
@@ -162,23 +200,12 @@ export async function enableWebPush(): Promise<WebPushResult> {
   }
   const client = initialState.client;
   // VAPID is advertised on ISUPPORT (`VAPID=`); never invent or round-trip a key.
-  const key = client.isupport.VAPID ?? '';
-  if (!key) return { ok: false, reason: 'Push is not enabled on this server.' };
-  let applicationServerKey: ArrayBuffer;
-  try {
-    const bytes = vapidKeyToBytes(key);
-    // Empty decode is not a usable applicationServerKey — refuse rather than
-    // hand PushManager a zero-length key that some engines treat as "default".
-    if (bytes.byteLength === 0) {
-      return { ok: false, reason: 'Push is not enabled on this server.' };
-    }
-    applicationServerKey = bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength,
-    ) as ArrayBuffer;
-  } catch {
-    return { ok: false, reason: 'This server advertised an invalid push key.' };
-  }
+  // Shape-check before permission so a misconfigured server never prompts.
+  const advertisedKey = client.isupport.VAPID ?? '';
+  if (!advertisedKey) return { ok: false, reason: 'Push is not enabled on this server.' };
+  const keyBytes = applicationServerKeyFromIsupport(advertisedKey);
+  if (!keyBytes) return { ok: false, reason: 'Push is misconfigured on this server.' };
+  const applicationServerKey = applicationServerKeyBuffer(keyBytes);
 
   let permission: NotificationPermission;
   try {
@@ -222,7 +249,7 @@ export async function enableWebPush(): Promise<WebPushResult> {
       createdSubscription = sub;
     }
     if (!pushSessionCurrent(ownerKey, client)) {
-      await discardCreatedSubscription(createdSubscription);
+      await rollBackFailedRegistration(ownerKey, createdSubscription);
       return { ok: false, reason: SESSION_CHANGED_REASON };
     }
 
@@ -232,28 +259,30 @@ export async function enableWebPush(): Promise<WebPushResult> {
     if (!sub.endpoint || !p256dh || !auth) {
       // Incomplete keys are unusable on the server — retire the local sub so we
       // never claim "active" over a half-formed endpoint, then fail closed.
-      try {
-        await sub.unsubscribe();
-      } catch {
-        // Best-effort; the honest outcome is still a failed enable.
-      }
-      clearPushOwnerKey(ownerKey);
+      await rollBackFailedRegistration(ownerKey, createdSubscription ?? sub);
       return { ok: false, reason: 'The browser returned an incomplete subscription.' };
     }
     if (!savePushOwnerKey(ownerKey)) {
-      await sub.unsubscribe().catch(() => false);
+      // Ownership claim is the gate for webPushActive — without it, retire any
+      // sub this enable created (or the unusable endpoint we just inspected).
+      await discardCreatedSubscription(createdSubscription ?? sub);
       return { ok: false, reason: 'This browser could not bind push to the current account.' };
     }
     // sendRaw returns false when the socket cannot carry the registration —
     // never report ok while the server has not learned the endpoint.
     if (!client.sendRaw('WEBPUSH', 'SUBSCRIBE', sub.endpoint, p256dh, auth)) {
-      clearPushOwnerKey(ownerKey);
-      await discardCreatedSubscription(createdSubscription);
-      return { ok: false, reason: 'Could not register push with the server. Try again.' };
+      // Always drop ownership + any sub created here. For a reused endpoint the
+      // browser subscription stays until the next enable/active reconciliation
+      // (unsubscribing would silently disable a prior working registration).
+      await rollBackFailedRegistration(ownerKey, createdSubscription);
+      return {
+        ok: false,
+        reason: 'The connection closed before push could be registered. Reconnect and try again.',
+      };
     }
     return { ok: true };
   } catch {
-    await discardCreatedSubscription(createdSubscription);
+    await rollBackFailedRegistration(ownerKey, createdSubscription);
     return { ok: false, reason: 'Subscribing failed — check site notification settings.' };
   }
 }

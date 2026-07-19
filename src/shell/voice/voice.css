@@ -901,6 +901,17 @@
   outline: none;
 }
 
+.voice-sec--button {
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+.voice-sec--button:hover {
+  border-color: color-mix(in oklab, currentColor 40%, var(--seam-faint));
+}
+
 .voice-sec:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 2px;
@@ -975,7 +986,16 @@
   }
 }
 
-/* ── ConnectionQuality pip ──────────────────────────────────────────────────── */
+/* ── ConnectionQuality pip + poor-network soft prompt (R6) ─────────────────── */
+
+.voice-cq-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 
 .voice-cq {
   display: inline-flex;
@@ -987,6 +1007,113 @@
   border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--ink) 52%, transparent);
   padding: 5px 8px;
+}
+
+.voice-cq-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(22rem, 70vw);
+  min-height: 28px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid color-mix(in oklab, var(--shu) 36%, var(--seam-faint));
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--shu) 12%, color-mix(in oklab, var(--ink) 62%, transparent));
+  color: var(--washi);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.voice-cq-prompt__msg {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-cq-prompt__action {
+  flex-shrink: 0;
+  appearance: none;
+  border: 1px solid color-mix(in oklab, var(--washi) 28%, transparent);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 40%, transparent);
+  color: var(--washi);
+  font: inherit;
+  font-weight: 600;
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.voice-cq-prompt__action:hover {
+  background: color-mix(in oklab, var(--ink) 55%, transparent);
+}
+
+.voice-cq-prompt__action:focus-visible,
+.voice-cq-prompt__dismiss:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.voice-cq-prompt__dismiss {
+  flex-shrink: 0;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--washi-mute);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: var(--r-pill);
+}
+
+/* Call privacy sheet body (R2) */
+.voice-privacy {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.voice-privacy__summary {
+  margin: 0;
+  color: var(--washi);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.voice-privacy__facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.voice-privacy__fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.voice-privacy__fact dt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+.voice-privacy__fact dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--washi);
+}
+
+.voice-privacy__code {
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
 }
 
 .voice-cq__bars {

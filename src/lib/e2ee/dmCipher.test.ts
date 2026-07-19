@@ -8,7 +8,7 @@
  */
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ENVELOPE_PREFIX,
@@ -61,6 +61,10 @@ beforeEach(() => {
   _resetSharedKeysForTests();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('dmCipher', () => {
   it('creates a device key once and reloads the same public key', async () => {
     const first = await deviceKeys();
@@ -72,6 +76,31 @@ describe('dmCipher', () => {
     const raw = fromB64url(first!.publicB64)!;
     expect(raw.length).toBe(65);
     expect(raw[0]).toBe(0x04);
+  });
+
+  it('refuses to use a device key when its IndexedDB write aborts', async () => {
+    // A key that cannot be persisted must never be used for seal/open — otherwise
+    // a reload mints a new identity and silently orphans every prior envelope.
+    //
+    // Avoid vi.spyOn(...).mockImplementation(function (this) {…}): vitest's Mock
+    // strips ThisParameterType and TS2683 fires under strict mode. Patch the
+    // prototype directly so `this` is a normal method receiver.
+    const original = IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction = function (
+      this: IDBDatabase,
+      ...args: Parameters<typeof original>
+    ) {
+      const tx = original.apply(this, args);
+      if (args[1] === 'readwrite') {
+        queueMicrotask(() => tx.abort());
+      }
+      return tx;
+    } as typeof original;
+    try {
+      await expect(deviceKeys()).resolves.toBeNull();
+    } finally {
+      IDBDatabase.prototype.transaction = original;
+    }
   });
 
   it('derives a stable bounded registry id without collapsing different devices', async () => {

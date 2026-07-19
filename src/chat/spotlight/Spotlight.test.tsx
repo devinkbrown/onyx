@@ -90,9 +90,9 @@ describe('Spotlight', () => {
     renderSpotlight();
 
     fireEvent.keyDown(window, { key: '/' });
-    fireEvent.click(screen.getByRole('button', { name: 'Use command example goto #root at yesterday 21:00' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use command example goto #root at yesterday 9pm' }));
 
-    expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('goto #root at yesterday 21:00');
+    expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('goto #root at yesterday 9pm');
     expect(screen.getByText('Time grammar')).toBeInTheDocument();
   });
 
@@ -100,7 +100,7 @@ describe('Spotlight', () => {
     renderSpotlight();
 
     fireEvent.keyDown(window, { key: '/' });
-    fireEvent.click(screen.getByRole('button', { name: 'Use command example goto #root at yesterday 21:00' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use command example goto #root at yesterday 9pm' }));
 
     // Clicking a teaching chip must do more than fill the input box: the command
     // layer parses the query it sees into a grammar command, so populating the

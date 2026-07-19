@@ -104,6 +104,17 @@ down to TLS.
    (navigate/join/create-DM + landing scroll); also fixed the pre-existing
    click-dead results strips (pointer-events). Verified live via
    `tools/vault-search-live.mjs`.
+   ✅ **SHIPPED 2026-07-19 (Era 1 A1)** — Hybrid device-memory search is the
+   **default** UI mode (`searchVaultHybrid` + RRF_K=60 fuses exact-substring and
+   on-device related-token rankings). Mode cycle is hybrid → exact → related
+   terms; Preferences **History & data → Default search mode** seeds a fresh
+   search (default **Text + related**). Search Center copy, provenance chips
+   (**This device** / **This server**), and `docs/search-and-history.md` all
+   state the boundary honestly — no cloud AI, no "hybrid not yet wired" claim.
+   Evidence: `src/lib/prefs/vaultSearchMode.ts`,
+   `src/shell/search/useMessageSearch.ts`, `src/shell/search/MessageSearch.tsx`,
+   `src/lib/vault/searchVaultHybrid.ts`; ledger
+   `.ai/roadmap-source-ledger.md` (A1 closed).
 
 ## Phase 2 — Reach (the tab is closed and it still works) ✅ COMPLETE 2026-07-02
 4. **Web Push** *(server + client)* — IRCv3 `draft/webpush`-shaped: VAPID
@@ -257,8 +268,13 @@ down to TLS.
     searches the device vault across targets, supports named save/run/delete
     queries, disables server search without a concrete room or DM, and hydrates
     archived results through the existing `travelTo` + message-focus path.
-    Saved queries now support exact, related-term, and combined modes without
-    overstating token similarity as embeddings or model inference.
+    Saved queries now support exact, related-term, and combined (hybrid RRF)
+    modes without overstating token similarity as embeddings or model inference.
+    ✅ **CLIENT / DOCS HONESTY SHIPPED 2026-07-19 (Era 1 A1)** — Hybrid is the
+    live default, not a roadmap promise: UI labels end with “on this device,”
+    Preferences default is **Text + related**, and
+    `docs/search-and-history.md` documents hybrid / exact / related terms with
+    provenance chips for device vs archived server paths.
     ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Every live Search Center entry
     path now shares a 512-character work bound, including typed input,
     command-palette prefills, recall pivots, and server history requests. A

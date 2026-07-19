@@ -15,6 +15,7 @@ import {
   MAX_STANDARD_REPLY_TOKEN_LENGTH,
   parseSessionTokenNote,
   parseSessionMeshTokenNote,
+  isValidSessionCredential,
   MAX_SESSION_CREDENTIAL_LENGTH,
   buildSessionResumeLine,
   MAX_MONITOR_NUMERIC_TARGETS,
@@ -243,26 +244,49 @@ describe('standard replies + SESSION notes', () => {
     ))).toBeNull();
   });
   it('extracts a SESSION TOKEN', () => {
-    expect(parseSessionTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc123'))).toBe('abc123');
+    expect(parseSessionTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc123')))
+      .toEqual({ token: 'abc123' });
   });
   it('extracts a SESSION TOKEN from the current server NOTICE envelope', () => {
     expect(parseSessionTokenNote(
       parseIRCMessage(':srv.example NOTICE onyx :SESSION TOKEN abc123'),
-    )).toBe('abc123');
+    )).toEqual({ token: 'abc123' });
   });
   it('extracts a SESSION MTOKEN (mesh)', () => {
-    expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION MTOKEN :m3sh'))).toBe('m3sh');
+    expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION MTOKEN :m3sh')))
+      .toEqual({ token: 'm3sh' });
   });
   it('extracts a SESSION MTOKEN from the current server NOTICE envelope', () => {
     expect(parseSessionMeshTokenNote(
       parseIRCMessage(':srv.example NOTICE onyx :SESSION MTOKEN m3sh'),
-    )).toBe('m3sh');
+    )).toEqual({ token: 'm3sh' });
+  });
+  it('extracts MTOKEN expires= from the live server NOTICE form', () => {
+    // Onyx Server: `SESSION MTOKEN {hex} expires={unix}` (mesh wall clock).
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(':srv.example NOTICE onyx :SESSION MTOKEN m3shdeadbeef expires=1800000000'),
+    )).toEqual({ token: 'm3shdeadbeef', expiresAt: 1_800_000_000 });
+  });
+  it('extracts MTOKEN expires= from a standard-reply description trailer', () => {
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(':srv NOTE SESSION MTOKEN :m3sh expires=1800000000'),
+    )).toEqual({ token: 'm3sh', expiresAt: 1_800_000_000 });
+  });
+  it('extracts MTOKEN expires= when the token sits in standard-reply context', () => {
+    // NOTE SESSION MTOKEN <token> :expires=<unix>
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(':srv NOTE SESSION MTOKEN m3sh :expires=1800000000'),
+    )).toEqual({ token: 'm3sh', expiresAt: 1_800_000_000 });
   });
   it('does not confuse TOKEN and MTOKEN', () => {
     expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc'))).toBeNull();
   });
   it('rejects malformed or oversized session credentials', () => {
+    // Free-text trailer (not key=value) fails closed on both envelopes.
     expect(parseSessionTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc extra'))).toBeNull();
+    expect(parseSessionTokenNote(
+      parseIRCMessage(':srv NOTICE onyx :SESSION TOKEN abc extra'),
+    )).toBeNull();
     expect(parseSessionTokenNote(parseIRCMessage(
       `:srv NOTICE onyx :SESSION TOKEN ${'x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH + 1)}`,
     ))).toBeNull();
@@ -270,8 +294,42 @@ describe('standard replies + SESSION notes', () => {
       `:srv NOTE SESSION MTOKEN :${'x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH + 1)}`,
     ))).toBeNull();
   });
+  it('rejects a malformed expires= attr fail-closed (does not return the bare token)', () => {
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(':srv NOTICE onyx :SESSION MTOKEN m3sh expires=not-a-number'),
+    )).toBeNull();
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(':srv NOTICE onyx :SESSION MTOKEN m3sh expires=-1'),
+    )).toBeNull();
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(':srv NOTICE onyx :SESSION MTOKEN m3sh expires=01'),
+    )).toBeNull();
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(':srv NOTICE onyx :SESSION MTOKEN m3sh expires=1 expires=2'),
+    )).toBeNull();
+    // Oversized digit run.
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(`:srv NOTICE onyx :SESSION MTOKEN m3sh expires=${'9'.repeat(17)}`),
+    )).toBeNull();
+  });
+  it('ignores unknown key=value attrs for forward-compat', () => {
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(':srv NOTICE onyx :SESSION MTOKEN m3sh expires=1800000000 scope=mesh'),
+    )).toEqual({ token: 'm3sh', expiresAt: 1_800_000_000 });
+  });
   it('builds a resume line', () => {
     expect(buildSessionResumeLine('tok')).toBe('SESSION RESUME tok\r\n');
+  });
+  it('isValidSessionCredential mirrors the parse-side fail-closed rules', () => {
+    expect(isValidSessionCredential('abc123')).toBe(true);
+    expect(isValidSessionCredential('x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH))).toBe(true);
+    expect(isValidSessionCredential('')).toBe(false);
+    expect(isValidSessionCredential(null)).toBe(false);
+    expect(isValidSessionCredential(undefined)).toBe(false);
+    expect(isValidSessionCredential('has space')).toBe(false);
+    expect(isValidSessionCredential('tok\r\nPRIVMSG')).toBe(false);
+    expect(isValidSessionCredential('tok\0nul')).toBe(false);
+    expect(isValidSessionCredential('x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH + 1))).toBe(false);
   });
 });
 

@@ -1238,6 +1238,8 @@
   gap: var(--space-1);
 }
 
+/* Place chips — the living primary of the ribbon (event horizon / voice).
+   Heavier mono seal than icon chrome so the eye lands here first. */
 .shell-ribbon-event-chip {
   appearance: none;
   display: inline-flex;
@@ -1246,14 +1248,14 @@
   max-width: 18rem;
   height: 28px;
   padding: 0 9px;
-  border: 1px solid color-mix(in oklab, var(--gold) 42%, var(--line));
+  border: 1px solid color-mix(in oklab, var(--gold) 48%, var(--line));
   border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--gold) 12%, var(--stone) 48%);
+  background: color-mix(in oklab, var(--gold) 14%, var(--stone) 48%);
   color: var(--washi);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  font-weight: 700;
+  font-weight: 750;
   line-height: 1;
   white-space: nowrap;
   transform: translateZ(0);
@@ -1306,13 +1308,13 @@
   gap: 6px;
   height: 28px;
   padding: 0 9px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--lapis) 38%, var(--line));
   border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--lapis) 12%, var(--stone) 48%);
+  background: color-mix(in oklab, var(--lapis) 14%, var(--stone) 48%);
   color: var(--washi);
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  font-weight: 700;
+  font-weight: 750;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
@@ -1429,9 +1431,10 @@
 }
 
 /* ── More overflow (A8 place-strip compression) ─────────────────────────────
-   Secondary chrome (pins / notify / settings / appearance / prefs / account)
-   collapses into one disclosure so the ribbon stays a place strip. Member
-   count stays on the primary strip as presence-as-place. */
+   Residual hierarchy: place chips (event · voice · members) own the eye;
+   Time/Date and Inbox stay one-click instruments; More is secondary chrome
+   (pins / notify / settings / appearance / prefs / account). The More trigger
+   defaults quieter than place controls so the strip never reads as a toolbar. */
 .shell-ribbon-group .onyx-popover {
   display: inline-flex;
 }
@@ -1454,6 +1457,11 @@
   border-color: transparent;
   box-shadow: none;
   color: inherit;
+}
+
+/* Default: mute chrome so event/voice chips win. Hover/open re-light to lapis. */
+.shell-ribbon-more-trigger {
+  color: var(--washi-mute);
 }
 
 .shell-ribbon-group .onyx-popover__trigger:hover .shell-ribbon-more-trigger,
@@ -1636,14 +1644,15 @@
   .shell-ribbon-account { transition: none; }
 }
 
-/* Connection status — state is carried by chip colour, not a decorative dot. */
+/* Connection status — terminal mono kicker at the far edge. Connected is the
+   calm default (faint); reconnect/error light up. Never competes with place. */
 .shell-ribbon-conn {
   display: inline-flex;
   align-items: center;
   padding: 3px 9px;
   border-radius: var(--r-sm);
   border: 1px solid var(--seam-faint);
-  background: color-mix(in oklab, var(--stone) 22%, transparent);
+  background: color-mix(in oklab, var(--stone) 18%, transparent);
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.13em;
@@ -1652,7 +1661,8 @@
 }
 
 .shell-ribbon-conn[data-state='connected'] {
-  border-color: color-mix(in oklab, var(--ok) 32%, var(--seam-faint));
+  border-color: color-mix(in oklab, var(--ok) 22%, var(--seam-faint));
+  background: transparent;
 }
 
 .shell-ribbon-conn[data-state='connecting'],
@@ -1665,9 +1675,9 @@
   border-color: color-mix(in oklab, var(--shu) 36%, var(--seam-faint));
 }
 
-.shell-ribbon-conn-label { line-height: 1; color: var(--washi-dim); }
+.shell-ribbon-conn-label { line-height: 1; color: var(--washi-mute); }
 .shell-ribbon-conn[data-state='connected'] .shell-ribbon-conn-label {
-  color: color-mix(in oklab, var(--ok) 65%, var(--washi));
+  color: color-mix(in oklab, var(--ok) 48%, var(--washi-dim));
 }
 .shell-ribbon-conn[data-state='connecting'] .shell-ribbon-conn-label,
 .shell-ribbon-conn[data-state='reconnecting'] .shell-ribbon-conn-label {
@@ -2151,6 +2161,70 @@
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
   background: color-mix(in oklab, var(--ink) 10%, transparent);
+}
+
+.shell-chset-access {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 10%, transparent);
+}
+
+.shell-chset-access-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.shell-chset-access-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--seam-faint);
+}
+
+.shell-chset-access-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.shell-chset-access-meta {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.shell-chset-access-level {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--washi);
+}
+
+.shell-chset-access-mask {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.shell-chset-access-extra {
+  font-size: 0.75rem;
+  color: var(--washi-mute);
+}
+
+.shell-chset-access-form {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--seam-faint);
+}
+
+.shell-chset-access-error {
+  color: var(--danger, #c44);
 }
 
 .shell-chset-inline-actions {
@@ -3168,6 +3242,20 @@
       transparent 100%
     ) !important;
   box-shadow: inset 2px 0 0 var(--lapis-bright);
+}
+
+/* Dense transcript: forced-colors mention signal (SC 1.4.1). The azure left
+   bar collapses under High Contrast when box-shadow is reset — restated as a
+   solid Highlight inset edge so mentioned rows stay non-colour-only. */
+@media (forced-colors: active) {
+  .shell-msg-group--highlight,
+  .shell-msg-cont--highlight {
+    background: Canvas !important;
+    box-shadow: none;
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+    forced-color-adjust: none;
+  }
 }
 
 /* Reply indicator — a faint azure thread back to the quoted message. */
@@ -4368,6 +4456,33 @@
 .shell-member-row--away { opacity: 0.66; }
 .shell-member-row--away:hover { opacity: 1; }
 .shell-member-nick--away { color: var(--washi-mute); font-style: italic; }
+
+/* Dense roster: forced-colors away signal (SC 1.4.1). Opacity dimming and the
+   presence-dot colour alone vanish under High Contrast — keep italic nick and
+   mark the presence glyph with ButtonText so away remains non-colour-only. */
+@media (forced-colors: active) {
+  .shell-member-row--away {
+    opacity: 1;
+  }
+
+  .shell-member-nick--away {
+    color: GrayText;
+    font-style: italic;
+    forced-color-adjust: none;
+  }
+
+  .shell-member-presence {
+    background: LinkText;
+    box-shadow: 0 0 0 2px Canvas;
+    forced-color-adjust: none;
+  }
+
+  .shell-member-presence--away {
+    background: GrayText;
+    box-shadow: 0 0 0 2px Canvas;
+    forced-color-adjust: none;
+  }
+}
 
 /* Role badges — each tier a distinct stratum of the reef, tinted only from
    theme tokens. Champagne gold marks the stewards (founder/owner); azure marks

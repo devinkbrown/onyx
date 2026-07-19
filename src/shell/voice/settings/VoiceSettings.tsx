@@ -367,6 +367,13 @@ function VoiceSettingsContent() {
         <p class="voice-settings__section-copy">Keep the signal readable without hiding the controls from power users.</p>
         <div class="voice-settings__grid">
           <ToggleRow
+            id="voice-mute-on-join"
+            label="Join muted"
+            description="Start with your microphone off. Unmute when you are ready to speak."
+            checked={voice().muteOnJoin === true}
+            onChecked={(checked) => updateVoice({ muteOnJoin: checked })}
+          />
+          <ToggleRow
             id="voice-vad-enabled"
             label="Voice activity"
             description="Transmit when speech is detected."
