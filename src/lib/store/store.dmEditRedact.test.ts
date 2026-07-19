@@ -18,9 +18,9 @@ import { store, type DMConversation } from './store';
 
 const initialState = store.getInitialState();
 
-function mockClient(sendRaw = vi.fn()) {
+function mockClient(sendRaw = vi.fn(), caps: string[] = []) {
   return {
-    negotiatedCaps: new Set<string>(),
+    negotiatedCaps: new Set<string>(caps),
     capValues: new Map<string, string>(),
     isupport: { CHANTYPES: '#&' },
     prefixToMode: {},
@@ -85,6 +85,73 @@ describe('inbound REDACT fold-back — DM keying', () => {
     });
     feed(':bob!u@h REDACT #room m1 :Deleted');
     expect(store.getState().channels.get('#room')!.messages[0]!.redacted).toBe(true);
+  });
+});
+
+describe('outbound REDACT authority', () => {
+  it('does not hide an owned message locally when REDACT was not negotiated', () => {
+    const sendRaw = vi.fn();
+    const original = chatMsg('m1', 'me', 'alice');
+    store.setState({
+      client: mockClient(sendRaw),
+      dms: new Map([['alice', dmWith('alice', [original])]]),
+    });
+
+    store.getState().deleteMessage('alice', 'm1');
+
+    expect(sendRaw).not.toHaveBeenCalled();
+    expect(store.getState().dms.get('alice')!.messages[0]).toBe(original);
+    expect(original.redacted).toBeUndefined();
+  });
+
+  it('sends one REDACT and immutably marks our live message after negotiation', () => {
+    const sendRaw = vi.fn(() => true);
+    const original = chatMsg('m1', 'me', 'alice');
+    store.setState({
+      client: mockClient(sendRaw, ['draft/message-redaction']),
+      dms: new Map([['alice', dmWith('alice', [original])]]),
+    });
+    const beforeDms = store.getState().dms;
+
+    store.getState().deleteMessage('alice', 'm1');
+
+    expect(sendRaw).toHaveBeenCalledTimes(1);
+    expect(sendRaw).toHaveBeenCalledWith('REDACT', 'alice', 'm1', 'Deleted');
+    const redacted = store.getState().dms.get('alice')!.messages[0]!;
+    expect(redacted).not.toBe(original);
+    expect(redacted).toMatchObject({ redacted: true, text: '[Message deleted]' });
+    expect(store.getState().dms).not.toBe(beforeDms);
+  });
+
+  it('keeps the message visible when a stale-capability REDACT cannot reach the socket', () => {
+    const sendRaw = vi.fn(() => false);
+    const original = chatMsg('m1', 'me', 'alice');
+    store.setState({
+      client: mockClient(sendRaw, ['draft/message-redaction']),
+      dms: new Map([['alice', dmWith('alice', [original])]]),
+    });
+
+    store.getState().deleteMessage('alice', 'm1');
+
+    expect(sendRaw).toHaveBeenCalledWith('REDACT', 'alice', 'm1', 'Deleted');
+    expect(store.getState().dms.get('alice')!.messages[0]).toBe(original);
+    expect(original.redacted).toBeUndefined();
+  });
+
+  it('refuses to REDACT another author or a message still queued locally', () => {
+    const sendRaw = vi.fn();
+    const peerMessage = chatMsg('peer', 'alice', 'alice');
+    const pendingMessage = { ...chatMsg('pending', 'me', 'alice'), pending: true };
+    store.setState({
+      client: mockClient(sendRaw, ['draft/message-redaction']),
+      dms: new Map([['alice', dmWith('alice', [peerMessage, pendingMessage])]]),
+    });
+
+    store.getState().deleteMessage('alice', 'peer');
+    store.getState().deleteMessage('alice', 'pending');
+
+    expect(sendRaw).not.toHaveBeenCalled();
+    expect(store.getState().dms.get('alice')!.messages).toEqual([peerMessage, pendingMessage]);
   });
 });
 

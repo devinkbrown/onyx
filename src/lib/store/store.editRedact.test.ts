@@ -24,6 +24,18 @@ function mockClient(caps: string[] = ['draft/message-editing', 'draft/message-re
   } as never;
 }
 
+function mockClientWithSend(sendRaw: ReturnType<typeof vi.fn>, caps: string[] = ['draft/message-redaction']) {
+  return {
+    negotiatedCaps: new Set(caps),
+    capValues: new Map<string, string>(),
+    isupport: { CHANTYPES: '#&' },
+    prefixToMode: {},
+    sendRaw,
+    send: vi.fn(() => true),
+    tagmsg: vi.fn(),
+  } as never;
+}
+
 function textMsg(partial: Partial<ChatMessage> & Pick<ChatMessage, 'id' | 'from' | 'target'>): ChatMessage {
   return {
     text: 'original',
@@ -111,6 +123,7 @@ describe('outbound REDACT', () => {
     store.setState({
       channels: new Map([channel('#room', [mine])]),
     });
+    const beforeChannels = store.getState().channels;
 
     store.getState().deleteMessage('#room', 'm1');
 
@@ -120,38 +133,58 @@ describe('outbound REDACT', () => {
       'm1',
       'Deleted',
     );
-    expect(store.getState().channels.get('#room')!.messages[0]).toMatchObject({
+    const redacted = store.getState().channels.get('#room')!.messages[0]!;
+    expect(redacted).not.toBe(mine);
+    expect(redacted).toMatchObject({
       id: 'm1',
       redacted: true,
       text: '[Message deleted]',
     });
+    expect(store.getState().channels).not.toBe(beforeChannels);
   });
 
-  it('still optimistically redacts locally when the cap is missing (local UX)', () => {
-    // Wire is gated on the cap; local redaction of our own row still applies so
-    // the menu Delete action is never a silent no-op on a plain server.
+  it('does not hide a message locally when REDACT was not negotiated', () => {
+    // Fail closed: a local-only hide would claim success while peers still see it.
+    const mine = textMsg({ id: 'm1', from: 'me', target: '#room', text: 'x' });
     store.setState({
       client: mockClient([]),
-      channels: new Map([channel('#room', [textMsg({ id: 'm1', from: 'me', target: '#room', text: 'x' })])]),
+      channels: new Map([channel('#room', [mine])]),
     });
 
     store.getState().deleteMessage('#room', 'm1');
 
     expect(store.getState().client!.sendRaw).not.toHaveBeenCalled();
-    expect(store.getState().channels.get('#room')!.messages[0]!.redacted).toBe(true);
+    expect(store.getState().channels.get('#room')!.messages[0]).toBe(mine);
+    expect(mine.redacted).toBeUndefined();
   });
 
-  it('does not redact someone else’s message locally', () => {
+  it('keeps the message visible when a stale-capability REDACT cannot reach the socket', () => {
+    const sendRaw = vi.fn(() => false);
+    const mine = textMsg({ id: 'm1', from: 'me', target: '#room', text: 'x' });
     store.setState({
-      channels: new Map([channel('#room', [textMsg({ id: 'm1', from: 'alice', target: '#room', text: 'theirs' })])]),
+      client: mockClientWithSend(sendRaw, ['draft/message-redaction']),
+      channels: new Map([channel('#room', [mine])]),
     });
 
     store.getState().deleteMessage('#room', 'm1');
 
-    // Wire may still fire (server decides authority), but local fold only owns our rows.
-    const row = store.getState().channels.get('#room')!.messages[0]!;
-    expect(row.text).toBe('theirs');
-    expect(row.redacted).toBeFalsy();
+    expect(sendRaw).toHaveBeenCalledWith('REDACT', '#room', 'm1', 'Deleted');
+    expect(store.getState().channels.get('#room')!.messages[0]).toBe(mine);
+    expect(mine.redacted).toBeUndefined();
+  });
+
+  it('refuses to REDACT another author or a message still queued locally', () => {
+    const peer = textMsg({ id: 'peer', from: 'alice', target: '#room', text: 'theirs' });
+    const pending = textMsg({ id: 'pending', from: 'me', target: '#room', text: 'queued', pending: true });
+    store.setState({
+      channels: new Map([channel('#room', [peer, pending])]),
+    });
+
+    store.getState().deleteMessage('#room', 'peer');
+    store.getState().deleteMessage('#room', 'pending');
+
+    expect(store.getState().client!.sendRaw).not.toHaveBeenCalled();
+    expect(store.getState().channels.get('#room')!.messages).toEqual([peer, pending]);
   });
 });
 

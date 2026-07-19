@@ -723,6 +723,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const firstUnreadId = useStore((s) => s.firstUnreadId);
   const ourNick = useStore((s) => s.ourNick);
   const canEditMessages = useStore((s) => s.canEditMessages);
+  const canRedactMessages = useStore((s) => s.canRedactMessages);
   const historyLoading = useStore((s) => s.historyLoading);
   const historyExhausted = useStore((s) => s.historyExhausted);
   const forumChannels = useStore((s) => s.forumChannels);
@@ -1791,6 +1792,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       target={activeTarget()}
                       selfNick={selfNick()}
                       canEdit={canEditMessages()}
+                      canRedact={canRedactMessages()}
                       menuOpen={menuOpen()}
                       onMenuOpenChange={setMenuOpen}
                     />
@@ -1849,6 +1851,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     target={activeTarget()}
                     selfNick={selfNick()}
                     canEdit={canEditMessages()}
+                    canRedact={canRedactMessages()}
                     menuOpen={menuOpen()}
                     onMenuOpenChange={setMenuOpen}
                   />

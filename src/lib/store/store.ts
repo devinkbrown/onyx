@@ -1223,6 +1223,7 @@ export interface OnyxState {
   /** Remove a specific nick's reaction (used for incoming REACT from others) */
   removeReaction(target: string, messageId: string, emoji: string, nick: string): void;
   editMessage(target: string, messageId: string, newText: string): void;
+  /** Redact our live message when draft/message-redaction is negotiated. */
   deleteMessage(target: string, messageId: string): void;
   _setTyping(channel: string, nick: string, active: boolean): void;
   setTyping(target: string, nick: string, active: boolean): void;
@@ -7354,13 +7355,26 @@ export const store = createStore<OnyxState>()(
     deleteMessage(target, messageId) {
       const { client, ourNick } = get();
       const key = target.toLowerCase();
+      const current = conversationMessage(get(), target, messageId);
+
+      // Fail closed: without negotiated REDACT support, a local-only hide
+      // would claim success while every other client still sees the message.
+      // Revalidate ownership/state here as well as in the menu because store
+      // actions are public to keyboard/dev harnesses and future call sites.
+      if (
+        !client?.negotiatedCaps.has('draft/message-redaction')
+        || !current
+        || current.from.toLowerCase() !== ourNick.toLowerCase()
+        || current.deleted
+        || current.redacted
+        || current.pending
+      ) return;
 
       // IRCv3 draft/message-redaction via REDACT — Onyx Server wire form is
       // `REDACT <target> <msgid> [:reason]` (formatIRCLine adds the trailing
       // colon itself; passing ':Deleted' would double it).
-      if (client?.negotiatedCaps.has('draft/message-redaction')) {
-        client.sendRaw('REDACT', target, messageId, 'Deleted');
-      }
+      const sent = client.sendRaw('REDACT', target, messageId, 'Deleted');
+      if (!sent) return;
 
       const applyDelete = (messages: ChatMessage[]): ChatMessage[] =>
         messages.map(m =>

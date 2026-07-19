@@ -8,9 +8,9 @@
  *   - ⋯      → overflow Popover: Copy text · Reply · Edit · Delete
  *
  * The overflow menu's open state is controllable (so a right-click on the row
- * can open it) and also opens from the ⋯ button. Delete is only shown when the
- * store exposes deleteMessage (it does — IRCv3 REDACT) and the message is the
- * user's own, non-deleted text message.
+ * can open it) and also opens from the ⋯ button. Delete is only shown when
+ * draft/message-redaction is negotiated (canRedact), the message is our own
+ * live non-pending text, and the user confirms "Delete for everyone".
  *
  * SOLID IDIOMS: components run once; never destructure props (splitProps);
  * createSignal/createMemo/onCleanup; For/Show. No innerHTML. Clipboard writes
@@ -71,7 +71,7 @@ export type MessageMenuCapabilities = {
 };
 
 export type CapabilityInput = {
-  msg: Pick<ChatMessage, 'from' | 'text' | 'plaintext' | 'encrypted' | 'type' | 'deleted' | 'redacted'>;
+  msg: Pick<ChatMessage, 'from' | 'text' | 'plaintext' | 'encrypted' | 'type' | 'deleted' | 'redacted' | 'pending'>;
   selfNick: string;
   /** server/account permits editing (store.canEditMessages) */
   editingEnabled: boolean;
@@ -116,7 +116,7 @@ export function messageMenuCapabilities(input: CapabilityInput): MessageMenuCapa
       && editingEnabled
       && msg.type === 'msg'
       && !hasEncryptedMessageBoundary(msg),
-    canDelete: !gone && isOwn && deleteSupported,
+    canDelete: !gone && !msg.pending && isOwn && deleteSupported,
   };
 }
 
@@ -158,6 +158,8 @@ export type MessageMenuProps = {
   selfNick: string;
   /** store.canEditMessages */
   canEdit: boolean;
+  /** store.canRedactMessages; omitted callers fail closed */
+  canRedact?: boolean;
   /** controlled overflow-menu open state (lets the row's right-click open it) */
   menuOpen?: boolean;
   onMenuOpenChange?: (open: boolean) => void;
@@ -184,6 +186,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     'target',
     'selfNick',
     'canEdit',
+    'canRedact',
     'menuOpen',
     'onMenuOpenChange',
   ]);
@@ -199,9 +202,8 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
       msg: local.msg,
       selfNick: local.selfNick,
       editingEnabled: local.canEdit,
-      // Delete rides IRCv3 REDACT via store.deleteMessage; it always exists on
-      // the store, so the affordance is governed purely by ownership/state.
-      deleteSupported: true,
+      // Fail closed: omit canRedact (or pass false) when REDACT was not negotiated.
+      deleteSupported: local.canRedact === true,
       channelTarget: isChannelTarget(),
     }),
   );
@@ -209,6 +211,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   // ── popover open states ──
   const [reactOpen, setReactOpen] = createSignal(false);
   const [innerMenuOpen, setInnerMenuOpen] = createSignal(false);
+  const [deleteConfirming, setDeleteConfirming] = createSignal(false);
   const [clipboardStatus, setClipboardStatus] = createSignal('');
   const [messageTranslation, setMessageTranslation] = createSignal<MessageTranslationState>({ status: 'idle' });
   const [translationCopyState, setTranslationCopyState] = createSignal<TranslationCopyState>('idle');
@@ -236,6 +239,8 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   const translator = createBrowserTranslator();
 
   let disposed = false;
+  let deleteActionRef: HTMLButtonElement | undefined;
+  let deleteCancelRef: HTMLButtonElement | undefined;
   let clipboardEpoch = 0;
   let activeTranslation: symbol | undefined;
   let activeTranslationCopy: symbol | undefined;
@@ -248,6 +253,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   let observedCopyMessageId = '';
   let observedCopyTarget = '';
   let observedCopyText: string | null = null;
+  let observedDeleteMessageId = '';
 
   // A keyed row is normally stable, but controlled tests and list replacement
   // can update props in place. Invalidate any old completion before it can land.
@@ -305,6 +311,18 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     observedCopyText = translated;
     activeTranslationCopy = undefined;
     setTranslationCopyState('idle');
+  });
+
+  // A confirmation is authority- and row-bound. If either the rendered row
+  // changes or REDACT disappears during reconnect/cap renegotiation, disarm it
+  // before a stale confirm can act on a different message.
+  createEffect(() => {
+    const messageId = local.msg.id;
+    const allowed = caps().canDelete;
+    if (messageId !== observedDeleteMessageId || !allowed) {
+      observedDeleteMessageId = messageId;
+      setDeleteConfirming(false);
+    }
   });
 
   // ── actions ──
@@ -493,7 +511,28 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   function remove(): void {
     if (!caps().canDelete) return;
     getState().deleteMessage(local.target, local.msg.id);
+    setDeleteConfirming(false);
     setMenuOpen(false);
+  }
+
+  function stageRemove(): void {
+    if (!caps().canDelete) return;
+    const panel = overflowMenuRef?.closest<HTMLElement>('.onyx-popover__panel');
+    setDeleteConfirming(true);
+    // The destructive item is commonly the last row and focusing it can leave
+    // the scroll-owned short-height popover scrolled down. Reset after swapping
+    // in the shorter confirmation so its warning is never clipped above view.
+    queueMicrotask(() => {
+      if (panel?.isConnected) panel.scrollTop = 0;
+    });
+  }
+
+  function cancelRemove(): void {
+    setDeleteConfirming(false);
+    queueMicrotask(() => {
+      const deleteIndex = overflowItems().findIndex((item) => item === deleteActionRef);
+      if (deleteIndex >= 0) focusMenuItem(deleteIndex);
+    });
   }
 
   // Pin/unpin (ops only, channels only). Reactive to the live PINS prop.
@@ -517,6 +556,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   // floating layers never stack on a single row.
   const guardedSetMenuOpen = (next: boolean): void => {
     if (next) setReactOpen(false);
+    if (!next) setDeleteConfirming(false);
     setMenuOpen(next);
   };
   const guardedSetReactOpen = (next: boolean): void => {
@@ -579,6 +619,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     activeTranslation = undefined;
     activeTranslationCopy = undefined;
     setReactOpen(false);
+    setDeleteConfirming(false);
     setInnerMenuOpen(false);
   });
 
@@ -690,20 +731,59 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
           }
         >
           <div class="msg-menu-overflow">
-            <div
-              ref={(element) => {
-                overflowMenuRef = element;
-                // This element only mounts while the Popover is open, so moving
-                // focus into the menu on mount == focus-into-menu on open (menu
-                // pattern). Deferred so the conditional <Show> menuitems exist
-                // before we focus the first one.
-                queueMicrotask(() => focusMenuItem(0));
-              }}
-              class="msg-menu-list"
-              role="menu"
-              aria-label={`More actions for ${messageActionTarget()}`}
-              onKeyDown={onMenuKeyDown}
+            <Show
+              when={!deleteConfirming()}
+              fallback={(
+                <div
+                  class="msg-menu-delete-confirm"
+                  role="group"
+                  aria-label={`Confirm deleting ${messageActionTarget()} for everyone`}
+                >
+                  <p class="msg-menu-delete-confirm__title">Delete for everyone?</p>
+                  <p class="msg-menu-delete-confirm__copy">
+                    This removes the message from the conversation and cannot be undone.
+                  </p>
+                  <div class="msg-menu-delete-confirm__actions">
+                    <button
+                      ref={(element) => {
+                        deleteCancelRef = element;
+                        queueMicrotask(() => {
+                          if (deleteCancelRef?.isConnected) deleteCancelRef.focus({ preventScroll: true });
+                        });
+                      }}
+                      type="button"
+                      class="msg-menu-delete-confirm__cancel"
+                      aria-label={`Keep ${messageActionTarget()}`}
+                      onClick={cancelRemove}
+                    >
+                      Keep message
+                    </button>
+                    <button
+                      type="button"
+                      class="msg-menu-delete-confirm__delete"
+                      aria-label={`Confirm deleting ${messageActionTarget()} for everyone`}
+                      onClick={remove}
+                    >
+                      Delete for everyone
+                    </button>
+                  </div>
+                </div>
+              )}
             >
+              <div
+                ref={(element) => {
+                  overflowMenuRef = element;
+                  // This element only mounts while the Popover is open, so moving
+                  // focus into the menu on mount == focus-into-menu on open (menu
+                  // pattern). Deferred so the conditional <Show> menuitems exist
+                  // before we focus the first one.
+                  queueMicrotask(() => focusMenuItem(0));
+                }}
+                class="msg-menu-list"
+                role="menu"
+                aria-label={`More actions for ${messageActionTarget()}`}
+                onKeyDown={onMenuKeyDown}
+              >
             <Show when={caps().canCopy}>
               <button
                 type="button"
@@ -803,23 +883,25 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
             </Show>
             <Show when={caps().canDelete}>
               <button
+                ref={(element) => { deleteActionRef = element; }}
                 type="button"
                 class="msg-menu-item msg-menu-item--danger"
                 role="menuitem"
-                aria-label={`Delete ${messageActionTarget()}`}
-                onClick={remove}
+                aria-label={`Delete ${messageActionTarget()} for everyone`}
+                onClick={stageRemove}
               >
                 <TrashIcon class="msg-menu-item-icon" />
-                <span>Delete</span>
+                <span>Delete for everyone</span>
               </button>
             </Show>
-            </div>
-            <Show when={actionText() !== null && !localTranslatorAvailable()}>
+              </div>
+            </Show>
+            <Show when={!deleteConfirming() && actionText() !== null && !localTranslatorAvailable()}>
               <p class="msg-menu-translation-note" role="note">
                 On-device translation is unavailable in this browser.
               </p>
             </Show>
-            <Show when={visibleMessageTranslation()} keyed>
+            <Show when={!deleteConfirming() && visibleMessageTranslation()} keyed>
               {(state) => (
                 <section
                   class="msg-menu-translation"

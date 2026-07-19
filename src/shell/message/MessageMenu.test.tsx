@@ -204,6 +204,15 @@ describe('messageMenuCapabilities', () => {
     expect(caps.canEdit).toBe(true);
   });
 
+  it('forbids redacting a message that is still queued locally', () => {
+    const caps = messageMenuCapabilities(input({
+      msg: { from: 'alice', text: 'waiting to send', type: 'msg', pending: true },
+    }));
+
+    expect(caps.canDelete).toBe(false);
+    expect(caps.canEdit).toBe(true);
+  });
+
   it('forbids copy when there is no real text (whitespace only)', () => {
     // Arrange
     const args = input({ msg: { from: 'alice', text: '   ', type: 'msg' } });
@@ -1077,7 +1086,7 @@ describe('<MessageMenu>', () => {
     };
 
     render(() => (
-      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit menuOpen />
+      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit canRedact menuOpen />
     ));
 
     const firstItem = screen.getByRole('menuitem', { name: 'Copy text from message from alice' });
@@ -1101,13 +1110,13 @@ describe('<MessageMenu>', () => {
     };
 
     render(() => (
-      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit menuOpen />
+      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit canRedact menuOpen />
     ));
 
     const menu = screen.getByRole('menu', { name: 'More actions for message from alice' });
     const first = screen.getByRole('menuitem', { name: 'Copy text from message from alice' });
     const second = screen.getByRole('menuitem', { name: 'Copy moment link for message from alice' });
-    const last = screen.getByRole('menuitem', { name: 'Delete message from alice' });
+    const last = screen.getByRole('menuitem', { name: 'Delete message from alice for everyone' });
 
     await waitFor(() => expect(document.activeElement).toBe(first));
 
@@ -1146,6 +1155,7 @@ describe('<MessageMenu>', () => {
         target="#general"
         selfNick="alice"
         canEdit
+        canRedact
         menuOpen
       />
     ));
@@ -1158,7 +1168,128 @@ describe('<MessageMenu>', () => {
     expect(screen.getByRole('menuitem', { name: 'Copy text from message from alice' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Reply to message from alice' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Edit message from alice' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Delete message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Delete message from alice for everyone' })).toBeInTheDocument();
+  });
+
+  it('fails closed by hiding delete when REDACT was not negotiated', () => {
+    const msg: ChatMessage = {
+      id: 'm-no-redact',
+      from: 'alice',
+      text: 'This must remain visible.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit menuOpen />
+    ));
+
+    expect(screen.queryByRole('menuitem', { name: /delete message from alice/i })).toBeNull();
+  });
+
+  it('disarms an open confirmation when REDACT authority disappears', async () => {
+    const remove = vi.spyOn(store.getState(), 'deleteMessage').mockImplementation(() => {});
+    const [canRedact, setCanRedact] = createSignal(true);
+    const msg: ChatMessage = {
+      id: 'm-redact-cap-loss',
+      from: 'alice',
+      text: 'Authority can change during reconnect.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu
+        msg={msg}
+        target="#general"
+        selfNick="alice"
+        canEdit
+        canRedact={canRedact()}
+        menuOpen
+      />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', {
+      name: 'Delete message from alice for everyone',
+    }));
+    expect(screen.getByRole('group', {
+      name: 'Confirm deleting message from alice for everyone',
+    })).toBeInTheDocument();
+
+    setCanRedact(false);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('group', {
+        name: 'Confirm deleting message from alice for everyone',
+      })).toBeNull();
+      expect(screen.queryByRole('menuitem', { name: /delete message from alice/i })).toBeNull();
+    });
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('reviews REDACT explicitly, focuses the safe action, and restores delete focus on cancel', async () => {
+    const remove = vi.spyOn(store.getState(), 'deleteMessage').mockImplementation(() => {});
+    const msg: ChatMessage = {
+      id: 'm-confirm-redact',
+      from: 'alice',
+      text: 'Delete only after review.',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu
+        msg={msg}
+        target="#general"
+        selfNick="alice"
+        canEdit
+        canRedact
+        menuOpen
+      />
+    ));
+
+    const deleteAction = screen.getByRole('menuitem', {
+      name: 'Delete message from alice for everyone',
+    });
+    const dialog = screen.getByRole('dialog', { name: 'More actions for message from alice' });
+    dialog.scrollTop = 96;
+    fireEvent.click(deleteAction);
+
+    expect(remove).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menu', { name: 'More actions for message from alice' })).toBeNull();
+    const confirmation = screen.getByRole('group', {
+      name: 'Confirm deleting message from alice for everyone',
+    });
+    expect(confirmation).toHaveTextContent('cannot be undone');
+    const keep = screen.getByRole('button', { name: 'Keep message from alice' });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(keep);
+      expect(dialog.scrollTop).toBe(0);
+    });
+
+    fireEvent.click(keep);
+    const restoredDelete = await screen.findByRole('menuitem', {
+      name: 'Delete message from alice for everyone',
+    });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(restoredDelete);
+      expect(restoredDelete).toHaveAttribute('tabindex', '0');
+      expect(screen.getByRole('menuitem', {
+        name: 'Copy text from message from alice',
+      })).toHaveAttribute('tabindex', '-1');
+    });
+    expect(remove).not.toHaveBeenCalled();
+
+    fireEvent.click(restoredDelete);
+    const confirm = screen.getByRole('button', {
+      name: 'Confirm deleting message from alice for everyone',
+    });
+    fireEvent.click(confirm);
+
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith('#general', 'm-confirm-redact');
   });
 
   it('keeps the reaction picker open while an input method owns Escape', () => {

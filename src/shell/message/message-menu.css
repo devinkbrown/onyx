@@ -190,6 +190,76 @@
   background: color-mix(in oklab, var(--shu) 14%, transparent);
 }
 
+/* REDACT confirmation replaces the ARIA menu instead of nesting non-menu
+   content inside it. The vermillion rail is the one deliberate danger mark;
+   the rest stays quiet so the consequence reads before the destructive verb. */
+.msg-menu-delete-confirm {
+  display: grid;
+  gap: var(--space-2);
+  width: min(18rem, 78vw);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--shu) 34%, var(--seam-faint));
+  border-left: 3px solid var(--shu);
+  border-radius: var(--r-sm);
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--shu) 8%, var(--ink));
+}
+
+.msg-menu-delete-confirm__title,
+.msg-menu-delete-confirm__copy {
+  margin: 0;
+}
+
+.msg-menu-delete-confirm__title {
+  color: var(--washi);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.msg-menu-delete-confirm__copy {
+  color: var(--washi-mute);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.msg-menu-delete-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.msg-menu-delete-confirm__cancel,
+.msg-menu-delete-confirm__delete {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  color: var(--washi-dim);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.msg-menu-delete-confirm__cancel:hover,
+.msg-menu-delete-confirm__cancel:focus-visible {
+  color: var(--washi);
+  border-color: var(--lapis);
+}
+
+.msg-menu-delete-confirm__delete {
+  color: var(--shu-bright);
+  border-color: color-mix(in oklab, var(--shu) 52%, var(--seam-faint));
+  background: color-mix(in oklab, var(--shu) 14%, transparent);
+}
+
+.msg-menu-delete-confirm__delete:hover,
+.msg-menu-delete-confirm__delete:focus-visible {
+  color: var(--washi);
+  border-color: var(--shu-bright);
+  background: color-mix(in oklab, var(--shu) 24%, transparent);
+}
+
 .msg-menu-item-icon {
   width: 16px;
   height: 16px;
@@ -393,8 +463,31 @@
   }
 
   .msg-menu-translation-note,
-  .msg-menu-translation {
+  .msg-menu-translation,
+  .msg-menu-delete-confirm {
     width: 100%;
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  .msg-menu-delete-confirm {
+    gap: 4px;
+    border-left-width: 3px;
+  }
+
+  .msg-menu-delete-confirm__title,
+  .msg-menu-delete-confirm__copy {
+    font-size: 14px;
+  }
+
+  .msg-menu-delete-confirm__actions {
+    gap: 4px;
+  }
+
+  .msg-menu-delete-confirm__cancel,
+  .msg-menu-delete-confirm__delete {
+    flex: 1 1 8rem;
+    min-height: 44px;
     padding: 8px;
     font-size: 14px;
   }

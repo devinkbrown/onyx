@@ -54,7 +54,7 @@ test('contains message overflow actions at 400% short reflow', async ({ page, br
                 </button>
                 <button class="msg-menu-item msg-menu-item--danger" type="button" role="menuitem">
                   <span class="msg-menu-item-icon" aria-hidden="true">D</span>
-                  <span>Delete message</span>
+                  <span>Delete for everyone</span>
                 </button>
               </div>
               <p class="msg-menu-translation">
@@ -64,6 +64,14 @@ test('contains message overflow actions at 400% short reflow', async ({ page, br
                   <button class="msg-menu-translation-action" type="button">Copy translation</button>
                 </span>
               </p>
+              <div class="msg-menu-delete-confirm" role="group" aria-label="Confirm deleting message for everyone" style="display:none">
+                <p class="msg-menu-delete-confirm__title">Delete for everyone?</p>
+                <p class="msg-menu-delete-confirm__copy">This removes the message from the conversation and cannot be undone.</p>
+                <div class="msg-menu-delete-confirm__actions">
+                  <button class="msg-menu-delete-confirm__cancel" type="button">Keep message</button>
+                  <button class="msg-menu-delete-confirm__delete" type="button">Delete for everyone</button>
+                </div>
+              </div>
             </div>
           </div>
         </span>
@@ -111,7 +119,7 @@ test('contains message overflow actions at 400% short reflow', async ({ page, br
   });
 
   const panel = page.getByRole('dialog', { name: 'More message actions' });
-  const deleteAction = panel.getByRole('menuitem', { name: 'Delete message' });
+  const deleteAction = panel.getByRole('menuitem', { name: 'Delete for everyone' });
   await deleteAction.focus();
   await expect(deleteAction).toBeFocused();
 
@@ -149,4 +157,73 @@ test('contains message overflow actions at 400% short reflow', async ({ page, br
   expect(geometry.actionTop).toBeGreaterThanOrEqual(geometry.panelTop);
   expect(geometry.actionBottom).toBeLessThanOrEqual(geometry.panelBottom);
   expect(geometry.actionHeight).toBeGreaterThanOrEqual(44);
+
+  await panel.evaluate((element) => {
+    element.querySelector<HTMLElement>('.msg-menu-list')!.style.display = 'none';
+    element.querySelector<HTMLElement>('.msg-menu-translation')!.style.display = 'none';
+    element.querySelector<HTMLElement>('.msg-menu-delete-confirm')!.style.removeProperty('display');
+    // MessageMenu resets the scroll-owned popover when replacing its last menu
+    // item with the confirmation so the warning cannot remain clipped above.
+    element.scrollTop = 0;
+  });
+
+  const confirmation = panel.getByRole('group', { name: 'Confirm deleting message for everyone' });
+  const keepMessage = confirmation.getByRole('button', { name: 'Keep message' });
+  await keepMessage.focus();
+  await expect(keepMessage).toBeFocused();
+  const confirmationGeometry = await confirmation.evaluate((element) => {
+    const panel = element.closest<HTMLElement>('.onyx-popover__panel')!;
+    const panelRect = panel.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
+    const buttons = Array.from(element.querySelectorAll<HTMLButtonElement>('button'));
+    return {
+      panelClientWidth: panel.clientWidth,
+      panelScrollWidth: panel.scrollWidth,
+      panelClientHeight: panel.clientHeight,
+      panelScrollHeight: panel.scrollHeight,
+      panelTop: panelRect.top,
+      panelBottom: panelRect.bottom,
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      buttonSizes: buttons.map((button) => {
+        const buttonRect = button.getBoundingClientRect();
+        return { width: buttonRect.width, height: buttonRect.height };
+      }),
+    };
+  });
+
+  expect(confirmationGeometry.panelScrollWidth).toBe(confirmationGeometry.panelClientWidth);
+  expect(confirmationGeometry.left).toBeGreaterThanOrEqual(8);
+  expect(confirmationGeometry.right).toBeLessThanOrEqual(320 - 24);
+  expect(confirmationGeometry.top).toBeGreaterThanOrEqual(12);
+  expect(confirmationGeometry.panelTop).toBeGreaterThanOrEqual(12);
+  expect(confirmationGeometry.panelBottom).toBeLessThanOrEqual(256 - 20 - 56 - 8);
+  expect(confirmationGeometry.panelScrollHeight).toBeGreaterThanOrEqual(
+    confirmationGeometry.panelClientHeight,
+  );
+  for (const size of confirmationGeometry.buttonSizes) {
+    expect(size.width).toBeGreaterThanOrEqual(44);
+    expect(size.height).toBeGreaterThanOrEqual(44);
+  }
+
+  // Vertical scrolling is permitted under 400% short reflow. The destructive
+  // action still has to become wholly visible when reached by keyboard.
+  const confirmDelete = confirmation.getByRole('button', { name: 'Delete for everyone' });
+  await confirmDelete.focus();
+  await expect(confirmDelete).toBeFocused();
+  const focusedGeometry = await confirmDelete.evaluate((button) => {
+    const panel = button.closest<HTMLElement>('.onyx-popover__panel')!;
+    const panelRect = panel.getBoundingClientRect();
+    const buttonRect = button.getBoundingClientRect();
+    return {
+      panelTop: panelRect.top,
+      panelBottom: panelRect.bottom,
+      buttonTop: buttonRect.top,
+      buttonBottom: buttonRect.bottom,
+    };
+  });
+  expect(focusedGeometry.buttonTop).toBeGreaterThanOrEqual(focusedGeometry.panelTop);
+  expect(focusedGeometry.buttonBottom).toBeLessThanOrEqual(focusedGeometry.panelBottom);
 });
