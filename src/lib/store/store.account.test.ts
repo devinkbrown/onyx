@@ -160,6 +160,52 @@ describe('SESSION token persistence — server NOTICE compatibility', () => {
     expect(client.updateResumeTokens).toHaveBeenCalledWith({ meshToken: 'mesh-token' });
   });
 
+  it('rekeys a collision alias when MTOKEN arrives without a preceding TOKEN', () => {
+    const client = makeClient();
+    saveCredentials({ nick: 'Alice_', server: 'wss://eshmaki.me', password: 'pw' });
+    store.setState({
+      client: client as never,
+      server: seedServer(null),
+      ourNick: 'Alice_',
+    });
+
+    feed(':eshmaki.me 900 Alice_ Alice_!u@h Alice :You are now logged in as Alice');
+    feed(':eshmaki.me NOTE SESSION MTOKEN :mesh-token');
+
+    expect(loadCredentials('wss://eshmaki.me', 'Alice_')).toBeNull();
+    expect(loadCredentials('wss://eshmaki.me', 'Alice')).toMatchObject({
+      nick: 'Alice',
+      meshToken: 'mesh-token',
+    });
+    expect(client.updateResumeTokens).toHaveBeenCalledWith({ meshToken: 'mesh-token' });
+  });
+
+  it('keeps existing canonical credentials when MTOKEN arrives before TOKEN', () => {
+    const client = makeClient();
+    saveCredentials({ nick: 'coolnick', server: 'wss://eshmaki.me', password: 'coolnick-pw' });
+    saveCredentials({ nick: 'Alice', server: 'wss://eshmaki.me', password: 'alice-pw' });
+    store.setState({
+      client: client as never,
+      server: seedServer(null),
+      ourNick: 'coolnick',
+    });
+
+    feed(':eshmaki.me 900 coolnick coolnick!u@h Alice :You are now logged in as Alice');
+    feed(':eshmaki.me NOTE SESSION MTOKEN :mesh-token');
+    feed(':eshmaki.me NOTE SESSION TOKEN :session-token');
+
+    expect(loadCredentials('wss://eshmaki.me', 'Alice')).toMatchObject({
+      nick: 'Alice',
+      password: 'alice-pw',
+      meshToken: 'mesh-token',
+      sessionToken: 'session-token',
+    });
+    expect(loadCredentials('wss://eshmaki.me', 'coolnick')).toMatchObject({
+      nick: 'coolnick',
+      password: 'coolnick-pw',
+    });
+  });
+
   it('keeps live token rotation scoped to the connected identity when another identity is active', () => {
     const client = makeClient();
     saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'alice-pw' });

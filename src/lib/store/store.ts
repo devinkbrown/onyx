@@ -8584,8 +8584,11 @@ export const store = createStore<OnyxState>()(
           const cred = parseSessionMeshTokenNote(msg);
           if (cred && _canAcceptSessionToken(get)) {
             _confirmRememberedSessionAccount(get, set);
+            const canonicalNick = _saslAccount ?? undefined;
             const target = _liveCredentialTokenTarget(get, false);
-            if (target) storeMeshToken(cred.token, cred.expiresAt, target);
+            // Pass canonicalNick so a collision alias (Alice_) is re-keyed to the
+            // authenticated account when MTOKEN arrives without a preceding TOKEN.
+            if (target) storeMeshToken(cred.token, cred.expiresAt, target, canonicalNick);
             // Prefer the mesh token on the live client so a reconnect landing on a
             // different node resumes correctly (updateResumeTokens merges, not clobbers).
             get().client?.updateResumeTokens({ meshToken: cred.token });
@@ -9885,7 +9888,16 @@ export const store = createStore<OnyxState>()(
             if (meshCred && _canAcceptSessionToken(get)) {
               _confirmRememberedSessionAccount(get, set);
               const target = _liveCredentialTokenTarget(get, false);
-              if (target) storeMeshToken(meshCred.token, meshCred.expiresAt, target);
+              // Same canonical re-key as the NOTE MTOKEN path — MTOKEN alone must
+              // still migrate a collision alias onto the authenticated account.
+              if (target) {
+                storeMeshToken(
+                  meshCred.token,
+                  meshCred.expiresAt,
+                  target,
+                  _saslAccount ?? undefined,
+                );
+              }
               get().client?.updateResumeTokens({ meshToken: meshCred.token });
               break;
             }

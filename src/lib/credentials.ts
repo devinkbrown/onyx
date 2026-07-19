@@ -525,15 +525,25 @@ export function storeSessionToken(
     const existing = ownCredential(store, entryKey);
     if (!existing) return;
     const nick = safeCanonicalNick ?? existing.nick;
+    const nextKey = credentialKey(existing.server, nick);
+    // An alias can authenticate as an account that already has its own saved
+    // credentials. Rotate the account entry in that case, but keep the alias
+    // entry intact so its password and independent identity are not lost.
+    const canonicalExisting = nextKey !== entryKey
+      ? ownCredential(store, nextKey)
+      : undefined;
     const creds: SavedCredentials = {
-      ...existing,
+      ...(canonicalExisting ?? existing),
       nick,
       sessionToken: safeToken,
-      tokenExpiry:  expiry,
+      // Only set tokenExpiry when the caller supplies one; otherwise preserve any
+      // expiry already governing an existing token rather than clobbering it.
+      ...(expiry !== undefined
+        ? { tokenExpiry: expiry }
+        : {}),
     };
-    const nextKey = credentialKey(existing.server, nick);
     const wasActive = store.activeKey === entryKey;
-    if (nextKey !== entryKey) delete store.entries[entryKey];
+    if (nextKey !== entryKey && !canonicalExisting) delete store.entries[entryKey];
     store.entries[nextKey] = creds;
     if (wasActive || !store.activeKey) store.activeKey = nextKey;
     writeStore(store);
@@ -576,17 +586,23 @@ export function clearSessionToken(server?: string, nick?: string): void {
  *   clearCredentials — the server still enforces its own expiry on any resume
  *   attempt, so a stale local copy is a housekeeping concern, not an
  *   auth-lifetime one.
+ * canonicalNick — when a collision alias is the only saved entry, re-key it to
+ *   the authenticated account just like storeSessionToken does.
  */
 export function storeMeshToken(
   token: string,
   expiresAt?: number,
   target?: CredentialTokenTarget,
+  canonicalNick?: string,
 ): void {
   if (typeof window === 'undefined') return;
   try {
     const safeToken = sanitizeResumeToken(token);
     const expiry = expiryFromSeconds(expiresAt);
-    if (!safeToken || expiry === null) return;
+    const safeCanonicalNick = canonicalNick === undefined
+      ? undefined
+      : sanitizeCredentialNick(canonicalNick);
+    if (!safeToken || expiry === null || (canonicalNick !== undefined && !safeCanonicalNick)) return;
     const store = readStore();
     if (!store) return; // Only store tokens when we have base credentials
     purgeExpiredTokens(store);
@@ -594,16 +610,31 @@ export function storeMeshToken(
     if (!entryKey) return;
     const existing = ownCredential(store, entryKey);
     if (!existing) return;
+    const nick = safeCanonicalNick ?? existing.nick;
+    const nextKey = credentialKey(existing.server, nick);
+    // Same alias→canonical merge as storeSessionToken: rotate the account entry
+    // when it already exists, but keep an independent alias credential intact.
+    const canonicalExisting = nextKey !== entryKey
+      ? ownCredential(store, nextKey)
+      : undefined;
     // Only set tokenExpiry when the caller supplies one; otherwise preserve any
     // expiry already governing an existing token rather than clobbering it.
-    store.entries[entryKey] = {
-      ...existing,
+    const creds: SavedCredentials = {
+      ...(canonicalExisting ?? existing),
+      nick,
       meshToken: safeToken,
       ...(expiry !== undefined
         ? { tokenExpiry: expiry }
         : {}),
     };
+    const wasActive = store.activeKey === entryKey;
+    if (nextKey !== entryKey && !canonicalExisting) delete store.entries[entryKey];
+    store.entries[nextKey] = creds;
+    if (wasActive || !store.activeKey) store.activeKey = nextKey;
     writeStore(store);
+    if (safeCanonicalNick && store.activeKey === nextKey) {
+      localStorage.setItem('onyx:saved-nick', safeCanonicalNick);
+    }
   } catch { /* quota */ }
 }
 

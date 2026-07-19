@@ -243,6 +243,44 @@ describe('credentials persistence', () => {
     expect(localStorage.getItem(SAVED_NICK_KEY)).toBe('Alice');
   });
 
+  it('stores a mesh token on the active credentials and rekeys canonical nick changes', () => {
+    saveCredentials({ nick: 'Alice_', server: 'irc.example', password: 'pw' });
+
+    storeMeshToken('mesh-token', 1_800_000_000, undefined, 'Alice');
+
+    const stored = readStoredCredentials();
+    expect(stored.activeKey).toBe('irc.example|alice');
+    expect(entryKeys()).toEqual(['irc.example|alice']);
+    expect(stored.entries['irc.example|alice']).toMatchObject({
+      nick: 'Alice',
+      meshToken: 'mesh-token',
+      tokenExpiry: '2027-01-15T08:00:00.000Z',
+    });
+    expect(localStorage.getItem(SAVED_NICK_KEY)).toBe('Alice');
+  });
+
+  it('rotates into an existing canonical identity without overwriting either credential', () => {
+    saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'canonical-pw' });
+    saveCredentials({ nick: 'Alice_', server: 'irc.example', password: 'alias-pw' });
+    const aliasTarget = { server: 'irc.example', nick: 'Alice_' };
+
+    storeMeshToken('mesh-token', 1_800_000_000, aliasTarget, 'Alice');
+    storeSessionToken('session-token', undefined, 'Alice', aliasTarget);
+
+    expect(loadCredentials('irc.example', 'Alice')).toMatchObject({
+      nick: 'Alice',
+      password: 'canonical-pw',
+      sessionToken: 'session-token',
+      meshToken: 'mesh-token',
+      tokenExpiry: '2027-01-15T08:00:00.000Z',
+    });
+    expect(loadCredentials('irc.example', 'Alice_')).toMatchObject({
+      nick: 'Alice_',
+      password: 'alias-pw',
+    });
+    expect(loadCredentials()).toMatchObject({ nick: 'Alice' });
+  });
+
   it('rotates local and mesh tokens only for an explicitly targeted identity', () => {
     saveCredentials({ nick: 'Alice', server: 'wss://alice.example', password: 'alice-pw' });
     saveCredentials({ nick: 'Bob', server: 'wss://bob.example', password: 'bob-pw' });
