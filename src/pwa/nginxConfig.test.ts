@@ -31,7 +31,7 @@ describe('public asset delivery policy', () => {
   it('keeps stats fingerprints out of the stats SPA fallback', () => {
     const body = locationBody('^~ /stats/assets/');
 
-    expect(body).toContain('alias /home/kain/onyx-stats/out/assets/;');
+    expect(body).toContain('alias /home/kain/onyx/out/assets/;');
     expect(body).toContain('error_page 404 = @onyx_public_asset_not_found;');
     expect(body).toContain(
       'add_header Cache-Control "public, max-age=31536000, immutable";',
@@ -66,7 +66,7 @@ describe('public asset delivery policy', () => {
   it('revalidates the stats SPA shell without weakening asset or data precedence', () => {
     const body = locationBody('^~ /stats/');
 
-    expect(body).toContain('alias /home/kain/onyx-stats/out/;');
+    expect(body).toContain('alias /home/kain/onyx/out/stats/;');
     expect(body).toContain('try_files $uri $uri/ /stats/index.html;');
     expect(body).toContain('add_header Cache-Control "no-cache";');
     expect(body.match(/Cache-Control/g)).toHaveLength(1);
