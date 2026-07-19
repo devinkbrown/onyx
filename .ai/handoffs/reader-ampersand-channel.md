@@ -21,7 +21,7 @@ gates:
 
 # Scope
 
-- Non-goals and forbidden paths: no server or Orochi work; no protocol, dependency, or `out/` changes.
+- Non-goals and forbidden paths: no server or Onyx Server work; no protocol, dependency, or `out/` changes.
 - Invariants: keep DMs excluded; preserve review-history `kind: 'channel'`; retain CHANTYPES-aware store travel behavior.
 - Worktree and branch (writers only): primary checkout, Codex integration owner.
 

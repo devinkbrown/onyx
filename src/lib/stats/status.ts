@@ -2,7 +2,7 @@
 /**
  * status.ts — public mesh health feed.
  *
- * Orochi writes `status.json` next to the stats index. The website consumes it
+ * Onyx Server writes `status.json` next to the stats index. The website consumes it
  * defensively because dev builds usually do not have live exported data.
  */
 import {

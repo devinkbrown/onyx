@@ -994,4 +994,15 @@ describe('buildCommands', () => {
     command?.run();
     expect(store.getState().showScheduledMessages).toBe(true);
   });
+
+  it('opens the jump-to-date sheet', () => {
+    const command = buildCommands(getState(), 'jump date').find(
+      (entry) => entry.id === 'action:jump-to-date',
+    );
+    expect(command).toBeDefined();
+    expect(command?.title).toBe('Jump to date…');
+    expect(command?.keywords).toContain('travel');
+    command?.run();
+    expect(store.getState().showJumpToDate).toBe(true);
+  });
 });

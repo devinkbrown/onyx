@@ -178,7 +178,7 @@ describe('SASL PLAIN UTF-8 credentials', () => {
 });
 
 // ── FIX 2 — SCRAM server-signature (mutual auth) verification ─────────────────
-// Simulate the orochi server SCRAM emit path: after the client-final, the server
+// Simulate the Onyx Server SCRAM emit path: after the client-final, the server
 // sends the server-final `v=<ServerSignature>` as a DISCRETE AUTHENTICATE line,
 // then 903. The client must recompute ServerSignature and fail closed on a
 // mismatch, and must NOT emit a stray `AUTHENTICATE +`.

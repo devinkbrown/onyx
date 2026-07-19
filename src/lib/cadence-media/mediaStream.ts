@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Media stream routing for the WS media plane.
 //
-// A relayed Kagura datagram carries a `stream_id` but no sender identity (the
-// Orochi SFU forwards verbatim). We make `stream_id` a DETERMINISTIC public
+// A relayed Cadence datagram carries a `stream_id` but no sender identity (the
+// Onyx Server SFU forwards verbatim). We make `stream_id` a DETERMINISTIC public
 // function of (channel, nick, kind) so a receiver can map an inbound datagram
 // back to a roster participant with no server cooperation. This id is a routing
 // label only — authenticity comes from the per-stream MAC, not from this value.

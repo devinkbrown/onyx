@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 
+import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import type { ChatMessage } from '@/lib/irc/types';
 import type { ReviewHistoryEntry } from '@/lib/notifications/reviewHistory';
 import {
@@ -8,6 +9,7 @@ import {
   buildReaderMemoryContext,
   hasReviewedAnchor,
   mergeReviewedContextTrails,
+  messageAccessibleLabel,
   orderChronologically,
   reviewedAnchorSource,
 } from './MessageView';
@@ -42,6 +44,14 @@ describe('reviewed reader context trails', () => {
     const context = buildReaderMemoryContext('&ops', [
       { ...message('ops-a', 'alice', 'handoff', 0), target: '&ops' },
     ], true);
+
+    expect(context).toMatchObject({ target: '&ops', lineCount: 1, voiceCount: 1 });
+  });
+
+  it('treats & local channels as rooms by default without an isChannel override', () => {
+    const context = buildReaderMemoryContext('&ops', [
+      { ...message('ops-b', 'alice', 'local room', 0), target: '&ops' },
+    ]);
 
     expect(context).toMatchObject({ target: '&ops', lineCount: 1, voiceCount: 1 });
   });
@@ -160,5 +170,71 @@ describe('orderChronologically', () => {
 
     expect(result).not.toBe(list);
     expect(result.map((m) => m.id)).toEqual(['b', 'c', 'prepended']);
+  });
+});
+
+describe('messageAccessibleLabel (dense transcript a11y)', () => {
+  it('names an ordinary message with author, clock, and body', () => {
+    const label = messageAccessibleLabel(message('m1', 'alice', 'hello there', 0));
+    expect(label).toMatch(/^alice at /);
+    expect(label).toContain(': hello there');
+  });
+
+  it('never exposes E2EE ciphertext when the seal is locked', () => {
+    const locked: ChatMessage = {
+      ...message('m2', 'alice', 'TSUMUGI1 ciphertext-must-not-leak', 0),
+      encrypted: true,
+      // plaintext omitted → sealed body is unreadable on this device
+    };
+    const label = messageAccessibleLabel(locked);
+    expect(label).toContain(LOCKED_PLACEHOLDER);
+    expect(label).not.toContain('TSUMUGI1');
+    expect(label).not.toContain('ciphertext-must-not-leak');
+  });
+
+  it('prefers decrypted plaintext over the sealed wire body', () => {
+    const open: ChatMessage = {
+      ...message('m3', 'bob', 'TSUMUGI1 still-on-wire', 0),
+      encrypted: true,
+      plaintext: 'secret hello',
+    };
+    const label = messageAccessibleLabel(open);
+    expect(label).toContain('secret hello');
+    expect(label).not.toContain('TSUMUGI1');
+  });
+
+  it('announces deleted and redacted rows without the original body', () => {
+    const deleted: ChatMessage = {
+      ...message('m4', 'carol', 'should not be read', 0),
+      deleted: true,
+    };
+    const redacted: ChatMessage = {
+      ...message('m5', 'dana', 'also hidden', 0),
+      redacted: true,
+    };
+    expect(messageAccessibleLabel(deleted)).toContain('[message deleted]');
+    expect(messageAccessibleLabel(deleted)).not.toContain('should not be read');
+    expect(messageAccessibleLabel(redacted)).toContain('[message deleted]');
+  });
+
+  it('surfaces pending and edited flags for AT parity with visual chrome', () => {
+    const pending: ChatMessage = {
+      ...message('m6', 'erin', 'still sending', 0),
+      pending: true,
+    };
+    const edited: ChatMessage = {
+      ...message('m7', 'frank', 'updated body', 0),
+      edited: true,
+    };
+    expect(messageAccessibleLabel(pending)).toContain('(queued)');
+    expect(messageAccessibleLabel(edited)).toContain('(edited)');
+  });
+
+  it('formats CTCP ACTION lines like the visible MsgBody', () => {
+    const action: ChatMessage = {
+      ...message('m8', 'grace', 'waves', 0),
+      type: 'action',
+    };
+    expect(messageAccessibleLabel(action)).toContain('* grace waves');
   });
 });

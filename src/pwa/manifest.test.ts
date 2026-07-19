@@ -282,6 +282,29 @@ describe('PWA manifest', () => {
       data: { url: '/app/' },
     }));
 
+    // E2EE envelope in a DM push payload must never reach the OS alert body.
+    pushWork = undefined;
+    showNotification.mockClear();
+    push!({
+      data: {
+        json: () => ({
+          type: 'dm',
+          from: 'Bob',
+          text: 'TSUMUGI1 AAAA_ciphertext_must_not_leak_to_lock_screen',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith('Message from Bob', expect.objectContaining({
+      body: 'New encrypted message',
+    }));
+    const encryptedCall = showNotification.mock.calls.at(-1);
+    expect(JSON.stringify(encryptedCall)).not.toContain('TSUMUGI1');
+    expect(JSON.stringify(encryptedCall)).not.toContain('ciphertext');
+
     const click = listeners.get('notificationclick');
     expect(click).toBeDefined();
     let clickWork: Promise<unknown> | undefined;

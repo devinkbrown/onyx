@@ -3,13 +3,13 @@
  * OpcodecWasm.ts — TypeScript wrapper for the opcodec WASM module.
  *
  * Provides ergonomic TS APIs for:
- *   - kaguravox audio encode/decode (opvox_wasm_*)
- *   - kaguravis video encode/decode (opvis_wasm_*)
+ *   - cadencevox audio encode/decode (opvox_wasm_*)
+ *   - cadencevis video encode/decode (opvis_wasm_*)
  *   - NS2 noise suppression (ns2_wasm_*)
  *
  * NOTE: the `*_wasm_*` C ABI symbol names below are baked into the prebuilt
  * opcodec_wasm.wasm binary and are intentionally NOT renamed — they are the
- * compiled export names, not the product-facing codec name (KaguraVox/KaguraVis).
+ * compiled export names, not the product-facing codec name (CadenceVox/CadenceVis).
  * Rebuild the WASM from its C source before touching those literals.
  *
  * Usage:
@@ -22,11 +22,11 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export const KAGURAVOX_FRAME_48K = 960;   // 20ms at 48kHz
-export const KAGURAVOX_FRAME_16K = 320;
-export const KAGURAVOX_FRAME_8K  = 160;
+export const CADENCEVOX_FRAME_48K = 960;   // 20ms at 48kHz
+export const CADENCEVOX_FRAME_16K = 320;
+export const CADENCEVOX_FRAME_8K  = 160;
 
-export type KaguraVoxQuality = 0 | 1 | 2 | 3;  // LOW / NORMAL / HIGH / ULTRA
+export type CadenceVoxQuality = 0 | 1 | 2 | 3;  // LOW / NORMAL / HIGH / ULTRA
 
 // -------------------------------------------------------------------
 // Module type (minimal Emscripten Module surface we use)
@@ -244,7 +244,7 @@ async function fetchWasmBinary(jsUrl: string): Promise<ArrayBuffer | null> {
 // -------------------------------------------------------------------
 // Audio encoder
 // -------------------------------------------------------------------
-export class KaguraVoxEncoder {
+export class CadenceVoxEncoder {
   private m: EmModule;
   private handle: number;
   private outPtr: number;
@@ -254,12 +254,12 @@ export class KaguraVoxEncoder {
   framesEncoded = 0;
   dtxSuppressedCount = 0;
 
-  constructor(m: EmModule, sampleRate: number, quality: KaguraVoxQuality, enableNs2 = true) {
+  constructor(m: EmModule, sampleRate: number, quality: CadenceVoxQuality, enableNs2 = true) {
     this.m = m;
     this.ns2Enabled = enableNs2;
     this.handle = m.ccall('opvox_wasm_enc_create', 'number',
                           ['number', 'number'], [sampleRate, quality]) as number;
-    if (!this.handle) throw new Error('kaguravox encoder init failed');
+    if (!this.handle) throw new Error('cadencevox encoder init failed');
     this.outPtr = m.ccall('opcodec_alloc_u8', 'number', ['number'], [this.OUT_CAP]) as number;
     this.ns2Handle = enableNs2
       ? (m.ccall('ns2_wasm_create', 'number', ['number', 'number'], [sampleRate, 0]) as number)
@@ -328,7 +328,7 @@ export class KaguraVoxEncoder {
 // -------------------------------------------------------------------
 // Audio decoder
 // -------------------------------------------------------------------
-export class KaguraVoxDecoder {
+export class CadenceVoxDecoder {
   private m: EmModule;
   private handle: number;
   private outPtr: number;
@@ -337,15 +337,15 @@ export class KaguraVoxDecoder {
   private readonly sampleRate: number;
   framesDecoded = 0;
 
-  constructor(m: EmModule, sampleRate: number, quality: KaguraVoxQuality) {
+  constructor(m: EmModule, sampleRate: number, quality: CadenceVoxQuality) {
     this.m = m;
     this.sampleRate = sampleRate;
-    this.frameSize = sampleRate === 48000 ? KAGURAVOX_FRAME_48K
-                   : sampleRate === 16000 ? KAGURAVOX_FRAME_16K
-                   : KAGURAVOX_FRAME_8K;
+    this.frameSize = sampleRate === 48000 ? CADENCEVOX_FRAME_48K
+                   : sampleRate === 16000 ? CADENCEVOX_FRAME_16K
+                   : CADENCEVOX_FRAME_8K;
     this.handle = m.ccall('opvox_wasm_dec_create', 'number',
                           ['number', 'number'], [sampleRate, quality]) as number;
-    if (!this.handle) throw new Error('kaguravox decoder init failed');
+    if (!this.handle) throw new Error('cadencevox decoder init failed');
     this.outPtr = m.ccall('opcodec_alloc_i16', 'number',
                           ['number'], [this.frameSize]) as number;
     /* Item 12: DTX comfort noise decoder — generates background noise during silence */
@@ -363,7 +363,7 @@ export class KaguraVoxDecoder {
     this.m.ccall('opcodec_free', null, ['number'], [p]);
   }
 
-  /** Decode one kaguravox frame. Pass null/empty for PLC (or DTX comfort noise). Returns Int16Array. */
+  /** Decode one cadencevox frame. Pass null/empty for PLC (or DTX comfort noise). Returns Int16Array. */
   decode(frame: Uint8Array | null): Int16Array {
     const inLen = frame ? frame.length : 0;
 
@@ -408,15 +408,15 @@ export class KaguraVoxDecoder {
 // -------------------------------------------------------------------
 // Video encoder
 // -------------------------------------------------------------------
-export type KaguraVisProfile = 'camera' | 'screen';
+export type CadenceVisProfile = 'camera' | 'screen';
 
-export class KaguraVisEncoder {
+export class CadenceVisEncoder {
   private m: EmModule;
   private handle: number;
   private outPtr: number;
   readonly width: number;
   readonly height: number;
-  readonly profile: KaguraVisProfile;
+  readonly profile: CadenceVisProfile;
   private readonly OUT_CAP: number;
   /** Frames between forced keyframes (screen share ≈5s; camera ≈1s) */
   readonly keyframeInterval: number;
@@ -424,7 +424,7 @@ export class KaguraVisEncoder {
   readonly targetFps: number;
   private frameCount = 0;
 
-  constructor(m: EmModule, width: number, height: number, quality: number, profile: KaguraVisProfile = 'camera', fps = 60) {
+  constructor(m: EmModule, width: number, height: number, quality: number, profile: CadenceVisProfile = 'camera', fps = 60) {
     this.m       = m;
     this.width   = width;
     this.height  = height;
@@ -439,7 +439,7 @@ export class KaguraVisEncoder {
     this.handle = m.ccall('opvis_wasm_enc_create', 'number',
                           ['number', 'number', 'number'],
                           [width, height, encQuality]) as number;
-    if (!this.handle) throw new Error('kaguravis encoder init failed');
+    if (!this.handle) throw new Error('cadencevis encoder init failed');
     this.outPtr = m.ccall('opcodec_alloc_u8', 'number', ['number'], [this.OUT_CAP]) as number;
   }
 
@@ -485,7 +485,7 @@ export class KaguraVisEncoder {
 // -------------------------------------------------------------------
 // Video decoder
 // -------------------------------------------------------------------
-export class KaguraVisDecoder {
+export class CadenceVisDecoder {
   private m: EmModule;
   private handle: number;
   private yPtr: number;
@@ -499,13 +499,13 @@ export class KaguraVisDecoder {
     const uvSize = (width >> 1) * (height >> 1);
     this.handle = m.ccall('opvis_wasm_dec_create', 'number',
                           ['number', 'number'], [width, height]) as number;
-    if (!this.handle) throw new Error('kaguravis decoder init failed');
+    if (!this.handle) throw new Error('cadencevis decoder init failed');
     this.yPtr = m.ccall('opcodec_alloc_u8', 'number', ['number'], [width * height]) as number;
     this.uPtr = m.ccall('opcodec_alloc_u8', 'number', ['number'], [uvSize]) as number;
     this.vPtr = m.ccall('opcodec_alloc_u8', 'number', ['number'], [uvSize]) as number;
   }
 
-  /** Decode one kaguravis frame. Returns {y, u, v} planes. */
+  /** Decode one cadencevis frame. Returns {y, u, v} planes. */
   decode(frame: Uint8Array): { y: Uint8Array; u: Uint8Array; v: Uint8Array } | null {
     const inPtr = this.m.ccall('opcodec_alloc_u8', 'number', ['number'], [frame.length]) as number;
     this.m.HEAPU8.set(frame, inPtr);
@@ -559,20 +559,20 @@ export class OpcodecWasm {
     return new OpcodecWasm(await workerModulePromise);
   }
 
-  audioEncoder(sampleRate: number, quality: KaguraVoxQuality = 2, enableNs2 = true): KaguraVoxEncoder {
-    return new KaguraVoxEncoder(this.m, sampleRate, quality, enableNs2);
+  audioEncoder(sampleRate: number, quality: CadenceVoxQuality = 2, enableNs2 = true): CadenceVoxEncoder {
+    return new CadenceVoxEncoder(this.m, sampleRate, quality, enableNs2);
   }
 
-  audioDecoder(sampleRate: number, quality: KaguraVoxQuality = 2): KaguraVoxDecoder {
-    return new KaguraVoxDecoder(this.m, sampleRate, quality);
+  audioDecoder(sampleRate: number, quality: CadenceVoxQuality = 2): CadenceVoxDecoder {
+    return new CadenceVoxDecoder(this.m, sampleRate, quality);
   }
 
-  videoEncoder(width: number, height: number, quality: number, profile: KaguraVisProfile = 'camera', fps = 60): KaguraVisEncoder {
-    return new KaguraVisEncoder(this.m, width, height, quality, profile, fps);
+  videoEncoder(width: number, height: number, quality: number, profile: CadenceVisProfile = 'camera', fps = 60): CadenceVisEncoder {
+    return new CadenceVisEncoder(this.m, width, height, quality, profile, fps);
   }
 
-  videoDecoder(width: number, height: number): KaguraVisDecoder {
-    return new KaguraVisDecoder(this.m, width, height);
+  videoDecoder(width: number, height: number): CadenceVisDecoder {
+    return new CadenceVisDecoder(this.m, width, height);
   }
 }
 

@@ -16,7 +16,7 @@ const LABELS: Record<ProvenanceScope, ProvenanceLabel> = {
   server: {
     scope: 'server',
     label: 'This server',
-    description: 'Computed by the connected Onyx/Orochi server from server-side history.',
+    description: 'Computed by the connected Onyx/Onyx Server server from server-side history.',
   },
   external: {
     scope: 'external',

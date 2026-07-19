@@ -22,7 +22,7 @@ import { setPageMeta } from './pageMeta';
 export default function About() {
   setPageMeta(
     'About Onyx — open protocol, sovereign mesh',
-    'Learn how Onyx, Suimyaku media, and the open mesh work together without closed-platform lock-in.',
+    'Learn how Onyx, Cadence media, and the open mesh work together without closed-platform lock-in.',
     '/about/',
   );
   const [status, { refetch }] = createResource(fetchNetworkStatus, { initialValue: null });
@@ -108,7 +108,7 @@ export default function About() {
             <span class="label">Authentication</span>
             <h3>SASL, your way</h3>
             <p>
-              Orochi advertises <b>SASL PLAIN, EXTERNAL, and SCRAM-SHA-256</b>.
+              Onyx Server advertises <b>SASL PLAIN, EXTERNAL, and SCRAM-SHA-256</b>.
               Pick whatever your client supports — SCRAM is preferred when the server
               offers it. No proprietary handshake, nothing bespoke.
             </p>
@@ -158,7 +158,7 @@ export default function About() {
               <i style={{ background: 'var(--gold)' }} aria-hidden="true" />
               <i style={{ background: 'var(--ok)' }} aria-hidden="true" />
             </span>
-            <span>CAP negotiation — what Orochi advertises on connect</span>
+            <span>CAP negotiation — what Onyx Server advertises on connect</span>
           </div>
           <div class="ab-cap-row">
             <span class="key">draft/sasl</span>
@@ -204,7 +204,7 @@ export default function About() {
             class="ab-media-diagram"
             viewBox="0 0 580 320"
             role="img"
-            aria-label="Media path: clients encode with KAGURAVOX/KAGURAVIS or WASM, send opaque Kagura frames over the mesh relay to the SFU, which forwards them unchanged."
+            aria-label="Media path: clients encode with CADENCEVOX/CADENCEVIS or WASM, send opaque Cadence frames over the mesh relay to the SFU, which forwards them unchanged."
           >
             {/* SFU center */}
             <rect x="230" y="120" width="120" height="80" fill="none" stroke="var(--seam)" stroke-width="1.5" />
@@ -215,25 +215,25 @@ export default function About() {
             {/* Desktop client left */}
             <rect x="30" y="60" width="100" height="50" fill="none" stroke="var(--lapis-bright)" stroke-width="1" rx="2" />
             <text x="80" y="82" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle">Desktop</text>
-            <text x="80" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">KAGURAVOX/KAGURAVIS</text>
+            <text x="80" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
             <text x="80" y="108" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">native</text>
 
             {/* Browser client left-lower */}
             <rect x="30" y="200" width="100" height="50" fill="none" stroke="var(--ok)" stroke-width="1" rx="2" />
             <text x="80" y="222" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--ok)" text-anchor="middle">Browser</text>
-            <text x="80" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">KAGURAVOX/KAGURAVIS</text>
+            <text x="80" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
             <text x="80" y="248" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">WASM</text>
 
             {/* Mobile right-upper */}
             <rect x="450" y="60" width="100" height="50" fill="none" stroke="var(--ok)" stroke-width="1" rx="2" />
             <text x="500" y="82" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--ok)" text-anchor="middle">Mobile</text>
-            <text x="500" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">KAGURAVOX/KAGURAVIS</text>
+            <text x="500" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
             <text x="500" y="108" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">WASM</text>
 
             {/* Desktop right-lower */}
             <rect x="450" y="200" width="100" height="50" fill="none" stroke="var(--lapis-bright)" stroke-width="1" rx="2" />
             <text x="500" y="222" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle">Desktop</text>
-            <text x="500" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">KAGURAVOX/KAGURAVIS</text>
+            <text x="500" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
             <text x="500" y="248" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">native</text>
 
             {/* Arrows from left clients to SFU */}
@@ -245,28 +245,28 @@ export default function About() {
             <path d="M352 172 L448 225" fill="none" stroke="var(--lapis)" stroke-width="1.2" stroke-dasharray="3 5" />
 
             {/* Frame label */}
-            <text x="175" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">kagura frame</text>
+            <text x="175" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">cadence frame</text>
             <text x="175" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--washi-mute)" text-anchor="middle">(opaque, e2ee)</text>
-            <text x="405" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">kagura frame</text>
+            <text x="405" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">cadence frame</text>
             <text x="405" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--washi-mute)" text-anchor="middle">(identical bytes)</text>
           </svg>
 
           <div class="ab-media-body">
             <p>
-              <b>KaguraVox</b> (audio) and <b>KaguraVis</b> (video) are Suimyaku codecs —
-              not Opus, not H.264. Desktop clients run them natively. Browsers and mobile
-              run the exact same codecs compiled to <b>WebAssembly</b>, with SIMD and
-              threads. The media path is identical on every platform.
+              <b>CadenceVox</b> (audio) and <b>CadenceVis</b> (video) are Onyx's native
+              codecs — not Opus, not H.264. Desktop clients run them natively. Browsers and
+              mobile run the exact same codecs compiled to <b>WebAssembly</b>, with SIMD
+              and threads. The media path is identical on every platform.
             </p>
             <p>
-              Encoded frames travel in a <b>kagura frame</b> container — a lightweight wire
+              Encoded frames travel in a <b>Cadence frame</b> container — a lightweight wire
               format carrying payload length, band, stream ID, sequence, timestamp,
               keyframe flag, and codec tag. End-to-end encryption wraps the payload
               before it ever leaves the sender.
             </p>
             <p>
               The media relay is a <b>pure selective-forwarding unit</b>. It reads the
-              kagura container header to know where to send the frame, then forwards the
+              Cadence container header to know where to send the frame, then forwards the
               opaque payload byte-for-byte. It does not encode, decode, or transcode.
               Your keys stay with you; plaintext never crosses the server.
             </p>
@@ -277,7 +277,7 @@ export default function About() {
         <div class="ab-transport-row" role="list" aria-label="Transport options">
           <article class="ab-transport primary" role="listitem">
             <span class="t-label">Default</span>
-            <h4>Kagura frames<br />over QUIC</h4>
+            <h4>Cadence frames<br />over QUIC</h4>
             <p>
               The preferred transport path. Datagram-eligible, head-of-line-blocking
               free, lower latency than TCP. Opaque media frames ride the mesh path,
@@ -289,7 +289,7 @@ export default function About() {
             <span class="t-label">Fallback carrier</span>
             <h4>Mesh relay<br />over WebSocket</h4>
             <p>
-              Where QUIC is not available, the browser keeps the same opaque Kagura
+              Where QUIC is not available, the browser keeps the same opaque Cadence
               frames moving over the WebSocket relay path. Same bytes, same codec,
               different pipe.
             </p>
@@ -299,7 +299,7 @@ export default function About() {
             <span class="t-label">Portable fallback</span>
             <h4>WASM decode<br />everywhere</h4>
             <p>
-              Browsers and mobile clients run the same KaguraVox/KaguraVis codecs via
+              Browsers and mobile clients run the same CadenceVox/CadenceVis codecs via
               WebAssembly. The server still never transcodes; codec convergence is a
               client responsibility.
             </p>
@@ -309,26 +309,26 @@ export default function About() {
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      {/* ── 3. E2EE — Tsumugi ── */}
+      {/* ── 3. E2EE — Mooring ── */}
       <section id="e2ee" class="r-wrap ab-section" aria-labelledby="e2ee-heading">
         <span class="r-eyebrow">03 — end-to-end encryption</span>
-        <h2 id="e2ee-heading" class="r-title">Tsumugi:<br />keys the server never holds</h2>
+        <h2 id="e2ee-heading" class="r-title">Mooring:<br />keys the server never holds</h2>
         <p class="r-lede">
-          End-to-end encryption isn't a feature Orochi has; it's a constraint the
+          End-to-end encryption isn't a feature Onyx Server has; it's a constraint the
           architecture enforces. The server relays ciphertext. That's all it can do.
         </p>
 
         <div class="ab-e2ee-split">
           <div class="ab-e2ee-body">
             <p>
-              Tsumugi is the secure channel layer. For group calls it uses
+              Mooring is the secure channel layer. For group calls it uses
               <b>TreeKEM</b> — a tree-structured key exchange where adding or removing
               a participant generates a new group key with a single tree walk, without
               re-keying every pair. No one who leaves the call can decrypt what came after.
             </p>
             <p>
               The encryption primitive is <b>HPKE</b> (Hybrid Public-Key Encryption).
-              Media payloads are wrapped in HPKE before they enter the kagura frame.
+              Media payloads are wrapped in HPKE before they enter the cadence frame.
               The server receives an opaque blob, knows which channel to forward it to,
               and sends it on — no key material, no plaintext, no metadata beyond routing.
             </p>
@@ -358,10 +358,10 @@ export default function About() {
             class="ab-e2ee-visual"
             viewBox="0 0 440 360"
             role="img"
-            aria-label="Tsumugi secure channel: TreeKEM tree on left, clients hold leaf keys, root key encrypts media, server relays opaque ciphertext on right"
+            aria-label="Mooring secure channel: TreeKEM tree on left, clients hold leaf keys, root key encrypts media, server relays opaque ciphertext on right"
           >
             {/* Tree structure */}
-            <text x="220" y="28" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle" letter-spacing="1.5">TSUMUGI SECURE CHANNEL</text>
+            <text x="220" y="28" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle" letter-spacing="1.5">MOORING SECURE CHANNEL</text>
 
             {/* Root */}
             <circle cx="220" cy="65" r="12" fill="none" stroke="var(--shu)" stroke-width="1.5" />
@@ -397,7 +397,7 @@ export default function About() {
 
             {/* Encrypted frame flow */}
             <rect x="60" y="248" width="320" height="40" fill="none" stroke="var(--seam-faint)" rx="2" />
-            <text x="220" y="263" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">HPKE-encrypted kagura frame</text>
+            <text x="220" y="263" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">HPKE-encrypted cadence frame</text>
             <text x="220" y="279" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">opaque payload — server cannot read</text>
 
             {/* Arrow to server */}
@@ -464,9 +464,10 @@ export default function About() {
           <div class="ab-mesh-text">
             <p>
               The client auto-routes to the nearest node — <b>eshmaki.me:8080</b> and
-              <b> ircx.us:8080</b> are two entrances to the same network. The mesh keeps
-              them in continuous sync using delta-state CRDTs, so a state change on one
-              node reaches the other without full-state floods.
+              <b> ircx.us:8080</b> are two entrances to the same network. State replicates
+              over <b>Undertow</b> (a CRDT mesh) sealed by <b>Mooring</b> (post-quantum
+              secure links between servers), so a change on one node reaches the other
+              without full-state floods.
             </p>
             <p>
               Lose a node and the mesh heals: HyParView partial views maintain an active
@@ -542,7 +543,7 @@ export default function About() {
         <span class="r-eyebrow">05 — services</span>
         <h2 id="services-heading" class="r-title">Real commands,<br />not bot puppets</h2>
         <p class="r-lede">
-          Orochi services are built into the server. No ChanServ ghost in your DMs.
+          Onyx Server services are built into the server. No ChanServ ghost in your DMs.
           No NickServ fiction. Just commands the server understands natively.
         </p>
 
@@ -630,19 +631,19 @@ export default function About() {
         <div class="ab-mythos-grid">
           <article class="ab-myth serpent">
             <span class="ideograph" aria-hidden="true"><Mascot variant="hero" /></span>
-            <span class="name">Orochi · the engine</span>
+            <span class="name">Onyx Server · the engine</span>
             <p>
               The daemon that <b>is</b> the network — many-noded and self-healing, with
               <b> no single head to cut off</b>, no single point of failure. Not a node,
               not a service: the network itself.
             </p>
             <p>
-              Named for the water-dragon Orochi, written in Zig from scratch. Clean-room.
-              Modern. No legacy IRC server code, no shared ancestry with anything that
-              existed before it.
+              Written in Zig from scratch. Clean-room. Modern. No legacy IRC server
+              code, no shared ancestry with anything that existed before it. (Historical
+              codename: Onyx Server — the multi-headed water dragon.)
             </p>
             <span class="etym">
-              orochi · the engine<br />
+              Onyx Server · the engine<br />
               clean-room zig daemon · no single point of failure
             </span>
           </article>
@@ -693,7 +694,7 @@ export default function About() {
         <h2 id="developer-heading" class="r-title">Open protocol.<br />Sovereign mesh.</h2>
         <p class="r-lede">
           The wire format is documented and usable outside Onyx. You can also run
-          your own Orochi node and peer it into the mesh — full sovereignty over your
+          your own Onyx Server node and peer it into the mesh — full sovereignty over your
           slice of the network.
         </p>
 
@@ -730,7 +731,7 @@ export default function About() {
             <span class="idx">run a node</span>
             <h3>Your node,<br />your sovereignty</h3>
             <p>
-              Orochi is a pure-Zig daemon. It runs on Linux x86_64 and aarch64.
+              Onyx Server is a pure-Zig daemon. It runs on Linux x86_64 and aarch64.
               Stand it up on your own hardware, configure it, and link it into the
               mesh — your node becomes another door into the whole network.
             </p>
@@ -743,12 +744,12 @@ export default function About() {
             <div class="code-snip" aria-label="Example node startup and peer configuration">
               <div><span class="o"># build from source</span></div>
               <div><span class="c">zig build -Doptimize=ReleaseFast</span></div>
-              <div><span class="o"># configure orochi.conf:</span></div>
+              <div><span class="o"># configure onyx-server.toml:</span></div>
               <div><span class="p">[mesh]</span></div>
               <div><span class="h">  peer = "eshmaki.me:7000"</span></div>
               <div><span class="h">  meshpass = "&lt;signed capability&gt;"</span></div>
               <div><span class="o"># start — sessions survive USR2 upgrade</span></div>
-              <div><span class="c">systemctl start orochi</span></div>
+              <div><span class="c">systemctl start onyx-server</span></div>
             </div>
             <a class="more" href="/app/">explore the network →</a>
           </article>
@@ -802,7 +803,7 @@ export default function About() {
         </div>
         <div class="base">
           <span><Mascot variant="mark" aria-label="Onyx" /> Onyx</span>
-          <span>Orochi · the open mesh · 2026</span>
+          <span>Onyx Server · the open mesh · 2026</span>
         </div>
       </footer>
     </main>

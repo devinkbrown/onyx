@@ -83,7 +83,11 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Member list uses a channel-scoped complementary landmark, labelled role groups, named member-detail dialogs, and target-specific member actions.',
       'Notification controls use a labelled compact control group, described calm-mode radios, and pressed-state desktop, sound, push, and do-not-disturb toggles.',
       'Time scrubber uses a channel-scoped region, labelled UTC-hour jump buttons, a date jump input, and a target-specific moment-copy action.',
+      'Jump to date uses a named Sheet dialog, UTC date/time fields, quick-date presets, target-specific jump and moment-copy actions, and ribbon/composer openers.',
       'Watch together uses named review and host-control groups, a bounded participant list, polite atomic outcome status, and focus restoration after successful or stale confirmations.',
+      'Reader memory uses a named device-memory region, reviewed-span and context-trail groups, labelled transcript jumps, and cross-room peer-review handoffs with focus-visible dense rows.',
+      'Preferences dense rows use segmented radio groups and switch controls with concise names, descriptions, keyboard roving, focus-visible outlines, and forced-colors selected states.',
+      'Message transcript uses a named live log, focusable articles, and state-aware accessible names that surface queued, edited, deleted, and locked states without exposing E2EE ciphertext.',
     ],
   },
 ];

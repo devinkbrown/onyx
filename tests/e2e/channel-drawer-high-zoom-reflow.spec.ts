@@ -17,7 +17,7 @@ test('keeps the channel drawer dense and keyboard reachable at 400% short reflow
       <div class="shell-sidebar-slot shell-sidebar--mobile-open">
         <aside class="shell-sidebar" aria-label="Channel drawer">
           <header class="shell-sidebar-head">
-            <span class="shell-sidebar-network"><span class="shell-sidebar-dot"></span>Orochi</span>
+            <span class="shell-sidebar-network"><span class="shell-sidebar-dot"></span>Onyx</span>
             <span class="shell-notify-controls">
               <button class="shell-notify-btn" aria-label="All activity">A</button>
               <button class="shell-notify-btn" aria-label="Highlights only">H</button>

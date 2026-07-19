@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
+import type { CadencePeerState } from '@/lib/cadence-media/types';
 
 /**
  * A participant identity shared by every in-call layout.
@@ -9,7 +9,7 @@ import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
  */
 export type VoiceParticipant = {
   nick: string;
-  peer: SuimyakuPeerState | null;
+  peer: CadencePeerState | null;
   isSelf: boolean;
 };
 
@@ -23,7 +23,7 @@ export type VoiceParticipant = {
  */
 export function mergeVoiceParticipants(
   selfNick: string,
-  peers: ReadonlyMap<string, SuimyakuPeerState>,
+  peers: ReadonlyMap<string, CadencePeerState>,
   roster?: ReadonlySet<string> | null,
 ): VoiceParticipant[] {
   const participants = new Map<string, VoiceParticipant>();

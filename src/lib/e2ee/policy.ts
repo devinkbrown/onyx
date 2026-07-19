@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-export const E2EE_CAP = 'orochi/e2ee';
-export const E2EE_TAG = '+orochi/e2ee';
+export const E2EE_CAP = 'onyx/e2ee';
+export const E2EE_TAG = '+onyx/e2ee';
 export const ENCRYPTION_POLICY_PROP = 'encryption-policy';
 export const E2EE_DEVICE_PROP_PREFIX = 'e2ee.device.';
 

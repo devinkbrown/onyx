@@ -2,7 +2,7 @@
 /**
  * store.replay.test.ts — draft/event-playback must never mutate live state.
  *
- * Orochi's CHATHISTORY replay includes historical JOIN/PART/QUIT/KICK/TOPIC
+ * Onyx Server's CHATHISTORY replay includes historical JOIN/PART/QUIT/KICK/TOPIC
  * lines (when the client has the event-playback cap) tagged with @time+msgid
  * but NO batch tag. Before the guard, a replayed QUIT deleted members who are
  * in the channel RIGHT NOW — the "nicklist shrinks after a while" bug.
@@ -59,7 +59,7 @@ beforeEach(() => {
 describe('event-playback replay guard', () => {
   it('replayed QUIT/PART/JOIN inside a chathistory batch never touch the roster', () => {
     feed('BATCH +r1 chathistory #root');
-    // Orochi replay lines: @time + msgid, NO batch tag.
+    // Onyx Server replay lines: @time + msgid, NO batch tag.
     feed('@time=2026-07-01T10:00:00.000Z;msgid=old-q1 :trev!t@host QUIT :old netsplit');
     feed('@time=2026-07-01T10:01:00.000Z;msgid=old-p1 :mizu!m@host PART #root :bbl');
     feed('@time=2026-07-01T10:02:00.000Z;msgid=old-j1 :ghost!g@host JOIN #root');

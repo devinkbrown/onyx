@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Watch-together host-side state machine (roadmap v2.3 Kagura).
+// Watch-together host-side state machine (roadmap v2.3 Cadence media era).
 //
 // This module is PURE and DOM-free: every transition is a total function that
 // returns a new immutable session and never mutates its input. The heavy logic

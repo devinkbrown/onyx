@@ -21,6 +21,11 @@ describe('parseJoinParam', () => {
     expect(parseJoinParam('#root')).toBe('#root');
   });
 
+  it('accepts a local & channel (CHANTYPES)', () => {
+    expect(parseJoinParam('&ops')).toBe('&ops');
+    expect(parseJoinParam('%26ops')).toBe('&ops');
+  });
+
   it('decodes a percent-encoded channel (%23 → #)', () => {
     expect(parseJoinParam('%23root')).toBe('#root');
   });
@@ -54,14 +59,18 @@ describe('parseJoinParam', () => {
     expect(parseJoinParam('root')).toBeNull();
   });
 
-  it('rejects a bare #', () => {
+  it('rejects a bare # or &', () => {
     expect(parseJoinParam('#')).toBeNull();
     expect(parseJoinParam('%23')).toBeNull();
+    expect(parseJoinParam('&')).toBeNull();
+    expect(parseJoinParam('%26')).toBeNull();
   });
 
-  it('rejects names longer than 63 chars after the #', () => {
+  it('rejects names longer than 63 chars after the CHANTYPES prefix', () => {
     expect(parseJoinParam(`#${'a'.repeat(63)}`)).toBe(`#${'a'.repeat(63)}`);
     expect(parseJoinParam(`#${'a'.repeat(64)}`)).toBeNull();
+    expect(parseJoinParam(`&${'b'.repeat(63)}`)).toBe(`&${'b'.repeat(63)}`);
+    expect(parseJoinParam(`&${'b'.repeat(64)}`)).toBeNull();
   });
 
   it('rejects oversized encoded names after decoding', () => {
@@ -239,7 +248,7 @@ describe('buildMomentLink', () => {
 
   it('round-trips allowed channel shapes through serialized URLSearchParams', () => {
     const moment = new Date('2026-07-08T12:00:00.000Z');
-    const channels = ['#root', '#café', '#dev-ops.chat', '#room+plus', `#${'z'.repeat(63)}`];
+    const channels = ['#root', '#café', '#dev-ops.chat', '#room+plus', '&ops', `&${'z'.repeat(63)}`, `#${'z'.repeat(63)}`];
 
     for (const channel of channels) {
       const params = new URL(buildMomentLink(channel, moment, 'https://onyx.example/old?join=%23stale')).searchParams;
@@ -247,6 +256,16 @@ describe('buildMomentLink', () => {
       expect(parseJoinParam(params.get('join'))).toBe(channel);
       expect(parseAtParam(params.get('at'))?.toISOString()).toBe(moment.toISOString());
     }
+  });
+
+  it('builds a shareable moment link that reopens a local & room', () => {
+    const moment = new Date('2026-07-08T18:30:00.000Z');
+    const link = buildMomentLink('&ops', moment, 'https://onyx.example/app/');
+    const params = new URL(link).searchParams;
+
+    expect(link).toBe('https://onyx.example/app/?join=%26ops&at=2026-07-08T18%3A30%3A00.000Z');
+    expect(parseJoinParam(params.get('join'))).toBe('&ops');
+    expect(parseAtParam(params.get('at'))?.toISOString()).toBe(moment.toISOString());
   });
 
   it('round-trips the exact latest parseAtParam future boundary', () => {

@@ -4,8 +4,8 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
 const page = await ctx.newPage();
 await page.route('**/linkpreview**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
-  url: 'https://github.com/devinkbrown/orochi', title: 'GitHub - devinkbrown/orochi: Pure-Zig, clean-slate IRC daemon',
-  description: 'IRCv3 · IRCX · SASL · in-process services · WebSocket · voice/video over the post-quantum Suimyaku mesh.',
+  url: 'https://github.com/devinkbrown/onyx-server', title: 'GitHub - devinkbrown/onyx: Pure-Zig, clean-slate IRC daemon',
+  description: 'IRCv3 · IRCX · SASL · in-process services · WebSocket · voice/video over the post-quantum Cadence mesh.',
   image: '', site: 'GitHub' }) }));
 await page.goto('http://localhost:3000/app', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => !!(window).__onyx);
@@ -15,7 +15,7 @@ await page.evaluate(() => {
   const users = new Map([['kain', { nick: 'kain', modes: new Set(['q']) }], ['trev', { nick: 'trev', modes: new Set(['o']) }]]);
   const t = (m) => new Date(Date.now() - m * 60000);
   const messages = [
-    { id: 'm1', from: 'trev', text: 'check out the daemon repo: https://github.com/devinkbrown/orochi', time: t(9), type: 'msg', target: '#root' },
+    { id: 'm1', from: 'trev', text: 'check out the daemon repo: https://github.com/devinkbrown/onyx-server', time: t(9), type: 'msg', target: '#root' },
     { id: 'm2', from: 'kain', text: 'nice — link previews land today', time: t(2), type: 'msg', target: '#root' },
   ];
   store.setState({ ...init,

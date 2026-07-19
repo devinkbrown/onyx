@@ -1,5 +1,5 @@
 // One-off LIVE connect probe — drives the Ruri connect screen against the real
-// ircx.us Orochi node to prove the vertical slice end-to-end. Not part of the suite.
+// ircx.us Onyx Server node to prove the vertical slice end-to-end. Not part of the suite.
 import { chromium } from '@playwright/test';
 
 const base = process.argv[2] ?? 'http://localhost:4173';

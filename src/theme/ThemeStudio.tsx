@@ -220,7 +220,7 @@ function StudioPreview() {
             </div>
             <div class="ts-pv-msg">
               <span class="ts-pv-msg__time">21:07</span>
-              <span class="ts-pv-msg__nick" style={{"color":"var(--ok)"}}>orochi</span>
+              <span class="ts-pv-msg__nick" style={{"color":"var(--ok)"}}>onyx</span>
               <span class="ts-pv-msg__text ts-pv-msg__text--dim">→ mesh: 2 shards linked, quorum ok</span>
             </div>
             <div class="ts-pv-msg">

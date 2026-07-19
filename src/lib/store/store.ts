@@ -15,6 +15,11 @@ import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
 import {
+  MAX_PENDING_LABELED_SENDS,
+  isValidLabel,
+  nextClientLabel,
+} from '@/lib/irc/labels';
+import {
   clearSessionToken,
   loadCredentials,
   storeMeshToken,
@@ -22,8 +27,8 @@ import {
   type CredentialTokenTarget,
 } from '@/lib/credentials';
 import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parseNamesPrefix, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
-import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
-import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
+import type { CadencePeerState, CadenceRoomStats, CallState } from '@/lib/cadence-media/types';
+import { getMountedCadenceMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
 import {
   MAX_VAULT_MESSAGE_ID_LENGTH,
@@ -303,11 +308,11 @@ export interface VoiceState {
   callState: CallState;
   callWith: string;
   callChannel: string | null;
-  peers: Map<string, SuimyakuPeerState>;
+  peers: Map<string, CadencePeerState>;
   muted: boolean;
   deafened: boolean;
   localStream: MediaStream | null;
-  roomStats: Map<string, SuimyakuRoomStats>;
+  roomStats: Map<string, CadenceRoomStats>;
 
   // Audio / device settings
   inputDeviceId: string | null;
@@ -328,7 +333,7 @@ export interface VoiceState {
   startScreenshare(): Promise<void>;
   stopScreenshare(): void;
 
-  // Video participants: nick → MediaStream from SUIMYAKU media engine
+  // Video participants: nick → MediaStream from CADENCE media engine
   videoParticipants: Map<string, MediaStream>;
 
   // Local camera state
@@ -445,7 +450,7 @@ export type AccountSetField = 'email' | 'secure' | 'enforce' | 'flags' | 'passwo
 /**
  * Structured account details parsed from the `ACCOUNTINFO` reply.
  *
- * Orochi's `ACCOUNTINFO` answers with `account=<name> flags=<n>` (server.zig
+ * Onyx Server's `ACCOUNTINFO` answers with `account=<name> flags=<n>` (server.zig
  * handleAccountInfo). Some deployments also surface `email=`, `secure=`,
  * `enforce=`, and a registration timestamp/`registered=` — all optional. We
  * parse whatever key=value pairs are present and leave the rest undefined,
@@ -581,6 +586,13 @@ export interface OnyxState {
   reconnectIn: number;
   /** Whether auto-reconnect is enabled */
   autoReconnect: boolean;
+  /**
+   * True when a connected flush finished with owned outbox rows still waiting
+   * and the auto-retry budget is exhausted. Composer + Home chrome surface this
+   * so a stuck queue is never silent; cleared on successful empty flush,
+   * disconnect, or when the user discards the last queued send.
+   */
+  outboxDeliveryFailed: boolean;
 
   setConnectionStatus(status: 'connected' | 'connecting' | 'disconnected' | 'reconnecting'): void;
   setReconnectIn(seconds: number): void;
@@ -641,6 +653,10 @@ export interface OnyxState {
   // Pins themselves live in the channel's IRCX PINS prop (server-synced);
   // this is only the drawer's open/closed UI state.
   showPinnedMessages: boolean;
+
+  // ── Jump-to-date Sheet (Era 1 A3) ────────────────────────────────────
+  // Discoverable time-travel UI that reuses travelTo / ?at= path.
+  showJumpToDate: boolean;
 
   // ── Voice ────────────────────────────────────────────────────────────
   voice: VoiceState;
@@ -719,7 +735,7 @@ export interface OnyxState {
   registerAccount(account: string, email: string | undefined, password: string): void;
   verifyAccount(account: string, code: string): void;
 
-  // ── Account identity / management (Orochi built-in, no NickServ bot) ──
+  // ── Account identity / management (Onyx Server built-in, no NickServ bot) ──
   /**
    * Latest structured details from `ACCOUNTINFO`, populated when the reply
    * arrives (NOTICE `account=<name> flags=<n>`). Null until first fetched or
@@ -768,7 +784,7 @@ export interface OnyxState {
    */
   dropAccount(account: string, password: string): void;
 
-  // ── Nick reclaim / CERTFP services (Orochi built-in, no NickServ bot) ──
+  // ── Nick reclaim / CERTFP services (Onyx Server built-in, no NickServ bot) ──
   /**
    * `GHOST <nick> <password>` — disconnect a stale session occupying a nick
    * that belongs to the caller's account (password-verified server-side).
@@ -960,7 +976,7 @@ export interface OnyxState {
   showServices: boolean;
   servicesTab: 'account' | 'channel' | 'memos' | 'vhost' | 'nickserv' | 'chanserv' | 'hostserv' | 'memoserv';
 
-  // ── Service notices (replies from Orochi built-in services: Account, Channel, Memo, etc.) ──
+  // ── Service notices (replies from Onyx Server built-in services: Account, Channel, Memo, etc.) ──
   serviceNotices: Array<{ source: string; text: string; time: Date }>;
   addServiceNotice(source: string, text: string): void;
   clearServiceNotices(): void;
@@ -1177,6 +1193,10 @@ export interface OnyxState {
   // pinned messages panel (pins are stored in the IRCX PINS channel prop)
   openPinnedMessages(): void;
   closePinnedMessages(): void;
+
+  // jump-to-date sheet (reuses travelTo; discoverable when scrubber is off)
+  openJumpToDate(): void;
+  closeJumpToDate(): void;
 
   // IRCX PROP requests
   requestChannelProps(channel: string): void;
@@ -1689,7 +1709,7 @@ export interface OnyxState {
   channelWelcomeSeen: Set<string>;
   markWelcomeSeen: (channel: string) => void;
 
-  // ── Voice / SUIMYAKU speaking + channel tracking ─────────────────────────────
+  // ── Voice / CADENCE speaking + channel tracking ─────────────────────────────
   /** Set of nicks currently speaking (local VAD + server MEDIA SPEAKING events) */
   speakingNicks: Set<string>;
   setSpeakingNick: (nick: string, speaking: boolean) => void;
@@ -1699,7 +1719,7 @@ export interface OnyxState {
    * too — their media never reaches this client, so they have no peer entry.
    */
   mutedNicks: Set<string>;
-  /** Channel names identified as SUIMYAKU voice channels (prefix + or mode V) */
+  /** Channel names identified as CADENCE voice channels (prefix + or mode V) */
   voiceChannels: string[];
   addVoiceChannel: (channel: string) => void;
   removeVoiceChannel: (channel: string) => void;
@@ -1853,7 +1873,7 @@ export interface OnyxState {
   setUserProfile: (nick: string, data: Partial<RichUserProfile>) => void;
   getUserProfile: (nick: string) => RichUserProfile | null;
 
-  // ── Orochi integration (serial integration pass) ─────────────────────────
+  // ── Onyx Server integration (serial integration pass) ─────────────────────────
   /** nick.toLowerCase() → raw METADATA key/value pairs (761 RPL_KEYVALUE) */
   userMetadata: Map<string, Record<string, string>>;
   /** nick.toLowerCase() → peer E2EE device public key (METADATA ocean.dm-key) */
@@ -2208,7 +2228,7 @@ interface StaleServerSearch {
   openRefs: Set<string>;
 }
 
-type BatchCollectorKind = 'multiline' | 'search' | 'search-quarantine';
+type BatchCollectorKind = 'multiline' | 'search' | 'search-quarantine' | 'labeled-response';
 
 interface BatchCollector {
   target: string;
@@ -2230,7 +2250,32 @@ interface BatchCollector {
   multilineRejected?: boolean;
   /** First inner line's provenance, reused for the assembled synthetic PRIVMSG. */
   src?: { tags: Record<string, string>; prefix: string | null; nick: string | null; host: string | null };
+  /**
+   * `@label=` from the BATCH + start line (labeled-response wrapper or a
+   * multiline echo that carried the client label on the opening BATCH).
+   */
+  responseLabel?: string;
 }
+
+/** In-flight optimistic / outbox sends awaiting a labeled server reply. */
+interface PendingLabeledSend {
+  label: string;
+  target: string;
+  targetKey: string;
+  /** UI row id (`label:…` for online, `outbox:…` for flush). */
+  messageId: string;
+  text: string;
+  from: string;
+  generation: number;
+  createdAt: number;
+  topic?: string | null;
+  replyTo?: ChatMessage['replyTo'];
+  encrypted?: boolean;
+  e2ee?: ChatMessage['e2ee'];
+  plaintext?: string;
+}
+
+const _pendingLabeledSends = new Map<string, PendingLabeledSend>();
 
 let _serverSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 let _serverSearchGeneration = 0;
@@ -2682,10 +2727,10 @@ function _pruneTypingUsers(
  * draft/event-playback guard — CHATHISTORY replays include historical
  * JOIN/PART/QUIT/KICK/TOPIC lines. They must NEVER mutate live state: a QUIT
  * from three hours ago replayed into the handler deleted members who are in
- * the channel RIGHT NOW (the "nicklist shrinks after a while" bug). Orochi's
+ * the channel RIGHT NOW (the "nicklist shrinks after a while" bug). Onyx Server's
  * replay lines carry @time+msgid but NO batch tag, so detection is:
  *   1. spec path — a batch tag referencing an open collector;
- *   2. Orochi path — the event's channel has an open chathistory batch AND the
+ *   2. Onyx Server path — the event's channel has an open chathistory batch AND the
  *      bare replay line carries a msgid;
  *   3. channel-less events (QUIT/NICK) — some batch is open AND the line
  *      carries a msgid (live event lines don't; replayed ones always do).
@@ -2718,9 +2763,9 @@ function _pushReplayEvent(tags: Record<string, string>, channel: string | null, 
 const _batchCollectors = new Map<string, BatchCollector>();
 /**
  * Lowercased target → batch ref for every currently-open `chathistory` BATCH.
- * Orochi's CHATHISTORY replay does NOT stamp `@batch=<ref>` on the inner
+ * Onyx Server's CHATHISTORY replay does NOT stamp `@batch=<ref>` on the inner
  * PRIVMSG lines (it writes `BATCH +1 chathistory #c` then bare
- * `:nick PRIVMSG #c :…` then `BATCH -1`; see orochi src/proto/chathistory_cmd.zig
+ * `:nick PRIVMSG #c :…` then `BATCH -1`; see onyx-server src/proto/chathistory_cmd.zig
  * writeMessage and the threaded test at src/daemon/server.zig:19476). Without a
  * per-line batch tag we cannot correlate inner lines by tag, so we track the
  * open batch by target and route inner PRIVMSGs into the collector while the
@@ -2734,6 +2779,185 @@ export function _resetBatchCollectorsForTests(): void {
   _batchCollectors.clear();
   _openChathistoryByTarget.clear();
   _resetServerSearchTransport();
+  _pendingLabeledSends.clear();
+}
+
+function _registerPendingLabeledSend(set: SetFn, entry: PendingLabeledSend): void {
+  if (_pendingLabeledSends.size >= MAX_PENDING_LABELED_SENDS) {
+    // Map insertion order = FIFO. Evict the oldest correlation and promote its
+    // UI row so a flood of in-flight labels cannot leave stuck "sending…" rows.
+    const oldestKey = _pendingLabeledSends.keys().next().value;
+    if (oldestKey !== undefined) {
+      const oldest = _pendingLabeledSends.get(oldestKey);
+      _pendingLabeledSends.delete(oldestKey);
+      if (oldest && oldest.generation === _accountGeneration) {
+        _promoteLabeledPending(set, oldest);
+      }
+    }
+  }
+  _pendingLabeledSends.set(entry.label, entry);
+}
+
+/**
+ * Drop every in-flight label correlation. When `set` is provided, promote the
+ * wire-admitted UI rows first — disconnect / reconnect must not leave
+ * `pending: true` placeholders that can never resolve (the durable outbox row
+ * was already deleted on socket admission).
+ */
+function _clearPendingLabeledSends(set?: SetFn): void {
+  if (!set || _pendingLabeledSends.size === 0) {
+    _pendingLabeledSends.clear();
+    return;
+  }
+  const remaining = [..._pendingLabeledSends.values()];
+  _pendingLabeledSends.clear();
+  for (const pending of remaining) {
+    if (pending.generation !== _accountGeneration) continue;
+    _promoteLabeledPending(set, pending);
+  }
+}
+
+function _hasPendingLabeledMessageId(messageId: string): boolean {
+  for (const pending of _pendingLabeledSends.values()) {
+    if (pending.messageId === messageId) return true;
+  }
+  return false;
+}
+
+function _takePendingLabeledSend(label: string | undefined): PendingLabeledSend | null {
+  if (!label || !isValidLabel(label)) return null;
+  const pending = _pendingLabeledSends.get(label);
+  if (!pending) return null;
+  if (pending.generation !== _accountGeneration) {
+    _pendingLabeledSends.delete(label);
+    return null;
+  }
+  _pendingLabeledSends.delete(label);
+  return pending;
+}
+
+function _replaceMessageById(
+  state: OnyxState,
+  targetKey: string,
+  oldId: string,
+  next: ChatMessage,
+): Partial<OnyxState> {
+  const replace = (messages: ChatMessage[]): ChatMessage[] | null => {
+    const idx = messages.findIndex((message) => message.id === oldId);
+    if (idx === -1) return null;
+    const copy = messages.slice();
+    copy[idx] = next;
+    return copy;
+  };
+
+  const channels = new Map(state.channels);
+  const channel = channels.get(targetKey);
+  if (channel) {
+    const messages = replace(channel.messages);
+    if (messages) {
+      channels.set(targetKey, { ...channel, messages });
+      return { channels };
+    }
+  }
+
+  const dms = new Map(state.dms);
+  const dm = dms.get(targetKey);
+  if (dm) {
+    const messages = replace(dm.messages);
+    if (messages) {
+      dms.set(targetKey, { ...dm, messages });
+      return { dms };
+    }
+  }
+
+  // Placeholder already gone (e.g. buffer trim) — still land the authoritative row.
+  return _addMessage(state, next.target, next);
+}
+
+function _removeMessageById(
+  state: OnyxState,
+  targetKey: string,
+  messageId: string,
+): Partial<OnyxState> {
+  const strip = (messages: ChatMessage[]) => messages.filter((message) => message.id !== messageId);
+  const channels = new Map(state.channels);
+  const channel = channels.get(targetKey);
+  if (channel) {
+    channels.set(targetKey, { ...channel, messages: strip(channel.messages) });
+    return { channels };
+  }
+  const dms = new Map(state.dms);
+  const dm = dms.get(targetKey);
+  if (dm) {
+    dms.set(targetKey, { ...dm, messages: strip(dm.messages) });
+    return { dms };
+  }
+  return {};
+}
+
+/** Promote a pending optimistic row when the server ACKs without an echo body. */
+function _promoteLabeledPending(
+  set: SetFn,
+  pending: PendingLabeledSend,
+): void {
+  const confirmed: ChatMessage = {
+    id: uid(),
+    time: new Date(),
+    from: pending.from,
+    text: pending.text,
+    type: 'msg',
+    target: pending.target,
+    ...(pending.topic ? { topic: pending.topic } : {}),
+    ...(pending.replyTo ? { replyTo: pending.replyTo } : {}),
+    ...(pending.encrypted
+      ? {
+          encrypted: true,
+          ...(pending.plaintext !== undefined ? { plaintext: pending.plaintext } : {}),
+        }
+      : {}),
+    ...(pending.e2ee ? { e2ee: pending.e2ee } : {}),
+  };
+  set((state) => _replaceMessageById(state, pending.targetKey, pending.messageId, confirmed));
+}
+
+function _failLabeledPending(
+  set: SetFn,
+  get: GetFn,
+  pending: PendingLabeledSend,
+  description: string,
+): void {
+  set((state) => _removeMessageById(state, pending.targetKey, pending.messageId));
+  get().addToast({
+    variant: 'error',
+    title: 'Message not delivered',
+    description: description || `Could not deliver to ${pending.target}.`,
+  });
+}
+
+/**
+ * If `label` matches an in-flight send, resolve it as success (echo body) or
+ * as an ACK-style promote when `chatMsg` is null. Returns true when handled.
+ */
+function _resolveLabeledChatEcho(
+  set: SetFn,
+  label: string | undefined,
+  chatMsg: ChatMessage | null,
+): boolean {
+  const pending = _takePendingLabeledSend(label);
+  if (!pending) return false;
+  if (chatMsg) {
+    const finalMsg: ChatMessage = {
+      ...chatMsg,
+      // Echo of a sealed DM may only carry ciphertext — keep the local plaintext.
+      ...(pending.plaintext !== undefined && chatMsg.encrypted
+        ? { plaintext: pending.plaintext }
+        : {}),
+    };
+    set((state) => _replaceMessageById(state, pending.targetKey, pending.messageId, finalMsg));
+    return true;
+  }
+  _promoteLabeledPending(set, pending);
+  return true;
 }
 
 // ── Time travel (module-level) ────────────────────────────────────────────────
@@ -3507,7 +3731,7 @@ export function _resetAccountReplyStateForTests(): void {
 
 // ── Remembered-session restoration ───────────────────────────────────────────
 // A resumed account can register under a temporary 433 alias (`kain_`) while
-// Orochi reclaims the canonical account identity (`kain`). Session-sync JOIN and
+// Onyx Server reclaims the canonical account identity (`kain`). Session-sync JOIN and
 // NAMES replay may therefore name either identity, and may arrive before each
 // other. Keep that equivalence narrowly scoped to this client and generation;
 // outside the bounded window the normal strict self/353 checks still apply.
@@ -4444,6 +4668,11 @@ function conversationMessage(
  * socket admission, not a server acknowledgement: callers may discard durable
  * state only after `true`. Direct composer sends intentionally remain
  * fire-and-forget through `sendMessage`; the outbox awaits this result.
+ *
+ * When `labeled-response` is negotiated, outbound chat is stamped with
+ * `@label=` and an optimistic/pending UI row is correlated until the server's
+ * labeled echo, ACK, or FAIL arrives. Pass `outboxMessageId` when flushing a
+ * durable outbox row so the existing placeholder is reused.
  */
 function deliverChatMessage(
   set: SetFn,
@@ -4451,22 +4680,68 @@ function deliverChatMessage(
   client: IRCClient,
   target: string,
   text: string,
+  opts?: { outboxMessageId?: string },
 ): boolean | Promise<boolean> {
   const generation = _accountGeneration;
   const { ourNick, replyingTo } = get();
   const waitForServerEcho = client.negotiatedCaps.has('echo-message');
+  const useLabel = client.negotiatedCaps.has('labeled-response');
+  const label = useLabel ? nextClientLabel() : null;
   const targetIsChannel = target.length > 0 && (client.isupport.CHANTYPES ?? '#&').includes(target[0]!);
   const activeTopic = targetIsChannel ? get().activeChannelTopics.get(target.toLowerCase()) ?? null : null;
   const topicTags = activeTopic ? topicMessageTag(activeTopic) ?? {} : {};
-  const outboundTags = replyingTo
+  const baseTags = replyingTo
     ? { ...topicTags, '+draft/reply': replyingTo.id }
     : topicTags;
+  const outboundTags = label ? { ...baseTags, label } : baseTags;
   const hasOutboundTags = Object.keys(outboundTags).length > 0;
   const replySnapshot = replyingTo ? {
     id: replyingTo.id,
     from: replyingTo.from,
     text: persistedReplyPreviewText(replyingTo),
   } : null;
+
+  const commitLabeledOptimistic = (fields: {
+    text: string;
+    encrypted?: boolean;
+    e2ee?: E2eeMessageKind;
+    plaintext?: string;
+  }): void => {
+    if (!label) return;
+    const messageId = opts?.outboxMessageId ?? `label:${label}`;
+    _registerPendingLabeledSend(set, {
+      label,
+      target,
+      targetKey: target.toLowerCase(),
+      messageId,
+      text: fields.text,
+      from: ourNick,
+      generation,
+      createdAt: Date.now(),
+      ...(activeTopic ? { topic: activeTopic } : {}),
+      ...(replySnapshot ? { replyTo: replySnapshot } : {}),
+      ...(fields.encrypted ? { encrypted: true } : {}),
+      ...(fields.e2ee ? { e2ee: fields.e2ee } : {}),
+      ...(fields.plaintext !== undefined ? { plaintext: fields.plaintext } : {}),
+    });
+    // Outbox flush reuses the existing `outbox:<id>` placeholder.
+    if (opts?.outboxMessageId) return;
+    set((s) => _addMessage(s, target, {
+      id: messageId,
+      time: new Date(),
+      from: ourNick,
+      text: fields.text,
+      type: 'msg',
+      target,
+      pending: true,
+      ...(activeTopic ? { topic: activeTopic } : {}),
+      ...(replySnapshot ? { replyTo: replySnapshot } : {}),
+      ...(fields.encrypted ? { encrypted: true } : {}),
+      ...(fields.e2ee ? { e2ee: fields.e2ee } : {}),
+      ...(fields.plaintext !== undefined ? { plaintext: fields.plaintext } : {}),
+    }));
+    if (targetIsChannel) get().updateChannelActivity(target);
+  };
 
   // A DM to a peer who published a device key (and with E2EE on) is sealed
   // before socket admission. A seal or admission failure must not create an
@@ -4517,7 +4792,14 @@ function deliverChatMessage(
 
       const envelope = outcome.envelope;
       if (!client.send(formatTaggedLine(encryptedOutboundTags, 'PRIVMSG', target, envelope))) return false;
-      if (!waitForServerEcho) {
+      if (label) {
+        commitLabeledOptimistic({
+          text: envelope,
+          encrypted: true,
+          ...(encryptedKind ? { e2ee: encryptedKind } : {}),
+          plaintext: text,
+        });
+      } else if (!waitForServerEcho) {
         // Ciphertext remains the persisted text; plaintext is transient display.
         set(s => _addMessage(s, target, {
           id: uid(), time: new Date(), from: ourNick, text: envelope, plaintext: text,
@@ -4555,7 +4837,9 @@ function deliverChatMessage(
   }
   if (admittedFrames === 0) return false;
 
-  if (!waitForServerEcho) {
+  if (label) {
+    commitLabeledOptimistic({ text });
+  } else if (!waitForServerEcho) {
     const msg: ChatMessage = {
       id: uid(),
       time: new Date(),
@@ -4587,6 +4871,7 @@ export const store = createStore<OnyxState>()(
     connectionStatus: 'disconnected',
     reconnectIn: 0,
     autoReconnect: false,
+    outboxDeliveryFailed: false,
     latencyMs: null,
     serverStats: null,
     activeView: { kind: 'home' },
@@ -4611,6 +4896,7 @@ export const store = createStore<OnyxState>()(
     showServerSettings: false,
     showAccessList: false,
     showPinnedMessages: false,
+    showJumpToDate: false,
     monitoredNicks: new Set(),
     // Contact lists are private and load only after a server owner exists.
     friends: new Map(),
@@ -4760,8 +5046,8 @@ export const store = createStore<OnyxState>()(
         const target = activeView.kind === 'channel' ? activeView.channel :
                        activeView.kind === 'dm' ? activeView.nick : get().voice.callChannel;
         if (!target) return;
-        await getMountedSuimyakuMediaEngine()?.startScreenShare(target);
-        const stream = getMountedSuimyakuMediaEngine()?.getLocalStream() ?? null;
+        await getMountedCadenceMediaEngine()?.startScreenShare(target);
+        const stream = getMountedCadenceMediaEngine()?.getLocalStream() ?? null;
         set(s => ({ voice: { ...s.voice, screenshareActive: !!stream, screenshareStream: stream } }));
         stream?.getVideoTracks()[0]?.addEventListener('ended', () => {
           get().voice.stopScreenshare();
@@ -4769,7 +5055,7 @@ export const store = createStore<OnyxState>()(
       },
       stopScreenshare() {
         const { voice } = get();
-        getMountedSuimyakuMediaEngine()?.stopBroadcast(voice.callChannel ?? undefined);
+        getMountedCadenceMediaEngine()?.stopBroadcast(voice.callChannel ?? undefined);
         voice.screenshareStream?.getTracks().forEach(t => t.stop());
         set(s => ({ voice: { ...s.voice, screenshareActive: false, screenshareStream: null } }));
       },
@@ -4823,6 +5109,9 @@ export const store = createStore<OnyxState>()(
       // leak across a (re)connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      // Promote any wire-admitted optimistic rows left over from the prior
+      // socket so they cannot stick as pending forever after a re-connect.
+      _clearPendingLabeledSends(set);
       _stopLatencyPing();
       _clearTempBanTimers();
       _resetServerSearchTransport();
@@ -4945,6 +5234,9 @@ export const store = createStore<OnyxState>()(
           const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
           _batchCollectors.clear();
           _openChathistoryByTarget.clear();
+          // Socket gone: no further labeled echo can arrive. Promote admitted
+          // optimistic / outbox placeholders so they don't hang as "sending…".
+          _clearPendingLabeledSends(set);
           _stopLatencyPing();
           _clearBanListTransport();
           _typingLastSent.clear();
@@ -5140,6 +5432,7 @@ export const store = createStore<OnyxState>()(
       // swallow live messages after a fresh connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      _clearPendingLabeledSends(set);
       _stopLatencyPing();
       _clearTempBanTimers();
       const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
@@ -5296,13 +5589,20 @@ export const store = createStore<OnyxState>()(
 
             // Keep both durable and UI state byte-for-byte intact until the
             // client explicitly admits every frame for this logical message.
-            const admitted = await deliverChatMessage(set, get, client, e.target, e.text);
+            // With labeled-response the UI placeholder stays until the labeled
+            // echo/ACK; durable outbox still drops on admission so a reconnect
+            // cannot double-send a wire-admitted row.
+            const admitted = await deliverChatMessage(set, get, client, e.target, e.text, {
+              outboxMessageId: `outbox:${e.id}`,
+            });
             if (!admitted) {
               waiting += 1;
               continue;
             }
             await deleteOutboxEntry(e.id);
-            dropPlaceholder(e);
+            if (!_hasPendingLabeledMessageId(`outbox:${e.id}`)) {
+              dropPlaceholder(e);
+            }
             sent += 1;
           }
 
@@ -5322,7 +5622,23 @@ export const store = createStore<OnyxState>()(
           }
           if (waiting > 0 && _outboxRetries < 5) {
             _outboxRetries += 1;
+            // Still auto-retrying — not a terminal failure yet.
+            if (get().outboxDeliveryFailed) set({ outboxDeliveryFailed: false });
             setTimeout(() => get().flushOutbox(), 4000);
+          } else if (waiting > 0) {
+            // Auto-retry budget exhausted: keep durable rows, surface chrome + toast.
+            if (!get().outboxDeliveryFailed) {
+              set({ outboxDeliveryFailed: true });
+              get().addToast({
+                variant: 'warning',
+                title: waiting === 1
+                  ? 'Queued message still waiting'
+                  : `${waiting} queued messages still waiting`,
+                description: 'Could not send yet. Open Home or retry from the composer.',
+              });
+            }
+          } else if (get().outboxDeliveryFailed) {
+            set({ outboxDeliveryFailed: false });
           }
         } finally {
           _outboxFlushActive = false;
@@ -5403,6 +5719,12 @@ export const store = createStore<OnyxState>()(
           title: 'Queued message removed',
           description: `Nothing will be sent to ${entry.target}.`,
         });
+        // If nothing owned remains, drop the failed-delivery chrome.
+        const owner = _outboxOwner(get());
+        const remaining = (await loadOutbox()).filter((row) => _sameOutboxOwner(row.owner, owner));
+        if (remaining.length === 0 && get().outboxDeliveryFailed) {
+          set({ outboxDeliveryFailed: false });
+        }
       })();
     },
 
@@ -6037,7 +6359,7 @@ export const store = createStore<OnyxState>()(
       if (!client) return;
       _logoutReplyContext = _captureAccountReplyContext(get);
       set({ accountActionError: null });
-      // Orochi LOGOUT replies with an optional `MODE <nick> :-o` then a
+      // Onyx Server LOGOUT replies with an optional `MODE <nick> :-o` then a
       // confirming NOTICE. The 901 RPL_LOGGEDOUT (if sent) clears server.account;
       // we also clear it defensively when the confirming notice lands.
       client.sendRaw('LOGOUT');
@@ -6096,7 +6418,7 @@ export const store = createStore<OnyxState>()(
     ghost(nick, password) {
       const { client } = get();
       if (!client) return;
-      // Orochi: `GHOST <nick> <password>` (password-verified). Replies arrive
+      // Onyx Server: `GHOST <nick> <password>` (password-verified). Replies arrive
       // as a server NOTICE on success or numerics on failure — both surface in
       // serviceNotices / notifications through the normal message path.
       client.sendRaw('GHOST', nick, password);
@@ -6394,7 +6716,7 @@ export const store = createStore<OnyxState>()(
         _saveVoiceSettings(voice);
         return { voice };
       });
-      const engine = getMountedSuimyakuMediaEngine();
+      const engine = getMountedCadenceMediaEngine();
       if (s.muted !== undefined) engine?.setMuted(s.muted);
       if (s.deafened !== undefined) engine?.setDeafened(s.deafened);
       if (s.outputDeviceId !== undefined || s.outputVolume !== undefined) {
@@ -6683,7 +7005,7 @@ export const store = createStore<OnyxState>()(
       const { client, ourNick } = get();
       const key = target.toLowerCase();
 
-      // IRCv3 draft/message-redaction via REDACT — Orochi wire form is
+      // IRCv3 draft/message-redaction via REDACT — Onyx Server wire form is
       // `REDACT <target> <msgid> [:reason]` (formatIRCLine adds the trailing
       // colon itself; passing ':Deleted' would double it).
       if (client?.negotiatedCaps.has('draft/message-redaction')) {
@@ -6767,7 +7089,7 @@ export const store = createStore<OnyxState>()(
       if (now - lastSent < TYPING_RATE_LIMIT_MS) return;
       if (!_typingLastSent.has(key) && _typingLastSent.size >= MAX_TYPING_TARGETS) return;
       _typingLastSent.set(key, now);
-      // Orochi inspects the spec client tag `+typing` (cap name draft/typing).
+      // Onyx Server inspects the spec client tag `+typing` (cap name draft/typing).
       client.tagmsg(safeTarget, { '+typing': 'active' });
     },
 
@@ -6811,6 +7133,13 @@ export const store = createStore<OnyxState>()(
     },
     closePinnedMessages() {
       set({ showPinnedMessages: false });
+    },
+
+    openJumpToDate() {
+      set({ showJumpToDate: true });
+    },
+    closeJumpToDate() {
+      set({ showJumpToDate: false });
     },
 
     // ── Pinned messages (IRCX PINS channel prop) ─────────────────────────
@@ -8025,7 +8354,7 @@ export const store = createStore<OnyxState>()(
           return;
         }
         if (standard.kind === 'NOTE' && standard.command === 'TEGAMI') {
-          // Orochi deliverTegami: `:server NOTE TEGAMI :from <nick> :<text>`
+          // Onyx Server deliverTegami: `:server NOTE TEGAMI :from <nick> :<text>`
           // The whole `from <nick> :<text>` arrives as one trailing param.
           const body = msg.params[1] ?? '';
           const tegamiMatch = body.match(/^from (\S+) :([\s\S]*)$/) ?? body.match(/^from (\S+) ([\s\S]*)$/);
@@ -8164,7 +8493,7 @@ export const store = createStore<OnyxState>()(
                 mediaTranscripts.set(tKey, entries);
                 return { mediaTranscripts };
               });
-              // Live captions feed the CaptionsOverlay. Orochi fans out
+              // Live captions feed the CaptionsOverlay. Onyx Server fans out
               // complete utterances, so each caption line is final.
               if (mediaVerb === 'CAPTION' && typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('ocean:caption', {
@@ -8282,17 +8611,38 @@ export const store = createStore<OnyxState>()(
               set({ mediaAvailable: true });
             }
             // Forward every media event to the engine (frame/signaling paths).
-            getMountedSuimyakuMediaEngine()?.handleMediaMessage(actor, channel, verb, detail);
+            getMountedCadenceMediaEngine()?.handleMediaMessage(actor, channel, verb, detail);
           } else {
             set({ mediaAvailable: true });
           }
           return;
+        }
+        // Labeled FAIL for an in-flight optimistic / outbox send (e.g. PRIVMSG
+        // rejected after `@label=`). Prefer this over a generic service notice.
+        if (standard.kind === 'FAIL') {
+          const pending = _takePendingLabeledSend(tags['label']);
+          if (pending) {
+            _failLabeledPending(
+              set,
+              get,
+              pending,
+              standard.description || `${standard.command} failed (${standard.code})`,
+            );
+            return;
+          }
         }
         get().addServiceNotice(standard.command, `${standard.kind} ${standard.code}${standard.description ? `: ${standard.description}` : ''}`);
         return;
       }
 
       switch (command) {
+
+        // ── IRCv3 labeled-response bare ACK (command produced no natural reply)
+        case 'ACK': {
+          const pending = _takePendingLabeledSend(tags['label']);
+          if (pending) _promoteLabeledPending(set, pending);
+          break;
+        }
 
         // ── IRCX EVENT plane (MEDIA presence + WEBAUTHN service replies) ──
         case 'EVENT': {
@@ -8327,7 +8677,7 @@ export const store = createStore<OnyxState>()(
           _addSessionRestoreIdentity(get, _saslAccount);
           _addSessionRestoreIdentity(get, _connectNick);
           _armSessionRestoreReplay(get, set);
-          // Orochi exposes voice/video via the MEDIA channel command for any
+          // Onyx Server exposes voice/video via the MEDIA channel command for any
           // registered member — there is no media cap to gate on, so mark it
           // available on registration. MEDIA EVENTs keep it true.
           set({ ourNick: params[0], mediaAvailable: true });
@@ -8355,7 +8705,7 @@ export const store = createStore<OnyxState>()(
           // Send initial latency ping
           _sendLatencyPing(get);
           // NO blind autojoin: joining is a choice, not a default. An account
-          // with orochi/session-sync gets its live channels replayed by the
+          // with onyx/session-sync gets its live channels replayed by the
           // server; everyone else lands on the Home view (a real directory)
           // unless they asked for a room — via the ?join= deep link or the
           // connect form's optional channel field, both of which flow through
@@ -8368,6 +8718,7 @@ export const store = createStore<OnyxState>()(
               // Offline outbox: fire queued messages once the session settles
               // (after the session-sync join replay, so channel sends land).
               _outboxRetries = 0;
+              if (get().outboxDeliveryFailed) set({ outboxDeliveryFailed: false });
               setTimeout(() => get().flushOutbox(), 2500);
               // Flush any scheduled messages that came due while the app was
               // closed or offline — once, promptly, right after the session
@@ -8593,7 +8944,7 @@ export const store = createStore<OnyxState>()(
             // an idempotent join refreshes the roster silently instead of
             // spamming "X joined" for the whole remote side of the channel.
             const alreadyPresent = get().channels.get(key)?.users.has(joiner.toLowerCase()) ?? false;
-            // Traditional IRC shows the mask on join — Orochi hosts are
+            // Traditional IRC shows the mask on join — Onyx Server hosts are
             // cloaks/personas, so this is safe to render.
             const joinMask = msg.prefix && msg.prefix.includes('!')
               ? msg.prefix.slice(msg.prefix.indexOf('!') + 1, msg.prefix.indexOf('!') + 257)
@@ -9127,7 +9478,7 @@ export const store = createStore<OnyxState>()(
           }
 
           // ── Account management notices (server-sourced replies) ──────────
-          // Orochi answers ACCOUNTINFO / LOGOUT / DROP with server NOTICEs.
+          // Onyx Server answers ACCOUNTINFO / LOGOUT / DROP with server NOTICEs.
           // Capture the structured ACCOUNTINFO payload and the logout/drop
           // confirmations into account state before the generic service-notice
           // routing folds them into the flat serviceNotices list. Only trust a
@@ -9142,7 +9493,7 @@ export const store = createStore<OnyxState>()(
             !isChan(target) &&
             !sender
           ) {
-            // Current Orochi delivers fresh resume credentials via server
+            // Current Onyx Server delivers fresh resume credentials via server
             // NOTICEs (`SESSION TOKEN …` / `SESSION MTOKEN …`). Older nodes
             // used NOTE standard replies, handled above. Keep both paths so a
             // rolling mesh upgrade cannot strand reconnect state.
@@ -9541,10 +9892,10 @@ export const store = createStore<OnyxState>()(
             break;
           }
 
-          // ── IRCv3 draft/message-editing (native Orochi shape) ────────────
-          // Orochi emits an edit as a PRIVMSG carrying `+draft/edit=<msgid>`
+          // ── IRCv3 draft/message-editing (native Onyx Server shape) ────────────
+          // Onyx Server emits an edit as a PRIVMSG carrying `+draft/edit=<msgid>`
           // (and `+draft/revision`), NOT a top-level EDIT command
-          // (orochi src/daemon/server.zig:10788). Apply it in place against the
+          // (onyx-server src/daemon/server.zig:10788). Apply it in place against the
           // referenced message instead of appending a duplicate.
           const editRef = tags['+draft/edit'] ?? tags['draft/edit'];
           if (editRef) {
@@ -9637,7 +9988,7 @@ export const store = createStore<OnyxState>()(
             ? rawServerMsgId
             : undefined;
           const e2eeTag = parseE2eeMessageTag(tags);
-          // E2EE: a DM carrying a Tsumugi envelope stays ciphertext in the
+          // E2EE: a DM carrying a Mooring envelope stays ciphertext in the
           // store (and thus in CHATHISTORY/vault) until decrypted in place.
           // The view shows a locked placeholder while `text` is an envelope.
           const isEncryptedDm = !isChannel && isEnvelope(displayText);
@@ -9658,7 +10009,7 @@ export const store = createStore<OnyxState>()(
           // ── If this PRIVMSG is part of a CHATHISTORY batch, collect it ────
           // Two routing paths:
           //  1. Spec-compliant servers stamp `@batch=<ref>` on each inner line.
-          //  2. Orochi omits that tag on CHATHISTORY replay, so fall back to the
+          //  2. Onyx Server omits that tag on CHATHISTORY replay, so fall back to the
           //     open-batch-by-target map populated on `BATCH +ref chathistory`.
           const batchTag = tags['batch'];
           if (batchTag) {
@@ -9667,6 +10018,23 @@ export const store = createStore<OnyxState>()(
             // Dropping it also prevents rows beyond an open-collector ceiling
             // from escaping the bound and rendering through the normal path.
             if (!collector) break;
+            if (collector.kind === 'labeled-response') {
+              // Multi-line labeled reply (or a labeled-response wrapper around
+              // an echo). Resolve the first self chat line against the pending
+              // optimistic row; other lines stay ignored for correlation.
+              if (
+                isSelf
+                && collector.responseLabel
+                && (command === 'PRIVMSG' || command === 'NOTICE')
+              ) {
+                const label = collector.responseLabel;
+                collector.responseLabel = undefined;
+                if (_resolveLabeledChatEcho(set, label, chatMsg)) {
+                  if (isChannel) get().updateChannelActivity(msgTarget);
+                }
+              }
+              break;
+            }
             if (collector.kind === 'multiline') {
               const concat =
                 'draft/multiline-concat' in tags || '+draft/multiline-concat' in tags;
@@ -9683,6 +10051,23 @@ export const store = createStore<OnyxState>()(
               );
             } else {
               _collectHistoryMessage(collector, chatMsg);
+            }
+            break;
+          }
+
+          // Live labeled self-echo (echo-message): replace the optimistic row.
+          if (
+            isSelf
+            && tags['label']
+            && !_openChathistoryByTarget.has(msgKey)
+            && _resolveLabeledChatEcho(set, tags['label'], chatMsg)
+          ) {
+            if (isChannel) get().updateChannelActivity(msgTarget);
+            if (isEncryptedDm) {
+              if (!get().peerDmKeys.has(msgTarget.toLowerCase())) {
+                get().client?.sendRaw('METADATA', sender, 'GET', 'ocean.dm-key');
+              }
+              get()._decryptDm(msgTarget, chatMsg.id);
             }
             break;
           }
@@ -10736,13 +11121,38 @@ export const store = createStore<OnyxState>()(
               && _batchCollectors.size < OPEN_BATCH_COLLECTOR_MAX
             ) {
               // draft/multiline: the inner PRIVMSGs reassemble into ONE message
-              // when the batch closes (echo of our own sends included).
+              // when the batch closes (echo of our own sends included). Client
+              // labels ride on the opening BATCH and must be preserved so the
+              // assembled synthetic PRIVMSG can resolve optimistic rows.
+              const responseLabel = tags['label'] && isValidLabel(tags['label'])
+                ? tags['label']
+                : undefined;
               _batchCollectors.set(batchRef, {
                 target: batchTarget,
                 messages: [],
                 kind: 'multiline',
                 parts: [],
                 multilineChars: 0,
+                ...(responseLabel ? { responseLabel } : {}),
+              });
+            } else if (
+              batchType === 'labeled-response'
+              && batchRef
+              && batchRef.length <= BATCH_REF_MAX
+              && !/[\u0000-\u0020\u007f]/u.test(batchRef)
+              && !_batchCollectors.has(batchRef)
+              && _batchCollectors.size < OPEN_BATCH_COLLECTOR_MAX
+            ) {
+              // Multi-line server reply to a labeled client command. No target
+              // is required (WHOIS / registration banners use bare batches).
+              const responseLabel = tags['label'] && isValidLabel(tags['label'])
+                ? tags['label']
+                : undefined;
+              _batchCollectors.set(batchRef, {
+                target: batchTarget || '*',
+                messages: [],
+                kind: 'labeled-response',
+                ...(responseLabel ? { responseLabel } : {}),
               });
             }
           } else if (batchParam.startsWith('-')) {
@@ -10807,6 +11217,15 @@ export const store = createStore<OnyxState>()(
               ));
               break;
             }
+            if (collector && collector.kind === 'labeled-response') {
+              _batchCollectors.delete(batchRef);
+              // No chat body was correlated (empty batch, or only numerics).
+              // Promote any remaining pending optimistic row as an ACK would.
+              if (collector.responseLabel) {
+                _resolveLabeledChatEcho(set, collector.responseLabel, null);
+              }
+              break;
+            }
             if (collector && collector.kind === 'multiline') {
               _batchCollectors.delete(batchRef);
               const parts = collector.parts ?? [];
@@ -10814,11 +11233,15 @@ export const store = createStore<OnyxState>()(
                 // Re-dispatch the assembled body as one synthetic PRIVMSG so it
                 // flows through the full delivery path (highlights, unread,
                 // notifications, DM routing) exactly like a plain message.
-                const tags = { ...collector.src.tags };
-                delete tags['batch'];
-                delete tags['draft/multiline-concat'];
+                const assembledTags = { ...collector.src.tags };
+                delete assembledTags['batch'];
+                delete assembledTags['draft/multiline-concat'];
+                // Opening-BATCH `@label=` is the correlation id for this send.
+                if (collector.responseLabel) {
+                  assembledTags['label'] = collector.responseLabel;
+                }
                 get()._handleMessage({
-                  tags,
+                  tags: assembledTags,
                   prefix: collector.src.prefix,
                   nick: collector.src.nick,
                   host: collector.src.host,
@@ -10826,6 +11249,9 @@ export const store = createStore<OnyxState>()(
                   params: [collector.target, assembleMultilineText(parts)],
                   raw: '',
                 });
+              } else if (collector.responseLabel) {
+                // Multiline echo produced nothing usable — still clear pending.
+                _resolveLabeledChatEcho(set, collector.responseLabel, null);
               }
               break;
             }
@@ -11267,6 +11693,15 @@ export const store = createStore<OnyxState>()(
         // ── ERR numerics ──────────────────────────────────────────────────
 
         case '401': { // ERR_NOSUCHNICK
+          const pending401 = _takePendingLabeledSend(tags['label']);
+          if (pending401) {
+            _failLabeledPending(
+              set,
+              get,
+              pending401,
+              params[2] || `No such nick: ${params[1] ?? pending401.target}`,
+            );
+          }
           const target401 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!target401) break;
           const key401 = target401.toLowerCase();
@@ -11288,6 +11723,10 @@ export const store = createStore<OnyxState>()(
 
         case '403': { // ERR_NOSUCHCHANNEL
           const channel403 = params[1] ?? '';
+          const pending403 = _takePendingLabeledSend(tags['label']);
+          if (pending403) {
+            _failLabeledPending(set, get, pending403, `No such channel: ${channel403 || pending403.target}`);
+          }
           get().addNotification({ type: 'error', text: `No such channel: ${channel403}` });
           break;
         }
@@ -11295,6 +11734,15 @@ export const store = createStore<OnyxState>()(
         case '404': { // ERR_CANNOTSENDTOCHAN
           const channel404 = params[1] ?? '';
           const reason404 = params[2] ?? '';
+          const pending404 = _takePendingLabeledSend(tags['label']);
+          if (pending404) {
+            _failLabeledPending(
+              set,
+              get,
+              pending404,
+              reason404 || `Cannot send to ${channel404 || pending404.target}`,
+            );
+          }
           get().addNotification({ type: 'error', text: `Cannot send to ${channel404}: ${reason404}` });
           break;
         }
@@ -11890,7 +12338,7 @@ export const store = createStore<OnyxState>()(
       void password;
       get().addNotification({
         type: 'system',
-        text: 'Orochi grants IRC operator status from the authenticated SASL account.',
+        text: 'Onyx Server grants IRC operator status from the authenticated SASL account.',
       });
       set({ operUsername: username });
     },
@@ -12812,7 +13260,7 @@ export const store = createStore<OnyxState>()(
       return { channelWelcomeSeen };
     }),
 
-    // ── Voice / SUIMYAKU speaking + channel tracking ────────────────────────────
+    // ── Voice / CADENCE speaking + channel tracking ────────────────────────────
     speakingNicks: new Set<string>(),
     mutedNicks: new Set<string>(),
     setSpeakingNick: (nick, speaking) => set(s => {
@@ -13163,7 +13611,7 @@ export const store = createStore<OnyxState>()(
     }),
     getUserProfile: (nick) => get().userProfiles.get(nick.toLowerCase()) ?? null,
 
-    // ── Orochi integration (serial integration pass) ──────────────────────────
+    // ── Onyx Server integration (serial integration pass) ──────────────────────────
     userMetadata: new Map(),
     peerDmKeys: new Map(),
     peerKeyChanges: new Map(),
@@ -13190,7 +13638,7 @@ export const store = createStore<OnyxState>()(
       const normalizedValue = value === null ? '' : _normalizeProfileMetadataValue(safeKey, value);
       if (normalizedValue === null) return;
       if (normalizedValue === '') {
-        // Orochi handleMetadata: SET with no/empty value deletes the key.
+        // Onyx Server handleMetadata: SET with no/empty value deletes the key.
         client.sendRaw('METADATA', '*', 'SET', safeKey);
       } else {
         client.sendRaw('METADATA', '*', 'SET', safeKey, normalizedValue);
@@ -13200,7 +13648,7 @@ export const store = createStore<OnyxState>()(
     },
 
     _applyMetadata(target, key, value) {
-      // Orochi echoes the literal target the client sent, so a self-SET
+      // Onyx Server echoes the literal target the client sent, so a self-SET
       // (`METADATA * SET …`) comes back as target `*`. Normalize it to our nick
       // so the metadata lands on our own profile, not a phantom `*` entry.
       const resolvedTarget = target === '*' ? (get().ourNick || target) : target;
@@ -13544,7 +13992,7 @@ export const store = createStore<OnyxState>()(
     async joinVoiceChannel(channel, withVideo = false) {
       const { client } = get();
       if (!client) return;
-      const engine = getMountedSuimyakuMediaEngine();
+      const engine = getMountedCadenceMediaEngine();
       if (!engine) {
         get().addToast({
           variant: 'error',
@@ -13602,8 +14050,8 @@ export const store = createStore<OnyxState>()(
 
       const ch = voice.callChannel;
 
-      if (ch) getMountedSuimyakuMediaEngine()?.leaveRoom(ch);
-      else if (voice.callWith) getMountedSuimyakuMediaEngine()?.hangup(voice.callWith);
+      if (ch) getMountedCadenceMediaEngine()?.leaveRoom(ch);
+      else if (voice.callWith) getMountedCadenceMediaEngine()?.hangup(voice.callWith);
 
       void client;
 
@@ -13637,7 +14085,7 @@ export const store = createStore<OnyxState>()(
     async toggleCamera() {
       const { voice, client } = get();
       if (voice.callState !== 'in_call') return;
-      const engine = getMountedSuimyakuMediaEngine();
+      const engine = getMountedCadenceMediaEngine();
       if (!engine) return;
 
       if (voice.cameraOn) {
@@ -13666,7 +14114,7 @@ export const store = createStore<OnyxState>()(
     toggleDeafen() {
       const { voice } = get();
       const deafened = !voice.deafened;
-      getMountedSuimyakuMediaEngine()?.setDeafened(deafened);
+      getMountedCadenceMediaEngine()?.setDeafened(deafened);
       get().setVoiceCallState({ deafened });
     },
 
@@ -13700,7 +14148,7 @@ export const store = createStore<OnyxState>()(
       get().setVoiceCallState({ handRaised: raised });
       // Surface a raised-hand reaction so the rest of the call sees it, and echo
       // it locally for the reactions overlay.
-      const engine = getMountedSuimyakuMediaEngine();
+      const engine = getMountedCadenceMediaEngine();
       if (raised) {
         engine?.sendReaction('✋');
         _dispatchVoiceEvent('ocean:voice-reaction', { nick: ourNick || 'you', emoji: '✋' });
@@ -13727,7 +14175,7 @@ export const store = createStore<OnyxState>()(
       const trimmed = emoji.trim();
       if (!trimmed) return;
       const { ourNick } = get();
-      getMountedSuimyakuMediaEngine()?.sendReaction(trimmed);
+      getMountedCadenceMediaEngine()?.sendReaction(trimmed);
       // Echo locally so the sender sees their own reaction float up immediately.
       _dispatchVoiceEvent('ocean:voice-reaction', { nick: ourNick || 'you', emoji: trimmed });
     },
@@ -13746,8 +14194,8 @@ export const store = createStore<OnyxState>()(
 
       get().setVoiceCallState({ callState: 'ringing_out', callWith: nick, callChannel: null });
 
-      void getMountedSuimyakuMediaEngine()?.startCall(nick, withVideo ? 'video' : 'voice');
-      // ONYX-UI: DM call affordances need an Orochi-backed room/channel flow;
+      void getMountedCadenceMediaEngine()?.startCall(nick, withVideo ? 'video' : 'voice');
+      // ONYX-UI: DM call affordances need an Onyx Server-backed room/channel flow;
       // do not emit legacy CTCP call messages.
 
       setTimeout(() => {
@@ -13762,14 +14210,14 @@ export const store = createStore<OnyxState>()(
       if (!client || voice.callState !== 'ringing_in') return;
 
       void client;
-      void getMountedSuimyakuMediaEngine()?.acceptIncomingCall();
+      void getMountedCadenceMediaEngine()?.acceptIncomingCall();
       get().setVoiceCallState({ callStartedAt: Date.now() });
     },
 
     rejectDmCall() {
       const { client, voice } = get();
       void client;
-      if (voice.callWith) getMountedSuimyakuMediaEngine()?.rejectCall(voice.callWith);
+      if (voice.callWith) getMountedCadenceMediaEngine()?.rejectCall(voice.callWith);
       get().setVoiceCallState({ callState: 'idle', callWith: '', callChannel: null, callStartedAt: null });
     },
 
@@ -13779,7 +14227,7 @@ export const store = createStore<OnyxState>()(
       voice.cameraStream?.getTracks().forEach(t => t.stop());
 
       void client;
-      if (voice.callWith) getMountedSuimyakuMediaEngine()?.hangup(voice.callWith);
+      if (voice.callWith) getMountedCadenceMediaEngine()?.hangup(voice.callWith);
 
       get().setVoiceCallState({
         callState: 'idle',
@@ -13829,7 +14277,7 @@ export const store = createStore<OnyxState>()(
         startedAt: Math.floor(Date.now() / 1000), viewers: 0, mode, quality,
       };
       set(s => ({ streams: new Map(s.streams).set(channel.toLowerCase(), info) }));
-      // MEDIA targets the real channel and requires membership (orochi
+      // MEDIA targets the real channel and requires membership (onyx-server
       // src/daemon/server.zig:12473 isMember check). Join the actual channel if
       // we are not already in it — never a `%%`-prefixed phantom (CHANTYPES=#&,
       // and `%` is only a single UTF8-only modifier prefix, not `%%`).
@@ -13840,7 +14288,7 @@ export const store = createStore<OnyxState>()(
       const c = encodeURIComponent(category);
       void t; void c; void key;
       client.sendRaw('MEDIA', 'JOIN', channel, mode === 'screen' ? 'screen' : 'video');
-      client.sendRaw('MEDIA', 'OFFER', channel, 'kaguravox,kaguravis', 'transport=webrtc');
+      client.sendRaw('MEDIA', 'OFFER', channel, 'cadencevox,cadencevis', 'transport=webrtc');
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ocean:stream-start', {
           detail: { channel, mode, quality },
@@ -13888,14 +14336,14 @@ export const store = createStore<OnyxState>()(
       };
       set(s => ({ streamPolls: new Map(s.streamPolls).set(channel.toLowerCase(), poll) }));
       void client;
-      // ONYX-UI: stream polls need a new Orochi-backed transport; no legacy CTCP.
+      // ONYX-UI: stream polls need a new Onyx Server-backed transport; no legacy CTCP.
     },
 
     voteStreamPoll: (channel, optionIndex) => {
       const { client } = get();
       if (!client) return;
       void client;
-      // ONYX-UI: stream poll votes need a new Orochi-backed transport; no legacy CTCP.
+      // ONYX-UI: stream poll votes need a new Onyx Server-backed transport; no legacy CTCP.
       set(s => {
         const key = channel.toLowerCase();
         const poll = s.streamPolls.get(key);
@@ -13938,7 +14386,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// ── Selectors (Orochi integration) ───────────────────────────────────────────
+// ── Selectors (Onyx Server integration) ───────────────────────────────────────────
 
 /** Unread message count for a channel or DM target. */
 export const selectUnreadCount = (target: string) => (s: OnyxState): number => {
@@ -14130,7 +14578,7 @@ export const selectTegami = (target: string) => (s: OnyxState): { count: number;
  * derived from the server-advertised CHANMODES groups and the PREFIX (status)
  * modes — never a hardcoded guess.
  *
- * ISUPPORT CHANMODES = A,B,C,D (Orochi: `beIZ,k,lfj,imnstCTNMSgWOA`):
+ * ISUPPORT CHANMODES = A,B,C,D (Onyx Server: `beIZ,k,lfj,imnstCTNMSgWOA`):
  *   A (list modes)       → always take an arg (+b / -b)
  *   B (always arg)       → take an arg when set AND unset
  *   C (arg only when set)→ take an arg only when adding

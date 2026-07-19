@@ -2,7 +2,7 @@
 /**
  * ChannelBrowser — network-wide channel discovery over IRC LIST.
  *
- * The store issues LIST on open (mesh-wide on Orochi) and folds 321/322/323
+ * The store issues LIST on open (mesh-wide on Onyx Server) and folds 321/322/323
  * into `channelList`; this sheet renders it with an instant text filter.
  * Lazy-loaded from AppShell so it costs nothing until first opened.
  */

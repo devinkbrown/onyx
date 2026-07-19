@@ -31,7 +31,7 @@
 
 import { createMemo, Index, Show } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
-import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
+import type { CadencePeerState } from '@/lib/cadence-media/types';
 import { ParticipantTile } from './ParticipantTile';
 import { CallStatusAnnouncer } from './CallStatusAnnouncer';
 import { mergeVoiceParticipants } from './voiceParticipants';
@@ -41,7 +41,7 @@ import './voice.css';
 type Slot = {
   key: string;
   nick: string;
-  peer: SuimyakuPeerState | null;
+  peer: CadencePeerState | null;
   isSelf: boolean;
   stream: MediaStream | null;
   speaking: boolean;

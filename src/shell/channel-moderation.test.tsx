@@ -215,6 +215,9 @@ describe('MemberList moderation', () => {
 describe('ChannelSettings panel', () => {
   function openSettings() {
     const result = render(() => <PresenceRibbon selfNick="me" />);
+    // A8: settings lives in the ribbon More disclosure, not the primary strip.
+    const moreSurface = screen.getByTestId('ribbon-more');
+    fireEvent.click(moreSurface.closest('button') ?? moreSurface);
     const gear = screen.getByTestId('ribbon-settings-gear');
     fireEvent.click(gear);
     return result;

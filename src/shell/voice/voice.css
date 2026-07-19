@@ -878,6 +878,103 @@
   outline-offset: 2px;
 }
 
+/* ── Call security chip (hop shield vs E2EE padlock) ────────────────────────── */
+
+.voice-sec {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 11rem;
+  min-height: 28px;
+  padding: 4px 9px 4px 7px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 52%, transparent);
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: default;
+  outline: none;
+}
+
+.voice-sec:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.voice-sec__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+
+.voice-sec__icon .voice-call-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.voice-sec__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.voice-sec--ok {
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 36%, var(--seam-faint));
+  background: color-mix(in oklab, var(--ok) 10%, color-mix(in oklab, var(--ink) 60%, transparent));
+}
+
+.voice-sec--warn {
+  color: var(--warn);
+  border-color: color-mix(in oklab, var(--warn) 36%, var(--seam-faint));
+  background: color-mix(in oklab, var(--warn) 10%, color-mix(in oklab, var(--ink) 60%, transparent));
+}
+
+.voice-sec--danger {
+  color: var(--danger);
+  border-color: color-mix(in oklab, var(--danger) 40%, var(--seam-faint));
+  background: color-mix(in oklab, var(--danger) 12%, color-mix(in oklab, var(--ink) 60%, transparent));
+}
+
+.voice-sec__spinner {
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin: 2px;
+  border: 1.5px solid color-mix(in oklab, currentColor 28%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: voice-sec-spin 0.8s linear infinite;
+}
+
+@keyframes voice-sec-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-sec__spinner {
+    animation: none;
+    border-top-color: color-mix(in oklab, currentColor 28%, transparent);
+    background: radial-gradient(circle at 50% 20%, currentColor 0 1.5px, transparent 2px);
+  }
+}
+
+/* Narrow: icon-only security chip — full copy stays in aria-label + tooltip. */
+@media (max-width: 640px) {
+  .voice-sec__label { display: none; }
+  .voice-sec {
+    max-width: none;
+    padding: 5px 8px;
+  }
+}
+
 /* ── ConnectionQuality pip ──────────────────────────────────────────────────── */
 
 .voice-cq {
@@ -935,6 +1032,7 @@
 @media (max-width: 480px) {
   .voice-bar__channel-name { max-width: 70px; }
   .voice-cq__rate { display: none; }
+  .voice-sec__label { display: none; }
 }
 
 /* Multiple 16:9 tiles become too narrow to expose their action clusters at

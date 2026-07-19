@@ -759,6 +759,37 @@
   letter-spacing: 0.04em;
 }
 
+/* Demoted password path under passkey-primary sign-in (A4) */
+.conn-password-path-toggle {
+  appearance: none;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--washi-dim);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.conn-password-path-toggle:hover:not(:disabled) {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis) 8%, transparent);
+}
+.conn-password-path-toggle:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+.conn-password-path-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Password strength meter (register) ── */
 .conn-strength {
   display: flex;

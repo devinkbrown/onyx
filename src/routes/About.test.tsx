@@ -141,12 +141,12 @@ describe('About page — source structure', () => {
     expect(srcContains('id="developer"')).toBe(true);
   });
 
-  it('mentions KaguraVox (audio codec)', () => {
-    expect(/kaguravox/i.test(src)).toBe(true);
+  it('mentions CadenceVox (audio codec)', () => {
+    expect(/cadencevox/i.test(src)).toBe(true);
   });
 
-  it('mentions KaguraVis (video codec)', () => {
-    expect(/kaguravis/i.test(src)).toBe(true);
+  it('mentions CadenceVis (video codec)', () => {
+    expect(/cadencevis/i.test(src)).toBe(true);
   });
 
   it('does not mention old transport branding in the main website copy', () => {
@@ -154,8 +154,8 @@ describe('About page — source structure', () => {
     expect(src.toLowerCase()).not.toContain(oldTransportBrand);
   });
 
-  it('mentions Kagura frames as the primary/default transport framing', () => {
-    expect(srcContains('Kagura frames')).toBe(true);
+  it('mentions Cadence frames as the primary/default transport framing', () => {
+    expect(srcContains('Cadence frames')).toBe(true);
   });
 
   it('mentions mesh relay as the browser fallback carrier', () => {
@@ -178,8 +178,8 @@ describe('About page — source structure', () => {
     expect(srcContains('HPKE')).toBe(true);
   });
 
-  it('calls out Tsumugi as the secure channel layer', () => {
-    expect(srcContains('Tsumugi')).toBe(true);
+  it('calls out Mooring as the secure channel layer', () => {
+    expect(srcContains('Mooring')).toBe(true);
   });
 
   it('includes eshmaki.me node address with port 8080', () => {
@@ -227,8 +227,8 @@ describe('About page — source structure', () => {
     expect(/NickServ|ChanServ|bot|fake/i.test(src)).toBe(true);
   });
 
-  it('frames Orochi as the engine in the stack section (no kanji lore)', () => {
-    expect(srcContains('Orochi · the engine')).toBe(true);
+  it('frames Onyx Server as the engine in the stack section (no kanji lore)', () => {
+    expect(srcContains('Onyx Server · the engine')).toBe(true);
     expect(srcContains('大蛇')).toBe(false);
   });
 
@@ -481,12 +481,12 @@ describe('About page — DOM rendering', () => {
     cleanup();
   });
 
-  it.skipIf(!renderAvailable)('footer contains brand, Orochi, and year', () => {
+  it.skipIf(!renderAvailable)('footer contains brand, Onyx Server, and year', () => {
     const { cleanup } = renderAbout!();
     const footer = document.querySelector('footer.r-footer');
     const t = footer?.textContent ?? '';
     expect(t).toContain('Onyx');
-    expect(t).toContain('Orochi');
+    expect(t).toContain('Onyx Server');
     expect(t).toContain('2026');
     cleanup();
   });

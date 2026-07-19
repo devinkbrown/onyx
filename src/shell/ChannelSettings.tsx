@@ -56,7 +56,7 @@ import { buildInviteLink } from '@/lib/invite/inviteLink';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { BridgeStatusBadge } from './BridgeStatusBadge';
 
-// Common simple channel flags exposed as toggles. Letters match Orochi's
+// Common simple channel flags exposed as toggles. Letters match Onyx Server's
 // CHANMODES group D (flags) — see ISUPPORT `imnstCTNMSgWOA`.
 const FLAG_TOGGLES: ReadonlyArray<{ letter: string; label: string; hint: string }> = [
   { letter: 'm', label: 'Moderated', hint: 'Only voiced members and ops may speak (+m)' },
@@ -85,7 +85,7 @@ const NOTIFY_OPTIONS: ReadonlyArray<{ value: NotifyMode; label: string }> = [
 
 const ENCRYPTION_POLICIES = [
   { value: 'off', label: 'Off', hint: 'Plaintext and encrypted messages are both accepted.' },
-  { value: 'optional', label: 'Optional', hint: 'Encrypted messages are marked when clients support Orochi E2EE.' },
+  { value: 'optional', label: 'Optional', hint: 'Encrypted messages are marked when clients support Onyx Server E2EE.' },
   { value: 'required', label: 'Required', hint: 'Clients should send only E2EE-tagged payloads here.' },
 ] as const;
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Kagura media frame — Onyx's browser-side media datagram container.
+// Cadence media frame — Onyx's browser-side media datagram container.
 // One encoded media payload per frame;
 // the browser sends each frame as a binary WebSocket frame (optionally followed
 // by a 16-byte MAC tag — see ./mediaMac).
@@ -14,35 +14,35 @@
 //   [ 1  codec_tag            ]
 //   [ payload …               ]
 
-export const KAGURA_HEADER_BYTES = 19;
-export const KAGURA_MIN_FRAME_BYTES = 4 + KAGURA_HEADER_BYTES; // 23
+export const CADENCE_HEADER_BYTES = 19;
+export const CADENCE_MIN_FRAME_BYTES = 4 + CADENCE_HEADER_BYTES; // 23
 /** Band IDs [0, 64) are control bands; media frames MUST use band >= 64. */
-export const KAGURA_MEDIA_BAND_FLOOR = 64;
+export const CADENCE_MEDIA_BAND_FLOOR = 64;
 
-export const KaguraCodec = {
+export const CadenceCodec = {
   raw: 0x00,
-  kaguravoxAudio: 0x01,
-  kaguravisVideo: 0x02,
+  cadencevoxAudio: 0x01,
+  cadencevisVideo: 0x02,
 } as const;
-export type KaguraCodecTag = (typeof KaguraCodec)[keyof typeof KaguraCodec];
+export type CadenceCodecTag = (typeof CadenceCodec)[keyof typeof CadenceCodec];
 
-export interface KaguraFrame {
+export interface CadenceFrame {
   bandId: number;
   streamId: number;
   sequence: number;
   /** Media-clock timestamp (codec-defined). Carried as a JS number (safe < 2^53). */
   timestamp: number;
   keyframe: boolean;
-  codec: KaguraCodecTag;
+  codec: CadenceCodecTag;
   payload: Uint8Array;
 }
 
 /** Encode `frame` into a fresh Uint8Array. Throws on a control band id. */
-export function encodeKaguraFrame(frame: KaguraFrame): Uint8Array {
-  if (frame.bandId < KAGURA_MEDIA_BAND_FLOOR || frame.bandId > 0xff) {
-    throw new Error(`kagura band_id must be ${KAGURA_MEDIA_BAND_FLOOR}-255, got ${frame.bandId}`);
+export function encodeCadenceFrame(frame: CadenceFrame): Uint8Array {
+  if (frame.bandId < CADENCE_MEDIA_BAND_FLOOR || frame.bandId > 0xff) {
+    throw new Error(`cadence band_id must be ${CADENCE_MEDIA_BAND_FLOOR}-255, got ${frame.bandId}`);
   }
-  const out = new Uint8Array(KAGURA_MIN_FRAME_BYTES + frame.payload.length);
+  const out = new Uint8Array(CADENCE_MIN_FRAME_BYTES + frame.payload.length);
   const dv = new DataView(out.buffer);
   let p = 0;
   dv.setUint32(p, frame.payload.length, true); p += 4;
@@ -57,27 +57,27 @@ export function encodeKaguraFrame(frame: KaguraFrame): Uint8Array {
 }
 
 /**
- * Decode the kagura frame prefix from `buf`, ignoring an optional trailing
+ * Decode the cadence frame prefix from `buf`, ignoring an optional trailing
  * 16-byte MAC tag (the server forwards datagrams verbatim, tag included).
  * Returns null when `buf` is too short or the declared payload overruns it.
  */
-export function decodeKaguraFrame(buf: Uint8Array, macTagBytes = 16): KaguraFrame | null {
-  if (buf.length < KAGURA_MIN_FRAME_BYTES) return null;
+export function decodeCadenceFrame(buf: Uint8Array, macTagBytes = 16): CadenceFrame | null {
+  if (buf.length < CADENCE_MIN_FRAME_BYTES) return null;
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const payloadLen = dv.getUint32(0, true);
-  const declaredTotal = KAGURA_MIN_FRAME_BYTES + payloadLen;
+  const declaredTotal = CADENCE_MIN_FRAME_BYTES + payloadLen;
   // Accept exactly the frame, or the frame plus one MAC tag; reject other sizes.
   if (buf.length !== declaredTotal && buf.length !== declaredTotal + macTagBytes) return null;
 
   let p = 4;
   const bandId = buf[p]!; p += 1;
-  if (bandId < KAGURA_MEDIA_BAND_FLOOR) return null;
+  if (bandId < CADENCE_MEDIA_BAND_FLOOR) return null;
   const streamId = dv.getUint32(p, true); p += 4;
   const sequence = dv.getUint32(p, true); p += 4;
   const timestamp = Number(dv.getBigUint64(p, true)); p += 8;
   const flags = buf[p]!; p += 1;
   const codecByte = buf[p]!; p += 1;
-  if (codecByte !== KaguraCodec.raw && codecByte !== KaguraCodec.kaguravoxAudio && codecByte !== KaguraCodec.kaguravisVideo) {
+  if (codecByte !== CadenceCodec.raw && codecByte !== CadenceCodec.cadencevoxAudio && codecByte !== CadenceCodec.cadencevisVideo) {
     return null;
   }
   return {
@@ -86,7 +86,7 @@ export function decodeKaguraFrame(buf: Uint8Array, macTagBytes = 16): KaguraFram
     sequence,
     timestamp,
     keyframe: (flags & 0x01) !== 0,
-    codec: codecByte as KaguraCodecTag,
+    codec: codecByte as CadenceCodecTag,
     payload: buf.subarray(p, p + payloadLen),
   };
 }

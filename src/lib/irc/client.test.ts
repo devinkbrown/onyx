@@ -29,7 +29,7 @@ function attachSocket(client: IRCClient, overrides: Partial<TestSocket> = {}) {
   return { socket, sent, closed };
 }
 
-// Regression tests for the WebSocket framing gotcha (memory: Orochi wss sends one IRC
+// Regression tests for the WebSocket framing gotcha (memory: Onyx Server wss sends one IRC
 // message per frame with NO trailing CRLF; clients must split on /\r?\n/ and must NOT
 // buffer a remainder across frames). _onMessage is driven directly — no socket needed.
 function makeClient(): { client: IRCClient; commands: string[] } {
@@ -131,9 +131,9 @@ describe('IRCClient ISUPPORT bounds', () => {
 
   it('retains valid structural features after ambiguous updates', () => {
     const { client } = makeClient();
-    feed(client, ':server 005 onyx NETWORK=Orochi CHANTYPES=#& CASEMAPPING=strict-rfc1459 CHANMODES=beI,k,lf,imnst :supported');
+    feed(client, ':server 005 onyx NETWORK=Onyx CHANTYPES=#& CASEMAPPING=strict-rfc1459 CHANMODES=beI,k,lf,imnst :supported');
     expect(client.isupport).toMatchObject({
-      NETWORK: 'Orochi',
+      NETWORK: 'Onyx',
       CHANTYPES: '#&',
       CASEMAPPING: 'strict-rfc1459',
       CHANMODES: ['beI', 'k', 'lf', 'imnst'],
@@ -141,7 +141,7 @@ describe('IRCClient ISUPPORT bounds', () => {
 
     feed(client, ':server 005 onyx NETWORK CHANTYPES=ab CASEMAPPING=unknown CHANMODES=beI,k,lf :supported');
     expect(client.isupport).toMatchObject({
-      NETWORK: 'Orochi',
+      NETWORK: 'Onyx',
       CHANTYPES: '#&',
       CASEMAPPING: 'strict-rfc1459',
       CHANMODES: ['beI', 'k', 'lf', 'imnst'],
@@ -511,5 +511,73 @@ describe('IRCClient account-attribution wiring (ACCOUNTRESIDENCE)', () => {
     ]);
     await new Promise((r) => setTimeout(r, 60));
     expect(sent).toEqual([]);
+  });
+});
+
+describe('IRCClient labeled-response capability (Era 1 A7)', () => {
+  function makeCapClient() {
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: () => {},
+    });
+    const { sent } = attachSocket(client);
+    return { client, sent };
+  }
+
+  it('requests labeled-response when the server advertises it', () => {
+    const { client, sent } = makeCapClient();
+    feed(client, ':srv CAP * LS :batch labeled-response message-tags echo-message server-time');
+
+    const req = sent.find((line) => typeof line === 'string' && line.startsWith('CAP REQ '));
+    expect(req).toBeDefined();
+    expect(String(req)).toContain('labeled-response');
+    expect(String(req)).toContain('batch');
+    expect(String(req)).toContain('echo-message');
+  });
+
+  it('still refuses always-off caps while requesting labeled-response', () => {
+    const { client, sent } = makeCapClient();
+    feed(
+      client,
+      ':srv CAP * LS :labeled-response batch tls sts bot draft/file-upload no-implicit-names message-tags',
+    );
+
+    const req = sent.find((line) => typeof line === 'string' && line.startsWith('CAP REQ '));
+    expect(req).toBeDefined();
+    const body = String(req);
+    expect(body).toContain('labeled-response');
+    expect(body).not.toMatch(/\btls\b/);
+    expect(body).not.toMatch(/\bsts\b/);
+    expect(body).not.toMatch(/\bbot\b/);
+    expect(body).not.toContain('draft/file-upload');
+    expect(body).not.toContain('no-implicit-names');
+  });
+
+  it('records labeled-response on CAP ACK', () => {
+    const { client } = makeCapClient();
+    feed(client, ':srv CAP * LS :labeled-response batch');
+    feed(client, ':srv CAP * ACK :labeled-response batch');
+    expect(client.negotiatedCaps.has('labeled-response')).toBe(true);
+    expect(client.negotiatedCaps.has('batch')).toBe(true);
+  });
+
+  it('does not record labeled-response when the server NAKs it', () => {
+    const { client } = makeCapClient();
+    feed(client, ':srv CAP * LS :labeled-response batch message-tags');
+    feed(client, ':srv CAP * NAK :labeled-response');
+    feed(client, ':srv CAP * ACK :batch message-tags');
+    expect(client.negotiatedCaps.has('labeled-response')).toBe(false);
+    expect(client.negotiatedCaps.has('batch')).toBe(true);
+  });
+
+  it('drops labeled-response from negotiatedCaps on CAP DEL', () => {
+    const { client } = makeCapClient();
+    feed(client, ':srv CAP * LS :labeled-response batch');
+    feed(client, ':srv CAP * ACK :labeled-response batch');
+    expect(client.negotiatedCaps.has('labeled-response')).toBe(true);
+    feed(client, ':srv CAP * DEL :labeled-response');
+    expect(client.negotiatedCaps.has('labeled-response')).toBe(false);
+    expect(client.negotiatedCaps.has('batch')).toBe(true);
   });
 });

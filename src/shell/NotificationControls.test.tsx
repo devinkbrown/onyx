@@ -47,7 +47,7 @@ function server(account: string): Server {
   return {
     id: 'local',
     name: 'Local',
-    network: 'Orochi',
+    network: 'Onyx',
     url: 'wss://example.invalid',
     icon: '#000',
     nick: 'me',

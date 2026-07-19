@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { SuimyakuRoomStats } from './types';
+import type { CadenceRoomStats } from './types';
 
 const MAX_CONTROL_JSON_BYTES = 64 * 1024;
 // Match PeerRegistry's hard cap so parsing cannot retain entries the live
@@ -63,7 +63,7 @@ function boundedNumber(value: unknown, max: number, integer = false): number | n
   return value;
 }
 
-export function parseRoomStats(payload: string): SuimyakuRoomStats | null {
+export function parseRoomStats(payload: string): CadenceRoomStats | null {
   const parsed = record(parseJson(payload));
   if (!parsed) return null;
   const activeSenders = boundedNumber(parsed.active_senders, 100_000, true);

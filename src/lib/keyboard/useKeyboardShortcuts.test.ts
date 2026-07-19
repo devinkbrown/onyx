@@ -120,7 +120,7 @@ describe('SHORTCUTS descriptor', () => {
 
   it('includes G sequences for Home and date navigation', () => {
     expect(SHORTCUTS.find((s) => s.keys === 'G then H')?.description).toBe('Go to Home');
-    expect(SHORTCUTS.find((s) => s.keys === 'G then D')?.description).toBe('Focus jump date');
+    expect(SHORTCUTS.find((s) => s.keys === 'G then D')?.description).toBe('Open jump-to-date');
   });
 
   it('includes U for following the current conversation', () => {
@@ -548,7 +548,7 @@ describe('SHORTCUTS descriptor', () => {
     dispose();
   });
 
-  it('focuses the time scrubber date input with the G then D sequence', () => {
+  it('opens jump-to-date and focuses the scrubber date with G then D', () => {
     const dispose = mountKeyboardHarness();
     const input = document.createElement('input');
     input.setAttribute('data-time-scrubber-date', '');
@@ -557,6 +557,7 @@ describe('SHORTCUTS descriptor', () => {
     fireEvent.keyDown(window, { key: 'g' });
     fireEvent.keyDown(window, { key: 'd' });
 
+    expect(store.getState().showJumpToDate).toBe(true);
     expect(document.activeElement).toBe(input);
     input.remove();
     dispose();

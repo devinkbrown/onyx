@@ -146,26 +146,26 @@ describe('E2EE DMs', () => {
     expect(echo.plaintext).toBe('meet at the quiet dock');
   });
 
-  it('marks sealed outgoing DMs with Orochi E2EE tag when negotiated', async () => {
+  it('marks sealed outgoing DMs with Onyx Server E2EE tag when negotiated', async () => {
     const mine = await deviceKeys();
     const peer = await makePeer(mine!.publicB64);
     const send = vi.fn((_line: string) => true);
     store.setState({ connectionStatus: 'connected', client: mockClient() });
     store.getState().client!.send = send;
-    store.getState().client!.negotiatedCaps.add('orochi/e2ee');
+    store.getState().client!.negotiatedCaps.add('onyx/e2ee');
     store.setState({ peerDmKeys: new Map([['trev', peer.publicB64]]) });
 
     store.getState().sendMessage('trev', 'sealed with a tag');
 
     await until(() => send.mock.calls.length > 0);
-    expect(String(send.mock.calls[0]![0])).toMatch(/^@\+orochi\/e2ee=mls PRIVMSG trev :/);
+    expect(String(send.mock.calls[0]![0])).toMatch(/^@\+onyx\/e2ee=mls PRIVMSG trev :/);
     await until(() => dmMsgs('trev').length > 0);
     expect(dmMsgs('trev')[0]?.e2ee).toBe('mls');
   });
 
-  it('stores inbound Orochi E2EE tags without locking plaintext channel messages', () => {
+  it('stores inbound Onyx Server E2EE tags without locking plaintext channel messages', () => {
     seedChannel('#room');
-    feed('@+orochi/e2ee=sframe;msgid=m1 :alice!u@h PRIVMSG #room :ciphertext frame');
+    feed('@+onyx/e2ee=sframe;msgid=m1 :alice!u@h PRIVMSG #room :ciphertext frame');
     const msg = store.getState().channels.get('#room')?.messages.at(-1);
     expect(msg).toMatchObject({ id: 'm1', text: 'ciphertext frame', e2ee: 'sframe' });
     expect(msg?.encrypted).toBeUndefined();

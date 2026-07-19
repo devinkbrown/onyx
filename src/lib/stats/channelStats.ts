@@ -3,9 +3,9 @@
  * channelStats.ts — per-channel telemetry for the presence heatline.
  *
  * Fetches the channel's own stats file (`/stats/data/<slug>.json`, emitted by
- * Orochi's chanstats engine) and normalizes the 24-hour activity histogram.
+ * Onyx Server's chanstats engine) and normalizes the 24-hour activity histogram.
  * The slug MUST match the server's `slugify` byte-for-byte or the file 404s —
- * this is the same contract proven in orochi-stats/src/lib/slug.ts.
+ * this is the same contract proven in onyx-stats/src/lib/slug.ts.
  */
 
 import { boundedFeedInteger, PUBLIC_FEED_COUNT_MAX } from './feedBounds';

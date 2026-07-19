@@ -1,0 +1,75 @@
+/* JumpToDateSheet.css — Era 1 A3 discoverable time-travel panel. */
+
+.jump-to-date {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-1) 0;
+}
+
+.jump-to-date__empty {
+  margin: 0;
+  color: var(--washi-mute);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.jump-to-date__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.jump-to-date__preset {
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 8px);
+  background: color-mix(in oklab, var(--stone) 70%, transparent);
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    border-color var(--dur, 140ms) var(--ease, ease),
+    background var(--dur, 140ms) var(--ease, ease),
+    color var(--dur, 140ms) var(--ease, ease);
+}
+
+.jump-to-date__preset:hover,
+.jump-to-date__preset:focus-visible {
+  border-color: color-mix(in oklab, var(--lapis-bright) 45%, var(--line));
+  color: var(--lapis-bright);
+}
+
+.jump-to-date__preset:focus-visible {
+  outline: 1px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.jump-to-date__fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+@media (max-width: 520px) {
+  .jump-to-date__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.jump-to-date__error {
+  margin: 0;
+  color: color-mix(in oklab, var(--shu) 80%, var(--washi));
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.jump-to-date__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}

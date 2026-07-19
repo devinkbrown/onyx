@@ -19,7 +19,7 @@ const expected = {
   },
   about: {
     title: 'About Onyx — open protocol, sovereign mesh',
-    description: 'Learn how Onyx, Suimyaku media, and the open mesh work together without closed-platform lock-in.',
+    description: 'Learn how Onyx, Cadence media, and the open mesh work together without closed-platform lock-in.',
   },
   appearance: {
     title: 'Onyx appearance — themes and backgrounds',

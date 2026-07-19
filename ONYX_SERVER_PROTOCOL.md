@@ -1,33 +1,33 @@
-# Orochi Protocol — Client Integration Reference (for Onyx)
+# Onyx Server Protocol — Client Integration Reference (for Onyx)
 
-Everything a client needs to talk to **Orochi**, the pure-Zig clean-room
+Everything a client needs to talk to **Onyx Server**, the pure-Zig clean-room
 sovereign-mesh IRC daemon (modern-only successor to C "Ophion"). This is the
 authoritative surface for refactoring Onyx's IRC layer (`src/lib/irc/`).
 
-Orochi is **modern-only**: there is **no STARTTLS**, **no WEBIRC**, **no identd /
+Onyx Server is **modern-only**: there is **no STARTTLS**, **no WEBIRC**, **no identd /
 RFC1413**, **no DCC proxy/filehost**, **no `OPER` command** (operator status is
 granted at SASL login), and **no pseudo-clients** — services are real server
 commands (`REGISTER`, `CHANNEL`, `TEGAMI`, …), never ChanServ/NickServ fake users.
 
-> Source of truth lives in the open Orochi repo under `docs/reference/` and
+> Source of truth lives in the Onyx Server repo under `docs/reference/` and
 > `docs/architecture/`. This file consolidates it for Onyx. When something here
-> conflicts with a live server, trust the server and the Orochi docs.
+> conflicts with a live server, trust the server and the Onyx Server docs.
 
 ---
 
 ## 1. Transport & Endpoints
 
 The live network is **Onyx** (the consumer brand; the daemon behind it is
-**Orochi**), two nodes: `eshmaki.me` and `ircx.us`. Listeners are **dual-stack
+**Onyx Server**), two nodes: `eshmaki.me` and `ircx.us`. Listeners are **dual-stack
 IPv6** (`[listen] host = "::"`). The wire `NETWORK` name is operator-set via
-`[network] name` (default `Orochi`); see §3.
+`[network] name` (default `Onyx Server`); see §3.
 
 | Port | Transport | Use |
 |---|---|---|
 | `6667` | Plaintext TCP | Plain IRC (dev/local only) |
 | `6697` | Implicit TLS | TLS IRC (TLS 1.3 + hardened 1.2 profile) |
 | `8080` | **Secure WebSocket (wss)** | **Browser clients — Onyx uses this** |
-| `6900` | Mesh S2S (Tsumugi PQ) | Server↔server only — **not for clients** |
+| `6900` | Mesh S2S (Mooring PQ) | Server↔server only — **not for clients** |
 
 TLS is **1.3 plus a hardened 1.2 profile** (AEAD/ECDHE-only; no RSA key exchange,
 CBC, compression, or renegotiation). There is no plaintext→TLS upgrade; pick a TLS
@@ -35,7 +35,7 @@ port up front.
 
 ### 1.1 WebSocket framing (CRITICAL — this bit Onyx before)
 
-Orochi's wss listener sends **one IRC message per WebSocket frame, with NO trailing
+Onyx Server's wss listener sends **one IRC message per WebSocket frame, with NO trailing
 CRLF** (per the IRCv3 WebSocket sub-protocol). A frame is exactly
 `:eshmaki.me CAP * LS :...` — no `\n`.
 
@@ -67,9 +67,9 @@ On success the server emits the welcome burst:
 | Numeric | Name | Notes |
 |---|---|---|
 | `001` | RPL_WELCOME | `Welcome to the <NETWORK> network, <nick> — you are <nick!user@host>` (`<NETWORK>` = the `[network] name`, live: `Onyx`) |
-| `002` | RPL_YOURHOST | `Your host is <server> (node N), running orochi-<hash>` |
+| `002` | RPL_YOURHOST | `Your host is <server> (node N), running onyx-server-<ver>+<hash>` |
 | `003` | RPL_CREATED | uptime/创建 line |
-| `004` | RPL_MYINFO | `<server> orochi-<hash> <usermodes> <chanmodes> <chanmodes-with-param>` |
+| `004` | RPL_MYINFO | `<server> onyx-server-<ver>+<hash> <usermodes> <chanmodes> <chanmodes-with-param>` |
 | `005` | RPL_ISUPPORT | one or more lines, trailing `are supported by this server` |
 
 Then MOTD (`375`/`372`/`376` or `422`), and any autojoins. A client is **registered**
@@ -89,7 +89,7 @@ Errors during registration: `432` erroneous nick, `433` nick in use, `437` nick 
 
 | Token | Default | Meaning |
 |---|---|---|
-| `NETWORK` | `Orochi` (live: `Onyx`) | Network name (operator-set via `[network] name`) |
+| `NETWORK` | `Onyx Server` (live: `Onyx`) | Network name (operator-set via `[network] name`) |
 | `CHANTYPES` | `#&` | Channel prefixes |
 | `PREFIX` | `(YQqov)*!.@+` | Status modes → prefix chars (see §8) |
 | `CHANMODES` | `beIZ,k,lfj,imnstCTNMSgWOAVUFD` | 4 classes: list, param-always, param-on-set, flag |
@@ -138,7 +138,7 @@ draft/metadata-2       draft/pre-away
 draft/account-registration=custom-account-name
 draft/multiline=max-bytes=4096,max-lines=24
 sts=<runtime policy>   (only if STS configured)
-orochi/session-sync    orochi/bouncer        (vendor — see §6)
+onyx/session-sync    onyx/bouncer        (vendor — see §6)
 ```
 
 Notes for Onyx:
@@ -151,7 +151,7 @@ Notes for Onyx:
 - **`echo-message`** — your own sent messages are echoed back (use for optimistic
   UI confirmation / msgid capture).
 - **`labeled-response`** — echo `@label=` on a command to correlate replies.
-- The live CAP registry namespace is `orochi/*`. There is **no `onyx/*` cap**.
+- The live CAP registry namespace is `onyx/*`. There is **no `onyx/*` cap**.
 
 CAP subcommands: `LS [302]`, `REQ`, `ACK`/`NAK`, `LIST`, `END`, plus `NEW`/`DEL`
 (cap-notify; not fired for the static set).
@@ -229,12 +229,12 @@ Onyx should reconnect instantly into its live session instead of a JOIN storm.
   `FAIL SESSION INVALID_TOKEN|NO_SESSION`.
 - **`SESSION-TOKEN` SASL mech**: reconnect by presenting the token from
   `SESSION TOKEN` — re-attaches to the same account session.
-- **`orochi/session-sync` cap**: multi-client "keep both" — when set, on login the
+- **`onyx/session-sync` cap**: multi-client "keep both" — when set, on login the
   server syncs the new connection into the same channels as your other same-account
   sessions. **Gate your `001` autojoin storm behind `!sessionSyncActive`** — the
   server drives the JOINs when the cap is present (this is already the pattern in
   Onyx's `src/lib/store`).
-- **`orochi/bouncer` cap**: automatic history rewind on join/rejoin. Combine with
+- **`onyx/bouncer` cap**: automatic history rewind on join/rejoin. Combine with
   CHATHISTORY; **dedup by `msgid`** on reconnect (auto-reconnect preserves channel
   state, so replayed history would otherwise duplicate).
 - **Hot upgrade**: the server can be upgraded in place (USR2/Helix) preserving every
@@ -406,15 +406,15 @@ Subcommands: `JOIN <kind>` · `LEAVE` · `OFFER <codecs> [transport=webrtc]` ·
 `CAPTION` · `TRANSCRIPT`.
 
 - **kind** = `voice` | `video` | `screen` (default `voice`).
-- **codecs** (CSV) = `kaguravox` (audio) | `kaguravis` (video) | `raw`. `OFFER` may request
-  `transport=webrtc` for the browser/WebRTC leg; otherwise the native KAGURAVOX/KAGURAVIS
+- **codecs** (CSV) = `cadencevox` (audio) | `cadencevis` (video) | `raw`. `OFFER` may request
+  `transport=webrtc` for the browser/WebRTC leg; otherwise the native CADENCEVOX/CADENCEVIS
   UDP leg is used.
 - Two media planes, bridged by header-rewrap only (no transcode): a **WebRTC-compatible
   RTP/STUN UDP plane** (`MEDIA OFFER transport=webrtc` → ICE creds, SRTP group key)
-  and a **native KAGURAVOX/KAGURAVIS UDP leg** (`kagura_frame` datagrams). SFU forwarding,
+  and a **native CADENCEVOX/CADENCEVIS UDP leg** (`kagura_frame` datagrams). SFU forwarding,
   simulcast, ABR; room cap 64 participants.
-- **Browser codec:** Orochi ships WASM codec exports (`kagura_wasm.zig`: KAGURAVOX
-  audio + KAGURAVIS video encode/decode for `wasm32-freestanding`) — Onyx can use these
+- **Browser codec:** Onyx Server ships WASM codec exports (`kagura_wasm.zig`: CADENCEVOX
+  audio + CADENCEVIS video encode/decode for `wasm32-freestanding`) — Onyx can use these
   for the native leg, or use standard WebRTC for the RTP leg.
 - **`ACTIVITY <target> <state> [text]`** — presence/activity broadcast (rich presence).
 
@@ -426,7 +426,7 @@ to render a rich voice UI. `OFFER-ACK`/`ANSWER-ACK`/`TRANSPORT`/`NATIVE`
 
 ## 13. Mesh Behaviors Visible to Clients
 
-Orochi is a CRDT **mesh** (not a TS6 tree). What a client sees:
+Onyx Server is a CRDT **mesh** (not a TS6 tree). What a client sees:
 
 - **Cross-node PMs** work transparently: a remote user is routable if they share any
   channel OR are otherwise present (every registered user is gossiped via a hidden
@@ -435,7 +435,7 @@ Orochi is a CRDT **mesh** (not a TS6 tree). What a client sees:
   `mesh@<server>` placeholder).
 - **Network-wide events** (§11) and **cross-node MODE** show the **setter's nick**
   (e.g. `:kain MODE #chan +q nick`), not the origin server.
-- `LINKS` (`364/365`) and `MAP` (`015/017`) render the Suimyaku mesh, not a spanning
+- `LINKS` (`364/365`) and `MAP` (`015/017`) render the Cadence mesh, not a spanning
   tree. Oper mesh introspection: `MESH`/`NETSTAT`, `ROUTE`, `NETHEALTH`.
 
 ---
@@ -476,7 +476,7 @@ Orochi is a CRDT **mesh** (not a TS6 tree). What a client sees:
 `:<server> NOTE EVENT <CATEGORY> :…`). Common codes: `ACCOUNT_REQUIRED`,
 `NEED_MORE_PARAMS`, `INVALID_PARAMS`, `TEMPORARILY_UNAVAILABLE`, `INVALID_UTF8`,
 `PERMISSION_DENIED`, `ACCOUNT_EXISTS`, `BAD_ACCOUNT_NAME`, `INVALID_PASSWORD`,
-`INVALID_TOKEN`, `NO_SESSION`, plus the full catalog in the Orochi numerics doc.
+`INVALID_TOKEN`, `NO_SESSION`, plus the full catalog in the Onyx Server numerics doc.
 
 ---
 
@@ -505,8 +505,8 @@ Orochi is a CRDT **mesh** (not a TS6 tree). What a client sees:
   external upload service for files.
 - **No pseudo-clients** — all services are real commands.
 - **No `+w` user-mode WALLOPS** — use `EVENT BROADCAST`.
-- **No `onyx/*` vendor cap** in the live registry — use `orochi/session-sync` and
-  `orochi/bouncer`.
+- **No `onyx/*` vendor cap** in the live registry — use `onyx/session-sync` and
+  `onyx/bouncer`.
 
 ---
 
@@ -516,8 +516,8 @@ Orochi is a CRDT **mesh** (not a TS6 tree). What a client sees:
 - [ ] CAP LS 302 → REQ the caps Onyx uses (echo-message, server-time, message-tags,
       batch, labeled-response, account-notify, away-notify, chghost, extended-join,
       multi-prefix, draft/chathistory, draft/event-playback, draft/typing,
-      draft/react, draft/reply, draft/message-redaction, orochi/session-sync,
-      orochi/bouncer, sasl).
+      draft/react, draft/reply, draft/message-redaction, onyx/session-sync,
+      onyx/bouncer, sasl).
 - [ ] SASL during registration; support PLAIN + SCRAM-SHA-256 (+ SESSION-TOKEN for
       reconnect, EXTERNAL if using client certs).
 - [ ] Gate the `001` autojoin storm behind `!session-sync`; let the server drive JOINs.
@@ -528,6 +528,6 @@ Orochi is a CRDT **mesh** (not a TS6 tree). What a client sees:
 - [ ] Parse `time=`/`msgid=`/`account=` tags; render typing/react/reply TAGMSG tags.
 - [ ] Honor `MODES` (combine modes per line per the advertised value; live = 1).
 - [ ] Map service `FAIL`/`NOTE`/`NOTICE` replies to UI (REGISTER/IDENTIFY/CHANNEL/…).
-- [ ] Voice/video via `MEDIA` (control) + WebRTC RTP leg or native KAGURAVOX/KAGURAVIS WASM
+- [ ] Voice/video via `MEDIA` (control) + WebRTC RTP leg or native CADENCEVOX/CADENCEVIS WASM
       codec; render roster/speaking/mute from `EVENT ... MEDIA ...`.
 - [ ] Treat `:server NOTE EVENT <CAT> :…` and `EVENT … OBSERVE …` as the oper feed.

@@ -14,13 +14,13 @@ import { test, expect, chromium, type Browser, type BrowserContext, type Page } 
 // HARNESS (identical rationale to chat.spec / voice.spec):
 //   • window.__onyx is DEV-only (src/index.tsx), so the :4173 production preview
 //     has NO store handle. We drive the DEV app (:5174), pinned via VITE_IRC_WS to
-//     a live Orochi WSS (self-signed cert → ignoreHTTPSErrors on every context).
+//     a live Onyx Server WSS (self-signed cert → ignoreHTTPSErrors on every context).
 //   • The default `chromium-headless-shell` drops the self-signed WSS, so we
 //     self-launch the FULL chromium binary, exactly like the sibling specs.
 //   • __onyx exposes the zustand vanilla store: `.getState()` for the actions and
 //     `.setState()` for the deterministic locked-placeholder injection below.
 //
-// Configure via env (default WS points at a locally-running Orochi):
+// Configure via env (default WS points at a locally-running Onyx Server):
 //   ONYX_APP  default http://localhost:5174/app
 //   ONYX_WS   default wss://127.0.0.1:8080
 // ─────────────────────────────────────────────────────────────────────────────

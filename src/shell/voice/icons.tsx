@@ -197,3 +197,64 @@ export function HangupIcon(props: IconProps): JSX.Element {
     </Svg>
   );
 }
+
+/** Transport / hop protection — never used to claim media E2EE. */
+export function ShieldIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <path
+        d="M12 3l7 3v5.5c0 4.4-2.9 7.8-7 9.5-4.1-1.7-7-5.1-7-9.5V6z"
+        fill="currentColor"
+        opacity="0.16"
+      />
+      <path d="M12 3l7 3v5.5c0 4.4-2.9 7.8-7 9.5-4.1-1.7-7-5.1-7-9.5V6z" />
+      <path d="M9.2 12.1l1.9 1.9 3.7-3.8" />
+    </Svg>
+  );
+}
+
+/**
+ * True media E2EE only (SFrame/MLS). Do not render for hop-only Cadence media.
+ * Reserved for when media E2EE is established — see callSecurity.ts.
+ */
+export function LockIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor" opacity="0.16" />
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </Svg>
+  );
+}
+
+/** Mixed-room / partial E2EE — open lock, not a closed padlock claim. */
+export function LockOpenIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 7.2-2.4" />
+      <path d="M16 6.5V8" />
+    </Svg>
+  );
+}
+
+export function WarningIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <path d="M12 4l9 16H3z" fill="currentColor" opacity="0.14" />
+      <path d="M12 4l9 16H3z" />
+      <path d="M12 10v4M12 16.5h.01" stroke-width="2.2" />
+    </Svg>
+  );
+}
+
+/** Stage / broadcast — not a private call. */
+export function StageIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <path d="M4 18h16" />
+      <path d="M7 18V9l5-4 5 4v9" />
+      <path d="M10 18v-4h4v4" />
+    </Svg>
+  );
+}

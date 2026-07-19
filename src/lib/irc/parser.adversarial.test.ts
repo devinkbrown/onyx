@@ -11,7 +11,7 @@ import {
 } from './parser';
 
 describe('parsePREFIX adversarial ISUPPORT values', () => {
-  it('learns Orochi exotic PREFIX=(YQqov)*!.@+ without dropping nonstandard ranks', () => {
+  it('learns Onyx Server exotic PREFIX=(YQqov)*!.@+ without dropping nonstandard ranks', () => {
     const parsed = parsePREFIX('(YQqov)*!.@+');
 
     expect(parsed.modeToPrefix).toEqual({

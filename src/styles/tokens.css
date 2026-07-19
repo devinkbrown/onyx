@@ -100,8 +100,15 @@
   --pad-panel: var(--space-4);    /* inner padding of a dialog/panel body */
   --pad-panel-lg: var(--space-5); /* roomier panel padding on wide surfaces */
 
+  /* Motion — chat-productive duration ladder (Era 1 A6).
+     Micro/fast stay fixed for direct-manipulation feedback; --dur-base is the
+     default control settle. Themes may still override --dur for personality
+     (see themes.ts); micro/fast intentionally do not ride that override. */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur: 260ms;
+  --dur-micro: 100ms; /* reaction pop, ACK flash, press */
+  --dur-fast: 160ms;  /* msg echo, toast/FAB in, focus rings */
+  --dur-base: 220ms;  /* default control hover/focus */
+  --dur: var(--dur-base); /* back-compat alias for existing var(--dur) call sites */
 
   /* Layout — conversation reading measure. Caps line length so messages,
      ribbon and composer stay readable and aligned on ultra-wide displays;
@@ -161,6 +168,14 @@
 @media (prefers-reduced-motion: reduce) {
   /* ThemeProvider applies theme tokens inline, including --dur. The operating
      system accessibility preference must outrank that authored inline value so
-     every transition built on the shared duration token actually stops. */
-  :root { --dur: 0ms !important; }
+     every transition built on the shared duration tokens actually stops.
+     Zero the full ladder (not only --dur) so new semantic tokens cannot leak
+     motion under reduce. Loop animations still need component-level
+     animation: none — CSS duration tokens alone do not stop rAF/canvas. */
+  :root {
+    --dur-micro: 0ms !important;
+    --dur-fast: 0ms !important;
+    --dur-base: 0ms !important;
+    --dur: 0ms !important;
+  }
 }

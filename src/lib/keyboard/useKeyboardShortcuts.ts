@@ -102,7 +102,7 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
   },
   {
     keys: 'G then D',
-    description: 'Focus jump date',
+    description: 'Open jump-to-date',
     group: 'Navigation',
   },
   {
@@ -268,6 +268,18 @@ function focusComposer(): void {
 function focusTimeScrubberDate(): void {
   const el = document.querySelector<HTMLElement>('[data-time-scrubber-date]');
   el?.focus();
+}
+
+/** Open the discoverable Jump-to-date sheet (Era 1 A3); fall back to scrubber date. */
+function openJumpToDate(): void {
+  getState().openJumpToDate();
+  // Sync fallback for power users when the scrubber is already mounted
+  // (covers unit tests and scrubber-visible rooms). Prefer the sheet field
+  // once the portal mounts on the next microtask.
+  focusTimeScrubberDate();
+  queueMicrotask(() => {
+    document.querySelector<HTMLElement>('[data-jump-to-date-input]')?.focus();
+  });
 }
 
 function messageRows(): HTMLElement[] {
@@ -451,7 +463,7 @@ export function useKeyboardShortcuts(): void {
         if (key === 'd') {
           event.preventDefault();
           clearPendingPrefix();
-          focusTimeScrubberDate();
+          openJumpToDate();
           return;
         }
       }

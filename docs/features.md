@@ -61,7 +61,7 @@ the feature works. (`src/lib/store/store.ts:3500`)
 
 > **Status — coming once server support lands.** The full passkey manager
 > (register, list, rename, remove) is built and shipping in the client, but it
-> only lights up end-to-end once your Orochi server replies to the `WEBAUTHN`
+> only lights up end-to-end once your Onyx Server replies to the `WEBAUTHN`
 > command with the expected `NOTE WEBAUTHN …` messages — a known server-side
 > gap. Renaming in particular degrades gracefully: if the server has passkeys
 > but not the rename subcommand, Onyx hides the **Rename** button and tells you

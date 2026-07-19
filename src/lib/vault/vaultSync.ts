@@ -6,6 +6,10 @@
  *    vault's copy renders immediately — the server's CHATHISTORY replay then
  *    merges on top (the store's history merge dedupes by msgid, and locally
  *    generated ids never collide with server msgids).
+ *  · COLD PAINT: the last-active room (activeView) is hydrated FIRST so local
+ *    scrollback paints before the network answers CHATHISTORY. init also
+ *    paints any buffers that already landed while retention applied — JOINs
+ *    must not wait for a later map mutation that may never come.
  *  · PERSIST: buffer changes flush to IndexedDB, debounced per target.
  *
  * Everything is preference-gated (prefs.localHistory) and best-effort.
@@ -151,6 +155,25 @@ function isOwnedTargetLive(key: string): boolean {
   return context !== null && liveOwnedTargetKeys(context).has(key);
 }
 
+/**
+ * Last-active conversation the UI is showing — the cold-start paint target.
+ * Home/status/voice-only views are not room buffers and return null.
+ */
+function activeRoomTarget(
+  state: ReturnType<typeof getState> = getState(),
+): { target: string; dm: boolean } | null {
+  const view = state.activeView;
+  if (view.kind === 'channel') {
+    const target = view.channel.toLowerCase();
+    return state.channels.has(target) ? { target, dm: false } : null;
+  }
+  if (view.kind === 'dm') {
+    const target = view.nick.toLowerCase();
+    return state.dms.has(target) ? { target, dm: true } : null;
+  }
+  return null;
+}
+
 function scheduleFlush(
   context: DeviceMemoryContext,
   target: string,
@@ -216,8 +239,49 @@ async function hydrate(context: DeviceMemoryContext, target: string, dm = false)
     _hydrated.delete(key);
     return;
   }
+  // Buffer may have closed while IndexedDB was in flight — drop the watermark
+  // so a later rejoin can paint from the vault again.
+  const state = getState();
+  const live = dm ? state.dms.has(targetKey) : state.channels.has(targetKey);
+  if (!live) {
+    _hydrated.delete(key);
+    return;
+  }
   if (local.length === 0) return;
   getState().hydrateHistory(targetKey, local);
+}
+
+/**
+ * Hydrate + flush every live buffer. The last-active room runs first so cold
+ * return paints local scrollback before CHATHISTORY (or a backlog of other
+ * rooms' IDB reads) can delay it.
+ */
+function syncLiveBuffers(): void {
+  if (!preferences().localHistory) return;
+  const context = captureDeviceMemoryContext();
+  if (!context) return;
+  reconcileLiveTargetCaches(context);
+
+  const state = getState();
+  const active = activeRoomTarget(state);
+  if (active) void hydrate(context, active.target, active.dm);
+
+  for (const [key, ch] of state.channels) {
+    if (active && !active.dm && key === active.target) {
+      if (ch.messages.length > 0) scheduleFlush(context, key, ch.messages);
+      continue;
+    }
+    void hydrate(context, key);
+    if (ch.messages.length > 0) scheduleFlush(context, key, ch.messages);
+  }
+  for (const [key, dm] of state.dms) {
+    if (active && active.dm && key === active.target) {
+      if (dm.messages.length > 0) scheduleFlush(context, key, dm.messages);
+      continue;
+    }
+    void hydrate(context, key, true);
+    if (dm.messages.length > 0) scheduleFlush(context, key, dm.messages);
+  }
 }
 
 /** Start vault sync. Call once at app boot; safe to call in any environment. */
@@ -228,31 +292,35 @@ export function initVaultSync(): void {
   _unsubscribers = [
     store.subscribe(
       (s) => s.channels,
-      (channels) => {
-        if (!preferences().localHistory) return;
-        const context = captureDeviceMemoryContext();
-        if (!context) return;
-        reconcileLiveTargetCaches(context);
-        for (const [key, ch] of channels) {
-          void hydrate(context, key);
-          if (ch.messages.length > 0) scheduleFlush(context, key, ch.messages);
-        }
+      () => {
+        syncLiveBuffers();
       },
     ),
     store.subscribe(
       (s) => s.dms,
-      (dms) => {
+      () => {
+        syncLiveBuffers();
+      },
+    ),
+    // Navigating to a remembered room must prioritize its vault paint even when
+    // the channels/dms maps themselves did not change (e.g. switching between
+    // already-joined rooms after a multi-JOIN restore).
+    store.subscribe(
+      (s) => s.activeView,
+      () => {
         if (!preferences().localHistory) return;
         const context = captureDeviceMemoryContext();
         if (!context) return;
-        reconcileLiveTargetCaches(context);
-        for (const [key, dm] of dms) {
-          void hydrate(context, key, true);
-          if (dm.messages.length > 0) scheduleFlush(context, key, dm.messages);
-        }
+        const active = activeRoomTarget();
+        if (active) void hydrate(context, active.target, active.dm);
       },
     ),
   ];
+
+  // Cold-start: JOINs may already have created empty buffers while retention
+  // applied (init runs in applyRetentionPolicy.finally). Subscribers do not
+  // fireImmediately, so paint whatever is live now — active room first.
+  syncLiveBuffers();
 }
 
 /** Test hook. */

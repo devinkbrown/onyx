@@ -38,8 +38,8 @@ export default defineConfig({
       exclude: [
         'src/**/*.{test,spec}.{ts,tsx}',
         'src/**/*.d.ts',
-        'src/lib/suimyaku-media/OpcodecWasm.ts',
-        'src/lib/suimyaku-media/videoEncodeWorker.ts',
+        'src/lib/cadence-media/OpcodecWasm.ts',
+        'src/lib/cadence-media/videoEncodeWorker.ts',
       ],
       thresholds: { lines: 80, functions: 80, statements: 80, branches: 70 },
     },

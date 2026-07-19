@@ -1226,7 +1226,7 @@
 .shell-ribbon-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap-tight);
   flex: none;
   margin-left: auto;
 }
@@ -1235,7 +1235,7 @@
 .shell-ribbon-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1);
 }
 
 .shell-ribbon-event-chip {
@@ -1428,6 +1428,162 @@
   letter-spacing: 0;
 }
 
+/* ── More overflow (A8 place-strip compression) ─────────────────────────────
+   Secondary chrome (pins / notify / settings / appearance / prefs / account)
+   collapses into one disclosure so the ribbon stays a place strip. Member
+   count stays on the primary strip as presence-as-place. */
+.shell-ribbon-group .onyx-popover {
+  display: inline-flex;
+}
+
+/* Strip the chunky default Popover trigger so the ribbon iconbtn surface shows. */
+.shell-ribbon-group .onyx-popover__trigger {
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: var(--r-sm);
+  color: inherit;
+}
+
+.shell-ribbon-group .onyx-popover__trigger:hover,
+.shell-ribbon-group .onyx-popover__trigger[aria-expanded='true'] {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: inherit;
+}
+
+.shell-ribbon-group .onyx-popover__trigger:hover .shell-ribbon-more-trigger,
+.shell-ribbon-group .onyx-popover__trigger[aria-expanded='true'] .shell-ribbon-more-trigger {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone-2) 48%, transparent);
+}
+
+.shell-ribbon-group .onyx-popover__trigger[aria-expanded='true'] .shell-ribbon-more-trigger {
+  border-color: color-mix(in oklab, var(--lapis) 42%, var(--seam));
+  background: color-mix(in oklab, var(--lapis) 14%, var(--stone) 50%);
+}
+
+.shell-ribbon-group .onyx-popover__panel {
+  min-width: 14.5rem;
+  max-width: min(20rem, calc(100vw - var(--space-6)));
+  padding: var(--space-2);
+}
+
+.shell-ribbon-more {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.shell-ribbon-more-section {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--seam-faint);
+}
+
+.shell-ribbon-more-label {
+  margin: 0;
+  padding-inline: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+/* In-menu scope kickers (Channel / Workspace) — visual hierarchy only. */
+.shell-ribbon-more-label--in-menu {
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-1);
+  padding-block: var(--space-1) 0;
+  border-top: 1px solid var(--seam-faint);
+}
+
+.shell-ribbon-more-list > .shell-ribbon-more-label--in-menu:first-child {
+  margin-top: 0;
+  border-top: 0;
+  padding-block: 0;
+}
+
+.shell-ribbon-more-notify {
+  width: 100%;
+  justify-content: stretch;
+}
+
+.shell-ribbon-more-notify .chan-notify-seg {
+  flex: 1 1 0;
+}
+
+.shell-ribbon-more-list {
+  display: grid;
+  gap: 1px;
+}
+
+.shell-ribbon-more-item {
+  display: grid;
+  grid-template-columns: var(--space-4) minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+  width: 100%;
+  min-height: 2.25rem; /* 36px — ≥24px target; comfortable for pointer */
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  color: var(--washi-dim);
+  background: transparent;
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.shell-ribbon-more-item:hover,
+.shell-ribbon-more-item:focus-visible {
+  color: var(--washi);
+  border-color: var(--seam-faint);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+  outline: none;
+}
+
+.shell-ribbon-more-item:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 1px;
+}
+
+.shell-ribbon-more-ico {
+  width: var(--space-4);
+  height: var(--space-4);
+  display: block;
+  flex: none;
+}
+
+.shell-ribbon-more-meta {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--washi-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell-ribbon-more-item--account .shell-ribbon-account-name {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.shell-ribbon-more-item--account[data-guest='true'] .shell-ribbon-account-name {
+  color: var(--washi-dim);
+}
+
 /* ── Account chip (opens the account panel) ───────────────────────────────── */
 .shell-ribbon-account {
   appearance: none;
@@ -1562,9 +1718,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .shell-ribbon-iconbtn { transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease); }
+  .shell-ribbon-event-chip,
   .shell-ribbon-voice-chip {
     transition: none;
   }
+  .shell-ribbon-event-chip:hover,
   .shell-ribbon-voice-chip:hover {
     transform: none;
   }
@@ -2438,7 +2596,10 @@
   margin-top: var(--space-2);
   max-width: var(--shell-measure);
   margin-inline: auto;
-  transition: background var(--dur) var(--ease);
+  /* opacity covers pending → ACK (Era 1 A6); background is the hover wash. */
+  transition:
+    background var(--dur) var(--ease),
+    opacity var(--dur-micro, 100ms) var(--ease);
 }
 
 .shell-msg-group:hover,
@@ -2578,7 +2739,10 @@
   padding: 1px var(--space-5);
   max-width: var(--shell-measure);
   margin-inline: auto;
-  transition: background var(--dur) var(--ease);
+  /* opacity covers pending → ACK (Era 1 A6); background is the hover wash. */
+  transition:
+    background var(--dur) var(--ease),
+    opacity var(--dur-micro, 100ms) var(--ease);
 }
 
 .shell-msg-cont-ts {
@@ -2891,6 +3055,71 @@
   white-space: nowrap;
 }
 
+.shell-reader-memory__peers {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.shell-reader-memory__peers-label {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.shell-reader-memory__peers-list {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shell-reader-memory__peer-item {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in oklab, var(--gold) 28%, var(--seam));
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--gold) 7%, transparent);
+  color: var(--washi-dim);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.shell-reader-memory__peer-item:hover,
+.shell-reader-memory__peer-item:focus-visible {
+  border-color: color-mix(in oklab, var(--gold-bright) 52%, transparent);
+  color: var(--washi);
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.shell-reader-memory__peer-item strong {
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.shell-reader-memory__peer-item span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .shell-reader-memory__nav {
   display: flex;
   flex-wrap: wrap;
@@ -2920,7 +3149,9 @@
   .shell-reader-memory__review,
   .shell-reader-memory__trail,
   .shell-reader-memory__trail-list,
-  .shell-reader-memory__trail-item {
+  .shell-reader-memory__trail-item,
+  .shell-reader-memory__peers,
+  .shell-reader-memory__peer-item {
     grid-template-columns: 1fr;
   }
 }
@@ -3833,6 +4064,61 @@
   cursor: not-allowed;
 }
 
+/* Offline / outbox status chrome — honest queue + failed-flush cues (Era 1 A2). */
+.shell-composer-outbox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 var(--space-2);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--washi) 14%, transparent);
+  background: color-mix(in oklab, var(--ink) 55%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--washi-dim);
+}
+.shell-composer-outbox--offline {
+  border-color: color-mix(in oklab, var(--washi) 18%, transparent);
+  color: var(--washi-mute);
+}
+.shell-composer-outbox--queued {
+  border-color: color-mix(in oklab, var(--lapis-bright) 35%, transparent);
+  color: color-mix(in oklab, var(--lapis-bright) 70%, var(--washi));
+}
+.shell-composer-outbox--warning {
+  border-color: color-mix(in oklab, var(--warn) 40%, transparent);
+  color: color-mix(in oklab, var(--warn) 75%, var(--washi));
+}
+.shell-composer-outbox--error {
+  border-color: color-mix(in oklab, var(--shu) 45%, transparent);
+  color: color-mix(in oklab, var(--shu) 72%, var(--washi));
+  background: color-mix(in oklab, var(--shu) 10%, var(--ink));
+}
+.shell-composer-outbox-label {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.shell-composer-outbox-retry {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.shell-composer-outbox-retry:hover,
+.shell-composer-outbox-retry:focus-visible {
+  background: color-mix(in oklab, currentColor 12%, transparent);
+  outline: none;
+}
+
 .shell-composer-error {
   margin: var(--space-2) 0 0;
   font-family: var(--font-mono);
@@ -4575,12 +4861,13 @@
     gap: 2px;
   }
 
+  /* A8: place chips (event/voice) stay primary. Only shed legacy strip chrome
+     that now lives in More, plus connection text and hairlines for density. */
   .shell-ribbon-account,
   .shell-ribbon-appearance,
   .shell-ribbon-preferences,
   .shell-ribbon-conn,
-  .shell-ribbon-divider,
-  .shell-ribbon-event-chip {
+  .shell-ribbon-divider {
     display: none;
   }
 
@@ -5112,9 +5399,19 @@
     height: 20px;
   }
 
-  .shell-ribbon-appearance,
-  .shell-ribbon-preferences {
+  /* Secondary chrome lives in More; keep the disclosure itself full-size. */
+  .shell-ribbon-more-trigger,
+  .shell-ribbon-group .onyx-popover__trigger {
     display: inline-flex;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .shell-ribbon-more-item {
+    min-height: 44px;
+    font-size: 14px;
   }
 
   .shell-ribbon-account {
@@ -6126,16 +6423,35 @@
 }
 
 /* ── Offline outbox: queued-but-unsent messages ─────────────────────────── */
-/* Dimmed with a soft pulse so "written but not delivered" reads at a glance;
-   the row returns at full strength when the echo lands after reconnect. */
+/* Dimmed so "written but not delivered" reads at a glance; the row returns at
+   full strength when the labeled ACK / echo lands. Era 1 A6: one-shot enter
+   motion (opacity + 6px settle) on local echo; the row-level opacity transition
+   on .shell-msg-group / .shell-msg-cont covers pending → confirmed ACK. No
+   continuous pulse (WCAG 2.2.2). */
 .shell-msg-pending {
   opacity: 0.55;
+  animation: shell-msg-echo-in var(--dur-fast, 160ms) var(--ease) both;
 }
 .shell-msg-pending .shell-msg-ts::after,
 .shell-msg-pending .shell-msg-cont-ts::after {
   content: ' · queued';
   color: var(--washi-mute);
   font-style: italic;
+}
+@keyframes shell-msg-echo-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 0.55;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-msg-pending {
+    animation: none;
+  }
 }
 
 /* ── Presence heatline — live 24h activity rhythm in the channel ribbon ──── */
@@ -6149,12 +6465,19 @@
   border-left: 1px solid var(--seam, color-mix(in oklab, var(--washi, #cde) 12%, transparent));
   flex: none;
 }
+/* Fixed track height + scaleY (compositor-only) instead of animating `height`
+   (layout thrash on every stats tick). Origin bottom so bars grow up from the
+   baseline. Scale maps the old 3px..16px range: 0.1875 + heat * 0.8125. */
 .shell-heat-bar {
   width: 2px;
-  height: calc(3px + var(--heat, 0) * 13px);
+  height: 16px;
   border-radius: 1px;
   background: color-mix(in oklab, var(--washi, #9ab) 22%, transparent);
-  transition: height 400ms var(--ease-out, ease), background 300ms ease;
+  transform: scaleY(calc(0.1875 + var(--heat, 0) * 0.8125));
+  transform-origin: bottom;
+  transition:
+    transform var(--dur-base, 220ms) var(--ease),
+    background var(--dur-base, 220ms) var(--ease);
 }
 /* A bar with any traffic glows with the glacier accent, scaled by intensity. */
 .shell-heat-bar--live {

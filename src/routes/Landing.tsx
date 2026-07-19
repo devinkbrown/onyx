@@ -241,7 +241,7 @@ export default function Landing() {
               <div><span class="o">welcome aboard —</span> <span class="c">finding the nearest shore …</span></div>
               <div><span class="o">you joined</span> <span class="h">#root</span></div>
               <div><span class="o">&lt;you&gt;</span> <span class="c">hello :)</span></div>
-              <div><span class="o">&lt;orochi&gt;</span> <span class="p">good to have you here.</span> <span class="cursor">▍</span></div>
+              <div><span class="o">&lt;onyx&gt;</span> <span class="p">good to have you here.</span> <span class="cursor">▍</span></div>
             </div>
           </div>
         </div>
@@ -282,7 +282,7 @@ export default function Landing() {
           <div>
             <span class="r-eyebrow">run your own</span>
             <h2 class="r-title" id="sovereign-heading">Or raise<br />your own shore</h2>
-            <p class="r-lede">Sovereignty is the whole point. Stand up your own Orochi node, peer it into the network, and own a slice of the mesh outright — your rooms, your rules, still part of the wider tide.</p>
+            <p class="r-lede">Sovereignty is the whole point. Stand up your own Onyx Server node, peer it into the network, and own a slice of the mesh outright — your rooms, your rules, still part of the wider tide.</p>
             <div class="r-cta"><a class="r-btn ghost" href="/about/">How to run a node &rarr;</a></div>
           </div>
           <svg class="r-meshvis" viewBox="0 0 600 360" role="img" aria-label="Several nodes joined by azure currents into one connected network">

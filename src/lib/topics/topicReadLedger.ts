@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * Device-local read cursors for Orochi named conversations.
+ * Device-local read cursors for Onyx Server named conversations.
  *
  * Privacy invariant: the persisted and published shape contains only a
  * normalized channel/topic pair plus the last-read message id and timestamp.

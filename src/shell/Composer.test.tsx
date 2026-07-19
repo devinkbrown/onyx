@@ -9,15 +9,19 @@
  *   3. The slash-command autocomplete is a labelled listbox of options.
  *   4. The textarea points aria-activedescendant at the highlighted command,
  *      and ArrowDown moves that pointer — so an AT user hears the selection.
+ *   5. Offline / outbox status chrome is visible (never silent queue/fail).
  *
  * AAA pattern; descriptive names.
  */
 
-import { cleanup, fireEvent, render, waitFor } from '@solidjs/testing-library';
+import 'fake-indexeddb/auto';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
 import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
+import { _resetVaultForTests, queueOutbox } from '@/lib/vault/historyVault';
 import { Composer } from './Composer';
 
 const initialState = store.getInitialState();
@@ -65,7 +69,17 @@ describe('Composer accessibility', () => {
     expect(getByRole('textbox', { name: /message #room/i })).toBeDefined();
     expect(getByRole('button', { name: 'Attach files' })).toBeDefined();
     expect(getByRole('button', { name: 'Insert emoji' })).toBeDefined();
+    expect(getByRole('button', { name: 'Jump to date in conversation history' })).toBeDefined();
     expect(getByRole('button', { name: 'Send message' })).toBeDefined();
+  });
+
+  it('opens the jump-to-date sheet from the composer tool', () => {
+    seedActiveChannel();
+    const { getByRole } = render(() => <Composer />);
+
+    fireEvent.click(getByRole('button', { name: 'Jump to date in conversation history' }));
+
+    expect(store.getState().showJumpToDate).toBe(true);
   });
 
   it('releases a local attachment preview when the account owner changes', async () => {
@@ -375,5 +389,58 @@ describe('Composer schedule (send later)', () => {
     expect(dialog.querySelectorAll('.shell-schedule-preset').length).toBeGreaterThan(0);
     // The custom time field is labelled for keyboard/AT users.
     expect(getByRole('textbox', { name: /message #room/i })).toBeDefined();
+  });
+});
+
+describe('Composer outbox status chrome', () => {
+  const owner = { serverUrl: 'wss://example.test', identity: 'me' } as const;
+
+  beforeEach(() => {
+    globalThis.indexedDB = new IDBFactory();
+    _resetVaultForTests();
+    store.setState(initialState, true);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('shows empty-offline honesty when disconnected with nothing queued', () => {
+    seedActiveChannel();
+    store.setState({ connectionStatus: 'disconnected' });
+    render(() => <Composer />);
+
+    expect(screen.getByText(/Offline · Messages queue on this device/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try sending now' })).not.toBeInTheDocument();
+  });
+
+  it('shows Queued (N) · Will send on reconnect for owned outbox rows', async () => {
+    seedActiveChannel();
+    store.setState({ connectionStatus: 'disconnected' });
+    await queueOutbox('#room', 'body stays out of chrome', owner);
+    render(() => <Composer />);
+
+    expect(await screen.findByText(/Queued \(1\) · Will send on reconnect/i)).toBeInTheDocument();
+    expect(screen.queryByText('body stays out of chrome')).not.toBeInTheDocument();
+  });
+
+  it('offers Try sending now when connected with a stuck queue', async () => {
+    seedActiveChannel();
+    await queueOutbox('#room', 'retry me', owner);
+    store.setState({ outboxDeliveryFailed: true });
+    const flushSpy = vi.spyOn(store.getState(), 'flushOutbox').mockImplementation(() => {});
+    render(() => <Composer />);
+
+    expect(await screen.findByText(/Couldn't send/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try sending now' }));
+    expect(flushSpy).toHaveBeenCalledOnce();
+  });
+
+  it('hides outbox chrome when online and the queue is empty', () => {
+    seedActiveChannel();
+    render(() => <Composer />);
+    expect(screen.queryByText(/Queued \(/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Messages queue on this device/i)).not.toBeInTheDocument();
   });
 });

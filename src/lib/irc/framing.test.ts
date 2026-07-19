@@ -14,8 +14,8 @@ import {
  * reintroduce either without failing here.
  */
 describe('splitWireFrame — stateless, remainder-free frame splitting', () => {
-  it('returns a single line for a CRLF-less frame (the Orochi CAP LS shape)', () => {
-    // Orochi emits ":eshmaki.me CAP * LS :..." with NO trailing CRLF. The old
+  it('returns a single line for a CRLF-less frame (the Onyx Server CAP LS shape)', () => {
+    // Onyx Server emits ":eshmaki.me CAP * LS :..." with NO trailing CRLF. The old
     // stateful `buffer = lines.pop()` stashed exactly this line forever, so CAP
     // was never handled and registration hung. It must surface immediately.
     const frame = ':eshmaki.me CAP * LS :sasl=PLAIN,SCRAM-SHA-256 multi-prefix';

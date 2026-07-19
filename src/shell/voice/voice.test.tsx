@@ -19,7 +19,7 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
-import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
+import type { CadencePeerState } from '@/lib/cadence-media/types';
 import { VoiceStage } from './VoiceStage';
 import { ParticipantTile } from './ParticipantTile';
 import { VoiceBar } from './VoiceBar';
@@ -71,7 +71,7 @@ function makeChannel(name: string, users: ChannelUser[]): Channel {
   };
 }
 
-function makePeer(nick: string, overrides: Partial<SuimyakuPeerState> = {}): SuimyakuPeerState {
+function makePeer(nick: string, overrides: Partial<CadencePeerState> = {}): CadencePeerState {
   return {
     nick,
     channel: '#media',
@@ -89,11 +89,11 @@ function makePeer(nick: string, overrides: Partial<SuimyakuPeerState> = {}): Sui
  * Resets store to initialState first to avoid cross-test bleed.
  */
 function seedVoiceStore(
-  peers: SuimyakuPeerState[],
+  peers: CadencePeerState[],
   channelUsers: ChannelUser[] = [],
   extra: Partial<typeof initialState.voice> = {},
 ) {
-  const peersMap = new Map<string, SuimyakuPeerState>();
+  const peersMap = new Map<string, CadencePeerState>();
   for (const p of peers) peersMap.set(p.nick, p);
 
   const channel = makeChannel('#media', channelUsers);
@@ -725,6 +725,45 @@ describe('VoiceBar', () => {
 
     // Assert
     expect(getByTestId('voice-bar')).toBeDefined();
+  });
+
+  it('shows a hop-protected security chip with shield language, never a padlock', () => {
+    // Arrange — in_call without media E2EE (not shipped)
+    seedVoiceStore([]);
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    const chip = getByTestId('call-security-chip');
+
+    // Assert — shield hop honesty (Era 1 A5 / research R1)
+    expect(chip).toBeDefined();
+    expect(chip.getAttribute('data-security-level')).toBe('hop_protected');
+    expect(chip.getAttribute('data-uses-padlock')).toBe('false');
+    expect(chip.getAttribute('aria-label')?.toLowerCase()).toContain('encrypted to this server');
+    expect(chip.textContent?.toLowerCase()).toContain('protected connection');
+    // No padlock SVG path for hop-only (LockIcon uses a keyed rect body)
+    expect(chip.querySelector('svg rect[width="14"]')).toBeNull();
+  });
+
+  it('shows connecting security chip while ringing (no padlock)', () => {
+    store.setState(
+      {
+        ...initialState,
+        voice: {
+          ...initialState.voice,
+          callState: 'ringing_out',
+          callWith: 'alice',
+        },
+      },
+      true,
+    );
+
+    const { getByTestId } = render(() => <VoiceBar />);
+    const chip = getByTestId('call-security-chip');
+
+    expect(chip.getAttribute('data-security-level')).toBe('connecting');
+    expect(chip.getAttribute('data-uses-padlock')).toBe('false');
+    expect(chip.textContent?.toLowerCase()).toContain('connecting');
   });
 
   it('holds a screen wake lock only for accepted media and releases it on call end', async () => {
@@ -1513,7 +1552,7 @@ describe('ParticipantTile enhancements', () => {
 /** Replace the in-call peer set without remounting the component. */
 function setPeers(nicks: string[]) {
   store.setState((s) => {
-    const peers = new Map<string, SuimyakuPeerState>();
+    const peers = new Map<string, CadencePeerState>();
     for (const nick of nicks) peers.set(nick, makePeer(nick));
     return { voice: { ...s.voice, peers } };
   });

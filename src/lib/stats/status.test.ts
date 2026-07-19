@@ -29,7 +29,7 @@ describe('normalizeStatus', () => {
     expect(normalizeStatus('offline')).toBeNull();
   });
 
-  it('accepts the Orochi public status shape', () => {
+  it('accepts the Onyx Server public status shape', () => {
     const status = normalizeStatus({
       generated_at: 1783500000,
       network: 'Onyx',

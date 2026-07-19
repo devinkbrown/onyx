@@ -15,7 +15,7 @@ import { test, expect, chromium, type Browser } from '@playwright/test';
 //   • CREATE side (connected): the "Share invite" section lives in ChannelSettings,
 //     which only mounts once the app is connected and focused on a channel. That
 //     requires the DEV build (window.__onyx store handle is DEV-only, src/index.tsx)
-//     pinned to a live Orochi WS — the same self-launched full-chromium harness
+//     pinned to a live Onyx Server WS — the same self-launched full-chromium harness
 //     voice.spec uses (the headless-shell binary drops the self-signed WSS). We
 //     drive the real UI: open the settings gear, read the generated share link,
 //     then open it in a fresh page and assert the landing preview names the room.

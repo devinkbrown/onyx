@@ -87,7 +87,7 @@ describe('<NotificationCenter>', () => {
         note({ id: 'b', type: 'dm', from: 'mizu' }),
         note({ id: 'f', type: 'follow', from: 'lapis', channel: '#root' }),
         note({ id: 'c', type: 'system', text: 'connected' }),
-        note({ id: 'd', type: 'mention', from: 'kagura', channel: '#zig' }),
+        note({ id: 'd', type: 'mention', from: 'cadence', channel: '#zig' }),
       ],
       readNotificationIds: new Set(['d']),
     });
@@ -122,7 +122,7 @@ describe('<NotificationCenter>', () => {
           text: 'quiet update',
         }),
       ],
-      channelProps: new Map([['#root', { 'orochi.topics': 'roadmap' }]]),
+      channelProps: new Map([['#root', { 'onyx_server.topics': 'roadmap' }]]),
     });
     const { getByTestId, getByText } = render(() => <NotificationCenter />);
     fireEvent.click(getByTestId('ribbon-bell'));

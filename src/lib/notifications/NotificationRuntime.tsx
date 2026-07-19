@@ -15,6 +15,7 @@ import {
 import { calmPreset, classifyNotification, type CalmContext } from './calmMode';
 import { shouldNotify } from './decision';
 import { isFollowed } from './followed';
+import { notificationBodyFor } from './notificationBody';
 
 const DESKTOP_THROTTLE_MS = 6000;
 const SOUND_THROTTLE_MS = 1500;
@@ -84,7 +85,8 @@ function titleFor(note: StoreNotification, targetLabel: string): string {
 }
 
 function bodyFor(note: StoreNotification): string {
-  return note.text.length > 180 ? `${note.text.slice(0, 177)}...` : note.text;
+  // Fail closed on E2EE envelopes — never put ciphertext on a lock screen.
+  return notificationBodyFor(note.text);
 }
 
 function calmAllowsNotification(note: StoreNotification): boolean {

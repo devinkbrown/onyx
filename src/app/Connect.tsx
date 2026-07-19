@@ -2,11 +2,13 @@
 /**
  * Connect.tsx — Onyx connect screen (deep-water dark-luxury).
  *
- * The front door to the Orochi mesh. A segmented mode switch routes between
+ * The front door to the Onyx Server mesh. A segmented mode switch routes between
  * three auth surfaces, all on the same deep-water atmosphere:
  *
  *   • Guest    — nick only; drifts in anonymously (or with a saved SESSION).
- *   • Sign in  — nick + account password → SASL login.
+ *   • Sign in  — passkey primary when WebAuthn is available; password demoted
+ *                under "Use password instead" (SASL). Password-only on browsers
+ *                without passkey support.
  *   • Register — desired account + optional email + password (+ confirm), with
  *                live validation and a strength meter. Flows form → verify → done.
  *
@@ -306,6 +308,8 @@ export function Connect(props: ConnectProps): JSX.Element {
 
   // ── Mode ──────────────────────────────────────────────────────────────────
   const [mode, setMode] = createSignal<Mode>('guest');
+  /** When passkeys are primary, password fields stay collapsed until the user asks. */
+  const [passwordPathOpen, setPasswordPathOpen] = createSignal(false);
 
   // Website → app handoff: /app/?join=%23channel (+ optional &at=<moment> for
   // time travel). Validated before it goes anywhere near a JOIN; a bad link is
@@ -521,6 +525,23 @@ export function Connect(props: ConnectProps): JSX.Element {
   };
   const phaseLabel = createMemo(() => PHASE_LABEL[formPhase()]);
 
+  // ── Live validity helpers (declared early so status copy can read them) ─────
+  const nickTrimmed = createMemo(() => nick().trim());
+  const passkeySupported = createMemo(() => isPasskeySupported());
+
+  /** Sign-in password fields + SASL submit — open by default only without passkeys. */
+  const showSignInPasswordPath = createMemo(
+    () => mode() === 'signin' && (!passkeySupported() || passwordPathOpen()),
+  );
+  /** Stay-signed-in stores a password; only relevant for guest or password sign-in. */
+  const showStaySignedIn = createMemo(
+    () => mode() === 'guest' || showSignInPasswordPath(),
+  );
+  /** Password/guest/register primary submit; hidden when passkey is the only CTA. */
+  const showPasswordSubmit = createMemo(
+    () => mode() !== 'signin' || showSignInPasswordPath(),
+  );
+
   // Reactive status copy — distinguishes failure types, never names a server,
   // never blames the nick for a server-side failure.
   const statusMsg = createMemo(() => {
@@ -550,7 +571,9 @@ export function Connect(props: ConnectProps): JSX.Element {
   function modeHint(m: Mode): string {
     switch (m) {
       case 'signin':
-        return 'Sign in to your account — Onyx finds the nearest node for you.';
+        return passkeySupported()
+          ? 'Sign in with a passkey — or use your account password.'
+          : 'Sign in to your account — Onyx finds the nearest node for you.';
       case 'register':
         return 'Claim a name that is yours — registration takes a moment.';
       default:
@@ -571,10 +594,6 @@ export function Connect(props: ConnectProps): JSX.Element {
     if (s === 'connecting' || s === 'connected' || s === 'reconnecting') return false;
     return !registerPending();
   });
-
-  // ── Live validity (drives submit-button enablement, no error text yet) ──────
-  const nickTrimmed = createMemo(() => nick().trim());
-  const passkeySupported = createMemo(() => isPasskeySupported());
 
   const canSubmit = createMemo<boolean>(() => {
     if (!isFormReady()) return false;
@@ -683,6 +702,8 @@ export function Connect(props: ConnectProps): JSX.Element {
     if (passkeySignInAttempt()?.dispatched) return;
     cancelPasskeySignIn();
     setMode(next);
+    // Password path starts collapsed again when passkeys are primary.
+    setPasswordPathOpen(false);
     // Clear transient errors so a stale message from another mode never lingers.
     setNickError(undefined);
     setPasswordError(undefined);
@@ -1008,7 +1029,7 @@ export function Connect(props: ConnectProps): JSX.Element {
       identity.access === 'resume'
       && (typeof credentials.password !== 'string' || credentials.password.length === 0)
     ) {
-      // SESSION tokens select a remembered logical session but Orochi still
+      // SESSION tokens select a remembered logical session but Onyx Server still
       // requires fresh account proof. Never connect this identity as a guest
       // and hope RESUME authenticates it: that is rejected server-side and was
       // the top-bar “Guest” regression. A supported passkey keeps this a
@@ -1348,8 +1369,9 @@ export function Connect(props: ConnectProps): JSX.Element {
                       />
                     </Show>
 
-                    {/* Password — guest hides it; sign-in & register show it */}
-                    <Show when={mode() !== 'guest'}>
+                    {/* Register password always; sign-in password only when demoted path is open
+                        (or when the browser has no passkey support). */}
+                    <Show when={mode() === 'register' || showSignInPasswordPath()}>
                       <PasswordInput
                         id="conn-password"
                         label={mode() === 'register' ? 'Password' : 'Account password'}
@@ -1366,15 +1388,20 @@ export function Connect(props: ConnectProps): JSX.Element {
                       />
                     </Show>
 
+                    {/* Passkey PRIMARY on sign-in when WebAuthn is available (A4).
+                        Password is demoted under "Use password instead" — never
+                        silently fall back from a failed passkey to plaintext. */}
                     <Show when={mode() === 'signin' && passkeySupported()}>
-                      <div class="conn-passkey">
-                        <div class="conn-passkey-divider" aria-hidden="true">
-                          <span>or use a passkey</span>
-                        </div>
+                      <div class="conn-passkey" data-testid="conn-passkey-primary">
+                        <Show when={passwordPathOpen()}>
+                          <div class="conn-passkey-divider" aria-hidden="true">
+                            <span>or use a passkey</span>
+                          </div>
+                        </Show>
                         <Button
                           class="conn-passkey-button"
                           type="button"
-                          variant="ghost"
+                          variant={passwordPathOpen() ? 'ghost' : 'primary'}
                           disabled={!isFormReady() || passkeyBusy()}
                           onClick={handlePasskeySignIn}
                           ref={(element: HTMLButtonElement) => (passkeyButtonRef = element)}
@@ -1392,6 +1419,17 @@ export function Connect(props: ConnectProps): JSX.Element {
                               {message()}
                             </p>
                           )}
+                        </Show>
+                        <Show when={!passwordPathOpen()}>
+                          <button
+                            type="button"
+                            class="conn-password-path-toggle"
+                            data-testid="conn-password-path-open"
+                            disabled={!isFormReady()}
+                            onClick={() => setPasswordPathOpen(true)}
+                          >
+                            Use password instead
+                          </button>
                         </Show>
                       </div>
                     </Show>
@@ -1435,8 +1473,8 @@ export function Connect(props: ConnectProps): JSX.Element {
                     </Show>
                   </div>
 
-                  {/* Stay signed in — guest & sign-in only (register chains in) */}
-                  <Show when={mode() !== 'register'}>
+                  {/* Stay signed in — guest & password sign-in only (stores password) */}
+                  <Show when={showStaySignedIn()}>
                     <div class="conn-seam" style={{ margin: '20px 0' }} aria-hidden="true" />
                     <div class="conn-toggle">
                       <div class="conn-toggle-body">
@@ -1536,28 +1574,31 @@ export function Connect(props: ConnectProps): JSX.Element {
                     </div>
                   </Show>
 
-                  {/* Submit */}
-                  <div class="conn-actions" style={{ 'margin-top': '20px' }}>
-                    <Show
-                      when={statusPhase() !== 'connecting'}
-                      fallback={
-                        <div class="conn-submit" style={{ display: 'flex', 'align-items': 'center', gap: '10px' }}>
-                          <Spinner size="sm" label={registerPending() ? 'Registering' : phaseLabel()} />
-                        </div>
-                      }
-                    >
-                      <Button
-                        class="conn-submit"
-                        type="submit"
-                        variant="primary"
-                        disabled={!canSubmit()}
-                        aria-label={SUBMIT_ARIA[mode()]}
-                        data-testid="conn-submit"
+                  {/* Submit — guest / register / password sign-in. Hidden when
+                      passkey is the sole primary CTA (password path collapsed). */}
+                  <Show when={showPasswordSubmit()}>
+                    <div class="conn-actions" style={{ 'margin-top': '20px' }}>
+                      <Show
+                        when={statusPhase() !== 'connecting'}
+                        fallback={
+                          <div class="conn-submit" style={{ display: 'flex', 'align-items': 'center', gap: '10px' }}>
+                            <Spinner size="sm" label={registerPending() ? 'Registering' : phaseLabel()} />
+                          </div>
+                        }
                       >
-                        {submitLabel(mode(), formPhase())}
-                      </Button>
-                    </Show>
-                  </div>
+                        <Button
+                          class="conn-submit"
+                          type="submit"
+                          variant="primary"
+                          disabled={!canSubmit()}
+                          aria-label={SUBMIT_ARIA[mode()]}
+                          data-testid="conn-submit"
+                        >
+                          {submitLabel(mode(), formPhase())}
+                        </Button>
+                      </Show>
+                    </div>
+                  </Show>
                 </form>
               </Show>
             </div>

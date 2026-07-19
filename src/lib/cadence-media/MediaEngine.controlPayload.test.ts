@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { IRCClient } from '../irc/client';
-import { SuimyakuMediaEngine } from './MediaEngine';
+import { CadenceMediaEngine } from './MediaEngine';
 import { mediaStreamId } from './mediaStream';
 import { OpcodecWasm } from './OpcodecWasm';
 import {
@@ -11,7 +11,7 @@ import {
   MAX_PEER_VIDEO_WIDTH,
   type PeerMedia,
 } from './PeerRegistry';
-import type { SuimyakuMediaCallbacks } from './types';
+import type { CadenceMediaCallbacks } from './types';
 
 function mediaClient(): IRCClient {
   return {
@@ -20,7 +20,7 @@ function mediaClient(): IRCClient {
   } as unknown as IRCClient;
 }
 
-function callbacks(overrides: Partial<SuimyakuMediaCallbacks> = {}): SuimyakuMediaCallbacks {
+function callbacks(overrides: Partial<CadenceMediaCallbacks> = {}): CadenceMediaCallbacks {
   return {
     onCallState: vi.fn(),
     onPeerLeft: vi.fn(),
@@ -30,10 +30,10 @@ function callbacks(overrides: Partial<SuimyakuMediaCallbacks> = {}): SuimyakuMed
   };
 }
 
-describe('SuimyakuMediaEngine control payload boundary', () => {
+describe('CadenceMediaEngine control payload boundary', () => {
   it('tears down owner-bound media state on a direct client replacement', () => {
     const onCallState = vi.fn();
-    const engine = new SuimyakuMediaEngine(callbacks({ onCallState }), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks({ onCallState }), { kind: 'voice' });
     const aliceClient = mediaClient();
     const bobClient = mediaClient();
     engine.setClient(aliceClient);
@@ -67,7 +67,7 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
 
   it('rejects malformed media envelopes before allocating peer state', () => {
     const onPresence = vi.fn();
-    const engine = new SuimyakuMediaEngine(callbacks({ onPresence }), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks({ onPresence }), { kind: 'voice' });
 
     engine.handleMediaMessage('bad nick', '#room', 'VOICE_JOIN', '');
     engine.handleMediaMessage('alice', '#bad room', 'VOICE_JOIN', '');
@@ -80,7 +80,7 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
   });
 
   it('does not partially populate peers from wrong-shape roster fields', () => {
-    const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
 
     expect(() => {
       engine.handleMediaMessage('server', '#room', 'ROSTER', JSON.stringify({
@@ -100,7 +100,7 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
   it('publishes only validated room statistics and bounded reactions', () => {
     const onRoomStats = vi.fn();
     const onReaction = vi.fn();
-    const engine = new SuimyakuMediaEngine(callbacks({ onRoomStats, onReaction }), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks({ onRoomStats, onReaction }), { kind: 'voice' });
 
     engine.handleMediaMessage('server', '#room', 'STATS', '{"active_senders":"many"}');
     engine.handleMediaMessage('server', '#room', 'STATS', JSON.stringify({
@@ -122,7 +122,7 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
   });
 
   it('contains malformed base64 in every inline media and crypto path', () => {
-    const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
 
     const subtypes = [
       'MCHUNK/AUDIO/1/1/1',
@@ -146,7 +146,7 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
   });
 
   it('rejects oversized inline frames before decoding or allocating peers', () => {
-    const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
     const oversized = 'A'.repeat(Math.ceil((1024 * 1024) / 3) * 4 + 8);
 
     engine.handleMediaMessage('Alice', '#room', 'AUDIO', oversized);
@@ -158,7 +158,7 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
 
   it('rejects oversized non-frame control payloads before parsing', () => {
     const onPresence = vi.fn();
-    const engine = new SuimyakuMediaEngine(callbacks({ onPresence }), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks({ onPresence }), { kind: 'voice' });
     const oversized = '1 '.repeat(40_000);
 
     engine.handleMediaMessage('Alice', '#room', 'VIDEO_JOIN', oversized);
@@ -172,7 +172,7 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
   it('shares codec startup and bounds frames retained while WASM loads', () => {
     const load = vi.spyOn(OpcodecWasm, 'load')
       .mockReturnValue(new Promise<OpcodecWasm>(() => {}));
-    const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
 
     for (let index = 0; index < 32; index += 1) {
       engine.handleMediaMessage(`peer-${index}`, '#room', 'AUDIO', 'YQ==');
@@ -191,7 +191,7 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
 
   it('bounds channel roster creation before firing near-capacity state', () => {
     const onRoomNearFull = vi.fn();
-    const engine = new SuimyakuMediaEngine(callbacks({ onRoomNearFull }), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks({ onRoomNearFull }), { kind: 'voice' });
     const roster = Array.from({ length: 200 }, (_, index) => ({ nick: `nick-${index}` }));
 
     engine.handleMediaMessage('server', '#room', 'CHANNEL_INFO', JSON.stringify(roster));
@@ -202,7 +202,7 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
   });
 
   it('bounds and retires per-peer presence and negotiation state', () => {
-    const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
     const negotiation = JSON.stringify({ max_bitrate_kbps: 128 });
 
     for (let index = 0; index < 72; index += 1) {
@@ -232,7 +232,7 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
   });
 
   it('clamps hostile VIDEO_JOIN capture geometry before peer allocation', () => {
-    const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
+    const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
     engine.handleMediaMessage('alice', '#room', 'VIDEO_JOIN', '999999 999999 200 999 true');
 
     const internals = engine as unknown as {

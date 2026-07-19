@@ -18,7 +18,7 @@ function server(account: string): Server {
   return {
     id: 'local',
     name: 'Local',
-    network: 'Orochi',
+    network: 'Onyx',
     url: 'wss://example.invalid',
     icon: '#000',
     nick: 'me',
@@ -27,9 +27,12 @@ function server(account: string): Server {
   };
 }
 
-function client(sendRaw = vi.fn()): NonNullable<OnyxState['client']> {
+function client(
+  sendRaw: ReturnType<typeof vi.fn> = vi.fn().mockReturnValue(true),
+  vapid = 'AQID',
+): NonNullable<OnyxState['client']> {
   return {
-    isupport: { VAPID: 'AQID' },
+    isupport: { VAPID: vapid },
     sendRaw,
   } as unknown as NonNullable<OnyxState['client']>;
 }
@@ -307,7 +310,7 @@ describe('webPushActive', () => {
 
 describe('web push operations', () => {
   it('registers a complete subscription on the same account and client session', async () => {
-    const sendRaw = vi.fn();
+    const sendRaw = vi.fn().mockReturnValue(true);
     const currentClient = client(sendRaw);
     const sub = pushSubscription();
     stubPushBrowser(
@@ -343,7 +346,7 @@ describe('web push operations', () => {
     const oldSub = pushSubscription(oldUnsubscribe);
     const newSub = pushSubscription();
     const subscribe = vi.fn().mockResolvedValue(newSub);
-    const sendRaw = vi.fn();
+    const sendRaw = vi.fn().mockReturnValue(true);
     const close = vi.fn();
     stubPushBrowser(
       vi.fn().mockResolvedValue('granted'),
@@ -423,10 +426,144 @@ describe('web push operations', () => {
     expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('carol'));
   });
 
+  it('refuses an incomplete subscription and retires it locally', async () => {
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    const sendRaw = vi.fn().mockReturnValue(true);
+    const incomplete = {
+      endpoint: 'https://push.example/sub',
+      toJSON: () => ({ endpoint: 'https://push.example/sub', keys: {} }),
+      unsubscribe,
+    } as unknown as PushSubscription;
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(incomplete),
+          subscribe: vi.fn(),
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+    markOwner('alice');
+
+    await expect(enableWebPush()).resolves.toEqual({
+      ok: false,
+      reason: 'The browser returned an incomplete subscription.',
+    });
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(sendRaw).not.toHaveBeenCalled();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
+  });
+
+  it('does not claim success when WEBPUSH SUBSCRIBE cannot be sent', async () => {
+    const sendRaw = vi.fn().mockReturnValue(false);
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    const subscribe = vi.fn().mockResolvedValue(pushSubscription(unsubscribe));
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(null),
+          subscribe,
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+
+    await expect(enableWebPush()).resolves.toEqual({
+      ok: false,
+      reason: 'Could not register push with the server. Try again.',
+    });
+    expect(sendRaw).toHaveBeenCalledWith(
+      'WEBPUSH',
+      'SUBSCRIBE',
+      'https://push.example/sub',
+      'p256dh-key',
+      'auth-key',
+    );
+    // Newly-created local sub is discarded; owner mark is not left dangling.
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
+  });
+
+  it('refuses a malformed ISUPPORT VAPID key before requesting a subscription', async () => {
+    const sendRaw = vi.fn().mockReturnValue(true);
+    const subscribe = vi.fn();
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn(),
+          subscribe,
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw, 'not valid ***'),
+    }, true);
+
+    await expect(enableWebPush()).resolves.toEqual({
+      ok: false,
+      reason: 'This server advertised an invalid push key.',
+    });
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(sendRaw).not.toHaveBeenCalled();
+  });
+
+  it('subscribes with the raw ISUPPORT VAPID bytes (no key round-trip)', async () => {
+    const sendRaw = vi.fn().mockReturnValue(true);
+    const subscribe = vi.fn().mockResolvedValue(pushSubscription());
+    // Unpadded base64url for bytes [1, 2, 3]
+    const vapid = 'AQID';
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(null),
+          subscribe,
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw, vapid),
+    }, true);
+
+    await expect(enableWebPush()).resolves.toEqual({ ok: true });
+    expect(subscribe).toHaveBeenCalledWith({
+      userVisibleOnly: true,
+      applicationServerKey: expect.any(ArrayBuffer),
+    });
+    const keyArg = subscribe.mock.calls[0]?.[0]?.applicationServerKey as ArrayBuffer;
+    expect(Array.from(new Uint8Array(keyArg))).toEqual([1, 2, 3]);
+    expect(sendRaw).toHaveBeenCalledWith(
+      'WEBPUSH',
+      'SUBSCRIBE',
+      'https://push.example/sub',
+      'p256dh-key',
+      'auth-key',
+    );
+  });
+
   it('refuses to cross-register an endpoint when foreign retirement fails', async () => {
     const oldUnsubscribe = vi.fn().mockResolvedValue(false);
     const subscribe = vi.fn();
-    const sendRaw = vi.fn();
+    const sendRaw = vi.fn().mockReturnValue(true);
     stubPushBrowser(
       vi.fn().mockResolvedValue('granted'),
       Promise.resolve({

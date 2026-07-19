@@ -1,23 +1,27 @@
 {
-  "$comment": "Canonical Onyx known-answer test for the WS/browser media datagram MAC used by src/lib/suimyaku-media/mediaMac.test.ts.",
+  "$comment": "Canonical Onyx known-answer test for the WS/browser media datagram MAC used by src/lib/cadence-media/mediaMac.test.ts.",
   "scheme": {
     "transport": "browser<->browser media rides binary WebSocket frames on the IRC WSS; server is an SFU/relay that lenient-verifies the sender MAC and forwards the binary frame verbatim to the channel's other on-node call members",
     "frame": "kagura_frame wire format, optionally followed by a 16-byte MAC tag (identical to the native UDP path)",
-    "derive_key": "K32 = HMAC-SHA256(key = HMAC-SHA256(key='suimyaku media mac extract v1', msg=root16), msg = 'suimyaku media datagram mac v1' || 0x00 || channel || 0x00 || participant || 0x01)",
+    "derive_key": "K32 = HMAC-SHA256(key = HMAC-SHA256(key='onyx native-media mac extract v1', msg=root16), msg = 'onyx native-media datagram mac v1' || 0x00 || channel || 0x00 || participant || 0x01)",
     "tag": "tag16 = HMAC-SHA256(K32, frame_bytes)[0..16]",
     "key_issuance": "server derives K32 from its per-process root + (channel, participant) and hands it to the owning participant at MEDIA JOIN over the authenticated WS: ':server EVENT <nick> MEDIA MACKEY <#chan> <base64 K32>'. The browser HMACs with its issued K32; the server re-derives to verify (stateless)."
   },
   "labels": {
-    "extract_key": "suimyaku media mac extract v1",
-    "expand_label": "suimyaku media datagram mac v1"
+    "extract_key": "onyx native-media mac extract v1",
+    "expand_label": "onyx native-media datagram mac v1"
   },
-  "sizes": { "root": 16, "k32": 32, "tag": 16 },
+  "sizes": {
+    "root": 16,
+    "k32": 32,
+    "tag": 16
+  },
   "vector": {
     "root_hex": "000102030405060708090a0b0c0d0e0f",
     "channel": "#call",
     "participant": "alice",
     "frame_hex": "0500000040443322110700000028230000000000000101766f696365",
-    "k32_hex": "79324ac6450b33b9cbc1d9c170d37bd8f075ff6744793971f47903b7d4e60f22",
-    "tag_hex": "21f6428efd873010cc9c3fb30b32556d"
+    "k32_hex": "1d4bbde57332c226590945e5a94259b4befe68264f6eeee864fe5adb741c2f0b",
+    "tag_hex": "5f274db2216a610c62affc09a34eebc9"
   }
 }

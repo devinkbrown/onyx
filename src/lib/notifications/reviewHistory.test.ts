@@ -10,6 +10,7 @@ import {
   latestReviewForTarget,
   mergeReviewHistory,
   parseReviewHistoryEntries,
+  peerReviewedAnchors,
   planReviewedAnchorRecall,
   readReviewHistory,
   recordReviewHistory,
@@ -22,7 +23,7 @@ function entry(target: string, reviewedAt: string, firstMessageId = `${target}-m
   return {
     target,
     name: target,
-    kind: target.startsWith('#') ? 'channel' : 'dm',
+    kind: target.startsWith('#') || target.startsWith('&') ? 'channel' : 'dm',
     firstMessageId,
     firstAt: '2026-07-09T00:00:00.000Z',
     reviewedAt,
@@ -327,5 +328,24 @@ describe('reviewHistory', () => {
       kind: 'dm',
     })).toBeNull();
     expect(planReviewedAnchorRecall({ target: '#general' })).toBeNull();
+  });
+
+  test('selects other-room reviewed anchors for cross-room handoffs', () => {
+    const entries = [
+      entry('#forge', '2026-07-09T00:05:00.000Z', 'forge-id'),
+      entry('&ops', '2026-07-09T00:04:00.000Z', 'ops-id'),
+      entry('#forge', '2026-07-09T00:03:00.000Z', 'forge-older'),
+      entry('#general', '2026-07-09T00:02:00.000Z', 'general-id'),
+      entry('alice', '2026-07-09T00:01:00.000Z', 'dm-id'),
+    ];
+
+    const peers = peerReviewedAnchors(entries, '#forge', 3);
+    expect(peers.map((item) => item.target)).toEqual(['&ops', '#general', 'alice']);
+    expect(peerReviewedAnchors(entries, '&ops', 2).map((item) => item.target)).toEqual(['#forge', '#general']);
+    expect(peerReviewedAnchors(entries, '#missing', 1).map((item) => item.target)).toEqual(['#forge']);
+    expect(peerReviewedAnchors(entries, '  #FORGE  ', 1).map((item) => item.target)).toEqual(['&ops']);
+    expect(peerReviewedAnchors([], '#forge')).toEqual([]);
+    expect(peerReviewedAnchors(entries, '', 3)).toEqual([]);
+    expect(peerReviewedAnchors(entries, '#forge', 0)).toEqual([]);
   });
 });

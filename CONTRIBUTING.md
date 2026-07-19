@@ -1,9 +1,9 @@
 # Contributing to Onyx
 
 **Audience: contributor.** How to set up, test, gate, and safely deploy the Onyx
-client. Onyx is a **SolidJS 1.9 + Vite 7** SPA — see
-[`docs/architecture.md`](docs/architecture.md) for the `src/` map and
-[`CLAUDE.md`](CLAUDE.md) for working conventions.
+client. Onyx is a **SolidJS 1.9 + Vite 7** SPA — see the docs hub
+([`docs/README.md`](docs/README.md)), [`docs/architecture.md`](docs/architecture.md)
+for the `src/` map, and [`CLAUDE.md`](CLAUDE.md) for working conventions.
 
 ## Prerequisites
 

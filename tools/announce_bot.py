@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Onyx announce bot — lives in #root on IRCXNet (eshmaki.me) and announces build
-stats, changelog, progress, and planning for the Onyx Orochi web client, with the
+stats, changelog, progress, and planning for the Onyx Onyx Server web client, with the
 feature set of a normal IRC bot:
 IRCv3 CAP negotiation + optional SASL PLAIN, nick recovery (433), CTCP, rich
 !commands (channel + PM), admin (say/announce/topic/raw), auto-rejoin on KICK,
@@ -27,7 +27,7 @@ from collections import deque
 
 SERVER = os.environ.get("ORO_SERVER", "127.0.0.1")
 PORT = int(os.environ.get("ORO_PORT", "6667"))
-NICK = os.environ.get("ORO_NICK", "Orochi")
+NICK = os.environ.get("ORO_NICK", "Onyx")
 CHANNEL = os.environ.get("ORO_CHANNEL", "#root")
 REPO = os.environ.get("ORO_REPO", "/home/kain/onyx-server")
 ADMIN = os.environ.get("ORO_ADMIN", "")  # nick allowed to run admin cmds
@@ -42,7 +42,7 @@ RECONNECT_MIN, RECONNECT_MAX = 6, 300
 MAX_MESSAGE_TEXT_BYTES = 360  # stay comfortably under IRC's 512-byte line cap
 # IRCv3 caps we use if the server offers them (graceful degrade otherwise).
 WANT_CAPS = {"server-time", "message-tags", "account-tag", "echo-message"}
-VERSION = "Onyx-announce 1.0 (Vite 8 + SolidJS Orochi web-client build bot)"
+VERSION = "Onyx-announce 1.0 (Vite 8 + SolidJS Onyx Server web-client build bot)"
 START = time.time()
 PROTECTED_TOPIC_CHANNELS = {"#root"}
 
@@ -187,21 +187,21 @@ def stats_lines() -> list[str]:
 
 def project_lines() -> list[str]:
     return [
-        f"{B}{BLUE}\U0001f48e Onyx{RST} — the Orochi web client. A SolidJS, dark-luxury, "
+        f"{B}{BLUE}\U0001f48e Onyx{RST} — the Onyx Server web client. A SolidJS, dark-luxury, "
         f"mesh-native chat + realtime-media app. Fully recoded (Vite 8 + Solid signals).",
         f"IRCv3/IRCX over WebSocket, SASL + SESSION-TOKEN resume, threaded chat, live "
         f"presence/activity, E2EE voice/video via {B}Suimyaku{RST}+{B}Tsumugi{RST} (no WebRTC).",
         f"Headline: deep theming + {B}Theme Studio{RST} customization + animated/solid "
-        f"background engine (Orochi-synced) · View Transitions · WebGPU · on-device AI.",
+        f"background engine (OnyxServer-synced) · View Transitions · WebGPU · on-device AI.",
         f"Built max-parallel (Claude + Codex). repo: {REPO}",
     ]
 
 
 ROADMAP = [
     "foundation: Vite 8 + Solid SPA · store bridge · oklch token engine",
-    "headline: Theme Studio + customization + animated/solid background engine (Orochi-synced)",
+    "headline: Theme Studio + customization + animated/solid background engine (OnyxServer-synced)",
     "shell #16: presence ribbon · thread sidebar · spotlight · voice PIP · reactor stacks",
-    "Orochi caps #17: presence/activity/thread/reaction/role-matrix · then on-device AI + local-first",
+    "Onyx Server caps #17: presence/activity/thread/reaction/role-matrix · then on-device AI + local-first",
 ]
 
 HELP = (
@@ -640,7 +640,7 @@ class Bot:
             self.msg(
                 reply,
                 f"{B}live{RST}: Vite 8 + Solid recode · theming/background engine · #16 shell · "
-                f"Orochi caps #17. tests={test_count()}, components={module_count()}. "
+                f"Onyx Server caps #17. tests={test_count()}, components={module_count()}. "
                 f"Next: on-device AI, local-first cache, WebTransport media.",
             )
         elif cmd in ("plan", "roadmap"):

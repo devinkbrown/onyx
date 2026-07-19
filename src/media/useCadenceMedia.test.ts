@@ -3,11 +3,11 @@ import { createRoot } from 'solid-js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MAX_LIVE_MEDIA_PARTICIPANTS, store } from '@/lib/store';
-import type { SuimyakuMediaCallbacks, SuimyakuPeerState } from '@/lib/suimyaku-media/types';
+import type { CadenceMediaCallbacks, CadencePeerState } from '@/lib/cadence-media/types';
 
 const mediaMock = vi.hoisted(() => {
   type MockEngineInstance = {
-    callbacks: SuimyakuMediaCallbacks;
+    callbacks: CadenceMediaCallbacks;
     options: { kind: string };
     setClient: ReturnType<typeof vi.fn>;
     setDeafened: ReturnType<typeof vi.fn>;
@@ -24,8 +24,8 @@ const mediaMock = vi.hoisted(() => {
   let mounted: MockEngineInstance | null = null;
   const instances: MockEngineInstance[] = [];
 
-  class MockSuimyakuMediaEngine implements MockEngineInstance {
-    callbacks: SuimyakuMediaCallbacks;
+  class MockCadenceMediaEngine implements MockEngineInstance {
+    callbacks: CadenceMediaCallbacks;
     options: { kind: string };
     setClient = vi.fn();
     setDeafened = vi.fn();
@@ -38,7 +38,7 @@ const mediaMock = vi.hoisted(() => {
     stopBroadcast = vi.fn();
     destroy = vi.fn();
 
-    constructor(callbacks: SuimyakuMediaCallbacks, options: { kind: string }) {
+    constructor(callbacks: CadenceMediaCallbacks, options: { kind: string }) {
       this.callbacks = callbacks;
       this.options = options;
       instances.push(this);
@@ -57,19 +57,19 @@ const mediaMock = vi.hoisted(() => {
     setMounted(engine: MockEngineInstance | null) {
       mounted = engine;
     },
-    MockSuimyakuMediaEngine,
+    MockCadenceMediaEngine,
   };
 });
 
-vi.mock('@/lib/suimyaku-media/MediaEngine', () => ({
-  SuimyakuMediaEngine: mediaMock.MockSuimyakuMediaEngine,
-  getMountedSuimyakuMediaEngine: mediaMock.getMounted,
-  setMountedSuimyakuMediaEngine: mediaMock.setMounted,
+vi.mock('@/lib/cadence-media/MediaEngine', () => ({
+  CadenceMediaEngine: mediaMock.MockCadenceMediaEngine,
+  getMountedCadenceMediaEngine: mediaMock.getMounted,
+  setMountedCadenceMediaEngine: mediaMock.setMounted,
 }));
 
 const initialState = store.getInitialState();
 
-function peer(nick: string, channel = '#video'): SuimyakuPeerState {
+function peer(nick: string, channel = '#video'): CadencePeerState {
   return {
     nick,
     channel,
@@ -88,7 +88,7 @@ describe('mountMedia', () => {
   });
 
   it('sets the mounted engine singleton under a Solid root', async () => {
-    const { mountMedia } = await import('./useSuimyakuMedia');
+    const { mountMedia } = await import('./useCadenceMedia');
 
     createRoot(dispose => {
       mountMedia();
@@ -105,7 +105,7 @@ describe('mountMedia', () => {
   });
 
   it('updates voice peers and video participants from onPeerState', async () => {
-    const { mountMedia } = await import('./useSuimyakuMedia');
+    const { mountMedia } = await import('./useCadenceMedia');
     const stream = { getTracks: vi.fn(() => []) } as unknown as MediaStream;
     const canvas = {
       captureStream: vi.fn(() => stream),
@@ -118,7 +118,7 @@ describe('mountMedia', () => {
       const engine = mediaMock.instances[0];
       expect(engine).toBeDefined();
 
-      const peer: SuimyakuPeerState = {
+      const peer: CadencePeerState = {
         nick: 'mika',
         channel: '#video',
         kind: 'video',
@@ -142,7 +142,7 @@ describe('mountMedia', () => {
   });
 
   it('sends client changes to engine.setClient', async () => {
-    const { mountMedia } = await import('./useSuimyakuMedia');
+    const { mountMedia } = await import('./useCadenceMedia');
     const client = { id: 'irc-client' };
     const dispose = createRoot(disposeRoot => {
       mountMedia();
@@ -161,7 +161,7 @@ describe('mountMedia', () => {
   });
 
   it('bounds callback peers and replaces casing instead of duplicating identities', async () => {
-    const { mountMedia } = await import('./useSuimyakuMedia');
+    const { mountMedia } = await import('./useCadenceMedia');
 
     createRoot(dispose => {
       mountMedia();
@@ -193,7 +193,7 @@ describe('mountMedia', () => {
   });
 
   it('dispatches bounded reactions only for known peers', async () => {
-    const { mountMedia } = await import('./useSuimyakuMedia');
+    const { mountMedia } = await import('./useCadenceMedia');
     const reactions: Array<{ nick: string; emoji: string }> = [];
     const handler = (event: Event) => reactions.push((event as CustomEvent).detail);
     window.addEventListener('ocean:voice-reaction', handler);

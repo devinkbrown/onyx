@@ -54,7 +54,7 @@ export interface ChatMessage {
   highlight?: boolean;
   /** raw target (channel or nick) */
   target: string;
-  /** Orochi named-conversation label from the `orochi/topic` IRCv3 tag. */
+  /** Named-conversation label from the `onyx/topic` IRCv3 tag. */
   topic?: string | null;
   /** emoji reactions on this message */
   reactions?: MessageReaction[];
@@ -72,7 +72,7 @@ export interface ChatMessage {
    *  ciphertext envelope (so the wire, CHATHISTORY and the vault only ever
    *  carry ciphertext). The decrypted view text lives in `plaintext`. */
   encrypted?: boolean;
-  /** Orochi `+orochi/e2ee` message tag when the sender marked the payload as
+  /** `+onyx/e2ee` message tag when the sender marked the payload as
    *  end-to-end encrypted at the protocol layer. */
   e2ee?: 'generic' | 'mls' | 'sframe';
   /** Decrypted body of an `encrypted` DM — transient, view-only, NEVER
@@ -81,7 +81,7 @@ export interface ChatMessage {
 }
 
 /**
- * Channel member status mode letters, per Orochi's
+ * Channel member status mode letters, per Onyx Server's
  * `ISUPPORT PREFIX=(YQqov)*!.@+`, plus standard IRC admin/halfop
  * deployments that advertise `(qaohv)~&@%+`:
  *   Y → '*' network-operator (server-derived, render-only; never set via MODE)

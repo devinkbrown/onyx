@@ -27,7 +27,7 @@
  *
  * Worker → Main:
  *   { type: 'encoded', data: Uint8Array, ftype: 'KEYFRAME'|'FRAME' }
- *     — One encoded kaguravis frame. `data.buffer` is transferred (zero-copy).
+ *     — One encoded cadencevis frame. `data.buffer` is transferred (zero-copy).
  *
  *   { type: 'ready' }
  *     — WASM loaded and encoder initialised; capture loop running.
@@ -44,7 +44,7 @@
  *   Tier 3 — 854  × 480   (cap at 480p; audio-only gate handled in engine)
  *
  * When the draw size is smaller than the encoder dimensions the OffscreenCanvas
- * is created at the tier size AND a new KaguraVisEncoder is created at that size
+ * is created at the tier size AND a new CadenceVisEncoder is created at that size
  * so the WASM codec always receives frames at its configured dimensions.
  *
  * Re-initialising the encoder on a tier change is intentional: the codec
@@ -53,8 +53,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { OpcodecWasm, KaguraVisEncoder, rgbaToYuv420 } from './OpcodecWasm';
-import type { KaguraVisProfile } from './OpcodecWasm';
+import { OpcodecWasm, CadenceVisEncoder, rgbaToYuv420 } from './OpcodecWasm';
+import type { CadenceVisProfile } from './OpcodecWasm';
 import type { NetworkQualityTier } from './types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,13 +94,13 @@ export function tierDimensions(
 
 interface WorkerState {
   wasm:         OpcodecWasm;
-  enc:          KaguraVisEncoder;
+  enc:          CadenceVisEncoder;
   reader:       ReadableStreamDefaultReader<VideoFrame>;
   profileWidth: number;
   profileHeight: number;
   profileQuality: number;
   profileFps:   number;
-  encProfile:   KaguraVisProfile;
+  encProfile:   CadenceVisProfile;
   tier:         NetworkQualityTier;
   forceKey:     boolean;
   stopped:      boolean;
@@ -113,9 +113,9 @@ let state: WorkerState | null = null;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Resolutions the kaguravis WASM encoder is known to accept, largest first. Used as
+ * Resolutions the cadencevis WASM encoder is known to accept, largest first. Used as
  * a fallback ladder: the codec rejects some sizes (notably ≥1600 wide and a few
- * small/odd ones), returning a null handle that makes KaguraVisEncoder throw. When
+ * small/odd ones), returning a null handle that makes CadenceVisEncoder throw. When
  * the requested size is rejected we step down to the next known-good size so the
  * worker still produces frames instead of silently disabling video. The capture
  * loop always draws into `enc.width × enc.height`, so the canvas follows.
@@ -132,9 +132,9 @@ function tryCreateEncoder(
   width: number,
   height: number,
   quality: number,
-  encProfile: KaguraVisProfile,
+  encProfile: CadenceVisProfile,
   fps: number,
-): KaguraVisEncoder | null {
+): CadenceVisEncoder | null {
   try {
     return wasm.videoEncoder(width, height, quality, encProfile, fps);
   } catch {
@@ -148,9 +148,9 @@ export function buildEncoder(
   profileWidth: number,
   profileHeight: number,
   profileQuality: number,
-  encProfile: KaguraVisProfile,
+  encProfile: CadenceVisProfile,
   profileFps: number,
-): KaguraVisEncoder {
+): CadenceVisEncoder {
   const { width, height } = tierDimensions(tier, profileWidth, profileHeight);
   const direct = tryCreateEncoder(wasm, width, height, profileQuality, encProfile, profileFps);
   if (direct) return direct;
@@ -245,7 +245,7 @@ async function captureLoop(s: WorkerState): Promise<void> {
     s.forceKey = false;
 
     /* Encode via WASM. The keyframe flag is also driven internally by
-     * KaguraVisEncoder.keyframeInterval — we only override via forceKey. */
+     * CadenceVisEncoder.keyframeInterval — we only override via forceKey. */
     let encoded: Uint8Array;
     try {
       encoded = s.enc.encode(y, u, v, forceKey);
@@ -281,7 +281,7 @@ self.onmessage = async (event: MessageEvent) => {
     encWidth?: number;
     encHeight?: number;
     encQuality?: number;
-    encProfile?: KaguraVisProfile;
+    encProfile?: CadenceVisProfile;
     encFps?: number;
     track?: MediaStreamTrack;
     readable?: ReadableStream<VideoFrame>;
@@ -300,7 +300,7 @@ self.onmessage = async (event: MessageEvent) => {
         encWidth  = 1920,
         encHeight = 1080,
         encQuality = 70,
-        encProfile = 'camera' as KaguraVisProfile,
+        encProfile = 'camera' as CadenceVisProfile,
         encFps    = 60,
         track,
         readable,
@@ -322,7 +322,7 @@ self.onmessage = async (event: MessageEvent) => {
       }
 
       const tier: NetworkQualityTier = 0;
-      let enc: KaguraVisEncoder;
+      let enc: CadenceVisEncoder;
       try {
         enc = buildEncoder(wasm, tier, encWidth, encHeight, encQuality, encProfile, encFps);
       } catch (err) {

@@ -27,7 +27,7 @@
 
 # secrets / generated runtime keys (never commit)
 *.key
-orochi-node.key
+onyx-server-node.key
 
 # debug
 npm-debug.log*

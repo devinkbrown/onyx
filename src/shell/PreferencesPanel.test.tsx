@@ -790,6 +790,8 @@ describe('PreferencesPanel', () => {
     expect(lastVisible).toHaveFocus();
   });
 
+  // Walks every category pane + the 30-row access ledger; cold transforms can
+  // push past the default 5s budget when this test runs in isolation.
   it('surfaces the client accessibility audit ledger', () => {
     renderPreferences();
 
@@ -857,6 +859,12 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Member list')).toBeInTheDocument();
     expect(screen.getByText('Notification controls')).toBeInTheDocument();
     expect(screen.getByText('Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.')).toBeInTheDocument();
+    // Prefer unique notes — surface titles like "Watch together" also appear as pref legends.
+    expect(screen.getByText('Named Sheet dialog, UTC date/time fields, quick-date presets, target-specific jump and moment-copy actions, and ribbon/composer openers.')).toBeInTheDocument();
+    expect(screen.getByText('Named review and host-control groups, bounded participant list, polite atomic outcome status, and focus restoration after confirmations.')).toBeInTheDocument();
+    expect(screen.getByText('Named device-memory region, reviewed-span and context-trail groups, labelled transcript jumps, and cross-room peer-review handoffs.')).toBeInTheDocument();
+    expect(screen.getByText('Segmented radio groups and switch rows expose concise names, descriptions, keyboard roving, focus-visible outlines, and forced-colors selected states.')).toBeInTheDocument();
+    expect(screen.getByText('Named live log, focusable articles, state-aware accessible names (queued/edited/deleted/locked without ciphertext), and keyboard action-bar reveal.')).toBeInTheDocument();
     expect(screen.getByText('Mobile drawers')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Reduce transparency/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText('Flatten glassy overlays and translucent panels for stronger separation from the background.')).toBeInTheDocument();
@@ -887,12 +895,12 @@ describe('PreferencesPanel', () => {
       'href',
       '/accessibility/',
     );
-  });
+  }, 15_000);
 
   it('keeps the client access ledger compact until its evidence is requested', () => {
     renderPreferences('Accessibility');
 
-    const summary = screen.getByText('25 surfaces checked · Review audit details');
+    const summary = screen.getByText('30 surfaces checked · Review audit details');
     const disclosure = summary.closest('details');
     expect(disclosure).not.toBeNull();
     expect(disclosure).not.toHaveAttribute('open');

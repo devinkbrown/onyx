@@ -273,6 +273,38 @@ export function latestReviewForTarget(
   ) ?? null;
 }
 
+/** Default cap for cross-room reviewed-anchor chips in reader memory. */
+export const PEER_REVIEWED_ANCHOR_LIMIT = 3;
+
+/**
+ * Other rooms/DMs recently reviewed, excluding the open transcript target.
+ * Entries are assumed newest-first (as returned by {@link readReviewHistory} /
+ * {@link parseReviewHistoryEntries}); the helper only filters + bounds.
+ * Pure: does not read storage.
+ */
+export function peerReviewedAnchors(
+  entries: readonly ReviewHistoryEntry[],
+  currentTarget: string,
+  limit = PEER_REVIEWED_ANCHOR_LIMIT,
+): ReviewHistoryEntry[] {
+  if (limit <= 0 || entries.length === 0) return [];
+  const key = currentTarget.trim().toLowerCase();
+  if (!key) return [];
+
+  // Newest-first input: keep the first (newest) entry per other target so the
+  // dense handoff strip never shows two chips for the same room.
+  const seen = new Set<string>();
+  const peers: ReviewHistoryEntry[] = [];
+  for (const entry of entries) {
+    const targetKey = entry.target.toLowerCase();
+    if (targetKey === key || seen.has(targetKey)) continue;
+    seen.add(targetKey);
+    peers.push(entry);
+    if (peers.length >= limit) break;
+  }
+  return peers;
+}
+
 export function recordReviewHistory(
   entry: ReviewHistoryEntry,
   owner?: DeviceMemoryOwner,

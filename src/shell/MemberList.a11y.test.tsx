@@ -143,6 +143,28 @@ describe('MemberList accessibility', () => {
     expect(count).not.toHaveAttribute('aria-atomic');
   });
 
+  it('names the complementary landmark and roster region for local & rooms', () => {
+    // Dense a11y: local CHANTYPES (`&`) rooms must keep the same channel-scoped
+    // landmark contract as `#` rooms so cross-room handoffs into &ops are named.
+    const client = makeClient();
+    const channels = new Map<string, Channel>();
+    channels.set('&ops', makeChannel('&ops', [makeUser('me', ['o']), makeUser('bob', ['v'])]));
+    store.setState({
+      ...initialState,
+      client: client as never,
+      channels,
+      ourNick: 'me',
+      activeView: { kind: 'channel', channel: '&ops' },
+      connectionStatus: 'connected',
+    }, true);
+
+    render(() => <MemberList />);
+
+    expect(screen.getByRole('complementary', { name: 'Member list for &ops' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Channel members in &ops' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open member details for bob, Voice/ })).toBeInTheDocument();
+  });
+
   it('singularises the accessible count name', () => {
     seedChannel([makeUser('me', ['o'])]);
 

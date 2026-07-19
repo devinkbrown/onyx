@@ -2,7 +2,7 @@
 /**
  * MemberList.tsx — channel member list with live role badges.
  *
- * Role precedence (Orochi PREFIX=(YQqov)*!.@+):
+ * Role precedence (Onyx Server PREFIX=(YQqov)*!.@+):
  *   Y → netop   (*)  — lapis badge
  *   Q → founder (!)  — gold bright badge
  *   q → owner   (. or ~) — gold badge
@@ -420,7 +420,10 @@ export function MemberList(props: MemberListProps): JSX.Element {
     <aside
       ref={memberListRef}
       class={`shell-members${local.hidden ? ' shell-members--hidden' : ''}`}
-      role={local.modal ? 'dialog' : undefined}
+      /* Non-modal roster is a complementary landmark; modal drawer is a dialog.
+         Keep role explicit so dense/high-zoom reflow never loses the landmark
+         name when the native <aside> mapping is overridden by CSS containment. */
+      role={local.modal ? 'dialog' : 'complementary'}
       aria-label={memberListLabel()}
       aria-hidden={local.hidden ? 'true' : 'false'}
       aria-modal={local.modal && !local.hidden ? 'true' : undefined}

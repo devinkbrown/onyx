@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * topics.ts — pure parsing and aggregation for Orochi named conversations.
+ * topics.ts — pure parsing and aggregation for Onyx Server named conversations.
  */
 
-export const TOPIC_TAG = 'orochi/topic';
-export const TOPIC_PROP = 'orochi.topics';
+export const TOPIC_TAG = 'onyx/topic';
+export const TOPIC_PROP = 'onyx_server.topics';
 export const MAX_TOPIC_LABEL_BYTES = 50;
 export const MAX_TOPIC_REGISTRY = 64;
 

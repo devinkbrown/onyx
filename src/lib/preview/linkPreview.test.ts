@@ -45,7 +45,7 @@ describe('isPreviewableUrl (SSRF defense in depth)', () => {
   it('accepts plain http(s) public web URLs', () => {
     expect(isPreviewableUrl('https://example.com/page')).toBe(true);
     expect(isPreviewableUrl('http://example.com')).toBe(true);
-    expect(isPreviewableUrl('https://github.com/orochi/onyx?tab=readme')).toBe(true);
+    expect(isPreviewableUrl('https://github.com/onyx/onyx?tab=readme')).toBe(true);
   });
 
   it('rejects dangerous / non-http(s) schemes', () => {
@@ -281,14 +281,14 @@ describe('fetchLinkPreview', () => {
 
   it('normalizes a good payload and dedupes concurrent fetches', async () => {
     const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ title: 'Orochi', description: 'a daemon', image: '', site: 'GitHub' }), { status: 200 }),
+      new Response(JSON.stringify({ title: 'Onyx', description: 'a daemon', image: '', site: 'GitHub' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
     const [a, b] = await Promise.all([
       fetchLinkPreview('https://example.com'),
       fetchLinkPreview('https://example.com'),
     ]);
-    expect(a).toEqual({ url: 'https://example.com', title: 'Orochi', description: 'a daemon', image: '', site: 'GitHub' });
+    expect(a).toEqual({ url: 'https://example.com', title: 'Onyx', description: 'a daemon', image: '', site: 'GitHub' });
     expect(b).toBe(a);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

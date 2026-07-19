@@ -13,8 +13,8 @@ export const MAX_IRC_MESSAGE_PARAMS = 512;
 /**
  * Split a received WebSocket text frame into complete IRC lines.
  *
- * Orochi follows the IRCv3 WebSocket sub-protocol: every frame carries one or
- * more COMPLETE IRC messages, and the trailing CRLF is OPTIONAL — Orochi omits
+ * Onyx Server follows the IRCv3 WebSocket sub-protocol: every frame carries one or
+ * more COMPLETE IRC messages, and the trailing CRLF is OPTIONAL — Onyx Server omits
  * it entirely (e.g. ":eshmaki.me CAP * LS :..." with no newline). Lines are
  * separated by CR, LF, or CRLF; empty segments — including the one left by a
  * trailing terminator or a doubled separator — are dropped.
@@ -390,7 +390,7 @@ export function parseStandardReply(msg: IRCMessage): StandardReply | null {
   if (msg.params.length === 0 || msg.params.length > MAX_STANDARD_REPLY_PARAMS) return null;
   const command = msg.params[0]!;
   const code = msg.params[1] ?? '';
-  // Orochi's offline TEGAMI delivery predates standard-reply framing and puts
+  // Onyx Server's offline TEGAMI delivery predates standard-reply framing and puts
   // `from <nick> :<text>` in the apparent code slot. Preserve the vault's
   // bounded 64 KiB message path without granting the larger ceiling to error
   // codes, notifications, or other standard replies.
@@ -425,7 +425,7 @@ export function parseStandardReply(msg: IRCMessage): StandardReply | null {
 /**
  * Parsed key=value fields from an `ACCOUNTINFO` reply.
  *
- * Orochi answers `ACCOUNTINFO` with a server NOTICE in the shape
+ * Onyx Server answers `ACCOUNTINFO` with a server NOTICE in the shape
  * `account=<name> flags=<n>` (server.zig handleAccountInfo); some deployments
  * append `email=`, `secure=on|off`, `enforce=on|off`, and `registered=`.
  * We extract only the keys the server actually sent — absent keys stay
@@ -561,7 +561,7 @@ function parseSessionCredential(msg: IRCMessage, kind: 'TOKEN' | 'MTOKEN'): stri
     return validSessionCredential(reply.description) ? reply.description : null;
   }
 
-  // Current Orochi emits session credentials as a traditional server NOTICE:
+  // Current Onyx Server emits session credentials as a traditional server NOTICE:
   //   :server NOTICE <nick> :SESSION TOKEN <token>
   // while older deployments used NOTE SESSION TOKEN. Accept both envelopes;
   // the store applies the NOTICE result only inside its server-source trust gate.
@@ -578,7 +578,7 @@ export function parseSessionTokenNote(msg: IRCMessage): string | null {
 }
 
 /**
- * Parse `:server NOTE SESSION MTOKEN :<token>` — Orochi's mesh-sealed reclaim
+ * Parse `:server NOTE SESSION MTOKEN :<token>` — Onyx Server's mesh-sealed reclaim
  * token, emitted alongside the local TOKEN on mesh deployments. Usable to
  * reclaim/redirect the session from any node via `SESSION RESUME <mtoken>`.
  */

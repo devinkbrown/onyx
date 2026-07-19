@@ -11,7 +11,7 @@ import {
   parseEncryptionPolicy,
 } from './policy';
 
-describe('Orochi E2EE policy helpers', () => {
+describe('Onyx Server E2EE policy helpers', () => {
   it('parses channel encryption policy values defensively', () => {
     expect(parseEncryptionPolicy('required')).toBe('required');
     expect(parseEncryptionPolicy(' OPTIONAL ')).toBe('optional');

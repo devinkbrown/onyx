@@ -1,6 +1,6 @@
 <style>
   /* ============================================================
-     Orochi × Onyx — Master Roadmap
+     Onyx Server × Onyx — Master Roadmap
      "Ink & Vermillion": sumi ink on washi, one vermillion seal.
      Palette (OKLCH) is lifted verbatim from the roadmap's Part V.
      ============================================================ */
@@ -529,7 +529,7 @@
     <!-- HERO -->
     <header class="rm-hero">
       <div class="rm-seal" aria-hidden="true">龍</div>
-      <p class="rm-eyebrow">Orochi × Onyx · Master Roadmap</p>
+      <p class="rm-eyebrow">Onyx Server × Onyx · Master Roadmap</p>
       <h1>Sovereign<br><span class="em">Realtime</span></h1>
       <p class="rm-lede">
         The network that <b>remembers you</b>, <b>reaches you</b>, <b>keeps your secrets</b>,
@@ -602,7 +602,7 @@
           <div class="rm-stat"><span class="n">14</span><span class="l">OKLCH themes · AA by construction</span></div>
         </div>
         <h4>Daemon — pure Zig, zero external dependencies</h4>
-        <p>A post-quantum CRDT mesh (Suimyaku + Tsumugi <code>X25519+ML-KEM-768</code>), an in-house TLS 1.3 stack with <code>kTLS</code> TX+RX offload, session-preserving zero-downtime hot-upgrades that carry live TLS &amp; mesh links across <code>execve</code>, services as real server commands, and a TigerBeetle-class deterministic-simulation harness. A two-node PQ mesh runs <b>in production</b> with zero-drop restarts.</p>
+        <p>A post-quantum CRDT mesh (Undertow + Mooring <code>X25519+ML-KEM-768</code>), an in-house TLS 1.3 stack with <code>kTLS</code> TX+RX offload, session-preserving zero-downtime hot-upgrades that carry live TLS &amp; mesh links across <code>execve</code>, services as real server commands, and a TigerBeetle-class deterministic-simulation harness. A two-node PQ mesh runs <b>in production</b> with zero-drop restarts.</p>
         <h4>Client — Onyx, SolidJS + Vite</h4>
         <p>~43k TS/TSX LOC, 66 components. An OKLCH theme factory, a local-first IndexedDB history vault with time-travel (<code>?at=</code>), E2EE DMs, WebRTC + native-codec group voice/video, presence heatlines, and scheduled events.</p>
         <h4>Web presence</h4>
@@ -657,7 +657,7 @@
       head:'Background-system consolidation, WCAG 2.2 / EU-Accessibility-Act conformance, theme-reactive scenes, and prefers-contrast / reduced-transparency / forced-colors variants derived from the OKLCH factory.' },
     { kanji:'金継ぎ', romaji:'Kintsugi', gloss:'golden joinery', num:'1.5', theme:'E2EE everywhere', status:'planned', effort:'XL', dep:'1.0 · crypto',
       head:'An MLS group ratchet for DMs, rooms and calls; key transparency; verified identity; DAVE-grade E2EE voice — the only self-hostable, post-quantum, audited-design E2EE stack of its class.' },
-    { kanji:'漣', romaji:'Sazanami', gloss:'ripples', num:'1.7', theme:'Mesh hardening', status:'planned', effort:'L', dep:'mesh',
+    { kanji:'漣', romaji:'Ripple', gloss:'ripples (Ripple)', num:'1.7', theme:'Mesh hardening', status:'planned', effort:'L', dep:'mesh',
       head:'Signed deltas end-to-end, RBSR anti-entropy, Plumtree/HyParView multi-peer dissemination, witnessed-SWIM at scale, and enforced MeshPass admission — a Byzantine-resilient, provably-converging mesh.' },
     { kanji:'龍神', romaji:'Ryūjin', gloss:'dragon god', num:'2.0', theme:'Leaderless federation', status:'planned', effort:'XL', dep:'1.5 · 1.7',
       head:'Portable sovereign identity, cross-mesh account roaming, a curated federated-discovery directory, geo-mesh, and capability-based access generalized — federation as the product.' },

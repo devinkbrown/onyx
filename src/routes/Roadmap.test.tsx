@@ -12,7 +12,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByRole('heading', { name: 'Memory' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Operations are visible/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Time-native' })).toBeInTheDocument();
-    expect(screen.getByText('Orochi E2EE capability')).toBeInTheDocument();
+    expect(screen.getByText('Onyx Server E2EE capability')).toBeInTheDocument();
     expect(screen.getByText('Encrypted message tags')).toBeInTheDocument();
     expect(screen.getByText('Channel encryption policy')).toBeInTheDocument();
     expect(screen.getByText('Account device-key publishing')).toBeInTheDocument();

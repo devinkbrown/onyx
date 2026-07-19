@@ -81,7 +81,7 @@ await page.waitForTimeout(1800);
 const bodyText = await page.textContent('body');
 check('multiline renders both lines', bodyText.includes('multiline line one') && bodyText.includes('multiline line two'));
 
-await composer.fill('repo: https://github.com/devinkbrown/orochi');
+await composer.fill('repo: https://github.com/devinkbrown/onyx-server');
 await page.keyboard.press('Enter');
 await page.waitForTimeout(3500);
 check('link preview card', await page.locator('.shell-msg-preview').first().isVisible().catch(() => false));

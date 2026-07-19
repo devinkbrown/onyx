@@ -27,8 +27,11 @@ import {
 import { isValidTopicLabel, parseTopicRegistry, TOPIC_PROP } from '@/lib/topics/topics';
 import { followed, isFollowed, toggleFollow } from '@/lib/notifications/followed';
 import {
-  latestReviewForTarget,
+  peerReviewedAnchors,
+  planReviewedAnchorRecall,
+  readReviewHistory,
   recordReviewHistory,
+  subscribeReviewHistory,
   type ReviewHistoryEntry,
 } from '@/lib/notifications/reviewHistory';
 import { buildSinceDigest } from '@/lib/notifications/sinceDigest';
@@ -146,9 +149,36 @@ function clipped(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
-function messageAccessibleLabel(msg: ChatMessage): string {
-  const text = msg.plaintext ?? msg.text;
-  return `${msg.from} at ${fmtTime(msg.time)}: ${clipped(text, 120)}`;
+/**
+ * Accessible name for a transcript row.
+ *
+ * Rows set `aria-label` on the article, which replaces the children's name
+ * computation for assistive tech. The label must therefore:
+ *  - never fall back to E2EE ciphertext (SC 1.3.1 + privacy boundary);
+ *  - match MsgBody's deleted / locked / action display text;
+ *  - surface pending ("queued") and edited states that the visual chrome only
+ *    paints via CSS or an aria-hidden timestamp (SC 1.3.1 / 4.1.2).
+ */
+export function messageAccessibleLabel(msg: ChatMessage): string {
+  const locked = Boolean(msg.encrypted && msg.plaintext === undefined);
+  let body: string;
+  if (msg.deleted || msg.redacted) {
+    body = '[message deleted]';
+  } else if (locked) {
+    body = LOCKED_PLACEHOLDER;
+  } else if (msg.type === 'action') {
+    body = `* ${msg.from} ${msg.plaintext ?? msg.text}`;
+  } else {
+    // Prefer decrypted plaintext; never read ciphertext when a sealed body is open.
+    body = msg.encrypted ? (msg.plaintext ?? LOCKED_PLACEHOLDER) : msg.text;
+  }
+
+  const flags: string[] = [];
+  if (msg.pending) flags.push('queued');
+  if (msg.edited && !msg.deleted && !msg.redacted) flags.push('edited');
+  const flagSuffix = flags.length > 0 ? ` (${flags.join(', ')})` : '';
+
+  return `${msg.from} at ${fmtTime(msg.time)}${flagSuffix}: ${clipped(body, 120)}`;
 }
 
 /** Human day label for the elegant date dividers. */
@@ -222,10 +252,16 @@ export function orderChronologically(list: ChatMessage[]): ChatMessage[] {
     : [...list].sort((a, b) => a.time.getTime() - b.time.getTime());
 }
 
+/** Channel-like targets include standard `#` rooms and local/`&` rooms (CHANTYPES). */
+function targetLooksLikeChannel(target: string): boolean {
+  const ch = target.charAt(0);
+  return ch === '#' || ch === '&';
+}
+
 export function buildReaderMemoryContext(
   target: string,
   sourceMessages: readonly ChatMessage[],
-  isChannel = target.startsWith('#'),
+  isChannel = targetLooksLikeChannel(target),
 ): ReaderMemoryContext | null {
   if (!isChannel) return null;
 
@@ -358,6 +394,7 @@ function ReaderMemoryStrip(props: {
   reviewedSpan: ReviewHistoryEntry | null;
   reviewedAnchorSource: ReviewedAnchorSource;
   reviewedTrail: ReviewedContextTrail | null;
+  peerReviews: readonly ReviewHistoryEntry[];
   hasUnreadBoundary: boolean;
   onJumpStart: () => void;
   onJumpUnread: () => void;
@@ -366,6 +403,7 @@ function ReaderMemoryStrip(props: {
   onJumpReviewed: (entry: ReviewHistoryEntry) => void;
   onJumpReviewedContext: (messageId: string) => void;
   onSearchReviewed: (entry: ReviewHistoryEntry) => void;
+  onOpenPeerReview: (entry: ReviewHistoryEntry) => void;
 }): JSX.Element {
   const overflow = createMemo(() =>
     Math.max(props.context.voiceCount - props.context.participants.length, 0),
@@ -428,6 +466,26 @@ function ReaderMemoryStrip(props: {
                   <span class="shell-reader-memory__trail-side">{item.label}</span>
                   <strong>{item.from}</strong>
                   <span>{item.preview}</span>
+                </button>
+              )}
+            </For>
+          </div>
+        </div>
+      </Show>
+      <Show when={props.peerReviews.length > 0}>
+        <div class="shell-reader-memory__peers" role="group" aria-label="Other rooms reviewed recently">
+          <span class="shell-reader-memory__peers-label">Other rooms</span>
+          <div class="shell-reader-memory__peers-list">
+            <For each={props.peerReviews}>
+              {(entry) => (
+                <button
+                  type="button"
+                  class="shell-reader-memory__peer-item"
+                  onClick={() => props.onOpenPeerReview(entry)}
+                  aria-label={`Open reviewed ${entry.name}${entry.kind === 'dm' ? ' direct messages' : ''}`}
+                >
+                  <strong>{entry.name}</strong>
+                  <span>{entry.preview}</span>
                 </button>
               )}
             </For>
@@ -668,6 +726,21 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     }, owner));
   });
 
+  // Device-local reviewed anchors (newest-first). Powers the current-room
+  // reviewed span and the cross-room peer-review handoff chips.
+  const [reviewHistory, setReviewHistory] = createSignal<readonly ReviewHistoryEntry[]>([]);
+  createEffect(() => {
+    const owner = memoryOwner();
+    if (!owner) {
+      setReviewHistory([]);
+      return;
+    }
+    setReviewHistory(readReviewHistory(owner));
+    onCleanup(subscribeReviewHistory((entries) => {
+      setReviewHistory(entries);
+    }, owner));
+  });
+
   const selfNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
 
   // ── active messages ──
@@ -898,8 +971,16 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   });
   const readerReviewedSpan = createMemo(() => {
     const context = readerMemoryContext();
-    const owner = memoryOwner();
-    return context && owner ? latestReviewForTarget(context.target, 'channel', owner) : null;
+    if (!context) return null;
+    // Prefer the reactive review-history signal so peer/current chips stay in
+    // sync without a second storage read on every render.
+    return reviewHistory().find((entry) =>
+      entry.kind === 'channel' && entry.target.toLowerCase() === context.target.toLowerCase(),
+    ) ?? null;
+  });
+  const readerPeerReviews = createMemo(() => {
+    const context = readerMemoryContext();
+    return context ? peerReviewedAnchors(reviewHistory(), context.target) : [];
   });
   const [readerVaultContext] = createResource(
     () => {
@@ -1088,6 +1169,15 @@ export function MessageView(props: MessageViewProps): JSX.Element {
 
   function searchReviewedSpan(entry: ReviewHistoryEntry): void {
     openMessageSearchWithQuery(entry.preview);
+  }
+
+  /** Cross-room handoff: reopen another room's reviewed anchor via exact-id travel. */
+  function openPeerReviewedAnchor(entry: ReviewHistoryEntry): void {
+    const plan = planReviewedAnchorRecall(entry);
+    if (!plan) return;
+    const state = getState();
+    state.openVaultResult(plan.target, plan.messageId);
+    if (plan.at) state.travelTo(plan.target, plan.at, plan.messageId);
   }
 
   // Autoscroll when new messages arrive and we're already at bottom
@@ -1505,7 +1595,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
             return historyExhausted().get(view.channel.toLowerCase()) === true;
           })()}>
             <div class="shell-channel-intro" data-testid="channel-intro">
-              <span class="shell-channel-intro-glyph" aria-hidden="true">#</span>
+              <span class="shell-channel-intro-glyph" aria-hidden="true">
+                {activeView().kind === 'channel'
+                  ? ((activeView() as { kind: 'channel'; channel: string }).channel.charAt(0) || '#')
+                  : '#'}
+              </span>
               <h2 class="shell-channel-intro-title">
                 {activeView().kind === 'channel' ? (activeView() as { kind: 'channel'; channel: string }).channel : ''}
               </h2>
@@ -1529,6 +1623,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 reviewedSpan={readerReviewedSpan()}
                 reviewedAnchorSource={readerAnchorSource()}
                 reviewedTrail={readerReviewedTrail()}
+                peerReviews={readerPeerReviews()}
                 hasUnreadBoundary={unreadDividerId() !== null}
                 onJumpStart={scrollToReaderStart}
                 onJumpUnread={scrollToUnreadBoundary}
@@ -1537,6 +1632,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 onJumpReviewed={jumpToReviewedSpan}
                 onJumpReviewedContext={jumpToReviewedContext}
                 onSearchReviewed={searchReviewedSpan}
+                onOpenPeerReview={openPeerReviewedAnchor}
               />
             )}
           </Show>

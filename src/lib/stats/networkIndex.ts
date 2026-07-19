@@ -2,7 +2,7 @@
 /**
  * networkIndex.ts — the live network pulse feed.
  *
- * Same-origin `/stats/data/index.json`, emitted by Orochi's chanstats engine
+ * Same-origin `/stats/data/index.json`, emitted by Onyx Server's chanstats engine
  * every ~30s. Shared by HomeView and the Connect screen's pulse panel.
  * Defensive normalization: the fetch 404s in dev and the shape is external —
  * consumers must always receive either `null` or a fully-typed value.

@@ -638,3 +638,86 @@
   flex-wrap: wrap;
 }
 .acct-passkey-rename .onyx-field { flex: 1; min-width: 140px; }
+
+/* ── Sessions & devices (skeleton — Era 1 A4 / Era 2 B8) ─────────────────── */
+
+.acct-sessions .acct-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.acct-session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.acct-session-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--stone-2) 50%, transparent);
+}
+
+.acct-session-id {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.acct-session-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--washi);
+}
+
+.acct-session-badge {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--jade, var(--lapis)) 40%, var(--line));
+  color: var(--jade-bright, var(--lapis-bright));
+  background: color-mix(in oklab, var(--jade, var(--lapis)) 12%, transparent);
+}
+
+.acct-session-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--washi-dim);
+}
+
+.acct-session-placeholder {
+  padding: var(--space-3);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--stone-2) 40%, transparent);
+}
+
+.acct-session-placeholder-title {
+  margin: 0 0 6px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+.acct-session-placeholder-body {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--washi-dim);
+}

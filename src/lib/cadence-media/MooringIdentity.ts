@@ -1,32 +1,32 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*
- * TsumugiIdentity.ts — Persistent P-256 identity key via IndexedDB.
+ * MooringIdentity.ts — Persistent P-256 identity key via IndexedDB.
  *
  * Provides a stable ECDH key pair across browser sessions for TOFU
  * (trust-on-first-use) peer verification.
  *
  * Usage:
- *   const id = await TsumugiIdentity.load();
+ *   const id = await MooringIdentity.load();
  *   const pub = await id.exportPublicKey();   // send in TSUMUGI_HANDSHAKE
  */
 
 const DB_NAME    = 'nexus-tsumugi';
 const DB_VERSION = 1;
 const STORE_NAME = 'identity';
-const KEY_ID     = 'suimyaku-identity-v1';
+const KEY_ID     = 'cadence-identity-v1';
 const CURVE      = 'P-256';
 
-export class TsumugiIdentity {
+export class MooringIdentity {
   private constructor(private readonly kp: CryptoKeyPair) {}
 
   /**
    * Load the persisted identity key from IndexedDB, or generate and save a new one.
    * Falls back gracefully if IndexedDB is unavailable (private browsing).
    */
-  static async load(): Promise<TsumugiIdentity> {
+  static async load(): Promise<MooringIdentity> {
     try {
-      const stored = await TsumugiIdentity.dbGet();
-      if (stored) return new TsumugiIdentity(stored);
+      const stored = await MooringIdentity.dbGet();
+      if (stored) return new MooringIdentity(stored);
     } catch { /* IndexedDB unavailable */ }
 
     const kp = await crypto.subtle.generateKey(
@@ -34,8 +34,8 @@ export class TsumugiIdentity {
       true,
       ['deriveKey', 'deriveBits'],
     );
-    try { await TsumugiIdentity.dbPut(kp); } catch { /* non-fatal */ }
-    return new TsumugiIdentity(kp);
+    try { await MooringIdentity.dbPut(kp); } catch { /* non-fatal */ }
+    return new MooringIdentity(kp);
   }
 
   /** Export raw uncompressed public key (65 bytes, 0x04 prefix). */
@@ -44,12 +44,12 @@ export class TsumugiIdentity {
     return new Uint8Array(raw);
   }
 
-  /** Return the underlying key pair for use in TsumugiSession ECDH. */
+  /** Return the underlying key pair for use in MooringSession ECDH. */
   get keyPair(): CryptoKeyPair { return this.kp; }
 
   /**
    * Fingerprint for TOFU display: SHA-256(pubkey) → 12-char Base58.
-   * Identical format to TsumugiSession.getFingerprint().
+   * Identical format to MooringSession.getFingerprint().
    */
   async getFingerprint(): Promise<string> {
     const raw   = await this.exportPublicKey();
@@ -61,7 +61,7 @@ export class TsumugiIdentity {
   static async clear(): Promise<void> {
     let db: IDBDatabase | null = null;
     try {
-      db = await TsumugiIdentity.openDb();
+      db = await MooringIdentity.openDb();
       const openDb = db;
       await new Promise<void>((res, rej) => {
         const tx = openDb.transaction(STORE_NAME, 'readwrite');
@@ -91,7 +91,7 @@ export class TsumugiIdentity {
   }
 
   private static async dbGet(): Promise<CryptoKeyPair | null> {
-    const db = await TsumugiIdentity.openDb();
+    const db = await MooringIdentity.openDb();
     try {
       return await new Promise((res, rej) => {
         const tx  = db.transaction(STORE_NAME, 'readonly');
@@ -108,8 +108,8 @@ export class TsumugiIdentity {
   }
 
   private static async dbPut(kp: CryptoKeyPair): Promise<void> {
-    if (!isTsumugiKeyPair(kp)) throw new Error('TsumugiIdentity: invalid key pair');
-    const db = await TsumugiIdentity.openDb();
+    if (!isTsumugiKeyPair(kp)) throw new Error('MooringIdentity: invalid key pair');
+    const db = await MooringIdentity.openDb();
     try {
       return await new Promise((res, rej) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');

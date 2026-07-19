@@ -1,10 +1,10 @@
 **Feature: client-side named-conversation (topic) model (roadmap v1.1 Sumi-e — named conversations, the marquee feature).**
 
-Orochi's server now carries topics on the wire. Build the pure CLIENT model that reads that wire format. Pure logic only — no store, no components, no wiring.
+Onyx Server's server now carries topics on the wire. Build the pure CLIENT model that reads that wire format. Pure logic only — no store, no components, no wiring.
 
-### The wire format (from the Orochi server, authoritative)
-- **Message tag** `orochi/topic=<label>` — an IRCv3 client-only message tag on a channel PRIVMSG/NOTICE naming the conversation it belongs to. In a parsed message the tag key is `orochi/topic` (no `+`). Label rules: 1–50 bytes, no control chars / CR / LF / DEL, and **no comma**.
-- **Channel PROP** `orochi.topics` — a comma-delimited registry of a channel's known topic labels (≤64 labels, ≤400 bytes total). Auto-grows as topics are used.
+### The wire format (from the Onyx Server server, authoritative)
+- **Message tag** `onyx/topic=<label>` — an IRCv3 client-only message tag on a channel PRIVMSG/NOTICE naming the conversation it belongs to. In a parsed message the tag key is `onyx/topic` (no `+`). Label rules: 1–50 bytes, no control chars / CR / LF / DEL, and **no comma**.
+- **Channel PROP** `onyx_server.topics` — a comma-delimited registry of a channel's known topic labels (≤64 labels, ≤400 bytes total). Auto-grows as topics are used.
 
 ### Files to create
 1. `src/lib/topics/topics.ts`
@@ -12,7 +12,7 @@ Orochi's server now carries topics on the wire. Build the pure CLIENT model that
 
 ### `topics.ts`
 Export:
-- `const TOPIC_TAG = 'orochi/topic'` and `const TOPIC_PROP = 'orochi.topics'`.
+- `const TOPIC_TAG = 'onyx/topic'` and `const TOPIC_PROP = 'onyx_server.topics'`.
 - `const MAX_TOPIC_LABEL_BYTES = 50`, `const MAX_TOPIC_REGISTRY = 64`.
 - `function isValidTopicLabel(label: string): boolean` — 1–50 bytes (use a UTF-8 byte length, not `.length`), no control chars (`\x00-\x1f`, `\x7f`), no comma.
 - `function parseMessageTopic(tags: Readonly<Record<string, string | undefined>>): string | null` — read `tags[TOPIC_TAG]`, trim, return it only if `isValidTopicLabel`, else null.

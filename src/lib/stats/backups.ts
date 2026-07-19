@@ -2,7 +2,7 @@
 /**
  * backups.ts — public backup manifest feed.
  *
- * Orochi's `[backup]` worker writes `latest.json` with a list of timestamped
+ * Onyx Server's `[backup]` worker writes `latest.json` with a list of timestamped
  * account and chanstats snapshots. The composite Onyx deployment exposes that
  * bounded manifest at one source-controlled canonical route.
  */

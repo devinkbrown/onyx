@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 // Autonomous E2E harness for Ocean.
 // Headless Chromium with FAKE media devices so voice/video paths (getUserMedia,
-// SUIMYAKU encode/MEDIAFRAME) can be exercised without real hardware or a human.
+// CADENCE encode/MEDIAFRAME) can be exercised without real hardware or a human.
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 90_000,

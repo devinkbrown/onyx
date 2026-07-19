@@ -2,15 +2,14 @@
 
 Onyx is the network people join — the consumer-facing brand — delivered as a
 **SolidJS 1.9 + Vite 7** web client: text chat plus realtime voice/video (the
-Suimyaku media engine) over IRC/IRCX with WebSocket transport. This is the
+**Cadence** voice/video) over IRC/IRCX with WebSocket transport. This is the
 documentation hub; each entry is labelled by audience.
 
-**Naming (branded house):** **Onyx** is the network/product/client; **Orochi**
-is the engine — the pure-Zig mesh daemon you self-host and the `orochi/*`
-protocol namespace (canonical glossary: `docs/reference/glossary.md` in the
-Orochi repo). "IRCXNet" is a **retired** public identity, kept only as a
-legacy/wire token (e.g. the `.users.ircxnet` cloak suffix). "IRCX" is the wire
-protocol, unrelated to that retired name.
+**Naming (branded house):** **Onyx** is the public network + **first-party client**
+(product sauce — not marketed as FOSS). **Onyx Server** is the **AGPL pure-Zig
+engine** you self-host. English subsystems: **Undertow**, **Mooring**, **Cadence**
+(CadenceVox/Vis). Wire: `onyx/*` caps, `TSUMUGI1` envelopes. "IRCXNet" is retired.
+See [`../NOTICE.md`](../NOTICE.md). Public glossary: https://eshmaki.me/glossary/
 
 ## Start here
 
@@ -27,14 +26,14 @@ protocol, unrelated to that retired name.
 | Doc | Audience | What it covers |
 |---|---|---|
 | [`features.md`](features.md) | end-user | Passkeys (passwordless sign-in: add/list/rename/remove) and the Home "since you were away" catch-up digest (Needs you / Followed / Quiet tiers, calm presets). |
-| [`search-and-history.md`](search-and-history.md) | end-user | The on-device history vault, message search (exact + on-device semantic), time travel (`?at=`), and the encrypted-DM privacy invariant. |
+| [`search-and-history.md`](search-and-history.md) | end-user | The on-device history vault, device-memory search (hybrid / exact / related terms), optional per-conversation archived server search, time travel (`?at=`), and the encrypted-DM privacy invariant. |
 | [`importing.md`](importing.md) | end-user | Import Discord (DiscordChatExporter) history into your on-device vault. |
 
 ## Integration
 
 | Doc | Audience | What it covers |
 |---|---|---|
-| [`../OROCHI_PROTOCOL.md`](../OROCHI_PROTOCOL.md) | integrator | Client integration reference for the Orochi wire surface — transport, WebSocket framing, CAP/IRCv3/IRCX, SASL, session resume, media signaling. |
+| [`../ONYX_SERVER_PROTOCOL.md`](../ONYX_SERVER_PROTOCOL.md) | integrator | Client integration reference for the Onyx Server wire surface — transport, WebSocket framing, CAP/IRCv3/IRCX, SASL, session resume, media signaling. |
 
 ## Planning (historical — not reference)
 

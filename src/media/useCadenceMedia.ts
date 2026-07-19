@@ -13,15 +13,15 @@ import {
   MAX_VAULT_TARGET_LENGTH,
 } from '@/lib/vault/historyVault';
 import {
-  SuimyakuMediaEngine,
-  setMountedSuimyakuMediaEngine,
-} from '@/lib/suimyaku-media/MediaEngine';
+  CadenceMediaEngine,
+  setMountedCadenceMediaEngine,
+} from '@/lib/cadence-media/MediaEngine';
 import type {
   NetworkQualityTier,
-  SuimyakuChannelInfo,
-  SuimyakuMediaCallbacks,
-  SuimyakuPeerState,
-} from '@/lib/suimyaku-media/types';
+  CadenceChannelInfo,
+  CadenceMediaCallbacks,
+  CadencePeerState,
+} from '@/lib/cadence-media/types';
 
 /** Per-peer auto-lower timers for raised hands signalled via the ✋ reaction. */
 const _handTimers = new Map<string, number>();
@@ -83,7 +83,7 @@ function clearCachedPeerStreams(): void {
   canvasStreamCache.clear();
 }
 
-function canvasStreamForPeer(peer: SuimyakuPeerState): MediaStream | null {
+function canvasStreamForPeer(peer: CadencePeerState): MediaStream | null {
   const canvas = peer.canvas;
   if (!canvas || !('captureStream' in canvas)) return null;
 
@@ -155,10 +155,10 @@ function dispatchWindowEvent(name: string, detail: unknown): void {
 }
 
 /**
- * Mount the SUIMYAKU media engine once under a Solid owner at app root.
+ * Mount the CADENCE media engine once under a Solid owner at app root.
  */
 export function mountMedia(): void {
-  let engine: SuimyakuMediaEngine | null = null;
+  let engine: CadenceMediaEngine | null = null;
   let previousScreenshareActive = false;
 
   const client = useStore(state => state.client);
@@ -168,7 +168,7 @@ export function mountMedia(): void {
   const screenshareActive = useStore(state => state.voice.screenshareActive);
   const activeView = useStore(state => state.activeView);
 
-  const callbacks: SuimyakuMediaCallbacks = {
+  const callbacks: CadenceMediaCallbacks = {
     onCallState(state, nick, channel) {
       const safeNick = validMediaNick(nick) ? nick : '';
       const safeChannel = validMediaChannel(channel) ? channel : null;
@@ -350,12 +350,12 @@ export function mountMedia(): void {
       });
     },
 
-    onChannelInfo(channel: string, info: SuimyakuChannelInfo) {
+    onChannelInfo(channel: string, info: CadenceChannelInfo) {
       dispatchWindowEvent('onyx:voice-channel-info', { channel, info });
     },
 
-    onTsumugiState(nick, epoch, fingerprint) {
-      dispatchWindowEvent('onyx:voice-tsumugi', { nick, epoch, fingerprint });
+    onMooringState(nick, epoch, fingerprint) {
+      dispatchWindowEvent('onyx:voice-mooring', { nick, epoch, fingerprint });
     },
 
     enableVideoCalls: () => true,
@@ -376,8 +376,8 @@ export function mountMedia(): void {
     getLocalNick: () => getState().ourNick,
   };
 
-  engine = new SuimyakuMediaEngine(callbacks, { kind: 'video' });
-  setMountedSuimyakuMediaEngine(engine);
+  engine = new CadenceMediaEngine(callbacks, { kind: 'video' });
+  setMountedCadenceMediaEngine(engine);
 
   createEffect(() => {
     engine?.setClient(client());
@@ -439,7 +439,7 @@ export function mountMedia(): void {
     clearCachedPeerStreams();
     for (const timer of _handTimers.values()) clearTimeout(timer);
     _handTimers.clear();
-    setMountedSuimyakuMediaEngine(null);
+    setMountedCadenceMediaEngine(null);
     engine = null;
   });
 }

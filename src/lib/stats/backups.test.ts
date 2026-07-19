@@ -19,11 +19,11 @@ describe('normalizeBackupManifest', () => {
     expect(normalizeBackupManifest('not-json')).toBeNull();
   });
 
-  it('accepts Orochi latest.json backup manifests', () => {
+  it('accepts Onyx Server latest.json backup manifests', () => {
     const manifest = normalizeBackupManifest({
       generated_at: 1783500000,
       files: [
-        { kind: 'accounts', name: 'accounts-1783500000.db.snap', source: '/var/lib/orochi/accounts.db' },
+        { kind: 'accounts', name: 'accounts-1783500000.db.snap', source: '/var/lib/onyx/accounts.db' },
         { kind: 'chanstats', name: 'chanstats-1783500000.snapshot', source: '/srv/stats/.chanstats.snapshot' },
       ],
     });

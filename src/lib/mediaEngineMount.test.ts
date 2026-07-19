@@ -2,28 +2,28 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
-  getMountedSuimyakuMediaEngine,
-  setMountedSuimyakuMediaEngine,
+  getMountedCadenceMediaEngine,
+  setMountedCadenceMediaEngine,
 } from './mediaEngineMount';
 
-type MountedEngine = NonNullable<Parameters<typeof setMountedSuimyakuMediaEngine>[0]>;
+type MountedEngine = NonNullable<Parameters<typeof setMountedCadenceMediaEngine>[0]>;
 
 function makeEngine(id: string): MountedEngine {
   return { id } as unknown as MountedEngine;
 }
 
 beforeEach(() => {
-  setMountedSuimyakuMediaEngine(null);
+  setMountedCadenceMediaEngine(null);
 });
 
 afterEach(() => {
-  setMountedSuimyakuMediaEngine(null);
+  setMountedCadenceMediaEngine(null);
 });
 
-describe('mounted Suimyaku media engine accessor', () => {
+describe('mounted Cadence media engine accessor', () => {
   it('returns null before an engine has been mounted', () => {
     // Arrange / Act
-    const mounted = getMountedSuimyakuMediaEngine();
+    const mounted = getMountedCadenceMediaEngine();
 
     // Assert
     expect(mounted).toBeNull();
@@ -34,10 +34,10 @@ describe('mounted Suimyaku media engine accessor', () => {
     const engine = makeEngine('primary');
 
     // Act
-    setMountedSuimyakuMediaEngine(engine);
+    setMountedCadenceMediaEngine(engine);
 
     // Assert
-    expect(getMountedSuimyakuMediaEngine()).toBe(engine);
+    expect(getMountedCadenceMediaEngine()).toBe(engine);
   });
 
   it('replaces an existing engine and clears back to null', () => {
@@ -46,16 +46,16 @@ describe('mounted Suimyaku media engine accessor', () => {
     const secondEngine = makeEngine('second');
 
     // Act
-    setMountedSuimyakuMediaEngine(firstEngine);
-    setMountedSuimyakuMediaEngine(secondEngine);
+    setMountedCadenceMediaEngine(firstEngine);
+    setMountedCadenceMediaEngine(secondEngine);
 
     // Assert
-    expect(getMountedSuimyakuMediaEngine()).toBe(secondEngine);
+    expect(getMountedCadenceMediaEngine()).toBe(secondEngine);
 
     // Act
-    setMountedSuimyakuMediaEngine(null);
+    setMountedCadenceMediaEngine(null);
 
     // Assert
-    expect(getMountedSuimyakuMediaEngine()).toBeNull();
+    expect(getMountedCadenceMediaEngine()).toBeNull();
   });
 });

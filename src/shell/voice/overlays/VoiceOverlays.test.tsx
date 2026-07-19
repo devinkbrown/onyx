@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@solidjs/testing-lib
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
-import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
+import type { CadencePeerState } from '@/lib/cadence-media/types';
 import { CaptionsOverlay } from './CaptionsOverlay';
 import { IncomingCallOverlay } from './IncomingCallOverlay';
 import { OutgoingCallOverlay } from './OutgoingCallOverlay';
@@ -16,7 +16,7 @@ import * as clipboard from '@/lib/clipboard/writeClipboardText';
 
 const initialState = store.getInitialState();
 
-function peer(nick: string, speaking = false): SuimyakuPeerState {
+function peer(nick: string, speaking = false): CadencePeerState {
   return {
     nick,
     channel: '#voice',

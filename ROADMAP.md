@@ -1,13 +1,49 @@
-# IRCXNet Roadmap — what sets this apart, and what to build next
+# Onyx Roadmap — what sets this apart, and what to build next
 
-*2026-07-02 · covers Orochi (server), Onyx (client), the community site, and stats.*
+*Started 2026-07-02 · **status refresh 2026-07-19** · covers **Onyx Server**
+(daemon), **Onyx** (SolidJS client), the community site (landing), and stats.
+Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
+"IRCXNet" is retired public identity only.*
+
+> **Product-complete north-star (eras, exit criteria, fleet scale):**  
+> [`/home/kain/ONYX_PRODUCT_COMPLETE_ROADMAP.md`](/home/kain/ONYX_PRODUCT_COMPLETE_ROADMAP.md)  
+> Design research synthesis: [`/home/kain/research/ONYX_PLATFORM_DESIGN_SYNTHESIS.md`](/home/kain/research/ONYX_PLATFORM_DESIGN_SYNTHESIS.md)  
+> Token-preserving tri-engine ops: [`/home/kain/TRI_ENGINE_SCALED_WORKFLOW.md`](/home/kain/TRI_ENGINE_SCALED_WORKFLOW.md)  
+> This file remains the detailed ✅ archaeology + competitive notes.
+
+## Status at a glance (2026-07-19)
+
+| Phase | Theme | Status |
+|-------|--------|--------|
+| **1** Memory (vault, time-travel, search) | Client | ✅ **COMPLETE** |
+| **2** Reach (Web Push, offline outbox) | Client + server | ✅ **COMPLETE** |
+| **3** Privacy (E2EE DMs, ephemeral rooms) | Client + server | ✅ **COMPLETE** |
+| **4** Presence (pins, heatline, events) | Client + server | ✅ **COMPLETE** (Comic Chat in-Onyx **dropped**) |
+| **5** Operations (status, stats, backup) | Server + website + client harden | ✅ **COMPLETE** (ops deploy paths remain operator work) |
+| **6** Time-Native + Washi (Home, reader, a11y) | Client | 🟡 **MOSTLY SHIPPED** — remaining: richer cross-room handoffs, finish dense-surface a11y audit rows |
+| **7+** (later sections in this file) | Product entry, Sumi-e venue, etc. | 🟡 **Many slices shipped**; read per-item ✅ / ⏭️ below — do not treat headers alone as authoritative |
+| **Onyx Server CSB / MESSAGE_V2 / Helix** | Daemon | ✅ **P0s closed 2026-07-17** (see `onyx-server/CLAUDE_CSB_TAKEOVER_ROADMAP.md`); deploy is human-gated |
+| **Engine rename** | Daemon | ✅ **Source rebrand to Onyx Server 2026-07-19**; live `onyx-server.service` / `onyx-run` still production names until deploy |
+
+**Active client bugs fixed this refresh (2026-07-19)**
+
+- **Join video opened Voice settings** (audio device sheet) instead of starting a
+  video call — `AppShell.joinVoice` misused `openVoiceSettings()` as a loading
+  affordance. Fixed: Join voice/video enter the call; settings only via the
+  in-call gear.
+- **`&` local channels** treated as DMs in reader-memory default and Home quiet-
+  boost open/label paths (`startsWith('#')` only). Fixed: `#` and `&` are rooms.
+
+**How to read this doc:** item-level `✅ SHIPPED` lines win over phase headers.
+Phase 6 still says `← NEXT` in places; most sub-items under it already shipped —
+use the ⏭️ **NEXT** bullets for remaining pure-Onyx work.
 
 ## The competitive read
 
 **Against modern IRCds (Ergo, Solanum, InspIRCd, UnrealIRCd):** Ergo is the only
-real peer — integrated services, always-on multiclient, aggressive IRCv3. Orochi
+real peer — integrated services, always-on multiclient, aggressive IRCv3. Onyx Server
 already exceeds it in four places no IRCd touches: in-protocol **voice/video**
-(KaguraVox/Vis, 64-seat rooms), a **post-quantum CRDT mesh** (Suimyaku/Tsumugi)
+(CadenceVox/Vis, 64-seat rooms), a **post-quantum CRDT mesh** (Cadence/Mooring)
 instead of legacy S2S, **hot upgrades with zero disconnects** (Helix), and
 **live public telemetry** (chanstats). No IRCd ships a first-party web client,
 a stats surface, and a community site as one coherent product. That coherence
@@ -17,7 +53,7 @@ IS the product.
 sync latency, and self-host pain (Synapse). We will never out-federate Matrix;
 we can out-*feel* it: instant everything, one binary, a client that loads in
 under a second. Their E2EE is table stakes we currently lack for DMs — the
-Tsumugi primitives (ECDH + AES-GCM, already shipping for media) close that gap
+Mooring primitives (ECDH + AES-GCM, already shipping for media) close that gap
 without inventing new crypto.
 
 **Against Discord:** the UX bar — voice rooms, pins, push, search, "it
@@ -27,7 +63,7 @@ we add must ride an open primitive (IRCv3 draft, IRCX PROP) — that's the moat:
 **"Discord comforts on 30-year-old open wire."**
 
 **Against web-IRC (The Lounge, IRCCloud, gamja/soju):** all require a bouncer or
-paid cloud for continuity. Orochi's session-sync already replaces the bouncer.
+paid cloud for continuity. Onyx Server's session-sync already replaces the bouncer.
 What none of them have: push when the tab is closed, local-first scrollback,
 voice. Those three make Onyx categorically different, not incrementally better.
 
@@ -93,7 +129,7 @@ down to TLS.
    Verified live via `tools/outbox-live.mjs`.
 
 ## Phase 3 — Privacy (close the Matrix gap where it matters) ✅ COMPLETE 2026-07-02
-6. **E2EE DMs over Tsumugi** — reuse the shipping media ratchet (ECDH +
+6. **E2EE DMs over Mooring** — reuse the shipping media ratchet (ECDH +
    AES-GCM) for DM payloads between Onyx clients; keys pinned via certfp +
    METADATA discovery; graceful cleartext fallback with a visible state chip.
    No new cryptography — new plumbing only.
@@ -138,7 +174,7 @@ down to TLS.
     a live countdown card with Join-call (when live+voice) and an op clear.
     9 tests; live cross-node verified. Client-only.
 
-## Phase 5 — Operations ← IN PROGRESS
+## Phase 5 — Operations ✅ COMPLETE (core surfaces; operator deploy remains)
 12. **Public status page** from mesh health (links states, node latency,
     uptime) on the community site.
     ✅ **SHIPPED 2026-07-03** — daemon emits status.json (node uptime, users,
@@ -160,7 +196,7 @@ down to TLS.
     parsing, so a hanging or oversized same-origin feed never materializes into
     the app first.
 14. **Nightly vault-safe backups** of accounts.db + chanstats snapshots.
-    ✅ **SERVER SHIPPED 2026-07-08** — Orochi `[backup]` emits timestamped
+    ✅ **SERVER SHIPPED 2026-07-08** — Onyx Server `[backup]` emits timestamped
     account-store snapshots and chanstats snapshots plus `latest.json` on a
     configurable cadence. Deployment still needs the target directory pointed at
     the operator's vault/sync path.
@@ -232,7 +268,7 @@ down to TLS.
     DM now matches only transient decrypted text from loaded lines and keeps the
     query on this device. Full-history server search is suppressed, while vault
     and archived panes discard ciphertext envelopes instead of presenting or
-    deriving recall terms from them. Legacy Tsumugi envelopes also fail closed
+    deriving recall terms from them. Legacy Mooring envelopes also fail closed
     when an old row omitted its encrypted flag, including after the local E2EE
     preference is disabled. Flagged encrypted vault rows are now excluded before
     lexical matching or candidate embedding, so an optional local provider never
@@ -423,8 +459,8 @@ down to TLS.
 
 ## Master roadmap backlog folded into Onyx/public-site scope
 
-Source: `/home/kain/OROCHI_ONYX_MASTER_ROADMAP.md`, filtered to Onyx and the
-main website. Orochi daemon work stays out of this client roadmap unless the
+Source: `/home/kain/ONYX_ONYX_MASTER_ROADMAP.md`, filtered to Onyx and the
+main website. Onyx Server daemon work stays out of this client roadmap unless the
 client or public site needs to expose the result.
 
 ## Phase 8 — Torii Product Entry ← PLANNED
@@ -484,7 +520,7 @@ client or public site needs to expose the result.
     invite unfurls, and docs. Track the master-roadmap direction to make
     protocol/engine names supporting context instead of public product clutter.
     ✅ **WEBSITE SLICE SHIPPED 2026-07-09** — The main site now has `/glossary/`
-    as the public language contract for IRCXNet, Onyx, Orochi-as-engine,
+    as the public language contract for Onyx (network), Onyx Server (engine),
     invites, guest/account claim, local vault memory, privacy, and protocol
     context, with root/footer navigation into it.
     ✅ **CLIENT SLICE SHIPPED 2026-07-11** — The eshmaki.me house identity now
@@ -603,7 +639,7 @@ client or public site needs to expose the result.
     activate exactly at the announced `HH:00 UTC` moment for pointer and
     keyboard users.
 
-## Phase 11 — Kagura Media Presence ← PLANNED
+## Phase 11 — Cadence Media Presence ← PLANNED
 28. **Voice-room-as-place UI** *(client)* — turn voice/video from a button row
     into persistent room presence with stage context, speaker/listener state,
     device health, and call status visible in the room header.

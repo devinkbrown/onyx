@@ -31,7 +31,10 @@ export function channelIdentityTarget(view: ActiveView): string | null {
 export function normalizeRoomTarget(target: string | null | undefined): string | null {
   const normalized = target?.trim().toLowerCase();
   if (!normalized) return null;
-  return normalized.startsWith('#') ? normalized : `#${normalized}`;
+  // Preserve CHANTYPES prefixes (`#` public, `&` local). Bare names default to
+  // `#` so invite/join helpers that omit the sigil still resolve to a room.
+  if (normalized.startsWith('#') || normalized.startsWith('&')) return normalized;
+  return `#${normalized}`;
 }
 
 export function roomIdentityForTarget(target: string | null | undefined): RoomIdentity | null {

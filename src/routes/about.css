@@ -471,7 +471,7 @@
   );
 }
 
-/* ───────── Suimyaku mesh section ───────── */
+/* ───────── Cadence mesh section ───────── */
 .ab-mesh-body {
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
@@ -742,7 +742,7 @@
   transform: translateY(-4px);
 }
 
-/* serpent = Orochi engine — the living azure current */
+/* serpent = Onyx Server engine — the living azure current */
 .ab-myth.serpent {
   background: linear-gradient(
     180deg,

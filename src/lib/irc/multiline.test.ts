@@ -210,9 +210,9 @@ describe('buildMultilineLines', () => {
   it('escapes extra tag values on the first BATCH command', () => {
     const batches = planMultilineBatches('one\ntwo')!;
     const { lines } = buildMultilineLines('#chan', batches, makeRef, {
-      'orochi/topic': 'release train',
+      'onyx/topic': 'release train',
     });
-    expect(lines[0]).toBe('@orochi/topic=release\\strain BATCH +ref1 draft/multiline #chan\r\n');
+    expect(lines[0]).toBe('@onyx/topic=release\\strain BATCH +ref1 draft/multiline #chan\r\n');
   });
 });
 

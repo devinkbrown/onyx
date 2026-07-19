@@ -871,6 +871,27 @@
   font-weight: 700;
 }
 
+/* Windows High Contrast drops the selected-segment fill. Restate the
+   aria-checked / aria-checked switch state with system Highlight so dense
+   Preference rows keep a non-color-only current-value signal (SC 1.4.1). */
+@media (forced-colors: active) {
+  .pref-segment[aria-checked='true'] {
+    color: HighlightText;
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+
+  .pref-toggle[aria-checked='true'] .pref-switch {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+
+  .pref-toggle[aria-checked='true'] .pref-switch::after {
+    background: HighlightText;
+    forced-color-adjust: none;
+  }
+}
+
 /* Toggle switch — a single on/off control. */
 .pref-toggle {
   display: flex;

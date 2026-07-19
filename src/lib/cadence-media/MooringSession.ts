@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*
- * TsumugiSession.ts — Browser-side TSUMUGI encrypted media session.
+ * MooringSession.ts — Browser-side TSUMUGI encrypted media session.
  *
  * Implements the TSUMUGI_HANDSHAKE / TSUMUGI_RATCHET / TSUMUGI_DATA protocol
  * using Web Crypto (P-256 ECDH + HKDF + AES-256-GCM).
  *
  * Usage:
- *   const v = await TsumugiSession.create();
+ *   const v = await MooringSession.create();
  *   const offer = v.exportPublicKey();  // send to peer via TSUMUGI_HANDSHAKE
  *   await v.ingestPeerKey(peerPublicKeyBytes); // on receiving TSUMUGI_HANDSHAKE
  *   const ct = await v.encrypt(plaintext);
@@ -26,7 +26,7 @@ const IV_PREFIX_LEN = 8;
 type AesGcmKey = CryptoKey & { _gcm: true };
 type Direction = 'low-to-high' | 'high-to-low';
 
-export class TsumugiSession {
+export class MooringSession {
   private readonly keyPair: CryptoKeyPair;
   private sendKey: AesGcmKey | null = null;
   private receiveKey: AesGcmKey | null = null;
@@ -40,17 +40,17 @@ export class TsumugiSession {
     this.keyPair = kp;
   }
 
-  static async create(): Promise<TsumugiSession> {
+  static async create(): Promise<MooringSession> {
     const kp = await crypto.subtle.generateKey(
       { name: 'ECDH', namedCurve: CURVE },
       true,
       ['deriveKey', 'deriveBits'],
     );
-    return new TsumugiSession(kp);
+    return new MooringSession(kp);
   }
 
-  static fromKeyPair(kp: CryptoKeyPair): TsumugiSession {
-    return new TsumugiSession(kp);
+  static fromKeyPair(kp: CryptoKeyPair): MooringSession {
+    return new MooringSession(kp);
   }
 
   /** Return raw uncompressed public key bytes (65 bytes, 0x04 prefix). */
@@ -69,7 +69,7 @@ export class TsumugiSession {
     const peerBytes = copyPublicKey(peerRawKey);
     const localBytes = await this.exportPublicKey();
     if (constantTimeEqual(peerBytes, localBytes)) {
-      throw new Error('TsumugiSession: refusing self public key');
+      throw new Error('MooringSession: refusing self public key');
     }
 
     const peerKey = await crypto.subtle.importKey(
@@ -107,12 +107,12 @@ export class TsumugiSession {
    */
   async ratchet(): Promise<void> {
     this.assertLive();
-    if (!this.sendKey || !this.receiveKey) throw new Error('TsumugiSession: not yet established');
+    if (!this.sendKey || !this.receiveKey) throw new Error('MooringSession: not yet established');
     const nextEpoch = this.ratchetEpoch + 1;
     const sendKeyBytes = await crypto.subtle.exportKey('raw', this.sendKey)
-      .catch(() => { throw new Error('TsumugiSession: ratchet requires extractable key'); });
+      .catch(() => { throw new Error('MooringSession: ratchet requires extractable key'); });
     const receiveKeyBytes = await crypto.subtle.exportKey('raw', this.receiveKey)
-      .catch(() => { throw new Error('TsumugiSession: ratchet requires extractable key'); });
+      .catch(() => { throw new Error('MooringSession: ratchet requires extractable key'); });
 
     try {
       const [sendKey, receiveKey] = await Promise.all([
@@ -140,7 +140,7 @@ export class TsumugiSession {
 
   private nextIv(): Uint8Array {
     if (this.sendIvCounter > 0xffffffff) {
-      throw new Error('TsumugiSession: AES-GCM nonce space exhausted');
+      throw new Error('MooringSession: AES-GCM nonce space exhausted');
     }
     const iv = new Uint8Array(IV_LEN);
     iv.set(this.sendIvPrefix, 0);
@@ -149,11 +149,11 @@ export class TsumugiSession {
   }
 
   private assertLive(): void {
-    if (this.destroyed) throw new Error('TsumugiSession: destroyed');
+    if (this.destroyed) throw new Error('MooringSession: destroyed');
   }
 
   private rememberReceiveIv(iv: Uint8Array): void {
-    if (!this.replayGuard.mayAccept(iv)) throw new Error('TsumugiSession: replayed frame');
+    if (!this.replayGuard.mayAccept(iv)) throw new Error('MooringSession: replayed frame');
     this.replayGuard.commit(iv);
   }
 
@@ -163,13 +163,13 @@ export class TsumugiSession {
 
   private get encryptKey(): AesGcmKey {
     this.assertLive();
-    if (!this.sendKey) throw new Error('TsumugiSession: not yet established');
+    if (!this.sendKey) throw new Error('MooringSession: not yet established');
     return this.sendKey;
   }
 
   private get decryptKey(): AesGcmKey {
     this.assertLive();
-    if (!this.receiveKey) throw new Error('TsumugiSession: not yet established');
+    if (!this.receiveKey) throw new Error('MooringSession: not yet established');
     return this.receiveKey;
   }
 
@@ -191,9 +191,9 @@ export class TsumugiSession {
   /** Decrypt iv || ciphertext with current session key. */
   async decrypt(frame: Uint8Array): Promise<Uint8Array> {
     const key = this.decryptKey;
-    if (frame.length < IV_LEN + 16) throw new Error('TsumugiSession: frame too short');
+    if (frame.length < IV_LEN + 16) throw new Error('MooringSession: frame too short');
     const iv = frame.slice(0, IV_LEN);
-    if (this.hasSeenReceiveIv(iv)) throw new Error('TsumugiSession: replayed frame');
+    if (this.hasSeenReceiveIv(iv)) throw new Error('MooringSession: replayed frame');
     const ct = frame.slice(IV_LEN);
     const pt = await crypto.subtle.decrypt(
       { name: GCM_ALG, iv: toArrayBuffer(iv), tagLength: GCM_TAG },
@@ -263,7 +263,7 @@ async function ratchetKey(rawKey: ArrayBuffer, epoch: number): Promise<AesGcmKey
 function copyPublicKey(peerRawKey: Uint8Array): Uint8Array {
   const peerBytes = new Uint8Array(peerRawKey);
   if (peerBytes.length !== 65 || peerBytes[0] !== 0x04) {
-    throw new Error('TsumugiSession: invalid P-256 public key');
+    throw new Error('MooringSession: invalid P-256 public key');
   }
   return peerBytes;
 }

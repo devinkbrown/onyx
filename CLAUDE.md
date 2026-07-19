@@ -1,10 +1,14 @@
 # Onyx — IRC webchat (SolidJS)
 
-Modern web client for the **Onyx** network, running on the **Orochi** engine
-(pure-Zig mesh daemon). Pre-release; branch `onyx-solid`.
+Modern web client for the **Onyx** network, running on the **Onyx Server** engine
+(pure-Zig mesh daemon; formerly called Onyx Server). Pre-release; branch `onyx-solid`.
 The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
-Branded house: **Onyx** = network/product/client; **Orochi** = engine/daemon/
+Branded house: **Onyx** = network/product/client; **Onyx Server** = engine/daemon/
 protocol; "IRCXNet" = retired public identity, legacy/wire token only.
+Wire/config leftovers that still say `onyx/*` (caps/tags) or `TSUMUGI_*` (MEDIA
+verbs) are **literals**, not product names — never rename them for branding.
+English subsystem names on the engine/media side: Cadence (CadenceVox/CadenceVis),
+MooringSession/MooringGroup (client crypto names), Event Spine.
 
 **License: AGPL-3.0-or-later** (see `LICENSE`). Onyx is copyleft-licensed but NOT yet
 publicly released — it lives only in the PRIVATE `github.com/devinkbrown/onyx` repo. The
@@ -36,9 +40,9 @@ separate, deliberate decision (the AGPL grant only takes effect on public distri
   `ThemeStudio.tsx`, `customThemes.ts`
 - Tokens: `src/styles/tokens.css` (+ `global.css`)
 - Primitives: `src/primitives/` — reusable UI building blocks
-- Media engine: `src/lib/suimyaku-media/` — Onyx voice/video
-  (TsumugiSession ECDH/AES-GCM, MediaEngine, TsumugiGroup, ChunkAssembler,
-  PeerRegistry). Default transport: Suimyaku/Kagura frames over WS.
+- Media engine: `src/lib/cadence-media/` — **Cadence** (CadenceVox/CadenceVis,
+  Cadence frames). Internals: MooringSession ECDH/AES-GCM (wire MEDIA verbs
+  still `TSUMUGI_*`), MediaEngine, MooringGroup, ChunkAssembler, PeerRegistry.
   Signaling = `MEDIA` subcommands + Event Spine `EVENT ... MEDIA ...` events.
 - Backgrounds: `src/backgrounds/` — animated canvas scenes
 - Uploads: `src/lib/upload/` — multipart POST (field `file`) to
@@ -55,7 +59,7 @@ separate, deliberate decision (the AGPL grant only takes effect on public distri
   are WIRE FORMAT (server-persisted) — never rename them.
 
 ## Env (Vite exposes only `VITE_*`)
-- `VITE_IRC_WS` — pin the Orochi WS endpoint (unset = auto node selection)
+- `VITE_IRC_WS` — pin the Onyx Server WS endpoint (unset = auto node selection)
 - `VITE_DEFAULT_CHANNEL` — reserved, not currently read
 - `VITE_MEDIA_URL` — upload base (unset = `/upload` in prod builds)
 
@@ -82,12 +86,12 @@ go to dist/, so tests/e2e can never wipe or half-replace production.
 | #channel | Text channel |
 | Private message | DM |
 | +q / +o / +v | Owner / Op / Voice roles |
-| Orochi account (built-in services) | Onyx account |
+| Onyx Server account (built-in services) | Onyx account |
 | CHATHISTORY | Message history |
 | IRCX PROP / ACCESS / METADATA | Channel & profile properties |
 | MEDIA subcommands + Event Spine MEDIA | Voice/video channel |
 
-## Services (Orochi built-in — NO NickServ pseudo-clients)
+## Services (Onyx Server built-in — NO NickServ pseudo-clients)
 Real server commands with structured replies (NOTE/FAIL/WARN): `REGISTER`,
 `VERIFY`, `IDENTIFY`, `LOGOUT`, `DROP`, `ACCOUNTINFO`, `ACCOUNTSET`,
 `GHOST`, `CERTADD`/`CERTLIST`/`CERTDEL`. Session resume: after SASL the

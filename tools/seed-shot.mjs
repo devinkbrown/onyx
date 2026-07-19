@@ -29,7 +29,7 @@ function seed() {
     id, from, text, time: t(mins), type, target: '#root',
   });
   const messages = [
-    msg('m1', 'aurora', 'welcome to #root — the build channel for onyx + orochi', 42),
+    msg('m1', 'aurora', 'welcome to #root — the build channel for onyx + onyx', 42),
     msg('m2', 'vesper', 'pushed the mobile polish branch, pulling now', 38),
     msg('m3', 'cinder', 'the auto-routing felt instant on cellular 👌', 33),
     msg('m4', 'moss', 'voice held up through a tunnel, mesh re-routed clean', 27),

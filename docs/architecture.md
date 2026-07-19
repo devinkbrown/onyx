@@ -8,7 +8,7 @@ overview; every load-bearing claim cites a real `src/…` path. Where this doc a
 Onyx is a **SolidJS 1.9 + Vite 7** single-page app — no SSR, no virtual DOM.
 State is a single Zustand-vanilla store; the UI subscribes with fine-grained
 Solid signals through a thin bridge. IRC/IRCX runs over a WebSocket. It is a
-client only: the server is Orochi (see [`../OROCHI_PROTOCOL.md`](../OROCHI_PROTOCOL.md)).
+client only: the server is Onyx Server (see [`../ONYX_SERVER_PROTOCOL.md`](../ONYX_SERVER_PROTOCOL.md)).
 
 ## Entry & routing
 
@@ -58,12 +58,12 @@ Slice behaviour is covered by ~15 co-located tests (`src/lib/store/store.*.test.
 `src/lib/irc/client.ts` is the `IRCClient` WebSocket client. It negotiates
 CAP/IRCv3 + IRCX, runs SASL during registration, keeps the connection alive with
 ping/pong, and drives reconnect. Constructor options include the wss `url`, nick,
-SASL `password`, and Orochi reclaim tokens `sessionToken` (local node) and
+SASL `password`, and Onyx Server reclaim tokens `sessionToken` (local node) and
 `meshToken` (any node) (`src/lib/irc/client.ts:28`). Key traits:
 
 - **Framing contract:** one IRC message per WebSocket frame with no trailing
   CRLF; the reader tolerates LF-only and splits on `/\r?\n/` without retaining a
-  cross-frame remainder. See [`../OROCHI_PROTOCOL.md`](../OROCHI_PROTOCOL.md) §1.1.
+  cross-frame remainder. See [`../ONYX_SERVER_PROTOCOL.md`](../ONYX_SERVER_PROTOCOL.md) §1.1.
 - The original constructor nick is preserved as the SASL authcid even after a
   `433` fallback (`src/lib/irc/client.ts:54`), so PLAIN/SCRAM always identify
   against the original account.
@@ -74,10 +74,10 @@ SASL `password`, and Orochi reclaim tokens `sessionToken` (local node) and
   CHANLIMIT parsers); wire types in `src/lib/irc/types.ts`; multiline batch
   planning in `src/lib/irc/multiline.ts`.
 
-**Node selection:** `src/app/nodes.ts` lists the Onyx network's Orochi nodes
+**Node selection:** `src/app/nodes.ts` lists the Onyx network's Onyx Server nodes
 (`ircx.us`, `eshmaki.me`; `src/app/nodes.ts:19`) and attaches to the fastest by
 connect latency. `VITE_IRC_WS` pins an endpoint and disables probing
-(`src/app/nodes.ts:25`) — the path for dev and self-host against your own Orochi.
+(`src/app/nodes.ts:25`) — the path for dev and self-host against your own Onyx Server.
 
 ## Theming (`src/theme/`)
 
@@ -102,31 +102,36 @@ themes in `src/theme/customThemes.ts`. Design tokens are emitted to CSS via
 
 The vault is a local-first IndexedDB message store. `src/lib/vault/historyVault.ts`
 persists per-target message batches bounded to **`VAULT_KEEP = 400`** messages,
-oldest pruned (`src/lib/vault/historyVault.ts:22`). `loadRecent`/`loadAround`
+oldest pruned (`src/lib/vault/historyVault.ts:45`). `loadRecent`/`loadAround`
 read back chronologically and drive time-travel (the `?at=` deep link). A
 retention policy can widen the per-channel keep above the flat bound
-(`src/lib/vault/historyVault.ts:146`). Supporting modules: on-device semantic
-search over a hashing embedding index (`embeddingIndex.ts`,
-`searchVaultSemantic.ts`), portable export/import (`portableTransfer.ts`),
-retention policy (`retentionPolicy.ts`), and hydrate/flush sync
-(`vaultSync.ts` — `initVaultSync` is called at boot from `src/index.tsx:79`).
+(`src/lib/vault/historyVault.ts:235`). Supporting modules: on-device vault search — exact substring (`historyVault.ts`
+`searchVault`), related-terms ranking over a hashing embedding index
+(`embeddingIndex.ts`, `searchVaultSemantic.ts`), and hybrid RRF fusion of both
+(`searchVaultHybrid.ts`, default UI mode) — plus portable export/import
+(`portableTransfer.ts`), retention policy (`retentionPolicy.ts`), and
+hydrate/flush sync (`vaultSync.ts` — `initVaultSync` is called from
+`src/routes/AppRoute.tsx:39` after retention policy apply).
 
 **Privacy invariant:** decrypted E2EE-DM plaintext is never written to
 IndexedDB — only ciphertext persists. E2EE lives in `src/lib/e2ee/`
 (`dmCipher.ts`, `policy.ts`).
 
-## Media engine (`src/lib/suimyaku-media/`)
+## Media engine (`src/lib/cadence-media/`)
 
-Voice/video is the Suimyaku engine. Default transport is Suimyaku/Kagura frames
-over the WebSocket (binary frames), with `MEDIA` subcommands + Event-Spine
-`EVENT … MEDIA …` messages for signaling. Key pieces: `MediaEngine.ts`
-(capture/encode/signaling), `kaguraFrame.ts` (frame codec), `ChunkAssembler.ts`
+Voice/video is the **Cadence** media stack (public English name; directory path
+is historical). Codecs: **CadenceVox** (audio) / **CadenceVis** (video). Default
+transport is Cadence frames over the WebSocket (binary frames), with `MEDIA`
+subcommands + Event-Spine `EVENT … MEDIA …` messages for signaling. Mesh state
+replication is **Undertow**; inter-server secure links are **Mooring**. Key
+pieces: `MediaEngine.ts` (capture/encode/signaling), `cadenceFrame.ts` (frame
+codec module name historical — Cadence framing), `ChunkAssembler.ts`
 (reassembly), `mediaMac.ts` (per-stream media MAC, pinned by
 `ws_media_mac.vectors.json`), `PeerRegistry.ts` + `spatialAudio.ts` (HRTF
-spatial audio), `TsumugiSession.ts`/`TsumugiGroup.ts`/`TsumugiIdentity.ts` (E2E
-media crypto), and `videoEncodeWorker.ts` (off-main-thread encode). Voice UI is
-in `src/shell/voice/`. Vite keeps this in a separate `media` chunk so it stays
-off first paint (`vite.config.ts:22`).
+spatial audio), `MooringSession.ts`/`MooringGroup.ts`/`MooringIdentity.ts` (E2E
+media crypto modules — historical names), and `videoEncodeWorker.ts`
+(off-main-thread encode). Voice UI is in `src/shell/voice/`. Vite keeps this in
+a separate `media` chunk so it stays off first paint (`vite.config.ts:22`).
 
 ## Command palette (`src/chat/spotlight/`)
 
@@ -181,7 +186,7 @@ fully unit-tested.
 ## Passkeys / WebAuthn (`src/lib/webauthn/`)
 
 Passwordless login. `src/lib/webauthn/passkey.ts` is the browser half of the
-daemon's `WEBAUTHN` command (see [`../OROCHI_PROTOCOL.md`](../OROCHI_PROTOCOL.md)
+daemon's `WEBAUTHN` command (see [`../ONYX_SERVER_PROTOCOL.md`](../ONYX_SERVER_PROTOCOL.md)
 §5.1). It is pure ceremony plumbing — base64url (no-padding) codecs, option
 builders, and response encoders — with the two `navigator.credentials`
 create/get calls as the only browser-dependent seam. Fail-closed by design:

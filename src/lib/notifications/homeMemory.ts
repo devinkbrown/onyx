@@ -43,6 +43,35 @@ export function summarizeHomeMemory(target: string, messages: readonly ChatMessa
   };
 }
 
+/**
+ * Pick vault-backed Home memory targets without inventing server membership.
+ *
+ * Order: recently-left rooms first (session join history), then persisted
+ * auto-join rooms not currently in the live map. Auto-join is the cold-return
+ * source — after a reload join history is empty, but auto-join still names the
+ * rooms this device expects, so Device memory can paint from the vault before
+ * JOIN replies land. Cap keeps IDB loadRecent fan-out bounded.
+ */
+export function collectHomeMemoryTargets(
+  joinHistory: readonly string[],
+  autoJoin: readonly string[],
+  joinedKeys: Iterable<string>,
+  limit = 6,
+): string[] {
+  const joined = new Set<string>();
+  for (const key of joinedKeys) joined.add(key.toLowerCase());
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const target of [...joinHistory, ...autoJoin]) {
+    const key = target.trim().toLowerCase();
+    if (!key || joined.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push(target.trim());
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 export async function buildHomeMemory(
   targets: readonly string[],
   loadRecent: (target: string) => Promise<readonly ChatMessage[]>,

@@ -48,7 +48,7 @@ import { WatchTogetherActivity } from './WatchTogetherActivity';
 import { MessageView } from './MessageView';
 import { TypingIndicator } from './TypingIndicator';
 import { Composer } from './Composer';
-// Voice/video UI is lazy: it (plus its ~76kB SUIMYAKU media/worker/wasm graph)
+// Voice/video UI is lazy: it (plus its ~76kB CADENCE media/worker/wasm graph)
 // is only rendered once a call is signalled, so it stays out of the initial
 // /app payload and loads on first voice activity. Gated below by voiceUiActive.
 const VoiceStage = lazy(() => import('./voice/VoiceStage').then((m) => ({ default: m.VoiceStage })));
@@ -75,6 +75,7 @@ import { AppearancePanel } from './AppearancePanel';
 import { PreferencesPanel } from './PreferencesPanel';
 import { PinnedMessages } from './PinnedMessages';
 import { ScheduledMessagesSheet } from './ScheduledMessagesSheet';
+import { JumpToDateSheet } from './JumpToDateSheet';
 import { applyPreferences, isPreferencesOpen, openPreferences, preferences } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
@@ -199,7 +200,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   });
 
   // ── voice/video ──
-  // The SUIMYAKU media engine (and its worker/wasm codec graph) is only needed
+  // The CADENCE media engine (and its worker/wasm codec graph) is only needed
   // once a call is signalled — always many network round-trips away — so it is
   // dynamically imported OFF the first-paint critical path instead of during
   // app boot. It is mounted under AppShell's owner (so its effects/onCleanup
@@ -219,7 +220,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
     // promise so every caller waits for readiness instead of treating
     // "loading" as "booted" and attempting a no-op join.
     if (mediaBootPromise) return mediaBootPromise;
-    mediaBootPromise = import('@/media/useSuimyakuMedia')
+    mediaBootPromise = import('@/media/useCadenceMedia')
       .then(({ mountMedia }) => {
         if (mediaDisposed) return false;
         runWithOwner(mediaOwner, () => mountMedia());
@@ -264,15 +265,23 @@ export function AppShell(props: AppShellProps): JSX.Element {
   async function joinVoice(withVideo: boolean): Promise<void> {
     const v = activeView();
     if (v.kind !== 'channel') return;
-    // Give immediate feedback while the lazy media chunk loads.
-    getState().openVoiceSettings();
+    // Join the call directly. Do NOT open Voice settings here — that sheet is
+    // for device/processing preferences (gear on the call bar), not the entry
+    // path. Opening it on "Join video" made video look broken (audio settings).
     try {
-      if (!(await ensureMediaEngine())) return;
-      void getState().joinVoiceChannel(v.channel, withVideo);
+      if (!(await ensureMediaEngine())) {
+        getState().addToast({
+          variant: 'error',
+          title: withVideo ? 'Video could not start' : 'Voice could not start',
+          description: 'The media engine did not load. Try joining again.',
+        });
+        return;
+      }
+      await getState().joinVoiceChannel(v.channel, withVideo);
     } catch {
       getState().addToast({
         variant: 'error',
-        title: 'Voice could not start',
+        title: withVideo ? 'Video could not start' : 'Voice could not start',
         description: 'The media engine did not load. Try joining again.',
       });
     }
@@ -766,6 +775,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
       {/* Scheduled "send later" queue — gated on store.showScheduledMessages */}
       <ScheduledMessagesSheet />
+
+      {/* Jump-to-date sheet — Era 1 A3 discoverable travelTo control */}
+      <JumpToDateSheet />
 
       {/* Voice/video overlays — the whole cluster is lazy and only mounts once
           a call is signalled or the settings sheet opens; each still self-gates

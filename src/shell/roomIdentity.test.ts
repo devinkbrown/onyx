@@ -7,10 +7,18 @@ describe('roomIdentity', () => {
   it('normalizes channel targets only into bounded identity targets', () => {
     expect(normalizeRoomTarget(' Root ')).toBe('#root');
     expect(normalizeRoomTarget('#Root')).toBe('#root');
+    expect(normalizeRoomTarget('&Ops')).toBe('&ops');
     expect(normalizeRoomTarget('')).toBeNull();
     expect(channelIdentityTarget({ kind: 'channel', channel: '#General' })).toBe('#general');
+    expect(channelIdentityTarget({ kind: 'channel', channel: '&Ops' })).toBe('&ops');
     expect(channelIdentityTarget({ kind: 'home' })).toBeNull();
     expect(channelIdentityTarget({ kind: 'dm', nick: 'kain' })).toBeNull();
+  });
+
+  it('does not rewrite a local & room into a #& hybrid', () => {
+    const identity = roomIdentityForTarget('&ops');
+    expect(identity?.target).toBe('&ops');
+    expect(identity?.target.startsWith('#&')).toBe(false);
   });
 
   it('generates stable OKLCH tokens for a room', () => {

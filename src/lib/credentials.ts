@@ -8,13 +8,13 @@
  *   activeKey   — last-used credential key
  *   entries     — saved credentials keyed by normalized server + nick
  *
- * Session tokens are issued by Orochi after successful account authentication via:
+ * Session tokens are issued by Onyx Server after successful account authentication via:
  *   NOTE SESSION TOKEN :<token>
  * Saved tokens are reused with SESSION RESUME after IRC registration. They are
  * bearer reclaim credentials, not SASL mechanisms, so a current token can
  * restore a passwordless/passkey account without rerunning SASL.
  *
- * On mesh deployments Orochi additionally emits:
+ * On mesh deployments Onyx Server additionally emits:
  *   NOTE SESSION MTOKEN :<token>
  * a mesh-sealed reclaim token usable to resume the session from ANY node in the
  * mesh (server.zig handleSession TOKEN). It is longer than the 32-hex local
@@ -40,9 +40,9 @@ export interface SavedCredentials {
   server: string;
   /** NickServ / SASL password — only set when user opted in AND no valid token */
   password?: string;
-  /** Orochi-issued session resume token (local node only) */
+  /** Onyx Server-issued session resume token (local node only) */
   sessionToken?: string;
-  /** Orochi-issued mesh-sealed reclaim token (resumes from any mesh node) */
+  /** Onyx Server-issued mesh-sealed reclaim token (resumes from any mesh node) */
   meshToken?: string;
   /** Token validity deadline — ISO string */
   tokenExpiry?: string;
@@ -495,7 +495,7 @@ export function saveCredentials(opts: {
 }
 
 /**
- * Store a session token received from Orochi.
+ * Store a session token received from Onyx Server.
  * expiresAt is a Unix timestamp (seconds).
  * canonicalNick — if provided, overwrites the stored nick with the account
  *   name so future auto-connects use the real nick, not a '_'-suffixed alias.
@@ -559,7 +559,7 @@ export function clearSessionToken(server?: string, nick?: string): void {
 }
 
 /**
- * Store a mesh-sealed reclaim token received from Orochi. Unlike the local
+ * Store a mesh-sealed reclaim token received from Onyx Server. Unlike the local
  * session token, this one is usable to reclaim/redirect the session from ANY
  * node in the mesh, so it survives a reconnect that lands on a different node.
  * Persisted against the active credential entry; a no-op when no base

@@ -9,12 +9,12 @@
  * byte-matched to the daemon's `src/proto/account_identity.zig`:
  *
  *   enroll (IDENTITY ADD):
- *     "OROCHI-ACCOUNT-IDENTITY-v1" ‖ 0x00 ‖ account ‖ 0x00 ‖ label ‖ 0x00 ‖ pub(32)
+ *     "ONYX-ACCOUNT-IDENTITY-v1" ‖ 0x00 ‖ account ‖ 0x00 ‖ label ‖ 0x00 ‖ pub(32)
  *
  *   residence proof (IDENTITY RESIDENCE):
  *     unsigned = "ARP1"(u32 BE) ‖ len8(account) ‖ account
  *                ‖ node:u64 BE ‖ epoch:u64 BE ‖ expiry_ms:u64 BE
- *     message  = "OROCHI-ACCOUNT-RESIDENCE-v1" ‖ 0x00 ‖ unsigned
+ *     message  = "ONYX-ACCOUNT-RESIDENCE-v1" ‖ 0x00 ‖ unsigned
  *
  * All integers are BIG-endian; every hex string on the wire is lower-case.
  * Fail-closed throughout: a keygen/sign/validation failure returns null and
@@ -29,9 +29,9 @@ const STORE = 'device';
 const KEY_ID = 'sign-v1';
 
 /** Domain label of the enroll self-signature (daemon `transcript_domain`). */
-export const IDENTITY_DOMAIN = 'OROCHI-ACCOUNT-IDENTITY-v1';
+export const IDENTITY_DOMAIN = 'ONYX-ACCOUNT-IDENTITY-v1';
 /** Domain label of the residence proof (daemon `residence_domain`). */
-export const RESIDENCE_DOMAIN = 'OROCHI-ACCOUNT-RESIDENCE-v1';
+export const RESIDENCE_DOMAIN = 'ONYX-ACCOUNT-RESIDENCE-v1';
 /** "ARP1" — the residence wire magic (daemon `residence_magic`). */
 const RESIDENCE_MAGIC = 0x41525031;
 
@@ -227,7 +227,7 @@ export function residenceUnsignedWire(b: ResidenceBinding): Uint8Array | null {
 
 /**
  * The exact bytes the device key signs for IDENTITY RESIDENCE:
- * "OROCHI-ACCOUNT-RESIDENCE-v1" ‖ 0x00 ‖ unsigned-wire. Null when the
+ * "ONYX-ACCOUNT-RESIDENCE-v1" ‖ 0x00 ‖ unsigned-wire. Null when the
  * binding is invalid.
  */
 export function buildResidenceMessage(b: ResidenceBinding): Uint8Array | null {

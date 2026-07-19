@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * Mascot — the Onyx water-dragon.
+ * Mascot — the Onyx network mark.
  *
- * Orochi is 水蛟 (a water-dragon), and this is its friendly companion: a sleek,
- * coiled serpent-dragon with a smooth onyx body, an azure underglow, a
+ * A sleek, coiled serpent-dragon with a smooth onyx body, an azure underglow, a
  * bioluminescent dorsal line, and a single champagne-gold eye. Calm and refined,
- * not fierce, not demonic — the face of the network you belong to.
+ * not fierce — the face of the network. (Historical engine codename: Onyx Server.)
  *
  * Pure inline SVG, no external assets. It themes itself from the Onyx CSS
  * custom properties (--ink, --lapis, --lapis-bright, --gold-bright, --washi),

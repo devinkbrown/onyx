@@ -1,11 +1,11 @@
 ---
 name: onyx-roadmap-execution
-description: Execute an Onyx-only slice of the Orochi-Onyx master roadmap with a source audit, SolidJS-safe implementation, focused tests, full pnpm gates, and optional release verification. Use when continuing the Onyx roadmap, fixing a roadmap-visible regression, or selecting the next client-only roadmap slice.
+description: Execute an Onyx-only slice of the Onyx Server-Onyx master roadmap with a source audit, SolidJS-safe implementation, focused tests, full pnpm gates, and optional release verification. Use when continuing the Onyx roadmap, fixing a roadmap-visible regression, or selecting the next client-only roadmap slice.
 ---
 
 # Onyx roadmap execution
 
-Read `AGENTS.md`, `CLAUDE.md`, `docs/architecture.md`, `CONTRIBUTING.md`, and `/home/kain/OROCHI_ONYX_MASTER_ROADMAP.md` before selecting work. Treat current source and tests as the truth when roadmap prose is stale.
+Read `AGENTS.md`, `CLAUDE.md`, `docs/architecture.md`, `CONTRIBUTING.md`, and `/home/kain/ONYX_ONYX_MASTER_ROADMAP.md` before selecting work. Treat current source and tests as the truth when roadmap prose is stale.
 
 ## Select a slice
 

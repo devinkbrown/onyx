@@ -3,7 +3,7 @@
 import { createBoundedAbort, type BoundedAbort } from '@/lib/net/boundedAbort';
 
 export type HighResolutionCapability = 'unknown' | 'efficient' | 'constrained';
-export type SuimyakuStreamQuality = 'auto' | '1080p60' | '4k60';
+export type CadenceStreamQuality = 'auto' | '1080p60' | '4k60';
 
 interface MediaCapabilityInfoLike {
   readonly supported?: boolean;
@@ -43,8 +43,8 @@ export interface HighResolutionCapabilityProbe {
 const PROBE_TIMEOUT_MS = 250;
 
 /**
- * Media Capabilities cannot describe KaguraVis, which remains the unchanged
- * Suimyaku wire codec. This standard VP9 record configuration is therefore
+ * Media Capabilities cannot describe CadenceVis, which remains the unchanged
+ * Cadence wire codec. This standard VP9 record configuration is therefore
  * used only as a conservative browser/device signal for the existing 4K60 vs
  * 1080p60 local capture choice. It never selects a codec or enters wire data.
  */
@@ -150,9 +150,9 @@ export function createHighResolutionCapabilityProbe(
 
 /** Apply the cached hint only to the existing high-resolution quality choice. */
 export function constrainHighResolutionQuality(
-  requested: SuimyakuStreamQuality,
+  requested: CadenceStreamQuality,
   capability: HighResolutionCapability,
-): SuimyakuStreamQuality {
+): CadenceStreamQuality {
   return requested === '4k60' && capability === 'constrained'
     ? '1080p60'
     : requested;

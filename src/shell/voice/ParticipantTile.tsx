@@ -24,14 +24,14 @@
 import { For, createEffect, createMemo, createSignal, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 import { Avatar } from '@/primitives';
 import { CameraOffIcon, MicOffIcon, DeafenIcon } from './icons';
-import type { NetworkQualityTier, SuimyakuPeerState } from '@/lib/suimyaku-media/types';
+import type { NetworkQualityTier, CadencePeerState } from '@/lib/cadence-media/types';
 import type { ChannelUser } from '@/lib/irc/types';
 
 export type ParticipantTileProps = {
   /** IRC nick of this participant */
   nick: string;
   /** Peer media state from store.voice.peers (null = local self tile) */
-  peer: SuimyakuPeerState | null;
+  peer: CadencePeerState | null;
   /** Live MediaStream for video, or null if no video */
   stream: MediaStream | null;
   /** True for the local self tile */

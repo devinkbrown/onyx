@@ -170,7 +170,7 @@ describe('vanilla store', () => {
       receive(':example.test CAP * LS :sasl=PLAIN');
       receive(':example.test CAP * ACK :sasl');
       receive('AUTHENTICATE +');
-      // Orochi sends 900 during SASL, before the 001 that causes the store to
+      // Onyx Server sends 900 during SASL, before the 001 that causes the store to
       // construct its Server record. This ordering used to discard the account
       // and made the top-bar identity chip incorrectly render “Guest”.
       receive(':example.test 900 alice alice!webchat@example alice :You are now logged in as alice');

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * webPush.ts — browser Web Push subscription against Orochi's WEBPUSH command
+ * webPush.ts — browser Web Push subscription against Onyx Server's WEBPUSH command
  * (Roadmap Phase 2.4: reach you with the tab closed).
  *
  * Flow: read the server's VAPID public key from ISUPPORT (`VAPID=`, no
@@ -161,8 +161,24 @@ export async function enableWebPush(): Promise<WebPushResult> {
     return { ok: false, reason: 'Reconnect first.' };
   }
   const client = initialState.client;
+  // VAPID is advertised on ISUPPORT (`VAPID=`); never invent or round-trip a key.
   const key = client.isupport.VAPID ?? '';
   if (!key) return { ok: false, reason: 'Push is not enabled on this server.' };
+  let applicationServerKey: ArrayBuffer;
+  try {
+    const bytes = vapidKeyToBytes(key);
+    // Empty decode is not a usable applicationServerKey — refuse rather than
+    // hand PushManager a zero-length key that some engines treat as "default".
+    if (bytes.byteLength === 0) {
+      return { ok: false, reason: 'Push is not enabled on this server.' };
+    }
+    applicationServerKey = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+  } catch {
+    return { ok: false, reason: 'This server advertised an invalid push key.' };
+  }
 
   let permission: NotificationPermission;
   try {
@@ -201,7 +217,7 @@ export async function enableWebPush(): Promise<WebPushResult> {
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: vapidKeyToBytes(key).buffer as ArrayBuffer,
+        applicationServerKey,
       });
       createdSubscription = sub;
     }
@@ -214,14 +230,27 @@ export async function enableWebPush(): Promise<WebPushResult> {
     const p256dh = json.keys?.p256dh;
     const auth = json.keys?.auth;
     if (!sub.endpoint || !p256dh || !auth) {
-      await discardCreatedSubscription(createdSubscription);
+      // Incomplete keys are unusable on the server — retire the local sub so we
+      // never claim "active" over a half-formed endpoint, then fail closed.
+      try {
+        await sub.unsubscribe();
+      } catch {
+        // Best-effort; the honest outcome is still a failed enable.
+      }
+      clearPushOwnerKey(ownerKey);
       return { ok: false, reason: 'The browser returned an incomplete subscription.' };
     }
     if (!savePushOwnerKey(ownerKey)) {
       await sub.unsubscribe().catch(() => false);
       return { ok: false, reason: 'This browser could not bind push to the current account.' };
     }
-    client.sendRaw('WEBPUSH', 'SUBSCRIBE', sub.endpoint, p256dh, auth);
+    // sendRaw returns false when the socket cannot carry the registration —
+    // never report ok while the server has not learned the endpoint.
+    if (!client.sendRaw('WEBPUSH', 'SUBSCRIBE', sub.endpoint, p256dh, auth)) {
+      clearPushOwnerKey(ownerKey);
+      await discardCreatedSubscription(createdSubscription);
+      return { ok: false, reason: 'Could not register push with the server. Try again.' };
+    }
     return { ok: true };
   } catch {
     await discardCreatedSubscription(createdSubscription);

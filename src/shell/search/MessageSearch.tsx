@@ -741,7 +741,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
                 title="Search the server's full history for this conversation (Ctrl+Enter)"
               >
                 {search.serverStatus() === 'pending'
-                  ? 'Searching history…'
+                  ? 'Searching archived history…'
                   : 'Search full history ↵'}
               </button>
               <Show when={search.serverStatus() === 'done'}>

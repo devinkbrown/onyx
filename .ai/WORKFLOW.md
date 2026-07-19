@@ -26,6 +26,6 @@ Codex owns the primary checkout, integration, Git, full verification, commit, me
 ## Stop rules
 
 - Do not queue permanent autonomous work. Refill only independent review slots for the current slice.
-- Stop a slice if it requires Orochi behavior, a new dependency, a schema/protocol change, or a release authority not in the contract; report the decision needed.
+- Stop a slice if it requires Onyx Server behavior, a new dependency, a schema/protocol change, or a release authority not in the contract; report the decision needed.
 - Never run two writers in the same checkout or on overlapping paths. A worktree writer stops if the base SHA is stale or rebase conflicts.
 - Never let a role modify `out/`; `./deploy.sh` is the only production writer.

@@ -8,7 +8,8 @@
  *   Engage:    Raise hand · Reactions · Captions
  *   View:      Grid ↔ Spotlight · Settings
  *   Exit:      Hang up
- *   Right:     connection-quality pip
+ *   Right:     security chip (shield for hop crypto; padlock only if media E2EE)
+ *              + connection-quality pip
  *
  * All controls use the shared inline-SVG icon set (./icons) so the bar reads as
  * one system; each button keeps its aria-label and Tooltip.
@@ -20,24 +21,24 @@
 
 import { For, createEffect, createMemo, createSignal, onCleanup, Show, untrack } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
-import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
+import { getMountedCadenceMediaEngine } from '@/lib/cadence-media/MediaEngine';
 import {
   DEFAULT_SPATIAL_POSITION,
   padToPosition,
   positionToPadPoint,
   positionToStereoPan,
   type SpatialAudioPosition,
-} from '@/lib/suimyaku-media/spatialAudio';
+} from '@/lib/cadence-media/spatialAudio';
 import {
   createVoiceActivityState,
   updateVoiceActivityFromSamples,
-} from '@/lib/suimyaku-media/voiceActivity';
+} from '@/lib/cadence-media/voiceActivity';
 import {
   advanceActiveSpeaker,
   createActiveSpeakerState,
   energySamplesFromSpeaking,
   type ActiveSpeakerState,
-} from '@/lib/suimyaku-media/activeSpeaker';
+} from '@/lib/cadence-media/activeSpeaker';
 import { shortDuration } from '@/lib/time/relativeTime';
 import { createScreenWakeLockController } from '@/lib/screenWakeLock';
 import { createCallMediaSessionController } from '@/lib/callMediaSession';
@@ -46,8 +47,14 @@ import {
   MicIcon, MicOffIcon, DeafenIcon, DeafenOffIcon, CameraIcon, CameraOffIcon,
   ScreenShareIcon, ScreenShareStopIcon, CaptionsIcon, HandIcon, ReactionIcon,
   GridIcon, SpotlightIcon, SpatialAudioIcon, SettingsIcon, HangupIcon,
+  ShieldIcon, LockIcon, LockOpenIcon, WarningIcon, StageIcon,
 } from './icons';
-import type { NetworkQualityTier } from '@/lib/suimyaku-media/types';
+import type { NetworkQualityTier } from '@/lib/cadence-media/types';
+import {
+  resolveCallSecurity,
+  type CallSecurityAffordance,
+  type CallSecurityIcon,
+} from '@/lib/cadence-media/callSecurity';
 import { mergeVoiceParticipants } from './voiceParticipants';
 import './voice.css';
 
@@ -59,6 +66,62 @@ const TIER_META: Record<NetworkQualityTier, { label: string; color: string; bars
   2: { label: 'Fair',      color: 'var(--gold-bright)', bars: 2 },
   3: { label: 'Poor',      color: 'var(--shu)',         bars: 1 },
 };
+
+// ── Call security chip ────────────────────────────────────────────────────────
+// Honest hop-vs-E2EE affordance (research R1 / Era 1 A5). Padlock only when
+// resolveCallSecurity says usesPadlock — hop-only media never claims E2EE.
+
+function SecurityIcon(props: { kind: CallSecurityIcon }) {
+  switch (props.kind) {
+    case 'shield':
+      return <ShieldIcon />;
+    case 'lock':
+      return <LockIcon />;
+    case 'lock_open':
+      return <LockOpenIcon />;
+    case 'warning':
+      return <WarningIcon />;
+    case 'stage':
+      return <StageIcon />;
+    case 'spinner':
+      return <span class="voice-sec__spinner" aria-hidden="true" />;
+  }
+}
+
+function CallSecurityChip(props: { affordance: CallSecurityAffordance }) {
+  const a = () => props.affordance;
+  const tone = () => {
+    switch (a().level) {
+      case 'hop_protected':
+      case 'e2ee':
+        return 'ok';
+      case 'e2ee_degraded':
+      case 'connecting':
+      case 'stage':
+        return 'warn';
+      case 'insecure':
+        return 'danger';
+    }
+  };
+
+  return (
+    <Tooltip content={a().detail} placement="top">
+      <span
+        class={`voice-sec voice-sec--${tone()}`}
+        role="status"
+        aria-label={a().detail}
+        data-testid="call-security-chip"
+        data-security-level={a().level}
+        data-uses-padlock={a().usesPadlock ? 'true' : 'false'}
+      >
+        <span class="voice-sec__icon" aria-hidden="true" data-testid="call-security-icon">
+          <SecurityIcon kind={a().icon} />
+        </span>
+        <span class="voice-sec__label">{a().label}</span>
+      </span>
+    </Tooltip>
+  );
+}
 
 /** Quick-reaction emoji set surfaced in the reactions popover. */
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👏', '🔥', '😮', '✋'] as const;
@@ -124,7 +187,7 @@ function ConnectionQualityPip() {
 
   createEffect(() => {
     const poll = () => {
-      const engine = getMountedSuimyakuMediaEngine();
+      const engine = getMountedCadenceMediaEngine();
       if (!engine) return;
       const s = engine.getNetworkStats();
       setSample({
@@ -280,6 +343,12 @@ export function VoiceBar() {
     const roster = channel ? voiceChannelParticipants().get(channel.toLowerCase()) : undefined;
     return mergeVoiceParticipants(selfNick() || 'you', voice().peers, roster).length;
   });
+  // Media E2EE is not shipped for Cadence voice — only callState is wired today.
+  // When SFrame/MLS media lands, pass mediaE2eeActive / mediaE2eeDegraded /
+  // stageMode from store/engine so the padlock can appear fail-closed.
+  const securityAffordance = createMemo(() =>
+    resolveCallSecurity({ callState: voice().callState }),
+  );
   const isSpotlight = createMemo(() => voice().callLayout === 'spotlight');
   const spatialPositionCount = createMemo(() => {
     const channel = channelLabel();
@@ -547,7 +616,7 @@ export function VoiceBar() {
   const handleLeave = () => getState().leaveVoiceChannel();
 
   function setPositionForSpatialNick(nick: string, pos: SpatialAudioPosition): void {
-    const engine = getMountedSuimyakuMediaEngine();
+    const engine = getMountedCadenceMediaEngine();
     if (!engine) return;
     const bridge = engine as unknown as SpatialRegistryBridge;
     const setter = bridge.registry?.setPositionForNick;
@@ -1069,8 +1138,11 @@ export function VoiceBar() {
           </Tooltip>
         </div>
 
-        {/* Right: connection quality */}
+        {/* Right: security honesty chip + connection quality */}
         <div class="voice-bar__right">
+          <Show when={securityAffordance()} keyed>
+            {(affordance) => <CallSecurityChip affordance={affordance} />}
+          </Show>
           <ConnectionQualityPip />
         </div>
       </div>

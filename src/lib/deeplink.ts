@@ -6,22 +6,24 @@
  * raw search-param value is untrusted input: it is URI-decoded, then validated
  * against IRC channel-name rules before it is allowed anywhere near a JOIN.
  *
- * Valid shape (after decodeURIComponent): `#` followed by 1–63 chars, none of
- * which may be whitespace, a comma (JOIN list separator) or any C0/DEL control
- * character (\x00–\x1f, \x7f) — this range subsumes \x07 (^G) and, critically,
- * NUL, which IRC channel-name rules forbid and which could otherwise truncate
- * or corrupt the downstream JOIN. Anything else is ignored — a bad deep link
- * must never break the connect flow.
+ * Valid shape (after decodeURIComponent): a CHANTYPES prefix (`#` public room
+ * or `&` local/server room) followed by 1–63 chars, none of which may be
+ * whitespace, a comma (JOIN list separator) or any C0/DEL control character
+ * (\x00–\x1f, \x7f) — this range subsumes \x07 (^G) and, critically, NUL,
+ * which IRC channel-name rules forbid and which could otherwise truncate or
+ * corrupt the downstream JOIN. Anything else is ignored — a bad deep link must
+ * never break the connect flow. Moment links for local `&` rooms must round-
+ * trip through the same validator so cross-room handoffs do not drop context.
  */
 
-const JOIN_PARAM_RE = /^#[^\s\x00-\x1f\x7f,]{1,63}$/;
+const JOIN_PARAM_RE = /^[&#][^\s\x00-\x1f\x7f,]{1,63}$/;
 const TOPIC_PARAM_CONTROL_PATTERN = /[\x00-\x1f\x7f,]/u;
 const textEncoder = new TextEncoder();
 
 /**
  * Parse and validate a `?join=` search-param value into a channel name.
- * Accepts both pre-decoded ("#foo") and encoded ("%23foo") input.
- * Returns the validated channel, or null when absent/malformed.
+ * Accepts both pre-decoded ("#foo" / "&ops") and encoded ("%23foo" / "%26ops")
+ * input. Returns the validated channel, or null when absent/malformed.
  */
 export function parseJoinParam(raw: string | string[] | null | undefined): string | null {
   // useSearchParams can surface repeated params as an array — take the first.

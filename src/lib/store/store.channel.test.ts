@@ -172,7 +172,7 @@ describe('channel management — raw command dispatch', () => {
     });
   });
 
-  it('stores Orochi topic tags on channel messages', () => {
+  it('stores Onyx Server topic tags on channel messages', () => {
     seed('#general', [makeUser('me', ['o'])]);
     feed(`@${TOPIC_TAG}=roadmap;msgid=m-topic :alice!a@host PRIVMSG #general :next milestone`);
 
@@ -206,7 +206,7 @@ describe('channel management — raw command dispatch', () => {
 
     store.getState().sendMessage('#general', 'ship it');
 
-    expect(client.send).toHaveBeenCalledWith('@orochi/topic=release\\strain PRIVMSG #general :ship it\r\n');
+    expect(client.send).toHaveBeenCalledWith('@onyx/topic=release\\strain PRIVMSG #general :ship it\r\n');
     expect(store.getState().channels.get('#general')?.messages.at(-1)).toMatchObject({
       text: 'ship it',
       topic: 'release train',
@@ -236,7 +236,7 @@ describe('channel management — raw command dispatch', () => {
 
     store.getState().sendMessage('#general', 'line one\nline two');
 
-    expect(client.send).toHaveBeenCalledWith(expect.stringMatching(/^@orochi\/topic=roadmap;\+draft\/reply=parent-1 BATCH \+/));
+    expect(client.send).toHaveBeenCalledWith(expect.stringMatching(/^@onyx\/topic=roadmap;\+draft\/reply=parent-1 BATCH \+/));
   });
 
   it('adds a follow notification for followed channel topics', () => {

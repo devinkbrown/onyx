@@ -6,7 +6,7 @@
  *
  * The store is the single source of truth. We seed reactive state (logged-in vs
  * guest, accountInfo, accountActionError) and spy on store actions to assert the
- * panel dispatches the right Orochi command for each affordance — change email,
+ * panel dispatches the right Onyx Server command for each affordance — change email,
  * change password, toggle secure/enforce, recover a nick, bind a certificate,
  * sign out, and the guarded account deletion (DROP).
  *
@@ -139,6 +139,19 @@ describe('Account panel — signed in', () => {
     const { client } = renderPanel({ account: 'alice' });
     expect(screen.getAllByText('alice').length).toBeGreaterThan(0);
     expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
+  });
+
+  it('mounts the Sessions & devices skeleton with this browser active', () => {
+    renderPanel({ account: 'alice' });
+    expect(screen.getByTestId('sessions-devices-section')).toBeInTheDocument();
+    expect(screen.getByTestId('sessions-current-device')).toHaveTextContent(/this browser/i);
+    expect(screen.getByTestId('sessions-remote-placeholder')).toHaveTextContent(/era 2 \(b8\)/i);
+    expect(screen.queryByRole('button', { name: /revoke/i })).not.toBeInTheDocument();
+  });
+
+  it('does not mount Sessions & devices for a guest', () => {
+    renderPanel({ account: null });
+    expect(screen.queryByTestId('sessions-devices-section')).not.toBeInTheDocument();
   });
 
   it('clears local secrets and an armed account deletion when closed', async () => {

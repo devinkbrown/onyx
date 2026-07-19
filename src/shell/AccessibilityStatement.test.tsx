@@ -35,5 +35,10 @@ describe('AccessibilityStatement', () => {
     expect(screen.getByText(/Member list uses a channel-scoped complementary landmark/i)).toBeInTheDocument();
     expect(screen.getByText(/Notification controls use a labelled compact control group/i)).toBeInTheDocument();
     expect(screen.getByText(/Time scrubber uses a channel-scoped region/i)).toBeInTheDocument();
+    expect(screen.getByText(/Jump to date uses a named Sheet dialog/i)).toBeInTheDocument();
+    expect(screen.getByText(/Reader memory uses a named device-memory region/i)).toBeInTheDocument();
+    expect(screen.getByText(/Preferences dense rows use segmented radio groups/i)).toBeInTheDocument();
+    expect(screen.getByText(/Message transcript uses a named live log/i)).toBeInTheDocument();
+    expect(screen.getByText(/without exposing E2EE ciphertext/i)).toBeInTheDocument();
   });
 });

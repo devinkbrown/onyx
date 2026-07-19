@@ -15,7 +15,7 @@ execFileSync('git', ['rev-parse', '--verify', `${base}^{commit}`], { stdio: 'ign
 // unstaged integration changes are both checked before a commit exists.
 const changed = execFileSync('git', ['diff', '--name-only', base], { encoding: 'utf8' })
   .split('\n').filter(Boolean);
-const forbidden = changed.filter((path) => path === 'pnpm-lock.yaml' || path.startsWith('out/') || path.startsWith('../orochi/'));
+const forbidden = changed.filter((path) => path === 'pnpm-lock.yaml' || path.startsWith('out/') || path.startsWith('../onyx-server/'));
 const outside = changed.filter((path) => !paths.some((allowed) => path === allowed || path.startsWith(`${allowed}/`)));
 if (forbidden.length || outside.length) {
   console.error(`Scope violation: ${[...forbidden, ...outside].join(', ')}`);

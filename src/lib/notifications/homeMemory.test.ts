@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, test } from 'vitest';
 import type { ChatMessage } from '@/lib/irc/types';
-import { buildHomeMemory, summarizeHomeMemory } from './homeMemory';
+import {
+  buildHomeMemory,
+  collectHomeMemoryTargets,
+  summarizeHomeMemory,
+} from './homeMemory';
 
 const base = new Date('2026-07-09T00:00:00.000Z');
 let idSeq = 0;
@@ -82,5 +86,29 @@ describe('buildHomeMemory', () => {
     );
 
     expect(out.map((item) => item.target)).toEqual(['#new']);
+  });
+});
+
+describe('collectHomeMemoryTargets', () => {
+  test('prefers join history, then auto-join, skips live rooms, and caps fan-out', () => {
+    expect(
+      collectHomeMemoryTargets(
+        ['#left', '#still-joined'],
+        ['#still-joined', '#auto', '#auto-dup', '#extra'],
+        ['#still-joined'],
+        3,
+      ),
+    ).toEqual(['#left', '#auto', '#auto-dup']);
+  });
+
+  test('is case-insensitive against the live map and de-dupes mixed sources', () => {
+    expect(
+      collectHomeMemoryTargets(
+        ['#Archive'],
+        ['#archive', '#Ops'],
+        new Set(['#OPS']),
+        6,
+      ),
+    ).toEqual(['#Archive']);
   });
 });

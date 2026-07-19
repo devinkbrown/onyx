@@ -356,4 +356,116 @@ describe('vaultSync', () => {
     await until(() => (store.getState().dms.get('trev')?.messages.length ?? 0) === 1);
     expect(store.getState().dms.get('trev')!.messages[0]!.id).toBe('d1');
   });
+
+  it('paints already-live buffers on init (JOIN beat retention finally)', async () => {
+    // AppRoute wires vaultSync AFTER applyRetentionPolicy. A fast SESSION
+    // resume can create empty channel shells first — subscribers do not
+    // fireImmediately, so init itself must paint whatever is already live.
+    await saveOwnedMessages('#room', [msg('cold-1', 1000), msg('cold-2', 2000)]);
+    setChannel('#room', []);
+    store.setState({ activeView: { kind: 'channel', channel: '#room' } });
+
+    initVaultSync();
+
+    await until(() => (store.getState().channels.get('#room')?.messages.length ?? 0) === 2);
+    expect(store.getState().channels.get('#room')!.messages.map((m) => m.id)).toEqual([
+      'cold-1',
+      'cold-2',
+    ]);
+  });
+
+  it('hydrates the last-active room before other rooms finish loading', async () => {
+    await saveOwnedMessages('#active', [msg('active-1', 1000, '#active')]);
+    await saveOwnedMessages('#other', [msg('other-1', 1000, '#other')]);
+
+    let releaseOther: (messages: ChatMessage[]) => void = () => {};
+    const otherPending = new Promise<ChatMessage[]>((resolve) => {
+      releaseOther = resolve;
+    });
+    const loadOrder: string[] = [];
+    vi.spyOn(vault, 'loadRecent').mockImplementation((target, _limit, _owner) => {
+      const key = target.toLowerCase();
+      loadOrder.push(key);
+      if (key === '#other') return otherPending;
+      return Promise.resolve([msg('active-1', 1000, '#active')]);
+    });
+
+    const channels = new Map<string, Channel>();
+    channels.set('#other', makeChannel('#other'));
+    channels.set('#active', makeChannel('#active'));
+    store.setState({
+      channels,
+      activeView: { kind: 'channel', channel: '#active' },
+    });
+    initVaultSync();
+
+    // Active room must start first and paint while the other room is still blocked.
+    await until(() => (store.getState().channels.get('#active')?.messages.length ?? 0) === 1);
+    expect(loadOrder[0]).toBe('#active');
+    expect(store.getState().channels.get('#active')!.messages.map((m) => m.id)).toEqual([
+      'active-1',
+    ]);
+    expect(store.getState().channels.get('#other')!.messages).toEqual([]);
+
+    releaseOther([msg('other-1', 1000, '#other')]);
+    await until(() => (store.getState().channels.get('#other')?.messages.length ?? 0) === 1);
+    expect(store.getState().channels.get('#other')!.messages.map((m) => m.id)).toEqual([
+      'other-1',
+    ]);
+  });
+
+  it('hydrates a newly joined room the user navigates into', async () => {
+    await saveOwnedMessages('#beta', [msg('b1', 1000, '#beta')]);
+    setChannel('#alpha', []);
+    store.setState({ activeView: { kind: 'home' } });
+    initVaultSync();
+
+    // User opens a room that just gained an empty shell (JOIN / openVaultResult).
+    // activeView + channels both change — vault must paint before CHATHISTORY.
+    const channels = new Map(store.getState().channels);
+    channels.set('#beta', makeChannel('#beta'));
+    store.setState({
+      channels,
+      activeView: { kind: 'channel', channel: '#beta' },
+    });
+
+    await until(() => (store.getState().channels.get('#beta')?.messages.length ?? 0) === 1);
+    expect(store.getState().channels.get('#beta')!.messages.map((m) => m.id)).toEqual(['b1']);
+  });
+
+  it('never flushes decrypted E2EE DM plaintext into the vault', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    initVaultSync();
+
+    const sealed: ChatMessage = {
+      id: 'dm-1',
+      time: new Date(1000),
+      from: 'trev',
+      text: 'onyx-e2ee:v1:ciphertext-envelope',
+      type: 'msg',
+      target: 'trev',
+      encrypted: true,
+      // View-only decrypted body — must never reach IndexedDB.
+      plaintext: 'super secret plaintext body',
+    };
+    const dms = new Map(store.getState().dms);
+    dms.set('trev', {
+      nick: 'trev',
+      account: null,
+      unread: 0,
+      highlights: 0,
+      messages: [sealed],
+    });
+    store.setState({ dms, activeView: { kind: 'dm', nick: 'trev' } });
+    await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+
+    await until(async () => (await loadOwnedRecent('trev')).length === 1);
+    const rows = await loadOwnedRecent('trev');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.text).toBe('onyx-e2ee:v1:ciphertext-envelope');
+    expect(rows[0]!.encrypted).toBe(true);
+    expect(rows[0]!.plaintext).toBeUndefined();
+    expect(JSON.stringify(rows[0])).not.toContain('super secret plaintext body');
+  });
 });

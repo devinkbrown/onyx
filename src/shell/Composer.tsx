@@ -15,6 +15,7 @@
 import {
   createEffect,
   createMemo,
+  createResource,
   createSignal,
   For,
   onCleanup,
@@ -43,6 +44,12 @@ import {
   hasEncryptedMessageBoundary,
 } from '@/lib/e2ee/replyPrivacy';
 import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
+import {
+  loadOutbox,
+  subscribeOutbox,
+  type OutboxEntry,
+} from '@/lib/vault/historyVault';
+import { outboxComposerChrome } from '@/lib/vault/outboxStatus';
 
 export type ComposerProps = {
   /** Optionally override the active target; defaults to deriving from activeView */
@@ -92,6 +99,7 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const outboxDeliveryFailed = useStore((s) => s.outboxDeliveryFailed);
   const activeChannelTopics = useStore((s) => s.activeChannelTopics);
   const replyingTo = useStore((s) => s.replyingTo);
   const editingMessage = useStore((s) => s.editingMessage);
@@ -100,6 +108,17 @@ export function Composer(props: ComposerProps): JSX.Element {
     selectDeviceMemoryOwner,
     (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
   );
+
+  // Device-local outbox journal — same substrate Home reads. Metadata only in
+  // chrome (count + delivery state); message bodies stay in the conversation.
+  const [outboxEntries, { refetch: refetchOutbox }] = createResource(
+    () => memoryOwner()?.serverUrl ?? null,
+    () => loadOutbox(),
+    { initialValue: [] as OutboxEntry[] },
+  );
+  onCleanup(subscribeOutbox(() => {
+    void refetchOutbox();
+  }));
 
   const [text, setText] = createSignal('');
   const [attachments, setAttachments] = createSignal<ComposerAttachment[]>([]);
@@ -192,6 +211,23 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (view.kind !== 'channel') return null;
     return activeChannelTopics().get(view.channel.toLowerCase()) ?? null;
   });
+
+  const ownedOutboxCount = createMemo(() => {
+    const owner = memoryOwner();
+    if (!owner) return 0;
+    return (outboxEntries.latest ?? []).filter(
+      (entry) => entry.owner?.serverUrl === owner.serverUrl
+        && entry.owner.identity === owner.identity,
+    ).length;
+  });
+
+  // Honest outbox chrome: offline queue, waiting flush, or failed delivery.
+  // Never silent — empty offline still says messages queue on this device.
+  const outboxChrome = createMemo(() => outboxComposerChrome({
+    connected: connectionStatus() === 'connected',
+    queuedCount: ownedOutboxCount(),
+    deliveryFailed: outboxDeliveryFailed(),
+  }));
 
   const placeholder = createMemo(() => {
     const t = target();
@@ -686,6 +722,29 @@ export function Composer(props: ComposerProps): JSX.Element {
       onDrop={handleDrop}
     >
       <div class="shell-composer-measure">
+      <Show when={outboxChrome()}>
+        {(chrome) => (
+          <div
+            class={`shell-composer-outbox shell-composer-outbox--${chrome().tone}`}
+            data-kind={chrome().kind}
+            role="status"
+            aria-live="polite"
+          >
+            <span class="shell-composer-outbox-label">{chrome().label}</span>
+            <span class="sr-only">{chrome().announcement}</span>
+            <Show when={chrome().canRetry}>
+              <button
+                type="button"
+                class="shell-composer-outbox-retry"
+                onClick={() => getState().flushOutbox()}
+              >
+                Try sending now
+              </button>
+            </Show>
+          </div>
+        )}
+      </Show>
+
       <Show when={activeTopic()}>
         {(topic) => (
           <div class="shell-composer-topic" role="status" aria-live="polite">
@@ -976,6 +1035,23 @@ export function Composer(props: ComposerProps): JSX.Element {
             <circle cx="8" cy="8.6" r="5.2" />
             <path d="M8 5.6v3l2 1.2" />
             <path d="M5.4 1.8 3.2 3.4M10.6 1.8l2.2 1.6" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="shell-composer-tool"
+          disabled={!target()}
+          aria-label="Jump to date in conversation history"
+          aria-haspopup="dialog"
+          title="Jump to date"
+          data-testid="composer-jump-to-date"
+          onClick={() => getState().openJumpToDate()}
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2.2" y="3.4" width="11.6" height="10.4" rx="1.4" />
+            <path d="M5 2.2v2.4M11 2.2v2.4M2.2 7h11.6" />
+            <path d="M8 9.2v2M8 9.2l1.4.8" />
           </svg>
         </button>
 

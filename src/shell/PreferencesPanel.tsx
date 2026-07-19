@@ -342,6 +342,31 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.',
   },
   {
+    surface: 'Jump to date',
+    status: 'checked',
+    note: 'Named Sheet dialog, UTC date/time fields, quick-date presets, target-specific jump and moment-copy actions, and ribbon/composer openers.',
+  },
+  {
+    surface: 'Watch together',
+    status: 'checked',
+    note: 'Named review and host-control groups, bounded participant list, polite atomic outcome status, and focus restoration after confirmations.',
+  },
+  {
+    surface: 'Reader memory',
+    status: 'checked',
+    note: 'Named device-memory region, reviewed-span and context-trail groups, labelled transcript jumps, and cross-room peer-review handoffs.',
+  },
+  {
+    surface: 'Preferences dense rows',
+    status: 'checked',
+    note: 'Segmented radio groups and switch rows expose concise names, descriptions, keyboard roving, focus-visible outlines, and forced-colors selected states.',
+  },
+  {
+    surface: 'Message transcript',
+    status: 'checked',
+    note: 'Named live log, focusable articles, state-aware accessible names (queued/edited/deleted/locked without ciphertext), and keyboard action-bar reveal.',
+  },
+  {
     surface: 'Mobile drawers',
     status: 'checked',
     note: 'Bottom-nav trigger handoff, drawer-initial focus, Escape close, Tab trap, and trigger focus restore.',

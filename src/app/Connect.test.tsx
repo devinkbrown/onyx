@@ -258,6 +258,113 @@ describe('Passkey sign-in', () => {
     return screen.getByTestId('conn-passkey-submit');
   }
 
+  it('makes passkey the primary sign-in CTA and collapses the password path', () => {
+    enablePasskeys();
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+
+    expect(screen.getByTestId('conn-passkey-primary')).toBeInTheDocument();
+    const passkeyBtn = screen.getByTestId('conn-passkey-submit');
+    expect(passkeyBtn).toHaveTextContent(/sign in with a passkey/i);
+    // Primary solid button — not the old ghost demotion.
+    expect(passkeyBtn.className).toContain('onyx-button--primary');
+    expect(passkeyBtn.className).not.toContain('onyx-button--ghost');
+    expect(screen.queryByLabelText(/account password/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('conn-submit')).not.toBeInTheDocument();
+    expect(screen.getByTestId('conn-password-path-open')).toHaveTextContent(/use password instead/i);
+    // Stay-signed-in stores a password — hidden while password path is collapsed.
+    expect(screen.queryByLabelText(/stay signed in/i)).not.toBeInTheDocument();
+  });
+
+  it('surfaces the passkey-primary mode hint once routing settles', async () => {
+    enablePasskeys();
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('conn-status')).toHaveTextContent(
+        /sign in with a passkey — or use your account password/i,
+      ),
+    );
+  });
+
+  it('reveals the password path under "Use password instead"', () => {
+    enablePasskeys();
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+
+    fireEvent.click(screen.getByTestId('conn-password-path-open'));
+
+    expect(screen.getByLabelText(/account password/i)).toBeInTheDocument();
+    expect(screen.getByTestId('conn-submit')).toHaveTextContent(/sign in/i);
+    // Passkey stays available as a secondary action (ghost + divider).
+    const passkeyBtn = screen.getByTestId('conn-passkey-submit');
+    expect(passkeyBtn).toBeInTheDocument();
+    expect(passkeyBtn.className).toContain('onyx-button--ghost');
+    expect(passkeyBtn.className).not.toContain('onyx-button--primary');
+    expect(screen.getByTestId('conn-passkey-primary')).toHaveTextContent(/or use a passkey/i);
+    expect(screen.queryByTestId('conn-password-path-open')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/stay signed in/i)).toBeInTheDocument();
+  });
+
+  it('collapses the password path again after a mode round-trip', () => {
+    enablePasskeys();
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+    fireEvent.click(screen.getByTestId('conn-password-path-open'));
+    expect(screen.getByLabelText(/account password/i)).toBeInTheDocument();
+
+    clickMode(/guest/i);
+    clickMode(/sign in/i);
+
+    expect(screen.queryByLabelText(/account password/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('conn-passkey-submit').className).toContain('onyx-button--primary');
+    expect(screen.getByTestId('conn-password-path-open')).toBeInTheDocument();
+  });
+
+  it('keeps password as the primary path when WebAuthn is unavailable', async () => {
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+
+    expect(screen.queryByTestId('conn-passkey-primary')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('conn-passkey-submit')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/account password/i)).toBeInTheDocument();
+    expect(screen.getByTestId('conn-submit')).toHaveTextContent(/sign in/i);
+    await waitFor(() =>
+      expect(screen.getByTestId('conn-status')).toHaveTextContent(
+        /sign in to your account — onyx finds the nearest node for you/i,
+      ),
+    );
+  });
+
+  it('validates the nick before opening a passkey transport', () => {
+    enablePasskeys();
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+
+    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
+    expect(screen.getByText(/nick is required/i)).toBeInTheDocument();
+    expect(connectSpy).not.toHaveBeenCalled();
+
+    fireEvent.input(nickField(), { target: { value: '1bad' } });
+    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
+    expect(screen.getByText(/must start with/i)).toBeInTheDocument();
+    expect(connectSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows Connecting securely… while the anonymous transport opens', async () => {
+    vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    const button = openPasskeySignIn();
+
+    fireEvent.click(button);
+
+    expect(screen.getByTestId('conn-passkey-submit')).toHaveTextContent(/connecting securely/i);
+    expect(screen.getByTestId('conn-passkey-submit')).toBeDisabled();
+  });
+
   it('opens IRC transport once before dispatching WEBAUTHN AUTH', async () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
       store.setState({ status: 'connecting', connectionStatus: 'connecting' });
@@ -265,14 +372,19 @@ describe('Passkey sign-in', () => {
     const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {
       store.setState({ passkeyBusy: true, passkeyError: null });
     });
+    const dismissSpy = vi.spyOn(getState(), 'dismissPasskeyMessage');
     const button = openPasskeySignIn();
 
     fireEvent.click(button);
     fireEvent.click(button);
 
     expect(connectSpy).toHaveBeenCalledTimes(1);
-    expect(connectSpy).toHaveBeenCalledWith(expect.objectContaining({ nick: 'alice' }));
+    expect(connectSpy).toHaveBeenCalledWith(expect.objectContaining({
+      nick: 'alice',
+      realname: 'alice (Onyx)',
+    }));
     expect(signInSpy).not.toHaveBeenCalled();
+    expect(dismissSpy).toHaveBeenCalled();
 
     store.setState({
       status: 'connected',
@@ -312,6 +424,75 @@ describe('Passkey sign-in', () => {
     const restoredButton = screen.getByTestId('conn-passkey-submit');
     expect(screen.getByRole('alert')).toHaveTextContent('Passkey prompt was dismissed.');
     await waitFor(() => expect(restoredButton).toHaveFocus());
+    // Form is actionable again after cancellation.
+    expect(restoredButton).not.toBeDisabled();
+    expect(restoredButton).toHaveTextContent(/sign in with a passkey/i);
+  });
+
+  it('releases the form when the anonymous transport drops before dispatch', async () => {
+    vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
+    const button = openPasskeySignIn();
+
+    fireEvent.click(button);
+    expect(screen.getByTestId('conn-passkey-submit')).toHaveTextContent(/connecting securely/i);
+
+    // Synchronous WS construction failure / drop before connected: free the guard.
+    store.setState({
+      status: 'disconnected',
+      connectionStatus: 'disconnected',
+      autoReconnect: false,
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('conn-passkey-submit')).toHaveTextContent(/sign in with a passkey/i),
+    );
+    expect(screen.getByTestId('conn-passkey-submit')).not.toBeDisabled();
+    expect(signInSpy).not.toHaveBeenCalled();
+  });
+
+  it('locks the form while a passkey attempt is in flight', async () => {
+    vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    openPasskeySignIn();
+    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
+
+    expect(nickField()).toBeDisabled();
+    expect(screen.getByTestId('conn-passkey-submit')).toBeDisabled();
+    expect(screen.getByTestId('conn-password-path-open')).toBeDisabled();
+  });
+
+  it('can start a fresh passkey attempt for another nick after a transport drop', async () => {
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
+    openPasskeySignIn();
+
+    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
+    store.setState({
+      status: 'disconnected',
+      connectionStatus: 'disconnected',
+      autoReconnect: false,
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('conn-passkey-submit')).not.toBeDisabled(),
+    );
+
+    fireEvent.input(nickField(), { target: { value: 'bob' } });
+    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
+    expect(connectSpy).toHaveBeenLastCalledWith(expect.objectContaining({ nick: 'bob' }));
+
+    store.setState({
+      status: 'connected',
+      connectionStatus: 'connected',
+      autoReconnect: true,
+      server: { ...connectedServer(null), nick: 'bob' },
+    });
+    await waitFor(() => expect(signInSpy).toHaveBeenCalledWith('bob'));
   });
 
   it('cancels the anonymous transport when mode changes before the challenge', async () => {
@@ -332,6 +513,33 @@ describe('Passkey sign-in', () => {
     expect(signInSpy).not.toHaveBeenCalled();
   });
 
+  it('freezes mode tabs once the passkey ceremony is dispatched', async () => {
+    vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {
+      store.setState({ passkeyBusy: true, passkeyError: null });
+    });
+    const disconnectSpy = vi.spyOn(getState(), 'disconnect');
+    const button = openPasskeySignIn();
+
+    fireEvent.click(button);
+    store.setState({
+      status: 'connected',
+      connectionStatus: 'connected',
+      autoReconnect: true,
+      server: connectedServer(),
+    });
+    await waitFor(() => expect(getState().signInWithPasskey).toHaveBeenCalledWith('alice'));
+    const disconnectsAfterDispatch = disconnectSpy.mock.calls.length;
+
+    // Mode change is ignored while dispatched so account A cannot complete on B.
+    clickMode(/guest/i);
+    expect(screen.getByRole('tab', { name: /sign in/i })).toHaveAttribute('aria-selected', 'true');
+    expect(disconnectSpy).toHaveBeenCalledTimes(disconnectsAfterDispatch);
+    expect(screen.getByTestId('conn-passkey-submit')).toHaveTextContent(/waiting for your device/i);
+  });
+
   it('does not prompt again when SESSION already restored the requested account', async () => {
     vi.spyOn(getState(), 'connect').mockImplementation(() => {
       store.setState({ status: 'connecting', connectionStatus: 'connecting' });
@@ -349,6 +557,36 @@ describe('Passkey sign-in', () => {
 
     await waitFor(() => expect(screen.getByTestId('app-shell')).toBeInTheDocument());
     expect(signInSpy).not.toHaveBeenCalled();
+  });
+
+  it('treats SESSION account restore as case-insensitive', async () => {
+    vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
+    const button = openPasskeySignIn();
+
+    fireEvent.click(button);
+    store.setState({
+      status: 'connected',
+      connectionStatus: 'connected',
+      autoReconnect: true,
+      server: connectedServer('ALICE'),
+    });
+
+    await waitFor(() => expect(screen.getByTestId('app-shell')).toBeInTheDocument());
+    expect(signInSpy).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a store passkeyError without starting a ceremony', () => {
+    enablePasskeys();
+    store.setState({ passkeyError: 'No passkey is registered for this account.' });
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'No passkey is registered for this account.',
+    );
   });
 
   it('destroys the anonymous transport on unmount before dispatch', async () => {

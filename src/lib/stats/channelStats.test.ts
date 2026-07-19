@@ -2,7 +2,7 @@
 /**
  * channelStats.test.ts — the slug must stay byte-faithful to the server's
  * `slugify` (chanstats.zig) or the per-channel stats file 404s. These vectors
- * mirror the pinned ones in orochi-stats/src/lib/slug.test.ts.
+ * mirror the pinned ones in onyx-stats/src/lib/slug.test.ts.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

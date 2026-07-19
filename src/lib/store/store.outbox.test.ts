@@ -155,6 +155,29 @@ describe('offline outbox', () => {
     expect(messagesFor(target)[0]).toBe(placeholderBefore);
     expect(messagesFor(target)[0]?.pending).toBe(true);
     expect(store.getState().toasts.some((toast) => toast.title.includes('sent'))).toBe(false);
+    // Still within auto-retry budget — not a terminal failure yet.
+    expect(store.getState().outboxDeliveryFailed).toBe(false);
+  });
+
+  it('marks outboxDeliveryFailed and toasts when auto-retries are exhausted', async () => {
+    store.getState().sendMessage('#room', 'stuck in outbox');
+    await until(async () => (await loadOutbox()).length === 1);
+
+    const sendRaw = vi.fn(() => false);
+    store.setState({ connectionStatus: 'connected', client: mockClient(sendRaw) });
+
+    // Exhaust the 5 auto-retries (plus the initial attempt = 6 flushes).
+    for (let i = 0; i < 6; i += 1) {
+      store.getState().flushOutbox();
+      await until(() => sendRaw.mock.calls.length >= i + 1);
+      // Allow the async flush body to settle before the next attempt.
+      await new Promise((r) => setTimeout(r, 20));
+    }
+
+    await until(() => store.getState().outboxDeliveryFailed);
+    expect(store.getState().outboxDeliveryFailed).toBe(true);
+    expect(await loadOutbox()).toHaveLength(1);
+    expect(store.getState().toasts.some((t) => t.title.includes('still waiting'))).toBe(true);
   });
 
   it('reopens a persisted queued send and restores its placeholder after reload', async () => {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*
- * tsumugiCrypto.test.ts — E2E media crypto pins for TsumugiSession / TsumugiGroup.
+ * mooringCrypto.test.ts — E2E media crypto pins for MooringSession / MooringGroup.
  *
  * jsdom ships a real crypto.subtle, so P-256 ECDH + HKDF + AES-256-GCM run
  * end-to-end here. These specs lock down the security-critical behaviour:
@@ -10,8 +10,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { TsumugiSession } from './TsumugiSession';
-import { TsumugiGroup } from './TsumugiGroup';
+import { MooringSession } from './MooringSession';
+import { MooringGroup } from './MooringGroup';
 import { REPLAY_WINDOW_BITS } from './replayWindow';
 
 const enc = new TextEncoder();
@@ -23,16 +23,16 @@ function text(b: Uint8Array): string {
 }
 
 /** Establish a mutually-keyed pair of sessions. */
-async function handshakePair(): Promise<[TsumugiSession, TsumugiSession]> {
-  const a = await TsumugiSession.create();
-  const b = await TsumugiSession.create();
+async function handshakePair(): Promise<[MooringSession, MooringSession]> {
+  const a = await MooringSession.create();
+  const b = await MooringSession.create();
   const [ak, bk] = await Promise.all([a.exportPublicKey(), b.exportPublicKey()]);
   await a.ingestPeerKey(bk);
   await b.ingestPeerKey(ak);
   return [a, b];
 }
 
-describe('TsumugiSession — handshake + direction separation', () => {
+describe('MooringSession — handshake + direction separation', () => {
   it('two parties derive complementary send/receive keys and interoperate', async () => {
     const [a, b] = await handshakePair();
     expect(a.established).toBe(true);
@@ -53,18 +53,18 @@ describe('TsumugiSession — handshake + direction separation', () => {
   });
 
   it('refuses ingesting its own public key', async () => {
-    const a = await TsumugiSession.create();
+    const a = await MooringSession.create();
     const ak = await a.exportPublicKey();
     await expect(a.ingestPeerKey(ak)).rejects.toThrow(/self public key/);
   });
 
   it('rejects a malformed peer public key', async () => {
-    const a = await TsumugiSession.create();
+    const a = await MooringSession.create();
     await expect(a.ingestPeerKey(new Uint8Array(65))).rejects.toThrow(/invalid P-256/);
   });
 });
 
-describe('TsumugiSession — IV monotonicity + replay guard', () => {
+describe('MooringSession — IV monotonicity + replay guard', () => {
   it('assigns a distinct, monotonically-increasing counter per encrypt', async () => {
     const [a] = await handshakePair();
     const first = await a.encrypt(bytes('x'));
@@ -117,7 +117,7 @@ describe('TsumugiSession — IV monotonicity + replay guard', () => {
   });
 });
 
-describe('TsumugiSession — ratchet', () => {
+describe('MooringSession — ratchet', () => {
   it('advances the epoch and both sides stay in sync', async () => {
     const [a, b] = await handshakePair();
     expect(a.epoch).toBe(0);
@@ -137,12 +137,12 @@ describe('TsumugiSession — ratchet', () => {
   });
 
   it('refuses to ratchet before establishment', async () => {
-    const a = await TsumugiSession.create();
+    const a = await MooringSession.create();
     await expect(a.ratchet()).rejects.toThrow(/not yet established/);
   });
 });
 
-describe('TsumugiSession — destroyed refuses ops', () => {
+describe('MooringSession — destroyed refuses ops', () => {
   it('assertLive blocks use after destroy()', async () => {
     const [a, b] = await handshakePair();
     a.destroy();
@@ -154,13 +154,13 @@ describe('TsumugiSession — destroyed refuses ops', () => {
   });
 });
 
-describe('TsumugiGroup — wrap/unwrap + shared-key round-trip', () => {
+describe('MooringGroup — wrap/unwrap + shared-key round-trip', () => {
   it('distributes the group key pairwise and members interoperate', async () => {
     const [creatorToMember, member] = await handshakePair();
-    const group = await TsumugiGroup.create();
+    const group = await MooringGroup.create();
 
     const wrapped = await group.exportKeyFor(creatorToMember);
-    const memberGroup = await TsumugiGroup.importKey(wrapped, member);
+    const memberGroup = await MooringGroup.importKey(wrapped, member);
 
     const ct = await group.encrypt(bytes('group broadcast'));
     expect(text(await memberGroup.decrypt(ct))).toBe('group broadcast');
@@ -174,27 +174,27 @@ describe('TsumugiGroup — wrap/unwrap + shared-key round-trip', () => {
     const [creatorToMember, member] = await handshakePair();
     // Wrap arbitrary 16-byte material through the session, then try to import.
     const bogus = await creatorToMember.encrypt(new Uint8Array(16));
-    await expect(TsumugiGroup.importKey(bogus, member)).rejects.toThrow(/invalid key length/);
+    await expect(MooringGroup.importKey(bogus, member)).rejects.toThrow(/invalid key length/);
   });
 
   it('refuses ops after destroy()', async () => {
-    const group = await TsumugiGroup.create();
+    const group = await MooringGroup.create();
     group.destroy();
     await expect(group.encrypt(bytes('x'))).rejects.toThrow(/destroyed/);
-    const other = await TsumugiGroup.create();
+    const other = await MooringGroup.create();
     const ct = await other.encrypt(bytes('y'));
     await expect(group.decrypt(ct)).rejects.toThrow(/destroyed/);
   });
 });
 
-describe('TsumugiGroup — bounded replay window', () => {
+describe('MooringGroup — bounded replay window', () => {
   it('rejects an exact replayed group frame', async () => {
-    const group = await TsumugiGroup.create();
+    const group = await MooringGroup.create();
     const ct = await group.encrypt(bytes('frame'));
     // Round-trip through a member so decrypt is a genuine receive path.
     const [creatorToMember, member] = await handshakePair();
     const wrapped = await group.exportKeyFor(creatorToMember);
-    const memberGroup = await TsumugiGroup.importKey(wrapped, member);
+    const memberGroup = await MooringGroup.importKey(wrapped, member);
 
     expect(text(await memberGroup.decrypt(ct))).toBe('frame');
     await expect(memberGroup.decrypt(ct)).rejects.toThrow(/replayed/);
@@ -203,10 +203,10 @@ describe('TsumugiGroup — bounded replay window', () => {
   it('tolerates in-window reordering across two senders but rejects duplicates', async () => {
     // One receiver decrypting frames from two independent senders — all three
     // hold the SAME group key but carry distinct random IV prefixes.
-    const origin = await TsumugiGroup.create();
-    const importFor = async (): Promise<TsumugiGroup> => {
+    const origin = await MooringGroup.create();
+    const importFor = async (): Promise<MooringGroup> => {
       const [c2m, m] = await handshakePair();
-      return TsumugiGroup.importKey(await origin.exportKeyFor(c2m), m);
+      return MooringGroup.importKey(await origin.exportKeyFor(c2m), m);
     };
     const receiver = await importFor();
     const senderA = await importFor();
@@ -229,8 +229,8 @@ describe('TsumugiGroup — bounded replay window', () => {
 
   it('does not grow memory unboundedly across many frames from one sender', async () => {
     const [c2m, m] = await handshakePair();
-    const sender = await TsumugiGroup.create();
-    const receiver = await TsumugiGroup.importKey(await sender.exportKeyFor(c2m), m);
+    const sender = await MooringGroup.create();
+    const receiver = await MooringGroup.importKey(await sender.exportKeyFor(c2m), m);
 
     const total = REPLAY_WINDOW_BITS + 200;
     let lastCt: Uint8Array | null = null;

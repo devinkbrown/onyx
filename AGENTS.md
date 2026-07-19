@@ -2,14 +2,19 @@
 # Agent rules for Onyx
 
 **Audience: coding agents.** Onyx is a **SolidJS 1.9 + Vite 7** single-page IRC
-web client — it is **not** React, Next.js, or any SSR framework. The reactivity
-model is fine-grained signals, not a virtual DOM; patterns from React training
-data (rules-of-hooks, re-render mental models, `useEffect` deps) do **not** apply.
+web client for the **Onyx** network on the **Onyx Server** engine (not React,
+Next.js, or any SSR framework). The reactivity model is fine-grained signals,
+not a virtual DOM; patterns from React training data (rules-of-hooks, re-render
+mental models, `useEffect` deps) do **not** apply. Use English subsystem names
+(Cadence media, Mooring client crypto) — not retired Suimyaku/Kagura/Tsumugi
+prose names. Wire tokens `onyx/*` and `TSUMUGI_*` stay as literals.
 
 Before writing code, read [`CLAUDE.md`](CLAUDE.md) (working context: layout,
 persistence conventions, IRC↔Onyx mapping) and
-[`docs/architecture.md`](docs/architecture.md) (the `src/` map). For contributor
-setup, gates, and the deploy-safety rule see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+[`docs/architecture.md`](docs/architecture.md) (the `src/` map). Docs hub:
+[`docs/README.md`](docs/README.md). For contributor setup, gates, and the
+deploy-safety rule see [`CONTRIBUTING.md`](CONTRIBUTING.md). Brand: **Onyx** =
+network/product/client; **Onyx Server** = engine (not "Onyx" in public docs).
 
 ## Stack (verified against `package.json`, `tsconfig.json`, `vite.config.ts`)
 
@@ -23,8 +28,8 @@ setup, gates, and the deploy-safety rule see [`CONTRIBUTING.md`](CONTRIBUTING.md
 - **OKLCH theme factory** — `src/theme/paletteFactory.ts`; AA contrast enforced
   by construction.
 - **IndexedDB history vault** — `src/lib/vault/` (`VAULT_KEEP = 400` per target).
-- **Suimyaku media engine** — `src/lib/suimyaku-media/` (voice/video, Kagura
-  frames over WS).
+- **Cadence media** — `src/lib/cadence-media/` (CadenceVox/CadenceVis codecs,
+  Cadence frames over WS).
 - **Strict TypeScript** — `strict: true` **and** `noUncheckedIndexedAccess:
   true` (`tsconfig.json`). Indexed access is `T | undefined`; handle it.
 

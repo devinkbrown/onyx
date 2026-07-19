@@ -92,9 +92,22 @@ describe('HomeView queued-send journal', () => {
 
     expect(await screen.findByRole('heading', { name: 'Queued on this device' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Try sending now' })).not.toBeInTheDocument();
+    expect(screen.getByText(/will send when you reconnect/i)).toBeInTheDocument();
 
     store.setState({ connectionStatus: 'connected' });
     fireEvent.click(await screen.findByRole('button', { name: 'Try sending now' }));
     expect(flushSpy).toHaveBeenCalledOnce();
+    expect(screen.getByText(/still waiting/i)).toBeInTheDocument();
+  });
+
+  it('surfaces failed delivery honestly when auto-retries are exhausted', async () => {
+    await queueOutbox('#room', 'stuck body never shown', OWNER);
+    store.setState({ connectionStatus: 'connected', outboxDeliveryFailed: true });
+    render(() => <HomeView />);
+
+    expect(await screen.findByRole('heading', { name: 'Queued on this device' })).toBeInTheDocument();
+    expect(screen.getByText(/could not be delivered/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try sending now' })).toBeInTheDocument();
+    expect(screen.queryByText('stuck body never shown')).not.toBeInTheDocument();
   });
 });

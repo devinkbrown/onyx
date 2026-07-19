@@ -61,6 +61,26 @@
 }
 
 /* ── Device outbox journal ──────────────────────────────────────────────── */
+.home-outbox--error {
+  border-color: color-mix(in oklab, var(--shu) 40%, transparent);
+  background: color-mix(in oklab, var(--shu) 8%, var(--ink, #0a1018));
+}
+.home-outbox--warning {
+  border-color: color-mix(in oklab, var(--warn) 35%, transparent);
+}
+.home-outbox__detail {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  color: var(--washi-dim);
+  max-width: 52ch;
+}
+.home-outbox--error .home-outbox__detail {
+  color: color-mix(in oklab, var(--shu) 70%, var(--washi));
+}
+.home-outbox__item--expiring .home-outbox__age,
+.home-outbox__item--expired .home-outbox__age {
+  color: color-mix(in oklab, var(--shu) 65%, var(--washi));
+}
 .home-outbox {
   display: grid;
   gap: var(--space-3);
@@ -477,7 +497,7 @@
   white-space: nowrap;
 }
 
-/* Device memory */
+/* Device memory — A9 calm local-first voice (Fraunces prose, mono meta) */
 .home-memory {
   margin: 0 0 34px;
 }
@@ -490,6 +510,10 @@
 }
 .home-memory-head .home-section-label {
   margin: 0;
+  /* Soften relative to catch-up thesis band — memory is archive, not alarm. */
+  color: var(--washi-mute);
+  letter-spacing: 0.2em;
+  font-weight: 500;
 }
 .home-memory-summary {
   font-family: var(--font-mono);
@@ -509,15 +533,15 @@
   gap: 10px;
   padding: 14px 16px;
   text-align: left;
-  border: 1px solid color-mix(in oklab, var(--line) 82%, var(--lapis));
+  border: 1px solid color-mix(in oklab, var(--line) 90%, var(--washi));
   border-radius: var(--r-md);
   background:
     linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--lapis) 12%, transparent),
-      transparent 42%
+      160deg,
+      color-mix(in oklab, var(--washi) 4%, transparent),
+      transparent 48%
     ),
-    color-mix(in oklab, var(--stone) 84%, transparent);
+    color-mix(in oklab, var(--stone) 78%, transparent);
   color: var(--washi);
   cursor: pointer;
   transition: border-color var(--dur, 200ms) var(--ease),
@@ -525,14 +549,14 @@
     transform var(--dur, 200ms) var(--ease);
 }
 .home-memory-card:hover {
-  border-color: color-mix(in oklab, var(--lapis-bright) 48%, var(--line));
+  border-color: color-mix(in oklab, var(--lapis) 28%, var(--line));
   background:
     linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--lapis) 16%, transparent),
-      transparent 46%
+      160deg,
+      color-mix(in oklab, var(--washi) 6%, transparent),
+      transparent 50%
     ),
-    color-mix(in oklab, var(--stone) 72%, transparent);
+    color-mix(in oklab, var(--stone) 70%, transparent);
   transform: translateY(-1px);
 }
 .home-memory-card-head,
@@ -549,9 +573,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-mono);
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: var(--washi);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--washi-dim);
 }
 .home-memory-when,
 .home-memory-foot {
@@ -562,22 +586,27 @@
 }
 .home-memory-preview {
   min-width: 0;
+  /* Soul face for remembered prose — calm local-first voice (synthesis A9). */
+  font-family: var(--font-serif);
   color: var(--washi-dim);
-  font-size: 0.84rem;
-  line-height: 1.45;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  font-weight: 450;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 .home-memory-preview b {
-  color: var(--lapis-bright);
-  font-weight: 650;
+  color: var(--washi);
+  font-family: var(--font-serif);
+  font-weight: 600;
 }
 
-/* Quiet activity */
+/* Quiet activity — ambient already-read rooms; demoted vs catch-up strata */
 .home-quiet {
   margin: 0 0 34px;
+  opacity: 0.92;
 }
 .home-quiet-head {
   display: flex;
@@ -588,6 +617,9 @@
 }
 .home-quiet-head .home-section-label {
   margin: 0;
+  color: var(--washi-mute);
+  font-weight: 500;
+  letter-spacing: 0.2em;
 }
 .home-quiet-summary {
   font-family: var(--font-mono);
@@ -600,24 +632,24 @@
 }
 .home-quiet-item {
   width: 100%;
-  min-height: 58px;
+  min-height: 52px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   text-align: left;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--stone) 72%, transparent);
-  color: var(--washi);
+  background: color-mix(in oklab, var(--stone) 64%, transparent);
+  color: var(--washi-dim);
   cursor: pointer;
   transition: border-color var(--dur, 200ms) var(--ease),
     background var(--dur, 200ms) var(--ease);
 }
 .home-quiet-item:hover {
-  border-color: color-mix(in oklab, var(--lapis) 36%, var(--line));
-  background: color-mix(in oklab, var(--stone) 62%, transparent);
+  border-color: color-mix(in oklab, var(--lapis) 28%, var(--line));
+  background: color-mix(in oklab, var(--stone) 58%, transparent);
 }
 .home-quiet-main {
   min-width: 0;
@@ -631,8 +663,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-mono);
-  font-size: 0.86rem;
-  font-weight: 700;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--washi-dim);
 }
 .home-quiet-topic {
   min-width: 0;
@@ -987,7 +1020,9 @@
   .home-memory-card:hover { transform: none; }
 }
 
-/* ── Catch up — "what did I miss" across joined rooms + DMs ─────────────────── */
+/* ── Catch up — "what did I miss" across joined rooms + DMs ───────────────────
+   A9 strata: Needs you strongest → Followed next → Quiet demoted.
+   Weight is visual only; structure + a11y labels stay stable. */
 .home-catchup {
   margin: 4px 0 28px;
 }
@@ -996,10 +1031,15 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .home-catchup-head .home-section-label {
   margin: 0;
+  /* Catch-up is the thesis band — slightly stronger than ambient section labels. */
+  color: var(--washi-dim);
+  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  font-weight: 650;
 }
 .home-catchup-summary,
 .home-catchup-clear {
@@ -1009,13 +1049,13 @@
 }
 .home-catchup-summary b {
   color: var(--gold-bright);
-  font-weight: 500;
+  font-weight: 600;
 }
 .home-catchup-tier {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 .home-catchup-tier:first-of-type {
   margin-top: 0;
@@ -1032,16 +1072,120 @@
      text and was effectively invisible. Never alpha-fade a text foreground. */
   color: var(--washi-dim);
 }
-.home-catchup-quiet {
-  margin-top: 10px;
+
+/* ── Stratum: Needs you (attention) — strongest visual weight ───────────────
+   Label text stays on the audited --washi-dim token (AA small text). Hierarchy
+   is size/weight + gold surface chrome — never a decorative token on body text. */
+.home-catchup-tier--attention {
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--gold) 10%, transparent),
+      transparent 70%
+    ),
+    color-mix(in oklab, var(--stone) 55%, transparent);
+  border: 1px solid color-mix(in oklab, var(--gold) 28%, var(--line));
 }
-.home-catchup-quiet > summary {
+.home-catchup-tier--attention .home-catchup-tier-label {
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  color: var(--washi);
+}
+.home-catchup-tier--attention .home-catchup-item {
+  min-height: 48px;
+  padding: 12px 16px;
+  border-left-width: 3px;
+  border-left-color: var(--gold-bright);
+  background: color-mix(in oklab, var(--gold) 8%, var(--stone));
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--gold) 12%, transparent);
+}
+.home-catchup-tier--attention .home-catchup-item:hover {
+  border-color: color-mix(in oklab, var(--gold-bright) 42%, var(--line));
+  background: color-mix(in oklab, var(--gold) 12%, var(--stone));
+}
+.home-catchup-tier--attention .home-catchup-name {
+  font-weight: 650;
+  font-size: 0.98rem;
+}
+.home-catchup-tier--attention .home-catchup-unread {
+  /* Unread chip is solid gold-bright on ink-facing washi text: use on-accent
+     only if present; washi on gold-bright is the badge convention elsewhere. */
+  color: var(--ink);
+  background: var(--gold-bright);
+  font-weight: 650;
+}
+
+/* ── Stratum: Followed — next weight, lapis instrument chrome ─────────────── */
+.home-catchup-tier--followed {
+  gap: 7px;
+  padding: 4px 2px 0;
+}
+.home-catchup-tier--followed .home-catchup-tier-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  /* Keep audited secondary text token; lapis lives on borders/badges only. */
+  color: var(--washi-dim);
+}
+.home-catchup-tier--followed .home-catchup-item {
+  min-height: 44px;
+  border-left-width: 2px;
+  border-left-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 8%, var(--stone));
+}
+.home-catchup-tier--followed .home-catchup-item:hover {
+  border-color: color-mix(in oklab, var(--lapis-bright) 40%, var(--line));
+  background: color-mix(in oklab, var(--lapis) 12%, var(--stone));
+}
+.home-catchup-tier--followed .home-catchup-name {
+  font-weight: 600;
+}
+
+/* ── Stratum: Quiet — demoted, collapsed ambient tail ─────────────────────── */
+.home-catchup-quiet,
+.home-catchup-tier--quiet {
+  margin-top: 12px;
+  opacity: 0.88;
+}
+.home-catchup-quiet > summary,
+.home-catchup-tier--quiet > summary {
   cursor: pointer;
   padding: 4px 0;
   user-select: none;
+  /* Keep washi-dim (AA) for the summary text; quiet is demoted via size/weight
+     and item chrome, not by dropping below 4.5:1. */
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--washi-dim);
 }
-.home-catchup-quiet[open] > summary {
+.home-catchup-quiet[open] > summary,
+.home-catchup-tier--quiet[open] > summary {
   margin-bottom: 6px;
+}
+.home-catchup-tier--quiet .home-catchup-item {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-left-width: 1px;
+  border-left-color: var(--line);
+  background: color-mix(in oklab, var(--stone) 70%, transparent);
+  color: var(--washi-dim);
+}
+.home-catchup-tier--quiet .home-catchup-item:hover {
+  border-color: var(--line);
+  background: color-mix(in oklab, var(--stone) 62%, transparent);
+}
+.home-catchup-tier--quiet .home-catchup-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+.home-catchup-tier--quiet .home-catchup-unread {
+  background: color-mix(in oklab, var(--washi) 10%, transparent);
+  color: var(--washi-dim);
+  font-size: 11px;
 }
 .home-catchup-list {
   list-style: none;
@@ -1126,6 +1270,7 @@
 .home-catchup-when {
   color: var(--washi-mute);
 }
+/* Resume — reading handoff band (between Followed weight and Quiet demotion) */
 .home-resume {
   margin-top: 18px;
 }
@@ -1138,6 +1283,8 @@
 }
 .home-resume-head .home-section-label {
   margin: 0;
+  color: var(--washi-dim);
+  font-weight: 600;
 }
 .home-resume-summary {
   font-family: var(--font-mono);
@@ -1287,9 +1434,11 @@
   white-space: nowrap;
 }
 .home-recap-card__preview {
+  /* Fraunces for recap prose — thesis "soul" face on since-you-left digests. */
+  font-family: var(--font-serif);
   color: var(--washi-dim);
-  font-size: 0.8rem;
-  line-height: 1.4;
+  font-size: 0.88rem;
+  line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

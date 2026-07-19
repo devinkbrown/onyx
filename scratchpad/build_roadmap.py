@@ -7,7 +7,7 @@ import markdown
 
 ROOT = pathlib.Path("/home/kain")
 ONYX = ROOT / "onyx"
-SRC = ROOT / "OROCHI_ONYX_MASTER_ROADMAP.md"
+SRC = ROOT / "ONYX_ONYX_MASTER_ROADMAP.md"
 
 # ---- load + clean markdown ------------------------------------------------
 raw = SRC.read_text()
@@ -26,7 +26,7 @@ for ln in lines:
     out.append(ln)
 # drop the leading H1 + subtitle (the hero carries them)
 text = "\n".join(out)
-text = re.sub(r"^# Orochi × Onyx — Master Roadmap\s*\n", "", text, count=1)
+text = re.sub(r"^# Onyx Server × Onyx — Master Roadmap\s*\n", "", text, count=1)
 text = re.sub(r"^### \*A north-star.*?\*\s*\n", "", text, count=1, flags=re.S)
 # drop the closing italic sign-off rule noise if any leading '---'
 text = text.lstrip("\n")
@@ -78,12 +78,12 @@ HTML = f"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Orochi × Onyx — Master Roadmap</title>
-<meta name="description" content="Sovereign Realtime — the complete Orochi × Onyx master roadmap: four eras, twelve versions, in the Ink & Vermillion design system.">
+<title>Onyx Server × Onyx — Master Roadmap</title>
+<meta name="description" content="Sovereign Realtime — the complete Onyx Server × Onyx master roadmap: four eras, twelve versions, in the Ink & Vermillion design system.">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#1a1512" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#ede4d3" media="(prefers-color-scheme: light)">
-<meta property="og:title" content="Orochi × Onyx — Sovereign Realtime">
+<meta property="og:title" content="Onyx Server × Onyx — Sovereign Realtime">
 <meta property="og:description" content="Four eras, twelve versions. Discord's comfort, Signal's secrets, IRC's openness — on a mesh no company can switch off.">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='4' width='24' height='24' rx='5' fill='none' stroke='%23de3b26' stroke-width='3'/><text x='16' y='24' font-size='19' text-anchor='middle' fill='%23de3b26' font-family='Georgia,serif'>龍</text></svg>">
@@ -99,7 +99,7 @@ HTML = f"""<!doctype html>
   <header class="rm-hero">
     <div class="rm-hero-inner">
       <div class="rm-seal" aria-hidden="true">龍</div>
-      <p class="rm-eyebrow">Orochi × Onyx · Master Roadmap</p>
+      <p class="rm-eyebrow">Onyx Server × Onyx · Master Roadmap</p>
       <h1>Sovereign<br><span class="em">Realtime</span></h1>
       <p class="rm-lede">The network that <b>remembers you</b>, <b>reaches you</b>, <b>keeps your secrets</b>, and <b>belongs to no one</b>.</p>
       <p class="rm-pitch">Discord's comfort, Signal's secrets, IRC's openness — on a mesh no company can switch off, from a binary you can <code>docker run</code> in sixty seconds.</p>

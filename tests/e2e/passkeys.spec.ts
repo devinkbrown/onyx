@@ -26,7 +26,7 @@ import { test, expect, chromium, type Browser, type BrowserContext, type Page } 
 //
 //   A REAL register/sign-in ceremony (navigator.credentials.create/get) cannot
 //   run in headless Chromium without a CDP virtual authenticator AND a live
-//   Orochi daemon to answer WEBAUTHN REGISTER-CHALLENGE / AUTH-CHALLENGE. That
+//   Onyx Server daemon to answer WEBAUTHN REGISTER-CHALLENGE / AUTH-CHALLENGE. That
 //   full path is intentionally left as a documented skip below.
 //
 // HARNESS (same rationale as voice.spec / chat.spec):
@@ -369,7 +369,7 @@ test.describe('Passkeys management UI (store-driven render paths)', () => {
   //                     hasResidentKey: true, hasUserVerification: true,
   //                     isUserVerified: true, automaticPresenceSimulation: true },
   //        });
-  //   2. a LIVE Orochi daemon to answer `WEBAUTHN REGISTER-CHALLENGE` (and to
+  //   2. a LIVE Onyx Server daemon to answer `WEBAUTHN REGISTER-CHALLENGE` (and to
   //      persist the credential so a subsequent `WEBAUTHN LIST` returns it).
   // Without the daemon, registerPasskey() sends REGISTER and the store stays
   // `passkeyBusy` forever, so there is no honest assertion to make here. This

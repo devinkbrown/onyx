@@ -16,7 +16,7 @@ import { test, expect, chromium, type Browser, type Page } from '@playwright/tes
 // HARNESS (identical rationale to voice.spec / invite.spec):
 //   • window.__onyx is DEV-only (src/index.tsx), so the :4173 production preview
 //     has NO store handle. We drive the DEV app (:5174) to connect + join.
-//   • The DEV app is pinned (VITE_IRC_WS) to a live Orochi WSS with a self-signed
+//   • The DEV app is pinned (VITE_IRC_WS) to a live Onyx Server WSS with a self-signed
 //     cert → ignoreHTTPSErrors on every context.
 //   • The default `chromium-headless-shell` drops the self-signed WSS, so we
 //     self-launch the FULL chromium binary, exactly like the sibling specs.

@@ -40,7 +40,7 @@ class MockObserver { observe() {} unobserve() {} disconnect() {} takeRecords() {
 globalThis.ResizeObserver ??= MockObserver as unknown as typeof ResizeObserver;
 globalThis.IntersectionObserver ??= MockObserver as unknown as typeof IntersectionObserver;
 
-// ── WebAudio + media (the suimyaku media engine touches these) ────────────────
+// ── WebAudio + media (the cadence media engine touches these) ────────────────
 Object.defineProperty(globalThis, 'AudioContext', {
   writable: true,
   value: class MockAudioContext {

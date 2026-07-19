@@ -163,8 +163,8 @@ export interface IRCClientOptions {
   realname?: string;
   username?: string;
   password?: string;     // SASL PLAIN password
-  sessionToken?: string; // Orochi SESSION RESUME token (local node)
-  meshToken?: string;    // Orochi mesh-sealed reclaim token (any node)
+  sessionToken?: string; // Onyx Server SESSION RESUME token (local node)
+  meshToken?: string;    // Onyx Server mesh-sealed reclaim token (any node)
   hasClientCert?: boolean;
   /** called for every parsed message */
   onMessage: IRCEventHandler;
@@ -257,14 +257,14 @@ export class IRCClient {
   public binaryHandlers: Set<(data: Uint8Array) => void> = new Set();
 
   isupport: ISupport = {
-    // Defaults mirror Orochi's ISUPPORT PREFIX=(YQqov)*!.@+ (founder Q/'!',
+    // Defaults mirror Onyx Server's ISUPPORT PREFIX=(YQqov)*!.@+ (founder Q/'!',
     // owner q/'.', op o/'@', voice v/'+', plus the render-only oper Y/'*').
     // The reverse map also accepts standard IRC admin/halfop prefixes so a
     // NAMES burst received before 005 still keeps &admin / %halfop status.
     // Overwritten verbatim from 005 PREFIX on connect.
     PREFIX: { Y: '*', Q: '!', q: '.', a: '&', o: '@', h: '%', v: '+' },
     PREFIX_MODES: { '*': 'Y', '!': 'Q', '.': 'q', '~': 'q', '&': 'a', '@': 'o', '%': 'h', '+': 'v' },
-    // Orochi defaults (overwritten from 005 on connect):
+    // Onyx Server defaults (overwritten from 005 on connect):
     //   CHANMODES=beIZ,k,lfj,imnstCTNMSgWOA, CHANTYPES=#&, CASEMAPPING=ascii,
     //   NICKLEN=64, TOPICLEN=390, CHANLIMIT=#&:50, MONITOR=128, SILENCE=32.
     CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'],
@@ -281,7 +281,7 @@ export class IRCClient {
     VAPID: '',           // VAPID=<key> — Web Push server key (empty = push off)
   };
 
-  /** Map prefix char → mode letter, e.g. '@' → 'o'. Orochi: (YQqov)*!.@+ */
+  /** Map prefix char → mode letter, e.g. '@' → 'o'. Onyx Server: (YQqov)*!.@+ */
   prefixToMode: Record<string, string> = {
     '*': 'Y',
     '!': 'Q',
@@ -292,7 +292,7 @@ export class IRCClient {
     '%': 'h',
     '+': 'v',
   };
-  /** Map mode letter → prefix char (used for display). Orochi: (YQqov)*!.@+ */
+  /** Map mode letter → prefix char (used for display). Onyx Server: (YQqov)*!.@+ */
   modeToPrefix: Record<string, string> = { Y: '*', Q: '!', q: '.', a: '&', o: '@', h: '%', v: '+' };
 
   constructor(opts: IRCClientOptions) {
@@ -533,7 +533,7 @@ export class IRCClient {
    * Run a server LIST and collect the reply into rows.
    *
    * Sends `LIST`, accumulates 322 RPL_LIST rows until 323 RPL_LISTEND, then
-   * resolves. Orochi merges mesh-wide results server-side, so a single LIST
+   * resolves. Onyx Server merges mesh-wide results server-side, so a single LIST
    * yields the whole network. A timeout guard resolves with whatever has been
    * collected if the end numeric never arrives (e.g. disconnect mid-reply).
    * Concurrent callers share the same in-flight request.
@@ -561,12 +561,12 @@ export class IRCClient {
   }
 
   /**
-   * True when the server ACKed `orochi/session-sync`. When active, the server
+   * True when the server ACKed `onyx/session-sync`. When active, the server
    * drives session reclaim (auto JOIN + NAMES/topic + CHATHISTORY replay) on
    * (re)connect, so the client must suppress its own blind autojoin storm.
    */
   get sessionSyncActive(): boolean {
-    return this.negotiatedCaps.has('orochi/session-sync');
+    return this.negotiatedCaps.has('onyx/session-sync');
   }
 
   /**
@@ -653,8 +653,8 @@ export class IRCClient {
       return;
     }
 
-    // Orochi follows the IRCv3 WebSocket sub-protocol: each frame carries a
-    // complete IRC message and the trailing CRLF is OPTIONAL — Orochi omits it
+    // Onyx Server follows the IRCv3 WebSocket sub-protocol: each frame carries a
+    // complete IRC message and the trailing CRLF is OPTIONAL — Onyx Server omits it
     // entirely (e.g. ":eshmaki.me CAP * LS :..." with no newline). The browser
     // reassembles continuation frames, so every onmessage delivers whole
     // message(s), never a partial line. We split on optional CR/LF and process
@@ -859,7 +859,7 @@ export class IRCClient {
         break;
       }
 
-      // NOTE: 903/904/905 are reused by Orochi's IRCX layer post-registration
+      // NOTE: 903/904/905 are reused by Onyx Server's IRCX layer post-registration
       // (903=ERR_BADLEVEL, 904=ERR_BADTAG, 905=ERR_BADPROPERTY). Only treat them
       // as the SASL result numerics while a SASL exchange is actually in flight
       // (pre-registration). Otherwise they must pass through to the store as
@@ -872,7 +872,7 @@ export class IRCClient {
           this._saslMech = null;
           this._scramState = null;
           // NOTE: SESSION RESUME / SESSION TOKEN are deliberately NOT sent here.
-          // Orochi's SESSION command requires a registered connection (it checks
+          // Onyx Server's SESSION command requires a registered connection (it checks
           // session.account() and lives in the post-registration command path),
           // so it is issued after 001 (see the '001' case below). Sending it
           // during CAP/SASL would be rejected as a pre-registration command.
@@ -881,7 +881,7 @@ export class IRCClient {
         break;
 
       case '900': // RPL_LOGGEDIN (SASL, passkey, IDENTIFY, or account claim)
-        // Orochi also uses numeric 900 for a two-parameter IRCX error. Only the
+        // Onyx Server also uses numeric 900 for a two-parameter IRCX error. Only the
         // four-parameter RPL_LOGGEDIN is account proof. SESSION is deliberately
         // account-scoped, so passwordless reconnects must wait for this proof
         // instead of replaying a bearer while they are still a guest.
@@ -963,7 +963,7 @@ export class IRCClient {
         // command is valid. Reclaim a prior detached session if we hold a token,
         // then request a fresh token for this session (arrives as
         // NOTE SESSION TOKEN, plus NOTE SESSION MTOKEN on mesh deployments).
-        // Orochi requires the live connection to authenticate to the owning
+        // Onyx Server requires the live connection to authenticate to the owning
         // account before accepting SESSION RESUME. Password SASL has already
         // completed here; passwordless/passkey reconnects wait for their
         // post-registration 900 RPL_LOGGEDIN.
@@ -1099,7 +1099,7 @@ export class IRCClient {
       // STARTTLS upgrade: Onyx already uses WSS; requesting this is wrong.
       if (cap === 'tls') return false;
       // sts (Strict Transport Security): an informational cap whose value is the
-      // transport policy. It is advertised, not negotiated — Orochi NAKs a REQ
+      // transport policy. It is advertised, not negotiated — Onyx Server NAKs a REQ
       // for it. The TLS upgrade is already implicit in the wss:// endpoint.
       if (cap === 'sts') return false;
       // SASL: only request when we have credentials to send.
@@ -1118,8 +1118,11 @@ export class IRCClient {
       // the server-side SEARCH command (results replay as a chathistory-shaped
       // batch, diverted into serverSearch.results); the MessageSearch bar
       // exposes it as "Search full history".
-      // labeled-response: no @label= request/response correlation in Onyx.
-      if (cap === 'labeled-response') return false;
+      // labeled-response: requested — the store stamps `@label=` on chat
+      // PRIVMSG / multiline BATCH (and outbox flush) and correlates the
+      // server's labeled echo, ACK, FAIL, or labeled-response batch so
+      // optimistic / pending rows resolve to the authoritative msgid.
+      // (Falls through to `return true`.)
       // draft/channel-rename: requested — the store handles the native
       // `:renamer RENAME #old #new [:reason]` line and migrates channel state
       // (messages, membership, unread, active view) under the new key.
@@ -1129,15 +1132,15 @@ export class IRCClient {
       // bot: Onyx is a human client, not a bot.
       if (cap === 'bot') return false;
 
-      // orochi/session-sync: server-driven session reclaim. When ACKed, the
+      // onyx/session-sync: server-driven session reclaim. When ACKed, the
       // server auto-pushes JOIN + NAMES/topic + CHATHISTORY replay for every
       // channel the account's session is live in, so the client must NOT run
       // its own blind autojoin storm. Always request it when offered; the
       // store gates autojoin suppression on negotiatedCaps having it.
       // (Falls through to `return true` — listed here only for documentation.)
       //
-      // orochi/e2ee: message-tag and channel-policy signaling. The store adds
-      // +orochi/e2ee only after the browser E2EE DM path has sealed the payload,
+      // onyx/e2ee: message-tag and channel-policy signaling. The store adds
+      // +onyx/e2ee only after the browser E2EE DM path has sealed the payload,
       // and reads the channel encryption-policy PROP.
       // (Falls through to `return true`.)
 
@@ -1235,7 +1238,7 @@ export class IRCClient {
 
   /**
    * Verify the SCRAM server-final (`v=<ServerSignature>`), completing mutual
-   * authentication. Orochi sends this as a discrete AUTHENTICATE line and then
+   * authentication. Onyx Server sends this as a discrete AUTHENTICATE line and then
    * immediately emits 903 — it does NOT wait for a client ack, so on success we
    * send nothing and let the 903 finish the login. On any mismatch (or a server
    * error `e=`) we fail CLOSED: tear the exchange down and clear the SASL flags

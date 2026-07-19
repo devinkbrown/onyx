@@ -26,7 +26,7 @@ This route needs nothing but Discord itself.
 ### Import the package into Onyx
 
 1. Open Onyx preferences (settings icon, bottom right).
-2. Scroll to **Import a Discord data package** under "Local history & portability".
+2. Open **Preferences → Import & export → Discord package**.
 3. Click **Choose package folder** and select the unzipped package folder. Onyx reads only the package files it recognizes (`account/user.json`, `messages/index.json`, and each channel's `channel.json` + `messages.json`/`messages.csv`) — everything else in the folder is ignored. (`src/shell/HistoryImportControls.tsx:247`, `:283`)
 4. Review the import summary (channels, message count, date range, any skipped or over-cap messages).
 5. Click **Import into vault**.
@@ -58,7 +58,7 @@ Repeat for as many channels as you like. JSON files are safe to store—they're 
 ### Import into Onyx
 
 1. Open Onyx preferences (settings icon, bottom right).
-2. Scroll to **Import from Discord** under "Local history & portability".
+2. Open **Preferences → Import & export → Discord JSON**.
 3. Click **Choose Discord JSON** and select one or more `.json` files from your computer.
 4. Review the import summary (channels, message count, date range, any skipped messages).
 5. Click **Import into vault**.

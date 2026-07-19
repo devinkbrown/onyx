@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'so
 
 import { Avatar, Button, Tooltip } from '@/primitives';
 import { getState, useStore } from '@/lib/store';
-import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
+import type { CadencePeerState } from '@/lib/cadence-media/types';
 
 import './overlays/voice-overlays.css';
 
@@ -98,7 +98,7 @@ function savePosition(position: PipPosition) {
 }
 
 function participantFromPeer(
-  peer: SuimyakuPeerState,
+  peer: CadencePeerState,
   selfNick: string,
   speakingNickKeys: ReadonlySet<string>,
 ): PipParticipant {

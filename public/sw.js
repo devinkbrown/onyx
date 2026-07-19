@@ -26,6 +26,19 @@ function boundedPushString(value, maxLength) {
   return typeof value === 'string' ? value.slice(0, maxLength) : '';
 }
 
+// E2EE DM envelopes ride ordinary PRIVMSG/tegami text as `TSUMUGI1 ` + b64url.
+// The service worker cannot open them (keys live in the page's IndexedDB), so
+// any envelope that reaches a push payload must fail closed to a neutral body —
+// never put ciphertext on a lock screen.
+const E2EE_ENVELOPE_PREFIX = 'TSUMUGI1 ';
+const ENCRYPTED_PUSH_BODY = 'New encrypted message';
+
+function pushBodyFor(text) {
+  if (typeof text !== 'string' || text.length === 0) return '';
+  if (text.startsWith(E2EE_ENVELOPE_PREFIX)) return ENCRYPTED_PUSH_BODY;
+  return text;
+}
+
 function safeNotificationPath(value, fallback = APP_PATH) {
   if (typeof value !== 'string' || value.length === 0 || value.length > PUSH_URL_MAX) {
     return fallback;
@@ -347,20 +360,22 @@ self.addEventListener('push', (event) => {
     data = { body: event.data?.text() ?? '' };
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) data = {};
-  // Orochi's webpushNotify sends {type:'dm', from, text} (RFC 8291-encrypted
-  // end to end); map it onto the generic {title, body, url} shape.
+  // Onyx Server's webpushNotify sends {type:'dm', from, text} (RFC 8291-encrypted
+  // end to end to the browser); map it onto the generic {title, body, url} shape.
+  // The JSON is sealed to the push subscription — the *message* text may still
+  // be an E2EE envelope the SW cannot open; pushBodyFor redacts those.
   const dmFrom = boundedPushString(data.from, PUSH_TITLE_MAX - 13);
   if (data.type === 'dm' && dmFrom) {
     data = {
       title: `Message from ${dmFrom}`,
-      body: data.text ?? '',
+      body: pushBodyFor(data.text),
       tag: `onyx-dm-${dmFrom}`,
       url: APP_PATH,
     };
   }
   const rawTag = boundedPushString(data.tag, PUSH_TAG_MAX);
   const title = boundedPushString(data.title, PUSH_TITLE_MAX) || 'Onyx';
-  const body = boundedPushString(data.body, PUSH_BODY_MAX);
+  const body = boundedPushString(pushBodyFor(data.body), PUSH_BODY_MAX);
   const targetUrl = safeNotificationPath(data.url);
   event.waitUntil(
     self.registration.showNotification(title, {

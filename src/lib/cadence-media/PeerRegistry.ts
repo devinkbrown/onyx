@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import {
-  KaguraVoxDecoder, KaguraVisDecoder,
+  CadenceVoxDecoder, CadenceVisDecoder,
   OpcodecWasm,
   yuv420ToRgba,
-  KAGURAVOX_FRAME_48K,
-  type KaguraVoxQuality,
+  CADENCEVOX_FRAME_48K,
+  type CadenceVoxQuality,
 } from './OpcodecWasm';
 import {
   DEFAULT_SPATIAL_POSITION,
@@ -16,17 +16,17 @@ import {
   supportsHrtf,
   type SpatialAudioPosition,
 } from './spatialAudio';
-import type { SuimyakuPeerState, MediaKind } from './types';
+import type { CadencePeerState, MediaKind } from './types';
 
 // -------------------------------------------------------------------
 // Per-peer decoder state
 // -------------------------------------------------------------------
 
 export interface PeerMedia {
-  state:          SuimyakuPeerState;
-  audDec:         KaguraVoxDecoder | null;
-  vidDec:         KaguraVisDecoder | null;
-  screenVidDec:   KaguraVisDecoder | null;
+  state:          CadencePeerState;
+  audDec:         CadenceVoxDecoder | null;
+  vidDec:         CadenceVisDecoder | null;
+  screenVidDec:   CadenceVisDecoder | null;
   audCtx:         AudioContext | null;
   vidCanvas:      HTMLCanvasElement | null;
   screenCanvas:   HTMLCanvasElement | null;
@@ -82,7 +82,7 @@ export class PeerRegistry {
 
   private wasm: OpcodecWasm | null = null;
   private readonly sampleRate: number;
-  private readonly audioQuality: () => KaguraVoxQuality;
+  private readonly audioQuality: () => CadenceVoxQuality;
   private readonly videoW: number;
   private readonly videoH: number;
   private readonly speakingRms: number;
@@ -93,13 +93,13 @@ export class PeerRegistry {
   readonly peerLevels    = new Map<string, number>();
   readonly decodeErrors  = new Map<string, number>();
 
-  onPeerStateChanged?: (state: SuimyakuPeerState) => void;
+  onPeerStateChanged?: (state: CadencePeerState) => void;
   onPeerLeft?:         (nick: string) => void;
   onPeerSpeaking?:     (nick: string, speaking: boolean) => void;
 
   constructor(opts: {
     sampleRate:   number;
-    audioQuality: () => KaguraVoxQuality;
+    audioQuality: () => CadenceVoxQuality;
     videoW:       number;
     videoH:       number;
     speakingRms:  number;
@@ -320,10 +320,10 @@ export class PeerRegistry {
 
     const ctx = pm.audCtx;
     this.applySink(pm);
-    // KaguraVoxDecoder returns KAGURAVOX_FRAME_48K mono Int16 samples.
+    // CadenceVoxDecoder returns CADENCEVOX_FRAME_48K mono Int16 samples.
     // Create a stereo AudioBuffer and copy the same mono data to both channels.
-    const buf = ctx.createBuffer(2, KAGURAVOX_FRAME_48K, this.sampleRate);
-    const monoSamples = Math.min(pcm.length, KAGURAVOX_FRAME_48K);
+    const buf = ctx.createBuffer(2, CADENCEVOX_FRAME_48K, this.sampleRate);
+    const monoSamples = Math.min(pcm.length, CADENCEVOX_FRAME_48K);
     for (let ch = 0; ch < 2; ch++) {
       const out = buf.getChannelData(ch);
       for (let i = 0; i < monoSamples; i++) {
@@ -341,7 +341,7 @@ export class PeerRegistry {
     const now = Date.now();
     if (this.lastDecodeAt > 0) {
       const iat      = now - this.lastDecodeAt;
-      const expected = (KAGURAVOX_FRAME_48K / this.sampleRate) * 1000;
+      const expected = (CADENCEVOX_FRAME_48K / this.sampleRate) * 1000;
       const diff     = Math.abs(iat - expected);
       this.lastJitterMs = this.lastJitterMs * 0.9 + diff * 0.1;
     }

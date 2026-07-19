@@ -37,7 +37,7 @@ const phases: Phase[] = [
     state: 'complete',
     date: '2026-07-16',
     summary: 'DMs, room policies, and account key surfaces keep private state out of durable replay while exposing stable, verifiable device identity hooks.',
-    items: ['Tsumugi-encrypted DMs', 'Orochi E2EE capability', 'Encrypted message tags', 'Channel encryption policy', 'Account device-key publishing', 'Stable device-key identity', 'Key transparency status', 'Ephemeral room TTL', 'Ciphertext-only vault/search'],
+    items: ['Mooring-encrypted DMs', 'Onyx Server E2EE capability', 'Encrypted message tags', 'Channel encryption policy', 'Account device-key publishing', 'Stable device-key identity', 'Key transparency status', 'Ephemeral room TTL', 'Ciphertext-only vault/search'],
   },
   {
     phase: 'Phase 4',

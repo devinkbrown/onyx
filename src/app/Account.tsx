@@ -10,6 +10,8 @@
  *   • Password      — ACCOUNTSET password (password-verified).  [if supported]
  *   • Protection    — secure / enforce toggles (ACCOUNTSET secure|enforce).
  *   • Certificates  — CERTADD / CERTLIST / CERTDEL fingerprint bindings.
+ *   • Sessions      — this browser (active) + Era 2 remote-list skeleton.
+ *   • Passkeys      — WebAuthn passwordless credentials for this account.
  *   • Recover nick  — RECOVER a registered nick held by a stale session.
  *   • Sign out      — LOGOUT.
  *   • Danger zone   — DROP (guarded behind a typed confirmation).
@@ -18,7 +20,7 @@
  * points back at Connect — this panel never logs anyone in (that's Connect's
  * job); it manages an *existing* session.
  *
- * The global store is the single source of truth. Actions dispatch raw Orochi
+ * The global store is the single source of truth. Actions dispatch raw Onyx Server
  * commands; the store folds the replies (FAIL/WARN/NOTE/NOTICE/numerics) into
  * `accountInfo` / `accountActionError`. We render those, never parse wire text.
  *
@@ -48,6 +50,7 @@ import {
 import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import { deviceKeys, deviceRegistryId } from '@/lib/e2ee/dmCipher';
 import { PasskeysSection } from '@/shell/PasskeysSection';
+import { SessionsDevicesSection } from '@/shell/SessionsDevicesSection';
 import { ModalShell } from '@/primitives/index';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
@@ -411,7 +414,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
       return;
     }
     setPasswordError(undefined);
-    // Orochi ACCOUNTSET accepts a password change via the `password` field when
+    // Onyx Server ACCOUNTSET accepts a password change via the `password` field when
     // supported; the value is the NEW password and the verifying arg is current.
     getState().accountSet('password', newPassword(), currentPassword());
     setNewPassword('');
@@ -850,6 +853,9 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               </Show>
             </div>
           </Section>
+
+          {/* Sessions & devices — current browser + Era 2 (B8) remote list skeleton */}
+          <SessionsDevicesSection account={account()} />
 
           {/* Passkeys — WebAuthn passwordless login: register, list, rename, remove */}
           <PasskeysSection account={account()} owner={memoryOwner()} active={local.open} />

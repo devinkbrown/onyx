@@ -2,7 +2,7 @@
 /**
  * store.account.test.ts
  *
- * Account identity / management actions (Orochi built-in services, no NickServ
+ * Account identity / management actions (Onyx Server built-in services, no NickServ
  * bot). Each action sends a raw server command through the IRC client; the
  * server's reply (a standard FAIL/WARN/NOTE, a NOTICE, or a numeric) is folded
  * back into state by _handleMessage. We mock the client to capture the exact

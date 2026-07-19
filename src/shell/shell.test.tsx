@@ -32,6 +32,12 @@ import { _resetVaultForTests, queueOutbox, saveMessages } from '@/lib/vault/hist
 import { Spotlight } from '@/chat/spotlight';
 import { AppShell } from './AppShell';
 
+// AppShell lazily mounts the media engine on Join voice/video. Keep that path
+// off the real codec graph in unit tests.
+vi.mock('@/media/useCadenceMedia', () => ({
+  mountMedia: vi.fn(),
+}));
+
 // ── Shared fixture helpers ────────────────────────────────────────────────────
 
 const initialState = store.getInitialState();
@@ -714,6 +720,73 @@ describe('AppShell', () => {
       travelToSpy.mockRestore();
     });
 
+    it('hands off from reader memory into another room reviewed anchor', () => {
+      setPreference('readerMode', true);
+      setPreference('localHistory', true);
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-memory-a', 'alice', 'Old remembered note', '#general'),
+          makeMessage('msg-memory-b', 'bob', 'Hydrated note one', '#general'),
+        ],
+        [makeUser('alice'), makeUser('bob')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        server: memoryServer,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+      }, true);
+      recordReviewHistory({
+        target: '#general',
+        name: '#general',
+        kind: 'channel',
+        firstMessageId: 'msg-memory-b',
+        firstAt: '2025-01-01T12:00:00.000Z',
+        reviewedAt: '2026-07-09T00:05:00.000Z',
+        messageCount: 2,
+        mentionCount: 0,
+        preview: 'Hydrated note one',
+      }, MEMORY_OWNER);
+      recordReviewHistory({
+        target: '&ops',
+        name: '&ops',
+        kind: 'channel',
+        firstMessageId: 'ops-anchor',
+        firstAt: '2026-07-08T18:30:00.000Z',
+        reviewedAt: '2026-07-09T00:06:00.000Z',
+        messageCount: 4,
+        mentionCount: 1,
+        preview: 'Local ops handoff',
+      }, MEMORY_OWNER);
+
+      const openVaultResult = vi.spyOn(store.getState(), 'openVaultResult');
+      const travelToSpy = vi.spyOn(store.getState(), 'travelTo');
+
+      render(() => <AppShell />);
+
+      const memory = screen.getByRole('region', { name: 'Device memory context' });
+      const peers = within(memory).getByRole('group', { name: 'Other rooms reviewed recently' });
+      expect(within(peers).getByText('Other rooms')).toBeInTheDocument();
+      const peerButton = within(peers).getByRole('button', { name: 'Open reviewed &ops' });
+      expect(peerButton).toHaveTextContent('Local ops handoff');
+
+      fireEvent.click(peerButton);
+      expect(openVaultResult).toHaveBeenCalledWith('&ops', 'ops-anchor');
+      expect(travelToSpy).toHaveBeenCalledWith(
+        '&ops',
+        new Date('2026-07-08T18:30:00.000Z'),
+        'ops-anchor',
+      );
+
+      openVaultResult.mockRestore();
+      travelToSpy.mockRestore();
+    });
+
     it('hydrates vault-only reviewed anchors before jumping in reader mode', async () => {
       setPreference('readerMode', true);
       setPreference('localHistory', true);
@@ -1052,13 +1125,20 @@ describe('AppShell', () => {
       expect(ribbon.textContent).not.toContain('testuser');
     });
 
+    function openRibbonMore(): void {
+      // A8: account / prefs live in the ribbon More disclosure.
+      const moreSurface = screen.getByTestId('ribbon-more');
+      fireEvent.click(moreSurface.closest('button') ?? moreSurface);
+    }
+
     it('shows a "Guest" account chip that opens the account panel', () => {
       // Arrange — connected guest (no logged-in account).
       seedStore('#general');
 
       // Act
-      const { getByTestId } = render(() => <AppShell />);
-      const chip = getByTestId('ribbon-account-chip');
+      render(() => <AppShell />);
+      openRibbonMore();
+      const chip = screen.getByTestId('ribbon-account-chip');
 
       // Assert — guest chip, panel closed.
       expect(chip).toHaveAttribute('data-guest', 'true');
@@ -1086,8 +1166,9 @@ describe('AppShell', () => {
       });
 
       // Act
-      const { getByTestId } = render(() => <AppShell />);
-      const chip = getByTestId('ribbon-account-chip');
+      render(() => <AppShell />);
+      openRibbonMore();
+      const chip = screen.getByTestId('ribbon-account-chip');
 
       // Assert
       expect(chip).toHaveAttribute('data-guest', 'false');
@@ -1100,6 +1181,7 @@ describe('AppShell', () => {
 
       // Act
       render(() => <AppShell />);
+      openRibbonMore();
       fireEvent.click(screen.getByTestId('ribbon-preferences'));
 
       // Assert
@@ -1107,23 +1189,43 @@ describe('AppShell', () => {
       expect(screen.getByTestId('preferences-panel')).toBeInTheDocument();
     });
 
-    it('opens voice settings immediately from Join video', async () => {
-      // Arrange
+    it('joins the channel with camera from Join video without opening voice settings', async () => {
+      // Arrange — previous behaviour opened Voice settings as a "loading"
+      // affordance, which made Join video look like audio-device settings.
       seedStore('#general');
+      const joinSpy = vi
+        .spyOn(store.getState(), 'joinVoiceChannel')
+        .mockResolvedValue(undefined);
 
       // Act
       render(() => <AppShell />);
       fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
 
-      // The state transition is synchronous; the dialog itself is a lazy
-      // chunk and can take longer than Testing Library's default 1s timeout
-      // when the full 3k-test suite is transforming modules in parallel.
-      expect(store.getState().showVoiceSettings).toBe(true);
-      expect(await screen.findByRole(
-        'dialog',
-        { name: 'Voice settings' },
-        { timeout: 5_000 },
-      )).toBeInTheDocument();
+      // Assert — enter the call with video; settings stay closed (gear on bar).
+      await waitFor(() => {
+        expect(joinSpy).toHaveBeenCalledWith('#general', true);
+      });
+      expect(store.getState().showVoiceSettings).toBe(false);
+      expect(screen.queryByRole('dialog', { name: 'Voice settings' })).not.toBeInTheDocument();
+
+      joinSpy.mockRestore();
+    });
+
+    it('joins the channel without video from Join voice without opening voice settings', async () => {
+      seedStore('#general');
+      const joinSpy = vi
+        .spyOn(store.getState(), 'joinVoiceChannel')
+        .mockResolvedValue(undefined);
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Join voice' }));
+
+      await waitFor(() => {
+        expect(joinSpy).toHaveBeenCalledWith('#general', false);
+      });
+      expect(store.getState().showVoiceSettings).toBe(false);
+
+      joinSpy.mockRestore();
     });
 
     it('shows scheduled room events in the presence header and opens the event moment', () => {

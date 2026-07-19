@@ -1,7 +1,7 @@
 import { test, expect, chromium, type Browser, type BrowserContext, type Page } from '@playwright/test';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Voice / Video e2e — exercises the Orochi MEDIA (Suimyaku) signaling + capture
+// Voice / Video e2e — exercises the Onyx Server MEDIA (Cadence) signaling + capture
 // path with TWO fake-media users in a FRESH channel on the staging media server.
 //
 // WHY a dedicated, self-launched browser (not the project `browser` fixture /
@@ -12,7 +12,7 @@ import { test, expect, chromium, type Browser, type BrowserContext, type Page } 
 //   • The DEV app on :5174 is pinned (VITE_IRC_WS) to the media-enabled staging
 //     server at wss://127.0.0.1:7080 — a self-signed cert, hence ignoreHTTPSErrors
 //     + explicit mic/camera permissions on every context.
-//   • Orochi's hand-rolled TLS does not yet offer Chrome's post-quantum key share,
+//   • Onyx Server's hand-rolled TLS does not yet offer Chrome's post-quantum key share,
 //     and the `chromium-headless-shell` binary (used by the default project) drops
 //     the WSS connection when two contexts connect concurrently. The FULL chromium
 //     binary (chromium.launch with the fake-media args) holds both connections
@@ -144,7 +144,7 @@ async function makeUser(nick: string): Promise<VoiceUser> {
   const mediaLogs: string[] = [];
   page.on('console', (m) => {
     const t = m.text();
-    if (/media|voice|codec|opus|kaguravox|datacloneerror|error/i.test(t)) {
+    if (/media|voice|codec|opus|cadencevox|datacloneerror|error/i.test(t)) {
       mediaLogs.push(`[${m.type()}] ${t}`.slice(0, 200));
     }
   });

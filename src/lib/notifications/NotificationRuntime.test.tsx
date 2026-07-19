@@ -252,4 +252,21 @@ describe('NotificationRuntime coalesced policy', () => {
 
     expect(openChannelConversation).toHaveBeenCalledWith('#room', null);
   });
+
+  it('fail-closes an E2EE envelope in a DM alert body (never surfaces ciphertext)', () => {
+    render(() => <NotificationRuntime />);
+
+    store.getState().addNotification({
+      type: 'dm',
+      text: 'TSUMUGI1 opaque-ciphertext-blob-must-not-leak',
+      from: 'alice',
+    });
+
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+    const payload = vi.mocked(showDesktopNotification).mock.calls[0]?.[0];
+    expect(payload?.title).toBe('Direct message from alice');
+    expect(payload?.body).toBe('New encrypted message');
+    expect(payload?.body).not.toContain('TSUMUGI1');
+    expect(payload?.body).not.toContain('ciphertext');
+  });
 });

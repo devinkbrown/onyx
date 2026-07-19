@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * topics.test.ts — behavior coverage for Orochi named-conversation parsing.
+ * topics.test.ts — behavior coverage for Onyx Server named-conversation parsing.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -44,7 +44,7 @@ describe('topic label validation', () => {
 });
 
 describe('message topic parsing', () => {
-  it('returns a trimmed valid topic label from the Orochi tag', () => {
+  it('returns a trimmed valid topic label from the Onyx Server tag', () => {
     expect(parseMessageTopic({ [TOPIC_TAG]: '  release ' })).toBe('release');
   });
 

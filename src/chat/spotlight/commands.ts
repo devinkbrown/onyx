@@ -1127,6 +1127,26 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
       keywords: ['scheduled', 'schedule', 'send later', 'queue', 'remind', 'pending', 'later'],
       run: () => getState().openScheduledMessages(),
     },
+    {
+      id: 'action:jump-to-date',
+      section: 'Actions',
+      title: 'Jump to date…',
+      hint: activeTarget(state) ? `${activeTargetLabel(state)} · g d` : 'g d',
+      keywords: [
+        'jump',
+        'date',
+        'time',
+        'travel',
+        'history',
+        'scrubber',
+        'at',
+        'moment',
+        'calendar',
+        'goto date',
+        'jump to date',
+      ],
+      run: () => getState().openJumpToDate(),
+    },
     ...(activeChannel && aiPolicy !== 'open'
       ? [
           {
