@@ -2257,6 +2257,8 @@ export const SERVER_SEARCH_RESULT_MAX = 200;
 export const SERVER_SEARCH_ROW_MAX = 400;
 export const SERVER_SEARCH_TEXT_MAX = 8 * 1024;
 export const HISTORY_BATCH_MESSAGE_MAX = 400;
+/** Onyx Server caps one TARGETS reply at 64; mirror it as a client work bound. */
+export const HISTORY_TARGET_DISCOVERY_MAX = 64;
 export const MULTILINE_BATCH_PART_MAX = 64;
 export const MULTILINE_BATCH_TEXT_MAX = 64 * 1024;
 export const OPEN_BATCH_COLLECTOR_MAX = 64;
@@ -2280,7 +2282,17 @@ interface StaleServerSearch {
   openRefs: Set<string>;
 }
 
-type BatchCollectorKind = 'multiline' | 'search' | 'search-quarantine' | 'labeled-response';
+type BatchCollectorKind =
+  | 'multiline'
+  | 'search'
+  | 'search-quarantine'
+  | 'labeled-response'
+  | 'history-targets';
+
+interface HistoryTargetDiscovery {
+  target: string;
+  latestAt: number;
+}
 
 interface BatchCollector {
   target: string;
@@ -2307,6 +2319,12 @@ interface BatchCollector {
    * multiline echo that carried the client label on the opening BATCH).
    */
   responseLabel?: string;
+  /** Bounded rows collected from a draft/chathistory-targets batch. */
+  historyTargets?: Map<string, HistoryTargetDiscovery>;
+  /** Request boundary committed only after the complete TARGETS batch closes. */
+  historyTargetsSweepAt?: number;
+  /** Marks a normal chathistory batch requested from TARGETS discovery. */
+  discovery?: HistoryTargetDiscovery;
 }
 
 /** In-flight optimistic / outbox sends awaiting a labeled server reply. */
@@ -2483,11 +2501,17 @@ function _collectMultilinePart(collector: BatchCollector, text: string, concat: 
   collector.multilineChars = nextChars;
 }
 
-function _validBatchEnvelope(batchRef: string, target: string): boolean {
+function _validBatchRef(batchRef: string): boolean {
   return Boolean(
     batchRef
     && batchRef.length <= BATCH_REF_MAX
     && !/[\u0000-\u0020\u007f]/u.test(batchRef)
+  );
+}
+
+function _validBatchEnvelope(batchRef: string, target: string): boolean {
+  return Boolean(
+    _validBatchRef(batchRef)
     && target
     && target.length <= SERVER_SEARCH_TARGET_MAX
     && !/[\u0000-\u001f\u007f]/u.test(target)
@@ -2813,6 +2837,20 @@ function _pushReplayEvent(tags: Record<string, string>, channel: string | null, 
 }
 
 const _batchCollectors = new Map<string, BatchCollector>();
+const HISTORY_TARGET_FUZZ_MS = 10_000;
+let _historyTargetsRequestPending = false;
+let _openHistoryTargetsBatchRef: string | null = null;
+let _lastHistoryTargetsSweepAt: number | null = null;
+let _historyTargetsRequestStartedAt: number | null = null;
+const _pendingHistoryDiscoveries = new Map<string, HistoryTargetDiscovery>();
+
+function _resetHistoryTargetDiscovery(resetSweep: boolean): void {
+  _historyTargetsRequestPending = false;
+  _openHistoryTargetsBatchRef = null;
+  _historyTargetsRequestStartedAt = null;
+  _pendingHistoryDiscoveries.clear();
+  if (resetSweep) _lastHistoryTargetsSweepAt = null;
+}
 /**
  * Lowercased target → batch ref for every currently-open `chathistory` BATCH.
  * Onyx Server's CHATHISTORY replay does NOT stamp `@batch=<ref>` on the inner
@@ -2830,6 +2868,7 @@ const _openChathistoryByTarget = new Map<string, string>();
 export function _resetBatchCollectorsForTests(): void {
   _batchCollectors.clear();
   _openChathistoryByTarget.clear();
+  _resetHistoryTargetDiscovery(true);
   _resetServerSearchTransport();
   _pendingLabeledSends.clear();
 }
@@ -3619,6 +3658,162 @@ function _clearReconnectCountdown() {
 
 type SetFn = (partial: Partial<OnyxState> | ((s: OnyxState) => Partial<OnyxState>)) => void;
 type GetFn = () => OnyxState;
+
+function _requestHistoryTargetDiscovery(get: GetFn): void {
+  const client = get().client;
+  if (
+    !hasChatHistoryCap(client)
+    || _historyTargetsRequestPending
+    || _openHistoryTargetsBatchRef !== null
+  ) return;
+
+  const now = Date.now();
+  const lowerMs = _lastHistoryTargetsSweepAt === null
+    ? 0
+    : Math.max(0, _lastHistoryTargetsSweepAt - HISTORY_TARGET_FUZZ_MS);
+  const upperMs = now + HISTORY_TARGET_FUZZ_MS;
+  const sent = client?.sendRaw(
+    'CHATHISTORY',
+    'TARGETS',
+    `timestamp=${new Date(lowerMs).toISOString()}`,
+    `timestamp=${new Date(upperMs).toISOString()}`,
+    String(HISTORY_TARGET_DISCOVERY_MAX),
+  );
+  if (sent === false) return;
+  _historyTargetsRequestPending = true;
+  _historyTargetsRequestStartedAt = now;
+}
+
+function _latestFiniteMessageTime(messages: readonly ChatMessage[]): number | null {
+  let latest: number | null = null;
+  for (const message of messages) {
+    const time = message.time.getTime();
+    if (!Number.isFinite(time)) continue;
+    if (latest === null || time > latest) latest = time;
+  }
+  return latest;
+}
+
+/**
+ * Make room for a first-contact DM without evicting unread or active work.
+ * Mutates `dms` only when an eligible read/inactive conversation exists.
+ */
+function _evictOldestReadInactiveDM(
+  dms: Map<string, DMConversation>,
+  activeView: ActiveView,
+): string | null {
+  const activeKey = activeView.kind === 'dm' ? activeView.nick.toLowerCase() : null;
+  let evictKey: string | null = null;
+  let evictTime = Number.POSITIVE_INFINITY;
+  for (const [candidateKey, conversation] of dms) {
+    if (candidateKey === activeKey || conversation.unread > 0) continue;
+    const lastTime = conversation.messages.at(-1)?.time.getTime() ?? 0;
+    const comparable = Number.isFinite(lastTime) ? lastTime : 0;
+    if (comparable < evictTime) {
+      evictKey = candidateKey;
+      evictTime = comparable;
+    }
+  }
+  if (evictKey) dms.delete(evictKey);
+  return evictKey;
+}
+
+function _applyHistoryTargetDiscovery(
+  rows: ReadonlyMap<string, HistoryTargetDiscovery>,
+  get: GetFn,
+  set: SetFn,
+): void {
+  const state = get();
+  const client = state.client;
+  if (!client || !hasChatHistoryCap(client)) return;
+
+  const chanTypes = client.isupport.CHANTYPES ?? '#&';
+  const dms = new Map(state.dms);
+  const channelLastActivity = new Map(state.channelLastActivity);
+  const historyLoading = new Map(state.historyLoading);
+  let firstUnreadId: Map<string, string | null> | null = null;
+  const requests: Array<{
+    target: string;
+    key: string;
+    reference: string;
+    discovery: HistoryTargetDiscovery;
+  }> = [];
+
+  for (const [key, discovery] of rows) {
+    if (requests.length >= HISTORY_TARGET_DISCOVERY_MAX) break;
+    const isChannel = discovery.target.length > 0 && chanTypes.includes(discovery.target[0]!);
+    const channel = isChannel ? state.channels.get(key) : undefined;
+    let messages: readonly ChatMessage[];
+    let target: string;
+
+    if (isChannel) {
+      // TARGETS is history visibility, not proof of current membership. Only
+      // enrich a channel shell established by JOIN/session-sync; never create a
+      // phantom joined room from an unsolicited history listing.
+      if (!channel) continue;
+      target = channel.name;
+      messages = channel.messages;
+      channelLastActivity.set(key, Math.max(channelLastActivity.get(key) ?? 0, discovery.latestAt));
+    } else {
+      if (key === state.ourNick.toLowerCase()) continue;
+      const existing = dms.get(key);
+      if (!existing && dms.size >= MAX_LIVE_DM_CONVERSATIONS) {
+        const evictedKey = _evictOldestReadInactiveDM(dms, state.activeView);
+        if (!evictedKey) continue;
+        firstUnreadId ??= new Map(state.firstUnreadId);
+        firstUnreadId.delete(evictedKey);
+      }
+      target = discovery.target;
+      messages = existing?.messages ?? [];
+      dms.set(key, {
+        ...(existing ?? {
+          nick: target,
+          account: null,
+          unread: 0,
+          highlights: 0,
+          messages: [],
+        }),
+        nick: target,
+        lastSeen: new Date(discovery.latestAt),
+      });
+    }
+
+    if (
+      historyLoading.get(key)
+      || _serverSearchOwnsTarget(target)
+      || _openChathistoryByTarget.has(key)
+      || _pendingHistoryDiscoveries.has(key)
+    ) continue;
+
+    const latest = _latestFiniteMessageTime(messages);
+    const reference = latest === null
+      ? '*'
+      : `timestamp=${new Date(Math.max(0, latest - HISTORY_TARGET_FUZZ_MS)).toISOString()}`;
+    requests.push({ target, key, reference, discovery: { ...discovery, target } });
+    historyLoading.set(key, true);
+  }
+
+  set({
+    dms,
+    channelLastActivity,
+    historyLoading,
+    ...(firstUnreadId ? { firstUnreadId } : {}),
+  });
+  for (const request of requests) {
+    _pendingHistoryDiscoveries.set(request.key, request.discovery);
+    if (client.negotiatedCaps.has('draft/read-marker')) {
+      client.sendRaw('MARKREAD', request.target);
+    }
+    if (!client.sendRaw('CHATHISTORY', 'LATEST', request.target, request.reference, '50')) {
+      _pendingHistoryDiscoveries.delete(request.key);
+      set((current) => {
+        const nextLoading = new Map(current.historyLoading);
+        nextLoading.set(request.key, false);
+        return { historyLoading: nextLoading };
+      });
+    }
+  }
+}
 
 function _accountKey(account: string | null | undefined): string | null {
   const normalized = account?.trim().toLowerCase();
@@ -5241,6 +5436,7 @@ export const store = createStore<OnyxState>()(
       // leak across a (re)connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      _resetHistoryTargetDiscovery(true);
       // Promote any wire-admitted optimistic rows left over from the prior
       // socket so they cannot stick as pending forever after a re-connect.
       _clearPendingLabeledSends(set);
@@ -5376,6 +5572,9 @@ export const store = createStore<OnyxState>()(
           const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
           _batchCollectors.clear();
           _openChathistoryByTarget.clear();
+          // A reconnect keeps the last successful sweep boundary but owns a
+          // fresh TARGETS/batch transport generation.
+          _resetHistoryTargetDiscovery(false);
           // Socket gone: no further labeled echo can arrive. Promote admitted
           // optimistic / outbox placeholders so they don't hang as "sending…".
           _clearPendingLabeledSends(set);
@@ -5391,6 +5590,10 @@ export const store = createStore<OnyxState>()(
             connectedAt: null,
             activeChannelTopics: new Map(),
             typingUsers: new Map(),
+            // Every in-flight history request belonged to the dead socket.
+            // Clear its loading ownership so TARGETS discovery or a manual
+            // fetch can retry the same buffer after reconnect.
+            historyLoading: new Map(),
             ...(searchWasPending
               ? {
                   serverSearch: {
@@ -5580,6 +5783,7 @@ export const store = createStore<OnyxState>()(
       // swallow live messages after a fresh connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      _resetHistoryTargetDiscovery(true);
       _clearPendingLabeledSends(set);
       _stopLatencyPing();
       _clearTempBanTimers();
@@ -5995,6 +6199,7 @@ export const store = createStore<OnyxState>()(
       // as needed — the vault hydration then repopulates its scrollback) and
       // hand the message to the feed's landing scroll. The landing effect
       // retries for a few seconds, which covers join + hydrate latency.
+      // Cold-return Home cards (exportVault) open exact retained rows here too.
       const key = target.toLowerCase();
       const s = get();
       const channel = s.channels.get(key);
@@ -6003,31 +6208,48 @@ export const store = createStore<OnyxState>()(
       // inserted into `dms` as a phantom conversation.
       const chantypes = s.client?.isupport.CHANTYPES ?? '#&';
       const isChannel = key.length > 0 && chantypes.includes(key[0]!);
+      let openedView: ActiveView | null = null;
+      // Only paint vault rows into a brand-new empty shell. Existing buffers
+      // already own live/CHATHISTORY rows (or vaultSync will fill empty ones).
+      let shouldHydrateVault = false;
       if (channel) {
         get().navigate({ kind: 'channel', channel: channel.name });
+        openedView = { kind: 'channel', channel: channel.name.toLowerCase() };
       } else if (isChannel) {
         const channels = new Map(s.channels);
         channels.set(key, emptyChannel(target));
         set({ channels, activeView: { kind: 'channel', channel: key } });
+        openedView = { kind: 'channel', channel: key };
+        shouldHydrateVault = true;
         get().joinChannel(target);
-        if (preferences().localHistory) {
-          const memoryContext = captureDeviceMemoryContext(get());
-          if (!memoryContext) return;
-          void loadRecent(target, HISTORY_PAGE_SIZE, memoryContext.owner).then((localMsgs) => {
-            if (!isDeviceMemoryContextCurrent(memoryContext, get())) return;
-            if (localMsgs.length > 0) get().hydrateHistory(target, localMsgs);
-          });
-        }
       } else {
         const dm = s.dms.get(key);
         if (!dm) {
           const dms = new Map(s.dms);
           dms.set(key, { nick: target, account: null, unread: 0, highlights: 0, messages: [] });
           set({ dms });
+          shouldHydrateVault = true;
         }
-        get().navigate({ kind: 'dm', nick: dm?.nick ?? target });
+        const nick = dm?.nick ?? target;
+        get().navigate({ kind: 'dm', nick });
+        openedView = { kind: 'dm', nick: nick.toLowerCase() };
       }
+      // Hold the opened conversation across the session-sync JOIN flood so a
+      // cold-return card open is not stolen by the first restored room.
+      const restore = _currentSessionRestore(get);
+      if (restore && openedView) restore.preserveActiveView = openedView;
+      // Landing id is independent of vault ownership — always pin it so the
+      // feed can scroll once rows land (vaultSync / CHATHISTORY / later owner).
       set({ timeTravelLandingId: messageId });
+      if (shouldHydrateVault && preferences().localHistory) {
+        const memoryContext = captureDeviceMemoryContext(get());
+        if (memoryContext) {
+          void loadRecent(target, HISTORY_PAGE_SIZE, memoryContext.owner).then((localMsgs) => {
+            if (!isDeviceMemoryContextCurrent(memoryContext, get())) return;
+            if (localMsgs.length > 0) get().hydrateHistory(target, localMsgs);
+          });
+        }
+      }
     },
 
     hydrateHistory(target, localMsgs, options) {
@@ -8779,10 +9001,27 @@ export const store = createStore<OnyxState>()(
           return;
         }
         if (standard.kind === 'FAIL' && standard.command === 'CHATHISTORY') {
-          const target = standard.context.find(p => isChan(p));
-          if (target) {
-            get().setHistoryLoading(target, false);
-            get().setHistoryExhausted(target);
+          const channelTarget = standard.context.find((p) => isChan(p));
+          if (channelTarget) {
+            get().setHistoryLoading(channelTarget, false);
+            get().setHistoryExhausted(channelTarget);
+          } else {
+            // TARGETS has no channel context. Clear the pending request so a
+            // later reconnect can retry discovery instead of staying stuck.
+            // Also release any DM discovery fetch the server rejected.
+            if (_historyTargetsRequestPending || _openHistoryTargetsBatchRef) {
+              if (_openHistoryTargetsBatchRef) {
+                _batchCollectors.delete(_openHistoryTargetsBatchRef);
+                _openHistoryTargetsBatchRef = null;
+              }
+              _historyTargetsRequestPending = false;
+            }
+            for (const token of standard.context) {
+              const key = token.toLowerCase();
+              if (!_pendingHistoryDiscoveries.has(key) && !get().historyLoading.get(key)) continue;
+              _pendingHistoryDiscoveries.delete(key);
+              get().setHistoryLoading(token, false);
+            }
           }
           return;
         }
@@ -9071,6 +9310,12 @@ export const store = createStore<OnyxState>()(
           _replaceOwnedMonitorContacts(get, set, false);
           // Request server stats for HomeView widget
           get().client?.sendRaw('LUSERS');
+          // Discover history targets before the user opens a buffer. This is
+          // the only IRCv3 path that reveals a DM which first became active
+          // while the browser was offline; its replay then feeds Home unread
+          // state. The first registration sweeps retained history, while later
+          // registrations on this client request only the reconnect gap.
+          _requestHistoryTargetDiscovery(get);
           // Send initial latency ping
           _sendLatencyPing(get);
           // NO blind autojoin: joining is a choice, not a default. An account
@@ -10418,6 +10663,11 @@ export const store = createStore<OnyxState>()(
             // Dropping it also prevents rows beyond an open-collector ceiling
             // from escaping the bound and rendering through the normal path.
             if (!collector) break;
+            if (collector.kind === 'history-targets') {
+              // TARGETS batches admit only CHATHISTORY TARGETS rows. A chat
+              // message tagged into the control batch is malformed and ignored.
+              break;
+            }
             if (collector.kind === 'labeled-response') {
               // Multi-line labeled reply (or a labeled-response wrapper around
               // an echo). Resolve the first self chat line against the pending
@@ -11447,6 +11697,40 @@ export const store = createStore<OnyxState>()(
           break;
         }
 
+        // ── IRCv3 CHATHISTORY TARGETS rows ───────────────────────────────
+        // :server CHATHISTORY TARGETS <nick|channel> timestamp=<ISO8601>
+        // Onyx Server currently omits @batch on the inner rows, so correlate
+        // them to the single bounded targets batch opened immediately above.
+        case 'CHATHISTORY': {
+          if ((params[0] ?? '').toUpperCase() !== 'TARGETS' || params.length !== 3 || nick) break;
+          const batchRef = tags['batch'] ?? _openHistoryTargetsBatchRef;
+          if (!batchRef || batchRef !== _openHistoryTargetsBatchRef) break;
+          const collector = _batchCollectors.get(batchRef);
+          if (!collector || collector.kind !== 'history-targets') break;
+
+          const target = params[1] ?? '';
+          const timestampToken = params[2] ?? '';
+          if (
+            !_validInboundWireToken(target, MAX_VAULT_TARGET_LENGTH)
+            || target.startsWith(':')
+            || target.includes(',')
+            || target.toLowerCase() === ourNick.toLowerCase()
+            || !/^timestamp=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(timestampToken)
+          ) break;
+          const timestamp = timestampToken.slice('timestamp='.length);
+          const latestAt = new Date(timestamp).getTime();
+          if (!Number.isFinite(latestAt) || new Date(latestAt).toISOString() !== timestamp) break;
+
+          const rows = collector.historyTargets ?? (collector.historyTargets = new Map());
+          const key = target.toLowerCase();
+          const existing = rows.get(key);
+          if (!existing && rows.size >= HISTORY_TARGET_DISCOVERY_MAX) break;
+          if (!existing || latestAt > existing.latestAt) {
+            rows.set(key, { target, latestAt });
+          }
+          break;
+        }
+
         // ── CHATHISTORY BATCH ─────────────────────────────────────────────
         case 'BATCH': {
           const batchParam = params[0] ?? '';
@@ -11455,7 +11739,26 @@ export const store = createStore<OnyxState>()(
             const batchRef = batchParam.slice(1);
             const batchType = params[1] ?? '';
             const batchTarget = params[2] ?? '';
-            if (
+            if (batchType === 'draft/chathistory-targets' && _historyTargetsRequestPending) {
+              _historyTargetsRequestPending = false;
+              const sweepAt = _historyTargetsRequestStartedAt;
+              _historyTargetsRequestStartedAt = null;
+              if (
+                sweepAt !== null
+                && _validBatchRef(batchRef)
+                && !_batchCollectors.has(batchRef)
+                && _batchCollectors.size < OPEN_BATCH_COLLECTOR_MAX
+              ) {
+                _openHistoryTargetsBatchRef = batchRef;
+                _batchCollectors.set(batchRef, {
+                  target: '*',
+                  messages: [],
+                  kind: 'history-targets',
+                  historyTargets: new Map(),
+                  historyTargetsSweepAt: sweepAt,
+                });
+              }
+            } else if (
               _validBatchEnvelope(batchRef, batchTarget) &&
               (batchType === 'draft/chathistory' || batchType === 'chathistory')
             ) {
@@ -11506,13 +11809,18 @@ export const store = createStore<OnyxState>()(
                 }
               }
 
+              const pendingDiscovery = kind
+                ? undefined
+                : _pendingHistoryDiscoveries.get(targetKey);
               _batchCollectors.set(batchRef, {
                 target: batchTarget,
                 messages: [],
                 ...(kind ? { kind } : {}),
                 ...(searchGeneration !== undefined ? { searchGeneration } : {}),
                 ...(kind === 'search' ? { seenIds: new Set<string>() } : {}),
+                ...(pendingDiscovery ? { discovery: pendingDiscovery } : {}),
               });
+              if (!kind) _pendingHistoryDiscoveries.delete(targetKey);
               _openChathistoryByTarget.set(targetKey, batchRef);
             } else if (
               batchType === 'draft/multiline'
@@ -11559,6 +11867,17 @@ export const store = createStore<OnyxState>()(
             // BATCH -ref — end of batch
             const batchRef = batchParam.slice(1);
             const collector = _batchCollectors.get(batchRef);
+            if (collector && collector.kind === 'history-targets') {
+              _batchCollectors.delete(batchRef);
+              if (_openHistoryTargetsBatchRef === batchRef) {
+                _openHistoryTargetsBatchRef = null;
+              }
+              if (collector.historyTargetsSweepAt !== undefined) {
+                _lastHistoryTargetsSweepAt = collector.historyTargetsSweepAt;
+              }
+              _applyHistoryTargetDiscovery(collector.historyTargets ?? new Map(), get, set);
+              break;
+            }
             if (collector && collector.kind === 'search-quarantine') {
               _batchCollectors.delete(batchRef);
               const targetKey = collector.target.toLowerCase();
@@ -11673,29 +11992,101 @@ export const store = createStore<OnyxState>()(
                   // auto-reconnect), duplicating every message. CHATHISTORY
                   // messages carry a server msgid as ChatMessage.id; locally
                   // generated ids (uid()) never collide with those.
-                  const mergeHistory = (existing: ChatMessage[]): ChatMessage[] => {
+                  const mergeHistory = (existing: ChatMessage[]): {
+                    messages: ChatMessage[];
+                    newHistory: ChatMessage[];
+                  } => {
                     const existingIds = new Set(existing.map(m => m.id));
                     const newHistory = batchMsgs.filter(m => !existingIds.has(m.id));
-                    if (newHistory.length === 0) return existing;
+                    if (newHistory.length === 0) return { messages: existing, newHistory };
                     // Stable time-sort: a plain prepend breaks chronology when
                     // batches land out of order (AROUND time travel fetches an
                     // older window while the join replay is still arriving).
-                    return [...newHistory, ...existing].sort(
-                      (a, b) => a.time.getTime() - b.time.getTime(),
-                    );
+                    return {
+                      messages: [...newHistory, ...existing].sort(
+                        (a, b) => a.time.getTime() - b.time.getTime(),
+                      ),
+                      newHistory,
+                    };
                   };
                   const channels = new Map(s.channels);
                   const c = channels.get(batchKey);
                   if (c) {
-                    channels.set(batchKey, { ...c, messages: mergeHistory(c.messages) });
-                    return { channels };
+                    const merged = mergeHistory(c.messages);
+                    const discoveryRows = collector.discovery && !s.readMarkers.has(batchKey)
+                      ? merged.newHistory.filter((message) => (
+                          !s.ignoredUsers.has(message.from.toLowerCase())
+                          && isEligibleChannelUnread(s, batchKey, message)
+                          && !isChannelMessageVisible(s, batchKey, message.topic)
+                        ))
+                      : [];
+                    const discoveryHighlights = discoveryRows.reduce(
+                      (count, message) => count + (isChannelUnreadHighlight(s, message) ? 1 : 0),
+                      0,
+                    );
+                    channels.set(batchKey, {
+                      ...c,
+                      messages: merged.messages,
+                      unread: c.unread + discoveryRows.length,
+                      highlights: c.highlights + discoveryHighlights,
+                    });
+                    if (discoveryRows.length === 0) return { channels };
+                    const firstUnreadId = new Map(s.firstUnreadId);
+                    if (!firstUnreadId.has(batchKey)) {
+                      const newIds = new Set(discoveryRows.map((message) => message.id));
+                      const first = merged.messages.find((message) => newIds.has(message.id));
+                      if (first) firstUnreadId.set(batchKey, first.id);
+                    }
+                    const channelUnread = {
+                      ...s.channelUnread,
+                      [batchKey]: c.unread + discoveryRows.length,
+                    };
+                    const channelMentions = {
+                      ...s.channelMentions,
+                      [batchKey]: c.highlights + discoveryHighlights,
+                    };
+                    return {
+                      channels,
+                      firstUnreadId,
+                      channelUnread,
+                      channelMentions,
+                      totalUnreadMentions: Object.values(channelMentions).reduce((a, b) => a + b, 0),
+                    };
                   }
                   // CHATHISTORY also covers DM targets (a nick, not a #channel).
                   const dms = new Map(s.dms);
                   const dm = dms.get(batchKey);
                   if (dm) {
-                    dms.set(batchKey, { ...dm, messages: mergeHistory(dm.messages) });
-                    return { dms };
+                    const merged = mergeHistory(dm.messages);
+                    const isActive = s.activeView.kind === 'dm'
+                      && s.activeView.nick.toLowerCase() === batchKey;
+                    const discoveryRows = collector.discovery
+                      && !s.readMarkers.has(batchKey)
+                      && !isActive
+                      && !s.mutedDMs.has(batchKey)
+                      && !s.ignoredUsers.has(batchKey)
+                      ? merged.newHistory.filter((message) => (
+                          CHANNEL_UNREAD_MESSAGE_TYPES.has(message.type)
+                          && message.from.toLowerCase() !== s.ourNick.toLowerCase()
+                        ))
+                      : [];
+                    dms.set(batchKey, {
+                      ...dm,
+                      messages: merged.messages,
+                      unread: dm.unread + discoveryRows.length,
+                      highlights: dm.highlights + discoveryRows.length,
+                      ...(collector.discovery
+                        ? { lastSeen: new Date(collector.discovery.latestAt) }
+                        : {}),
+                    });
+                    if (discoveryRows.length === 0) return { dms };
+                    const firstUnreadId = new Map(s.firstUnreadId);
+                    if (!firstUnreadId.has(batchKey)) {
+                      const newIds = new Set(discoveryRows.map((message) => message.id));
+                      const first = merged.messages.find((message) => newIds.has(message.id));
+                      if (first) firstUnreadId.set(batchKey, first.id);
+                    }
+                    return { dms, firstUnreadId };
                   }
                   return {};
                 });
@@ -15479,7 +15870,11 @@ function _applyReadMarker(state: OnyxState, key: string, iso: string): Partial<O
     out.totalUnreadMentions = Object.values(channelMentions).reduce((a, b) => a + b, 0);
   } else if (dm) {
     const dms = new Map(state.dms);
-    dms.set(key, { ...dm, unread, highlights: unread === 0 ? 0 : Math.min(dm.highlights, unread) });
+    // DMs are intrinsically personal/high-priority. Replayed rows may be the
+    // first rows ever materialized for this conversation, so preserving the
+    // pre-replay highlight count (often zero) would hide them from Home even
+    // though the read marker correctly classifies them as unread.
+    dms.set(key, { ...dm, unread, highlights: mentions });
     out.dms = dms;
   }
 
@@ -15516,22 +15911,8 @@ function _addDMMessage(
     // working set is full, only a read inactive DM is eligible for eviction;
     // otherwise the new unsolicited conversation is refused. Server history
     // can recover it later without allowing an inbound memory flood now.
-    const activeKey = state.activeView.kind === 'dm'
-      ? state.activeView.nick.toLowerCase()
-      : null;
-    let evictKey: string | null = null;
-    let evictTime = Number.POSITIVE_INFINITY;
-    for (const [candidateKey, conversation] of dms) {
-      if (candidateKey === activeKey || conversation.unread > 0) continue;
-      const lastTime = conversation.messages.at(-1)?.time.getTime() ?? 0;
-      const comparable = Number.isFinite(lastTime) ? lastTime : 0;
-      if (comparable < evictTime) {
-        evictKey = candidateKey;
-        evictTime = comparable;
-      }
-    }
+    const evictKey = _evictOldestReadInactiveDM(dms, state.activeView);
     if (!evictKey) return {};
-    dms.delete(evictKey);
     const nextFirstUnreadId = new Map(state.firstUnreadId);
     nextFirstUnreadId.delete(evictKey);
     firstUnreadId = nextFirstUnreadId;
