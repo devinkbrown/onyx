@@ -5,6 +5,7 @@ import { ENVELOPE_PREFIX } from '@/lib/e2ee/dmCipher';
 
 import {
   ENCRYPTED_NOTIFICATION_BODY,
+  isNotificationEnvelope,
   notificationBodyFor,
 } from './notificationBody';
 
@@ -28,11 +29,21 @@ describe('notificationBodyFor', () => {
     expect(notificationBodyFor(envelope)).not.toContain('AAAA');
   });
 
+  it('fail-closes a whitespace-prefixed envelope (display redaction is broader than isEnvelope)', () => {
+    const padded = ` \t${ENVELOPE_PREFIX}opaque-ciphertext-blob`;
+    // Crypto stays strict — only display redaction softens leading whitespace.
+    expect(isNotificationEnvelope(padded)).toBe(true);
+    expect(notificationBodyFor(padded)).toBe(ENCRYPTED_NOTIFICATION_BODY);
+    expect(notificationBodyFor(padded)).not.toContain('TSUMUGI1');
+    expect(notificationBodyFor(padded)).not.toContain('ciphertext');
+  });
+
   it('does not treat ordinary text that merely mentions the prefix word as an envelope', () => {
     // isEnvelope requires the exact "TSUMUGI1 " wire prefix at the start.
     expect(notificationBodyFor('talking about TSUMUGI1 offline')).toBe(
       'talking about TSUMUGI1 offline',
     );
+    expect(isNotificationEnvelope('talking about TSUMUGI1 offline')).toBe(false);
   });
 
   it('fail-closes even when the envelope is shorter than the display truncate limit', () => {

@@ -299,6 +299,22 @@ describe('NotificationRuntime coalesced policy', () => {
     expect(payload?.body).not.toContain('ciphertext');
   });
 
+  it('fail-closes a whitespace-prefixed E2EE envelope in a DM alert body', () => {
+    render(() => <NotificationRuntime />);
+
+    store.getState().addNotification({
+      type: 'dm',
+      text: ' \tTSUMUGI1 padded-ciphertext-must-not-leak',
+      from: 'alice',
+    });
+
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+    const payload = vi.mocked(showDesktopNotification).mock.calls[0]?.[0];
+    expect(payload?.body).toBe('New encrypted message');
+    expect(JSON.stringify(payload)).not.toContain('TSUMUGI1');
+    expect(JSON.stringify(payload)).not.toContain('ciphertext');
+  });
+
   it('never exposes a decrypted E2EE DM in the desktop notification body', () => {
     const secret = 'private launch coordinates';
     setEncryptedDirectMessage(secret);

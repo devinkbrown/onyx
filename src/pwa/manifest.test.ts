@@ -305,6 +305,28 @@ describe('PWA manifest', () => {
     expect(JSON.stringify(encryptedCall)).not.toContain('TSUMUGI1');
     expect(JSON.stringify(encryptedCall)).not.toContain('ciphertext');
 
+    // Leading whitespace must not defeat envelope redaction on the push plane.
+    pushWork = undefined;
+    showNotification.mockClear();
+    push!({
+      data: {
+        json: () => ({
+          type: 'dm',
+          from: 'Bob',
+          text: ' \tTSUMUGI1 padded_ciphertext_must_not_leak',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith('Message from Bob', expect.objectContaining({
+      body: 'New encrypted message',
+    }));
+    expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('TSUMUGI1');
+    expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('ciphertext');
+
     const click = listeners.get('notificationclick');
     expect(click).toBeDefined();
     let clickWork: Promise<unknown> | undefined;

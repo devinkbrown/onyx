@@ -15,12 +15,26 @@ export const ENCRYPTED_NOTIFICATION_BODY = 'New encrypted message';
 const MAX_BODY_CHARS = 180;
 
 /**
+ * True when `text` is a Tsumugi DM envelope, including after leading whitespace.
+ *
+ * Crypto (`isEnvelope`) stays strict so seal/open never invent a wire form.
+ * Display redaction is deliberately broader: a buggy or hostile peer that
+ * prefixes ` TSUMUGI1 …` must still fail closed on a lock-screen alert body.
+ */
+export function isNotificationEnvelope(text: string): boolean {
+  if (isEnvelope(text)) return true;
+  // Strip only leading whitespace — never rewrite the envelope body itself.
+  const trimmed = text.replace(/^\s+/u, '');
+  return trimmed !== text && isEnvelope(trimmed);
+}
+
+/**
  * Body string for an OS notification.
- * - E2EE envelope (`TSUMUGI1 …`) → neutral placeholder (fail closed)
+ * - E2EE envelope (`TSUMUGI1 …`, optionally whitespace-prefixed) → neutral placeholder
  * - otherwise truncate at 180 characters
  */
 export function notificationBodyFor(text: string): string {
-  if (isEnvelope(text)) return ENCRYPTED_NOTIFICATION_BODY;
+  if (isNotificationEnvelope(text)) return ENCRYPTED_NOTIFICATION_BODY;
   if (text.length > MAX_BODY_CHARS) return `${text.slice(0, MAX_BODY_CHARS - 3)}...`;
   return text;
 }
