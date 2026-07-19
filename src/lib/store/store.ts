@@ -5507,6 +5507,10 @@ export const store = createStore<OnyxState>()(
       // Per-client flag: true once this client has registered at least once, so
       // onConnected can tell a fresh connect from a reconnect/session-resume.
       let hasRegistered = false;
+      // `new WebSocket(url)` can throw before the store owns this client. onError
+      // is ownership-gated, so remember the construction failure text here and
+      // surface it from the connect() failure path below.
+      let constructionError: string | null = null;
 
       const client = new IRCClient({
         url,
@@ -5620,7 +5624,10 @@ export const store = createStore<OnyxState>()(
           }
         },
         onError(err) {
-          if (get().client !== client) return;
+          if (get().client !== client) {
+            constructionError = err;
+            return;
+          }
           set({ status: 'error' });
           get().addNotification({ type: 'error', text: err });
           get().addServerLog(err, '', 'error');
@@ -5711,6 +5718,10 @@ export const store = createStore<OnyxState>()(
           reconnectIn: 0,
           autoReconnect: false,
         });
+        const text = constructionError
+          ?? 'Unable to open the WebSocket connection.';
+        get().addNotification({ type: 'error', text });
+        get().addServerLog(text, '', 'error');
         return;
       }
 
@@ -6208,10 +6219,10 @@ export const store = createStore<OnyxState>()(
       // inserted into `dms` as a phantom conversation.
       const chantypes = s.client?.isupport.CHANTYPES ?? '#&';
       const isChannel = key.length > 0 && chantypes.includes(key[0]!);
-      let openedView: ActiveView | null = null;
       // Only paint vault rows into a brand-new empty shell. Existing buffers
       // already own live/CHATHISTORY rows (or vaultSync will fill empty ones).
       let shouldHydrateVault = false;
+      let openedView: ActiveView;
       if (channel) {
         get().navigate({ kind: 'channel', channel: channel.name });
         openedView = { kind: 'channel', channel: channel.name.toLowerCase() };
@@ -6237,7 +6248,7 @@ export const store = createStore<OnyxState>()(
       // Hold the opened conversation across the session-sync JOIN flood so a
       // cold-return card open is not stolen by the first restored room.
       const restore = _currentSessionRestore(get);
-      if (restore && openedView) restore.preserveActiveView = openedView;
+      if (restore) restore.preserveActiveView = openedView;
       // Landing id is independent of vault ownership — always pin it so the
       // feed can scroll once rows land (vaultSync / CHATHISTORY / later owner).
       set({ timeTravelLandingId: messageId });

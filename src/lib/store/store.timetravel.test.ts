@@ -205,6 +205,37 @@ describe('travelTo', () => {
     expect(store.getState().timeTravelLandingId).toBe('dm-1');
   });
 
+  it('hydrates a cold-return DM open from vault ciphertext only', async () => {
+    // Home cold cards open exact retained rows via openVaultResult — DMs must
+    // paint local scrollback the same way channels do, without inventing plaintext.
+    await vault.saveMessages('trev', [{
+      ...live('dm-cold', '2026-06-30T12:00:00.000Z', 'TSUMUGI1 opaque-ciphertext', 'trev'),
+      encrypted: true,
+      plaintext: 'must never hydrate from disk',
+    }], MEMORY_OWNER);
+
+    store.getState().openVaultResult('trev', 'dm-cold');
+    expect(store.getState().activeView).toEqual({ kind: 'dm', nick: 'trev' });
+    expect(store.getState().timeTravelLandingId).toBe('dm-cold');
+    await waitForExpect(() => {
+      const row = store.getState().dms.get('trev')?.messages[0];
+      expect(row?.id).toBe('dm-cold');
+      expect(row?.text).toBe('TSUMUGI1 opaque-ciphertext');
+      expect(row?.plaintext).toBeUndefined();
+    });
+  });
+
+  it('pins the landing id even when device-memory owner is not ready yet', () => {
+    // Missing owner used to early-return before timeTravelLandingId — cold
+    // cards would open a shell that never scrolled to the retained row.
+    store.setState({ server: null, ourNick: 'me' });
+    store.getState().openVaultResult('#offline', 'offline-last');
+    expect(store.getState().channels.has('#offline')).toBe(true);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#offline' });
+    expect(store.getState().timeTravelLandingId).toBe('offline-last');
+    expect(store.getState().channels.get('#offline')?.messages).toEqual([]);
+  });
+
   it('hydrates from the local vault without the chathistory cap', async () => {
     const sendRaw = vi.fn();
     await vault.saveMessages('#root', [

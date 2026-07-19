@@ -1,10 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ChatMessage } from '@/lib/irc/types';
-import { store } from './store';
+import { parseIRCMessage } from '@/lib/irc/parser';
+import {
+  _resetSessionRestoreForTests,
+  store,
+  type Server,
+} from './store';
 
 const initialState = store.getInitialState();
+const SERVER: Server = {
+  id: 'hydrate-cold',
+  name: 'Onyx',
+  network: 'Onyx',
+  url: 'wss://example.test',
+  icon: '',
+  nick: 'alice',
+  account: 'alice',
+  connected: true,
+};
 
 function message(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -18,8 +33,30 @@ function message(overrides: Partial<ChatMessage> = {}): ChatMessage {
   };
 }
 
+function mockClient() {
+  return {
+    negotiatedCaps: new Set<string>(),
+    capValues: new Map<string, string>(),
+    isupport: { CHANTYPES: '#&' },
+    prefixToMode: {},
+    sendRaw: vi.fn(() => true),
+    join: vi.fn(),
+    send: vi.fn(() => true),
+    connect: vi.fn(() => true),
+    updateResumeTokens: vi.fn(),
+  } as never;
+}
+
 describe('hydrateHistory cold-start activation', () => {
-  beforeEach(() => store.setState(initialState, true));
+  beforeEach(() => {
+    _resetSessionRestoreForTests();
+    store.setState(initialState, true);
+  });
+
+  afterEach(() => {
+    _resetSessionRestoreForTests();
+    vi.restoreAllMocks();
+  });
 
   it('materializes and activates a missing channel buffer before JOIN replay', () => {
     store.getState().hydrateHistory('#Room', [message()], { activate: 'channel' });
@@ -68,5 +105,28 @@ describe('hydrateHistory cold-start activation', () => {
 
     expect(store.getState().channels.get('#room')?.messages.map((row) => row.id))
       .toEqual(['older', 'between', 'live', 'newer']);
+  });
+
+  it('holds a cold-activated room across the session-sync JOIN flood', () => {
+    // vaultResumeMemory → hydrateHistory({activate}) must win over the first
+    // restored JOIN so cold return does not bounce off the remembered room.
+    store.setState({
+      ...initialState,
+      client: mockClient(),
+      ourNick: 'alice',
+      server: SERVER,
+      activeView: { kind: 'home' },
+      channels: new Map(),
+      dms: new Map(),
+      autoReconnect: true,
+    }, true);
+    store.getState().reconnectNow();
+    store.getState().hydrateHistory('#room', [message()], { activate: 'channel' });
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#room' });
+
+    store.getState()._handleMessage(parseIRCMessage(':alice!a@h JOIN #other'));
+
+    expect(store.getState().channels.has('#other')).toBe(true);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#room' });
   });
 });

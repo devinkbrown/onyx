@@ -195,6 +195,27 @@ describe('vaultSync', () => {
     expect(JSON.stringify(await loadOwnedRecent('trev'))).not.toContain('must never reach IndexedDB');
   });
 
+  it('cold-return openVaultResult paints a non-resume room without clobbering resume memory', async () => {
+    // Resume pointer stays #room; Home cold cards may open a different retained
+    // target via openVaultResult. Both paths must hydrate independently.
+    await saveOwnedMessages('#room', [msg('resume-1', 1000)]);
+    await saveOwnedMessages('#offline', [msg('card-1', 2000, '#offline')]);
+    expect(saveVaultResumeTarget({ kind: 'channel', target: '#room' }, ALICE_OWNER)).toBe(true);
+
+    initVaultSync();
+    await until(() => (store.getState().channels.get('#room')?.messages.length ?? 0) === 1);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#room' });
+
+    store.getState().openVaultResult('#offline', 'card-1');
+    await until(() => (store.getState().channels.get('#offline')?.messages.length ?? 0) === 1);
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#offline' });
+    expect(store.getState().timeTravelLandingId).toBe('card-1');
+    expect(store.getState().channels.get('#offline')?.messages.map((m) => m.id)).toEqual(['card-1']);
+    // Pointer updates to the room the user actually opened.
+    expect(loadVaultResumeTarget(ALICE_OWNER)).toEqual({ kind: 'channel', target: '#offline' });
+  });
+
   it('empty cold-resume does not lock out a later JOIN hydrate of the same room', async () => {
     // Remembered room with nothing in the vault yet — activate path must not
     // leave a permanent watermark that blocks the post-JOIN paint.

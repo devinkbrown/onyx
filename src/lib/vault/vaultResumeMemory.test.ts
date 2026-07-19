@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   VAULT_RESUME_STORAGE_KEY,
   loadVaultResumeTarget,
@@ -37,5 +38,19 @@ describe('vault resume memory', () => {
       kind: 'channel',
       target: '#ok',
     });
+  });
+
+  it('fails closed on corrupt or non-object resume storage without throwing', () => {
+    const key = deviceMemoryStorageKey(VAULT_RESUME_STORAGE_KEY, ALICE);
+    expect(key).toBeTruthy();
+
+    localStorage.setItem(key!, '{not-json');
+    expect(loadVaultResumeTarget(ALICE)).toBeNull();
+
+    localStorage.setItem(key!, JSON.stringify({ kind: 'channel', target: 12 }));
+    expect(loadVaultResumeTarget(ALICE)).toBeNull();
+
+    localStorage.setItem(key!, JSON.stringify({ kind: 'status', target: '#ok' }));
+    expect(loadVaultResumeTarget(ALICE)).toBeNull();
   });
 });
