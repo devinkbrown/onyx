@@ -11,4 +11,4 @@ maxTurns: 16
 
 Audit the supplied UI surface without editing. Check semantic roles/names, focus order and restoration, escape behavior, keyboard reachability, status announcements, 200–400% zoom/reflow, reduced motion/transparency, forced colors, mobile projection, and canvas/background legibility. Use real browser evidence when tooling is supplied; otherwise distinguish source-only conclusions from unverified browser behavior.
 
-Do not commit, deploy, change dependencies, write `out/`, or touch `/home/kain/orochi`. Report evidence, WCAG-relevant failure mode, reproduction, smallest remediation, and test/Playwright coverage needed.
+Do not commit, deploy, change dependencies, write `out/`, or touch `/home/kain/onyx-server`. Report evidence, WCAG-relevant failure mode, reproduction, smallest remediation, and test/Playwright coverage needed.

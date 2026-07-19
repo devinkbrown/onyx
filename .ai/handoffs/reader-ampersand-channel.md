@@ -37,4 +37,4 @@ Return only: finding with severity/confidence; file:line or command/browser evid
 
 # Stop authority
 
-No delegate may edit the primary checkout, commit, merge, deploy, write `out/`, modify dependencies, or touch `/home/kain/orochi`. A writer stops for a stale base SHA, ownership conflict, or rebase conflict and returns its diff and evidence to Codex.
+No delegate may edit the primary checkout, commit, merge, deploy, write `out/`, modify dependencies, or touch `/home/kain/onyx-server`. A writer stops for a stale base SHA, ownership conflict, or rebase conflict and returns its diff and evidence to Codex.

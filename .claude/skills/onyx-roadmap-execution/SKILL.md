@@ -9,7 +9,7 @@ Read `AGENTS.md`, `CLAUDE.md`, `docs/architecture.md`, `CONTRIBUTING.md`, and `/
 
 ## Select a slice
 
-Stay in Onyx. Do not modify `/home/kain/orochi`. Choose one observable, testable slice. Prioritize in this order unless the user names a different target:
+Stay in Onyx. Do not modify `/home/kain/onyx-server`. Choose one observable, testable slice. Prioritize in this order unless the user names a different target:
 
 1. Regressions in identity, session resume, navigation, nicklist, active surfaces, or browser rendering.
 2. Remaining Sumi-e/Washi evidence: reader and time handoffs, dense-surface accessibility/reflow, background guardrails.
