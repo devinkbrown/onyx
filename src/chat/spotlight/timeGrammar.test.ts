@@ -45,6 +45,8 @@ describe('parseTimeExpr', () => {
   it('parses am/pm clocks on keywords, dayparts, and weekdays', () => {
     expectParsed('today 3pm', new Date(2026, 6, 8, 15, 0, 0, 0));
     expectParsed('yesterday 3pm', new Date(2026, 6, 7, 15, 0, 0, 0));
+    // Teaching chip / docs forms: compact am/pm glued to the hour.
+    expectParsed('yesterday 9pm', new Date(2026, 6, 7, 21, 0, 0, 0));
     expectParsed('yesterday 9:15 am', new Date(2026, 6, 7, 9, 15, 0, 0));
     // 2026-07-08 is Wednesday → monday is 2026-07-06, last friday is 2026-07-03.
     expectParsed('monday 9am', new Date(2026, 6, 6, 9, 0, 0, 0));

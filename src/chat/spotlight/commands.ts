@@ -119,6 +119,20 @@ function exactCommand(query: string, ...commands: string[]): boolean {
   return commands.some((command) => normalized === command);
 }
 
+/** Sheet aliases that must never be rewritten into a `goto #date` channel join. */
+function requestsJumpToDateSheet(query: string): boolean {
+  return exactCommand(
+    query,
+    'date',
+    'jump date',
+    'jump to date',
+    'goto date',
+    'go to date',
+    'open date',
+    'open calendar',
+  );
+}
+
 function splitAtKeyword(value: string): { before: string; after: string } | null {
   const match = /^(.+?)\s+at\s+(.+)$/i.exec(value.trim());
   if (!match) return null;
@@ -533,13 +547,19 @@ function channelAiPolicy(channel: unknown): AiPolicy {
 
 function grammarCommands(state: CommandState, query: string): SpotlightCommand[] {
   const commands: SpotlightCommand[] = [];
-  const gotoArg = commandArg(query, 'goto') ?? commandArg(query, 'join') ?? commandArg(query, 'open');
+  // Reserve sheet aliases (`goto date`, `jump to date`, …) so they never
+  // become a synthetic `#date` channel join.
+  const gotoArg = requestsJumpToDateSheet(query)
+    ? null
+    : commandArg(query, 'goto') ?? commandArg(query, 'join') ?? commandArg(query, 'open');
   if (gotoArg) {
     const timed = splitAtKeyword(gotoArg);
     const channel = normalizeChannel(timed?.before ?? gotoArg);
-    if (channel.length > 1) {
+    const at = timed ? parseTimeExpr(timed.after) : null;
+    // Once a user has supplied an `at` clause, surface no grammar command
+    // rather than discard an unparseable time and navigate bare.
+    if (channel.length > 1 && (!timed || at)) {
       const known = state.channels.get(channel.toLowerCase());
-      const at = timed ? parseTimeExpr(timed.after) : null;
       commands.push({
         id: at
           ? `grammar:goto-time:${channel.toLowerCase()}:${at.toISOString()}`
@@ -1167,6 +1187,9 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
         'moment',
         'calendar',
         'goto date',
+        'go to date',
+        'open date',
+        'open calendar',
         'jump to date',
       ],
       run: () => getState().openJumpToDate(),

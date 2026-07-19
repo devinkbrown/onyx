@@ -226,11 +226,65 @@ describe('buildCommands', () => {
     const command = buildCommands(getState(), 'goto #forge at yesterday 21:00')
       .find((entry) => entry.id.startsWith('grammar:goto-time:#forge:'));
 
-    expect(command?.title).toContain('Go to #forge at');
-    command?.run();
+    expect(command).toBeDefined();
+    expect(command!.title).toContain('Go to #forge at');
+    command!.run();
     expect(joinChannel).toHaveBeenCalledWith('#forge');
     expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
     expect(travelTo).toHaveBeenCalledWith('#forge', new Date(2026, 6, 7, 21, 0, 0, 0));
+  });
+
+  it('builds a goto-at command with the fleet teaching am/pm form', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 8, 12, 0, 0, 0));
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    const travelTo = vi.fn();
+    setState({
+      channels: new Map([['#root', channel('#root')]]),
+      joinChannel,
+      navigate,
+      travelTo,
+    });
+
+    // Spotlight teaching chip: "goto #root at yesterday 9pm" must land a
+    // time-travel command, not a bare navigate that silently drops the clock.
+    const command = buildCommands(getState(), 'goto #root at yesterday 9pm')
+      .find((entry) => entry.id.startsWith('grammar:goto-time:#root:'));
+
+    expect(command).toBeDefined();
+    expect(command!.title).toContain('Go to #root at');
+    expect(command!.hint).toBe('time grammar');
+    command!.run();
+    expect(joinChannel).toHaveBeenCalledWith('#root');
+    expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#root' });
+    expect(travelTo).toHaveBeenCalledWith('#root', new Date(2026, 6, 7, 21, 0, 0, 0));
+  });
+
+  it('fails closed instead of navigating when goto-at has an invalid time', () => {
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    const travelTo = vi.fn();
+    setState({
+      channels: new Map([['#forge', channel('#forge')]]),
+      joinChannel,
+      navigate,
+      travelTo,
+    });
+
+    // Once the user supplies an `at` clause, discard the whole grammar hit if
+    // the clock is unparseable — never silently drop the time and join only.
+    const grammar = buildCommands(getState(), 'goto #forge at someday')
+      .find((entry) => entry.id.startsWith('grammar:goto:'));
+
+    expect(grammar).toBeUndefined();
+    expect(
+      buildCommands(getState(), 'goto #forge at someday')
+        .find((entry) => entry.id.startsWith('grammar:goto-time:')),
+    ).toBeUndefined();
+    expect(joinChannel).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(travelTo).not.toHaveBeenCalled();
   });
 
   it('builds a targeted at command for a channel timeline jump', () => {
@@ -244,8 +298,9 @@ describe('buildCommands', () => {
     const command = buildCommands(getState(), 'at #forge 3h ago')
       .find((entry) => entry.id.startsWith('action:time-jump:#forge:'));
 
-    expect(command?.title).toContain('Jump #forge to');
-    command?.run();
+    expect(command).toBeDefined();
+    expect(command!.title).toContain('Jump #forge to');
+    command!.run();
     expect(joinChannel).toHaveBeenCalledWith('#forge');
     expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
     expect(travelTo).toHaveBeenCalledWith('#forge', new Date('2026-07-08T09:00:00.000Z'));
@@ -264,8 +319,9 @@ describe('buildCommands', () => {
     const command = buildCommands(getState(), 'at: yesterday 3pm')
       .find((entry) => entry.id.startsWith('action:time-jump:#lapis:'));
 
-    expect(command?.title).toContain('Jump to');
-    command?.run();
+    expect(command).toBeDefined();
+    expect(command!.title).toContain('Jump to');
+    command!.run();
     expect(travelTo).toHaveBeenCalledWith('#lapis', new Date(2026, 6, 7, 15, 0, 0, 0));
   });
 
@@ -279,8 +335,9 @@ describe('buildCommands', () => {
 
     const colon = buildCommands(getState(), '#forge at: last friday')
       .find((entry) => entry.id.startsWith('action:time-jump:#forge:'));
-    expect(colon?.title).toContain('Jump #forge to');
-    colon?.run();
+    expect(colon).toBeDefined();
+    expect(colon!.title).toContain('Jump #forge to');
+    colon!.run();
     expect(joinChannel).toHaveBeenCalledWith('#forge');
     expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
     // 2026-07-08 Wed → last friday = 2026-07-03 midnight local
@@ -293,8 +350,28 @@ describe('buildCommands', () => {
     const spaced = buildCommands(getState(), '#forge at yesterday 3pm')
       .find((entry) => entry.id.startsWith('action:time-jump:#forge:'));
     expect(spaced).toBeDefined();
-    spaced?.run();
+    spaced!.run();
+    expect(joinChannel).toHaveBeenCalledWith('#forge');
+    expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
     expect(travelTo).toHaveBeenCalledWith('#forge', new Date(2026, 6, 7, 15, 0, 0, 0));
+  });
+
+  it('rejects channel-first and verb-first time jumps without a parseable expression', () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#lapis' },
+      channels: new Map([['#lapis', channel('#lapis')]]),
+      joinChannel: vi.fn(),
+      navigate: vi.fn(),
+      travelTo: vi.fn(),
+    });
+
+    // Empty / glued / garbage expressions must fail closed — no jump command.
+    for (const query of ['#forge at:', '#forge at:last', 'at #forge', 'at #forge someday', '#forge at someday']) {
+      const jumps = buildCommands(getState(), query).filter((entry) =>
+        entry.id.startsWith('action:time-jump:'),
+      );
+      expect(jumps, query).toEqual([]);
+    }
   });
 
   it('preserves & channel targets in time-jump grammar', () => {
@@ -309,7 +386,7 @@ describe('buildCommands', () => {
       .find((entry) => entry.id.startsWith('action:time-jump:&ops:'));
 
     expect(command).toBeDefined();
-    command?.run();
+    command!.run();
     expect(joinChannel).toHaveBeenCalledWith('&ops');
     expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '&ops' });
     expect(travelTo).toHaveBeenCalledWith('&ops', new Date(2026, 6, 7, 15, 0, 0, 0));
@@ -1064,9 +1141,26 @@ describe('buildCommands', () => {
       (entry) => entry.id === 'action:jump-to-date',
     );
     expect(command).toBeDefined();
-    expect(command?.title).toBe('Jump to date…');
-    expect(command?.keywords).toContain('travel');
-    command?.run();
+    expect(command!.title).toBe('Jump to date…');
+    expect(command!.keywords).toContain('travel');
+    command!.run();
+    expect(store.getState().showJumpToDate).toBe(true);
+  });
+
+  it('reserves goto date for the sheet instead of treating date as a channel', () => {
+    const joinChannel = vi.fn();
+    setState({ joinChannel });
+
+    const commands = buildCommands(getState(), 'goto date');
+    // Must not invent a `#date` channel join from the sheet alias.
+    expect(commands.find((entry) => entry.id === 'grammar:goto:#date')).toBeUndefined();
+    expect(commands.find((entry) => entry.id.startsWith('grammar:goto:'))).toBeUndefined();
+
+    const jumpToDate = commands.find((entry) => entry.id === 'action:jump-to-date');
+    expect(jumpToDate).toBeDefined();
+    jumpToDate!.run();
+
+    expect(joinChannel).not.toHaveBeenCalled();
     expect(store.getState().showJumpToDate).toBe(true);
   });
 });

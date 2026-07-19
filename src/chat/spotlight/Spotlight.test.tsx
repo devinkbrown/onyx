@@ -106,8 +106,13 @@ describe('Spotlight', () => {
     // layer parses the query it sees into a grammar command, so populating the
     // input has to reach that layer (via a real input event). Otherwise the
     // taught command never appears and the chip teaches a dead end.
+    // Pin the TIME-TRAVEL form (title includes "at <when>" + the command's
+    // "time grammar" hint) — a bare "Go to #root" navigate would still match
+    // a weaker assertion if am/pm parsing regressed to fail-open join-only.
     await waitFor(() => {
-      expect(screen.getByRole('listbox').textContent).toContain('Go to #root');
+      const list = screen.getByRole('listbox').textContent ?? '';
+      expect(list).toMatch(/Go to #root at/i);
+      expect(list.toLowerCase()).toContain('time grammar');
     });
   });
 
