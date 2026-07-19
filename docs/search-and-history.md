@@ -37,7 +37,7 @@ tells you when erasure could not be verified.
 ## Searching your history
 
 Press **Cmd/Ctrl-F** (or Home → **Search device memory**) to open message search.
-(`src/shell/AppShell.tsx:122`, `src/shell/HomeView.tsx:1035`) Search is layered:
+(`src/shell/AppShell.tsx:122`, `src/shell/HomeView.tsx:1138`) Search is layered:
 
 1. **Visible matches** — messages already loaded in the active conversation
    (in-memory find next/previous).
@@ -50,6 +50,12 @@ Press **Cmd/Ctrl-F** (or Home → **Search device memory**) to open message sear
    across every room.
    (`src/shell/search/useMessageSearch.ts:355`, `:405`,
    `src/shell/search/MessageSearch.tsx:745`)
+
+Every pane carries a provenance chip so the boundary is visible at a glance:
+**This device** for visible find, device-memory recall, and saved searches;
+**This server** only for the archived opt-in path.
+(`src/shell/ProvenanceBadge.tsx:10`, `src/lib/intelligence/provenance.ts:11`,
+`src/shell/search/MessageSearch.tsx:542`, `:637`, `:735`, `:828`)
 
 Type at least two characters for device-memory results; they update as you type
 (a short debounce keeps it smooth). (`src/shell/search/useMessageSearch.ts:539`,
