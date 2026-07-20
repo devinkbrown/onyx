@@ -786,7 +786,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
             <MessageView selfNick={displayNick()} />
             {/* Persistent call controls while in a call */}
             <Show when={inCall()}>
-              <VoiceBar />
+              <Suspense fallback={null}>
+                <VoiceBar />
+              </Suspense>
             </Show>
             <TypingIndicator />
             <Composer />
