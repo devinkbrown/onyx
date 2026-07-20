@@ -42,6 +42,7 @@ const WhoisSheet = lazy(() => import('./WhoisSheet').then((m) => ({ default: m.W
 import { PresenceRibbon } from './PresenceRibbon';
 import { GuestClaimPrompt } from './GuestClaimPrompt';
 import { DmKeyChangeBanner } from './DmKeyChangeBanner';
+import { DmSafetySheet } from './DmSafetySheet';
 import { ReconnectStatusBanner } from './ReconnectStatusBanner';
 import { TimeScrubber } from './TimeScrubber';
 import { WatchTogetherActivity } from './WatchTogetherActivity';
@@ -640,6 +641,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
           />
+          {/* Always-available DM trust receipt. It self-gates outside DMs and
+              expands in flow so verification never covers the transcript. */}
+          <DmSafetySheet />
           {/* Guest → claim-your-nick affordance (self-gates on guest state) */}
           <GuestClaimPrompt />
           {/* E2EE key-change warning (self-gates on the active DM having a pending change) */}

@@ -1,0 +1,274 @@
+/* DmSafetySheet — an in-flow verification receipt for direct messages.
+ *
+ * The signature is a numbered device receipt: the safety number reads like a
+ * physical inspection instrument instead of another settings card. It stays
+ * compact, uses the existing Onyx type/color system, and never overlays chat.
+ */
+
+.dm-safety {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--line-faint);
+  background: color-mix(in oklab, var(--ink) 72%, transparent);
+}
+
+.dm-safety__trigger {
+  display: inline-flex;
+  min-height: 2.25rem;
+  padding: 0 var(--space-2);
+  border: 0;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--washi-dim);
+  background: transparent;
+  font: 600 0.72rem/1 var(--font-sans);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.dm-safety__trigger:hover,
+.dm-safety__trigger:focus-visible,
+.dm-safety__trigger[aria-expanded='true'] {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis) 10%, transparent);
+}
+
+.dm-safety__trigger:focus-visible,
+.dm-safety__close:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.dm-safety__trigger-icon {
+  width: 1rem;
+  height: 1rem;
+  color: var(--lapis-bright);
+}
+
+.dm-safety__trigger-state {
+  width: 0.38rem;
+  height: 0.38rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.dm-safety__trigger-state[data-ready='true'] {
+  border-color: var(--ok);
+  background: var(--ok);
+  box-shadow: 0 0 0.75rem color-mix(in oklab, var(--ok) 45%, transparent);
+}
+
+.dm-safety__panel {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+  width: min(100%, var(--shell-measure));
+  max-height: min(43vh, 25rem);
+  margin: 0 auto var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--lapis) 32%, var(--line));
+  border-radius: var(--r-md);
+  overflow: auto;
+  color: var(--washi);
+  background:
+    linear-gradient(112deg, color-mix(in oklab, var(--lapis-deep) 17%, transparent), transparent 46%),
+    color-mix(in oklab, var(--stone) 94%, var(--ink));
+  box-shadow: 0 18px 44px -34px color-mix(in oklab, var(--ink) 90%, transparent);
+  animation: dm-safety-open var(--dur) var(--ease);
+}
+
+@keyframes dm-safety-open {
+  from { opacity: 0; transform: translateY(-0.3rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dm-safety__seal {
+  display: flex;
+  padding: var(--space-3) 0;
+  border-right: 1px solid color-mix(in oklab, var(--lapis) 34%, var(--line));
+  align-items: center;
+  justify-content: space-between;
+  flex-direction: column;
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 25%, transparent);
+  font: 600 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.16em;
+  writing-mode: vertical-rl;
+}
+
+.dm-safety__content {
+  min-width: 0;
+  padding: var(--space-3);
+}
+
+.dm-safety__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dm-safety__kicker,
+.dm-safety__number-label {
+  margin: 0;
+  color: var(--lapis-bright);
+  font: 600 0.62rem/1.3 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dm-safety__header h2 {
+  margin: 0.2rem 0 0;
+  color: var(--washi);
+  font: 430 1.15rem/1.2 var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+.dm-safety__close {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--washi-dim);
+  background: transparent;
+  font: 300 1.35rem/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.dm-safety__close:hover {
+  color: var(--washi);
+  border-color: color-mix(in oklab, var(--lapis) 42%, var(--line));
+}
+
+.dm-safety__guidance,
+.dm-safety__warning {
+  max-width: 68ch;
+  margin: var(--space-2) 0 0;
+  color: var(--washi-dim);
+  font: 400 0.78rem/1.5 var(--font-sans);
+}
+
+.dm-safety__readiness {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: var(--space-3);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--line-faint);
+}
+
+.dm-safety__readiness-row {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: var(--space-2);
+  background: color-mix(in oklab, var(--ink) 42%, var(--stone));
+}
+
+.dm-safety__readiness-row span {
+  overflow: hidden;
+  color: var(--washi-dim);
+  font: 400 0.67rem/1.2 var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-safety__readiness-row strong {
+  color: var(--washi);
+  font: 600 0.72rem/1.2 var(--font-sans);
+}
+
+.dm-safety__number-block {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-faint);
+}
+
+.dm-safety__number {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(4.5rem, 1fr));
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.dm-safety__number-group {
+  display: flex;
+  min-width: 0;
+  padding: 0.42rem 0.5rem;
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-sm);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--ink) 48%, transparent);
+  font: 500 0.78rem/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.dm-safety__number-group small {
+  color: var(--washi-mute);
+  font: 500 0.52rem/1 var(--font-mono);
+}
+
+.dm-safety__empty {
+  min-height: 2.6rem;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
+  border: 1px dashed var(--line);
+  border-radius: var(--r-sm);
+  color: var(--washi-dim);
+  font: 400 0.76rem/1.4 var(--font-sans);
+}
+
+.dm-safety__warning {
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--gold);
+}
+
+@media (max-width: 720px) {
+  .dm-safety {
+    padding: 0 var(--space-2);
+  }
+
+  .dm-safety__panel {
+    grid-template-columns: 2.35rem minmax(0, 1fr);
+    max-height: min(52vh, 28rem);
+  }
+
+  .dm-safety__content {
+    padding: var(--space-2);
+  }
+
+  .dm-safety__readiness {
+    grid-template-columns: 1fr;
+  }
+
+  .dm-safety__number {
+    grid-template-columns: repeat(3, minmax(4.25rem, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dm-safety__panel {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .dm-safety__trigger-state[data-ready='true'] {
+    border-color: Highlight;
+    background: Highlight;
+  }
+
+  .dm-safety__seal,
+  .dm-safety__warning {
+    border-color: Highlight;
+  }
+}

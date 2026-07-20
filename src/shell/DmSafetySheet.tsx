@@ -1,0 +1,226 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+ * DmSafetySheet — proactive, in-flow DM identity verification.
+ *
+ * This is deliberately not a modal Sheet. Verification should remain available
+ * beside the conversation without hiding the transcript a person may need to
+ * inspect. The panel self-gates to direct messages, loads the store-owned stable
+ * safety number on demand, and never renders either device's raw public key.
+ */
+
+import './dm-safety-sheet.css';
+
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
+import { getState, useStore, type ActiveView } from '@/lib/store';
+
+type LoadState = 'idle' | 'loading' | 'ready' | 'unavailable';
+
+function dmPeer(view: ActiveView): string | null {
+  return view.kind === 'dm' ? view.nick : null;
+}
+
+function safetyGroups(value: string | null): string[] {
+  return value?.split(/\s+/).filter(Boolean) ?? [];
+}
+
+export function DmSafetySheet(): JSX.Element {
+  const activeView = useStore((state) => state.activeView);
+  const peerDmKeys = useStore((state) => state.peerDmKeys);
+  const peerSafetyNumbers = useStore((state) => state.peerSafetyNumbers);
+
+  const peer = createMemo(() => dmPeer(activeView()));
+  const peerKey = createMemo(() => peer()?.toLowerCase() ?? null);
+  const advertisedKeyAvailable = createMemo(() => {
+    const key = peerKey();
+    return key !== null && peerDmKeys().has(key);
+  });
+  const cachedSafetyNumber = createMemo(() => {
+    const key = peerKey();
+    return key === null ? null : peerSafetyNumbers().get(key) ?? null;
+  });
+
+  const [open, setOpen] = createSignal(false);
+  const [loadState, setLoadState] = createSignal<LoadState>('idle');
+  const [loadedSafetyNumber, setLoadedSafetyNumber] = createSignal<string | null>(null);
+  let openerRef: HTMLButtonElement | undefined;
+  let requestEpoch = 0;
+  let previousPeer: string | null = null;
+
+  onCleanup(() => {
+    requestEpoch += 1;
+  });
+
+  const safetyNumber = createMemo(() => loadedSafetyNumber() ?? cachedSafetyNumber());
+  const groups = createMemo(() => safetyGroups(safetyNumber()));
+
+  // A verification receipt belongs to exactly one peer. Switching views closes
+  // it and invalidates an in-flight computation so another DM never inherits
+  // the prior peer's number or load result.
+  createEffect(() => {
+    const nextPeer = peer();
+    if (nextPeer === previousPeer) return;
+    previousPeer = nextPeer;
+    requestEpoch += 1;
+    setOpen(false);
+    setLoadedSafetyNumber(null);
+    setLoadState('idle');
+  });
+
+  createEffect(() => {
+    const name = peer();
+    if (!open() || !name) return;
+
+    const epoch = ++requestEpoch;
+    // Snapshot the cache rather than subscribing this request effect to it.
+    // loadSafetyNumber writes that map on success; a reactive read here would
+    // turn the write into a second load for the same open panel.
+    const cached = getState().peerSafetyNumbers.get(name.toLowerCase()) ?? null;
+    setLoadedSafetyNumber(cached);
+    setLoadState(cached ? 'ready' : 'loading');
+
+    void getState().loadSafetyNumber(name).then((value) => {
+      if (epoch !== requestEpoch) return;
+      setLoadedSafetyNumber(value);
+      setLoadState(value ? 'ready' : 'unavailable');
+    }).catch(() => {
+      if (epoch !== requestEpoch) return;
+      setLoadedSafetyNumber(null);
+      setLoadState('unavailable');
+    });
+  });
+
+  function closeAndRestoreFocus(): void {
+    requestEpoch += 1;
+    setOpen(false);
+    queueMicrotask(() => {
+      if (openerRef?.isConnected) openerRef.focus();
+    });
+  }
+
+  function handlePanelKeyDown(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    closeAndRestoreFocus();
+  }
+
+  return (
+    <Show when={peer()}>
+      {(name) => (
+        <section class="dm-safety" aria-label={`Encryption verification for ${name()}`}>
+          <button
+            ref={openerRef}
+            type="button"
+            class="dm-safety__trigger"
+            aria-expanded={open()}
+            aria-controls="dm-safety-panel"
+            onClick={() => (open() ? closeAndRestoreFocus() : setOpen(true))}
+          >
+            <svg class="dm-safety__trigger-icon" viewBox="0 0 24 24" aria-hidden="true"
+              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z" />
+              <path d="m9.3 12 1.8 1.8 3.8-4" />
+            </svg>
+            <span>Verify encryption</span>
+            <span
+              class="dm-safety__trigger-state"
+              data-ready={safetyNumber() ? 'true' : 'false'}
+              aria-hidden="true"
+            />
+          </button>
+
+          <Show when={open()}>
+            <div
+              id="dm-safety-panel"
+              class="dm-safety__panel"
+              role="region"
+              aria-labelledby="dm-safety-title"
+              aria-describedby="dm-safety-guidance"
+              onKeyDown={handlePanelKeyDown}
+            >
+              <div class="dm-safety__seal" aria-hidden="true">
+                <span>DM</span>
+                <span>01</span>
+              </div>
+
+              <div class="dm-safety__content">
+                <header class="dm-safety__header">
+                  <div>
+                    <p class="dm-safety__kicker">Identity check · first-use trust</p>
+                    <h2 id="dm-safety-title">Verify encryption with {name()}</h2>
+                  </div>
+                  <button
+                    type="button"
+                    class="dm-safety__close"
+                    aria-label="Close encryption verification"
+                    onClick={closeAndRestoreFocus}
+                  >×</button>
+                </header>
+
+                <p id="dm-safety-guidance" class="dm-safety__guidance">
+                  Compare every group with {name()} in person, on a trusted voice call,
+                  or through another channel you already trust. A matching number ties
+                  this device to the peer key Onyx remembered.
+                </p>
+
+                <div class="dm-safety__readiness" role="list" aria-label="Encryption key readiness">
+                  <div class="dm-safety__readiness-row" role="listitem">
+                    <span>Your device</span>
+                    <strong>{safetyNumber() ? 'Ready to compare' : 'Not ready to compare'}</strong>
+                  </div>
+                  <div class="dm-safety__readiness-row" role="listitem">
+                    <span>{name()}'s device key</span>
+                    <strong>{advertisedKeyAvailable() ? 'Received' : 'Not received'}</strong>
+                  </div>
+                  <div class="dm-safety__readiness-row" role="listitem">
+                    <span>Manual comparison</span>
+                    <strong>Required</strong>
+                  </div>
+                </div>
+
+                <div class="dm-safety__number-block">
+                  <p class="dm-safety__number-label">Current safety number</p>
+                  <Show
+                    when={groups().length > 0}
+                    fallback={
+                      <p class="dm-safety__empty" role="status" aria-live="polite">
+                        {loadState() === 'loading'
+                          ? 'Loading this device’s safety number…'
+                          : advertisedKeyAvailable()
+                            ? 'No trusted device pair is ready to compare yet.'
+                            : `${name()}’s device key has not arrived yet.`}
+                      </p>
+                    }
+                  >
+                    <output
+                      class="dm-safety__number"
+                      aria-label={`Safety number for ${name()}: ${safetyNumber()}`}
+                      aria-live="off"
+                    >
+                      <For each={groups()}>
+                        {(group, index) => (
+                          <span class="dm-safety__number-group">
+                            <small aria-hidden="true">{String(index() + 1).padStart(2, '0')}</small>
+                            {group}
+                          </span>
+                        )}
+                      </For>
+                    </output>
+                  </Show>
+                </div>
+
+                <p class="dm-safety__warning">
+                  Onyx uses trust on first use: the first key is remembered, not
+                  automatically proven to belong to {name()}. Until you compare this
+                  number, treat the identity as unverified. If their key changes,
+                  encrypted messages fail closed until you review the warning.
+                </p>
+              </div>
+            </div>
+          </Show>
+        </section>
+      )}
+    </Show>
+  );
+}
+
+export default DmSafetySheet;
