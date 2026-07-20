@@ -326,6 +326,7 @@ export class IRCClient {
     // detach its handlers so its close event can't trigger another reconnect.
     if (this.ws) {
       try {
+        this.ws.onopen = null;
         this.ws.onclose = null;
         this.ws.onmessage = null;
         this.ws.onerror = null;
@@ -363,14 +364,26 @@ export class IRCClient {
     this._clearPingTimers();
 
     try {
-      this.ws = new WebSocket(this.opts.url, [...WEBSOCKET_SUBPROTOCOLS]);
+      const ws = new WebSocket(this.opts.url, [...WEBSOCKET_SUBPROTOCOLS]);
+      this.ws = ws;
       // Browser media datagrams ride binary frames on this same socket; deliver
       // them as ArrayBuffers (not Blobs) so onBinary gets bytes synchronously.
-      this.ws.binaryType = 'arraybuffer';
-      this.ws.onopen = this._onOpen.bind(this);
-      this.ws.onmessage = this._onMessage.bind(this);
-      this.ws.onclose = this._onClose.bind(this);
-      this.ws.onerror = this._onError.bind(this);
+      ws.binaryType = 'arraybuffer';
+      // Event callbacks can already be queued when reconnect replaces a
+      // CONNECTING socket. Bind every callback to its originating socket so a
+      // stale open/message/close/error can never act on the replacement.
+      ws.onopen = () => {
+        if (this.ws === ws) this._onOpen();
+      };
+      ws.onmessage = (event) => {
+        if (this.ws === ws) this._onMessage(event);
+      };
+      ws.onclose = (event) => {
+        if (this.ws === ws) this._onClose(event);
+      };
+      ws.onerror = (event) => {
+        if (this.ws === ws) this._onError(event);
+      };
       return true;
     } catch (e) {
       this.opts.onError?.(`WebSocket error: ${e}`);
@@ -652,6 +665,23 @@ export class IRCClient {
   // ── Internals ───────────────────────────────────────────────────────────
 
   private _onOpen() {
+    const ws = this.ws;
+    // A conforming browser WebSocket always exposes `protocol`. Once this
+    // client offers explicit application protocols, an empty/unknown selection
+    // is a downgrade: CRLF and binary semantics would otherwise fall through
+    // to the legacy no-subprotocol path. Some unit-test doubles intentionally
+    // omit the browser property, so only that non-browser shape is exempt.
+    if (
+      ws
+      && 'protocol' in ws
+      && ws.protocol !== ONYX_MEDIA_WEBSOCKET_SUBPROTOCOL
+      && ws.protocol !== IRC_WEBSOCKET_SUBPROTOCOL
+    ) {
+      this.opts.onError?.('WebSocket protocol error: the server did not select a supported subprotocol.');
+      try { ws.close(1002, 'WebSocket subprotocol required'); } catch { /* already closing */ }
+      return;
+    }
+
     this.reconnectDelay = RECONNECT_BASE;
 
     // Begin CAP negotiation

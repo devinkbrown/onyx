@@ -106,6 +106,59 @@ describe('IRCClient WebSocket subprotocol', () => {
     }
   });
 
+  it('ignores a queued stale open event after reconnect replaces its socket', () => {
+    const sockets: Array<{
+      protocol: string;
+      onopen: ((e: Event) => void) | null;
+      send: ReturnType<typeof vi.fn>;
+      close: ReturnType<typeof vi.fn>;
+    }> = [];
+    class StubWS {
+      static OPEN = 1;
+      readyState = StubWS.OPEN;
+      bufferedAmount = 0;
+      binaryType = '';
+      protocol = '';
+      onopen: ((e: Event) => void) | null = null;
+      onmessage: ((e: MessageEvent) => void) | null = null;
+      onclose: ((e: CloseEvent) => void) | null = null;
+      onerror: ((e: Event) => void) | null = null;
+      send = vi.fn();
+      close = vi.fn();
+
+      constructor() {
+        sockets.push(this);
+      }
+    }
+    vi.stubGlobal('WebSocket', StubWS);
+    try {
+      const client = new IRCClient({
+        url: 'wss://ircx.us:8080/',
+        nick: 'onyx',
+        onMessage: () => {},
+      });
+      expect(client.connect()).toBe(true);
+      const queuedStaleOpen = sockets[0]?.onopen;
+
+      expect(client.connect()).toBe(true);
+      expect(sockets[0]?.onopen).toBeNull();
+      queuedStaleOpen?.(new Event('open'));
+
+      expect(sockets[1]?.send).not.toHaveBeenCalled();
+      expect(sockets[1]?.close).not.toHaveBeenCalled();
+
+      if (sockets[1]) sockets[1].protocol = 'onyx.irc-media.v1';
+      sockets[1]?.onopen?.(new Event('open'));
+      expect(sockets[1]?.send.mock.calls.slice(0, 3).map(([payload]) => payload)).toEqual([
+        'CAP LS 302\r\n',
+        'NICK onyx\r\n',
+        'USER webchat 0 * :onyx (webchat)\r\n',
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('removes one terminal CRLF from registration frames on text.ircv3.net, including reconnect', () => {
     const client = new IRCClient({
       url: 'wss://ircx.us:8080/',
@@ -124,6 +177,25 @@ describe('IRCClient WebSocket subprotocol', () => {
     const reconnect = attachSocket(client, { protocol: 'text.ircv3.net' });
     (client as unknown as { _onOpen(): void })._onOpen();
     expect(reconnect.sent.slice(0, 3)).toEqual(first.sent.slice(0, 3));
+  });
+
+  it.each(['', 'chat.v1'])('fails closed before registration when the server selects %j', (protocol) => {
+    const errors: string[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: () => {},
+      onError: (error) => errors.push(error),
+    });
+    const { sent, closed } = attachSocket(client, { protocol });
+
+    (client as unknown as { _onOpen(): void })._onOpen();
+
+    expect(sent).toEqual([]);
+    expect(closed).toEqual([{ code: 1002, reason: 'WebSocket subprotocol required' }]);
+    expect(errors).toEqual([
+      'WebSocket protocol error: the server did not select a supported subprotocol.',
+    ]);
   });
 
   it('keeps CRLF and binary media on the Onyx multiplexed protocol', () => {

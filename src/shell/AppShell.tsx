@@ -27,7 +27,7 @@
 
 import './shell.css';
 
-import { lazy, createEffect, createMemo, createSignal, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, type JSX } from 'solid-js';
+import { lazy, createEffect, createMemo, createSignal, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, Suspense, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { useThemeOptional } from '@/theme';
 import { Background } from '@/backgrounds/index';
@@ -663,7 +663,20 @@ export function AppShell(props: AppShellProps): JSX.Element {
           >
             {/* In-call stage when viewing the voice channel you're in */}
             <Show when={viewingCall()}>
-              <VoiceStage />
+              <Suspense
+                fallback={
+                  <div
+                    class="voice-stage"
+                    aria-label="Voice call participants"
+                    role="region"
+                    data-testid="voice-stage-loading"
+                  >
+                    <p role="status">Starting voice and video…</p>
+                  </div>
+                }
+              >
+                <VoiceStage />
+              </Suspense>
             </Show>
             <MessageView selfNick={displayNick()} />
             {/* Persistent call controls while in a call */}
