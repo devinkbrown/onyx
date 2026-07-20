@@ -51,10 +51,10 @@ const phases: Phase[] = [
   {
     phase: 'Phase 5',
     title: 'Operations',
-    state: 'active',
-    date: 'in progress',
-    summary: 'The public site now shows the network, not just describes it.',
-    items: ['Mesh status page', 'Stats graphs', 'Backup readiness'],
+    state: 'complete',
+    date: '2026-07-20',
+    summary: 'The public site shows the live network and a released self-host path instead of asking visitors to trust prose.',
+    items: ['Mesh status page', 'Live stats graphs', 'Backup readiness', 'Released server binary', 'Unified self-host route'],
   },
   {
     phase: 'Phase 6',
@@ -128,6 +128,14 @@ const phases: Phase[] = [
     summary: 'Generalize offline-first behavior into read, compose, search, bounded device-memory retention, PWA install clarity, moderation drafts, update recovery, and portable local-state transfer including saved searches and retention policy.',
     items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Offline reviewed recall', 'Offline search gating', 'Local-memory mode status', 'Device-memory retention controls', 'Bounded vault pruning', 'Outbox count status', 'Offline draft counts', 'Offline topic drafts', 'Installable manifest', 'PWA shortcuts', 'Install screenshots', 'Launch handler', 'Installed app readiness', 'Service worker readiness', 'App shell refresh action', 'Wrapper readiness matrix', 'Wrapper contract', 'Portable vault export', 'Portable vault import', 'Reviewed catch-up transfer', 'Room draft transfer', 'Topic draft transfer', 'Followed conversation transfer', 'Saved search transfer', 'Retention policy transfer', 'Account handoff transfer', 'Preference handoff transfer', 'Full offline-first UX', 'Desktop packaging path'],
   },
+  {
+    phase: 'Phase 15',
+    title: 'Continuity',
+    state: 'active',
+    date: '2026-07-20',
+    summary: 'Reusable certificate sessions, exact message routing, immediate rosters, and negotiated media now survive the two-node mesh; user-visible device control is the next boundary.',
+    items: ['Certificate session resume', 'Multi-attachment message convergence', 'Immediate authoritative roster', 'No repeated operator-mode churn', 'Explicit WebSocket media protocol', 'Bounded binary transport', 'Helix WebSocket continuity', 'Sessions and devices list next', 'Remote revoke next', 'Recovery codes next'],
+  },
 ];
 
 const completePhaseCount = phases.filter((phase) => phase.state === 'complete').length;
@@ -175,12 +183,12 @@ export default function RoadmapRoute() {
           <div class="data-metric">
             <span class="label">complete phases</span>
             <span class="value">{completePhaseCount}</span>
-            <span class="note">client features shipped</span>
+            <span class="note">public milestones closed</span>
           </div>
           <div class="data-metric">
             <span class="label">in motion</span>
-            <span class="value">Return</span>
-            <span class="note">calm re-entry, accessible reading, local memory</span>
+            <span class="value">Devices</span>
+            <span class="note">session control, recovery, complete Cadence calls</span>
           </div>
           <div class="data-metric">
             <span class="label">site role</span>
@@ -224,24 +232,24 @@ export default function RoadmapRoute() {
       <section class="r-wrap r-section data-grid" aria-label="Roadmap next steps">
         <article class="data-card">
           <span class="label">now</span>
-          <h2>The next job is a better return</h2>
+          <h2>The next job is user-controlled continuity</h2>
           <p>
-            A visit should begin with orientation, not recovery work. The active
-            program joins live public status with catch-up, searchable local memory,
-            calmer room signals, and accessible reader handoffs so people can leave
-            and return without losing the thread.
+            Sessions now resume across the mesh and every attachment sees the same
+            accepted messages. The active program makes that continuity inspectable
+            and revocable, then completes the Cadence call roster and control path
+            without weakening encrypted DMs or the open IRC wire.
           </p>
         </article>
         <aside class="data-card">
           <span class="label">open surfaces</span>
           <h3>Keep tightening</h3>
           <div class="data-list data-list--compact">
-            <div class="data-row"><div><strong>Search Center</strong><span>Device memory is globally reachable, saved queries are portable, and archived results hydrate their transcript context.</span></div></div>
-            <div class="data-row"><div><strong>Reader mode</strong><span>Carry reviewed anchors into richer cross-room handoffs.</span></div></div>
-            <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue remaining dense-surface pass/fix evidence.</a></span></div></div>
-            <div class="data-row"><div><strong>Torii entry</strong><span><a href="/invite/?join=%23root">Rich invite entry</a>, remembered identities, and capability-labelled sign-in now anchor the first-run path.</span></div></div>
-            <div class="data-row"><div><strong>Public contracts</strong><span><a href="/glossary/">Glossary</a>, <a href="/integrations/">integrations</a>, and <a href="/agents/">agent safety</a> now carry site-level roadmap contracts.</span></div></div>
-            <div class="data-row"><div><strong>Master roadmap fold-in</strong><span>Track onboarding, calm presets, media presence, app surfaces, local intelligence, and offline roaming here.</span></div></div>
+            <div class="data-row"><div><strong>Sessions & devices</strong><span>List every attached device, revoke it remotely, and add recovery codes without a fake local-only control.</span></div></div>
+            <div class="data-row"><div><strong>Cadence calls</strong><span>Finish participant state, mute/leave/error controls, and two-client media delivery while keeping chat visible.</span></div></div>
+            <div class="data-row"><div><strong>Room administration</strong><span>Expose roles, encryption policy, and history policy through ACCESS and PROP.</span></div></div>
+            <div class="data-row"><div><strong>Closed-tab reach</strong><span>Prove DM push recovery without exposing encrypted message bodies.</span></div></div>
+            <div class="data-row"><div><strong>Open-wire proof</strong><span>Publish the Halloy capability matrix against both public nodes.</span></div></div>
+            <div class="data-row"><div><strong>Public contracts</strong><span><a href="/glossary/">Glossary</a>, <a href="/integrations/">integrations</a>, and <a href="/agents/">agent safety</a> remain the product boundary.</span></div></div>
           </div>
         </aside>
       </section>
