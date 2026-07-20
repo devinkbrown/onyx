@@ -903,17 +903,21 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
       {/* Voice/video overlays — the whole cluster is lazy and only mounts once
           a call is signalled or the settings sheet opens; each still self-gates
-          finer on store.voice. */}
+          finer on store.voice. Keep this lazy cluster inside its own boundary:
+          otherwise its first Edge load suspends the outer connected shell and
+          removes both the conversation and the provisional in-flow stage. */}
       <Show when={voiceUiActive()}>
-        <VoiceSettings
-          open={showVoiceSettings()}
-          onOpenChange={(open) => (open ? getState().openVoiceSettings() : getState().closeVoiceSettings())}
-        />
-        <VoicePip />
-        <IncomingCallOverlay />
-        <OutgoingCallOverlay />
-        <CaptionsOverlay />
-        <ReactionsOverlay />
+        <Suspense fallback={null}>
+          <VoiceSettings
+            open={showVoiceSettings()}
+            onOpenChange={(open) => (open ? getState().openVoiceSettings() : getState().closeVoiceSettings())}
+          />
+          <VoicePip />
+          <IncomingCallOverlay />
+          <OutgoingCallOverlay />
+          <CaptionsOverlay />
+          <ReactionsOverlay />
+        </Suspense>
       </Show>
 
       {/* Keyboard shortcuts help overlay — opened with "?" or Home shortcuts action */}
