@@ -277,6 +277,13 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // Gating the lazy voice cluster on this keeps its chunk off first paint.
   const voiceUiActive = createMemo(() => voice().callState !== 'idle' || showVoiceSettings());
   const canJoinVoice = createMemo(() => preferences().voiceEntry && activeView().kind === 'channel' && !inCall());
+  const yieldForCallSurfacePaint = (): Promise<void> => new Promise((resolve) => {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => resolve());
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
   async function joinVoice(withVideo: boolean): Promise<void> {
     const v = activeView();
     if (v.kind !== 'channel') return;
@@ -322,6 +329,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
     };
     let storeJoinStarted = false;
     try {
+      // Give Edge/Chromium one paint with the provisional surface before media
+      // startup can occupy the main thread with device and encoder setup.
+      await yieldForCallSurfacePaint();
+      if (!ownsProvisionalJoin()) return;
       const mediaReady = await ensureMediaEngine();
       if (!ownsProvisionalJoin()) return;
       if (!mediaReady) {
@@ -730,7 +741,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
           >
             {/* In-call stage when viewing the voice channel you're in */}
             <Show when={viewingCall()}>
-              <Suspense
+              <Show
+                when={voice().callStartedAt !== null}
                 fallback={
                   <div
                     class="voice-stage"
@@ -742,8 +754,21 @@ export function AppShell(props: AppShellProps): JSX.Element {
                   </div>
                 }
               >
-                <VoiceStage />
-              </Suspense>
+                <Suspense
+                  fallback={
+                    <div
+                      class="voice-stage"
+                      aria-label="Voice call participants"
+                      role="region"
+                      data-testid="voice-stage-loading"
+                    >
+                      <p role="status">Starting voice and video…</p>
+                    </div>
+                  }
+                >
+                  <VoiceStage />
+                </Suspense>
+              </Show>
             </Show>
             <MessageView selfNick={displayNick()} />
             {/* Persistent call controls while in a call */}

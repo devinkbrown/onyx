@@ -827,6 +827,21 @@
     overflow-wrap: anywhere;
   }
 
+  .stats-ledger {
+    grid-template-columns: auto minmax(0, 1fr);
+    font-size: 12px;
+  }
+
+  .stats-ledger p {
+    overflow-wrap: anywhere;
+  }
+
+  .stats-refresh {
+    grid-column: 2;
+    justify-self: start;
+    white-space: normal;
+  }
+
   .data-card h2 {
     font-size: 36px;
     overflow-wrap: anywhere;
