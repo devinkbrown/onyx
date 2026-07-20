@@ -231,6 +231,29 @@ describe('IRCClient WebSocket subprotocol', () => {
       'Message was not sent: text.ircv3.net requires exactly one IRC line per frame.',
     ]);
   });
+
+  it.each([
+    { payload: '', label: 'empty' },
+    { payload: ':s NOTICE * :one\r\n:s NOTICE * :two', label: 'CRLF-batched' },
+  ])('closes on an inbound $label text.ircv3.net message before dispatch', ({ payload }) => {
+    const commands: string[] = [];
+    const errors: string[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: (message) => commands.push(message.command),
+      onError: (error) => errors.push(error),
+    });
+    const { closed } = attachSocket(client, { protocol: 'text.ircv3.net' });
+
+    feed(client, payload);
+
+    expect(commands).toEqual([]);
+    expect(errors).toEqual([
+      'WebSocket protocol error: text.ircv3.net requires exactly one non-empty IRC line per frame.',
+    ]);
+    expect(closed).toEqual([{ code: 1002, reason: 'Invalid text.ircv3.net frame' }]);
+  });
 });
 
 describe('IRCClient WebSocket frame handling', () => {
@@ -402,7 +425,7 @@ describe('IRCClient binary media plane', () => {
     client.binaryHandlers.add(viaHandler);
     const { closed } = attachSocket(client);
 
-    feedBinary(client, new Uint8Array((8 * MIB) + 1));
+    feedBinary(client, new Uint8Array((4 * MIB) + 1));
 
     expect(viaOption).toEqual([]);
     expect(viaHandler).not.toHaveBeenCalled();
@@ -522,7 +545,7 @@ describe('IRCClient bounded WebSocket sends', () => {
     const { client } = makeSendClient();
     const { sent, closed } = attachSocket(client);
 
-    expect(client.sendBinary(new Uint8Array((8 * MIB) + 1))).toBe(false);
+    expect(client.sendBinary(new Uint8Array((4 * MIB) + 1))).toBe(false);
     expect(sent).toEqual([]);
     expect(closed).toEqual([]);
   });

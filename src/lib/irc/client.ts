@@ -21,7 +21,7 @@ const WATCH_PROP = 'ocean.watch';
 const SASL_CHUNK_BYTES = 400;
 // Browser WebSocket has no buffered-amount-low event. Keep one generous bound
 // around the send queue: ordinary IRC lines are tiny, while an 8 MiB allowance
-// still accommodates the media engine's largest valid reassembled frame.
+// can hold two maximum-size media messages without permitting unbounded growth.
 const MAX_WEBSOCKET_BUFFERED_BYTES = 8 * 1024 * 1024;
 /** IRCv3's text-only WebSocket contract for interoperable fallback servers. */
 const IRC_WEBSOCKET_SUBPROTOCOL = 'text.ircv3.net';
@@ -32,7 +32,8 @@ const WEBSOCKET_SUBPROTOCOLS = [
   IRC_WEBSOCKET_SUBPROTOCOL,
 ] as const;
 const MAX_INBOUND_TEXT_BYTES = 1024 * 1024;
-const MAX_BINARY_FRAME_BYTES = 8 * 1024 * 1024;
+// Exact Onyx Server per-message and fragmented-aggregate media ceiling.
+const MAX_BINARY_FRAME_BYTES = 4 * 1024 * 1024;
 const MAX_OUTBOUND_TEXT_BYTES = 1024 * 1024;
 export const MAX_CLIENT_CAP_ENTRIES = 256;
 export const MAX_CLIENT_CAP_NAME_LENGTH = 128;
@@ -720,6 +721,14 @@ export class IRCClient {
       return;
     }
     const data = typeof ev.data === 'string' ? ev.data : '';
+    if (
+      this.ws?.protocol === IRC_WEBSOCKET_SUBPROTOCOL
+      && (!data || data.includes('\r') || data.includes('\n'))
+    ) {
+      this.opts.onError?.('WebSocket protocol error: text.ircv3.net requires exactly one non-empty IRC line per frame.');
+      try { this.ws.close(1002, 'Invalid text.ircv3.net frame'); } catch { /* already closing */ }
+      return;
+    }
     if (!data) return;
     // As with outbound text, reject definitely-oversized strings before making
     // a second allocation, then enforce the actual UTF-8 wire-size bound. A
@@ -736,8 +745,9 @@ export class IRCClient {
     // complete IRC message and the trailing CRLF is OPTIONAL — Onyx Server omits it
     // entirely (e.g. ":eshmaki.me CAP * LS :..." with no newline). The browser
     // reassembles continuation frames, so every onmessage delivers whole
-    // message(s), never a partial line. We split on optional CR/LF and process
-    // every non-empty segment.
+    // message(s), never a partial line. The strict text.ircv3.net branch above
+    // admits exactly one non-empty line. Onyx's multiplexed/legacy wire may
+    // still batch CRLF-delimited IRC lines, so split those frames here.
     //
     // We must NOT retain a trailing remainder across frames: a previous
     // `split('\n')` + `buffer = lines.pop()` stashed the CRLF-less final line

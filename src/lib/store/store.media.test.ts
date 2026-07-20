@@ -28,6 +28,7 @@ function makeClient() {
     negotiatedCaps: new Set<string>(),
     sessionSyncActive: false,
     currentNick: 'me',
+    destroy: vi.fn(),
   };
 }
 
@@ -115,6 +116,72 @@ describe('channel media panel lifecycle', () => {
     expect(store.getState().voice.callState).toBe('idle');
     expect(store.getState().voice.callChannel).toBeNull();
     expect(store.getState().toasts.at(-1)?.title).toBe('Camera unavailable');
+  });
+
+  it('does not resurrect a call when pending Edge capture resolves after leave', async () => {
+    seedChannel('#root');
+    let finishJoin: (() => void) | undefined;
+    const pendingJoin = new Promise<void>((resolve) => {
+      finishJoin = resolve;
+    });
+    const stream = {
+      getAudioTracks: () => [],
+      getVideoTracks: () => [],
+    } as unknown as MediaStream;
+    const engine = {
+      joinVideo: vi.fn(() => pendingJoin),
+      joinVoice: vi.fn(async () => undefined),
+      getLocalStream: vi.fn(() => stream),
+      setMuted: vi.fn(),
+      leaveRoom: vi.fn(),
+    };
+    setMountedCadenceMediaEngine(engine as never);
+
+    const joining = store.getState().joinVoiceChannel('#root', true);
+    expect(store.getState().voice.callState).toBe('in_call');
+    store.getState().leaveVoiceChannel();
+    expect(store.getState().voice.callState).toBe('idle');
+
+    finishJoin?.();
+    await joining;
+
+    expect(engine.leaveRoom).toHaveBeenCalledWith('#root');
+    expect(store.getState().voice.callState).toBe('idle');
+    expect(store.getState().voice.callChannel).toBeNull();
+    expect(store.getState().voice.callStartedAt).toBeNull();
+  });
+
+  it('invalidates and cleans a pending media join on explicit disconnect', async () => {
+    seedChannel('#root');
+    let finishJoin: (() => void) | undefined;
+    const pendingJoin = new Promise<void>((resolve) => {
+      finishJoin = resolve;
+    });
+    const stream = {
+      getAudioTracks: () => [],
+      getVideoTracks: () => [],
+    } as unknown as MediaStream;
+    const engine = {
+      joinVideo: vi.fn(() => pendingJoin),
+      joinVoice: vi.fn(async () => undefined),
+      getLocalStream: vi.fn(() => stream),
+      setMuted: vi.fn(),
+      leaveRoom: vi.fn(),
+    };
+    setMountedCadenceMediaEngine(engine as never);
+
+    const joining = store.getState().joinVoiceChannel('#root', true);
+    expect(store.getState().voice.callState).toBe('in_call');
+    store.getState().disconnect();
+    expect(store.getState().voice.callState).toBe('idle');
+
+    finishJoin?.();
+    await joining;
+
+    expect(engine.leaveRoom).toHaveBeenCalledWith('#root');
+    expect(store.getState().client).toBeNull();
+    expect(store.getState().voice.callState).toBe('idle');
+    expect(store.getState().voice.callChannel).toBeNull();
   });
 });
 

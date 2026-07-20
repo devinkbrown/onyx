@@ -5195,6 +5195,10 @@ function deliverChatMessage(
 const _initialEmojiMemory = loadEmojiMemory();
 const _initialCtcpConfig = loadCtcpConfig();
 const _initialInvisibleMode = loadInvisibleMode();
+// Monotonic ownership for asynchronous browser media joins. Leaving or starting
+// another join invalidates every older continuation so a delayed permission or
+// codec promise can never resurrect a call the user already left.
+let _voiceJoinAttempt = 0;
 
 export const store = createStore<OnyxState>()(
   subscribeWithSelector<OnyxState>((set, get) => ({
@@ -5816,6 +5820,11 @@ export const store = createStore<OnyxState>()(
       _typingLastSent.clear();
       _motdBuffer = '';
       _motdCollecting = false;
+      // Explicit disconnect owns media teardown too. Invalidate any delayed
+      // permission/capture continuation before destroying the chat transport,
+      // and close the provisional room so it cannot resurrect after reconnect.
+      if (get().voice.callState !== 'idle') get().leaveVoiceChannel();
+      else _voiceJoinAttempt += 1;
       get().client?.destroy();
       _resetAccountBoundState(set, true, true);
       set({
@@ -14936,6 +14945,7 @@ export const store = createStore<OnyxState>()(
         });
         return;
       }
+      const joinAttempt = ++_voiceJoinAttempt;
 
       // Publish the call surface before awaiting browser permission, device
       // capture, WASM initialisation, and encoder startup. Edge can keep those
@@ -14958,6 +14968,7 @@ export const store = createStore<OnyxState>()(
       try {
         await (withVideo ? engine.joinVideo(channel) : engine.joinVoice(channel));
       } catch (error) {
+        if (joinAttempt !== _voiceJoinAttempt) return;
         get().setVoiceCallState({
           callState: 'idle',
           callChannel: null,
@@ -14967,6 +14978,13 @@ export const store = createStore<OnyxState>()(
           callStartedAt: null,
         });
         throw error;
+      }
+      if (joinAttempt !== _voiceJoinAttempt) {
+        const current = get().voice;
+        if (current.callState === 'idle' || current.callChannel !== channel) {
+          engine.leaveRoom(channel);
+        }
+        return;
       }
       const stream = engine.getLocalStream();
       if (!stream) {
@@ -15028,6 +15046,7 @@ export const store = createStore<OnyxState>()(
     leaveVoiceChannel() {
       const { client, voice } = get();
       if (voice.callState === 'idle') return;
+      _voiceJoinAttempt += 1;
 
       const ch = voice.callChannel;
 

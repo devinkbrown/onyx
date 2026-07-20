@@ -31,7 +31,7 @@ import { readTopicReadMarker, TOPIC_READ_LEDGER_KEY } from '@/lib/topics/topicRe
 import { _resetVaultForTests, queueOutbox, saveMessages } from '@/lib/vault/historyVault';
 import { setMountedCadenceMediaEngine } from '@/lib/mediaEngineMount';
 import { Spotlight } from '@/chat/spotlight';
-import { AppShell } from './AppShell';
+import { AppShell, _setMediaModuleLoaderForTests } from './AppShell';
 
 // AppShell lazily mounts the media engine on Join voice/video. Keep that path
 // off the real codec graph in unit tests.
@@ -170,6 +170,7 @@ describe('AppShell', () => {
 
   afterEach(() => {
     cleanup();
+    _setMediaModuleLoaderForTests();
     setMountedCadenceMediaEngine(null);
     _resetNamesBurstsForTests();
     vi.unstubAllGlobals();
@@ -1192,26 +1193,145 @@ describe('AppShell', () => {
       expect(screen.getByTestId('preferences-panel')).toBeInTheDocument();
     });
 
-    it('joins the channel with camera from Join video without opening voice settings', async () => {
+    it('opens the channel video surface without opening voice settings', () => {
       // Arrange — previous behaviour opened Voice settings as a "loading"
       // affordance, which made Join video look like audio-device settings.
       seedStore('#general');
-      const joinSpy = vi
-        .spyOn(store.getState(), 'joinVoiceChannel')
-        .mockResolvedValue(undefined);
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+          negotiatedCaps: new Set<string>(),
+        } as never,
+      });
 
       // Act
       render(() => <AppShell />);
       fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
 
-      // Assert — enter the call with video; settings stay closed (gear on bar).
-      await waitFor(() => {
-        expect(joinSpy).toHaveBeenCalledWith('#general', true);
-      });
+      // Assert — publish the in-flow call surface; settings stay closed (gear
+      // on the bar). The pending-engine test below owns media invocation.
+      expect(store.getState().voice.callState).toBe('in_call');
+      expect(store.getState().voice.callChannel).toBe('#general');
       expect(store.getState().showVoiceSettings).toBe(false);
       expect(screen.queryByRole('dialog', { name: 'Voice settings' })).not.toBeInTheDocument();
 
-      joinSpy.mockRestore();
+    });
+
+    it('opens an in-flow video panel before a cold media chunk finishes booting', () => {
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+          negotiatedCaps: new Set<string>(),
+        } as never,
+      });
+      setMountedCadenceMediaEngine(null);
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+
+      // The dynamic import continuation cannot run until this synchronous turn
+      // yields. The call surface must nevertheless be visible immediately.
+      expect(store.getState().voice.callState).toBe('in_call');
+      expect(store.getState().voice.callChannel).toBe('#general');
+      expect(store.getState().voice.callStartedAt).toBeNull();
+      expect(screen.getByRole('region', { name: 'Voice call participants' })).toBeInTheDocument();
+    });
+
+    it('does not resurrect a video join abandoned before cold media boot resolves', async () => {
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+          negotiatedCaps: new Set<string>(),
+        } as never,
+      });
+      const engine = {
+        joinVideo: vi.fn(async () => undefined),
+        joinVoice: vi.fn(async () => undefined),
+        getLocalStream: vi.fn(() => null),
+        setMuted: vi.fn(),
+        leaveRoom: vi.fn(),
+      };
+      const mountMedia = vi.fn(() => setMountedCadenceMediaEngine(engine as never));
+      let finishBoot!: () => void;
+      const coldBoot = new Promise<{ mountMedia: typeof mountMedia }>((resolve) => {
+        finishBoot = () => resolve({ mountMedia });
+      });
+      _setMediaModuleLoaderForTests(() => coldBoot);
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+      expect(store.getState().voice.callState).toBe('in_call');
+
+      store.getState().leaveVoiceChannel();
+      expect(store.getState().voice.callState).toBe('idle');
+      finishBoot();
+      await waitFor(() => expect(mountMedia).toHaveBeenCalledOnce());
+      await Promise.resolve();
+
+      expect(engine.joinVideo).not.toHaveBeenCalled();
+      expect(store.getState().voice.callState).toBe('idle');
+      expect(screen.queryByRole('region', { name: 'Voice call participants' })).not.toBeInTheDocument();
+    });
+
+    it('does not toast when an abandoned cold media boot later rejects', async () => {
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+          negotiatedCaps: new Set<string>(),
+        } as never,
+      });
+      let rejectBoot!: (error: Error) => void;
+      const coldBoot = new Promise<{ mountMedia(): void }>((_resolve, reject) => {
+        rejectBoot = reject;
+      });
+      _setMediaModuleLoaderForTests(() => coldBoot);
+      const toastCount = store.getState().toasts.length;
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+      store.getState().leaveVoiceChannel();
+      rejectBoot(new Error('cold media chunk failed'));
+      await coldBoot.catch(() => undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(store.getState().voice.callState).toBe('idle');
+      expect(store.getState().toasts).toHaveLength(toastCount);
+    });
+
+    it('toasts when the current video join rejects after media boot succeeds', async () => {
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+          negotiatedCaps: new Set<string>(),
+        } as never,
+      });
+      const engine = {
+        joinVideo: vi.fn(async () => { throw new Error('camera permission denied'); }),
+        joinVoice: vi.fn(async () => undefined),
+        getLocalStream: vi.fn(() => null),
+        setMuted: vi.fn(),
+        leaveRoom: vi.fn(),
+      };
+      setMountedCadenceMediaEngine(engine as never);
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+
+      await waitFor(() => {
+        expect(engine.joinVideo).toHaveBeenCalledWith('#general');
+        expect(store.getState().toasts.at(-1)?.title).toBe('Video could not start');
+      });
+      expect(store.getState().voice.callState).toBe('idle');
     });
 
     it('opens the video call panel while Edge media startup is still pending', async () => {
@@ -1255,21 +1375,23 @@ describe('AppShell', () => {
       });
     });
 
-    it('joins the channel without video from Join voice without opening voice settings', async () => {
+    it('opens the channel voice surface without opening voice settings', () => {
       seedStore('#general');
-      const joinSpy = vi
-        .spyOn(store.getState(), 'joinVoiceChannel')
-        .mockResolvedValue(undefined);
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+          negotiatedCaps: new Set<string>(),
+        } as never,
+      });
 
       render(() => <AppShell />);
       fireEvent.click(screen.getByRole('button', { name: 'Join voice' }));
 
-      await waitFor(() => {
-        expect(joinSpy).toHaveBeenCalledWith('#general', false);
-      });
+      expect(store.getState().voice.callState).toBe('in_call');
+      expect(store.getState().voice.callChannel).toBe('#general');
       expect(store.getState().showVoiceSettings).toBe(false);
 
-      joinSpy.mockRestore();
     });
 
     it('shows scheduled room events in the presence header and opens the event moment', () => {

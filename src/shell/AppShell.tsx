@@ -49,6 +49,13 @@ import { WatchTogetherActivity } from './WatchTogetherActivity';
 import { MessageView } from './MessageView';
 import { TypingIndicator } from './TypingIndicator';
 import { Composer } from './Composer';
+type MediaModule = Pick<typeof import('@/media/useCadenceMedia'), 'mountMedia'>;
+const defaultMediaModuleLoader = (): Promise<MediaModule> => import('@/media/useCadenceMedia');
+let mediaModuleLoader = defaultMediaModuleLoader;
+/** Deterministic cold-chunk seam; production callers never replace the loader. */
+export function _setMediaModuleLoaderForTests(loader?: () => Promise<MediaModule>): void {
+  mediaModuleLoader = loader ?? defaultMediaModuleLoader;
+}
 // Voice/video UI is lazy: it (plus its ~76kB CADENCE media/worker/wasm graph)
 // is only rendered once a call is signalled, so it stays out of the initial
 // /app payload and loads on first voice activity. Gated below by voiceUiActive.
@@ -210,9 +217,16 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const mediaOwner = getOwner();
   let mediaBootPromise: Promise<boolean> | null = null;
   let mediaDisposed = false;
+  let voiceJoinAttempt = 0;
   let cancelMediaPreload: CancelBackgroundTask = () => {};
   onCleanup(() => {
     mediaDisposed = true;
+    voiceJoinAttempt += 1;
+    const pendingVoice = getState().voice;
+    if (
+      pendingVoice.callState === 'in_call'
+      && pendingVoice.callStartedAt === null
+    ) getState().leaveVoiceChannel();
     cancelMediaPreload();
   });
   function ensureMediaEngine(): Promise<boolean> {
@@ -221,7 +235,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
     // promise so every caller waits for readiness instead of treating
     // "loading" as "booted" and attempting a no-op join.
     if (mediaBootPromise) return mediaBootPromise;
-    mediaBootPromise = import('@/media/useCadenceMedia')
+    mediaBootPromise = mediaModuleLoader()
       .then(({ mountMedia }) => {
         if (mediaDisposed) return false;
         runWithOwner(mediaOwner, () => mountMedia());
@@ -266,11 +280,52 @@ export function AppShell(props: AppShellProps): JSX.Element {
   async function joinVoice(withVideo: boolean): Promise<void> {
     const v = activeView();
     if (v.kind !== 'channel') return;
+    const channel = v.channel;
+    const state = getState();
+    if (!state.client) return;
+    const attempt = ++voiceJoinAttempt;
     // Join the call directly. Do NOT open Voice settings here — that sheet is
     // for device/processing preferences (gear on the call bar), not the entry
     // path. Opening it on "Join video" made video look broken (audio settings).
+    // Publish the in-flow call surface synchronously, before the lazy media
+    // chunk starts loading. On a cold Edge session the dynamic import itself
+    // can remain pending behind browser scheduling, and the click must still
+    // produce immediate, visible feedback without covering the conversation.
+    state.setVoiceCallState({
+      callState: 'in_call',
+      callChannel: channel,
+      localStream: null,
+      cameraOn: false,
+      cameraStream: null,
+      callStartedAt: null,
+      pinnedParticipant: null,
+      handRaised: false,
+      raisedHands: new Set<string>(),
+    });
+    const ownsProvisionalJoin = () => {
+      const current = getState().voice;
+      return attempt === voiceJoinAttempt
+        && current.callState === 'in_call'
+        && current.callChannel === channel
+        && current.callStartedAt === null;
+    };
+    const rollbackProvisionalJoin = () => {
+      if (!ownsProvisionalJoin()) return;
+      getState().setVoiceCallState({
+        callState: 'idle',
+        callChannel: null,
+        localStream: null,
+        cameraOn: false,
+        cameraStream: null,
+        callStartedAt: null,
+      });
+    };
+    let storeJoinStarted = false;
     try {
-      if (!(await ensureMediaEngine())) {
+      const mediaReady = await ensureMediaEngine();
+      if (!ownsProvisionalJoin()) return;
+      if (!mediaReady) {
+        rollbackProvisionalJoin();
         getState().addToast({
           variant: 'error',
           title: withVideo ? 'Video could not start' : 'Voice could not start',
@@ -278,8 +333,20 @@ export function AppShell(props: AppShellProps): JSX.Element {
         });
         return;
       }
-      await getState().joinVoiceChannel(v.channel, withVideo);
+      if (!getState().client) {
+        rollbackProvisionalJoin();
+        return;
+      }
+      storeJoinStarted = true;
+      await getState().joinVoiceChannel(channel, withVideo);
     } catch {
+      if (attempt !== voiceJoinAttempt) return;
+      // Loader failures still own the provisional panel and must be stale-safe.
+      // Once the store join starts, its own current-attempt failure rolls that
+      // panel back before rethrowing, so ownership is intentionally already
+      // false while this layer remains responsible for user-facing feedback.
+      if (!storeJoinStarted && !ownsProvisionalJoin()) return;
+      rollbackProvisionalJoin();
       getState().addToast({
         variant: 'error',
         title: withVideo ? 'Video could not start' : 'Voice could not start',
