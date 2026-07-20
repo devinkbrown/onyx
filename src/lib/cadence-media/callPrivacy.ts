@@ -3,9 +3,8 @@
  * callPrivacy — pure copy for the in-call Privacy / call-details sheet (R2).
  *
  * Builds on resolveCallSecurity so the sheet and the VoiceBar chip never
- * disagree. Epoch / Privacy Code is a reserved slot for future media E2EE
- * (MLS exporter) — always null until that ships. Hop-only media never claims
- * end-to-end privacy.
+ * disagree. A human-comparable group-transcript Privacy Code remains a
+ * separate slot; hop-only media never claims end-to-end privacy.
  */
 
 import {
@@ -22,9 +21,8 @@ export interface CallPrivacyDetails {
   /** Whether server operators can access call media content. */
   readonly serverCanAccessMedia: boolean;
   /**
-   * Future MLS epoch authenticator (Discord "Voice Privacy Code" pattern).
-   * Null until media E2EE is established — UI must render a reserved empty
-   * slot, not invent a code.
+   * Future group-transcript authenticator. Null until a comparable code is
+   * implemented — UI must render a reserved empty slot, not invent one.
    */
   readonly epochCode: string | null;
   readonly usesPadlock: boolean;
@@ -64,7 +62,8 @@ export function resolveCallPrivacy(input: CallSecurityInput): CallPrivacyDetails
     title,
     summary: affordance.detail,
     serverCanAccessMedia,
-    // Reserved for future media E2EE Privacy Code export.
+    // E2EE can be active without a human-comparable transcript code. Never
+    // display the numeric local epoch as if it authenticated the group.
     epochCode: null,
     usesPadlock: affordance.usesPadlock,
     affordance,

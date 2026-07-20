@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   MAX_STATS_CHANNEL_LENGTH,
@@ -8,8 +8,29 @@ import {
   MAX_STATS_SPARK_POINTS,
   MAX_STATS_TOPIC_LENGTH,
   normalizeIndex,
+  fetchStatsIndex,
   relTime,
 } from './networkIndex';
+
+describe('fetchStatsIndex continuity', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    sessionStorage.clear();
+  });
+
+  it('keeps the last populated public index through a transient empty restart feed', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        generated_at: 1_783_500_000, users_online: 8, channels: [{ channel: '#root', messages: 42 }], network_days: [],
+      })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        generated_at: 1_783_500_030, users_online: 8, channels: [], network_days: [],
+      }))));
+
+    expect((await fetchStatsIndex())?.channels[0]?.channel).toBe('#root');
+    expect((await fetchStatsIndex())?.channels[0]?.channel).toBe('#root');
+  });
+});
 
 describe('normalizeIndex', () => {
   it('returns null when the external feed has no channel list', () => {

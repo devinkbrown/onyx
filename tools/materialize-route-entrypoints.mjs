@@ -12,7 +12,7 @@ export const ROUTE_ENTRYPOINTS = [
   {
     route: 'app',
     title: 'Open Onyx — chat on the open mesh',
-    description: 'Open Onyx in your browser for local-first rooms, encrypted media, live network context, and an identity you control.',
+    description: 'Open Onyx in your browser for local-first rooms, honest media security, live network context, and an identity you control.',
   },
   {
     route: 'about',
@@ -43,6 +43,26 @@ export const ROUTE_ENTRYPOINTS = [
     route: 'invite',
     title: 'Join Onyx — open a room invite',
     description: 'Open an Onyx invite to join a room as a guest or with your account, carrying its topic, moment, and reading context.',
+  },
+  {
+    route: 'accessibility',
+    title: 'Onyx accessibility — access is a requirement',
+    description: 'Read the public Onyx accessibility contract for keyboard use, focus recovery, motion, contrast, and status announcements.',
+  },
+  {
+    route: 'glossary',
+    title: 'Onyx glossary — names used across the mesh',
+    description: 'A concise guide to Onyx, Onyx Server, Cadence, Mooring, Armor, and the open mesh.',
+  },
+  {
+    route: 'integrations',
+    title: 'Onyx integrations — constrained by design',
+    description: 'Learn how Onyx renders reviewed integration content and keeps extension actions capability-scoped.',
+  },
+  {
+    route: 'agents',
+    title: 'Onyx agent safety — automation with boundaries',
+    description: 'Read the public contract for labelled, reviewed, capability-scoped automation in Onyx.',
   },
 ];
 

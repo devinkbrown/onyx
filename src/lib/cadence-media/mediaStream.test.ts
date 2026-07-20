@@ -9,6 +9,16 @@ import {
   mediaStreamId,
 } from './mediaStream';
 
+function serverBytewiseStreamId(channel: string, nick: string, kind: string): number {
+  const bytes = new TextEncoder().encode(`${channel}\u0000${nick}\u0000${kind}`);
+  let hash = 0x811c9dc5;
+  for (const byte of bytes) {
+    hash ^= byte >= 0x41 && byte <= 0x5a ? byte + 0x20 : byte;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
 describe('mediaStreamId', () => {
   it('is deterministic and a 32-bit unsigned int', () => {
     const a = mediaStreamId('#call', 'alice', 'audio');
@@ -21,6 +31,13 @@ describe('mediaStreamId', () => {
 
   it('is case-insensitive on channel and nick', () => {
     expect(mediaStreamId('#Call', 'Alice', 'audio')).toBe(mediaStreamId('#call', 'alice', 'audio'));
+  });
+
+  it('matches the server bytewise ASCII fold for UTF-8 names', () => {
+    expect(mediaStreamId('%Äther', 'KÄIN', 'audio'))
+      .toBe(serverBytewiseStreamId('%Äther', 'KÄIN', 'audio'));
+    expect(mediaStreamId('%Äther', 'KÄIN', 'audio'))
+      .not.toBe(mediaStreamId('%äther', 'käin', 'audio'));
   });
 
   it('separates audio vs video, different nicks, and different channels', () => {

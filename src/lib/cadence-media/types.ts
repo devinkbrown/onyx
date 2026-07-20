@@ -53,6 +53,15 @@ export interface CadenceMediaCallbacks {
   onRecordConsent?:  (nick: string) => void;
   onChannelInfo?:    (channel: string, info: CadenceChannelInfo) => void;
   onMooringState?:      (nick: string, epoch: number, fingerprint: string) => void;
+  /** Negotiated media E2EE state. A closed padlock is permitted only while active. */
+  onMediaE2eeState?:    (active: boolean, degraded: boolean, epoch: number) => void;
+  /** Bind a presented media handshake key to the peer's pinned account key. */
+  verifyPeerMediaKey?:  (
+    nick: string,
+    publicKeyB64url: string,
+    attachmentId: string,
+    trustBinding: string,
+  ) => Promise<boolean>;
   enableVideoCalls?: () => boolean;
   enableVoiceCalls?: () => boolean;
   getMediaQuality?:  () => { audioQuality: 0 | 1 | 2; videoQuality: number; noiseSuppress: boolean };

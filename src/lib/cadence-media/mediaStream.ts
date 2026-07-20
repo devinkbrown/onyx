@@ -22,15 +22,16 @@ function validRoutingToken(value: string, maxLength: number): boolean {
 }
 
 /**
- * FNV-1a (32-bit) over UTF-8 of "channel\0nick\0kind", with channel/nick lowered
- * for case-insensitive IRC identity. Sender and receiver are the same JS, so the
- * exact hash only needs to agree with itself.
+ * FNV-1a (32-bit) over UTF-8 of "channel\0nick\0kind", with ASCII A-Z folded
+ * after UTF-8 encoding. Onyx Server uses the identical bytewise fold: non-ASCII
+ * UTF-8 bytes stay unchanged, avoiding JS Unicode-lowercasing drift.
  */
 export function mediaStreamId(channel: string, nick: string, kind: MediaStreamKind): number {
-  const bytes = new TextEncoder().encode(`${channel.toLowerCase()}\0${nick.toLowerCase()}\0${kind}`);
+  const bytes = new TextEncoder().encode(`${channel}\0${nick}\0${kind}`);
   let h = 0x811c9dc5;
-  for (const b of bytes) {
-    h ^= b;
+  for (const byte of bytes) {
+    const folded = byte >= 0x41 && byte <= 0x5a ? byte + 0x20 : byte;
+    h ^= folded;
     h = Math.imul(h, 0x01000193);
   }
   return h >>> 0;

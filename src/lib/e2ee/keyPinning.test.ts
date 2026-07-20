@@ -28,6 +28,7 @@ import {
   peerKeyStatus,
   peerSafetyNumber,
   pinPeerKey,
+  pinPeerTrustBinding,
   pinnedPeerKey,
   safetyNumber,
   sealDmTrusted,
@@ -129,6 +130,13 @@ describe('safetyNumber', () => {
 });
 
 describe('peerKeyStatus + pin lifecycle', () => {
+  it('persists only canonical SHA-256 base64url composite trust bindings', async () => {
+    const binding = toB64url(new Uint8Array(32).fill(0x5a));
+    expect(await pinPeerTrustBinding('alice#media#device', binding)).toBe(true);
+    expect(await peerKeyStatus('alice#media#device', binding)).toBe('unchanged');
+    expect(await pinPeerTrustBinding('alice#media#bad', `${binding}=`)).toBe(false);
+  });
+
   it('isolates the same peer pin by local account and quarantines the legacy bucket', async () => {
     const localAlice = { serverUrl: 'wss://e2ee.example/ws', identity: 'alice' } as const;
     const localBob = { serverUrl: 'wss://e2ee.example/ws', identity: 'bob' } as const;

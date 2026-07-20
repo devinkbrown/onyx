@@ -6,6 +6,7 @@ import { Mascot } from '@/components/brand/Mascot';
 import { fetchStatsIndex, relTime, type NetworkDay, type StatsChannel } from '@/lib/stats/networkIndex';
 import { publicFeedFreshness, type PublicFeedFreshness } from '@/lib/stats/feedBounds';
 import { setPageMeta } from './pageMeta';
+import { PublicFooter } from './PublicFooter';
 
 function PageChrome(props: {
   children: JSX.Element;
@@ -43,11 +44,13 @@ function PageChrome(props: {
           <a class="hideable" href="/status/">Status</a>
           <a class="hideable" href="/roadmap/">Roadmap</a>
           <a class="hideable" href="/about/">About</a>
+          <a class="hideable" href="/invite/?join=%23root">Invite</a>
           <span class="live hideable" data-feed-state={props.feedState}><i aria-hidden="true" />{label()}</span>
           <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
       {props.children}
+      <PublicFooter />
     </main>
   );
 }

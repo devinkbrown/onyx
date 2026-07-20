@@ -6,6 +6,7 @@ import { Mascot } from '@/components/brand/Mascot';
 import { fetchNetworkStatus, publicMeshFeedLabel, publicMeshFeedState } from '@/lib/stats/status';
 import { AccessibilityStatement } from '@/shell/AccessibilityStatement';
 import { setPageMeta } from './pageMeta';
+import { PublicFooter } from './PublicFooter';
 
 /**
  * Onyx /about — full editorial deep-dive.
@@ -81,7 +82,7 @@ export default function About() {
         <p class="serif-pull">
           A protocol you can read.<br />
           A mesh that <em>belongs to no one</em>.<br />
-          A server that never sees your voice.
+          A network that tells you exactly how your media is protected.
         </p>
         <div class="ab-seam" aria-hidden="true" />
         <p class="sub">
@@ -194,8 +195,9 @@ export default function About() {
         <span class="r-eyebrow">02 — voice &amp; video</span>
         <h2 id="media-heading" class="r-title">Our codec,<br />every device</h2>
         <p class="r-lede">
-          One codec everywhere. No per-platform divergence. The server forwards opaque
-          frames it will never read.
+          One codec everywhere. No per-platform divergence. The server forwards
+          encrypted frames without transcoding; the call surface reports whether
+          the client-held group key is established.
         </p>
 
         <div class="ab-media-header">
@@ -204,7 +206,7 @@ export default function About() {
             class="ab-media-diagram"
             viewBox="0 0 580 320"
             role="img"
-            aria-label="Media path: clients encode with CADENCEVOX/CADENCEVIS or WASM, send opaque Cadence frames over the mesh relay to the SFU, which forwards them unchanged."
+            aria-label="Media path: clients encode with CADENCEVOX/CADENCEVIS or WASM, send Cadence frames over the mesh relay to the SFU, which forwards them without transcoding."
           >
             {/* SFU center */}
             <rect x="230" y="120" width="120" height="80" fill="none" stroke="var(--seam)" stroke-width="1.5" />
@@ -246,7 +248,7 @@ export default function About() {
 
             {/* Frame label */}
             <text x="175" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">cadence frame</text>
-            <text x="175" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--washi-mute)" text-anchor="middle">(opaque, e2ee)</text>
+            <text x="175" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--washi-mute)" text-anchor="middle">(security state labelled)</text>
             <text x="405" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">cadence frame</text>
             <text x="405" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--washi-mute)" text-anchor="middle">(identical bytes)</text>
           </svg>
@@ -261,14 +263,14 @@ export default function About() {
             <p>
               Encoded frames travel in a <b>Cadence frame</b> container — a lightweight wire
               format carrying payload length, band, stream ID, sequence, timestamp,
-              keyframe flag, and codec tag. End-to-end encryption wraps the payload
-              before it ever leaves the sender.
+              keyframe flag, and codec tag. The encoded payload is sealed under a
+              client-held room key before it leaves the sender.
             </p>
             <p>
               The media relay is a <b>pure selective-forwarding unit</b>. It reads the
               Cadence container header to know where to send the frame, then forwards the
-              opaque payload byte-for-byte. It does not encode, decode, or transcode.
-              Your keys stay with you; plaintext never crosses the server.
+              ciphertext byte-for-byte. It does not encode, decode, transcode, or
+              receive the room key. Outer routing fields are authenticated as GCM context.
             </p>
           </div>
         </div>
@@ -289,7 +291,7 @@ export default function About() {
             <span class="t-label">Fallback carrier</span>
             <h4>Mesh relay<br />over WebSocket</h4>
             <p>
-              Where QUIC is not available, the browser keeps the same opaque Cadence
+              Where QUIC is not available, the browser keeps the same Cadence
               frames moving over the WebSocket relay path. Same bytes, same codec,
               different pipe.
             </p>
@@ -309,46 +311,48 @@ export default function About() {
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      {/* ── 3. E2EE — Mooring ── */}
+      {/* ── 3. Security boundaries ── */}
       <section id="e2ee" class="r-wrap ab-section" aria-labelledby="e2ee-heading">
         <span class="r-eyebrow">03 — end-to-end encryption</span>
-        <h2 id="e2ee-heading" class="r-title">Mooring:<br />keys the server never holds</h2>
+        <h2 id="e2ee-heading" class="r-title">Client-held keys.<br />Truthful state.</h2>
         <p class="r-lede">
-          End-to-end encryption isn't a feature Onyx Server has; it's a constraint the
-          architecture enforces. The server relays ciphertext. That's all it can do.
+          Armor protects client connections. Mooring protects server-to-server mesh
+          links. A separate client-held group key protects media end to end—and the
+          padlock appears only after that group converges.
         </p>
 
         <div class="ab-e2ee-split">
           <div class="ab-e2ee-body">
             <p>
-              Mooring is the secure channel layer. For group calls it uses
-              <b>TreeKEM</b> — a tree-structured key exchange where adding or removing
-              a participant generates a new group key with a single tree walk, without
-              re-keying every pair. No one who leaves the call can decrypt what came after.
+              Each physical client signs a fresh per-call P-256 key with its enrolled
+              Ed25519 account identity. The deterministic room leader creates an
+              AES-256-GCM group key and wraps it separately for every authenticated
+              attachment—even when several clients share one nick.
             </p>
             <p>
-              The encryption primitive is <b>HPKE</b> (Hybrid Public-Key Encryption).
-              Media payloads are wrapped in HPKE before they enter the cadence frame.
-              The server receives an opaque blob, knows which channel to forward it to,
-              and sends it on — no key material, no plaintext, no metadata beyond routing.
+              Audio, video, and screenshare payloads stay fail-closed until the group
+              key arrives. Joins and departures rotate the key; replayed frames are
+              rejected; room, sender, attachment, epoch, media kind, and keyframe state
+              are authenticated. Every encrypted frame also carries the sender's
+              Ed25519 signature, so a relay or another room member cannot impersonate it.
             </p>
 
             <div class="ab-prop-list" role="list" aria-label="Encryption properties">
               <div class="ab-prop" role="listitem">
-                <span class="pk">Primitive</span>
-                <span class="pv">TreeKEM group key derivation · HPKE per-frame encryption</span>
+                <span class="pk">Identity</span>
+                <span class="pv">Enrolled Ed25519 identity signs a fresh per-call P-256 key</span>
               </div>
               <div class="ab-prop" role="listitem">
-                <span class="pk">Server sees</span>
-                <span class="pv">Channel routing tag, opaque ciphertext, frame length — never content</span>
+                <span class="pk">Room key</span>
+                <span class="pv">AES-256-GCM, context-bound once per physical attachment</span>
               </div>
               <div class="ab-prop" role="listitem">
-                <span class="pk">Forward secrecy</span>
-                <span class="pv">Group key rotates on every join and leave; past frames stay dark</span>
+                <span class="pk">Membership</span>
+                <span class="pv">Strictly newer epochs on join and final attachment leave</span>
               </div>
               <div class="ab-prop" role="listitem">
-                <span class="pk">Post-quantum</span>
-                <span class="pv">Mesh S2S links use X25519 + ML-KEM-768 hybrid (PQ on day one)</span>
+                <span class="pk">Interface rule</span>
+                <span class="pv">No key, no media frame, no padlock</span>
               </div>
             </div>
           </div>
@@ -358,10 +362,10 @@ export default function About() {
             class="ab-e2ee-visual"
             viewBox="0 0 440 360"
             role="img"
-            aria-label="Mooring secure channel: TreeKEM tree on left, clients hold leaf keys, root key encrypts media, server relays opaque ciphertext on right"
+            aria-label="Media end-to-end encryption: clients hold leaf identity keys, receive a wrapped room key, and send ciphertext through a relay that never receives the room key"
           >
             {/* Tree structure */}
-            <text x="220" y="28" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle" letter-spacing="1.5">MOORING SECURE CHANNEL</text>
+            <text x="220" y="28" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle" letter-spacing="1.5">SECURITY BOUNDARIES</text>
 
             {/* Root */}
             <circle cx="220" cy="65" r="12" fill="none" stroke="var(--shu)" stroke-width="1.5" />
@@ -397,12 +401,12 @@ export default function About() {
 
             {/* Encrypted frame flow */}
             <rect x="60" y="248" width="320" height="40" fill="none" stroke="var(--seam-faint)" rx="2" />
-            <text x="220" y="263" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">HPKE-encrypted cadence frame</text>
-            <text x="220" y="279" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">opaque payload — server cannot read</text>
+            <text x="220" y="263" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">AES-GCM encrypted cadence payload</text>
+            <text x="220" y="279" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">outer routing context authenticated</text>
 
             {/* Arrow to server */}
-            <text x="220" y="320" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">↓ SFU forwards unchanged ↓</text>
-            <text x="220" y="338" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--shu)" text-anchor="middle">server never decrypts</text>
+            <text x="220" y="320" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">↓ relay forwards ciphertext unchanged ↓</text>
+            <text x="220" y="338" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--shu)" text-anchor="middle">server never receives room key</text>
           </svg>
         </div>
       </section>
@@ -766,46 +770,7 @@ export default function About() {
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      {/* ── Footer ── */}
-      <footer class="r-wrap r-footer">
-        <div class="cols">
-          <div class="sig">
-            <div class="logo"><Mascot variant="mark" aria-label="Onyx" />ONYX</div>
-            <p>
-              A mesh-native client for the open network — end-to-end-encrypted
-              media, real services, and a home you own. Built in the open with Claude and Codex.
-            </p>
-          </div>
-          <div class="col">
-            <h5>This page</h5>
-            <a href="#protocol">Protocol</a>
-            <a href="#media">Media model</a>
-            <a href="#e2ee">Encryption</a>
-            <a href="#mesh">Mesh</a>
-            <a href="#services">Services</a>
-            <a href="#mythos">Names</a>
-            <a href="#developer">Build on it</a>
-            <a href="#accessibility">Accessibility</a>
-          </div>
-          <div class="col">
-            <h5>Network</h5>
-            <a href="#mesh">The mesh</a>
-            <a href="/app/">Auto-routing</a>
-            <a href="/">Landing</a>
-          </div>
-          <div class="col">
-            <h5>Commons</h5>
-            <a href="/app/">Open Onyx</a>
-            <a href="/app/">Join #root</a>
-            <a href="#developer">Build a client</a>
-            <a href="#developer">Run a node</a>
-          </div>
-        </div>
-        <div class="base">
-          <span><Mascot variant="mark" aria-label="Onyx" /> Onyx</span>
-          <span>Onyx Server · the open mesh · 2026</span>
-        </div>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }

@@ -4,6 +4,7 @@ import './data-pages.css';
 import { For } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { setPageMeta } from './pageMeta';
+import { PublicFooter } from './PublicFooter';
 
 type Phase = {
   phase: string;
@@ -37,7 +38,7 @@ const phases: Phase[] = [
     state: 'complete',
     date: '2026-07-16',
     summary: 'DMs, room policies, and account key surfaces keep private state out of durable replay while exposing stable, verifiable device identity hooks.',
-    items: ['Mooring-encrypted DMs', 'Onyx Server E2EE capability', 'Encrypted message tags', 'Channel encryption policy', 'Account device-key publishing', 'Stable device-key identity', 'Key transparency status', 'Ephemeral room TTL', 'Ciphertext-only vault/search'],
+    items: ['Client-encrypted DMs', 'Onyx Server E2EE capability', 'Encrypted message tags', 'Channel encryption policy', 'Account device-key publishing', 'Stable device-key identity', 'Key transparency status', 'Ephemeral room TTL', 'Ciphertext-only vault/search'],
   },
   {
     phase: 'Phase 4',
@@ -98,9 +99,9 @@ const phases: Phase[] = [
   {
     phase: 'Phase 11',
     title: 'Media presence',
-    state: 'planned',
-    date: 'planned',
-    summary: 'Promote voice and video into room presence with stage context, spatial controls, screenshare controls, and watch-together surfaces.',
+    state: 'active',
+    date: '2026-07-20',
+    summary: 'Voice, video, and screenshare now fail closed through client-held group encryption with authenticated routing context, membership re-keying, replay rejection, and a padlock driven only by negotiated engine state. Multi-node media cascading and a human-comparable privacy code remain active work.',
     items: ['Voice-room-as-place UI', 'Voice room status chip', 'Stage context', 'Spatial audio controls', 'Spatial audio availability state', 'Screenshare controls', 'Watch-together surface', 'Watch-together room activity'],
   },
   {
@@ -114,9 +115,9 @@ const phases: Phase[] = [
   {
     phase: 'Phase 13',
     title: 'Local intelligence',
-    state: 'planned',
-    date: 'planned',
-    summary: 'Add local-first intelligence without making AI the front door: provenance chrome, vault recall, local catch-up, captions, browser-local translation readiness, and agent-safe contracts.',
+    state: 'active',
+    date: '2026-07-20',
+    summary: 'Local-first intelligence is active without becoming the front door: provenance chrome, vault recall, reviewed catch-up, caption controls, loopback-only embeddings, browser-local translation readiness, and agent-safe contracts.',
     items: ['AI provenance chrome', 'Search provenance labels', 'Digest provenance labels', 'Caption provenance labels', 'Caption transcript copy', 'Extension action audit', 'Digest recall terms', 'Digest review history', 'Search recall pivots', 'Vault RAG', 'Semantic recall', 'Local catch-up', 'Local captions', 'Local translation', 'Local language tools', 'Browser translator readiness', 'No external translation endpoint', 'Agent-safe public contract', 'Agent safety page', 'Provenance labels'],
   },
   {
@@ -158,6 +159,7 @@ export default function RoadmapRoute() {
           <a class="hideable" href="/status/">Status</a>
           <a class="hideable" href="/roadmap/" aria-current="page">Roadmap</a>
           <a class="hideable" href="/about/">About</a>
+          <a class="hideable" href="/invite/?join=%23root">Invite</a>
           <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
@@ -166,9 +168,8 @@ export default function RoadmapRoute() {
         <p class="r-kicker">roadmap</p>
         <h1 id="roadmap-heading">What shipped,<br /><span class="gold">what is next</span></h1>
         <p class="sub">
-          The public product plan, reduced to what matters on the site: memory,
-          reach, privacy, presence, operations, and the Onyx backlog folded in
-          from the master roadmap.
+          A public ledger of the network: what is dependable today, what is being
+          sharpened now, and where a new person can feel the difference next.
         </p>
         <div class="data-summary">
           <div class="data-metric">
@@ -177,9 +178,9 @@ export default function RoadmapRoute() {
             <span class="note">client features shipped</span>
           </div>
           <div class="data-metric">
-            <span class="label">next tranche</span>
-            <span class="value">Time</span>
-            <span class="note">venue model, access, local-first roaming</span>
+            <span class="label">in motion</span>
+            <span class="value">Return</span>
+            <span class="note">calm re-entry, accessible reading, local memory</span>
           </div>
           <div class="data-metric">
             <span class="label">site role</span>
@@ -223,16 +224,12 @@ export default function RoadmapRoute() {
       <section class="r-wrap r-section data-grid" aria-label="Roadmap next steps">
         <article class="data-card">
           <span class="label">now</span>
-          <h2>Operations are visible; time is active</h2>
+          <h2>The next job is a better return</h2>
           <p>
-            The site now carries `/status`, `/stats`, backup readiness, and a live
-            root pulse. Onyx's current client work makes the app a time-native
-            place to return to: followed catch-up, scheduled room events, local
-            memory previews, quiet room activity, home return recaps, Spotlight
-            handoff, room rhythm heatlines, event context, review-from-start
-            handoffs, review history, a global Search Center, saved queries, archived-result hydration, channel directory dedupe, reader digest notes, shareable moment links, reader memory context, moment search handoff,
-            reader transcript jumps, digest review handoff, review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, vault anchor jumps, and
-            command grammar for goto, search, time jumps, reading projections, J/K transcript navigation, and quieter activity surfaces.
+            A visit should begin with orientation, not recovery work. The active
+            program joins live public status with catch-up, searchable local memory,
+            calmer room signals, and accessible reader handoffs so people can leave
+            and return without losing the thread.
           </p>
         </article>
         <aside class="data-card">
@@ -248,6 +245,7 @@ export default function RoadmapRoute() {
           </div>
         </aside>
       </section>
+      <PublicFooter />
     </main>
   );
 }

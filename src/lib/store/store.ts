@@ -329,6 +329,12 @@ export interface VoiceState {
   deafened: boolean;
   localStream: MediaStream | null;
   roomStats: Map<string, CadenceRoomStats>;
+  /** True only after a client-held media group key is negotiated. */
+  mediaE2eeActive: boolean;
+  /** True when E2EE is expected but the current participant set has not converged. */
+  mediaE2eeDegraded: boolean;
+  /** Local group-key generation; zero while no E2EE group is active. */
+  mediaE2eeEpoch: number;
 
   // Audio / device settings
   inputDeviceId: string | null;
@@ -5356,6 +5362,9 @@ export const store = createStore<OnyxState>()(
       deafened: false,
       localStream: null,
       roomStats: new Map(),
+      mediaE2eeActive: false,
+      mediaE2eeDegraded: false,
+      mediaE2eeEpoch: 0,
       ..._loadVoiceSettings(),
       screenshareActive: false,
       screenshareStream: null,
@@ -9124,16 +9133,19 @@ export const store = createStore<OnyxState>()(
           }
           const channel = mediaChannel;
           const verb = mediaVerb;
+          const isE2eeMediaVerb = verb === 'E2EE-HANDSHAKE'
+            || verb === 'E2EE-GROUPKEY'
+            || verb === 'E2EE-DETACH';
           // Presence verbs are `<verb> <nick> [kind]`; signaling verbs
           // (TRANSPORT/NATIVE/PROFILE/LAYER…) have no nick. Only treat param[3]
           // as an actor for presence; otherwise forward the whole tail.
           const isPresenceVerb = verb === 'JOIN' || verb === 'LEAVE' || verb === 'ROSTER'
             || verb === 'MUTE' || verb === 'UNMUTE' || verb === 'SPEAKING' || verb === 'SILENT'
-            || verb === 'HAND' || verb === 'REACT';
+            || verb === 'HAND' || verb === 'REACT' || isE2eeMediaVerb;
           const actor = isPresenceVerb ? (mediaActor || nick || '') : '';
           // Pass the full param tail after the verb so the media engine can parse
           // per-verb signaling payloads itself.
-          const detail = mediaParams.slice(3).join(' ');
+          const detail = mediaParams.slice(isE2eeMediaVerb ? 4 : 3).join(' ');
 
           const validMediaChannel = isChan(channel)
             && _validInboundWireToken(channel, MAX_VAULT_TARGET_LENGTH)

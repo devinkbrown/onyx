@@ -155,6 +155,16 @@ describe('MooringSession — destroyed refuses ops', () => {
 });
 
 describe('MooringGroup — wrap/unwrap + shared-key round-trip', () => {
+  it('cryptographically binds a wrapped room key to its routing context', async () => {
+    const [creatorSession, memberSession] = await handshakePair();
+    const group = await MooringGroup.create();
+    const expected = bytes('room\u0000leader\u0000member\u00001');
+    const altered = bytes('room\u0000leader\u0000member\u00002');
+    const wrapped = await group.exportKeyFor(creatorSession, expected);
+
+    await expect(MooringGroup.importKey(wrapped, memberSession, altered)).rejects.toThrow();
+  });
+
   it('distributes the group key pairwise and members interoperate', async () => {
     const [creatorToMember, member] = await handshakePair();
     const group = await MooringGroup.create();
@@ -168,6 +178,22 @@ describe('MooringGroup — wrap/unwrap + shared-key round-trip', () => {
     // And the reverse direction (member -> creator) with the same shared key.
     const ct2 = await memberGroup.encrypt(bytes('reply'));
     expect(text(await group.decrypt(ct2))).toBe('reply');
+  });
+
+  it('authenticates the outer media routing context as GCM additional data', async () => {
+    const [creatorToMember, member] = await handshakePair();
+    const group = await MooringGroup.create();
+    const memberGroup = await MooringGroup.importKey(
+      await group.exportKeyFor(creatorToMember),
+      member,
+    );
+    const audioContext = bytes('room:#root|sender:alice|kind:audio');
+    const videoContext = bytes('room:#root|sender:alice|kind:video');
+    const ciphertext = await group.encrypt(bytes('encoded frame'), audioContext);
+
+    await expect(memberGroup.decrypt(ciphertext, videoContext)).rejects.toThrow();
+    // Failed authentication must not poison the replay window.
+    expect(text(await memberGroup.decrypt(ciphertext, audioContext))).toBe('encoded frame');
   });
 
   it('rejects a wrapped key of the wrong length', async () => {
@@ -188,6 +214,23 @@ describe('MooringGroup — wrap/unwrap + shared-key round-trip', () => {
 });
 
 describe('MooringGroup — bounded replay window', () => {
+  it('rejects a concurrent duplicate while authentication is in flight', async () => {
+    const [creatorSession, memberSession] = await handshakePair();
+    const sender = await MooringGroup.create();
+    const receiver = await MooringGroup.importKey(
+      await sender.exportKeyFor(creatorSession),
+      memberSession,
+    );
+    const ciphertext = await sender.encrypt(bytes('once'));
+
+    const settled = await Promise.allSettled([
+      receiver.decrypt(ciphertext),
+      receiver.decrypt(ciphertext),
+    ]);
+    expect(settled.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(settled.filter((result) => result.status === 'rejected')).toHaveLength(1);
+  });
+
   it('rejects an exact replayed group frame', async () => {
     const group = await MooringGroup.create();
     const ct = await group.encrypt(bytes('frame'));

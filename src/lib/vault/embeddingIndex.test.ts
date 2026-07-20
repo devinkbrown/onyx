@@ -363,6 +363,11 @@ describe('OllamaEmbeddingProvider (gated stub)', () => {
     expect(provider.isAvailable()).toBe(false);
   });
 
+  it('refuses a non-loopback endpoint even when explicitly enabled', () => {
+    const provider = new OllamaEmbeddingProvider({ ...config, endpoint: 'https://embeddings.example', enabled: true });
+    expect(provider.isAvailable()).toBe(false);
+  });
+
   it('falls back to a zero vector of the configured dim when disabled', async () => {
     const provider = new OllamaEmbeddingProvider(config);
     const vec = await provider.embed('never leaves the device');

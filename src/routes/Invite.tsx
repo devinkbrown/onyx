@@ -6,6 +6,7 @@ import { Mascot } from '@/components/brand/Mascot';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { buildInviteCard, inviteDescription, inviteTitle } from '@/lib/invite/inviteCard';
 import { setPageMeta } from './pageMeta';
+import { PublicFooter } from './PublicFooter';
 
 const NETWORK_NAME = 'Onyx';
 
@@ -101,6 +102,7 @@ export default function InviteRoute() {
           <a class="hideable" href="/status/">Status</a>
           <a class="hideable" href="/roadmap/">Roadmap</a>
           <a class="hideable" href="/about/">About</a>
+          <a class="hideable" href="/invite/?join=%23root" aria-current="page">Invite</a>
           <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
@@ -201,6 +203,7 @@ export default function InviteRoute() {
           <div role="listitem"><strong>After claim</strong><span>Same room path, saved identity, local memory.</span></div>
         </div>
       </section>
+      <PublicFooter />
     </main>
   );
 }

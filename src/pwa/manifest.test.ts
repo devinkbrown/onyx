@@ -43,7 +43,7 @@ describe('PWA manifest', () => {
 
     expect(publicMetadata).not.toMatch(/IRCXNet/i);
     expect(manifest.description).toContain('Onyx mesh');
-    expect(entryDocument).toContain('<title>Onyx — open rooms and encrypted media</title>');
+    expect(entryDocument).toContain('<title>Onyx — open rooms on the mesh</title>');
   });
 
   it('keeps installed launches on the app route with wrapper-safe display metadata', () => {

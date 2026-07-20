@@ -24,6 +24,8 @@ export const MAX_STATS_SPARK_POINTS = 64;
 export const MAX_STATS_CHANNEL_LENGTH = 128;
 export const MAX_STATS_TOPIC_LENGTH = 512;
 const MAX_STATS_META_LENGTH = 256;
+const STATS_SNAPSHOT_KEY = 'onyx:public-stats:last-populated';
+let lastPopulatedIndex: StatsIndex | null = null;
 
 function normalizedChannel(value: unknown): string {
   if (typeof value !== 'string' || value.length > MAX_STATS_CHANNEL_LENGTH) return '';
@@ -134,7 +136,21 @@ export function normalizeIndex(raw: unknown): StatsIndex | null {
 }
 
 export async function fetchStatsIndex(): Promise<StatsIndex | null> {
-  return normalizeIndex(await fetchPublicJson('/stats/data/index.json'));
+  const incoming = normalizeIndex(await fetchPublicJson('/stats/data/index.json'));
+  if (incoming && (incoming.channels.length > 0 || incoming.users_online === 0)) {
+    lastPopulatedIndex = incoming;
+    try { sessionStorage.setItem(STATS_SNAPSHOT_KEY, JSON.stringify(incoming)); } catch { /* storage is optional */ }
+    return incoming;
+  }
+  if (lastPopulatedIndex) return lastPopulatedIndex;
+  try {
+    const cached = normalizeIndex(JSON.parse(sessionStorage.getItem(STATS_SNAPSHOT_KEY) ?? 'null'));
+    if (cached?.channels.length) {
+      lastPopulatedIndex = cached;
+      return cached;
+    }
+  } catch { /* malformed or unavailable storage falls through */ }
+  return incoming;
 }
 
 /** Compact relative time from a unix-seconds stamp. */

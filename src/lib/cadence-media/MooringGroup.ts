@@ -41,6 +41,7 @@ export class MooringGroup {
    * gives O(senders) memory while preserving replay rejection.
    */
   private readonly replayGuard = new ReplayGuard();
+  private readonly decryptingIvs = new Set<string>();
   private destroyed = false;
 
   private constructor(groupKey: CryptoKey) {
@@ -61,12 +62,15 @@ export class MooringGroup {
    * Wrap the group key for a specific peer using their MooringSession.
    * Returns iv || encrypted_group_key_material for transmission.
    */
-  async exportKeyFor(session: { encrypt: (pt: Uint8Array) => Promise<Uint8Array> }): Promise<Uint8Array> {
+  async exportKeyFor(
+    session: { encrypt: (pt: Uint8Array, additionalData?: Uint8Array) => Promise<Uint8Array> },
+    additionalData?: Uint8Array,
+  ): Promise<Uint8Array> {
     const key = this.requireKey();
     const raw = await crypto.subtle.exportKey('raw', key);
     const rawBytes = new Uint8Array(raw);
     try {
-      return await session.encrypt(rawBytes);
+      return await session.encrypt(rawBytes, additionalData);
     } finally {
       rawBytes.fill(0);
     }
@@ -78,9 +82,10 @@ export class MooringGroup {
    */
   static async importKey(
     wrapped: Uint8Array,
-    session: { decrypt: (ct: Uint8Array) => Promise<Uint8Array> },
+    session: { decrypt: (ct: Uint8Array, additionalData?: Uint8Array) => Promise<Uint8Array> },
+    additionalData?: Uint8Array,
   ): Promise<MooringGroup> {
-    const raw = await session.decrypt(wrapped);
+    const raw = await session.decrypt(wrapped, additionalData);
     try {
       if (raw.byteLength !== GCM_LEN / 8) throw new Error('MooringGroup: invalid key length');
       const keyBytes = new Uint8Array(raw);
@@ -101,11 +106,16 @@ export class MooringGroup {
   }
 
   /** Encrypt a plaintext frame. Returns iv || ciphertext. */
-  async encrypt(plaintext: Uint8Array): Promise<Uint8Array> {
+  async encrypt(plaintext: Uint8Array, additionalData?: Uint8Array): Promise<Uint8Array> {
     const key = this.requireKey();
     const iv = this.nextIv();
     const ct = await crypto.subtle.encrypt(
-      { name: GCM_ALG, iv: toArrayBuffer(iv), tagLength: GCM_TAG },
+      {
+        name: GCM_ALG,
+        iv: toArrayBuffer(iv),
+        tagLength: GCM_TAG,
+        ...(additionalData ? { additionalData: toArrayBuffer(additionalData) } : {}),
+      },
       key,
       toArrayBuffer(plaintext),
     );
@@ -116,27 +126,41 @@ export class MooringGroup {
   }
 
   /** Decrypt iv || ciphertext with the group key. */
-  async decrypt(frame: Uint8Array): Promise<Uint8Array> {
+  async decrypt(frame: Uint8Array, additionalData?: Uint8Array): Promise<Uint8Array> {
     const key = this.requireKey();
     if (frame.length < IV_LEN + 16) throw new Error('MooringGroup: frame too short');
     const iv = frame.slice(0, IV_LEN);
-    if (!this.replayGuard.mayAccept(iv)) throw new Error('MooringGroup: replayed frame');
+    const ivKey = ivHex(iv);
+    if (!this.replayGuard.mayAccept(iv) || this.decryptingIvs.has(ivKey)) {
+      throw new Error('MooringGroup: replayed frame');
+    }
+    this.decryptingIvs.add(ivKey);
     const ct = frame.slice(IV_LEN);
-    const pt = await crypto.subtle.decrypt(
-      { name: GCM_ALG, iv: toArrayBuffer(iv), tagLength: GCM_TAG },
-      key,
-      toArrayBuffer(ct),
-    );
-    // Only remember the IV AFTER successful authentication, so a forged IV
-    // whose GCM tag fails can never poison the replay window.
-    this.replayGuard.commit(iv);
-    return new Uint8Array(pt);
+    try {
+      const pt = await crypto.subtle.decrypt(
+        {
+          name: GCM_ALG,
+          iv: toArrayBuffer(iv),
+          tagLength: GCM_TAG,
+          ...(additionalData ? { additionalData: toArrayBuffer(additionalData) } : {}),
+        },
+        key,
+        toArrayBuffer(ct),
+      );
+      // Only remember the IV AFTER successful authentication, so a forged IV
+      // whose GCM tag fails can never poison the replay window.
+      this.replayGuard.commit(iv);
+      return new Uint8Array(pt);
+    } finally {
+      this.decryptingIvs.delete(ivKey);
+    }
   }
 
   /** Clear group key material and reject future use of this object. */
   destroy(): void {
     this.groupKey = null;
     this.replayGuard.clear();
+    this.decryptingIvs.clear();
     this.destroyed = true;
   }
 
@@ -154,6 +178,12 @@ export class MooringGroup {
     new DataView(iv.buffer).setUint32(IV_PREFIX_LEN, this.sendIvCounter++, false);
     return iv;
   }
+}
+
+function ivHex(iv: Uint8Array): string {
+  let out = '';
+  for (const byte of iv) out += byte.toString(16).padStart(2, '0');
+  return out;
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {

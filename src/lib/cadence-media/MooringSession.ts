@@ -33,6 +33,7 @@ export class MooringSession {
   private readonly sendIvPrefix = crypto.getRandomValues(new Uint8Array(IV_PREFIX_LEN));
   private sendIvCounter = 0;
   private readonly replayGuard = new ReplayGuard();
+  private readonly decryptingIvs = new Set<string>();
   private ratchetEpoch = 0;
   private destroyed = false;
 
@@ -99,6 +100,7 @@ export class MooringSession {
     this.receiveKey = await deriveGcmKey(hkdfKey, salt, `${info}:media:${peerDirection}`);
     this.ratchetEpoch = 0;
     this.replayGuard.clear();
+    this.decryptingIvs.clear();
   }
 
   /**
@@ -134,6 +136,7 @@ export class MooringSession {
     this.sendKey = null;
     this.receiveKey = null;
     this.replayGuard.clear();
+    this.decryptingIvs.clear();
     this.ratchetEpoch = 0;
     this.destroyed = true;
   }
@@ -174,11 +177,14 @@ export class MooringSession {
   }
 
   /** Encrypt plaintext with current session key. Returns iv || ciphertext. */
-  async encrypt(plaintext: Uint8Array): Promise<Uint8Array> {
+  async encrypt(plaintext: Uint8Array, additionalData?: Uint8Array): Promise<Uint8Array> {
     const key = this.encryptKey;
     const iv = this.nextIv();
     const ct = await crypto.subtle.encrypt(
-      { name: GCM_ALG, iv: toArrayBuffer(iv), tagLength: GCM_TAG },
+      {
+        name: GCM_ALG, iv: toArrayBuffer(iv), tagLength: GCM_TAG,
+        ...(additionalData ? { additionalData: toArrayBuffer(additionalData) } : {}),
+      },
       key,
       toArrayBuffer(plaintext),
     );
@@ -189,19 +195,30 @@ export class MooringSession {
   }
 
   /** Decrypt iv || ciphertext with current session key. */
-  async decrypt(frame: Uint8Array): Promise<Uint8Array> {
+  async decrypt(frame: Uint8Array, additionalData?: Uint8Array): Promise<Uint8Array> {
     const key = this.decryptKey;
     if (frame.length < IV_LEN + 16) throw new Error('MooringSession: frame too short');
     const iv = frame.slice(0, IV_LEN);
-    if (this.hasSeenReceiveIv(iv)) throw new Error('MooringSession: replayed frame');
+    const ivKey = ivHex(iv);
+    if (this.hasSeenReceiveIv(iv) || this.decryptingIvs.has(ivKey)) {
+      throw new Error('MooringSession: replayed frame');
+    }
+    this.decryptingIvs.add(ivKey);
     const ct = frame.slice(IV_LEN);
-    const pt = await crypto.subtle.decrypt(
-      { name: GCM_ALG, iv: toArrayBuffer(iv), tagLength: GCM_TAG },
-      key,
-      toArrayBuffer(ct),
-    );
-    this.rememberReceiveIv(iv);
-    return new Uint8Array(pt);
+    try {
+      const pt = await crypto.subtle.decrypt(
+        {
+          name: GCM_ALG, iv: toArrayBuffer(iv), tagLength: GCM_TAG,
+          ...(additionalData ? { additionalData: toArrayBuffer(additionalData) } : {}),
+        },
+        key,
+        toArrayBuffer(ct),
+      );
+      this.rememberReceiveIv(iv);
+      return new Uint8Array(pt);
+    } finally {
+      this.decryptingIvs.delete(ivKey);
+    }
   }
 
   get established(): boolean { return this.sendKey !== null && this.receiveKey !== null; }
@@ -217,6 +234,12 @@ export class MooringSession {
     const hash  = await crypto.subtle.digest('SHA-256', raw);
     return tsumugiBase58(new Uint8Array(hash)).slice(0, 12).padStart(12, '1');
   }
+}
+
+function ivHex(iv: Uint8Array): string {
+  let out = '';
+  for (const byte of iv) out += byte.toString(16).padStart(2, '0');
+  return out;
 }
 
 async function deriveGcmKey(

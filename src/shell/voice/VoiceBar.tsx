@@ -142,9 +142,15 @@ function CallPrivacySheet(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   callState: CallState;
+  mediaE2eeActive: boolean;
+  mediaE2eeDegraded: boolean;
 }) {
   // Same inputs as the security chip — sheet + chip cannot disagree.
-  const details = createMemo(() => resolveCallPrivacy({ callState: props.callState }));
+  const details = createMemo(() => resolveCallPrivacy({
+    callState: props.callState,
+    mediaE2eeActive: props.mediaE2eeActive,
+    mediaE2eeDegraded: props.mediaE2eeDegraded,
+  }));
 
   return (
     <Sheet
@@ -472,11 +478,12 @@ export function VoiceBar() {
     const roster = channel ? voiceChannelParticipants().get(channel.toLowerCase()) : undefined;
     return mergeVoiceParticipants(selfNick() || 'you', voice().peers, roster).length;
   });
-  // Media E2EE is not shipped for Cadence voice — only callState is wired today.
-  // When SFrame/MLS media lands, pass mediaE2eeActive / mediaE2eeDegraded /
-  // stageMode from store/engine so the padlock can appear fail-closed.
   const securityAffordance = createMemo(() =>
-    resolveCallSecurity({ callState: voice().callState }),
+    resolveCallSecurity({
+      callState: voice().callState,
+      mediaE2eeActive: voice().mediaE2eeActive,
+      mediaE2eeDegraded: voice().mediaE2eeDegraded,
+    }),
   );
   const isSpotlight = createMemo(() => voice().callLayout === 'spotlight');
   const spatialPositionCount = createMemo(() => {
@@ -1285,6 +1292,8 @@ export function VoiceBar() {
         open={privacyOpen()}
         onOpenChange={setPrivacyOpen}
         callState={voice().callState}
+        mediaE2eeActive={voice().mediaE2eeActive}
+        mediaE2eeDegraded={voice().mediaE2eeDegraded}
       />
     </Show>
   );

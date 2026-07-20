@@ -10,6 +10,7 @@ import {
   publicMeshFeedState,
 } from '@/lib/stats/status';
 import { setPageMeta } from './pageMeta';
+import { PublicFooter } from './PublicFooter';
 
 /** Onyx launch site — deep-water dark luxury, community-first.
  *  Leads with people and place: a real IRC network you join, not a product you buy.
@@ -17,8 +18,8 @@ import { setPageMeta } from './pageMeta';
  *  all reduced-motion safe. The friendly water-dragon Mascot is the brand face. */
 export default function Landing() {
   setPageMeta(
-    'Onyx — open rooms and encrypted media',
-    'Onyx is the public front door to the mesh: open rooms, encrypted media, live network stats, and a name that is yours.',
+    'Onyx — open rooms on the mesh',
+    'Onyx is the public front door to the mesh: open rooms, honest media security, live network stats, and a name that is yours.',
     '/',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
@@ -71,6 +72,8 @@ export default function Landing() {
           <a class="hideable" href="/stats/">Stats</a>
           <a class="hideable" href="/status/">Status</a>
           <a class="hideable" href="/roadmap/">Roadmap</a>
+          <a class="hideable" href="/about/">About</a>
+          <a class="hideable" href="/invite/?join=%23root">Invite</a>
           <a class="hideable" href="#join">Join</a>
           <span class="live hideable" data-feed-state={feedState()}>
             <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
@@ -88,7 +91,8 @@ export default function Landing() {
             <p class="serif-sub">A real network of real people — rooms that stay open, names that are yours, and a place no one can quietly take away.</p>
             <p class="sub">
               Onyx is the warm front door to the mesh: drop into a channel,
-              find your people, talk in text or hop into encrypted voice and video.
+              find your people, talk in text or hop into voice and video with its
+              exact security state shown.
               It's open, it's yours, and there's no account to rent and no ads to dodge.
             </p>
             <div class="r-cta">
@@ -97,7 +101,7 @@ export default function Landing() {
             </div>
             <div class="r-ticker">
               <span><b>open protocol</b> · IRCv3 + IRCX</span>
-              <span><b>encrypted media</b> · voice, video, screen</span>
+              <span><b>honest media state</b> · voice, video, screen</span>
               <span><b>yours to keep</b> · no ads, no rental</span>
             </div>
           </div>
@@ -204,7 +208,7 @@ export default function Landing() {
           <article class="r-card">
             <span class="k">voice</span>
             <h4>Voice stages</h4>
-            <p>Hop into a room and just talk — spatial audio, screen-share, raise-hand. Encrypted end to end; the server only forwards, it never listens.</p>
+            <p>Hop into a room and just talk — spatial audio, screen-share, raise-hand. Media is protected in transit today, with its exact privacy state shown in the call.</p>
             <a class="more" href="/app/">Join a stage &rarr;</a>
           </article>
           <article class="r-card">
@@ -311,28 +315,16 @@ export default function Landing() {
       <section class="r-wrap r-section r-built" aria-labelledby="built-heading">
         <span class="r-eyebrow">built right</span>
         <h2 class="r-title" id="built-heading">Quietly serious<br />underneath</h2>
-        <p class="r-lede">You never have to think about any of this — but it's the reason the network heals, the calls stay private, and the lights stay on.</p>
+        <p class="r-lede">You never have to think about any of this — but it is why the network heals, media protection stays visible, and the lights stay on.</p>
         <div class="r-strip">
           <div class="r-spec"><span class="t">self-healing network</span><p>The client finds the nearest node by latency; when one drops, the rest close over the gap. You never pick a server.</p></div>
-          <div class="r-spec"><span class="t">media the server can't read</span><p>Voice and video are end-to-end encrypted. The server forwards opaque frames and never decodes them — the keys are yours.</p></div>
+          <div class="r-spec"><span class="t">honest media security</span><p>Calls show whether they are protected to the server or end-to-end encrypted. Onyx never uses a padlock to overstate hop protection.</p></div>
           <div class="r-spec"><span class="t">real services, not bots</span><p>Register, ghost a stale session, manage a room — all real server commands, not a puppet sitting in your DMs.</p></div>
           <div class="r-spec"><span class="t">a client you can theme</span><p>A live Theme Studio and deep-water backgrounds, synced to your account across every device you sign in from.</p></div>
         </div>
       </section>
 
-      {/* ── footer ── */}
-      <footer class="r-wrap r-footer">
-        <div class="cols">
-          <div class="sig">
-            <div class="logo"><Mascot variant="mark" />ONYX</div>
-            <p>A warm, open home on the Onyx mesh — real rooms, real people, encrypted media, and a name that's yours to keep. Built in the open.</p>
-          </div>
-          <div class="col"><h5>Community</h5><a href="#community">Who's here</a><a href="#rooms">Rooms</a><a href="#join">Join</a><a href="/app/">Open Onyx</a></div>
-          <div class="col"><h5>Network</h5><a href="/about/">The network</a><a href="/stats/">Channel stats</a><a href="/status/">Mesh status</a><a href="/roadmap/">Roadmap</a></div>
-          <div class="col"><h5>Get in</h5><a href="/app/">Drop into #root</a><a href="/app/">Browse rooms</a><a href="/about/">Build a client</a><a href="/about/">Read more</a></div>
-        </div>
-        <div class="base"><span><Mascot variant="mark" /> Onyx — on the open mesh</span><span>Open IRC · made for people · 2026</span></div>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }

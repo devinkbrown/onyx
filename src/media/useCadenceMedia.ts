@@ -5,9 +5,11 @@ import {
   getState,
   MAX_LIVE_MEDIA_CHANNELS,
   MAX_LIVE_MEDIA_PARTICIPANTS,
+  selectDeviceMemoryOwner,
   setState,
   useStore,
 } from '@/lib/store';
+import { peerKeyStatus, pinPeerTrustBinding } from '@/lib/e2ee/keyPinning';
 import {
   MAX_VAULT_SENDER_LENGTH,
   MAX_VAULT_TARGET_LENGTH,
@@ -356,6 +358,36 @@ export function mountMedia(): void {
 
     onMooringState(nick, epoch, fingerprint) {
       dispatchWindowEvent('onyx:voice-mooring', { nick, epoch, fingerprint });
+    },
+
+    onMediaE2eeState(active, degraded, epoch) {
+      getState().setVoiceCallState({
+        mediaE2eeActive: active,
+        mediaE2eeDegraded: degraded,
+        mediaE2eeEpoch: epoch,
+      });
+      dispatchWindowEvent('onyx:voice-e2ee', { active, degraded, epoch });
+    },
+
+    async verifyPeerMediaKey(nick, publicKeyB64url, _attachmentId, trustBinding) {
+      if (!validMediaNick(nick)) return false;
+      const state = getState();
+      const owner = selectDeviceMemoryOwner(state);
+      if (!owner) return false;
+      // Trust follows the enrolled durable signing identity, not the random
+      // per-connection attachment route. Reconnects retain continuity while
+      // separately enrolled devices keep independent trust buckets.
+      const trustSubject = `${nick.toLowerCase()}#media-device#${trustBinding}`;
+      const verdict = await peerKeyStatus(trustSubject, trustBinding, owner);
+      if (verdict === 'changed') {
+        await state._flagPeerKeyChange(nick, publicKeyB64url);
+        return false;
+      }
+      if (verdict === 'unreadable') return false;
+      if (verdict === 'first-use') {
+        return pinPeerTrustBinding(trustSubject, trustBinding, owner);
+      }
+      return true;
     },
 
     enableVideoCalls: () => true,

@@ -8,7 +8,13 @@ import {
 } from './OpcodecWasm';
 import { MooringSession } from './MooringSession';
 import { MooringGroup } from './MooringGroup';
-import { MooringIdentity } from './MooringIdentity';
+import {
+  deviceKeys,
+  fromB64url,
+  toB64url,
+  type DeviceKeys,
+} from '@/lib/e2ee/dmCipher';
+import { deviceSigningKeys, type DeviceSigningKeys } from '@/lib/e2ee/deviceSign';
 import { ChunkAssembler } from './ChunkAssembler';
 import { TeardownGuard } from './teardownGuard';
 import {
@@ -45,7 +51,16 @@ import type {
 // how a relayed datagram's payload is handled (the codec tag is informational).
 const WS_BAND_AUDIO = 64;          // cadencevox audio, plaintext
 const WS_BAND_VIDEO = 65;          // cadencevis video
-const WS_BAND_TSUMUGI_AUDIO = 66;  // cadencevox audio, TSUMUGI group-encrypted ciphertext
+const WS_BAND_E2EE_AUDIO = 66;     // cadencevox audio, client group-encrypted ciphertext
+const WS_BAND_E2EE_VIDEO = 67;     // cadencevis video/screen, client group-encrypted ciphertext
+const MEDIA_CALL_NONCE_BYTES = 32;
+const MEDIA_ATTACHMENT_BYTES = 16;
+const MEDIA_SIGNING_PUBLIC_BYTES = 32;
+const MEDIA_SIGNATURE_BYTES = 64;
+const MEDIA_HANDSHAKE_UNSIGNED_BYTES = 1 + MEDIA_ATTACHMENT_BYTES + 65 + 65
+  + MEDIA_CALL_NONCE_BYTES + MEDIA_SIGNING_PUBLIC_BYTES;
+const MEDIA_HANDSHAKE_BYTES = MEDIA_HANDSHAKE_UNSIGNED_BYTES + MEDIA_SIGNATURE_BYTES;
+const MEDIA_HANDSHAKE_VERSION = 2;
 const MAX_MEDIA_TRACKED_PEERS = 64;
 const MAX_MEDIA_NICK_LENGTH = 128;
 const MAX_MEDIA_CHANNEL_LENGTH = 256;
@@ -70,6 +85,91 @@ function deleteCaseInsensitive(source: Set<string>, value: string): void {
   for (const candidate of source) {
     if (candidate.toLowerCase() === key) source.delete(candidate);
   }
+}
+
+/** Authenticated context for a media payload. The relay needs these outer
+ * fields for routing, but cannot alter them without making GCM verification
+ * fail at every recipient. */
+function mediaE2eeAad(
+  channel: string,
+  sender: string,
+  kind: 'audio' | 'video',
+  keyframe: boolean,
+): Uint8Array {
+  return new TextEncoder().encode(
+    `onyx-media-e2ee-v1\u0000${channel.toLowerCase()}\u0000${sender.toLowerCase()}\u0000${kind}\u0000${keyframe ? 1 : 0}`,
+  );
+}
+
+function bytesHex(bytes: Uint8Array): string {
+  let out = '';
+  for (const byte of bytes) out += byte.toString(16).padStart(2, '0');
+  return out;
+}
+
+function mediaPairwiseInfo(
+  channel: string,
+  localPublic: Uint8Array,
+  localNonce: Uint8Array,
+  peerPublic: Uint8Array,
+  peerNonce: Uint8Array,
+): string {
+  const participants = [
+    `${bytesHex(localPublic)}:${bytesHex(localNonce)}`,
+    `${bytesHex(peerPublic)}:${bytesHex(peerNonce)}`,
+  ].sort();
+  return `onyx-media-e2ee-v2:${channel.toLowerCase()}:${participants.join(':')}`;
+}
+
+function mediaGroupWrapAad(
+  channel: string,
+  leader: string,
+  target: string,
+  epoch: number,
+): Uint8Array {
+  return new TextEncoder().encode(
+    `onyx-media-group-wrap-v2\u0000${channel.toLowerCase()}\u0000${leader.toLowerCase()}\u0000${target.toLowerCase()}\u0000${epoch}`,
+  );
+}
+
+function mediaHandshakeTranscript(channel: string, unsigned: Uint8Array): Uint8Array {
+  const prefix = new TextEncoder().encode('onyx-media-handshake-v2\u0000');
+  const channelBytes = new TextEncoder().encode(channel);
+  for (let i = 0; i < channelBytes.length; i++) {
+    const byte = channelBytes[i]!;
+    if (byte >= 0x41 && byte <= 0x5a) channelBytes[i] = byte + 0x20;
+  }
+  const transcript = new Uint8Array(prefix.length + channelBytes.length + 1 + unsigned.length);
+  transcript.set(prefix, 0);
+  transcript.set(channelBytes, prefix.length);
+  transcript[prefix.length + channelBytes.length] = 0;
+  transcript.set(unsigned, prefix.length + channelBytes.length + 1);
+  return transcript;
+}
+
+async function mediaTrustBinding(staticPublic: Uint8Array, signingPublic: Uint8Array): Promise<string> {
+  const material = new Uint8Array(staticPublic.length + signingPublic.length);
+  material.set(staticPublic, 0);
+  material.set(signingPublic, staticPublic.length);
+  return toB64url(new Uint8Array(await crypto.subtle.digest('SHA-256', material)));
+}
+
+function mediaFrameSignatureTranscript(
+  epoch: number,
+  attachment: Uint8Array,
+  aad: Uint8Array,
+  ciphertext: Uint8Array,
+): Uint8Array {
+  const domain = new TextEncoder().encode('onyx-media-frame-signature-v2\u0000');
+  const out = new Uint8Array(
+    domain.length + 4 + MEDIA_ATTACHMENT_BYTES + aad.length + ciphertext.length,
+  );
+  out.set(domain, 0);
+  new DataView(out.buffer).setUint32(domain.length, epoch, false);
+  out.set(attachment, domain.length + 4);
+  out.set(aad, domain.length + 4 + MEDIA_ATTACHMENT_BYTES);
+  out.set(ciphertext, domain.length + 4 + MEDIA_ATTACHMENT_BYTES + aad.length);
+  return out;
 }
 
 export type { CallState, VoiceCallState, MediaKind, CadencePeerState, CadenceRoomStats, NetworkQualityTier, CadenceMediaCallbacks, CadenceChannelInfo };
@@ -309,14 +409,33 @@ export class CadenceMediaEngine {
   private negotiatedBitrate = new Map<string, number>();
   private audioLevelTimer: ReturnType<typeof setInterval> | null = null;
   private mooringSessions = new Map<string, MooringSession>();
-  private pendingMooringPeers = new Set<string>();
+  private mooringPeerNonces = new Map<string, string>();
+  private peerMediaSigningKeys = new Map<string, CryptoKey>();
+  // The value is the attachment lifecycle captured when async WebCrypto work
+  // starts. Detach/leave advances that lifecycle so a late continuation can
+  // never resurrect a retired physical attachment.
+  private pendingMooringPeers = new Map<string, number>();
+  private mooringPeerLifecycles = new Map<string, number>();
   private mooringGroupKey: MooringGroup | null = null;
   private mooringGroupKeyPromise: Promise<MooringGroup> | null = null;
+  private mediaE2eeEpoch = 0;
+  private mediaE2eeGeneration = 0;
+  private selfDetachedEpochFloor: {
+    room: string;
+    epoch: number;
+    participants: Set<string>;
+  } | null = null;
+  private mediaCallNonce: Uint8Array | null = null;
+  private readonly mediaAttachmentId = crypto.getRandomValues(new Uint8Array(MEDIA_ATTACHMENT_BYTES));
+  private mediaEphemeralKeyPair: CryptoKeyPair | null = null;
+  private mediaEphemeralKeyPairPromise: Promise<CryptoKeyPair> | null = null;
+  private mediaSigningIdentity: DeviceSigningKeys | null = null;
+  private mediaSigningIdentityPromise: Promise<DeviceSigningKeys> | null = null;
   // Fences async crypto write-backs so a continuation scheduled during call A
   // cannot resurrect/clobber E2EE key state after hangup or into a later call.
   private readonly callGuard = new TeardownGuard();
-  private tsumugiIdentity: MooringIdentity | null = null;
-  private tsumugiIdentityPromise: Promise<MooringIdentity> | null = null;
+  private mediaIdentity: DeviceKeys | null = null;
+  private mediaIdentityPromise: Promise<DeviceKeys> | null = null;
   private incomingKind: MediaKind;
 
   /* PTT */
@@ -434,21 +553,31 @@ export class CadenceMediaEngine {
   }
 
   async getLocalTsumugiFingerprint(): Promise<string> {
-    const id = await this.ensureMooringIdentity();
-    return id.getFingerprint();
+    const session = await this.createMooringSession();
+    try {
+      return await session.getFingerprint();
+    } finally {
+      session.destroy();
+    }
   }
 
-  private ensureMooringIdentity(): Promise<MooringIdentity> {
-    if (this.tsumugiIdentity) return Promise.resolve(this.tsumugiIdentity);
-    // Memoize the in-flight load so concurrent callers share one identity,
-    // and reset on failure so a later call can retry instead of spinning
-    // forever (MooringIdentity.load() can reject in insecure contexts).
-    if (!this.tsumugiIdentityPromise) {
-      this.tsumugiIdentityPromise = MooringIdentity.load()
-        .then(id => { this.tsumugiIdentity = id; return id; })
-        .catch(err => { this.tsumugiIdentityPromise = null; throw err; });
+  private ensureMediaIdentity(): Promise<DeviceKeys> {
+    if (this.mediaIdentity) return Promise.resolve(this.mediaIdentity);
+    // Reuse the account-published DM ECDH identity. A separate, unadvertised
+    // media key would let a malicious relay substitute both handshake halves.
+    if (!this.mediaIdentityPromise) {
+      this.mediaIdentityPromise = deviceKeys()
+        .then((keys) => {
+          if (!keys) throw new Error('Durable E2EE device identity unavailable');
+          this.mediaIdentity = keys;
+          return keys;
+        })
+        .catch((error) => {
+          this.mediaIdentityPromise = null;
+          throw error;
+        });
     }
-    return this.tsumugiIdentityPromise;
+    return this.mediaIdentityPromise;
   }
 
   getScreenStream(nick: string): MediaStream | null {
@@ -630,24 +759,6 @@ export class CadenceMediaEngine {
     if (!this.audEnc || !this.activeRoom) return;
     const encoded = this.audEnc.encode(i16);
     if (!encoded || !encoded.length) return;
-    /* Use TSUMUGI group encryption if a group key is established (multi-party room) */
-    if (this.mooringGroupKey) {
-      this.mooringGroupKey.encrypt(encoded).then(ct => {
-        if (this.activeRoom) this.sendFrame(this.activeRoom, 'TSUMUGI_DATA', ct);
-      }).catch(() => { if (this.activeRoom) this.sendFrame(this.activeRoom, 'AUDIO', encoded); });
-      return;
-    }
-    /* Use per-peer TSUMUGI for 1:1 (no active room participants besides 1 peer) */
-    const [singleNick, singleVs] = this.mooringSessions.size === 1
-      ? [...this.mooringSessions.entries()][0]!
-      : [null, null];
-    if (singleVs?.established && !this.activeRoom.startsWith('#')) {
-      singleVs.encrypt(encoded).then((ct: Uint8Array) => {
-        void ct;
-      }).catch(() => { if (this.activeRoom) this.sendFrame(this.activeRoom, 'AUDIO', encoded); });
-      void singleNick; // suppress unused warning
-      return;
-    }
     this.sendFrame(this.activeRoom, 'AUDIO', encoded);
   }
 
@@ -981,15 +1092,66 @@ export class CadenceMediaEngine {
     if (!client || !this.wsMediaKey || channel !== this.activeRoom || !this.wsMyNick) return;
     if (!data.length) return;
 
+    // Media is fail-closed: audio/video/screen payloads do not leave this
+    // client until a client-held group key is established. The server-issued
+    // MAC authenticates the relay transport but is not an E2EE key.
+    if (ftype === 'AUDIO' || ftype === 'KEYFRAME' || ftype === 'FRAME') {
+      const group = this.mooringGroupKey;
+      if (!group) {
+        this.reportMediaE2ee(false, true);
+        return;
+      }
+      const protectedType = ftype === 'AUDIO'
+        ? 'E2EE_AUDIO'
+        : ftype === 'KEYFRAME' ? 'E2EE_KEYFRAME' : 'E2EE_VIDEO';
+      const generation = this.callGuard.capture();
+      const groupGeneration = this.mediaE2eeGeneration;
+      const groupEpoch = this.mediaE2eeEpoch;
+      const kind = ftype === 'AUDIO' ? 'audio' : 'video';
+      const keyframe = ftype === 'KEYFRAME';
+      const aad = mediaE2eeAad(channel, this.wsMyNick, kind, keyframe);
+      group.encrypt(data, aad)
+        .then(async (ciphertext) => {
+          const signing = await this.ensureMediaSigningIdentity();
+          const signature = new Uint8Array(await crypto.subtle.sign(
+            'Ed25519',
+            signing.keyPair.privateKey,
+            mediaFrameSignatureTranscript(
+              groupEpoch,
+              this.mediaAttachmentId,
+              aad,
+              ciphertext,
+            ) as BufferSource,
+          ));
+          const signedCiphertext = new Uint8Array(
+            MEDIA_ATTACHMENT_BYTES + ciphertext.length + MEDIA_SIGNATURE_BYTES,
+          );
+          signedCiphertext.set(this.mediaAttachmentId, 0);
+          signedCiphertext.set(ciphertext, MEDIA_ATTACHMENT_BYTES);
+          signedCiphertext.set(signature, MEDIA_ATTACHMENT_BYTES + ciphertext.length);
+          if (this.callGuard.isCurrent(generation)
+            && this.activeRoom === channel
+            && this.mooringGroupKey === group
+            && this.mediaE2eeGeneration === groupGeneration
+            && this.mediaE2eeEpoch === groupEpoch) {
+            this.sendFrame(channel, protectedType, signedCiphertext);
+          }
+        })
+        .catch(() => this.reportMediaE2ee(false, true));
+      return;
+    }
+
     let bandId: number;
     let codec: CadenceCodecTag;
     let keyframe = false;
     let kind: 'audio' | 'video';
     switch (ftype) {
-      case 'AUDIO':        bandId = WS_BAND_AUDIO;         codec = CadenceCodec.cadencevoxAudio; kind = 'audio'; break;
-      case 'TSUMUGI_DATA': bandId = WS_BAND_TSUMUGI_AUDIO; codec = CadenceCodec.cadencevoxAudio; kind = 'audio'; break;
-      case 'KEYFRAME':     bandId = WS_BAND_VIDEO;         codec = CadenceCodec.cadencevisVideo; keyframe = true; kind = 'video'; break;
-      case 'FRAME':        bandId = WS_BAND_VIDEO;         codec = CadenceCodec.cadencevisVideo; kind = 'video'; break;
+      case 'AUDIO':          bandId = WS_BAND_AUDIO;       codec = CadenceCodec.cadencevoxAudio; kind = 'audio'; break;
+      case 'KEYFRAME':       bandId = WS_BAND_VIDEO;       codec = CadenceCodec.cadencevisVideo; keyframe = true; kind = 'video'; break;
+      case 'FRAME':          bandId = WS_BAND_VIDEO;       codec = CadenceCodec.cadencevisVideo; kind = 'video'; break;
+      case 'E2EE_AUDIO':     bandId = WS_BAND_E2EE_AUDIO; codec = CadenceCodec.cadencevoxAudio; kind = 'audio'; break;
+      case 'E2EE_KEYFRAME':  bandId = WS_BAND_E2EE_VIDEO; codec = CadenceCodec.cadencevisVideo; keyframe = true; kind = 'video'; break;
+      case 'E2EE_VIDEO':     bandId = WS_BAND_E2EE_VIDEO; codec = CadenceCodec.cadencevisVideo; kind = 'video'; break;
       default: return;
     }
 
@@ -1056,24 +1218,56 @@ export class CadenceMediaEngine {
     const src = this.streamRouter.resolve(frame.streamId);
     if (!src) return; // unknown stream (not a current roster participant)
 
-    if (frame.bandId === WS_BAND_TSUMUGI_AUDIO) {
+    if (frame.bandId === WS_BAND_E2EE_AUDIO || frame.bandId === WS_BAND_E2EE_VIDEO) {
       const groupKey = this.mooringGroupKey;
       if (!groupKey) return; // can't decrypt without the group key
+      const groupGeneration = this.mediaE2eeGeneration;
+      const groupEpoch = this.mediaE2eeEpoch;
       const payload = frame.payload;
-      groupKey.decrypt(payload)
-        .then((pcm) => {
-          const pm = this.registry.getOrCreate(src.nick, room, 'voice');
-          void this.registry.decodeAudio(pm, pcm);
+      if (payload.length < MEDIA_ATTACHMENT_BYTES + 12 + 16 + MEDIA_SIGNATURE_BYTES) return;
+      const encryptedKind = frame.bandId === WS_BAND_E2EE_AUDIO ? 'audio' : 'video';
+      const senderAttachment = toB64url(payload.slice(0, MEDIA_ATTACHMENT_BYTES));
+      const ciphertext = payload.slice(MEDIA_ATTACHMENT_BYTES, -MEDIA_SIGNATURE_BYTES);
+      const signature = payload.slice(-MEDIA_SIGNATURE_BYTES);
+      const senderSigningKey = this.peerMediaSigningKeys.get(
+        `${src.nick.toLowerCase()}:${senderAttachment}`,
+      );
+      if (!senderSigningKey) return;
+      const aad = mediaE2eeAad(room, src.nick, encryptedKind, frame.keyframe);
+      crypto.subtle.verify(
+        'Ed25519',
+        senderSigningKey,
+        signature as BufferSource,
+        mediaFrameSignatureTranscript(
+          groupEpoch,
+          payload.slice(0, MEDIA_ATTACHMENT_BYTES),
+          aad,
+          ciphertext,
+        ) as BufferSource,
+      ).then((valid) => {
+        if (!valid) throw new Error('Media sender signature rejected');
+        return groupKey.decrypt(ciphertext, aad);
+      })
+        .then((plaintext) => {
+          if (this.mooringGroupKey !== groupKey
+            || this.mediaE2eeGeneration !== groupGeneration
+            || this.mediaE2eeEpoch !== groupEpoch) return;
+          this.reportMediaE2ee(true, false);
+          if (frame.bandId === WS_BAND_E2EE_AUDIO) {
+            const pm = this.registry.getOrCreate(src.nick, room, 'voice');
+            void this.registry.decodeAudio(pm, plaintext);
+          } else {
+            const pm = this.registry.getOrCreate(src.nick, room, 'video');
+            void this.registry.decodeVideo(pm, plaintext, frame.keyframe ? 'KEYFRAME' : 'FRAME');
+          }
         })
-        .catch(() => {});
+        .catch(() => this.reportMediaE2ee(false, true));
       return;
     }
     if (src.kind === 'audio') {
-      const pm = this.registry.getOrCreate(src.nick, room, 'voice');
-      void this.registry.decodeAudio(pm, frame.payload);
+      this.reportMediaE2ee(false, true);
     } else {
-      const pm = this.registry.getOrCreate(src.nick, room, 'video');
-      void this.registry.decodeVideo(pm, frame.payload, frame.keyframe ? 'KEYFRAME' : 'FRAME');
+      this.reportMediaE2ee(false, true);
     }
   }
 
@@ -1347,25 +1541,8 @@ export class CadenceMediaEngine {
       || !validMediaToken(subtype, MAX_MEDIA_SUBTYPE_LENGTH)
     ) return;
     if (subtype.startsWith('MCHUNK/')) {
-      const parts = subtype.slice(7).split('/');
-      if (parts.length < 4) return;
-      const serverChunk = parts.length >= 5;
-      const ftype = parts[0];
-      const senderNick = serverChunk ? parts[1] : fromNick;
-      if (
-        !senderNick
-        || !validMediaToken(senderNick, MAX_MEDIA_NICK_LENGTH)
-        || (ftype !== 'AUDIO' && ftype !== 'FRAME' && ftype !== 'KEYFRAME')
-      ) return;
-      const fidS = serverChunk ? parts[2] : parts[1];
-      const nS = serverChunk ? parts[3] : parts[2];
-      const totalS = serverChunk ? parts[4] : parts[3];
-      const fid = parseInt(fidS!, 10), n = parseInt(nS!, 10), total = parseInt(totalS!, 10);
-      if (isNaN(fid) || isNaN(n) || isNaN(total)) return;
-      const chunk = decodeInlineBase64(payload, 65_536);
-      if (!chunk) return;
-      const frame = this.assembler.ingest(senderNick!, ftype!, fid, n, total, chunk);
-      if (frame) this.dispatchFrame(senderNick!, channel, ftype!, frame);
+      // Legacy IRC media chunks have no signed-v2 sender binding or room AAD.
+      // They are never accepted inside the fail-closed E2EE engine.
       return;
     }
 
@@ -1381,16 +1558,13 @@ export class CadenceMediaEngine {
         const ftype = legacyType === 'AUDIO_FRAME'
           ? 'AUDIO'
           : legacyType === 'VIDEO_KEYFRAME' ? 'KEYFRAME' : 'FRAME';
-        const frame = decodeInlineBase64(payload);
-        if (!frame) return;
-        this.dispatchFrame(senderNick, channel, ftype, frame);
+        void ftype;
         return;
       }
     }
 
     if (subtype === 'AUDIO' || subtype === 'KEYFRAME' || subtype === 'FRAME') {
-      const frame = decodeInlineBase64(payload);
-      if (frame) this.dispatchFrame(fromNick, channel, subtype, frame);
+      // Unsigned plaintext downgrade path: intentionally rejected.
       return;
     }
 
@@ -1410,6 +1584,11 @@ export class CadenceMediaEngine {
         if (this.callState === 'in_call' && this.activeRoom) {
           const localNick = this.getLocalNick();
           this.sendFrame(this.activeRoom, 'NEGO_OFFER', msgpackArray3(localNick, 'opus', 2000));
+          if (fromNick.toLowerCase() !== localNick.toLowerCase()) {
+            this.sendMooringHandshake(this.activeRoom).catch(() => {
+              this.reportMediaE2ee(false, true);
+            });
+          }
         }
         break;
       }
@@ -1614,115 +1793,217 @@ export class CadenceMediaEngine {
         if (this.client && this.activeRoom)
           this.client.send?.(`MEDIA ${this.activeRoom} MEDIA_PONG2 :${payload}`);
         break;
-      case 'TSUMUGI_HANDSHAKE': {
-        const peerKeyBytes = decodeInlineBase64(payload, 65);
-        if (!peerKeyBytes) break;
-        const peerKey = fromNick.toLowerCase();
-        const existing = this.mooringSessions.get(peerKey);
-        if (!existing) {
-          if (this.pendingMooringPeers.has(peerKey)) break;
-          if (
-            this.mooringSessions.size + this.pendingMooringPeers.size
-            >= MAX_MEDIA_TRACKED_PEERS
-          ) break;
-          this.pendingMooringPeers.add(peerKey);
+      case 'TSUMUGI_HANDSHAKE':
+      case 'E2EE-HANDSHAKE': {
+        const handshake = decodeInlineBase64(payload, MEDIA_HANDSHAKE_BYTES);
+        if (!handshake || handshake.length !== MEDIA_HANDSHAKE_BYTES) break;
+        if (handshake[0] !== MEDIA_HANDSHAKE_VERSION) break;
+        const peerAttachment = handshake.slice(1, 1 + MEDIA_ATTACHMENT_BYTES);
+        const peerStaticPublic = handshake.slice(1 + MEDIA_ATTACHMENT_BYTES, 1 + MEDIA_ATTACHMENT_BYTES + 65);
+        const peerEphemeralPublic = handshake.slice(1 + MEDIA_ATTACHMENT_BYTES + 65, 1 + MEDIA_ATTACHMENT_BYTES + 130);
+        const peerNonce = handshake.slice(1 + MEDIA_ATTACHMENT_BYTES + 130, 1 + MEDIA_ATTACHMENT_BYTES + 130 + MEDIA_CALL_NONCE_BYTES);
+        const peerSigningPublic = handshake.slice(MEDIA_HANDSHAKE_UNSIGNED_BYTES - MEDIA_SIGNING_PUBLIC_BYTES, MEDIA_HANDSHAKE_UNSIGNED_BYTES);
+        const peerSignature = handshake.slice(MEDIA_HANDSHAKE_UNSIGNED_BYTES);
+        const peerAttachmentB64 = toB64url(peerAttachment);
+        if (peerAttachmentB64 === toB64url(this.mediaAttachmentId)) break;
+        const peerKey = `${fromNick.toLowerCase()}:${peerAttachmentB64}`;
+        if (this.selfDetachedEpochFloor?.room === channel.toLowerCase()) {
+          this.selfDetachedEpochFloor.participants.add(peerKey);
         }
-        const shouldReply = !existing?.established;
+        // A self-detached engine observes signed attachment membership and
+        // epochs but owns no active call transcript until a fresh local JOIN.
+        if (channel !== this.activeRoom) break;
+        const existing = this.mooringSessions.get(peerKey);
+        const nonceHex = bytesHex(peerNonce);
+        if (existing?.established && this.mooringPeerNonces.get(peerKey) === nonceHex) {
+          this.maybeDistributeMooringGroup().catch(() => this.reportMediaE2ee(false, true));
+          break;
+        }
+        if (existing) {
+          existing.destroy();
+          this.mooringSessions.delete(peerKey);
+          this.mooringPeerNonces.delete(peerKey);
+        }
+        if (this.pendingMooringPeers.has(peerKey)) break;
+        if (
+          this.mooringSessions.size + this.pendingMooringPeers.size
+          >= MAX_MEDIA_TRACKED_PEERS
+        ) break;
+        const peerLifecycle = this.mooringPeerLifecycles.get(peerKey) ?? 0;
+        this.mooringPeerLifecycles.set(peerKey, peerLifecycle);
+        this.pendingMooringPeers.set(peerKey, peerLifecycle);
+        const shouldReply = true;
         const hsGen = this.callGuard.capture();
         let created: MooringSession | null = null;
-        let retained = Boolean(existing);
-        const session = existing
-          ? Promise.resolve(existing)
-          : this.createMooringSession().then((candidate) => {
-              created = candidate;
-              return candidate;
-            });
+        let retained = false;
+        const session = this.createMooringSession().then((candidate) => {
+          created = candidate;
+          return candidate;
+        });
         session.then(async vs => {
-          await vs.ingestPeerKey(peerKeyBytes);
+          const localEphemeral = await this.ensureMediaEphemeralKeyPair();
+          const localPublic = new Uint8Array(await crypto.subtle.exportKey('raw', localEphemeral.publicKey));
+          const localNonce = this.mediaCallNonce;
+          if (!localPublic || !localNonce || channel !== this.activeRoom) {
+            throw new Error('Media E2EE call transcript unavailable');
+          }
+          const signingKey = await crypto.subtle.importKey(
+            'raw',
+            peerSigningPublic,
+            'Ed25519',
+            false,
+            ['verify'],
+          );
+          await crypto.subtle.importKey(
+            'raw',
+            peerStaticPublic,
+            { name: 'ECDH', namedCurve: 'P-256' },
+            false,
+            [],
+          );
+          const signatureValid = await crypto.subtle.verify(
+            'Ed25519',
+            signingKey,
+            peerSignature as BufferSource,
+            mediaHandshakeTranscript(
+              channel,
+              handshake.slice(0, MEDIA_HANDSHAKE_UNSIGNED_BYTES),
+            ) as BufferSource,
+          );
+          if (!signatureValid) throw new Error('Media E2EE handshake signature rejected');
+          await vs.ingestPeerKey(
+            peerEphemeralPublic,
+            mediaPairwiseInfo(channel, localPublic, localNonce, peerEphemeralPublic, peerNonce),
+          );
+          // Only persist a TOFU pin after WebCrypto has accepted the P-256
+          // point and the transcript-derived pairwise session is established.
+          const peerPublicB64url = toB64url(peerStaticPublic);
+          const trustBinding = await mediaTrustBinding(peerStaticPublic, peerSigningPublic);
+          if (this.cb.verifyPeerMediaKey
+            && !(await this.cb.verifyPeerMediaKey(
+              fromNick,
+              peerPublicB64url,
+              peerAttachmentB64,
+              trustBinding,
+            ))) {
+            throw new Error('Media E2EE peer key is not trusted');
+          }
           // Hangup (or a rejoin) happened while we were establishing — drop this
           // session instead of resurrecting it into an idle/new call.
-          if (!this.callGuard.isCurrent(hsGen)) {
-            if (!existing) vs.destroy();
+          if (!this.callGuard.isCurrent(hsGen)
+            || this.mooringPeerLifecycles.get(peerKey) !== peerLifecycle) {
+            vs.destroy();
             return;
           }
           this.mooringSessions.set(peerKey, vs);
+          this.mooringPeerNonces.set(peerKey, nonceHex);
+          this.peerMediaSigningKeys.set(peerKey, signingKey);
           retained = true;
           if (shouldReply) {
-            const ourPub = await this.exportMooringPublicKey(vs);
-            void ourPub;
+            const room = this.activeRoom;
+            if (room) await this.sendMooringHandshake(room);
           }
           if (this.cb.onMooringState) {
             const fp = await vs.getFingerprint();
             this.cb.onMooringState(fromNick, vs.epoch, fp);
           }
-          /* When all known peers have TSUMUGI sessions and we're in a room,
-           * create/refresh the group key and distribute it. */
-          if (this.activeRoom) this.maybeDistributeMooringGroup().catch(() => {});
+          /* A newly authenticated member changes the group. Rotate so the new
+           * participant cannot decrypt ciphertext emitted before their join. */
+          if (this.activeRoom) {
+            const update = this.rotateMooringGroupAfterMembershipChange();
+            update.catch(() => this.reportMediaE2ee(false, true));
+          }
         }).catch(() => {}).finally(() => {
           if (!retained) created?.destroy();
-          if (!existing) this.pendingMooringPeers.delete(peerKey);
+          if (this.pendingMooringPeers.get(peerKey) === peerLifecycle) {
+            this.pendingMooringPeers.delete(peerKey);
+          }
         });
         break;
       }
-      case 'TSUMUGI_RATCHET': {
-        const vs = this.mooringSessions.get(fromNick.toLowerCase());
-        if (vs) vs.ratchet().then(async () => {
-          if (this.cb.onMooringState) {
-            const fp = await vs.getFingerprint();
-            this.cb.onMooringState(fromNick, vs.epoch, fp);
-          }
-        }).catch(() => {});
-        break;
-      }
       case 'TSUMUGI_DATA': {
-        const ct = decodeInlineBase64(payload);
-        if (!ct) break;
-        /* Try group key first (multi-party) */
-        if (this.mooringGroupKey) {
-          this.mooringGroupKey.decrypt(ct)
-            .then(pt => this.dispatchFrame(fromNick, channel, 'AUDIO', pt))
-            .catch(() => {
-              /* Fall back to per-peer session */
-              const vs = this.mooringSessions.get(fromNick.toLowerCase());
-              if (vs?.established)
-                vs.decrypt(ct).then(pt => this.dispatchFrame(fromNick, channel, 'AUDIO', pt)).catch(() => {});
-            });
-        } else {
-          const vs = this.mooringSessions.get(fromNick.toLowerCase());
-          if (!vs?.established) break;
-          vs.decrypt(ct).then(pt => this.dispatchFrame(fromNick, channel, 'AUDIO', pt)).catch(() => {});
-        }
+        // Pre-v2 ciphertext lacks attachment signatures and authenticated room
+        // context; accepting it would create a downgrade beside signed WS media.
         break;
       }
-      case 'TSUMUGI_GROUP_KEY': {
-        /* payload: base64(wrapped_key) or sender:target:base64(wrapped_key) */
-        const parts = payload.split(':');
-        const wrappedB64 = parts.length >= 3 ? parts.slice(2).join(':') : payload;
-        const targetNick = parts.length >= 3 ? parts[1] : '';
+      case 'TSUMUGI_GROUP_KEY':
+      case 'E2EE-GROUPKEY': {
+        /* Current wire: `<sender-attachment> <target-nick>
+         * <target-attachment> <epoch> <base64(wrapped_key)>`. */
+        const wireParts = payload.trim().split(/\s+/);
+        if (wireParts.length !== 5) break;
+        const senderAttachment = wireParts[0]!;
+        const targetNick = wireParts[1]!;
+        const targetAttachment = wireParts[2]!;
+        const epoch = Number.parseInt(wireParts[3]!, 10);
+        const wrappedB64 = wireParts[4]!;
+        if (!Number.isSafeInteger(epoch) || epoch < 1 || epoch > 0xffffffff) break;
         const myNick = this.getLocalNick().toLowerCase();
-        if (targetNick && myNick && targetNick.toLowerCase() !== myNick) break;
+        const myAttachment = toB64url(this.mediaAttachmentId);
+        const senderKey = `${fromNick.toLowerCase()}:${senderAttachment}`;
+        const detachedFloor = this.selfDetachedEpochFloor;
+        const remainingLeader = detachedFloor
+          ? [...detachedFloor.participants].sort()[0] ?? null
+          : null;
+        if (detachedFloor
+          && detachedFloor.room === channel.toLowerCase()
+          && remainingLeader === senderKey
+          && epoch > detachedFloor.epoch) {
+          // While detached we cannot unwrap a key addressed to a remaining
+          // member, but the server authenticated this exact sender attachment.
+          // Observe only the leader that remained after our retirement.
+          detachedFloor.epoch = epoch;
+          if (this.activeRoom?.toLowerCase() === detachedFloor.room) {
+            const localGroup = this.mooringGroupKey;
+            const collidesWithLocalGroup = localGroup !== null && epoch >= this.mediaE2eeEpoch;
+            if (epoch > this.mediaE2eeEpoch) this.mediaE2eeEpoch = epoch;
+            if (collidesWithLocalGroup) {
+              // A delayed remaining-leader rotation can arrive after rejoin
+              // already created the same numeric epoch. Retire that unaccepted
+              // local key and immediately redistribute at the observed floor+1.
+              this.mediaE2eeGeneration++;
+              localGroup?.destroy();
+              this.mooringGroupKey = null;
+              this.mooringGroupKeyPromise = null;
+              this.reportMediaE2ee(false, true);
+              this.maybeDistributeMooringGroup().catch(() => {
+                this.reportMediaE2ee(false, true);
+              });
+            }
+          }
+        }
+        if (targetNick.toLowerCase() !== myNick || targetAttachment !== myAttachment) break;
         const wrapped = decodeInlineBase64(wrappedB64, 256);
         if (!wrapped) break;
-        const vs = this.mooringSessions.get(fromNick.toLowerCase());
+        const vs = this.mooringSessions.get(senderKey);
         if (vs?.established) {
+          const myKey = `${myNick}:${myAttachment}`;
+          const establishedNicks = [myKey, ...this.mooringSessions.keys()].sort();
+          if (senderKey !== establishedNicks[0]) break;
+          if (epoch <= this.mediaE2eeEpoch) break;
           const gkGen = this.callGuard.capture();
-          MooringGroup.importKey(wrapped, vs).then(group => {
+          const groupGeneration = this.mediaE2eeGeneration;
+          MooringGroup.importKey(
+            wrapped,
+            vs,
+            mediaGroupWrapAad(channel, senderKey, myKey, epoch),
+          ).then(group => {
             // Reject a group key that arrived after teardown / into a new call.
-            if (!this.callGuard.isCurrent(gkGen)) { group.destroy(); return; }
+            if (!this.callGuard.isCurrent(gkGen)
+              || groupGeneration !== this.mediaE2eeGeneration
+              || epoch <= this.mediaE2eeEpoch) { group.destroy(); return; }
             this.mooringGroupKey?.destroy();
             this.mooringGroupKey = group;
+            this.mediaE2eeEpoch = epoch;
+            this.reportMediaE2ee(true, false);
           }).catch(() => {});
         }
         break;
       }
       case 'VOICE_DATA': {
-        const frame = decodeInlineBase64(payload);
-        if (frame) this.dispatchFrame(fromNick, channel, 'AUDIO', frame);
         break;
       }
       case 'VIDEO_DATA': {
-        const frame = decodeInlineBase64(payload);
-        if (frame) this.dispatchFrame(fromNick, channel, 'FRAME', frame);
         break;
       }
       case 'MEDIA_BYE': {
@@ -1730,9 +2011,65 @@ export class CadenceMediaEngine {
         this.registry.remove(fromNick);
         deleteCaseInsensitive(this.presenceList, fromNick);
         this.negotiatedBitrate.delete(peerKey);
-        this.pendingMooringPeers.delete(peerKey);
-        this.mooringSessions.get(peerKey)?.destroy();
+        if (this.selfDetachedEpochFloor?.room === channel.toLowerCase()) {
+          const prefix = `${peerKey}:`;
+          for (const attachmentKey of this.selfDetachedEpochFloor.participants) {
+            if (attachmentKey.startsWith(prefix)) {
+              this.selfDetachedEpochFloor.participants.delete(attachmentKey);
+            }
+          }
+        }
+        this.removeMooringPeerAttachments(peerKey);
+        this.rotateMooringGroupAfterMembershipChange().catch(() => {
+          this.reportMediaE2ee(false, true);
+        });
+        break;
+      }
+      case 'E2EE-DETACH': {
+        const attachment = payload.trim();
+        if (!/^[A-Za-z0-9_-]{22}$/u.test(attachment)) break;
+        const localNick = this.getLocalNick();
+        if (localNick
+          && fromNick.toLowerCase() === localNick.toLowerCase()
+          && attachment === toB64url(this.mediaAttachmentId)) {
+          // The server retired this physical publisher (account/nick/channel
+          // authority changed while a same-nick sibling kept the call alive).
+          // Peer-only cleanup cannot represent that boundary: destroy the
+          // entire local transcript and require a fresh MEDIA JOIN/handshake.
+          const detachedRoom = this.activeRoom;
+          const detachedEpoch = this.mediaE2eeEpoch;
+          const participants = new Set([
+            ...this.mooringSessions.keys(),
+            ...this.pendingMooringPeers.keys(),
+          ]);
+          this.setIdle();
+          if (detachedRoom) {
+            // Peers retain a monotonic epoch floor for this still-live call.
+            // Keep it outside active key state so a same-room rejoin creates
+            // epoch n+1 instead of replaying epoch 1 into peers at epoch n.
+            this.selfDetachedEpochFloor = {
+              room: detachedRoom.toLowerCase(),
+              epoch: detachedEpoch,
+              participants,
+            };
+          }
+          break;
+        }
+        const peerKey = `${fromNick.toLowerCase()}:${attachment}`;
+        if (this.selfDetachedEpochFloor?.room === channel.toLowerCase()) {
+          this.selfDetachedEpochFloor.participants.delete(peerKey);
+        }
+        const session = this.mooringSessions.get(peerKey);
+        const wasPending = this.pendingMooringPeers.has(peerKey);
+        this.retireMooringPeer(peerKey);
+        session?.destroy();
         this.mooringSessions.delete(peerKey);
+        this.mooringPeerNonces.delete(peerKey);
+        this.peerMediaSigningKeys.delete(peerKey);
+        if (!session && !wasPending) break;
+        this.rotateMooringGroupAfterMembershipChange().catch(() => {
+          this.reportMediaE2ee(false, true);
+        });
         break;
       }
       case 'SPEAKING': {
@@ -1776,10 +2113,29 @@ export class CadenceMediaEngine {
         break;
       case 'REJECT':
       case 'HANGUP':
-      case 'LEAVE':
+      case 'LEAVE': {
         this.registry.remove(fromNick);
-        if (!this.activeRoom || subtype !== 'LEAVE') this.setIdle();
+        const detachedObserver = this.selfDetachedEpochFloor;
+        if (subtype === 'LEAVE'
+          && !this.activeRoom
+          && detachedObserver?.room === channel.toLowerCase()) {
+          const prefix = `${fromNick.toLowerCase()}:`;
+          for (const peerKey of detachedObserver.participants) {
+            if (peerKey.startsWith(prefix)) detachedObserver.participants.delete(peerKey);
+          }
+          break;
+        }
+        if (!this.activeRoom || subtype !== 'LEAVE') {
+          this.setIdle();
+        } else {
+          const peerKey = fromNick.toLowerCase();
+          this.removeMooringPeerAttachments(peerKey);
+          this.rotateMooringGroupAfterMembershipChange().catch(() => {
+            this.reportMediaE2ee(false, true);
+          });
+        }
         break;
+      }
     }
   }
 
@@ -1860,13 +2216,43 @@ export class CadenceMediaEngine {
   private unloadHandler: (() => void) | null = null;
 
   private setActiveRoom(channel: string) {
+    const newRoom = this.activeRoom === null || this.activeRoom.toLowerCase() !== channel.toLowerCase();
+    const detachedEpochFloor = this.selfDetachedEpochFloor?.room === channel.toLowerCase()
+      ? this.selfDetachedEpochFloor.epoch
+      : 0;
+    if (this.selfDetachedEpochFloor?.room !== channel.toLowerCase()) {
+      this.selfDetachedEpochFloor = null;
+    }
+    const changedRoom = this.activeRoom !== null && newRoom;
+    if (changedRoom) {
+      this.callGuard.bump();
+      this.mediaE2eeGeneration++;
+      for (const session of this.mooringSessions.values()) session.destroy();
+      this.mooringSessions.clear();
+      this.mooringPeerNonces.clear();
+      this.peerMediaSigningKeys.clear();
+      this.pendingMooringPeers.clear();
+      this.mooringPeerLifecycles.clear();
+      this.mooringGroupKey?.destroy();
+      this.mooringGroupKey = null;
+      this.mooringGroupKeyPromise = null;
+      this.mediaEphemeralKeyPair = null;
+      this.mediaEphemeralKeyPairPromise = null;
+    }
     this.activeRoom = channel;
+    if (newRoom || !this.mediaCallNonce) {
+      this.mediaCallNonce = crypto.getRandomValues(new Uint8Array(MEDIA_CALL_NONCE_BYTES));
+    }
     this.setCallState('in_call', '', channel);
     // Drop any prior call's MAC key/stream map; the new call's MACKEY repopulates.
     this.wsMediaKey = null;
     this.wsAudSeq = 0;
     this.wsVidSeq = 0;
     this.streamRouter.clear();
+    if (newRoom) {
+      this.mediaE2eeEpoch = detachedEpochFloor;
+      this.reportMediaE2ee(false, true);
+    }
     if (!this.audioLevelTimer) {
       this.audioLevelTimer = setInterval(() => {
         for (const [nick, level] of this.registry.peerLevels)
@@ -1886,29 +2272,100 @@ export class CadenceMediaEngine {
     return this.cb.getLocalNick?.() ?? '';
   }
 
+  private removeMooringPeerAttachments(nick: string): void {
+    const prefix = `${nick.toLowerCase()}:`;
+    for (const [key, session] of this.mooringSessions) {
+      if (!key.startsWith(prefix)) continue;
+      this.retireMooringPeer(key);
+      session.destroy();
+      this.mooringSessions.delete(key);
+      this.mooringPeerNonces.delete(key);
+      this.peerMediaSigningKeys.delete(key);
+    }
+    for (const key of [...this.pendingMooringPeers.keys()]) {
+      if (key.startsWith(prefix)) this.retireMooringPeer(key);
+    }
+  }
+
+  private retireMooringPeer(peerKey: string): void {
+    const lifecycle = this.mooringPeerLifecycles.get(peerKey) ?? 0;
+    this.mooringPeerLifecycles.set(peerKey, lifecycle + 1);
+    this.pendingMooringPeers.delete(peerKey);
+  }
+
   private async createMooringSession(): Promise<MooringSession> {
-    try {
-      const id = await this.ensureMooringIdentity();
-      return MooringSession.fromKeyPair(id.keyPair);
-    } catch {
-      return MooringSession.create();
-    }
+    return MooringSession.fromKeyPair(await this.ensureMediaEphemeralKeyPair());
   }
 
-  private async exportMooringPublicKey(session: MooringSession): Promise<Uint8Array> {
-    try {
-      const id = await this.ensureMooringIdentity();
-      return id.exportPublicKey();
-    } catch {
-      return session.exportPublicKey();
+  private ensureMediaEphemeralKeyPair(): Promise<CryptoKeyPair> {
+    if (this.mediaEphemeralKeyPair) return Promise.resolve(this.mediaEphemeralKeyPair);
+    if (!this.mediaEphemeralKeyPairPromise) {
+      this.mediaEphemeralKeyPairPromise = crypto.subtle.generateKey(
+        { name: 'ECDH', namedCurve: 'P-256' },
+        false,
+        ['deriveBits'],
+      ).then((pair) => {
+        this.mediaEphemeralKeyPair = pair;
+        return pair;
+      }).catch((error) => {
+        this.mediaEphemeralKeyPairPromise = null;
+        throw error;
+      });
     }
+    return this.mediaEphemeralKeyPairPromise;
   }
 
-  private async sendMooringHandshake(target: string): Promise<void> {
-    if (!this.client || !target) return;
-    const id = await this.ensureMooringIdentity();
-    const pub = await id.exportPublicKey();
-    void target; void pub;
+  private ensureMediaSigningIdentity(): Promise<DeviceSigningKeys> {
+    if (this.mediaSigningIdentity) return Promise.resolve(this.mediaSigningIdentity);
+    if (!this.mediaSigningIdentityPromise) {
+      this.mediaSigningIdentityPromise = deviceSigningKeys()
+        .then((keys) => {
+          if (!keys) throw new Error('Durable media signing identity unavailable');
+          this.mediaSigningIdentity = keys;
+          return keys;
+        })
+        .catch((error) => {
+          this.mediaSigningIdentityPromise = null;
+          throw error;
+        });
+    }
+    return this.mediaSigningIdentityPromise;
+  }
+
+  private async sendMooringHandshake(channel: string): Promise<void> {
+    const client = this.client;
+    if (!client || !channel || channel !== this.activeRoom) return;
+    const id = await this.ensureMediaIdentity();
+    const staticPublic = fromB64url(id.publicB64);
+    if (!staticPublic) throw new Error('Invalid local E2EE public key');
+    const ephemeral = await this.ensureMediaEphemeralKeyPair();
+    const ephemeralPublic = new Uint8Array(await crypto.subtle.exportKey('raw', ephemeral.publicKey));
+    const signing = await this.ensureMediaSigningIdentity();
+    if (!this.mediaCallNonce) {
+      this.mediaCallNonce = crypto.getRandomValues(new Uint8Array(MEDIA_CALL_NONCE_BYTES));
+    }
+    const unsigned = new Uint8Array(MEDIA_HANDSHAKE_UNSIGNED_BYTES);
+    let offset = 0;
+    unsigned[offset++] = MEDIA_HANDSHAKE_VERSION;
+    unsigned.set(this.mediaAttachmentId, offset); offset += MEDIA_ATTACHMENT_BYTES;
+    unsigned.set(staticPublic, offset); offset += 65;
+    unsigned.set(ephemeralPublic, offset); offset += 65;
+    unsigned.set(this.mediaCallNonce, offset); offset += MEDIA_CALL_NONCE_BYTES;
+    unsigned.set(signing.publicRaw, offset);
+    const signature = new Uint8Array(await crypto.subtle.sign(
+      'Ed25519',
+      signing.keyPair.privateKey,
+      mediaHandshakeTranscript(channel, unsigned) as BufferSource,
+    ));
+    const handshake = new Uint8Array(MEDIA_HANDSHAKE_BYTES);
+    handshake.set(unsigned, 0);
+    handshake.set(signature, MEDIA_HANDSHAKE_UNSIGNED_BYTES);
+    if (channel !== this.activeRoom || this.client !== client) return;
+    client.sendRaw('MEDIA', 'E2EE-HANDSHAKE', channel, CadenceMediaEngine.toB64(handshake));
+  }
+
+  private reportMediaE2ee(active: boolean, degraded: boolean): void {
+    this.cb.onMediaE2eeState?.(active, degraded, active ? this.mediaE2eeEpoch : 0);
   }
 
   private setCallState(state: CallState, nick: string, channel: string | null) {
@@ -1930,12 +2387,22 @@ export class CadenceMediaEngine {
     this.pendingWasmFrames.clear();
     for (const vs of this.mooringSessions.values()) vs.destroy();
     this.mooringSessions.clear();
+    this.mooringPeerNonces.clear();
+    this.peerMediaSigningKeys.clear();
     this.pendingMooringPeers.clear();
+    this.mooringPeerLifecycles.clear();
     this.presenceList.clear();
     this.negotiatedBitrate.clear();
     this.mooringGroupKey?.destroy();
     this.mooringGroupKey = null;
     this.mooringGroupKeyPromise = null;
+    this.mediaE2eeGeneration++;
+    this.mediaE2eeEpoch = 0;
+    this.mediaCallNonce = null;
+    this.selfDetachedEpochFloor = null;
+    this.mediaEphemeralKeyPair = null;
+    this.mediaEphemeralKeyPairPromise = null;
+    this.reportMediaE2ee(false, false);
     // WS media plane teardown.
     this.wsMediaKey = null;
     this.wsMyNick = '';
@@ -2015,7 +2482,19 @@ export class CadenceMediaEngine {
     if (!this.activeRoom || !this.client) return;
     const established = [...this.mooringSessions.entries()].filter(([, vs]) => vs.established);
     if (established.length === 0) return;
+    const myNick = this.getLocalNick();
+    if (!myNick) return;
+    // Exactly one participant owns group-key creation. Every client computes
+    // the same leader from authenticated nick identity, avoiding duelling keys.
+    const myKey = `${myNick.toLowerCase()}:${toB64url(this.mediaAttachmentId)}`;
+    const leader = [myKey, ...established.map(([attachment]) => attachment)]
+      .sort()[0];
+    if (leader !== myKey) {
+      this.reportMediaE2ee(false, true);
+      return;
+    }
     const gen = this.callGuard.capture();
+    const groupGeneration = this.mediaE2eeGeneration;
     /* Create or reuse group key. Memoize the in-flight creation so two
      * concurrent handshakes resolving in the same tick can't each build a
      * separate group key (the second would clobber the first, making the
@@ -2026,8 +2505,11 @@ export class CadenceMediaEngine {
         this.mooringGroupKeyPromise = MooringGroup.create()
           .then(g => {
             // If the call was torn down while creating, don't install the key.
-            if (!this.callGuard.isCurrent(gen)) { g.destroy(); return g; }
+            if (!this.callGuard.isCurrent(gen)
+              || groupGeneration !== this.mediaE2eeGeneration) { g.destroy(); return g; }
             this.mooringGroupKey = g;
+            this.mediaE2eeEpoch = Math.max(1, this.mediaE2eeEpoch + 1);
+            this.reportMediaE2ee(true, false);
             return g;
           })
           .catch(err => { this.mooringGroupKeyPromise = null; throw err; });
@@ -2035,14 +2517,43 @@ export class CadenceMediaEngine {
       group = await this.mooringGroupKeyPromise;
     }
     // A hangup/rejoin during key creation invalidates this distribution pass.
-    if (!this.callGuard.isCurrent(gen)) return;
-    const myNick = this.getLocalNick();
-    for (const [nick, vs] of established) {
-      const wrapped = await group.exportKeyFor(vs);
+    if (!this.callGuard.isCurrent(gen) || groupGeneration !== this.mediaE2eeGeneration) return;
+    for (const [attachmentKey, vs] of established) {
+      const separator = attachmentKey.lastIndexOf(':');
+      if (separator <= 0) continue;
+      const nick = attachmentKey.slice(0, separator);
+      const targetAttachment = attachmentKey.slice(separator + 1);
+      const wrapped = await group.exportKeyFor(
+        vs,
+        mediaGroupWrapAad(this.activeRoom, myKey, attachmentKey, this.mediaE2eeEpoch),
+      );
       const b64 = CadenceMediaEngine.toB64(wrapped);
-      /* TSUMUGI_GROUP_KEY payload: the wrapped key; the server relay identifies target by msgpack */
-      void myNick; void nick; void b64;
+      if (!this.callGuard.isCurrent(gen)
+        || groupGeneration !== this.mediaE2eeGeneration
+        || this.mooringGroupKey !== group
+        || !this.activeRoom) return;
+      this.client?.sendRaw(
+        'MEDIA',
+        'E2EE-GROUPKEY',
+        this.activeRoom,
+        toB64url(this.mediaAttachmentId),
+        nick,
+        targetAttachment,
+        String(this.mediaE2eeEpoch),
+        b64,
+      );
     }
+  }
+
+  /** Rotate the room key after a departure. The deterministic leader creates
+   * and redistributes; everyone else drops the old key and waits fail-closed. */
+  private async rotateMooringGroupAfterMembershipChange(): Promise<void> {
+    this.mediaE2eeGeneration++;
+    this.mooringGroupKey?.destroy();
+    this.mooringGroupKey = null;
+    this.mooringGroupKeyPromise = null;
+    this.reportMediaE2ee(false, this.mooringSessions.size > 0);
+    if (this.mooringSessions.size > 0) await this.maybeDistributeMooringGroup();
   }
 
   private startGc() {

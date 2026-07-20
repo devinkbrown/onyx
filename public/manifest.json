@@ -1,7 +1,7 @@
 {
   "name": "Onyx",
   "short_name": "Onyx",
-  "description": "Open rooms, local-first memory, encrypted media, and live Onyx mesh telemetry.",
+  "description": "Open rooms, local-first memory, honest media security, and live Onyx mesh telemetry.",
   "id": "/app",
   "start_url": "/app/",
   "scope": "/",

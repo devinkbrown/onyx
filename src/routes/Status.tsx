@@ -12,6 +12,7 @@ import {
   publicMeshFeedState,
 } from '@/lib/stats/status';
 import { setPageMeta } from './pageMeta';
+import { PublicFooter } from './PublicFooter';
 
 function topologyState(quorum: boolean, partitioned: boolean, peersComplete: boolean): 'up' | 'degraded' {
   return quorum && !partitioned && peersComplete ? 'up' : 'degraded';
@@ -59,6 +60,7 @@ export default function StatusRoute() {
           <a class="hideable" href="/status/" aria-current="page">Status</a>
           <a class="hideable" href="/roadmap/">Roadmap</a>
           <a class="hideable" href="/about/">About</a>
+          <a class="hideable" href="/invite/?join=%23root">Invite</a>
           <span class="live hideable" data-feed-state={feedState()}>
             <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
           </span>
@@ -200,6 +202,7 @@ export default function StatusRoute() {
           </table>
         </Show>
       </section>
+      <PublicFooter />
     </main>
   );
 }

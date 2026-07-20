@@ -10,7 +10,7 @@ describe('RoadmapRoute', () => {
 
     expect(screen.getByRole('heading', { name: /what shipped/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Memory' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Operations are visible/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /The next job is a better return/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Time-native' })).toBeInTheDocument();
     expect(screen.getByText('Onyx Server E2EE capability')).toBeInTheDocument();
     expect(screen.getByText('Encrypted message tags')).toBeInTheDocument();
@@ -185,7 +185,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Topic draft transfer')).toBeInTheDocument();
     expect(screen.getByText('Saved search transfer')).toBeInTheDocument();
     expect(screen.getByText('Retention policy transfer')).toBeInTheDocument();
-    expect(screen.getByText(/time is active/i)).toBeInTheDocument();
+    expect(screen.getByText(/A visit should begin with orientation/i)).toBeInTheDocument();
     expect(screen.getByText('complete phases').closest('.data-metric')).toHaveTextContent('4');
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });

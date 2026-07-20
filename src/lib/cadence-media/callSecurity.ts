@@ -2,8 +2,9 @@
 /**
  * callSecurity — pure Cadence call security affordance resolver.
  *
- * Cadence media today is hop-protected (DTLS-SRTP / native MAC / server-held
- * group material). True media E2EE (SFrame + MLS) is planned, not shipped.
+ * Cadence media is fail-closed while its client-held group key negotiates.
+ * The transport MAC is server-verifiable and therefore never sufficient for
+ * a padlock; only the engine's established media E2EE state permits one.
  * Showing a padlock for hop-only crypto is a security bug (over-claims
  * end-to-end privacy). This module is the single source of truth for:
  *
@@ -59,8 +60,7 @@ export interface CallSecurityAffordance {
 export interface CallSecurityInput {
   readonly callState: CallState;
   /**
-   * True when SFrame/MLS media keys are established for this call.
-   * Not shipped for Cadence voice/video today — leave unset/false.
+   * True when client-held media group keys are established for this call.
    */
   readonly mediaE2eeActive?: boolean;
   /**

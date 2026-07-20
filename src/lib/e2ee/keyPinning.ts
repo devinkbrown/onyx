@@ -231,6 +231,20 @@ export async function pinPeerKey(
   return writePin(account, key, owner);
 }
 
+/** Persist a bounded, pre-hashed trust binding for protocols that authenticate
+ * more than one public key (for example media static + signing keys). The
+ * caller must compute a SHA-256 base64url digest; storing only that digest keeps
+ * this API from becoming a generic garbage bucket while allowing composite
+ * device identities to use the same owner-scoped TOFU database. */
+export async function pinPeerTrustBinding(
+  account: string,
+  binding: string,
+  owner?: DeviceMemoryOwner,
+): Promise<boolean> {
+  if (!/^[A-Za-z0-9_-]{43}$/u.test(binding)) return false;
+  return writePin(account, binding, owner);
+}
+
 /** Forget an account's pin (drops back to first-use on next contact). */
 export function unpinPeerKey(account: string, owner?: DeviceMemoryOwner): Promise<void> {
   return deletePin(account, owner);

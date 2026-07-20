@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { describe, expect, it, vi } from 'vitest';
+import 'fake-indexeddb/auto';
+import { IDBFactory } from 'fake-indexeddb';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IRCClient } from '../irc/client';
 import { CadenceMediaEngine } from './MediaEngine';
 import { mediaStreamId } from './mediaStream';
-import { OpcodecWasm } from './OpcodecWasm';
+import { MooringGroup } from './MooringGroup';
+import { decodeCadenceFrame } from './cadenceFrame';
+import { importMediaMacKey } from './mediaMac';
+import { toB64url, type DeviceKeys } from '@/lib/e2ee/dmCipher';
 import {
   MAX_PEER_VIDEO_FPS,
   MAX_PEER_VIDEO_HEIGHT,
@@ -12,11 +17,19 @@ import {
   type PeerMedia,
 } from './PeerRegistry';
 import type { CadenceMediaCallbacks } from './types';
+import { _resetDeviceSigningForTests, deviceSigningKeys } from '@/lib/e2ee/deviceSign';
+
+beforeEach(() => {
+  globalThis.indexedDB = new IDBFactory();
+  _resetDeviceSigningForTests();
+});
 
 function mediaClient(): IRCClient {
   return {
     binaryHandlers: new Set(),
     extraMessageHandlers: new Set(),
+    sendRaw: vi.fn(() => true),
+    sendBinary: vi.fn(() => true),
   } as unknown as IRCClient;
 }
 
@@ -31,6 +44,133 @@ function callbacks(overrides: Partial<CadenceMediaCallbacks> = {}): CadenceMedia
 }
 
 describe('CadenceMediaEngine control payload boundary', () => {
+  it('fails closed instead of emitting plaintext media before a group key exists', async () => {
+    const onMediaE2eeState = vi.fn();
+    const client = mediaClient();
+    const engine = new CadenceMediaEngine(callbacks({ onMediaE2eeState }), { kind: 'voice' });
+    engine.setClient(client);
+    const internals = engine as unknown as {
+      activeRoom: string | null;
+      wsMyNick: string;
+      wsMediaKey: CryptoKey | null;
+      sendFrame(channel: string, type: string, data: Uint8Array): void;
+    };
+    internals.activeRoom = '#root';
+    internals.wsMyNick = 'alice';
+    internals.wsMediaKey = await importMediaMacKey(new Uint8Array(32).fill(7));
+
+    internals.sendFrame('#root', 'AUDIO', new Uint8Array([1, 2, 3]));
+    await Promise.resolve();
+
+    expect(client.sendBinary).not.toHaveBeenCalled();
+    expect(onMediaE2eeState).toHaveBeenCalledWith(false, true, 0);
+  });
+
+  it('encrypts both audio and video payloads into dedicated E2EE media bands', async () => {
+    const client = mediaClient();
+    const engine = new CadenceMediaEngine(callbacks(), { kind: 'video' });
+    engine.setClient(client);
+    const internals = engine as unknown as {
+      activeRoom: string | null;
+      wsMyNick: string;
+      wsMediaKey: CryptoKey | null;
+      mooringGroupKey: MooringGroup | null;
+      mediaE2eeEpoch: number;
+      sendFrame(channel: string, type: string, data: Uint8Array): void;
+    };
+    internals.activeRoom = '#root';
+    internals.wsMyNick = 'alice';
+    internals.wsMediaKey = await importMediaMacKey(new Uint8Array(32).fill(9));
+    internals.mooringGroupKey = await MooringGroup.create();
+    internals.mediaE2eeEpoch = 1;
+
+    internals.sendFrame('#root', 'AUDIO', new Uint8Array([1, 2, 3]));
+    internals.sendFrame('#root', 'KEYFRAME', new Uint8Array([4, 5, 6]));
+
+    await vi.waitFor(() => expect(client.sendBinary).toHaveBeenCalledTimes(2));
+    const frames = (client.sendBinary as ReturnType<typeof vi.fn>).mock.calls
+      .map(([datagram]) => decodeCadenceFrame(datagram as Uint8Array));
+    expect(frames.map((frame) => frame?.bandId).sort()).toEqual([66, 67]);
+    expect(frames.every((frame) => (frame?.payload.length ?? 0) > 3)).toBe(true);
+    const audio = frames.find((frame) => frame?.bandId === 66)!;
+    const ciphertext = audio.payload.slice(16, -64);
+    const signature = audio.payload.slice(-64);
+    const aad = new TextEncoder().encode(
+      'onyx-media-e2ee-v1\u0000#root\u0000alice\u0000audio\u00000',
+    );
+    const domain = new TextEncoder().encode('onyx-media-frame-signature-v2\u0000');
+    const attachment = audio.payload.slice(0, 16);
+    const transcript = new Uint8Array(domain.length + 4 + 16 + aad.length + ciphertext.length);
+    transcript.set(domain, 0);
+    new DataView(transcript.buffer).setUint32(domain.length, 1, false);
+    transcript.set(attachment, domain.length + 4);
+    transcript.set(aad, domain.length + 4 + 16);
+    transcript.set(ciphertext, domain.length + 4 + 16 + aad.length);
+    const signing = await deviceSigningKeys();
+    expect(signing).not.toBeNull();
+    expect(await crypto.subtle.verify(
+      'Ed25519',
+      signing!.keyPair.publicKey,
+      signature as BufferSource,
+      transcript as BufferSource,
+    )).toBe(true);
+    transcript[transcript.length - 1] = transcript[transcript.length - 1]! ^ 1;
+    expect(await crypto.subtle.verify(
+      'Ed25519',
+      signing!.keyPair.publicKey,
+      signature as BufferSource,
+      transcript as BufferSource,
+    )).toBe(false);
+  });
+
+  it('puts the account-bound device public key on the opaque E2EE handshake wire', async () => {
+    const client = mediaClient();
+    const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
+    engine.setClient(client);
+    const keyPair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      false,
+      ['deriveBits'],
+    );
+    const publicB64 = toB64url(new Uint8Array(await crypto.subtle.exportKey('raw', keyPair.publicKey)));
+    const internals = engine as unknown as {
+      activeRoom: string | null;
+      mediaIdentity: DeviceKeys | null;
+      sendMooringHandshake(channel: string): Promise<void>;
+    };
+    internals.activeRoom = '#root';
+    internals.mediaIdentity = { keyPair, publicB64 };
+
+    await internals.sendMooringHandshake('#root');
+
+    expect(client.sendRaw).toHaveBeenCalledWith(
+      'MEDIA',
+      'E2EE-HANDSHAKE',
+      '#root',
+      expect.any(String),
+    );
+    const wire = (client.sendRaw as ReturnType<typeof vi.fn>).mock.calls[0]![3] as string;
+    const envelope = Uint8Array.from(atob(wire), char => char.charCodeAt(0));
+    expect(envelope).toHaveLength(275);
+    expect(envelope[0]).toBe(2);
+    expect(toB64url(envelope.slice(17, 82))).toBe(publicB64);
+    expect(envelope[82]).toBe(0x04);
+    expect(toB64url(envelope.slice(82, 147))).not.toBe(publicB64);
+    const handshakeSigningKey = await crypto.subtle.importKey(
+      'raw', envelope.slice(179, 211), 'Ed25519', false, ['verify'],
+    );
+    const prefix = new TextEncoder().encode('onyx-media-handshake-v2\u0000#root\u0000');
+    const signed = new Uint8Array(prefix.length + 211);
+    signed.set(prefix, 0);
+    signed.set(envelope.slice(0, 211), prefix.length);
+    expect(await crypto.subtle.verify(
+      'Ed25519',
+      handshakeSigningKey,
+      envelope.slice(211) as BufferSource,
+      signed as BufferSource,
+    )).toBe(true);
+  });
+
   it('tears down owner-bound media state on a direct client replacement', () => {
     const onCallState = vi.fn();
     const engine = new CadenceMediaEngine(callbacks({ onCallState }), { kind: 'voice' });
@@ -169,9 +309,7 @@ describe('CadenceMediaEngine control payload boundary', () => {
     expect(onPresence).not.toHaveBeenCalled();
   });
 
-  it('shares codec startup and bounds frames retained while WASM loads', () => {
-    const load = vi.spyOn(OpcodecWasm, 'load')
-      .mockReturnValue(new Promise<OpcodecWasm>(() => {}));
+  it('rejects every unsigned legacy frame without starting a decoder', () => {
     const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
 
     for (let index = 0; index < 32; index += 1) {
@@ -181,12 +319,10 @@ describe('CadenceMediaEngine control payload boundary', () => {
     const internals = engine as unknown as {
       pendingWasmFrames: Map<string, unknown>;
     };
-    expect(load).toHaveBeenCalledOnce();
-    expect(internals.pendingWasmFrames.size).toBe(8);
+    expect(internals.pendingWasmFrames.size).toBe(0);
 
     engine.handleMediaMessage('server', '#room', 'HANGUP', '');
     expect(internals.pendingWasmFrames.size).toBe(0);
-    load.mockRestore();
   });
 
   it('bounds channel roster creation before firing near-capacity state', () => {

@@ -292,7 +292,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
 
   /** True only when opted in and a fetch implementation exists. */
   isAvailable(): boolean {
-    return this.config.enabled && typeof fetch === 'function';
+    return this.config.enabled && typeof fetch === 'function' && isLoopbackEndpoint(this.config.endpoint);
   }
 
   async embed(text: string): Promise<Float32Array> {
@@ -329,6 +329,16 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     } finally {
       clearTimeout(timeout);
     }
+  }
+}
+
+/** Local-intelligence must stay on the device: reject LAN and internet hosts. */
+function isLoopbackEndpoint(endpoint: string): boolean {
+  try {
+    const host = new URL(endpoint).hostname.toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1';
+  } catch {
+    return false;
   }
 }
 

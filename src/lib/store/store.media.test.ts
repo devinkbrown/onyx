@@ -17,6 +17,7 @@ import {
 } from './store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
+import { setMountedCadenceMediaEngine } from '@/lib/mediaEngineMount';
 
 const initialState = store.getInitialState();
 
@@ -65,9 +66,30 @@ function callRoster(channel: string): Set<string> | undefined {
 
 beforeEach(() => {
   store.setState(initialState, true);
+  setMountedCadenceMediaEngine(null);
 });
 
 describe('MEDIA presence via the IRCX EVENT plane', () => {
+  it('forwards opaque E2EE controls with authenticated actor and payload boundaries', () => {
+    seedChannel('#root');
+    const handleMediaMessage = vi.fn();
+    setMountedCadenceMediaEngine({ handleMediaMessage } as never);
+
+    feed(':eshmaki.me EVENT me MEDIA E2EE-HANDSHAKE #root alice AQID');
+    feed(':eshmaki.me EVENT me MEDIA E2EE-GROUPKEY #root alice c2VuZGVy bob dGFyZ2V0 7 BAUG');
+    feed(':eshmaki.me EVENT me MEDIA E2EE-DETACH #root alice YXR0YWNobWVudC0xNg');
+
+    expect(handleMediaMessage).toHaveBeenNthCalledWith(
+      1, 'alice', '#root', 'E2EE-HANDSHAKE', 'AQID',
+    );
+    expect(handleMediaMessage).toHaveBeenNthCalledWith(
+      2, 'alice', '#root', 'E2EE-GROUPKEY', 'c2VuZGVy bob dGFyZ2V0 7 BAUG',
+    );
+    expect(handleMediaMessage).toHaveBeenNthCalledWith(
+      3, 'alice', '#root', 'E2EE-DETACH', 'YXR0YWNobWVudC0xNg',
+    );
+  });
+
   it('an EVENT MEDIA JOIN adds the actor to the channel call roster', () => {
     seedChannel('#root');
     feed(':eshmaki.me EVENT me MEDIA JOIN #root alice voice');

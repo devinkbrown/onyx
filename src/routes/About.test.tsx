@@ -101,8 +101,8 @@ describe('About page — source structure', () => {
     expect(src).not.toMatch(/>mesh online<\/span>/);
   });
 
-  it('has a footer with class r-footer', () => {
-    expect(srcContains('r-footer')).toBe(true);
+  it('uses the shared public footer', () => {
+    expect(srcContains('<PublicFooter />')).toBe(true);
   });
 
   it('has an h1 heading in the hero', () => {
@@ -170,16 +170,19 @@ describe('About page — source structure', () => {
     expect(/irc client/i.test(src)).toBe(false);
   });
 
-  it('mentions TreeKEM for group key derivation', () => {
-    expect(srcContains('TreeKEM')).toBe(true);
+  it('does not claim unfinished media group-key cryptography', () => {
+    expect(srcContains('TreeKEM')).toBe(false);
+    expect(srcContains('HPKE')).toBe(false);
   });
 
-  it('mentions HPKE for per-frame encryption', () => {
-    expect(srcContains('HPKE')).toBe(true);
+  it('describes negotiated media E2EE without overstating transport protection', () => {
+    expect(srcContains('client-held room key')).toBe(true);
+    expect(srcContains('No key, no media frame, no padlock')).toBe(true);
   });
 
-  it('calls out Mooring as the secure channel layer', () => {
+  it('calls out Mooring as the server-to-server secure channel', () => {
     expect(srcContains('Mooring')).toBe(true);
+    expect(srcContains('server-to-server mesh')).toBe(true);
   });
 
   it('includes eshmaki.me node address with port 8080', () => {
@@ -303,9 +306,8 @@ describe('About page — source structure', () => {
     expect(srcContains('aria-label=')).toBe(true);
   });
 
-  it('footer has the Onyx brand and year 2026, no kanji', () => {
-    expect(srcContains('aria-label="Onyx" /> Onyx</span>')).toBe(true);
-    expect(srcContains('2026')).toBe(true);
+  it('uses the shared branded footer and no kanji', () => {
+    expect(srcContains('<PublicFooter />')).toBe(true);
     expect(srcContains('瑠璃')).toBe(false);
   });
 
@@ -481,7 +483,7 @@ describe('About page — DOM rendering', () => {
     cleanup();
   });
 
-  it.skipIf(!renderAvailable)('footer contains brand, Onyx Server, and year', () => {
+  it.skipIf(!renderAvailable)('shared footer contains brand, Onyx Server, and year', () => {
     const { cleanup } = renderAbout!();
     const footer = document.querySelector('footer.r-footer');
     const t = footer?.textContent ?? '';
