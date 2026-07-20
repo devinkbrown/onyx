@@ -29,6 +29,7 @@ import { readReviewHistory, recordReviewHistory } from '@/lib/notifications/revi
 import { closePreferences, isPreferencesOpen, resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { readTopicReadMarker, TOPIC_READ_LEDGER_KEY } from '@/lib/topics/topicReadLedger';
 import { _resetVaultForTests, queueOutbox, saveMessages } from '@/lib/vault/historyVault';
+import { setMountedCadenceMediaEngine } from '@/lib/mediaEngineMount';
 import { Spotlight } from '@/chat/spotlight';
 import { AppShell } from './AppShell';
 
@@ -164,10 +165,12 @@ describe('AppShell', () => {
     resetPreferences();
     globalThis.indexedDB = new IDBFactory();
     _resetVaultForTests();
+    setMountedCadenceMediaEngine(null);
   });
 
   afterEach(() => {
     cleanup();
+    setMountedCadenceMediaEngine(null);
     _resetNamesBurstsForTests();
     vi.unstubAllGlobals();
   });
@@ -1209,6 +1212,47 @@ describe('AppShell', () => {
       expect(screen.queryByRole('dialog', { name: 'Voice settings' })).not.toBeInTheDocument();
 
       joinSpy.mockRestore();
+    });
+
+    it('opens the video call panel while Edge media startup is still pending', async () => {
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+          negotiatedCaps: new Set<string>(),
+        } as never,
+      });
+      let finishJoin: (() => void) | undefined;
+      const pendingJoin = new Promise<void>((resolve) => {
+        finishJoin = resolve;
+      });
+      const stream = {
+        getAudioTracks: () => [],
+        getVideoTracks: () => [],
+      } as unknown as MediaStream;
+      const engine = {
+        joinVideo: vi.fn(() => pendingJoin),
+        joinVoice: vi.fn(async () => undefined),
+        getLocalStream: vi.fn(() => stream),
+        setMuted: vi.fn(),
+      };
+      setMountedCadenceMediaEngine(engine as never);
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+
+      await waitFor(() => {
+        expect(engine.joinVideo).toHaveBeenCalledWith('#general');
+        expect(screen.getByRole('region', { name: 'Voice call participants' })).toBeInTheDocument();
+      });
+      expect(store.getState().voice.callChannel).toBe('#general');
+      expect(store.getState().voice.callStartedAt).toBeNull();
+
+      finishJoin?.();
+      await waitFor(() => {
+        expect(store.getState().voice.callStartedAt).not.toBeNull();
+      });
     });
 
     it('joins the channel without video from Join voice without opening voice settings', async () => {

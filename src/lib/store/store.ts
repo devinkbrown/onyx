@@ -14937,9 +14937,47 @@ export const store = createStore<OnyxState>()(
         return;
       }
 
-      await (withVideo ? engine.joinVideo(channel) : engine.joinVoice(channel));
+      // Publish the call surface before awaiting browser permission, device
+      // capture, WASM initialisation, and encoder startup. Edge can keep those
+      // promises pending while its permission UI is open; leaving callState at
+      // `idle` made the Join video click appear to do nothing until the entire
+      // media path completed. This provisional state is rolled back below if
+      // capture does not produce a local stream.
+      get().setVoiceCallState({
+        callState: 'in_call',
+        callChannel: channel,
+        localStream: null,
+        cameraOn: false,
+        cameraStream: null,
+        callStartedAt: null,
+        pinnedParticipant: null,
+        handRaised: false,
+        raisedHands: new Set<string>(),
+      });
+
+      try {
+        await (withVideo ? engine.joinVideo(channel) : engine.joinVoice(channel));
+      } catch (error) {
+        get().setVoiceCallState({
+          callState: 'idle',
+          callChannel: null,
+          localStream: null,
+          cameraOn: false,
+          cameraStream: null,
+          callStartedAt: null,
+        });
+        throw error;
+      }
       const stream = engine.getLocalStream();
       if (!stream) {
+        get().setVoiceCallState({
+          callState: 'idle',
+          callChannel: null,
+          localStream: null,
+          cameraOn: false,
+          cameraStream: null,
+          callStartedAt: null,
+        });
         get().addToast({
           variant: 'error',
           title: withVideo ? 'Camera unavailable' : 'Microphone unavailable',

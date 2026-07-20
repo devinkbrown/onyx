@@ -69,6 +69,55 @@ beforeEach(() => {
   setMountedCadenceMediaEngine(null);
 });
 
+describe('channel media panel lifecycle', () => {
+  it('publishes the video panel before Edge capture startup resolves', async () => {
+    seedChannel('#root');
+    let finishJoin: (() => void) | undefined;
+    const pendingJoin = new Promise<void>((resolve) => {
+      finishJoin = resolve;
+    });
+    const stream = {
+      getAudioTracks: () => [],
+      getVideoTracks: () => [],
+    } as unknown as MediaStream;
+    const engine = {
+      joinVideo: vi.fn(() => pendingJoin),
+      joinVoice: vi.fn(async () => undefined),
+      getLocalStream: vi.fn(() => stream),
+      setMuted: vi.fn(),
+    };
+    setMountedCadenceMediaEngine(engine as never);
+
+    const joining = store.getState().joinVoiceChannel('#root', true);
+
+    expect(store.getState().voice.callState).toBe('in_call');
+    expect(store.getState().voice.callChannel).toBe('#root');
+    expect(store.getState().voice.callStartedAt).toBeNull();
+
+    finishJoin?.();
+    await joining;
+    expect(store.getState().voice.callStartedAt).not.toBeNull();
+    expect(store.getState().voice.cameraOn).toBe(true);
+  });
+
+  it('closes the provisional panel when video capture yields no stream', async () => {
+    seedChannel('#root');
+    const engine = {
+      joinVideo: vi.fn(async () => undefined),
+      joinVoice: vi.fn(async () => undefined),
+      getLocalStream: vi.fn(() => null),
+      setMuted: vi.fn(),
+    };
+    setMountedCadenceMediaEngine(engine as never);
+
+    await store.getState().joinVoiceChannel('#root', true);
+
+    expect(store.getState().voice.callState).toBe('idle');
+    expect(store.getState().voice.callChannel).toBeNull();
+    expect(store.getState().toasts.at(-1)?.title).toBe('Camera unavailable');
+  });
+});
+
 describe('MEDIA presence via the IRCX EVENT plane', () => {
   it('forwards opaque E2EE controls with authenticated actor and payload boundaries', () => {
     seedChannel('#root');

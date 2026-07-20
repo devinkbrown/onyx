@@ -9,6 +9,8 @@ const accessibilityCss = readFileSync(
   new URL('../../src/styles/a11y-media.css', import.meta.url),
   'utf8',
 );
+const voiceStageDockRule = voiceCss.match(/\.voice-stage\s*\{[^}]+\}/u)?.[0];
+if (!voiceStageDockRule) throw new Error('voice-stage docking rule is missing');
 
 test('reflows participant tiles and exposes their actions at 400% short zoom', async ({ page }) => {
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
@@ -310,4 +312,71 @@ test('keeps the spotlight filmstrip pointer and keyboard reachable at 400% zoom'
   expect(geometry.focusedBottom).toBeLessThanOrEqual(geometry.stageBottom);
   expect(geometry.outlineStyle).not.toBe('none');
   expect(geometry.outlineWidth).toBeGreaterThanOrEqual(2);
+});
+
+test('docks the video tray without covering the chat feed', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setContent(`
+    <!doctype html>
+    <main class="conversation">
+      <section class="voice-stage" aria-label="Voice call participants">
+        <div class="voice-stage__grid" data-count="1">
+          <article class="voice-tile">Video preview</article>
+        </div>
+      </section>
+      <section class="message-feed" aria-label="Message history">Visible chat</section>
+      <form class="composer"><input aria-label="Message channel"></form>
+    </main>
+  `);
+  await page.addStyleTag({
+    content: `
+      *, *::before, *::after { box-sizing: border-box; }
+      :root {
+        --space-2: 8px;
+        --space-3: 12px;
+        --r-md: 8px;
+        --r-pill: 999px;
+        --dur: 0ms;
+        --ease: linear;
+        --seam: #456;
+        --seam-faint: #234;
+        --ink: #020a12;
+        --stone: #123;
+        --stone-2: #234;
+        --washi: #fff;
+        --washi-dim: #ddd;
+        --washi-mute: #aaa;
+        --lapis: #168ce0;
+        --lapis-bright: #55baff;
+        --lapis-deep: #075080;
+      }
+      html, body { margin: 0; height: 100%; }
+      .conversation { display: flex; flex-direction: column; height: 720px; overflow: hidden; }
+      .message-feed { flex: 1; min-height: 0; overflow: auto; background: #08121d; }
+      .composer { flex: none; height: 56px; }
+      ${voiceStageDockRule}
+    `,
+  });
+
+  const geometry = await page.locator('.conversation').evaluate((conversation) => {
+    const stage = conversation.querySelector<HTMLElement>('.voice-stage')!.getBoundingClientRect();
+    const feed = conversation.querySelector<HTMLElement>('.message-feed')!.getBoundingClientRect();
+    const composer = conversation.querySelector<HTMLElement>('.composer')!.getBoundingClientRect();
+    return {
+      stageBottom: stage.bottom,
+      stageHeight: stage.height,
+      feedTop: feed.top,
+      feedBottom: feed.bottom,
+      feedHeight: feed.height,
+      composerTop: composer.top,
+    };
+  });
+
+  expect(geometry.stageBottom).toBeLessThanOrEqual(geometry.feedTop);
+  expect(geometry.feedBottom).toBeLessThanOrEqual(geometry.composerTop);
+  expect(geometry.stageHeight).toBeLessThanOrEqual(800 * 0.42);
+  expect(geometry.feedHeight).toBeGreaterThan(260);
+  await expect(page.getByRole('region', { name: 'Message history' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Message channel' })).toBeVisible();
 });
