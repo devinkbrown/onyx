@@ -742,6 +742,18 @@
 }
 
 @media (max-width: 42rem) and (max-height: 30rem) {
+  .data-page .r-status {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .data-page .r-status nav {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
   .data-page .r-wrap {
     min-width: 0;
     padding-inline: 12px;
@@ -777,8 +789,14 @@
 
   .data-summary,
   .data-grid,
-  .roadmap-track {
+  .roadmap-track,
+  .data-room-row,
+  .data-room-copy,
+  .data-room-telemetry,
+  .stats-card-heading,
+  .stats-chart-caption {
     min-width: 0;
+    max-width: 100%;
   }
 
   .data-summary > *,
@@ -816,6 +834,75 @@
 
   .data-card h3 {
     font-size: 26px;
+    overflow-wrap: anywhere;
+  }
+
+  .stats-card-heading,
+  .stats-chart-caption {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .stats-card-quiet,
+  .stats-chart-caption span,
+  .stats-chart-caption strong,
+  .stats-chart-caption time {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .stats-card-quiet,
+  .stats-chart-caption {
+    font-size: 12px;
+  }
+
+  .data-room-row {
+    grid-template-columns: 1fr;
+  }
+
+  .data-room-rank,
+  .data-room-copy,
+  .data-room-telemetry {
+    grid-column: 1;
+  }
+
+  .data-room-numbers {
+    flex-wrap: wrap;
+  }
+
+  .data-room-heading strong,
+  .data-room-heading span,
+  .data-room-copy p,
+  .data-room-numbers dt,
+  .data-room-numbers dd {
+    overflow-wrap: anywhere;
+  }
+
+  .data-page .r-footer .cols {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .data-page .r-footer .sig .logo {
+    width: 100%;
+    font-size: 32px;
+  }
+
+  .data-page .r-footer .mascot {
+    flex: 0 0 1em;
+    overflow: hidden;
+  }
+
+  .data-page .r-footer .cols > *,
+  .data-page .r-footer .sig,
+  .data-page .r-footer .sig .logo,
+  .data-page .r-footer .sig p,
+  .data-page .r-footer .col,
+  .data-page .r-footer .col a {
+    min-width: 0;
+    max-width: 100%;
     overflow-wrap: anywhere;
   }
 
