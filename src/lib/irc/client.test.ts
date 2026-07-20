@@ -11,6 +11,7 @@ const MIB = 1024 * 1024;
 interface TestSocket {
   readyState: number;
   bufferedAmount: number;
+  protocol?: string;
   send(data: unknown): void;
   close(code?: number, reason?: string): void;
 }
@@ -45,6 +46,120 @@ function makeClient(): { client: IRCClient; commands: string[] } {
 function feed(client: IRCClient, data: string): void {
   (client as unknown as { _onMessage(ev: { data: string }): void })._onMessage({ data });
 }
+
+describe('IRCClient WebSocket subprotocol', () => {
+  it('prefers the Onyx media protocol and offers text.ircv3.net as fallback', () => {
+    const constructions: Array<{ url: string | URL; protocols?: string | string[] }> = [];
+    const sockets: Array<{
+      onopen: ((e: Event) => void) | null;
+      send: ReturnType<typeof vi.fn>;
+    }> = [];
+    class StubWS {
+      static OPEN = 1;
+      readyState = StubWS.OPEN;
+      bufferedAmount = 0;
+      binaryType = '';
+      protocol = 'onyx.irc-media.v1';
+      onopen: ((e: Event) => void) | null = null;
+      onmessage: ((e: MessageEvent) => void) | null = null;
+      onclose: ((e: CloseEvent) => void) | null = null;
+      onerror: ((e: Event) => void) | null = null;
+      send = vi.fn();
+      close = vi.fn();
+
+      constructor(url: string | URL, protocols?: string | string[]) {
+        constructions.push({ url, protocols });
+        sockets.push(this);
+      }
+    }
+    vi.stubGlobal('WebSocket', StubWS);
+    try {
+      const client = new IRCClient({
+        url: 'wss://ircx.us:8080/',
+        nick: 'onyx',
+        onMessage: () => {},
+      });
+
+      expect(client.connect()).toBe(true);
+      expect(constructions).toEqual([{
+        url: 'wss://ircx.us:8080/',
+        protocols: ['onyx.irc-media.v1', 'text.ircv3.net'],
+      }]);
+      sockets[0]?.onopen?.(new Event('open'));
+      expect(sockets[0]?.send.mock.calls.slice(0, 3).map(([payload]) => payload)).toEqual([
+        'CAP LS 302\r\n',
+        'NICK onyx\r\n',
+        'USER webchat 0 * :onyx (webchat)\r\n',
+      ]);
+
+      // The store's reconnect path reuses the same client and calls connect();
+      // connect itself closes and detaches the prior socket before replacing it.
+      expect(client.connect()).toBe(true);
+      expect(constructions).toHaveLength(2);
+      expect(constructions[1]).toEqual(constructions[0]);
+      sockets[1]?.onopen?.(new Event('open'));
+      expect(sockets[1]?.send.mock.calls.slice(0, 3).map(([payload]) => payload)).toEqual(
+        sockets[0]?.send.mock.calls.slice(0, 3).map(([payload]) => payload),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('removes one terminal CRLF from registration frames on text.ircv3.net, including reconnect', () => {
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: () => {},
+    });
+
+    const first = attachSocket(client, { protocol: 'text.ircv3.net' });
+    (client as unknown as { _onOpen(): void })._onOpen();
+    expect(first.sent.slice(0, 3)).toEqual([
+      'CAP LS 302',
+      'NICK onyx',
+      'USER webchat 0 * :onyx (webchat)',
+    ]);
+
+    const reconnect = attachSocket(client, { protocol: 'text.ircv3.net' });
+    (client as unknown as { _onOpen(): void })._onOpen();
+    expect(reconnect.sent.slice(0, 3)).toEqual(first.sent.slice(0, 3));
+  });
+
+  it('keeps CRLF and binary media on the Onyx multiplexed protocol', () => {
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: () => {},
+    });
+    const { sent } = attachSocket(client, { protocol: 'onyx.irc-media.v1' });
+    (client as unknown as { _onOpen(): void })._onOpen();
+    expect(sent.slice(0, 3)).toEqual([
+      'CAP LS 302\r\n',
+      'NICK onyx\r\n',
+      'USER webchat 0 * :onyx (webchat)\r\n',
+    ]);
+    expect(client.sendBinary(new Uint8Array([1, 2, 3]))).toBe(true);
+    expect(sent[3]).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it('rejects multiline text and binary media on text.ircv3.net', () => {
+    const errors: string[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: () => {},
+      onError: (error) => errors.push(error),
+    });
+    const { sent } = attachSocket(client, { protocol: 'text.ircv3.net' });
+    expect(client.send('PRIVMSG #root :one\r\nPRIVMSG #root :two\r\n')).toBe(false);
+    expect(client.sendBinary(new Uint8Array([1, 2, 3]))).toBe(false);
+    expect(sent).toEqual([]);
+    expect(errors).toEqual([
+      'Message was not sent: text.ircv3.net requires exactly one IRC line per frame.',
+    ]);
+  });
+});
 
 describe('IRCClient WebSocket frame handling', () => {
   it('processes a single frame that has NO trailing CRLF', () => {
@@ -721,6 +836,7 @@ describe('IRCClient onyx/session-sync capability (Era 2 B1)', () => {
 
     class StubWS {
       static OPEN = 1;
+      static constructions: Array<{ url: string | URL; protocols?: string | string[] }> = [];
       readyState = StubWS.OPEN;
       binaryType = '';
       onopen: ((e: Event) => void) | null = null;
@@ -729,10 +845,18 @@ describe('IRCClient onyx/session-sync capability (Era 2 B1)', () => {
       onerror: ((e: Event) => void) | null = null;
       send = vi.fn();
       close = vi.fn();
+
+      constructor(url: string | URL, protocols?: string | string[]) {
+        StubWS.constructions.push({ url, protocols });
+      }
     }
     vi.stubGlobal('WebSocket', StubWS);
     try {
       expect(client.connect()).toBe(true);
+      expect(StubWS.constructions).toEqual([{
+        url: 'wss://ircx.us:8080/',
+        protocols: ['onyx.irc-media.v1', 'text.ircv3.net'],
+      }]);
       expect(client.sessionSyncActive).toBe(false);
       expect(client.negotiatedCaps.has('onyx/session-sync')).toBe(false);
     } finally {

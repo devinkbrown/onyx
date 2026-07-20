@@ -23,6 +23,14 @@ const SASL_CHUNK_BYTES = 400;
 // around the send queue: ordinary IRC lines are tiny, while an 8 MiB allowance
 // still accommodates the media engine's largest valid reassembled frame.
 const MAX_WEBSOCKET_BUFFERED_BYTES = 8 * 1024 * 1024;
+/** IRCv3's text-only WebSocket contract for interoperable fallback servers. */
+const IRC_WEBSOCKET_SUBPROTOCOL = 'text.ircv3.net';
+/** Onyx multiplexes IRC text and binary Cadence media on one WebSocket. */
+const ONYX_MEDIA_WEBSOCKET_SUBPROTOCOL = 'onyx.irc-media.v1';
+const WEBSOCKET_SUBPROTOCOLS = [
+  ONYX_MEDIA_WEBSOCKET_SUBPROTOCOL,
+  IRC_WEBSOCKET_SUBPROTOCOL,
+] as const;
 const MAX_INBOUND_TEXT_BYTES = 1024 * 1024;
 const MAX_BINARY_FRAME_BYTES = 8 * 1024 * 1024;
 const MAX_OUTBOUND_TEXT_BYTES = 1024 * 1024;
@@ -355,7 +363,7 @@ export class IRCClient {
     this._clearPingTimers();
 
     try {
-      this.ws = new WebSocket(this.opts.url);
+      this.ws = new WebSocket(this.opts.url, [...WEBSOCKET_SUBPROTOCOLS]);
       // Browser media datagrams ride binary frames on this same socket; deliver
       // them as ArrayBuffers (not Blobs) so onBinary gets bytes synchronously.
       this.ws.binaryType = 'arraybuffer';
@@ -396,13 +404,27 @@ export class IRCClient {
       return false;
     }
 
+    // `text.ircv3.net` carries exactly one unterminated IRC line per text
+    // message. Onyx's own protocol keeps the legacy CRLF framing because it
+    // also multiplexes binary Cadence media on this socket.
+    const payload = ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL && line.endsWith('\r\n')
+      ? line.slice(0, -2)
+      : line;
+    if (
+      ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL
+      && (payload.includes('\r') || payload.includes('\n'))
+    ) {
+      this.opts.onError?.('Message was not sent: text.ircv3.net requires exactly one IRC line per frame.');
+      return false;
+    }
+
     // Fast character bound avoids allocating another huge buffer just to learn
     // that a hostile/accidental line cannot be admitted.
-    if (line.length > MAX_OUTBOUND_TEXT_BYTES) {
+    if (payload.length > MAX_OUTBOUND_TEXT_BYTES) {
       this.opts.onError?.('Message was not sent: the IRC frame is too large.');
       return false;
     }
-    const encodedBytes = new TextEncoder().encode(line).byteLength;
+    const encodedBytes = new TextEncoder().encode(payload).byteLength;
     if (encodedBytes > MAX_OUTBOUND_TEXT_BYTES) {
       this.opts.onError?.('Message was not sent: the IRC frame is too large.');
       return false;
@@ -415,7 +437,7 @@ export class IRCClient {
     }
 
     try {
-      ws.send(line);
+      ws.send(payload);
     } catch {
       this.opts.onError?.('Message was not sent: the connection closed during send.');
       return false;
@@ -459,7 +481,12 @@ export class IRCClient {
   /** Send a media datagram as a binary WebSocket frame (browser media plane). */
   sendBinary(bytes: Uint8Array): boolean {
     const ws = this.ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN || bytes.byteLength > MAX_BINARY_FRAME_BYTES) {
+    if (
+      !ws
+      || ws.readyState !== WebSocket.OPEN
+      || ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL
+      || bytes.byteLength > MAX_BINARY_FRAME_BYTES
+    ) {
       return false;
     }
     if (!hasWebSocketSendCapacity(ws, bytes.byteLength)) {
@@ -644,6 +671,11 @@ export class IRCClient {
   private _onMessage(ev: MessageEvent) {
     // Binary frames carry browser media datagrams, not IRC lines.
     if (ev.data instanceof ArrayBuffer) {
+      if (this.ws?.protocol === IRC_WEBSOCKET_SUBPROTOCOL) {
+        this.opts.onError?.('WebSocket protocol error: text.ircv3.net received a binary frame.');
+        try { this.ws.close(1002, 'Binary frame on text.ircv3.net'); } catch { /* already closing */ }
+        return;
+      }
       if (ev.data.byteLength > MAX_BINARY_FRAME_BYTES) {
         this._rejectOversizedInbound('binary');
         return;
