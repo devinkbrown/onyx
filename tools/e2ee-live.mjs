@@ -1,70 +1,104 @@
-// E2EE DM live check — two browser contexts (Alice, Bob), each registered.
-// Alice DMs Bob; verify (1) Bob's app shows the plaintext, (2) a raw WS
-// observer NEVER sees the plaintext on the wire (only the TSUMUGI envelope).
+// E2EE DM live check — two registered browser contexts join the same room,
+// open a DM through the authoritative member list, and verify both delivery
+// and ciphertext-only transport.
 import { chromium } from '@playwright/test';
 
-const browser = await chromium.launch();
-const errs = [];
+const browser = await chromium.launch({ headless: true });
+const errors = [];
+const secret = `lowtide-${Date.now()}`;
 
-const secret = 'lowtide-' + Math.floor(Math.random() * 99999);
-const aliceFramesSent = [];
-
-async function user(name, captureSent) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
-  const page = await ctx.newPage();
-  page.on('pageerror', (e) => errs.push(`${name}: ${String(e).slice(0, 160)}`));
+async function registeredUser(prefix, captureSent = false) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  const page = await context.newPage();
+  const sentFrames = [];
+  page.on('pageerror', (error) => errors.push(`${prefix}: ${String(error).slice(0, 160)}`));
   if (captureSent) {
-    page.on('websocket', (wsock) => {
-      wsock.on('framesent', (f) => { if (typeof f.payload === 'string') captureSent.push(f.payload); });
+    page.on('websocket', (socket) => {
+      socket.on('framesent', (frame) => {
+        if (typeof frame.payload === 'string') sentFrames.push(frame.payload);
+      });
     });
   }
-  await page.goto('https://eshmaki.me/app', { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2200);
-  const nick = name + Math.floor(Math.random() * 9999);
-  await page.locator('input').first().fill(nick);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(7000);
-  return { ctx, page, nick };
+
+  await page.goto('https://eshmaki.me/app/', { waitUntil: 'networkidle' });
+  await page.getByRole('tab', { name: /Register/i }).click();
+  const nick = `${prefix}${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 99)}`;
+  const password = 'E2eeLive!12345';
+  await page.getByPlaceholder('your-nick').fill(nick);
+  await page.getByPlaceholder('at least 8 characters').fill(password);
+  await page.getByPlaceholder('re-enter your password').fill(password);
+  const submit = page.getByRole('button', { name: 'Register a new account' });
+  for (let attempt = 0; attempt < 80 && await submit.isDisabled(); attempt += 1) {
+    await page.waitForTimeout(250);
+  }
+  if (await submit.isDisabled()) throw new Error(`${prefix}: registration never became available`);
+  await submit.click();
+  await page.getByText('CONNECTION: CONNECTED').first().waitFor({ timeout: 40_000 });
+
+  const join = page.getByRole('textbox', { name: 'Channel name to join' });
+  await join.fill('#root');
+  await join.press('Enter');
+  await page.getByRole('region', { name: 'Channel members in #root' }).waitFor({ timeout: 30_000 });
+  return { context, page, nick, sentFrames };
 }
 
-const alice = await user('alice', aliceFramesSent);
-const bob = await user('bob');
+let alice;
+let bob;
+let exitCode = 1;
+try {
+  // Bob joins first so Alice's initial authoritative roster contains him.
+  bob = await registeredUser('bobe2');
+  alice = await registeredUser('alicee2', true);
 
-// Prod build hides the store handle — drive through the UI. Alice opens a DM
-// to Bob (join field accepts a nick), which fetches Bob's ocean.dm-key; Bob's
-// inbound handler fetches Alice's on receipt.
-const joinField = (page) => page.locator('input[placeholder*="join"], input[placeholder*="#channel"]').first();
-await joinField(alice.page).fill(bob.nick);
-await alice.page.keyboard.press('Enter');
-await alice.page.waitForTimeout(3000); // let the METADATA GET round-trip
+  const bobMember = alice.page.getByRole('button', {
+    name: new RegExp(`Open member details for ${bob.nick}`, 'i'),
+  });
+  await bobMember.waitFor({ timeout: 30_000 });
+  await bobMember.click();
+  await alice.page.getByRole('button', { name: `Send DM to ${bob.nick}` }).click();
 
-const composer = (page) => page.locator('.shell-composer-textarea');
-await composer(alice.page).fill(secret);
-await alice.page.keyboard.press('Enter');
-await alice.page.waitForTimeout(6000);
+  const aliceComposer = alice.page.locator('.shell-composer-textarea');
+  await aliceComposer.waitFor({ timeout: 10_000 });
+  await alice.page.waitForTimeout(4_000); // peer key METADATA round-trip
+  await aliceComposer.fill(secret);
+  await aliceComposer.press('Enter');
+  await alice.page.waitForTimeout(6_000);
 
-// Bob's feed must show the plaintext; his DM opens from a notification/sidebar.
-await joinField(bob.page).fill(alice.nick);
-await bob.page.keyboard.press('Enter');
-await bob.page.waitForTimeout(3000);
+  const bobDm = bob.page.getByRole('button', {
+    name: new RegExp(`DM with ${alice.nick}`, 'i'),
+  });
+  await bobDm.waitFor({ timeout: 30_000 });
+  await bobDm.click();
+  await bob.page.waitForTimeout(3_000);
 
-const aliceShowsPlain = (await alice.page.textContent('.shell-feed').catch(() => '') ?? '').includes(secret);
-const bobShowsPlain = (await bob.page.textContent('.shell-feed').catch(() => '') ?? '').includes(secret);
-const bobShowsLocked = (await bob.page.locator('.shell-msg-text--locked').count()) > 0;
+  const aliceFeed = await alice.page.locator('.shell-feed').textContent().catch(() => '');
+  const bobFeed = await bob.page.locator('.shell-feed').textContent().catch(() => '');
+  const dmFrames = alice.sentFrames.filter((frame) => frame.includes(`PRIVMSG ${bob.nick}`));
+  const aliceShowsPlain = aliceFeed?.includes(secret) ?? false;
+  const bobShowsPlain = bobFeed?.includes(secret) ?? false;
+  const wireSawEnvelope = dmFrames.some((frame) => frame.includes('TSUMUGI1'));
+  const wireLeaked = dmFrames.some((frame) => frame.includes(secret));
 
-// What did Alice actually put on the wire for this DM?
-const dmFrames = aliceFramesSent.filter((f) => f.includes(`PRIVMSG ${bob.nick}`));
-const wireSawEnvelope = dmFrames.some((f) => f.includes('TSUMUGI1'));
-const wireLeaked = dmFrames.some((f) => f.includes(secret));
+  console.log('alice feed shows plaintext:', aliceShowsPlain);
+  console.log('bob feed shows plaintext:  ', bobShowsPlain);
+  console.log('alice DM frames:', dmFrames.map((frame) => frame.slice(0, 100)));
+  console.log('wire carried envelope:     ', wireSawEnvelope);
+  console.log('wire leaked plaintext:     ', wireLeaked);
+  console.log('page errors:', errors.length ? errors : 'none');
 
-console.log('alice feed shows plaintext:', aliceShowsPlain);
-console.log('bob feed shows plaintext:  ', bobShowsPlain, bobShowsLocked ? '(LOCKED)' : '');
-console.log('alice DM frames:', dmFrames.map((f) => f.slice(0, 80)));
-console.log('wire carried envelope:     ', wireSawEnvelope);
-console.log('wire leaked plaintext:     ', wireLeaked);
-console.log('page errors:', errs.length ? errs : 'none');
+  const pass = aliceShowsPlain
+    && bobShowsPlain
+    && wireSawEnvelope
+    && !wireLeaked
+    && errors.length === 0;
+  console.log(pass ? 'E2EE LIVE: PASS' : 'E2EE LIVE: FAIL');
+  exitCode = pass ? 0 : 1;
+} catch (error) {
+  console.error('E2EE LIVE: ERROR', error);
+} finally {
+  await alice?.context.close();
+  await bob?.context.close();
+  await browser.close();
+}
 
-const pass = aliceShowsPlain && bobShowsPlain && wireSawEnvelope && !wireLeaked && errs.length === 0;
-console.log(pass ? 'E2EE LIVE: PASS' : 'E2EE LIVE: FAIL');
-await browser.close();
-process.exit(pass ? 0 : 1);
+process.exit(exitCode);
