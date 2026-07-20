@@ -9575,12 +9575,19 @@ export const store = createStore<OnyxState>()(
             }
             // Fetch WHO data for away status
             get().client?.sendRaw('WHO', ch);
-            // Roster: normal JOIN gets automatic 353/366 — only arm the burst so
-            // the first 353 may REPLACE. Do not send a second NAMES here (that
-            // re-armed mid-burst and collapsed nicklists under mesh multi-line
-            // NAMES). Session reclaim still needs an explicit NAMES.
+            // Roster: a traditional JOIN gets automatic 353/366, but a client
+            // that negotiated no-implicit-names must request the authoritative
+            // roster itself. Arm before sending so even an immediate reply can
+            // replace stale membership. Never send the extra request on legacy
+            // JOINs: duplicate interleaved bursts can collapse mesh nicklists.
             if (_currentSessionRestore(get)) {
               _refreshChannelRoster(get, ch);
+            } else if (
+              get().client?.negotiatedCaps.has('draft/no-implicit-names')
+              || get().client?.negotiatedCaps.has('no-implicit-names')
+            ) {
+              _beginNamesBurst(key);
+              get().client?.sendRaw('NAMES', ch);
             } else {
               _beginNamesBurst(key);
             }

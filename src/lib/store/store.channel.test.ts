@@ -596,6 +596,32 @@ describe('navigate() reconciles the focused channel roster', () => {
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#resumecase' });
     expect([...store.getState().channels.get('#resumecase')?.users.keys() ?? []].sort()).toEqual(['alice', 'me']);
   });
+
+  it('requests NAMES once after self-JOIN when no-implicit-names is negotiated', () => {
+    const client = makeClient();
+    client.negotiatedCaps.add('draft/no-implicit-names');
+    store.setState({
+      ...initialState,
+      client: client as never,
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      channels: new Map(),
+      activeView: { kind: 'home' },
+    }, true);
+
+    feed(':me JOIN #ExplicitRoster');
+    feed(':irc 353 me = #ExplicitRoster :me Alice @Bob');
+    feed(':irc 366 me #ExplicitRoster :End of /NAMES list');
+
+    expect(client.sendRaw.mock.calls.filter((c) => c[0] === 'NAMES')).toEqual([
+      ['NAMES', '#ExplicitRoster'],
+    ]);
+    expect([...store.getState().channels.get('#explicitroster')?.users.keys() ?? []].sort()).toEqual([
+      'alice',
+      'bob',
+      'me',
+    ]);
+  });
 });
 
 // ── Server / status buffer ──────────────────────────────────────────────────
