@@ -14,11 +14,11 @@
      it. A full-height stage pushed the message feed out of the clipped shell,
      which read as the video panel covering chat. Keep a useful video canvas
      while reserving the majority of the column for messages and composing. */
-  flex: 0 1 clamp(9rem, 36vh, 26rem);
+  flex: 0 1 min(clamp(8rem, 30vh, 22rem), 36%);
   width: 100%;
-  height: clamp(9rem, 36vh, 26rem);
-  min-height: min(9rem, 30vh);
-  max-height: 42vh;
+  height: min(clamp(8rem, 30vh, 22rem), 36%);
+  min-height: min(7rem, 24vh);
+  max-height: min(38vh, 36%);
   overflow: hidden;
   background:
     radial-gradient(circle at 50% -12%, color-mix(in oklab, var(--lapis-deep) 26%, transparent), transparent 42%),
@@ -36,10 +36,10 @@
 
 @media (max-width: 900px) {
   .voice-stage {
-    flex-basis: clamp(8rem, 30dvh, 20rem);
-    height: clamp(8rem, 30dvh, 20rem);
-    min-height: min(8rem, 26dvh);
-    max-height: 34dvh;
+    flex-basis: min(clamp(7rem, 26dvh, 18rem), 38%);
+    height: min(clamp(7rem, 26dvh, 18rem), 38%);
+    min-height: min(6rem, 22dvh);
+    max-height: min(32dvh, 38%);
   }
 }
 

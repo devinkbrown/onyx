@@ -380,3 +380,35 @@ test('docks the video tray without covering the chat feed', async ({ page }) => 
   await expect(page.getByRole('region', { name: 'Message history' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Message channel' })).toBeVisible();
 });
+
+test('keeps chat usable in a compact desktop conversation', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setContent(`
+    <!doctype html>
+    <main class="conversation">
+      <section class="voice-stage" aria-label="Voice call participants">Starting video</section>
+      <section class="message-feed" aria-label="Message history">Visible chat</section>
+      <form class="composer"><input aria-label="Message channel"></form>
+    </main>
+  `);
+  await page.addStyleTag({
+    content: `
+      *, *::before, *::after { box-sizing: border-box; }
+      :root { --r-md: 8px; --seam-faint: #234; --ink: #020a12; --stone: #123; --stone-2: #234; --washi: #fff; --lapis: #168ce0; --lapis-bright: #55baff; --lapis-deep: #075080; }
+      html, body { margin: 0; }
+      .conversation { display: flex; flex-direction: column; height: 395px; overflow: hidden; }
+      .message-feed { flex: 1; min-height: 0; overflow: auto; }
+      .composer { flex: none; height: 56px; }
+      ${voiceStageDockRule}
+    `,
+  });
+
+  const geometry = await page.locator('.conversation').evaluate((conversation) => {
+    const stage = conversation.querySelector<HTMLElement>('.voice-stage')!.getBoundingClientRect();
+    const feed = conversation.querySelector<HTMLElement>('.message-feed')!.getBoundingClientRect();
+    return { stageBottom: stage.bottom, feedTop: feed.top, feedHeight: feed.height };
+  });
+
+  expect(geometry.stageBottom).toBeLessThanOrEqual(geometry.feedTop);
+  expect(geometry.feedHeight).toBeGreaterThanOrEqual(120);
+});
