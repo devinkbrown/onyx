@@ -264,13 +264,24 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   const voice = useStore((s) => s.voice);
   const showVoiceSettings = useStore((s) => s.showVoiceSettings);
+  const [callSurfaceChannel, setCallSurfaceChannel] = createSignal<string | null>(null);
   const inCall = createMemo(() => {
     const cs = voice().callState;
     return cs !== 'idle' && cs !== 'ringing_in' && cs !== 'ringing_out';
   });
   const viewingCall = createMemo(() => {
     const v = activeView();
-    return inCall() && v.kind === 'channel' && v.channel === voice().callChannel;
+    return inCall()
+      && v.kind === 'channel'
+      && (v.channel === voice().callChannel || v.channel === callSurfaceChannel());
+  });
+  createEffect(() => {
+    const current = voice();
+    if (current.callState === 'idle') {
+      setCallSurfaceChannel(null);
+    } else if (current.callChannel) {
+      setCallSurfaceChannel(current.callChannel);
+    }
   });
   // Any voice surface (incoming/outgoing ring, active call, or the settings
   // sheet) is only ever shown when the call is non-idle or settings are open.
@@ -291,6 +302,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
     const state = getState();
     if (!state.client) return;
     const attempt = ++voiceJoinAttempt;
+    setCallSurfaceChannel(channel);
     // Join the call directly. Do NOT open Voice settings here — that sheet is
     // for device/processing preferences (gear on the call bar), not the entry
     // path. Opening it on "Join video" made video look broken (audio settings).
@@ -318,6 +330,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
     };
     const rollbackProvisionalJoin = () => {
       if (!ownsProvisionalJoin()) return;
+      setCallSurfaceChannel(null);
       getState().setVoiceCallState({
         callState: 'idle',
         callChannel: null,
