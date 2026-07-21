@@ -32,6 +32,8 @@ import {
   shouldAnnounceDecodeError,
   type CodecFailureMediaKind,
 } from '@/lib/cadence-media/codecFailure';
+import { isTypingTarget } from '@/lib/keyboard/shortcutsRegistry';
+import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
 
 /** Per-peer auto-lower timers for raised hands signalled via the ✋ reaction. */
 const _handTimers = new Map<string, number>();
@@ -168,6 +170,15 @@ function dispatchWindowEvent(name: string, detail: unknown): void {
 }
 
 /**
+ * Match a KeyboardEvent against the VoiceSettings-captured push-to-talk key.
+ * Capture stores `event.key` (with space normalised to `'Space'`).
+ */
+function eventMatchesPttKey(event: KeyboardEvent, boundKey: string): boolean {
+  if (boundKey === 'Space') return event.key === ' ' || event.key === 'Space';
+  return event.key === boundKey;
+}
+
+/**
  * Mount the CADENCE media engine once under a Solid owner at app root.
  */
 export function mountMedia(): void {
@@ -178,6 +189,8 @@ export function mountMedia(): void {
   const deafened = useStore(state => state.voice.deafened);
   const outputDeviceId = useStore(state => state.voice.outputDeviceId);
   const outputVolume = useStore(state => state.voice.outputVolume);
+  const pushToTalk = useStore(state => state.voice.pushToTalk);
+  const pushToTalkKey = useStore(state => state.voice.pushToTalkKey);
   const screenshareActive = useStore(state => state.voice.screenshareActive);
   const activeView = useStore(state => state.activeView);
 
@@ -346,7 +359,7 @@ export function mountMedia(): void {
     },
 
     onNetworkQuality(tier: NetworkQualityTier, suggestedBps: number) {
-      dispatchWindowEvent('ocean:voice-network', { tier, suggestedBps });
+      dispatchWindowEvent('onyx:voice-network', { tier, suggestedBps });
     },
 
     onReaction(nick, emoji) {
@@ -357,7 +370,7 @@ export function mountMedia(): void {
         || /[\u0000-\u001f\u007f]/u.test(emoji)
         || !caseInsensitiveKey(getState().voice.peers, nick)
       ) return;
-      dispatchWindowEvent('ocean:voice-reaction', { nick, emoji });
+      dispatchWindowEvent('onyx:voice-reaction', { nick, emoji });
       // A ✋ reaction is the raise-hand signal (toggleRaiseHand emits it on raise;
       // there is no explicit lower signal), so surface the peer's raised hand and
       // auto-clear it after a window so a stale hand doesn't linger forever.
@@ -477,6 +490,62 @@ export function mountMedia(): void {
     engine?.setOutput(outputDeviceId(), outputVolume());
   });
 
+  // Push-to-talk: mirror the store flag into the engine on every setting change
+  // (and on initial mount / re-join). When enabled the engine mutes local audio
+  // until pttPress; when disabled it restores open-mic.
+  createEffect(() => {
+    engine?.setPushToTalk(pushToTalk());
+  });
+
+  // Window keydown/keyup for the bound PTT key. Rebinds when the flag or key
+  // changes; onCleanup removes listeners and releases a held press so a setting
+  // flip mid-hold never leaves the mic stuck open.
+  createEffect(() => {
+    const enabled = pushToTalk();
+    const boundKey = pushToTalkKey();
+    if (!enabled || !boundKey || typeof window === 'undefined') return;
+
+    let held = false;
+
+    const release = () => {
+      if (!held) return;
+      held = false;
+      engine?.pttRelease();
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      // IME / already-claimed keys, auto-repeat, and typing targets never arm PTT.
+      if (keyboardEventIsClaimed(event) || event.repeat || held) return;
+      if (!eventMatchesPttKey(event, boundKey)) return;
+      if (isTypingTarget(event.target)) return;
+      // Modifier chords (Ctrl+V paste, etc.) are not a PTT hold.
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      held = true;
+      // Space would otherwise scroll the page while held as PTT.
+      event.preventDefault();
+      engine?.pttPress();
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (!held || !eventMatchesPttKey(event, boundKey)) return;
+      release();
+    };
+
+    const onBlur = () => {
+      release();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    onCleanup(() => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      release();
+    });
+  });
+
   createEffect(() => {
     const active = screenshareActive();
     const view = activeView();
@@ -512,11 +581,11 @@ export function mountMedia(): void {
       engine?.stopBroadcast(detail.channel);
     };
 
-    window.addEventListener('ocean:stream-start', startHandler);
-    window.addEventListener('ocean:stream-stop', stopHandler);
+    window.addEventListener('onyx:stream-start', startHandler);
+    window.addEventListener('onyx:stream-stop', stopHandler);
     onCleanup(() => {
-      window.removeEventListener('ocean:stream-start', startHandler);
-      window.removeEventListener('ocean:stream-stop', stopHandler);
+      window.removeEventListener('onyx:stream-start', startHandler);
+      window.removeEventListener('onyx:stream-stop', stopHandler);
     });
   }
 

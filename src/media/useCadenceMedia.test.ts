@@ -12,6 +12,9 @@ const mediaMock = vi.hoisted(() => {
     setClient: ReturnType<typeof vi.fn>;
     setDeafened: ReturnType<typeof vi.fn>;
     setOutput: ReturnType<typeof vi.fn>;
+    setPushToTalk: ReturnType<typeof vi.fn>;
+    pttPress: ReturnType<typeof vi.fn>;
+    pttRelease: ReturnType<typeof vi.fn>;
     getScreenStream: ReturnType<typeof vi.fn>;
     getLocalKind: ReturnType<typeof vi.fn>;
     getLocalStream: ReturnType<typeof vi.fn>;
@@ -30,6 +33,9 @@ const mediaMock = vi.hoisted(() => {
     setClient = vi.fn();
     setDeafened = vi.fn();
     setOutput = vi.fn();
+    setPushToTalk = vi.fn();
+    pttPress = vi.fn();
+    pttRelease = vi.fn();
     getScreenStream = vi.fn(() => null);
     getLocalKind = vi.fn(() => null);
     getLocalStream = vi.fn(() => null);
@@ -196,7 +202,7 @@ describe('mountMedia', () => {
     const { mountMedia } = await import('./useCadenceMedia');
     const reactions: Array<{ nick: string; emoji: string }> = [];
     const handler = (event: Event) => reactions.push((event as CustomEvent).detail);
-    window.addEventListener('ocean:voice-reaction', handler);
+    window.addEventListener('onyx:voice-reaction', handler);
 
     createRoot(dispose => {
       mountMedia();
@@ -210,7 +216,7 @@ describe('mountMedia', () => {
       dispose();
     });
 
-    window.removeEventListener('ocean:voice-reaction', handler);
+    window.removeEventListener('onyx:voice-reaction', handler);
   });
 
   it('toasts a dedicated codec failure on encoder init errors (R5)', async () => {
@@ -259,5 +265,106 @@ describe('mountMedia', () => {
 
       dispose();
     });
+  });
+
+  it('mirrors voice.pushToTalk into engine.setPushToTalk', async () => {
+    store.setState({
+      voice: { ...store.getState().voice, pushToTalk: true, pushToTalkKey: 'v' },
+    });
+    const { mountMedia } = await import('./useCadenceMedia');
+    const dispose = createRoot(disposeRoot => {
+      mountMedia();
+      return disposeRoot;
+    });
+    const engine = mediaMock.instances[0];
+    expect(engine).toBeDefined();
+    await Promise.resolve();
+    expect(engine?.setPushToTalk).toHaveBeenCalledWith(true);
+
+    store.setState({
+      voice: { ...store.getState().voice, pushToTalk: false },
+    });
+    await Promise.resolve();
+    expect(engine?.setPushToTalk).toHaveBeenLastCalledWith(false);
+
+    dispose();
+  });
+
+  it('presses and releases PTT on the bound key, ignores repeats and typing targets', async () => {
+    store.setState({
+      voice: { ...store.getState().voice, pushToTalk: true, pushToTalkKey: 'v' },
+    });
+    const { mountMedia } = await import('./useCadenceMedia');
+    const dispose = createRoot(disposeRoot => {
+      mountMedia();
+      return disposeRoot;
+    });
+    const engine = mediaMock.instances[0];
+    expect(engine).toBeDefined();
+    await Promise.resolve();
+
+    // Wrong key — no-op.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }));
+    expect(engine?.pttPress).not.toHaveBeenCalled();
+
+    // Bound key press → press; key-repeat must not re-fire.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', bubbles: true, repeat: true }));
+    expect(engine?.pttPress).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'v', bubbles: true }));
+    expect(engine?.pttRelease).toHaveBeenCalledTimes(1);
+
+    // Typing in an input must not steal the key for PTT.
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', bubbles: true }));
+    expect(engine?.pttPress).toHaveBeenCalledTimes(1);
+    input.remove();
+
+    // Space alias matches the VoiceSettings capture format.
+    store.setState({
+      voice: { ...store.getState().voice, pushToTalk: true, pushToTalkKey: 'Space' },
+    });
+    await Promise.resolve();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    expect(engine?.pttPress).toHaveBeenCalledTimes(2);
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
+    expect(engine?.pttRelease).toHaveBeenCalledTimes(2);
+
+    // Disabling PTT tears down listeners (and releases if held).
+    store.setState({
+      voice: { ...store.getState().voice, pushToTalk: false },
+    });
+    await Promise.resolve();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', bubbles: true }));
+    expect(engine?.pttPress).toHaveBeenCalledTimes(2);
+
+    dispose();
+  });
+
+  it('releases PTT on window blur and on cleanup while held', async () => {
+    store.setState({
+      voice: { ...store.getState().voice, pushToTalk: true, pushToTalkKey: 'v' },
+    });
+    const { mountMedia } = await import('./useCadenceMedia');
+    const dispose = createRoot(disposeRoot => {
+      mountMedia();
+      return disposeRoot;
+    });
+    const engine = mediaMock.instances[0];
+    await Promise.resolve();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', bubbles: true }));
+    expect(engine?.pttPress).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new Event('blur'));
+    expect(engine?.pttRelease).toHaveBeenCalledTimes(1);
+
+    // Hold again, then unmount — cleanup must release.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', bubbles: true }));
+    expect(engine?.pttPress).toHaveBeenCalledTimes(2);
+    dispose();
+    expect(engine?.pttRelease).toHaveBeenCalledTimes(2);
   });
 });
