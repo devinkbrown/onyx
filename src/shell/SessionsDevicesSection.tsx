@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * SessionsDevicesSection.tsx — Account "Sessions & devices" skeleton (Era 1 A4).
+ * SessionsDevicesSection.tsx — Account "Sessions & devices" (Era 2 B8).
  *
- * Honest product surface for the identity mental model:
- *   • This browser is the only session we can truthfully list today.
- *   • Other sessions + revoke arrive with server list support in Era 2 (B8).
- *   • Device credentials (passkeys) live in the Passkeys section below —
- *     this section points there instead of inventing a second credential UI.
+ * Loads `SESSION LIST` from the daemon and offers `SESSION DROP #<n>` for
+ * non-current attachments. Never fabricates remote devices; empty until the
+ * server answers. Passkeys stay in the Passkeys section below.
  *
- * No fake revoke, no fabricated remote sessions. Fail-closed by omission.
- *
- * SOLID IDIOMS: component runs once. Never destructure props; read them in
- * tracked scopes. Token-driven styling lives in account.css.
+ * SOLID IDIOMS: never destructure props; read props in tracked scopes.
  */
-import { Show, type JSX } from 'solid-js';
+import { createEffect, For, Show, type JSX } from 'solid-js';
+import { useStore, getState } from '@/lib/store';
+import {
+  formatSessionSignon,
+  sessionRowLabel,
+  type AccountSessionRow,
+} from '@/lib/irc/sessionList';
+import { Button } from '@/primitives/index';
 
 export interface SessionsDevicesSectionProps {
   /** Signed-in account name, or null for a guest (section stays inert). */
@@ -21,6 +23,26 @@ export interface SessionsDevicesSectionProps {
 }
 
 export function SessionsDevicesSection(props: SessionsDevicesSectionProps): JSX.Element {
+  const sessions = useStore((s) => s.accountSessions);
+  const pending = useStore((s) => s.accountSessionsPending);
+  const error = useStore((s) => s.accountSessionsError);
+
+  createEffect(() => {
+    const acct = props.account;
+    if (!acct) return;
+    // Fresh open of Account while signed in: pull authoritative list once.
+    getState().refreshAccountSessions();
+  });
+
+  function onRefresh(): void {
+    getState().refreshAccountSessions();
+  }
+
+  function onDrop(row: AccountSessionRow): void {
+    if (row.current) return;
+    getState().dropAccountSession(row.index);
+  }
+
   return (
     <Show when={props.account}>
       {(account) => (
@@ -35,38 +57,93 @@ export function SessionsDevicesSection(props: SessionsDevicesSectionProps): JSX.
               Sessions &amp; devices
             </h3>
             <p class="acct-section-hint" id="acct-sessions-hint">
-              Where <strong>{account()}</strong> is signed in. Manage passkeys
-              for this account in the Passkeys section below.
+              Where <strong>{account()}</strong> is signed in across the mesh.
+              Revoke another connection here; manage passkeys in the section below.
             </p>
           </div>
 
           <div class="acct-section-body">
-            <ul class="acct-session-list" aria-label="Active sessions on this device">
-              <li class="acct-session-row" data-testid="sessions-current-device">
-                <div class="acct-session-id">
-                  <span class="acct-session-name">This browser</span>
-                  <span class="acct-session-badge" data-active="true">
-                    Active
-                  </span>
-                </div>
-                <p class="acct-session-meta">
-                  Current session on this device. Signing out ends it here.
-                </p>
-              </li>
-            </ul>
-
-            <div
-              class="acct-session-placeholder"
-              data-testid="sessions-remote-placeholder"
-              role="note"
-            >
-              <p class="acct-session-placeholder-title">Other sessions</p>
-              <p class="acct-session-placeholder-body">
-                Session list from the server arrives in Era 2 (B8). Remote
-                devices and revoke will show here when the mesh can list them —
-                nothing is fabricated in the meantime.
-              </p>
+            <div class="acct-session-toolbar">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={pending()}
+                onClick={onRefresh}
+                data-testid="sessions-refresh"
+              >
+                {pending() ? 'Refreshing…' : 'Refresh list'}
+              </Button>
             </div>
+
+            <Show when={error()}>
+              {(msg) => (
+                <p class="acct-error" role="alert" data-testid="sessions-error">
+                  {msg()}
+                </p>
+              )}
+            </Show>
+
+            <Show
+              when={sessions().length > 0}
+              fallback={
+                <div
+                  class="acct-session-placeholder"
+                  data-testid="sessions-empty"
+                  role="status"
+                >
+                  <p class="acct-session-placeholder-title">
+                    {pending() ? 'Loading sessions…' : 'No sessions listed yet'}
+                  </p>
+                  <p class="acct-session-placeholder-body">
+                    {pending()
+                      ? 'Asking the server for every attachment of this account.'
+                      : 'Refresh after signing in on another device, or if the list looks stale.'}
+                  </p>
+                </div>
+              }
+            >
+              <ul class="acct-session-list" aria-label="Account sessions">
+                <For each={sessions()}>
+                  {(row) => (
+                    <li
+                      class="acct-session-row"
+                      data-testid={row.current ? 'sessions-current-device' : `sessions-row-${row.index}`}
+                      data-current={row.current ? 'true' : 'false'}
+                      data-state={row.state}
+                    >
+                      <div class="acct-session-id">
+                        <span class="acct-session-name">{sessionRowLabel(row)}</span>
+                        <span
+                          class="acct-session-badge"
+                          data-active={row.state === 'attached' ? 'true' : 'false'}
+                        >
+                          {row.current ? 'This device' : row.state}
+                        </span>
+                      </div>
+                      <p class="acct-session-meta">
+                        #{row.index} · signed on {formatSessionSignon(row.signonMs)}
+                      </p>
+                      <Show when={!row.current}>
+                        <div class="acct-session-actions">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={pending()}
+                            onClick={() => onDrop(row)}
+                            data-testid={`sessions-drop-${row.index}`}
+                            aria-label={`Revoke session ${row.index}`}
+                          >
+                            Revoke
+                          </Button>
+                        </div>
+                      </Show>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
 
             <p class="acct-section-hint" data-testid="sessions-passkeys-hint">
               Device credentials (Face ID, fingerprint, security keys) are

@@ -639,12 +639,23 @@
 }
 .acct-passkey-rename .onyx-field { flex: 1; min-width: 140px; }
 
-/* ── Sessions & devices (skeleton — Era 1 A4 / Era 2 B8) ─────────────────── */
+/* ── Sessions & devices (Era 2 B8 — SESSION LIST / DROP) ─────────────────── */
 
 .acct-sessions .acct-section-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+.acct-session-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.acct-session-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
 
 .acct-session-list {

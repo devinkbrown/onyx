@@ -27,6 +27,12 @@ import {
   type CredentialTokenTarget,
 } from '@/lib/credentials';
 import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parseNamesPrefix, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
+import {
+  isSessionListEnd,
+  parseSessionDropOk,
+  parseSessionListLine,
+  type AccountSessionRow,
+} from '@/lib/irc/sessionList';
 import type { CadencePeerState, CadenceRoomStats, CallState } from '@/lib/cadence-media/types';
 import { getMountedCadenceMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
@@ -779,6 +785,20 @@ export interface OnyxState {
    * Cleared when a new action is dispatched or on success.
    */
   accountActionError: { command: string; code: string; description: string } | null;
+  /**
+   * Rows from the latest `SESSION LIST` (1-based indices match `SESSION DROP`).
+   * Empty until the Account panel requests a refresh; never fabricated.
+   */
+  accountSessions: AccountSessionRow[];
+  accountSessionsPending: boolean;
+  accountSessionsError: string | null;
+  /** `SESSION LIST` — refresh the account session roster from the server. */
+  refreshAccountSessions(): void;
+  /**
+   * `SESSION DROP #<n>` — revoke another attachment. Refuses the current
+   * connection (server-side CANNOT_DROP_CURRENT); UI also disables that row.
+   */
+  dropAccountSession(index: number): void;
   /**
    * `IDENTIFY <account> <password>` — log in to an account on the existing
    * connection. Success arrives as 900 RPL_LOGGEDIN (sets server.account);
@@ -3909,6 +3929,9 @@ function _resetAccountBoundState(
       accountInfo: null,
       accountInfoPending: false,
       accountActionError: null,
+      accountSessions: [],
+      accountSessionsPending: false,
+      accountSessionsError: null,
       passkeyBusy: false,
       passkeyError: preservePasskeyError ? s.passkeyError : null,
       passkeyNotice: null,
@@ -5293,6 +5316,9 @@ export const store = createStore<OnyxState>()(
     accountInfo: null,
     accountInfoPending: false,
     accountActionError: null,
+    accountSessions: [],
+    accountSessionsPending: false,
+    accountSessionsError: null,
     notifications: [],
     serverSearch: { target: '', query: '', status: 'idle', results: [], error: null },
     canSearchHistory: false,
@@ -5853,6 +5879,9 @@ export const store = createStore<OnyxState>()(
         accountInfo: null,
         accountInfoPending: false,
         accountActionError: null,
+        accountSessions: [],
+        accountSessionsPending: false,
+        accountSessionsError: null,
         ...(searchWasPending
           ? {
               serverSearch: {
@@ -6999,6 +7028,38 @@ export const store = createStore<OnyxState>()(
       // `account=… flags=…` NOTICE in the message handler.
       if (acct) client.sendRaw('ACCOUNTINFO', acct);
       else client.sendRaw('ACCOUNTINFO');
+    },
+
+    refreshAccountSessions() {
+      const { client, server } = get();
+      if (!client || !server?.account) {
+        set({
+          accountSessions: [],
+          accountSessionsPending: false,
+          accountSessionsError: server?.account ? null : 'Sign in to list sessions.',
+        });
+        return;
+      }
+      // Collect rows until "end of session list"; start a fresh accumulator.
+      set({
+        accountSessions: [],
+        accountSessionsPending: true,
+        accountSessionsError: null,
+      });
+      client.sendRaw('SESSION', 'LIST');
+    },
+
+    dropAccountSession(index) {
+      const { client, server, accountSessions } = get();
+      if (!client || !server?.account) return;
+      if (!Number.isFinite(index) || index <= 0) return;
+      const row = accountSessions.find((r) => r.index === index);
+      if (row?.current) {
+        set({ accountSessionsError: 'Cannot drop this connection — sign out instead.' });
+        return;
+      }
+      set({ accountSessionsPending: true, accountSessionsError: null });
+      client.sendRaw('SESSION', 'DROP', `#${Math.trunc(index)}`);
     },
 
     accountSet(field, value, password) {
@@ -8935,6 +8996,17 @@ export const store = createStore<OnyxState>()(
               if (!_replyTransportIsCurrent(_accountInfoReplyContext, get)) return;
               _accountInfoReplyContext = null;
             }
+            if (standard.command === 'SESSION') {
+              set({
+                accountSessionsPending: false,
+                accountSessionsError: standard.description || standard.code,
+              });
+              get().addNotification({
+                type: 'error',
+                text: standard.description || `SESSION failed (${standard.code})`,
+              });
+              return;
+            }
             set({
               accountInfoPending: false,
               accountActionError: {
@@ -10203,6 +10275,42 @@ export const store = createStore<OnyxState>()(
               }
               get().client?.updateResumeTokens({ meshToken: meshCred.token });
               break;
+            }
+
+            // ── SESSION LIST / DROP (account multi-device roster) ─────────
+            const sessionRow = parseSessionListLine(text);
+            if (sessionRow) {
+              set((st) => {
+                const without = st.accountSessions.filter((r) => r.index !== sessionRow.index);
+                const next = [...without, sessionRow].sort((a, b) => a.index - b.index);
+                return { accountSessions: next, accountSessionsError: null };
+              });
+              break;
+            }
+            if (isSessionListEnd(text)) {
+              set({ accountSessionsPending: false });
+              break;
+            }
+            const dropped = parseSessionDropOk(text);
+            if (dropped !== null) {
+              set((st) => ({
+                accountSessions: st.accountSessions.filter((r) => r.index !== dropped),
+                accountSessionsPending: false,
+                accountSessionsError: null,
+              }));
+              // Refresh so indices renumber consistently after a drop.
+              get().refreshAccountSessions();
+              break;
+            }
+            if (/^FAIL SESSION\b/i.test(text) || /^SESSION:\s/i.test(text)) {
+              // FAIL is usually standard-reply; keep a soft notice for free-form SESSION: errors.
+              if (!/^SESSION:\s*end of session list/i.test(text)) {
+                set({
+                  accountSessionsPending: false,
+                  accountSessionsError: text.slice(0, 200),
+                });
+              }
+              // Fall through so service notices still record free-form SESSION: lines.
             }
 
             // Account security replies are server-authored but carry no request
