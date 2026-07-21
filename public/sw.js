@@ -26,33 +26,18 @@ function boundedPushString(value, maxLength) {
   return typeof value === 'string' ? value.slice(0, maxLength) : '';
 }
 
-// E2EE DM envelopes ride ordinary PRIVMSG/memo text as `ONYXDM1 ` + b64url
-// (legacy `TSUMUGI1 ` still accepted so old push payloads stay private).
+// E2EE DM envelopes ride ordinary PRIVMSG/memo text as `ONYXDM1 ` + b64url.
 // The service worker cannot open them (keys live in the page's IndexedDB), so
 // any envelope that reaches a push payload must fail closed to a neutral body —
 // never put ciphertext on a lock screen. Leading whitespace is also redacted:
 // crypto stays strict, but a lock-screen body must not surface a padded envelope.
 const E2EE_ENVELOPE_PREFIX = 'ONYXDM1 ';
-const E2EE_LEGACY_ENVELOPE_PREFIX = 'TSUMUGI1 ';
 const ENCRYPTED_PUSH_BODY = 'New encrypted message';
 
 function isPushEnvelope(text) {
-  // Mirror dmCipher isEnvelope dual-open: current + legacy prefixes, plus
-  // leading-whitespace forms so lock-screen bodies never show ciphertext.
-  if (
-    text.startsWith(E2EE_ENVELOPE_PREFIX)
-    || text.startsWith(E2EE_LEGACY_ENVELOPE_PREFIX)
-  ) {
-    return true;
-  }
+  if (text.startsWith(E2EE_ENVELOPE_PREFIX)) return true;
   const trimmed = text.replace(/^\s+/u, '');
-  return (
-    trimmed !== text
-    && (
-      trimmed.startsWith(E2EE_ENVELOPE_PREFIX)
-      || trimmed.startsWith(E2EE_LEGACY_ENVELOPE_PREFIX)
-    )
-  );
+  return trimmed !== text && trimmed.startsWith(E2EE_ENVELOPE_PREFIX);
 }
 
 function pushBodyFor(text) {

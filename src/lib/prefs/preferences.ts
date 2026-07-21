@@ -96,7 +96,6 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
 
 const STORAGE_KEY = 'onyx:preferences';
 /** Legacy key from the previous brand name; read-only for one-time migration. */
-const LEGACY_STORAGE_KEY = 'ruri:preferences';
 /** Older store-level high-contrast toggle; read-only for migration. */
 const LEGACY_HIGH_CONTRAST_KEY = 'onyx:high-contrast';
 /** Fixed-schema preferences are tiny; reject quota-sized storage before parsing. */
@@ -147,9 +146,8 @@ export function loadPreferences(): Preferences {
 
   let parsed: unknown;
   try {
-    // Current key first, then fall back to the legacy key (read-old-write-new)
-    // so prefs saved under the previous brand survive one load after the rebrand.
-    const serialized = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    // Current onyx preferences key
+    const serialized = localStorage.getItem(STORAGE_KEY);
     if (serialized && serialized.length > MAX_PREFERENCES_STORAGE_CHARS) {
       return { ...DEFAULT_PREFERENCES };
     }

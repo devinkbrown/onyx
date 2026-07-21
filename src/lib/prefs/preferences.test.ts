@@ -171,10 +171,8 @@ describe('preferences store', () => {
       expect(loadPreferences().highContrast).toBe(true);
     });
 
-    it('prefers the current storage key over the legacy preferences key', () => {
-      localStorage.setItem('ruri:preferences', JSON.stringify({ density: 'compact' }));
+    it('reads only the current onyx preferences key', () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ density: 'roomy' }));
-
       expect(loadPreferences().density).toBe('roomy');
     });
 

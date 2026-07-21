@@ -95,13 +95,10 @@ describe('recents', () => {
     localStorage.setItem(PALETTE_RECENTS_STORAGE_KEY, JSON.stringify([
       { id: 'dm:private', label: 'Open DM with private', section: 'DMs', at: new Date().toISOString() },
     ]));
-    localStorage.setItem('ruri:palette-recents', 'legacy-private');
-
-    expect(loadRecents()).toEqual([]);
+        expect(loadRecents()).toEqual([]);
     saveRecent({ id: 'channel:#secret', label: '#secret', section: 'Channels' });
 
     expect(localStorage.getItem(PALETTE_RECENTS_STORAGE_KEY)).toBeNull();
-    expect(localStorage.getItem('ruri:palette-recents')).toBeNull();
   });
 
   it('saves and loads a recent target for one owner', () => {

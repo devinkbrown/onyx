@@ -140,14 +140,15 @@ describe('background registry', () => {
   });
 
   it('resolves legacy ids to their canonical catalogue entries', async () => {
-    // Prefs and theme signatureBg written before the rename must keep working.
+    // Japanese legacy background ids are rejected (English catalogue only).
     const { resolveBackgroundId, getBackgroundMeta } = await import('./catalogue');
-    expect(resolveBackgroundId('kintsugi-veins')).toBe('gold-veins');
-    expect(resolveBackgroundId('sumi-e')).toBe('ink-wash');
-    expect(resolveBackgroundId('washi')).toBe('paper-grain');
-    expect(resolveBackgroundId('tokyo-night')).toBe('neon-night');
-    expect(getBackgroundMeta('kintsugi-veins')?.id).toBe('gold-veins');
-    const loaded = await loadBackgroundVariant('kintsugi-veins');
+    expect(resolveBackgroundId('kintsugi-veins')).toBeUndefined();
+    expect(resolveBackgroundId('sumi-e')).toBeUndefined();
+    expect(resolveBackgroundId('washi')).toBeUndefined();
+    expect(resolveBackgroundId('tokyo-night')).toBeUndefined();
+    expect(getBackgroundMeta('kintsugi-veins')).toBeUndefined();
+    expect(resolveBackgroundId('gold-veins')).toBe('gold-veins');
+    const loaded = await loadBackgroundVariant('gold-veins');
     expect(loaded?.id).toBe('gold-veins');
   });
 

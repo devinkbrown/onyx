@@ -125,25 +125,11 @@ export const backgroundFamilies = BACKGROUND_CATALOGUE.reduce<Record<string, Sig
 const CATALOGUE_BY_ID = new Map(BACKGROUND_CATALOGUE.map((meta) => [meta.id, meta]));
 const FAMILY_BY_ID = new Map(SIGNATURE_FAMILIES.map((meta) => [meta.id, meta]));
 
-/**
- * Legacy public ids retained as aliases so stored prefs and theme `signatureBg`
- * values written before the rename still resolve. The canonical catalogue id is
- * what the picker shows and what the loader fetches.
- */
-const LEGACY_ID_ALIASES: Readonly<Record<string, BackgroundId>> = {
-  'kintsugi-veins': 'gold-veins',
-  'sumi-e': 'ink-wash',
-  washi: 'paper-grain',
-  'tokyo-night': 'neon-night',
-  // Half-finished rename that briefly landed in themes before ink-wash settled.
-  'ink-e': 'ink-wash',
-};
-
-/** Resolve a possibly-legacy id to its canonical catalogue id. */
+/** Resolve a catalogue id (canonical English ids only — no Japanese aliases). */
 export function resolveBackgroundId(id: string | null | undefined): BackgroundId | undefined {
   if (id == null) return undefined;
   if (CATALOGUE_BY_ID.has(id)) return id as BackgroundId;
-  return LEGACY_ID_ALIASES[id];
+  return undefined;
 }
 
 /** Metadata for an id (or legacy alias), or undefined for an unknown id. No render code loaded. */
@@ -152,7 +138,7 @@ export function getBackgroundMeta(id: string | null | undefined): BackgroundMeta
   return canonical == null ? undefined : CATALOGUE_BY_ID.get(canonical);
 }
 
-/** True for a canonical catalogue id *or* a known legacy alias. */
+/** True for a canonical catalogue id. */
 export function isBackgroundId(id: string | null | undefined): boolean {
   return resolveBackgroundId(id) != null;
 }

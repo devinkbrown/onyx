@@ -85,7 +85,6 @@ export function clearCommands(): void {
 export const PALETTE_RECENTS_STORAGE_KEY = 'onyx:palette-recents';
 export const MAX_PALETTE_RECENTS_STORAGE_CHARS = 16 * 1024;
 /** Legacy key from the previous brand name; read-only for one-time migration. */
-const LEGACY_RECENTS_KEY = 'ruri:palette-recents';
 const MAX_RECENTS = 6;
 const MAX_RECENT_ID_LENGTH = 256;
 const MAX_RECENT_LABEL_LENGTH = 256;
@@ -106,7 +105,6 @@ function recentStorageKey(owner?: DeviceMemoryOwner): string | null {
 
 function purgeOwnerlessRecents(): void {
   localStorage.removeItem(PALETTE_RECENTS_STORAGE_KEY);
-  localStorage.removeItem(LEGACY_RECENTS_KEY);
 }
 
 function parseRecentTarget(value: unknown): RecentTarget | null {

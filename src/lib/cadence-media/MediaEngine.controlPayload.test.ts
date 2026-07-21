@@ -272,9 +272,9 @@ describe('CadenceMediaEngine control payload boundary', () => {
       'KEYFRAME',
       'FRAME',
       'CHANNEL_INFO_RESP',
-      'TSUMUGI_HANDSHAKE',
-      'TSUMUGI_DATA',
-      'TSUMUGI_GROUP_KEY',
+      'E2EE-HANDSHAKE',
+      'E2EE_DATA',
+      'E2EE-GROUPKEY',
       'VOICE_DATA',
       'VIDEO_DATA',
     ];
@@ -291,7 +291,7 @@ describe('CadenceMediaEngine control payload boundary', () => {
 
     engine.handleMediaMessage('Alice', '#room', 'AUDIO', oversized);
     engine.handleMediaMessage('Alice', '#room', 'VIDEO_DATA', oversized);
-    engine.handleMediaMessage('Alice', '#room', 'TSUMUGI_DATA', oversized);
+    engine.handleMediaMessage('Alice', '#room', 'SCREEN_DATA', oversized);
 
     expect(engine.getPeers().size).toBe(0);
   });
@@ -303,7 +303,7 @@ describe('CadenceMediaEngine control payload boundary', () => {
 
     engine.handleMediaMessage('Alice', '#room', 'VIDEO_JOIN', oversized);
     engine.handleMediaMessage('Alice', '#room', 'PRESENCE', oversized);
-    engine.handleMediaMessage('Alice', '#room', 'TSUMUGI_GROUP_KEY', oversized);
+    engine.handleMediaMessage('Alice', '#room', 'E2EE-GROUPKEY', oversized);
 
     expect(engine.getPeers().size).toBe(0);
     expect(onPresence).not.toHaveBeenCalled();

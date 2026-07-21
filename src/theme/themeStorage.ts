@@ -4,11 +4,8 @@ import { getCustomTheme, isCustomThemeId } from './customThemes';
 
 export const THEME_STORAGE_KEY = 'onyx:theme';
 
-const LEGACY_THEME_ID = 'ruri';
-const MIGRATED_THEME_ID: ThemeId = 'onyx';
-
+/** English-only theme id remaps for retired English aliases (no Japanese brands). */
 const LEGACY_THEME_MAP: Record<string, ThemeId> = {
-  [LEGACY_THEME_ID]: MIGRATED_THEME_ID,
   lacquer: 'shu',
   midnight: 'ocean',
   amoled: 'abyss',

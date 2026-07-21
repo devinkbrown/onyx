@@ -9,7 +9,6 @@
  *   shared  = ECDH(my_device_secret, peer_device_public)
  *   aes_key = HKDF(shared, salt="onyx-dm-v1", info=sorted(pubA ‖ pubB))
  *   wire    = "ONYXDM1 " ‖ b64url(nonce12 ‖ ciphertext‖tag)
- *   (legacy "TSUMUGI1 " prefixes are still accepted when opening history)
  *
  * The envelope rides an ordinary PRIVMSG, so CHATHISTORY, session-sync and
  * the outbox all carry ciphertext untouched; the server (and its search
@@ -26,10 +25,8 @@ const DB_VERSION = 1;
 const STORE = 'device';
 const KEY_ID = 'dm-v1';
 
-/** On-wire E2EE DM envelope prefix (current). */
+/** On-wire E2EE DM envelope prefix. */
 export const ENVELOPE_PREFIX = 'ONYXDM1 ';
-/** Historical prefix still accepted when opening old vault/history rows. */
-export const LEGACY_ENVELOPE_PREFIX = 'TSUMUGI1 ';
 
 /** Rendered in place of ciphertext we cannot open (wrong device, lost key). */
 export const LOCKED_PLACEHOLDER = '🔒 Encrypted message (sent to another device)';
@@ -309,13 +306,12 @@ export function _sharedKeyCacheSizeForTests(): number {
 // ── envelope ─────────────────────────────────────────────────────────────────
 
 export function isEnvelope(text: string): boolean {
-  return text.startsWith(ENVELOPE_PREFIX) || text.startsWith(LEGACY_ENVELOPE_PREFIX);
+  return text.startsWith(ENVELOPE_PREFIX);
 }
 
 /** Body offset after a recognized envelope prefix, or -1. */
 export function envelopeBodyOffset(text: string): number {
   if (text.startsWith(ENVELOPE_PREFIX)) return ENVELOPE_PREFIX.length;
-  if (text.startsWith(LEGACY_ENVELOPE_PREFIX)) return LEGACY_ENVELOPE_PREFIX.length;
   return -1;
 }
 

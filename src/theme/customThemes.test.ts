@@ -242,16 +242,11 @@ describe('persistence', () => {
     expect(getCustomTheme(added.id)).toEqual(added);
   });
 
-  it('migrates and removes the legacy theme key once', () => {
+  it('ignores retired Japanese brand storage keys', () => {
     localStorage.setItem('ruri:custom-themes', JSON.stringify([
       { id: 'custom:legacy', name: 'Legacy', base: 'ruri', overrides: { '--lapis': '#00ace9' } },
     ]));
-
-    expect(loadCustomThemes()).toEqual([
-      { id: 'custom:legacy', name: 'Legacy', base: 'onyx', overrides: { '--lapis': '#00ace9' } },
-    ]);
-    expect(localStorage.getItem('ruri:custom-themes')).toBeNull();
-    expect(JSON.parse(localStorage.getItem('onyx:custom-themes') ?? 'null')).toHaveLength(1);
+    expect(loadCustomThemes()).toEqual([]);
   });
 
   it('round-trips saved themes through the onyx custom theme key', () => {

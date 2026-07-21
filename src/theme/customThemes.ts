@@ -22,12 +22,7 @@ export type CustomTheme = {
 };
 
 const STORAGE_KEY = 'onyx:custom-themes';
-/** Legacy key from the previous brand name; read-only for one-time migration. */
-const LEGACY_STORAGE_KEY = 'ruri:custom-themes';
 const CUSTOM_PREFIX = 'custom:';
-/** Legacy built-in theme id that was renamed; migrate custom-theme `base` refs. */
-const LEGACY_BASE_ID = 'ruri';
-const MIGRATED_BASE_ID = 'onyx';
 const MAX_CUSTOM_THEME_STORAGE_BYTES = 256 * 1024;
 const MAX_CUSTOM_THEMES = 32;
 const MAX_CUSTOM_THEME_CANDIDATES = 128;
@@ -219,9 +214,7 @@ export function isCustomThemeId(id: string): boolean {
 export function loadCustomThemes(): CustomTheme[] {
   if (typeof window === 'undefined') return [];
   try {
-    const current = localStorage.getItem(STORAGE_KEY);
-    const legacy = current === null ? localStorage.getItem(LEGACY_STORAGE_KEY) : null;
-    const serialized = current ?? legacy;
+    const serialized = localStorage.getItem(STORAGE_KEY);
     if (!serialized || serialized.length > MAX_CUSTOM_THEME_STORAGE_BYTES) return [];
     const raw: unknown = JSON.parse(serialized);
     if (!Array.isArray(raw)) return [];
@@ -229,27 +222,15 @@ export function loadCustomThemes(): CustomTheme[] {
     const seen = new Set<string>();
     for (const candidate of raw.slice(0, MAX_CUSTOM_THEME_CANDIDATES)) {
       if (themes.length >= MAX_CUSTOM_THEMES) break;
-      const theme = parseCustomThemeValue(migrateCustomThemeBase(candidate));
+      const theme = parseCustomThemeValue(candidate);
       if (!theme || seen.has(theme.id)) continue;
       seen.add(theme.id);
       themes.push(theme);
     }
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
-    if (current === null && legacy !== null) persist(themes);
     return themes;
   } catch {
     return [];
   }
-}
-
-/** Rewrite a legacy `base: 'ruri'` reference to the current theme id. */
-function migrateCustomThemeBase(value: unknown): unknown {
-  if (typeof value !== 'object' || value === null) return value;
-  const v = value as Record<string, unknown>;
-  if (v.base === LEGACY_BASE_ID) {
-    return { ...v, base: MIGRATED_BASE_ID };
-  }
-  return value;
 }
 
 function persist(list: CustomTheme[]): void {
