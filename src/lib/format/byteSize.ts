@@ -1,4 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+ * formatBytes — intentional shared pure util (format-contracts suite).
+ *
+ * Not wired into VoiceBar's `formatBitrate`: that helper is compact *rate*
+ * notation (`128k` / `1.5M` bps), not a byte-size label. Composer keeps a
+ * local attachment-size formatter with different unit/precision rules.
+ * Import here when a product surface needs decimal/binary byte labels.
+ */
 export interface ByteSizeFormatOptions {
   binary?: boolean;
   precision?: number;

@@ -128,8 +128,9 @@ pieces: `MediaEngine.ts` (capture/encode/signaling), `cadenceFrame.ts` (frame
 codec module name historical — Cadence framing), `ChunkAssembler.ts`
 (reassembly), `mediaMac.ts` (per-stream media MAC, pinned by
 `ws_media_mac.vectors.json`), `PeerRegistry.ts` + `spatialAudio.ts` (HRTF
-spatial audio), `MooringSession.ts`/`MooringGroup.ts`/`MooringIdentity.ts` (E2E
-media crypto modules — historical names), and `videoEncodeWorker.ts`
+spatial audio), `MooringSession.ts`/`MooringGroup.ts` (E2E media crypto modules
+— historical names; device identity lives in `dmCipher` deviceKeys), and
+`videoEncodeWorker.ts`
 (off-main-thread encode). Voice UI is in `src/shell/voice/`. Vite keeps this in
 a separate `media` chunk so it stays off first paint (`vite.config.ts:22`).
 
