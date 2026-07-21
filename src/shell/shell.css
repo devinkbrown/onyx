@@ -6396,6 +6396,21 @@
 .shell-channel-item:hover .shell-channel-time { color: var(--paper-dim); }
 .shell-channel-item--active .shell-channel-time { color: var(--lapis-bright); opacity: 1; }
 
+/* Offline-memo aggregate on a DM — calm secondary, never a hot badge. */
+.shell-channel-offline {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  color: var(--paper-mute);
+  opacity: 0.9;
+  white-space: nowrap;
+  transition: color var(--dur) var(--ease);
+}
+.shell-channel-item:hover .shell-channel-offline { color: var(--paper-dim); }
+.shell-channel-item--active .shell-channel-offline { color: var(--lapis-bright); opacity: 1; }
+
 /* ── Professional scrollbars across the shell ──────────────────────────── */
 .shell-feed::-webkit-scrollbar,
 .shell-sidebar-scroll::-webkit-scrollbar,

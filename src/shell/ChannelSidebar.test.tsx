@@ -181,6 +181,68 @@ describe('ChannelSidebar accessibility', () => {
     expect(erin.getAttribute('aria-label')).toBe('DM with erin, 4 unread, 1 mention');
   });
 
+  it('shows offline memo counts on DM rows and clears when the aggregate drops', () => {
+    // Arrange — pending offline memos for a peer (store.offlineMemo aggregate).
+    const channels = new Map<string, Channel>();
+    const dms = new Map<string, DMConversation>();
+    dms.set('alice', makeDm('alice'));
+    dms.set('bob', makeDm('bob'));
+    store.setState({
+      ...initialState,
+      channels,
+      dms,
+      offlineMemo: new Map([
+        ['alice', { count: 3, firstMsgId: 'memo-1' }],
+      ]),
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+    }, true);
+
+    // Act
+    const { getByRole, container, queryByText } = render(() => <ChannelSidebar />);
+    const alice = getByRole('button', { name: /alice/ });
+    const bob = getByRole('button', { name: /bob/ });
+
+    // Assert — accessible name + calm secondary stamp; no stamp on peers without memos.
+    expect(alice.getAttribute('aria-label')).toBe('DM with alice, 3 offline');
+    expect(alice.querySelector('.shell-channel-offline')?.textContent).toBe('3 offline');
+    expect(bob.getAttribute('aria-label')).toBe('DM with bob');
+    expect(bob.querySelector('.shell-channel-offline')).toBeNull();
+    // Decorative only — AT reads the name, not a live region.
+    expect(alice.querySelector('.shell-channel-offline')?.getAttribute('aria-hidden')).toBe('true');
+
+    // Act — opening the DM (or an explicit clear) drops the map entry; UI must react.
+    store.getState().clearOfflineMemo('alice');
+
+    // Assert — badge gone after aggregate clear (Solid updates synchronously).
+    expect(alice.getAttribute('aria-label')).toBe('DM with alice');
+    expect(queryByText('3 offline')).toBeNull();
+    expect(container.querySelector('.shell-channel-offline')).toBeNull();
+  });
+
+  it('singularizes a single offline memo stamp', () => {
+    const dms = new Map<string, DMConversation>();
+    dms.set('cara', makeDm('cara'));
+    store.setState({
+      ...initialState,
+      channels: new Map(),
+      dms,
+      offlineMemo: new Map([['cara', { count: 1, firstMsgId: 'memo-only' }]]),
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+    }, true);
+
+    const { getByRole } = render(() => <ChannelSidebar />);
+    const cara = getByRole('button', { name: /cara/ });
+
+    expect(cara.getAttribute('aria-label')).toBe('DM with cara, 1 offline');
+    expect(cara.querySelector('.shell-channel-offline')?.textContent).toBe('1 offline');
+  });
+
   it('does not announce unread counts through a live region', () => {
     // Arrange — #bravo carries 3 unread / 2 mentions.
     seed();

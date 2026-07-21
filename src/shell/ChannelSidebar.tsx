@@ -2,8 +2,10 @@
 /**
  * ChannelSidebar.tsx — channel list + DM list + join form.
  *
- * Reads store: channels, dms, activeView, connectionStatus.
- * Actions: joinChannel (store), navigate (store).
+ * Reads store: channels, dms, offlineMemo, activeView, connectionStatus.
+ * Actions: joinChannel (store), navigate (store). Offline-memo aggregates
+ * surface as a calm "N offline" stamp on DM rows; navigate → clearOfflineMemo
+ * drops the map entry and the stamp clears reactively.
  *
  * SOLID IDIOMS: never destructure props; splitProps; createSignal/createMemo;
  * For/Show; a11y landmarks.
@@ -64,6 +66,18 @@ function unreadLabel(unread: number, highlights: number): string {
   if (unread > 0) parts.push(`${unread} unread`);
   if (highlights > 0) parts.push(`${highlights} mention${highlights === 1 ? '' : 's'}`);
   return parts.length > 0 ? `, ${parts.join(', ')}` : '';
+}
+
+/** Accessible suffix for pending offline-memo aggregates on a DM. */
+function offlineMemoLabel(count: number): string {
+  if (count <= 0) return '';
+  return `, ${count} offline`;
+}
+
+/** Calm secondary stamp for the DM row (decorative; name carries the count). */
+function offlineMemoStamp(count: number): string {
+  if (count <= 0) return '';
+  return count === 1 ? '1 offline' : `${count} offline`;
 }
 
 /**
@@ -195,6 +209,9 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     return `${Math.floor(sec / 86400)}d`;
   };
   const dms = useStore((s) => s.dms);
+  // Immutable Map replace on write — Object.is equality is enough; badge
+  // rows re-read via .get(nick) when the map identity changes.
+  const offlineMemo = useStore((s) => s.offlineMemo);
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
@@ -459,6 +476,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                   const active = createMemo(() => isDmActive(activeView(), dm));
                   const hasUnread = createMemo(() => dm.unread > 0);
                   const hasHighlight = createMemo(() => dm.highlights > 0);
+                  // Offline-memo aggregate (wire MEMO). Cleared by navigate →
+                  // clearOfflineMemo when the DM is opened.
+                  const offlineCount = createMemo(
+                    () => offlineMemo().get(dm.nick.toLowerCase())?.count ?? 0,
+                  );
 
                   return (
                     <li>
@@ -473,11 +495,16 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                           hasHighlight() ? 'shell-channel-item--highlight' : '',
                         ].filter(Boolean).join(' ')}
                         aria-current={active() ? 'page' : undefined}
-                        aria-label={`DM with ${dm.nick}${unreadLabel(dm.unread, dm.highlights)}`}
+                        aria-label={`DM with ${dm.nick}${unreadLabel(dm.unread, dm.highlights)}${offlineMemoLabel(offlineCount())}`}
                         onClick={() => handleDmClick(dm)}
                       >
                         <span class="shell-channel-sigil" aria-hidden="true">@</span>
                         <span class="shell-channel-name">{dm.nick}</span>
+                        <Show when={offlineCount() > 0}>
+                          <span class="shell-channel-offline" aria-hidden="true">
+                            {offlineMemoStamp(offlineCount())}
+                          </span>
+                        </Show>
                         <Show when={dm.highlights > 0}>
                           <span class="shell-channel-badge" aria-hidden="true">
                             {dm.highlights}
