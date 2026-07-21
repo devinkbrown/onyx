@@ -24,9 +24,20 @@ import type {
   CadenceMediaCallbacks,
   CadencePeerState,
 } from '@/lib/cadence-media/types';
+import {
+  classifyCodecFailure,
+  codecFailureToastCopy,
+  decodeFailureKey,
+  isCodecFailureMessage,
+  shouldAnnounceDecodeError,
+  type CodecFailureMediaKind,
+} from '@/lib/cadence-media/codecFailure';
 
 /** Per-peer auto-lower timers for raised hands signalled via the ✋ reaction. */
 const _handTimers = new Map<string, number>();
+
+/** Decode-failure toast keys already announced this call (R5 rate-limit). */
+const _decodeFailureAnnounced = new Set<string>();
 
 type CanvasStreamCacheEntry = {
   canvas: HTMLCanvasElement;
@@ -174,6 +185,8 @@ export function mountMedia(): void {
     onCallState(state, nick, channel) {
       const safeNick = validMediaNick(nick) ? nick : '';
       const safeChannel = validMediaChannel(channel) ? channel : null;
+      // Fresh call → re-arm R5 decode toasts for new peers/sessions.
+      if (state === 'idle') _decodeFailureAnnounced.clear();
       getState().setVoiceCallState({
         callState: state,
         callWith: safeNick,
@@ -225,6 +238,10 @@ export function mountMedia(): void {
       if (videoKey) videoParticipants.delete(videoKey);
 
       clearCachedPeerStream(peerKey ?? nick);
+      // Allow a future rejoin of the same nick to re-announce codec failure.
+      for (const key of [..._decodeFailureAnnounced]) {
+        if (key.startsWith(`${nick.toLowerCase()}:`)) _decodeFailureAnnounced.delete(key);
+      }
       state.setVoiceCallState({ peers, videoParticipants });
       state.setSpeakingNick(nick, false);
       removeNickFromVoicePresence(nick);
@@ -267,6 +284,20 @@ export function mountMedia(): void {
       // visible AT THE MOMENT it happens (a silent camera/permission failure
       // reads as "clicking Join video does nothing").
       getState().addNotification({ type: 'error', text: `Voice: ${safeMessage}` });
+      // Research R5 — codec init/ladder exhaust gets a dedicated fail-closed toast
+      // (never a generic "Media error" that users miss as black video).
+      if (isCodecFailureMessage(safeMessage)) {
+        const kind = classifyCodecFailure(safeMessage);
+        const copy = codecFailureToastCopy(kind, { rawMessage: safeMessage });
+        getState().addToast({
+          variant: 'error',
+          title: copy.title,
+          description: copy.description,
+          duration: 7000,
+          groupKey: `codec-fail-${kind}`,
+        });
+        return;
+      }
       getState().addToast({
         variant: 'error',
         title: 'Media error',
@@ -274,8 +305,31 @@ export function mountMedia(): void {
       });
     },
 
-    onDecodeError() {
-      // Decode errors are non-fatal; the engine handles peer reset/recovery.
+    onDecodeError(peer, type, err) {
+      // Decode errors are non-fatal for the call, but R5 requires a fail-closed
+      // toast so a peer codec mismatch never presents as silent black video.
+      if (!validMediaNick(peer)) return;
+      const mediaKind: CodecFailureMediaKind =
+        type === 'screen' ? 'screen' : type === 'voice' ? 'voice' : 'video';
+      // Audio decode glitches are common under packet loss — only toast video/
+      // screenshare so we don't spam on transient voice frames.
+      if (mediaKind === 'voice') return;
+      const key = decodeFailureKey(peer, mediaKind);
+      if (!shouldAnnounceDecodeError(_decodeFailureAnnounced, key)) return;
+      _decodeFailureAnnounced.add(key);
+      const raw = err instanceof Error ? err.message : String(err ?? '');
+      const kind = classifyCodecFailure(raw || 'decode failed');
+      const copy = codecFailureToastCopy(
+        kind === 'unknown' ? 'decode' : kind,
+        { peer, mediaKind, rawMessage: raw },
+      );
+      getState().addToast({
+        variant: 'error',
+        title: copy.title,
+        description: copy.description,
+        duration: 6000,
+        groupKey: `codec-decode-${key}`,
+      });
     },
 
     onAudioLevel(nick, level) {

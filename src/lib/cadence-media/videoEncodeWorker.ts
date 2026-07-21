@@ -215,11 +215,22 @@ async function captureLoop(s: WorkerState): Promise<void> {
       builtForW = targetW;
       builtForH = targetH;
       s.enc.destroy();
-      s.enc = buildEncoder(
-        s.wasm, s.tier,
-        s.profileWidth, s.profileHeight,
-        s.profileQuality, s.encProfile, s.profileFps,
-      );
+      try {
+        s.enc = buildEncoder(
+          s.wasm, s.tier,
+          s.profileWidth, s.profileHeight,
+          s.profileQuality, s.encProfile, s.profileFps,
+        );
+      } catch (err) {
+        /* Research R5 — ladder exhaust on tier change must not die silently
+         * (black video with no toast). Main thread surfaces via onError. */
+        self.postMessage({
+          type: 'error',
+          msg: `Encoder init failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+        s.stopped = true;
+        break;
+      }
       drawW = s.enc.width;
       drawH = s.enc.height;
       canvas = new OffscreenCanvas(drawW, drawH);

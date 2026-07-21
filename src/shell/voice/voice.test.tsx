@@ -799,6 +799,52 @@ describe('VoiceBar', () => {
     }
   });
 
+  it('toasts once when the bandwidth ladder degrades after a good baseline (R3)', async () => {
+    vi.useFakeTimers();
+    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+    let tier: 0 | 1 | 2 | 3 = 0;
+    setMountedCadenceMediaEngine({
+      getNetworkStats: () => ({
+        tier,
+        suggestedBps: tier === 0 ? 500_000 : 100_000,
+        jitterMs: 20,
+        lossRate: 0.01,
+      }),
+    } as never);
+
+    try {
+      seedVoiceStore([], [], { cameraOn: true });
+      const toastCountBefore = store.getState().toasts.length;
+      render(() => <VoiceBar />);
+
+      // Establish a good baseline (stable tier 0). 1 Hz poll + 2500 ms hold.
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(
+        store.getState().toasts.filter(t => t.groupKey?.startsWith('bw-ladder-')),
+      ).toHaveLength(0);
+
+      // Degrade to fair. The next poll arms the candidate; then hold ≥ hysteresis
+      // (another ~3 interval ticks) so the ladder notice can fire once.
+      tier = 2;
+      await vi.advanceTimersByTimeAsync(4000);
+
+      const ladderToasts = store.getState().toasts.filter(t => t.groupKey === 'bw-ladder-lowering');
+      expect(ladderToasts.length).toBeGreaterThanOrEqual(1);
+      expect(ladderToasts[0]?.description?.toLowerCase()).toContain('keep audio clear');
+      expect(store.getState().toasts.length).toBeGreaterThan(toastCountBefore);
+
+      // Stay fair — no spam.
+      const afterFirst = store.getState().toasts.filter(t => t.groupKey === 'bw-ladder-lowering').length;
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(
+        store.getState().toasts.filter(t => t.groupKey === 'bw-ladder-lowering'),
+      ).toHaveLength(afterFirst);
+    } finally {
+      setMountedCadenceMediaEngine(null);
+      vi.useRealTimers();
+    }
+  });
+
   it('shows connecting security chip while ringing (no padlock)', () => {
     store.setState(
       {

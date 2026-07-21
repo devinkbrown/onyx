@@ -63,6 +63,12 @@ import {
   INITIAL_CONNECTION_QUALITY_ACTION_STATE,
   type ConnectionQualityActionState,
 } from '@/lib/cadence-media/connectionQualityAction';
+import {
+  advanceBandwidthLadderFeedback,
+  bandwidthLadderNoticeCopy,
+  consumeBandwidthLadderNotice,
+  INITIAL_BANDWIDTH_LADDER_FEEDBACK_STATE,
+} from '@/lib/cadence-media/bandwidthLadderFeedback';
 import { mergeVoiceParticipants } from './voiceParticipants';
 import './voice.css';
 
@@ -255,6 +261,9 @@ function ConnectionQualityPip() {
   const [cqAction, setCqAction] = createSignal<ConnectionQualityActionState>(
     INITIAL_CONNECTION_QUALITY_ACTION_STATE,
   );
+  // Ladder feedback is poll-driven only — no DOM binding, so a plain local
+  // (not a signal) is enough to carry hysteresis across 1 Hz samples.
+  let ladderState = INITIAL_BANDWIDTH_LADDER_FEEDBACK_STATE;
 
   let intervalId: ReturnType<typeof setInterval> | undefined;
 
@@ -279,6 +288,24 @@ function ConnectionQualityPip() {
         tier: stats.tier,
         cameraOn: cameraOn(),
       }));
+      // Research R3 — calm one-shot toast when the bandwidth ladder steps down.
+      const ladderNext = advanceBandwidthLadderFeedback(ladderState, {
+        nowMs: Date.now(),
+        tier: stats.tier,
+      });
+      if (ladderNext.pendingNotice) {
+        const copy = bandwidthLadderNoticeCopy(ladderNext.pendingNotice);
+        getState().addToast({
+          variant: 'info',
+          title: copy.title,
+          description: copy.description,
+          duration: 4500,
+          groupKey: `bw-ladder-${ladderNext.pendingNotice}`,
+        });
+        ladderState = consumeBandwidthLadderNotice(ladderNext);
+      } else {
+        ladderState = ladderNext;
+      }
     };
     poll();
     intervalId = setInterval(poll, 1000);

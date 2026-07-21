@@ -896,6 +896,9 @@ export class CadenceMediaEngine {
       }
       if (msg.type === 'error') {
         console.warn('[cadence/worker]', msg.msg);
+        /* Research R5 — fail closed: never leave silent black video when the
+         * encode worker exhausts the codec ladder or cannot load WASM. */
+        this.handleVideoCodecFailure(msg.msg ?? 'Video encoder failed');
         return;
       }
       if (msg.type === 'encoded' && msg.data && msg.ftype && this.activeRoom) {
@@ -907,6 +910,7 @@ export class CadenceMediaEngine {
 
     worker.onerror = (ev) => {
       console.error('[cadence/worker] uncaught:', ev.message);
+      this.handleVideoCodecFailure(ev.message || 'Video encode worker crashed');
     };
 
     /* Clone the video track so the worker can consume it independently via
@@ -987,14 +991,30 @@ export class CadenceMediaEngine {
     stream: MediaStream,
     profile: VideoCaptureProfile,
   ): Promise<void> {
-    const wasm = await this.ensureWasm();
-    this.vidEnc = wasm.videoEncoder(
-      profile.width,
-      profile.height,
-      profile.quality,
-      profile.profile,
-      profile.fps,
-    );
+    let wasm: OpcodecWasm;
+    try {
+      wasm = await this.ensureWasm();
+    } catch (err) {
+      this.handleVideoCodecFailure(
+        `Codec unavailable — video capture disabled: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return;
+    }
+    try {
+      this.vidEnc = wasm.videoEncoder(
+        profile.width,
+        profile.height,
+        profile.quality,
+        profile.profile,
+        profile.fps,
+      );
+    } catch (err) {
+      /* Main-thread path has no size ladder — surface the same fail-closed toast. */
+      this.handleVideoCodecFailure(
+        `Encoder init failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return;
+    }
     const video = document.createElement('video');
     video.srcObject = stream; video.muted = true;
     await video.play();
@@ -1003,6 +1023,15 @@ export class CadenceMediaEngine {
     canvas.width = profile.width; canvas.height = profile.height;
     this.vidCanvas = canvas;
     this.vidFrameTimer = setInterval(() => this.onVideoTick(), 1000 / profile.fps);
+  }
+
+  /**
+   * Research R5 — codec init/ladder exhaust must not leave a silent black
+   * publish path. Tear down the broken encoder and surface via onError (toast).
+   */
+  private handleVideoCodecFailure(message: string): void {
+    this.stopVideoCapture();
+    this.cb.onError(message);
   }
 
   /**
@@ -1040,10 +1069,18 @@ export class CadenceMediaEngine {
     if (this.vidCanvas.width !== drawW || this.vidCanvas.height !== drawH) {
       /* Dimensions changed — rebuild canvas and encoder at new size. */
       if (this.wasm) {
-        this.vidEnc.destroy();
-        this.vidEnc = this.wasm.videoEncoder(
-          drawW, drawH, profile.quality, profile.profile, profile.fps,
-        );
+        try {
+          this.vidEnc.destroy();
+          this.vidEnc = this.wasm.videoEncoder(
+            drawW, drawH, profile.quality, profile.profile, profile.fps,
+          );
+        } catch (err) {
+          /* Research R5 — fail closed on tier-driven encoder rebuild. */
+          this.handleVideoCodecFailure(
+            `Encoder init failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          return;
+        }
       }
       this.vidCanvas.width  = drawW;
       this.vidCanvas.height = drawH;

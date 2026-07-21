@@ -212,4 +212,52 @@ describe('mountMedia', () => {
 
     window.removeEventListener('ocean:voice-reaction', handler);
   });
+
+  it('toasts a dedicated codec failure on encoder init errors (R5)', async () => {
+    const { mountMedia } = await import('./useCadenceMedia');
+
+    createRoot(dispose => {
+      mountMedia();
+      mediaMock.instances[0]?.callbacks.onError(
+        'Encoder init failed: cadencevis encoder init failed',
+      );
+
+      const toast = store.getState().toasts.at(-1);
+      expect(toast?.variant).toBe('error');
+      expect(toast?.title.toLowerCase()).toContain('camera');
+      expect(toast?.description?.toLowerCase()).toContain('cannot see you');
+      expect(toast?.groupKey).toBe('codec-fail-encoder_init');
+      dispose();
+    });
+  });
+
+  it('toasts once per peer on video decode failure and re-arms on idle (R5)', async () => {
+    const { mountMedia } = await import('./useCadenceMedia');
+
+    createRoot(dispose => {
+      mountMedia();
+      const cb = mediaMock.instances[0]?.callbacks;
+      cb?.onDecodeError?.('mika', 'video', new Error('decode frame failed'));
+      cb?.onDecodeError?.('mika', 'video', new Error('decode frame failed again'));
+
+      const videoToasts = store.getState().toasts.filter(t => t.groupKey === 'codec-decode-mika:video');
+      expect(videoToasts).toHaveLength(1);
+      expect(videoToasts[0]?.title.toLowerCase()).toContain('video');
+      expect(videoToasts[0]?.description).toContain('mika');
+
+      // Voice decode stays quiet (packet-loss noise).
+      const before = store.getState().toasts.length;
+      cb?.onDecodeError?.('mika', 'voice', new Error('decode audio'));
+      expect(store.getState().toasts).toHaveLength(before);
+
+      // Idle clears the rate-limit set so a later session can re-announce.
+      cb?.onCallState('idle', '', null);
+      cb?.onDecodeError?.('mika', 'video', new Error('decode frame failed'));
+      expect(
+        store.getState().toasts.filter(t => t.groupKey === 'codec-decode-mika:video'),
+      ).toHaveLength(2);
+
+      dispose();
+    });
+  });
 });
