@@ -114,6 +114,28 @@ export function ScreenShareStopIcon(props: IconProps): JSX.Element {
   );
 }
 
+/** Local-only call recording — filled circle (start). */
+export function RecordIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <circle cx="12" cy="12" r="8" fill="currentColor" opacity="0.16" />
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3.5" fill="currentColor" />
+    </Svg>
+  );
+}
+
+/** Local-only call recording — stop square while armed. */
+export function RecordStopIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <circle cx="12" cy="12" r="8" fill="currentColor" opacity="0.16" />
+      <circle cx="12" cy="12" r="8" />
+      <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" />
+    </Svg>
+  );
+}
+
 export function CaptionsIcon(props: IconProps): JSX.Element {
   return (
     <Svg class={props.class}>
