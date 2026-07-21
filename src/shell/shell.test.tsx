@@ -1328,10 +1328,55 @@ describe('AppShell', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
 
       await waitFor(() => {
-        expect(engine.joinVideo).toHaveBeenCalledWith('#general');
+        expect(engine.joinVideo).toHaveBeenCalledWith('#general', null);
         expect(store.getState().toasts.at(-1)?.title).toBe('Video could not start');
       });
       expect(store.getState().voice.callState).toBe('idle');
+    });
+
+    it('hands a gesture-captured stream to joinVideo (desktop activation path)', async () => {
+      // Desktop Chromium requires getUserMedia under the click; we capture first
+      // and pass the stream so later awaits cannot burn user-activation.
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+          negotiatedCaps: new Set<string>(),
+        } as never,
+      });
+      const gestureStream = {
+        getAudioTracks: () => [{ stop: vi.fn(), readyState: 'live', addEventListener: vi.fn() }],
+        getVideoTracks: () => [{ stop: vi.fn(), readyState: 'live', addEventListener: vi.fn() }],
+        getTracks: () => [],
+      } as unknown as MediaStream;
+      (gestureStream as { getTracks: () => MediaStreamTrack[] }).getTracks = () => [
+        ...gestureStream.getAudioTracks(),
+        ...gestureStream.getVideoTracks(),
+      ] as MediaStreamTrack[];
+      const getUserMedia = vi.fn(async () => gestureStream);
+      vi.stubGlobal('navigator', {
+        ...navigator,
+        mediaDevices: { getUserMedia },
+      });
+      const engine = {
+        joinVideo: vi.fn(async () => undefined),
+        joinVoice: vi.fn(async () => undefined),
+        getLocalStream: vi.fn(() => gestureStream),
+        setMuted: vi.fn(),
+        leaveRoom: vi.fn(),
+      };
+      setMountedCadenceMediaEngine(engine as never);
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+
+      await waitFor(() => {
+        expect(getUserMedia).toHaveBeenCalled();
+        expect(engine.joinVideo).toHaveBeenCalledWith('#general', gestureStream);
+      });
+      expect(store.getState().voice.callState).toBe('in_call');
+      expect(store.getState().voice.callStartedAt).not.toBeNull();
     });
 
     it('opens the video call panel while Edge media startup is still pending', async () => {
@@ -1363,7 +1408,7 @@ describe('AppShell', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
 
       await waitFor(() => {
-        expect(engine.joinVideo).toHaveBeenCalledWith('#general');
+        expect(engine.joinVideo).toHaveBeenCalledWith('#general', null);
         expect(screen.getByRole('region', { name: 'Voice call participants' })).toBeInTheDocument();
       });
       expect(store.getState().voice.callChannel).toBe('#general');

@@ -1414,7 +1414,7 @@ describe('store voice slice — in-call actions', () => {
 
       await store.getState().joinVoiceChannel('#media', false);
 
-      expect(engine.joinVoice).toHaveBeenCalledWith('#media');
+      expect(engine.joinVoice).toHaveBeenCalledWith('#media', null);
       expect(audioTrack.enabled).toBe(false);
       expect(store.getState().voice.callState).toBe('in_call');
       expect(store.getState().voice.muted).toBe(true);

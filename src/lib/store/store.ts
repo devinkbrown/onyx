@@ -1787,7 +1787,12 @@ export interface OnyxState {
   voiceChannelParticipants: Map<string, Set<string>>;
 
   // Voice channel actions
-  joinVoiceChannel(channel: string, withVideo?: boolean): Promise<void>;
+  /**
+   * Join a channel voice/video room.
+   * @param preacquired Optional stream captured under the click's user gesture
+   *   (desktop Chromium drops transient activation across awaits).
+   */
+  joinVoiceChannel(channel: string, withVideo?: boolean, preacquired?: MediaStream | null): Promise<void>;
   leaveVoiceChannel(): void;
   toggleCamera(): Promise<void>;
   toggleMute(): void;
@@ -14940,11 +14945,15 @@ export const store = createStore<OnyxState>()(
     voiceChannelParticipants: new Map(),
     showVoiceSettings: false,
 
-    async joinVoiceChannel(channel, withVideo = false) {
+    async joinVoiceChannel(channel, withVideo = false, preacquired = null) {
       const { client } = get();
-      if (!client) return;
+      if (!client) {
+        preacquired?.getTracks().forEach((t) => t.stop());
+        return;
+      }
       const engine = getMountedCadenceMediaEngine();
       if (!engine) {
+        preacquired?.getTracks().forEach((t) => t.stop());
         get().addToast({
           variant: 'error',
           title: 'Media engine not ready',
@@ -14963,7 +14972,7 @@ export const store = createStore<OnyxState>()(
       get().setVoiceCallState({
         callState: 'in_call',
         callChannel: channel,
-        localStream: null,
+        localStream: preacquired,
         cameraOn: false,
         cameraStream: null,
         callStartedAt: null,
@@ -14973,9 +14982,14 @@ export const store = createStore<OnyxState>()(
       });
 
       try {
-        await (withVideo ? engine.joinVideo(channel) : engine.joinVoice(channel));
+        await (withVideo
+          ? engine.joinVideo(channel, preacquired)
+          : engine.joinVoice(channel, preacquired));
       } catch (error) {
-        if (joinAttempt !== _voiceJoinAttempt) return;
+        if (joinAttempt !== _voiceJoinAttempt) {
+          // Superseded — caller owns stopping only if we never adopted.
+          return;
+        }
         get().setVoiceCallState({
           callState: 'idle',
           callChannel: null,

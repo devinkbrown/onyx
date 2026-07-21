@@ -618,6 +618,28 @@ export class CadenceMediaEngine {
     return this.cb.enableVideoCalls?.() ?? true;
   }
 
+  /**
+   * Adopt a stream already acquired under a user gesture (desktop Chromium
+   * drops transient activation across awaits — AppShell captures first).
+   */
+  private adoptLocalStream(stream: MediaStream, kind: MediaKind): MediaStream {
+    if (this.localStream && this.localStream !== stream) this.releaseMedia();
+    this.localStream = stream;
+    this.localKind = kind;
+    this.cb.onLocalStream(stream);
+    stream.getTracks().forEach((t) => {
+      t.addEventListener('ended', () => {
+        if (this.localStream !== stream) return;
+        if (kind === 'screen') {
+          this.releaseMedia();
+          return;
+        }
+        if (stream.getTracks().every((x) => x.readyState === 'ended')) this.releaseMedia();
+      });
+    });
+    return stream;
+  }
+
   private async capture(
     kind: MediaKind,
     quality: StreamQuality = '4k60',
@@ -631,44 +653,69 @@ export class CadenceMediaEngine {
     if (!devs) throw new Error('Media devices unavailable');
     const profile = selectedProfile ?? videoProfileFor(kind, quality, broadcast);
     const settings = this.cb.getMediaSettings?.();
-    const audio: boolean | MediaTrackConstraints = kind === 'screen'
-      ? true
-      : {
+
+    if (kind === 'screen') {
+      const stream = await devs.getDisplayMedia({
+        video: {
+          width: { ideal: profile.width, max: profile.width },
+          height: { ideal: profile.height, max: profile.height },
+          frameRate: { ideal: profile.fps, max: profile.fps },
+        },
+        audio: true,
+      });
+      return this.adoptLocalStream(stream, kind);
+    }
+
+    // Constraint ladder: preferred devices → soft ideals → bare audio/video.
+    // Stale `{ exact: deviceId }` from another machine/session is a common
+    // desktop "Join video does nothing" failure mode.
+    const attempts: MediaStreamConstraints[] = [
+      {
+        audio: {
           deviceId: settings?.inputDeviceId ? { exact: settings.inputDeviceId } : undefined,
           noiseSuppression: settings?.noiseSuppression ?? true,
           echoCancellation: settings?.echoCancellation ?? true,
-        };
-    const stream = kind === 'screen'
-      ? await devs.getDisplayMedia({
-          video: {
-            width: { ideal: profile.width, max: profile.width },
-            height: { ideal: profile.height, max: profile.height },
-            frameRate: { ideal: profile.fps, max: profile.fps },
-          },
-          audio: true,
-        })
-      : await devs.getUserMedia({
-          audio,
-          video: kind === 'video'
-            ? {
-                deviceId: settings?.cameraDeviceId ? { exact: settings.cameraDeviceId } : undefined,
-                width: { ideal: profile.width, max: profile.width },
-                height: { ideal: profile.height, max: profile.height },
-                frameRate: { ideal: profile.fps, max: profile.fps },
-              }
-            : false,
-        });
-    this.localStream = stream;
-    this.localKind   = kind;
-    this.cb.onLocalStream(stream);
-    stream.getTracks().forEach(t => {
-      t.addEventListener('ended', () => {
-        if (this.localStream !== stream) return;
-        if (kind === 'screen') { this.releaseMedia(); return; }
-        if (stream.getTracks().every(x => x.readyState === 'ended')) this.releaseMedia();
-      });
-    });
-    return stream;
+        },
+        video: kind === 'video'
+          ? {
+              deviceId: settings?.cameraDeviceId ? { exact: settings.cameraDeviceId } : undefined,
+              width: { ideal: profile.width, max: profile.width },
+              height: { ideal: profile.height, max: profile.height },
+              frameRate: { ideal: profile.fps, max: profile.fps },
+            }
+          : false,
+      },
+      {
+        audio: {
+          noiseSuppression: settings?.noiseSuppression ?? true,
+          echoCancellation: settings?.echoCancellation ?? true,
+        },
+        video: kind === 'video'
+          ? {
+              width: { ideal: Math.min(profile.width, 1280) },
+              height: { ideal: Math.min(profile.height, 720) },
+              frameRate: { ideal: Math.min(profile.fps, 30) },
+            }
+          : false,
+      },
+      {
+        audio: true,
+        video: kind === 'video',
+      },
+    ];
+
+    let lastError: unknown;
+    for (const constraints of attempts) {
+      try {
+        const stream = await devs.getUserMedia(constraints);
+        return this.adoptLocalStream(stream, kind);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(`${kind} media capture failed`);
   }
 
   private releaseMedia() {
@@ -1305,9 +1352,11 @@ export class CadenceMediaEngine {
   // Public join / leave
   // ----------------------------------------------------------------
 
-  async joinVoice(channel: string) {
+  async joinVoice(channel: string, preacquired?: MediaStream | null) {
     try {
-      const stream = await this.capture('voice');
+      const stream = preacquired
+        ? this.adoptLocalStream(preacquired, 'voice')
+        : await this.capture('voice');
       await this.ensureWasm();
       this.setActiveRoom(channel);
       this.mediaframeCmd(channel, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
@@ -1317,13 +1366,21 @@ export class CadenceMediaEngine {
       this.startSpeakingMeter(stream);
       this.startGc();
     } catch (err) {
+      // Release a half-started join so the store's null-stream rollback is honest
+      // and a retry is not blocked by a stale localStream.
+      try { this.releaseMedia(); } catch { /* best-effort */ }
       this.cb.onError(`Voice join failed: ${err}`);
+      // Rethrow: swallowing made desktop failures look like a no-op click when
+      // the toast path was slow or the provisional panel stayed stuck.
+      throw err instanceof Error ? err : new Error(`Voice join failed: ${String(err)}`);
     }
   }
 
-  async joinVideo(channel: string) {
+  async joinVideo(channel: string, preacquired?: MediaStream | null) {
     try {
-      const stream = await this.capture('video');
+      const stream = preacquired
+        ? this.adoptLocalStream(preacquired, 'video')
+        : await this.capture('video');
       const profile = videoProfileFor('video');
       await this.ensureWasm();
       this.setActiveRoom(channel);
@@ -1337,7 +1394,9 @@ export class CadenceMediaEngine {
       this.startSpeakingMeter(stream);
       this.startGc();
     } catch (err) {
+      try { this.releaseMedia(); } catch { /* best-effort */ }
       this.cb.onError(`Video join failed: ${err}`);
+      throw err instanceof Error ? err : new Error(`Video join failed: ${String(err)}`);
     }
   }
 

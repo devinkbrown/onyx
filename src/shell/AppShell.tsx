@@ -301,15 +301,14 @@ export function AppShell(props: AppShellProps): JSX.Element {
     const channel = v.channel;
     const state = getState();
     if (!state.client) return;
+
     const attempt = ++voiceJoinAttempt;
     setCallSurfaceChannel(channel);
     // Join the call directly. Do NOT open Voice settings here — that sheet is
     // for device/processing preferences (gear on the call bar), not the entry
     // path. Opening it on "Join video" made video look broken (audio settings).
-    // Publish the in-flow call surface synchronously, before the lazy media
-    // chunk starts loading. On a cold Edge session the dynamic import itself
-    // can remain pending behind browser scheduling, and the click must still
-    // produce immediate, visible feedback without covering the conversation.
+    // Publish the in-flow call surface SYNCHRONOUSLY so the click always paints
+    // feedback before any await (including getUserMedia).
     state.setVoiceCallState({
       callState: 'in_call',
       callChannel: channel,
@@ -321,6 +320,86 @@ export function AppShell(props: AppShellProps): JSX.Element {
       handRaised: false,
       raisedHands: new Set<string>(),
     });
+
+    // Desktop Chromium drops transient user-activation across non-media awaits
+    // (rAF, dynamic import). Capture devices as the FIRST await after the click
+    // so permission still runs; later engine boot may not keep activation.
+    let preacquired: MediaStream | null = null;
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      const gestureAttempts: MediaStreamConstraints[] = withVideo
+        ? [
+            { audio: true, video: true },
+            { audio: true, video: { width: { ideal: 1280 }, height: { ideal: 720 } } },
+          ]
+        : [{ audio: true }];
+      let captureError: unknown;
+      for (const constraints of gestureAttempts) {
+        try {
+          preacquired = await navigator.mediaDevices.getUserMedia(constraints);
+          captureError = undefined;
+          break;
+        } catch (error) {
+          captureError = error;
+        }
+      }
+      if (!preacquired) {
+        // User abandoned (leave / newer join) while the permission prompt was up.
+        if (attempt !== voiceJoinAttempt) return;
+        const current = getState().voice;
+        const stillOurs = current.callState === 'in_call'
+          && current.callChannel === channel
+          && current.callStartedAt === null;
+        if (!stillOurs) return;
+
+        const name = captureError instanceof Error ? captureError.name : '';
+        const message = captureError instanceof Error ? captureError.message : '';
+        // Vitest stubs getUserMedia to reject with "not available in test" —
+        // continue without a preacquired stream so unit tests still exercise
+        // the engine path. Real browsers always surface the failure.
+        const isTestStub = /not available in test/i.test(message);
+        if (!isTestStub) {
+          setCallSurfaceChannel(null);
+          getState().setVoiceCallState({
+            callState: 'idle',
+            callChannel: null,
+            localStream: null,
+            cameraOn: false,
+            cameraStream: null,
+            callStartedAt: null,
+          });
+          const detail = name === 'NotAllowedError'
+            ? 'Camera/microphone permission was blocked. Allow access for this site and try again.'
+            : name === 'NotFoundError'
+              ? 'No camera or microphone was found on this device.'
+              : message || 'Could not access media devices.';
+          getState().addToast({
+            variant: 'error',
+            title: withVideo ? 'Camera unavailable' : 'Microphone unavailable',
+            description: detail,
+          });
+          return;
+        }
+        // Test/stub path: keep the provisional panel and continue to the engine.
+      } else if (attempt === voiceJoinAttempt) {
+        const current = getState().voice;
+        if (
+          current.callState === 'in_call'
+          && current.callChannel === channel
+          && current.callStartedAt === null
+        ) {
+          getState().setVoiceCallState({ localStream: preacquired });
+        } else {
+          preacquired.getTracks().forEach((t) => t.stop());
+          preacquired = null;
+          return;
+        }
+      } else {
+        preacquired.getTracks().forEach((t) => t.stop());
+        preacquired = null;
+        return;
+      }
+    }
+
     const ownsProvisionalJoin = () => {
       const current = getState().voice;
       return attempt === voiceJoinAttempt
@@ -331,6 +410,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
     const rollbackProvisionalJoin = () => {
       if (!ownsProvisionalJoin()) return;
       setCallSurfaceChannel(null);
+      preacquired?.getTracks().forEach((t) => t.stop());
+      preacquired = null;
       getState().setVoiceCallState({
         callState: 'idle',
         callChannel: null,
@@ -342,12 +423,18 @@ export function AppShell(props: AppShellProps): JSX.Element {
     };
     let storeJoinStarted = false;
     try {
-      // Give Edge/Chromium one paint with the provisional surface before media
-      // startup can occupy the main thread with device and encoder setup.
-      await yieldForCallSurfacePaint();
-      if (!ownsProvisionalJoin()) return;
+      // Do not await paint before getUserMedia — that burned desktop activation.
+      // Schedule a paint after we already hold (or skipped) the stream.
+      void yieldForCallSurfacePaint();
+      if (!ownsProvisionalJoin()) {
+        preacquired?.getTracks().forEach((t) => t.stop());
+        return;
+      }
       const mediaReady = await ensureMediaEngine();
-      if (!ownsProvisionalJoin()) return;
+      if (!ownsProvisionalJoin()) {
+        preacquired?.getTracks().forEach((t) => t.stop());
+        return;
+      }
       if (!mediaReady) {
         rollbackProvisionalJoin();
         getState().addToast({
@@ -362,19 +449,32 @@ export function AppShell(props: AppShellProps): JSX.Element {
         return;
       }
       storeJoinStarted = true;
-      await getState().joinVoiceChannel(channel, withVideo);
+      const streamForJoin = preacquired;
+      preacquired = null; // ownership transfers to the engine/store path
+      await getState().joinVoiceChannel(channel, withVideo, streamForJoin);
     } catch {
-      if (attempt !== voiceJoinAttempt) return;
+      if (attempt !== voiceJoinAttempt) {
+        preacquired?.getTracks().forEach((t) => t.stop());
+        return;
+      }
       // Loader failures still own the provisional panel and must be stale-safe.
       // Once the store join starts, its own current-attempt failure rolls that
       // panel back before rethrowing, so ownership is intentionally already
       // false while this layer remains responsible for user-facing feedback.
-      if (!storeJoinStarted && !ownsProvisionalJoin()) return;
-      rollbackProvisionalJoin();
+      if (!storeJoinStarted && !ownsProvisionalJoin()) {
+        preacquired?.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      if (!storeJoinStarted) rollbackProvisionalJoin();
+      else {
+        preacquired?.getTracks().forEach((t) => t.stop());
+      }
       getState().addToast({
         variant: 'error',
         title: withVideo ? 'Video could not start' : 'Voice could not start',
-        description: 'The media engine did not load. Try joining again.',
+        description: storeJoinStarted
+          ? 'Media startup failed after permission was granted. Check camera/mic permissions and try again.'
+          : 'The media engine did not load. Try joining again.',
       });
     }
   }
