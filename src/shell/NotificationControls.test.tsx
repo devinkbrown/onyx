@@ -17,6 +17,11 @@ const webPushMocks = vi.hoisted(() => ({
   active: vi.fn(async () => false),
   disable: vi.fn<() => Promise<WebPushResult>>(async () => ({ ok: true })),
   enable: vi.fn<() => Promise<WebPushResult>>(async () => ({ ok: true })),
+  intentDesired: vi.fn(() => false),
+  recover: vi.fn<() => Promise<WebPushResult>>(async () => ({
+    ok: false,
+    reason: 'Push is not enabled on this browser.',
+  })),
   supported: vi.fn(() => false),
 }));
 
@@ -28,7 +33,9 @@ vi.mock('@/lib/notifications', () => ({
 vi.mock('@/lib/notifications/webPush', () => ({
   disableWebPush: webPushMocks.disable,
   enableWebPush: webPushMocks.enable,
+  recoverWebPush: webPushMocks.recover,
   webPushActive: webPushMocks.active,
+  webPushIntentDesired: webPushMocks.intentDesired,
   webPushSupported: webPushMocks.supported,
 }));
 
@@ -71,6 +78,11 @@ describe('NotificationControls accessibility', () => {
     webPushMocks.active.mockReset().mockResolvedValue(false);
     webPushMocks.disable.mockReset().mockResolvedValue({ ok: true });
     webPushMocks.enable.mockReset().mockResolvedValue({ ok: true });
+    webPushMocks.intentDesired.mockReset().mockReturnValue(false);
+    webPushMocks.recover.mockReset().mockResolvedValue({
+      ok: false,
+      reason: 'Push is not enabled on this browser.',
+    });
     webPushMocks.supported.mockReset().mockReturnValue(false);
     localStorage.clear();
     setCalmPreset('regular');
@@ -290,6 +302,51 @@ describe('NotificationControls accessibility', () => {
     store.setState({ server: null });
 
     expect(webPushMocks.active).toHaveBeenCalledOnce();
+  });
+
+  it('recovers a missing subscription when prior intent exists and the session is connected', async () => {
+    webPushMocks.supported.mockReturnValue(true);
+    webPushMocks.active.mockResolvedValue(false);
+    webPushMocks.intentDesired.mockReturnValue(true);
+    webPushMocks.recover.mockResolvedValue({ ok: true });
+    store.setState({
+      server: server('alice'),
+      connectionStatus: 'connected',
+    });
+    render(() => <NotificationControls />);
+
+    await waitFor(() => expect(webPushMocks.recover).toHaveBeenCalledOnce());
+    expect(screen.getByRole('button', { name: 'Disable web push' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('does not attempt recovery while disconnected even when intent is set', async () => {
+    webPushMocks.supported.mockReturnValue(true);
+    webPushMocks.active.mockResolvedValue(false);
+    webPushMocks.intentDesired.mockReturnValue(true);
+    store.setState({
+      server: server('alice'),
+      connectionStatus: 'disconnected',
+    });
+    render(() => <NotificationControls />);
+    await waitFor(() => expect(webPushMocks.active).toHaveBeenCalledOnce());
+
+    expect(webPushMocks.recover).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Enable web push' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('does not recover without prior intent (no silent enable)', async () => {
+    webPushMocks.supported.mockReturnValue(true);
+    webPushMocks.active.mockResolvedValue(false);
+    webPushMocks.intentDesired.mockReturnValue(false);
+    store.setState({
+      server: server('alice'),
+      connectionStatus: 'connected',
+    });
+    render(() => <NotificationControls />);
+    await waitFor(() => expect(webPushMocks.active).toHaveBeenCalledOnce());
+
+    expect(webPushMocks.recover).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Enable web push' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('lets only the newest overlapping desktop permission request update state', async () => {

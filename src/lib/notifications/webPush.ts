@@ -8,6 +8,10 @@
  * the endpoint + keys to the server (`WEBPUSH SUBSCRIBE`). The server pushes an RFC 8291
  * end-to-end-encrypted payload when a DM lands while no session is attached;
  * the service worker renders it. Account-scoped: guests can't subscribe.
+ *
+ * Recovery: `recoverWebPush` re-binds after reconnect / SW update / expired
+ * endpoint when the user previously enabled push (intent marker). Every failure
+ * returns a typed reason — never a silent no-op.
  */
 import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import { getState, selectAccount, selectDeviceMemoryOwner } from '@/lib/store';
@@ -61,7 +65,10 @@ export function webPushSupported(): boolean {
 }
 
 const SESSION_CHANGED_REASON = 'Your account or connection changed. Try again.';
+const NO_INTENT_REASON = 'Push is not enabled on this browser.';
 export const WEB_PUSH_OWNER_STORAGE_KEY = 'onyx:web-push-owner';
+/** Survives expired/missing browser subscriptions so recovery can re-bind. */
+export const WEB_PUSH_INTENT_STORAGE_KEY = 'onyx:web-push-intent';
 
 function signedInPushOwnerKey(state: OnyxState): string | null {
   if (!selectAccount(state)) return null;
@@ -69,31 +76,61 @@ function signedInPushOwnerKey(state: OnyxState): string | null {
   return owner ? deviceMemoryOwnerKey(owner) : null;
 }
 
-function readPushOwnerKey(): string | null {
+function readStorageKey(key: string): string | null {
   try {
-    const value = localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY);
+    const value = localStorage.getItem(key);
     return value && value.length <= 4_096 ? value : null;
   } catch {
     return null;
   }
 }
 
-function savePushOwnerKey(ownerKey: string): boolean {
+function saveStorageKey(key: string, value: string): boolean {
   try {
-    localStorage.setItem(WEB_PUSH_OWNER_STORAGE_KEY, ownerKey);
+    localStorage.setItem(key, value);
     return true;
   } catch {
     return false;
   }
 }
 
-function clearPushOwnerKey(expectedOwnerKey?: string | null): void {
+function clearStorageKey(key: string, expectedValue?: string | null): void {
   try {
-    if (expectedOwnerKey !== undefined && localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY) !== expectedOwnerKey) return;
-    localStorage.removeItem(WEB_PUSH_OWNER_STORAGE_KEY);
+    if (expectedValue !== undefined && localStorage.getItem(key) !== expectedValue) return;
+    localStorage.removeItem(key);
   } catch {
     // A blocked storage area cannot be made less private by retaining a marker.
   }
+}
+
+function readPushOwnerKey(): string | null {
+  return readStorageKey(WEB_PUSH_OWNER_STORAGE_KEY);
+}
+
+function savePushOwnerKey(ownerKey: string): boolean {
+  return saveStorageKey(WEB_PUSH_OWNER_STORAGE_KEY, ownerKey);
+}
+
+function clearPushOwnerKey(expectedOwnerKey?: string | null): void {
+  clearStorageKey(WEB_PUSH_OWNER_STORAGE_KEY, expectedOwnerKey);
+}
+
+function readPushIntentKey(): string | null {
+  return readStorageKey(WEB_PUSH_INTENT_STORAGE_KEY);
+}
+
+function savePushIntentKey(ownerKey: string): boolean {
+  return saveStorageKey(WEB_PUSH_INTENT_STORAGE_KEY, ownerKey);
+}
+
+function clearPushIntentKey(expectedOwnerKey?: string | null): void {
+  clearStorageKey(WEB_PUSH_INTENT_STORAGE_KEY, expectedOwnerKey);
+}
+
+/** True when the signed-in account previously enabled push on this browser. */
+export function webPushIntentDesired(): boolean {
+  const ownerKey = signedInPushOwnerKey(getState());
+  return Boolean(ownerKey && readPushIntentKey() === ownerKey);
 }
 
 function pushSessionCurrent(ownerKey: string, client: NonNullable<OnyxState['client']>): boolean {
@@ -111,6 +148,19 @@ function pushCleanupScopeCurrent(
     && readPushOwnerKey() === markedOwnerKey;
 }
 
+function subscriptionKeysComplete(subscription: PushSubscription): {
+  complete: true;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+} | { complete: false } {
+  const json = subscription.toJSON();
+  const p256dh = json.keys?.p256dh;
+  const auth = json.keys?.auth;
+  if (!subscription.endpoint || !p256dh || !auth) return { complete: false };
+  return { complete: true, endpoint: subscription.endpoint, p256dh, auth };
+}
+
 async function discardCreatedSubscription(subscription: PushSubscription | null): Promise<void> {
   if (!subscription) return;
   try {
@@ -126,6 +176,9 @@ async function discardCreatedSubscription(subscription: PushSubscription | null)
  * webPushActive() cannot treat an unregistered endpoint as working push, then
  * retire any subscription this enable created. The expected-value guard on
  * clearPushOwnerKey preserves a replacement owner's marker.
+ *
+ * Intent is intentionally preserved — a transient register failure must not
+ * erase the user's opt-in so recoverWebPush can retry after reconnect.
  */
 async function rollBackFailedRegistration(
   ownerKey: string,
@@ -157,6 +210,9 @@ async function closeRegistrationNotifications(
  * True when this browser holds a subscription owned by the current account.
  * Unmarked and foreign-owner endpoints are retired locally before returning;
  * they must never be inherited or registered by a replacement account.
+ *
+ * A missing subscription clears the ownership claim but keeps the intent
+ * marker so recoverWebPush can re-subscribe after expiry / SW update.
  */
 export async function webPushActive(): Promise<boolean> {
   if (!webPushSupported()) return false;
@@ -188,8 +244,21 @@ export async function webPushActive(): Promise<boolean> {
   }
 }
 
-/** Subscribe this browser and register it with the server. */
-export async function enableWebPush(): Promise<WebPushResult> {
+type RegisterMode = 'enable' | 'recover';
+
+/**
+ * Shared subscribe + server registration path.
+ *
+ * Gate order (load-bearing):
+ *   supported → signed-in account → connected session → VAPID shape
+ *   → permission (prompt only for enable) → [recover: intent]
+ *   → retire foreign/incomplete → subscribe if needed → complete keys
+ *   → owner+intent markers → WEBPUSH SUBSCRIBE
+ *
+ * VAPID is validated before any permission prompt so a misconfigured server
+ * never asks the user for notification access.
+ */
+async function registerWebPush(mode: RegisterMode): Promise<WebPushResult> {
   if (!webPushSupported()) return { ok: false, reason: 'This browser does not support push.' };
   const initialState = getState();
   const account = selectAccount(initialState);
@@ -207,11 +276,25 @@ export async function enableWebPush(): Promise<WebPushResult> {
   if (!keyBytes) return { ok: false, reason: 'Push is misconfigured on this server.' };
   const applicationServerKey = applicationServerKeyBuffer(keyBytes);
 
+  if (mode === 'recover' && readPushIntentKey() !== ownerKey) {
+    return { ok: false, reason: NO_INTENT_REASON };
+  }
+
   let permission: NotificationPermission;
-  try {
-    permission = await Notification.requestPermission();
-  } catch {
-    return { ok: false, reason: 'Requesting notification permission failed.' };
+  if (mode === 'enable') {
+    try {
+      permission = await Notification.requestPermission();
+    } catch {
+      return { ok: false, reason: 'Requesting notification permission failed.' };
+    }
+  } else {
+    // Recovery never prompts — permission must already be granted (site
+    // settings, prior enable, or an external grant while the tab was open).
+    try {
+      permission = Notification.permission;
+    } catch {
+      return { ok: false, reason: 'Requesting notification permission failed.' };
+    }
   }
   if (permission !== 'granted') return { ok: false, reason: 'Notifications are blocked by the browser.' };
   if (!pushSessionCurrent(ownerKey, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
@@ -241,6 +324,20 @@ export async function enableWebPush(): Promise<WebPushResult> {
       clearPushOwnerKey(markedOwnerKey);
       if (!pushSessionCurrent(ownerKey, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
     }
+
+    // Incomplete keys are unusable — retire and create a fresh subscription
+    // once rather than fail closed on a half-formed browser endpoint.
+    if (sub && !subscriptionKeysComplete(sub).complete) {
+      try {
+        await sub.unsubscribe();
+      } catch {
+        // Fall through to a fresh subscribe; if the dead sub lingers, subscribe
+        // will either replace it or throw into the outer catch.
+      }
+      sub = null;
+      if (!pushSessionCurrent(ownerKey, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
+    }
+
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -253,26 +350,26 @@ export async function enableWebPush(): Promise<WebPushResult> {
       return { ok: false, reason: SESSION_CHANGED_REASON };
     }
 
-    const json = sub.toJSON();
-    const p256dh = json.keys?.p256dh;
-    const auth = json.keys?.auth;
-    if (!sub.endpoint || !p256dh || !auth) {
-      // Incomplete keys are unusable on the server — retire the local sub so we
-      // never claim "active" over a half-formed endpoint, then fail closed.
+    const keys = subscriptionKeysComplete(sub);
+    if (!keys.complete) {
+      // Still incomplete after a fresh subscribe — retire and fail closed.
       await rollBackFailedRegistration(ownerKey, createdSubscription ?? sub);
       return { ok: false, reason: 'The browser returned an incomplete subscription.' };
     }
-    if (!savePushOwnerKey(ownerKey)) {
-      // Ownership claim is the gate for webPushActive — without it, retire any
-      // sub this enable created (or the unusable endpoint we just inspected).
+    if (!savePushOwnerKey(ownerKey) || !savePushIntentKey(ownerKey)) {
+      // Ownership + intent are the gates for active/recover — without both,
+      // retire any sub this registration created (or the unusable endpoint).
+      clearPushOwnerKey(ownerKey);
+      clearPushIntentKey(ownerKey);
       await discardCreatedSubscription(createdSubscription ?? sub);
       return { ok: false, reason: 'This browser could not bind push to the current account.' };
     }
     // sendRaw returns false when the socket cannot carry the registration —
     // never report ok while the server has not learned the endpoint.
-    if (!client.sendRaw('WEBPUSH', 'SUBSCRIBE', sub.endpoint, p256dh, auth)) {
-      // Always drop ownership + any sub created here. For a reused endpoint the
-      // browser subscription stays until the next enable/active reconciliation
+    if (!client.sendRaw('WEBPUSH', 'SUBSCRIBE', keys.endpoint, keys.p256dh, keys.auth)) {
+      // Always drop ownership + any sub created here. Intent stays so recover
+      // can retry after reconnect. For a reused endpoint the browser
+      // subscription stays until the next enable/active reconciliation
       // (unsubscribing would silently disable a prior working registration).
       await rollBackFailedRegistration(ownerKey, createdSubscription);
       return {
@@ -285,6 +382,21 @@ export async function enableWebPush(): Promise<WebPushResult> {
     await rollBackFailedRegistration(ownerKey, createdSubscription);
     return { ok: false, reason: 'Subscribing failed — check site notification settings.' };
   }
+}
+
+/** Subscribe this browser and register it with the server. */
+export async function enableWebPush(): Promise<WebPushResult> {
+  return registerWebPush('enable');
+}
+
+/**
+ * Re-bind push after reconnect, permission grant, service-worker update, or an
+ * expired endpoint. Requires a prior successful enable (intent marker) and an
+ * already-granted notification permission — never prompts and never silently
+ * reports success when it did no work.
+ */
+export async function recoverWebPush(): Promise<WebPushResult> {
+  return registerWebPush('recover');
 }
 
 /** Drop this browser's subscription locally and on the server. */
@@ -305,6 +417,8 @@ export async function disableWebPush(): Promise<WebPushResult> {
     if (!cleanupScopeCurrent()) return { ok: false, reason: SESSION_CHANGED_REASON };
     if (!sub) {
       clearPushOwnerKey(markedOwnerKey);
+      // Explicit disable clears this account's recovery intent.
+      if (ownerKey) clearPushIntentKey(ownerKey);
       return { ok: true };
     }
 
@@ -312,6 +426,7 @@ export async function disableWebPush(): Promise<WebPushResult> {
       return { ok: false, reason: 'The browser could not remove its push subscription.' };
     }
     clearPushOwnerKey(markedOwnerKey);
+    if (ownerKey) clearPushIntentKey(ownerKey);
 
     // Never unregister an endpoint through a replacement account/session.
     // Local unsubscribe remains safe and makes the browser truthfully off.

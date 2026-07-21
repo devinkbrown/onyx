@@ -14,7 +14,14 @@ import {
   setCalmPreset,
   type CalmPreset,
 } from '@/lib/notifications/calmMode';
-import { disableWebPush, enableWebPush, webPushActive, webPushSupported } from '@/lib/notifications/webPush';
+import {
+  disableWebPush,
+  enableWebPush,
+  recoverWebPush,
+  webPushActive,
+  webPushIntentDesired,
+  webPushSupported,
+} from '@/lib/notifications/webPush';
 
 const CALM_PRESET_LABELS: Record<CalmPreset, string> = {
   calm: 'Calm',
@@ -57,6 +64,7 @@ export function NotificationControls(): JSX.Element {
   const dndEnabled = useStore((s) => s.dndEnabled);
   const dndUntil = useStore((s) => s.dndUntil);
   const account = useStore(selectAccount);
+  const connectionStatus = useStore((s) => s.connectionStatus);
   const webPushOwnerScope = useStore((s) => (
     s.server ? JSON.stringify([s.server.url, selectAccount(s)]) : null
   ));
@@ -64,6 +72,9 @@ export function NotificationControls(): JSX.Element {
   const [webPushOn, setWebPushOn] = createSignal(false);
   const [webPushBusy, setWebPushBusy] = createSignal(false);
   const [dndNowMs, setDndNowMs] = createSignal(Date.now());
+  // Bumps to re-run recovery after an external permission grant or SW update
+  // without treating those events as a user toggle.
+  const [webPushRecoveryEpoch, setWebPushRecoveryEpoch] = createSignal(0);
   let disposed = false;
   let desktopOperation = 0;
   let webPushOperation = 0;
@@ -116,30 +127,63 @@ export function NotificationControls(): JSX.Element {
   // A PushSubscription is browser-global. Reconcile it whenever the connected
   // server/account owner changes so a replacement account cannot inherit the
   // prior owner's endpoint. A fully disconnected client deliberately skips
-  // reconciliation: push must keep working while the tab is closed.
+  // recovery (push must keep working while the tab is closed) and only refreshes
+  // the active bit. When connected + prior intent, recoverWebPush re-binds a
+  // missing/expired endpoint and re-sends WEBPUSH SUBSCRIBE — always with a
+  // typed reason, never a silent no-op.
   createEffect(() => {
     const ownerScope = webPushOwnerScope();
+    const connected = connectionStatus() === 'connected';
+    webPushRecoveryEpoch(); // subscribe to external recovery triggers
     const operation = ++webPushOperation;
     setWebPushBusy(false);
     setWebPushOn(false);
     if (ownerScope === null) return;
-    void webPushActive().then((active) => {
-      if (isCurrentWebPushOperation(operation)) setWebPushOn(active);
-    }).catch(() => {
-      if (isCurrentWebPushOperation(operation)) setWebPushOn(false);
-    });
+    void (async () => {
+      try {
+        let active = await webPushActive();
+        if (!isCurrentWebPushOperation(operation)) return;
+        if (!active && connected && webPushIntentDesired()) {
+          const recovered = await recoverWebPush();
+          if (!isCurrentWebPushOperation(operation)) return;
+          active = recovered.ok;
+        }
+        if (isCurrentWebPushOperation(operation)) setWebPushOn(active);
+      } catch {
+        if (isCurrentWebPushOperation(operation)) setWebPushOn(false);
+      }
+    })();
   });
 
   onMount(() => {
     const stopMonitoring = monitorDesktopNotificationPermission((nextPermission) => {
-      if (disposed || nextPermission === untrack(permission)) return;
+      if (disposed) return;
+      const previous = untrack(permission);
+      if (nextPermission === previous) return;
       // An external browser/site-settings change supersedes a pending prompt
-      // completion. It updates only the displayed permission; the user's push
-      // preference is never enabled automatically.
+      // completion. It updates only the displayed permission; desktop prefs are
+      // never enabled automatically. Web-push recovery may re-bind when the
+      // user previously opted in and permission becomes granted.
       desktopOperation += 1;
       setPermission(nextPermission);
+      if (nextPermission === 'granted' && webPushIntentDesired()) {
+        setWebPushRecoveryEpoch((epoch) => epoch + 1);
+      }
     }, { readPermission: getDesktopNotificationPermission });
     onCleanup(stopMonitoring);
+
+    // A waiting worker that claims this page can drop or replace the push
+    // subscription surface. Re-run recovery without a full reload.
+    if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
+      const onControllerChange = () => {
+        if (disposed) return;
+        if (webPushIntentDesired()) setWebPushRecoveryEpoch((epoch) => epoch + 1);
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+      onCleanup(() => {
+        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      });
+    }
   });
 
   onCleanup(() => {

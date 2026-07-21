@@ -6,9 +6,12 @@ import { store, type OnyxState, type Server } from '@/lib/store/store';
 import {
   disableWebPush,
   enableWebPush,
+  recoverWebPush,
   vapidKeyToBytes,
+  WEB_PUSH_INTENT_STORAGE_KEY,
   WEB_PUSH_OWNER_STORAGE_KEY,
   webPushActive,
+  webPushIntentDesired,
   webPushSupported,
 } from './webPush';
 
@@ -51,6 +54,17 @@ function ownerKey(account: string): string {
 
 function markOwner(account: string): void {
   localStorage.setItem(WEB_PUSH_OWNER_STORAGE_KEY, ownerKey(account));
+}
+
+function markIntent(account: string): void {
+  localStorage.setItem(WEB_PUSH_INTENT_STORAGE_KEY, ownerKey(account));
+}
+
+function stubNotificationPermission(permission: NotificationPermission): void {
+  vi.stubGlobal('Notification', {
+    permission,
+    requestPermission: vi.fn().mockResolvedValue(permission),
+  });
 }
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
@@ -297,10 +311,16 @@ describe('webPushActive', () => {
       },
     });
     markOwner('alice');
+    markIntent('alice');
 
     // Act / Assert
     await expect(webPushActive()).resolves.toBe(false);
+    // Ownership claim drops with the subscription, but intent survives so
+    // recoverWebPush can re-subscribe after expiry / SW update.
     expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(WEB_PUSH_INTENT_STORAGE_KEY)).toBe(ownerKey('alice'));
+    store.setState({ server: server('alice') });
+    expect(webPushIntentDesired()).toBe(true);
 
     // Arrange
     vi.stubGlobal('navigator', {
@@ -519,7 +539,47 @@ describe('web push operations', () => {
     expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('carol'));
   });
 
-  it('refuses an incomplete subscription and retires it locally', async () => {
+  it('retires an incomplete subscription and re-subscribes once', async () => {
+    const oldUnsubscribe = vi.fn().mockResolvedValue(true);
+    const sendRaw = vi.fn().mockReturnValue(true);
+    const incomplete = {
+      endpoint: 'https://push.example/stale',
+      toJSON: () => ({ endpoint: 'https://push.example/stale', keys: {} }),
+      unsubscribe: oldUnsubscribe,
+    } as unknown as PushSubscription;
+    const subscribe = vi.fn().mockResolvedValue(pushSubscription());
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(incomplete),
+          subscribe,
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+    markOwner('alice');
+
+    await expect(enableWebPush()).resolves.toEqual({ ok: true });
+    expect(oldUnsubscribe).toHaveBeenCalledOnce();
+    expect(subscribe).toHaveBeenCalledOnce();
+    expect(sendRaw).toHaveBeenCalledWith(
+      'WEBPUSH',
+      'SUBSCRIBE',
+      'https://push.example/sub',
+      'p256dh-key',
+      'auth-key',
+    );
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('alice'));
+    expect(localStorage.getItem(WEB_PUSH_INTENT_STORAGE_KEY)).toBe(ownerKey('alice'));
+  });
+
+  it('refuses a freshly-created incomplete subscription and retires it locally', async () => {
     const unsubscribe = vi.fn().mockResolvedValue(true);
     const sendRaw = vi.fn().mockReturnValue(true);
     const incomplete = {
@@ -531,8 +591,8 @@ describe('web push operations', () => {
       vi.fn().mockResolvedValue('granted'),
       Promise.resolve({
         pushManager: {
-          getSubscription: vi.fn().mockResolvedValue(incomplete),
-          subscribe: vi.fn(),
+          getSubscription: vi.fn().mockResolvedValue(null),
+          subscribe: vi.fn().mockResolvedValue(incomplete),
         },
       }),
     );
@@ -542,7 +602,6 @@ describe('web push operations', () => {
       connectionStatus: 'connected',
       client: client(sendRaw),
     }, true);
-    markOwner('alice');
 
     await expect(enableWebPush()).resolves.toEqual({
       ok: false,
@@ -889,5 +948,273 @@ describe('web push operations', () => {
     expect(oldSendRaw).not.toHaveBeenCalled();
     expect(newSendRaw).not.toHaveBeenCalled();
     expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('bob'));
+  });
+
+  it('clears recovery intent when the current owner disables push', async () => {
+    const sendRaw = vi.fn();
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(pushSubscription(unsubscribe)),
+          subscribe: vi.fn(),
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+    markOwner('alice');
+    markIntent('alice');
+
+    await expect(disableWebPush()).resolves.toEqual({ ok: true });
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(WEB_PUSH_INTENT_STORAGE_KEY)).toBeNull();
+    expect(webPushIntentDesired()).toBe(false);
+  });
+});
+
+describe('recoverWebPush', () => {
+  it('fails with a reason when the user never enabled push (no silent no-op)', async () => {
+    const subscribe = vi.fn();
+    const sendRaw = vi.fn().mockReturnValue(true);
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(null),
+          subscribe,
+        },
+      }),
+    );
+    stubNotificationPermission('granted');
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+
+    await expect(recoverWebPush()).resolves.toEqual({
+      ok: false,
+      reason: 'Push is not enabled on this browser.',
+    });
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(sendRaw).not.toHaveBeenCalled();
+  });
+
+  it('re-subscribes when intent is set but the browser subscription is missing', async () => {
+    const sendRaw = vi.fn().mockReturnValue(true);
+    const subscribe = vi.fn().mockResolvedValue(pushSubscription());
+    const requestPermission = vi.fn().mockResolvedValue('granted');
+    vi.stubGlobal('PushManager', class PushManager {});
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission });
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        ready: Promise.resolve({
+          pushManager: {
+            getSubscription: vi.fn().mockResolvedValue(null),
+            subscribe,
+          },
+        }),
+      },
+    });
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+    markIntent('alice');
+
+    await expect(recoverWebPush()).resolves.toEqual({ ok: true });
+    expect(requestPermission).not.toHaveBeenCalled();
+    expect(subscribe).toHaveBeenCalledOnce();
+    expect(sendRaw).toHaveBeenCalledWith(
+      'WEBPUSH',
+      'SUBSCRIBE',
+      'https://push.example/sub',
+      'p256dh-key',
+      'auth-key',
+    );
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('alice'));
+    expect(localStorage.getItem(WEB_PUSH_INTENT_STORAGE_KEY)).toBe(ownerKey('alice'));
+  });
+
+  it('re-registers an existing subscription with the server after reconnect', async () => {
+    const sendRaw = vi.fn().mockReturnValue(true);
+    const subscribe = vi.fn();
+    const sub = pushSubscription();
+    vi.stubGlobal('PushManager', class PushManager {});
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission: vi.fn() });
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        ready: Promise.resolve({
+          pushManager: {
+            getSubscription: vi.fn().mockResolvedValue(sub),
+            subscribe,
+          },
+        }),
+      },
+    });
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+    markOwner('alice');
+    markIntent('alice');
+
+    await expect(recoverWebPush()).resolves.toEqual({ ok: true });
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(sendRaw).toHaveBeenCalledWith(
+      'WEBPUSH',
+      'SUBSCRIBE',
+      'https://push.example/sub',
+      'p256dh-key',
+      'auth-key',
+    );
+  });
+
+  it('does not prompt when permission is not granted and returns a reason', async () => {
+    const requestPermission = vi.fn().mockResolvedValue('granted');
+    const subscribe = vi.fn();
+    vi.stubGlobal('PushManager', class PushManager {});
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission });
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        ready: Promise.resolve({
+          pushManager: {
+            getSubscription: vi.fn(),
+            subscribe,
+          },
+        }),
+      },
+    });
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(),
+    }, true);
+    markIntent('alice');
+
+    await expect(recoverWebPush()).resolves.toEqual({
+      ok: false,
+      reason: 'Notifications are blocked by the browser.',
+    });
+    expect(requestPermission).not.toHaveBeenCalled();
+    expect(subscribe).not.toHaveBeenCalled();
+    // Intent survives so a later grant / enable path can recover.
+    expect(localStorage.getItem(WEB_PUSH_INTENT_STORAGE_KEY)).toBe(ownerKey('alice'));
+  });
+
+  it('retires a stale incomplete endpoint and creates a fresh subscription', async () => {
+    const oldUnsubscribe = vi.fn().mockResolvedValue(true);
+    const incomplete = {
+      endpoint: 'https://push.example/expired',
+      toJSON: () => ({ endpoint: 'https://push.example/expired', keys: { p256dh: '' } }),
+      unsubscribe: oldUnsubscribe,
+    } as unknown as PushSubscription;
+    const sendRaw = vi.fn().mockReturnValue(true);
+    const subscribe = vi.fn().mockResolvedValue(pushSubscription());
+    vi.stubGlobal('PushManager', class PushManager {});
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission: vi.fn() });
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        ready: Promise.resolve({
+          pushManager: {
+            getSubscription: vi.fn().mockResolvedValue(incomplete),
+            subscribe,
+          },
+        }),
+      },
+    });
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+    markOwner('alice');
+    markIntent('alice');
+
+    await expect(recoverWebPush()).resolves.toEqual({ ok: true });
+    expect(oldUnsubscribe).toHaveBeenCalledOnce();
+    expect(subscribe).toHaveBeenCalledOnce();
+    expect(sendRaw).toHaveBeenCalledWith(
+      'WEBPUSH',
+      'SUBSCRIBE',
+      'https://push.example/sub',
+      'p256dh-key',
+      'auth-key',
+    );
+  });
+
+  it('keeps intent after a failed server registration so reconnect can retry', async () => {
+    const sendRaw = vi.fn().mockReturnValue(false);
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    const subscribe = vi.fn().mockResolvedValue(pushSubscription(unsubscribe));
+    vi.stubGlobal('PushManager', class PushManager {});
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission: vi.fn() });
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        ready: Promise.resolve({
+          pushManager: {
+            getSubscription: vi.fn().mockResolvedValue(null),
+            subscribe,
+          },
+        }),
+      },
+    });
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+    markIntent('alice');
+
+    await expect(recoverWebPush()).resolves.toEqual({
+      ok: false,
+      reason: 'The connection closed before push could be registered. Reconnect and try again.',
+    });
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(WEB_PUSH_INTENT_STORAGE_KEY)).toBe(ownerKey('alice'));
+  });
+
+  it('uses the current ISUPPORT VAPID key when recovering after a service-worker update', async () => {
+    const sendRaw = vi.fn().mockReturnValue(true);
+    const subscribe = vi.fn().mockResolvedValue(pushSubscription());
+    vi.stubGlobal('PushManager', class PushManager {});
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission: vi.fn() });
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        ready: Promise.resolve({
+          pushManager: {
+            getSubscription: vi.fn().mockResolvedValue(null),
+            subscribe,
+          },
+        }),
+      },
+    });
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw, VALID_VAPID_KEY),
+      serverFeatures: new Map([['VAPID', 'stale-key']]),
+    }, true);
+    markIntent('alice');
+
+    await expect(recoverWebPush()).resolves.toEqual({ ok: true });
+    const applicationServerKey = subscribe.mock.calls[0]?.[0]?.applicationServerKey as ArrayBuffer;
+    expect(Array.from(new Uint8Array(applicationServerKey))).toEqual([4, ...new Uint8Array(64)]);
   });
 });
