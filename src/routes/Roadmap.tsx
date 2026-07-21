@@ -134,7 +134,7 @@ const phases: Phase[] = [
     state: 'active',
     date: '2026-07-20',
     summary: 'Reusable certificate sessions, exact message routing, immediate rosters, and negotiated media now survive the two-node mesh; user-visible device control is the next boundary.',
-    items: ['Certificate session resume', 'Multi-attachment message convergence', 'Immediate authoritative roster', 'No repeated operator-mode churn', 'Explicit WebSocket media protocol', 'Bounded binary transport', 'Helix WebSocket continuity', 'Sessions and devices list next', 'Remote revoke next', 'Recovery codes next'],
+    items: ['Certificate session resume', 'Multi-attachment message convergence', 'Immediate authoritative roster', 'No repeated operator-mode churn', 'Explicit WebSocket media protocol', 'Bounded binary transport', 'Helix WebSocket continuity', 'Sessions and devices list', 'Remote session revoke', 'Recovery codes next'],
   },
 ];
 
