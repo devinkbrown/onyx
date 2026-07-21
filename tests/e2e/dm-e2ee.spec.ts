@@ -170,7 +170,7 @@ async function waitForPeerKey(page: Page, peerNick: string): Promise<void> {
 
 /**
  * The core invariant check, run against ONE store: locate the DM message from
- * `fromNick` and require (a) `text` is the Tsumugi ciphertext envelope, (b) that
+ * `fromNick` and require (a) `text` is the ONYXDM1 ciphertext envelope, (b) that
  * ciphertext does NOT contain the plaintext token, and (c) `plaintext` decrypted
  * to exactly the cleartext — held for N consecutive samples so we never assert on
  * a mid-decrypt frame. Returns nothing; fails loudly on timeout.
@@ -255,7 +255,7 @@ test.describe('E2EE direct messages (connected DEV build)', () => {
       await waitForPeerKey(alice, bobNick);
 
       // The real user action: Alice sends a DM. With Bob's key present and e2eeDms
-      // on (default), sendMessage seals it into a single Tsumugi envelope PRIVMSG.
+      // on (default), sendMessage seals it into a single ONYXDM1 envelope PRIVMSG.
       await alice.evaluate(
         ([g, t, body]) => (window as unknown as WindowWithStore)[g].store!.getState().sendMessage(t, body),
         [ONYX, bobNick, secret] as const,
@@ -298,7 +298,7 @@ test.describe('E2EE direct messages (connected DEV build)', () => {
       const me = 'dmC' + rand();
       const page = await bootConnectedPage(ctx, me);
 
-      // Build a GENUINE Tsumugi envelope in-page with the same primitives the app
+      // Build a GENUINE ONYXDM1 envelope in-page with the same primitives the app
       // ships (P-256 ECDH → HKDF-SHA-256 → AES-GCM), sealing `secret` between two
       // ephemeral keypairs. Neither private key is ever registered as our device
       // key, so the ciphertext is real yet undecryptable here — the honest
