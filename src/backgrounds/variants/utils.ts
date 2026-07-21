@@ -17,9 +17,9 @@ export interface BackgroundTheme {
   goldDeep: string;
   shu: string;
   shuBright: string;
-  washi: string;
-  washiDim: string;
-  washiMute: string;
+  paper: string;
+  paperDim: string;
+  paperMute: string;
 }
 
 const FALLBACK_THEME: BackgroundTheme = {
@@ -37,9 +37,9 @@ const FALLBACK_THEME: BackgroundTheme = {
   goldDeep: '#9a7a30',
   shu: '#e0452f',
   shuBright: '#ff5a40',
-  washi: '#ece4cf',
-  washiDim: '#ada590',
-  washiMute: '#6d6f86',
+  paper: '#ece4cf',
+  paperDim: '#ada590',
+  paperMute: '#6d6f86',
 };
 
 const TOKEN_MAP: Record<keyof BackgroundTheme, string> = {
@@ -57,9 +57,9 @@ const TOKEN_MAP: Record<keyof BackgroundTheme, string> = {
   goldDeep: '--gold-deep',
   shu: '--shu',
   shuBright: '--shu-bright',
-  washi: '--washi',
-  washiDim: '--washi-dim',
-  washiMute: '--washi-mute',
+  paper: '--paper',
+  paperDim: '--paper-dim',
+  paperMute: '--paper-mute',
 };
 
 /** A source of resolved CSS custom-property values (`--ink` → `#07090f`). */
@@ -163,7 +163,7 @@ export function drawGrain(ctx: BackgroundFrameContext, theme: BackgroundTheme, d
   const count = Math.floor(120 * density * ctx.qualityScale);
   c.save();
   c.globalAlpha = 0.1;
-  c.fillStyle = theme.washiDim;
+  c.fillStyle = theme.paperDim;
 
   for (let i = 0; i < count; i += 1) {
     const x = seeded(i + 17) * ctx.width;
@@ -201,7 +201,7 @@ export function drawPyriteFlecks(ctx: BackgroundFrameContext, theme: BackgroundT
   c.restore();
 }
 
-export function strokeKintsugiVein(
+export function strokeGoldVein(
   ctx: BackgroundFrameContext,
   theme: BackgroundTheme,
   index: number,

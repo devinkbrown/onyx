@@ -19,7 +19,12 @@ import {
   type CanvasBackgroundKind,
 } from './engine';
 import { allBackgroundVariants, backgroundRegistry, getBackground, sceneRegistry, type BackgroundId } from './registry';
-import { backgroundOptions } from './catalogue';
+import {
+  SIGNATURE_FAMILIES,
+  backgroundOptions,
+  backgroundsInFamily,
+  getSignatureFamily,
+} from './catalogue';
 import { loadBackgroundVariant } from './loader';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { resetSceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
@@ -61,25 +66,25 @@ describe('background registry', () => {
       caustics: 'animated',
       aurora: 'animated',
       'pyrite-field': 'animated',
-      'kintsugi-veins': 'animated',
+      'gold-veins': 'animated',
       ember: 'animated',
       forest: 'animated',
       resin: 'animated',
-      'sumi-e': 'animated',
+      'ink-wash': 'animated',
       mist: 'animated',
       frost: 'animated',
       'aurora-ribbons': 'animated',
       'tide-bands': 'animated',
       obsidian: 'solid',
       'lapis-gradient': 'solid',
-      washi: 'solid',
+      'paper-grain': 'solid',
       'retro-arcade': 'scene',
       starfield: 'scene',
       lightning: 'scene',
       phoenix: 'scene',
       'aurora-borealis': 'scene',
       volcanic: 'scene',
-      'tokyo-night': 'scene',
+      'neon-night': 'scene',
     };
 
     // Act
@@ -113,8 +118,37 @@ describe('background registry', () => {
     // The picker reads the lightweight catalogue (no render code); the eager
     // registry is the source of truth for id/label/kind/order. They must match
     // one-for-one or the lazy loader could point at a stale/missing id.
+    // Family is catalogue-only grouping metadata (not on the render object).
     const fromRegistry = allBackgroundVariants.map(({ id, label, kind }) => ({ id, label, kind }));
-    expect(backgroundOptions).toEqual(fromRegistry);
+    expect(backgroundOptions.map(({ id, label, kind }) => ({ id, label, kind }))).toEqual(fromRegistry);
+  });
+
+  it('assigns every catalogue id to a known signature family', () => {
+    // Consolidation groups many selectable ids under ~5 signature families +
+    // scenes — IDs stay for theme signatureBg / prefs; family is the grouping.
+    const known = new Set(SIGNATURE_FAMILIES.map((f) => f.id));
+    for (const meta of backgroundOptions) {
+      const family = getSignatureFamily(meta.id);
+      expect(family, `missing family for ${meta.id}`).toBeDefined();
+      expect(known.has(family!)).toBe(true);
+      expect(meta.family).toBe(family);
+    }
+    // Every non-scene family has at least one canvas preset; scenes have theirs.
+    for (const family of SIGNATURE_FAMILIES) {
+      expect(backgroundsInFamily(family.id).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('resolves legacy ids to their canonical catalogue entries', async () => {
+    // Prefs and theme signatureBg written before the rename must keep working.
+    const { resolveBackgroundId, getBackgroundMeta } = await import('./catalogue');
+    expect(resolveBackgroundId('kintsugi-veins')).toBe('gold-veins');
+    expect(resolveBackgroundId('sumi-e')).toBe('ink-wash');
+    expect(resolveBackgroundId('washi')).toBe('paper-grain');
+    expect(resolveBackgroundId('tokyo-night')).toBe('neon-night');
+    expect(getBackgroundMeta('kintsugi-veins')?.id).toBe('gold-veins');
+    const loaded = await loadBackgroundVariant('kintsugi-veins');
+    expect(loaded?.id).toBe('gold-veins');
   });
 
   it('lazily loads the concrete variant for every catalogued id', async () => {
@@ -675,7 +709,7 @@ describe('themed background variants', () => {
     { id: 'ember', label: 'Ember' },
     { id: 'forest', label: 'Grove' },
     { id: 'resin', label: 'Resin' },
-    { id: 'sumi-e', label: 'Sumi-e' },
+    { id: 'ink-wash', label: 'Ink wash' },
     { id: 'mist', label: 'Mist' },
     { id: 'frost', label: 'Frost' },
   ];

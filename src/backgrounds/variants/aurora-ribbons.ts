@@ -95,7 +95,7 @@ function drawRibbons(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: 
 
     // A thin pale filament threading the curtain — no shadow, a crisp highlight.
     c.globalAlpha = 0.12 + seeded(seed + 7) * 0.1;
-    c.strokeStyle = rgba(theme.washi, 0.72);
+    c.strokeStyle = rgba(theme.paper, 0.72);
     c.lineWidth = 0.85;
     c.shadowBlur = 0;
     c.stroke();

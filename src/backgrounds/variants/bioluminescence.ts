@@ -7,7 +7,7 @@ import { rgba, seeded } from './utils';
 /**
  * Bioluminescence — routed through the shared signature pipeline. Its own deep
  * gradient and per-variant grain are retired for the shared luminance-capped
- * ground + fixed washi grain; its distinctive ink layer keeps the slow field of
+ * ground + fixed paper grain; its distinctive ink layer keeps the slow field of
  * glowing motes drifting up through deep water — azure crests with the odd
  * champagne spark, each twinkling on its own phase over the vermilion seal.
  * Deterministic seeding keeps it stable across frames, and a soft two-ring glow

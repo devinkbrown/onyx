@@ -10,9 +10,9 @@ import { rgba, seeded } from './utils';
  * legibility contract); the ground now comes from the shared luminance-capped
  * tokens, and the ink layer is the drifting gold paper fibres. Solid: one frame.
  */
-export const washi = {
-  id: 'washi',
-  label: 'Paper Grain',
+export const paperGrain = {
+  id: 'paper-grain',
+  label: 'Paper grain',
   kind: 'solid',
   init(_ctx) {},
   frame(ctx) {

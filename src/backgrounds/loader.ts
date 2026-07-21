@@ -9,6 +9,7 @@
  * render, so the picker never pulls render code.
  */
 import type { AnyBackgroundVariant, BackgroundVariant, SceneVariant } from './engine';
+import { resolveBackgroundId } from './catalogue';
 
 type VariantLoader = () => Promise<BackgroundVariant>;
 type SceneLoader = () => Promise<SceneVariant>;
@@ -19,18 +20,18 @@ const CANVAS_LOADERS: Record<string, VariantLoader> = {
   caustics: () => import('./variants/caustics').then((m) => m.caustics),
   aurora: () => import('./variants/aurora').then((m) => m.aurora),
   'pyrite-field': () => import('./variants/pyrite-field').then((m) => m.pyriteField),
-  'kintsugi-veins': () => import('./variants/kintsugi-veins').then((m) => m.kintsugiVeins),
+  'gold-veins': () => import('./variants/gold-veins').then((m) => m.goldVeins),
   ember: () => import('./variants/ember').then((m) => m.ember),
   forest: () => import('./variants/forest').then((m) => m.forest),
   resin: () => import('./variants/resin').then((m) => m.resin),
-  'sumi-e': () => import('./variants/sumi-e').then((m) => m.sumiE),
+  'ink-wash': () => import('./variants/ink-wash').then((m) => m.inkWash),
   mist: () => import('./variants/mist').then((m) => m.mist),
   frost: () => import('./variants/frost').then((m) => m.frost),
   'aurora-ribbons': () => import('./variants/aurora-ribbons').then((m) => m.auroraRibbons),
   'tide-bands': () => import('./variants/tide-bands').then((m) => m.tideBands),
   obsidian: () => import('./variants/obsidian').then((m) => m.obsidian),
   'lapis-gradient': () => import('./variants/lapis-gradient').then((m) => m.lapisGradient),
-  washi: () => import('./variants/washi').then((m) => m.washi),
+  'paper-grain': () => import('./variants/paper-grain').then((m) => m.paperGrain),
 };
 
 const SCENE_LOADERS: Record<string, SceneLoader> = {
@@ -40,7 +41,7 @@ const SCENE_LOADERS: Record<string, SceneLoader> = {
   phoenix: () => import('./scenes/Phoenix').then((m) => m.phoenix),
   'aurora-borealis': () => import('./scenes/AuroraBorealis').then((m) => m.auroraBorealis),
   volcanic: () => import('./scenes/Volcanic').then((m) => m.volcanic),
-  'tokyo-night': () => import('./scenes/TokyoNight').then((m) => m.tokyoNight),
+  'neon-night': () => import('./scenes/NeonNight').then((m) => m.neonNight),
 };
 
 /**
@@ -49,10 +50,11 @@ const SCENE_LOADERS: Record<string, SceneLoader> = {
  * from the synchronous catalogue metadata before awaiting this.
  */
 export async function loadBackgroundVariant(id: string | null | undefined): Promise<AnyBackgroundVariant | undefined> {
-  if (id == null) return undefined;
-  const canvas = CANVAS_LOADERS[id];
+  const canonical = resolveBackgroundId(id);
+  if (canonical == null) return undefined;
+  const canvas = CANVAS_LOADERS[canonical];
   if (canvas) return canvas();
-  const scene = SCENE_LOADERS[id];
+  const scene = SCENE_LOADERS[canonical];
   if (scene) return scene();
   return undefined;
 }

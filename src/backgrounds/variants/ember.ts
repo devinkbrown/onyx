@@ -10,7 +10,7 @@ const TAU = Math.PI * 2;
 /**
  * Ember — for the garnet themes, routed through the shared signature pipeline.
  * Its own opaque garnet ground and per-variant grain are retired for the shared
- * luminance-capped ground + fixed washi grain; its distinctive ink layer keeps
+ * luminance-capped ground + fixed paper grain; its distinctive ink layer keeps
  * the banked-fire shu glow rising from below, slow ember motes with the odd
  * brighter spark, and a whisper of heat-shimmer. Every point of warmth is the
  * shu accent — no gold anywhere — and the pipeline's single vermilion seal reads

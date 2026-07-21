@@ -8,7 +8,7 @@ import {
   type BackgroundVariant,
   type SceneVariant,
 } from './engine';
-import { isBackgroundId, type BackgroundId } from './catalogue';
+import { resolveBackgroundId, type BackgroundId } from './catalogue';
 import { loadBackgroundVariant } from './loader';
 import { preferences } from '@/lib/prefs/preferences';
 import { sceneMotion } from '@/lib/prefs/sceneMotion';
@@ -20,7 +20,7 @@ export interface BackgroundProps {
   quality?: BackgroundQuality;
 }
 
-export const DEFAULT_BACKGROUND_ID: BackgroundId = 'kintsugi-veins';
+export const DEFAULT_BACKGROUND_ID: BackgroundId = 'gold-veins';
 export const REDUCED_MOTION_BACKGROUND_ID: BackgroundId = 'lapis-gradient';
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
@@ -28,12 +28,12 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
  * Resolve the id of the background to render. Reduced motion NO LONGER swaps to
  * a generic solid — the engine renders the theme's own scene as a still frame
  * (see `staticMode`), so a reduced-motion / low-power device still gets its
- * theme-coloured background, just frozen. Only an unknown id falls back. This is
- * metadata-only (no render code loaded), so the picker stays lightweight.
+ * theme-coloured background, just frozen. Only an unknown id falls back. Legacy
+ * ids (pre-rename prefs / signatureBg) resolve to their canonical catalogue
+ * id. This is metadata-only (no render code loaded), so the picker stays light.
  */
 export function selectBackgroundId(id: string | undefined, _reducedMotion: boolean): BackgroundId {
-  if (isBackgroundId(id)) return id;
-  return DEFAULT_BACKGROUND_ID;
+  return resolveBackgroundId(id) ?? DEFAULT_BACKGROUND_ID;
 }
 
 export function Background(props: BackgroundProps) {

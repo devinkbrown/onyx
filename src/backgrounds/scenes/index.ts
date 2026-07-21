@@ -5,7 +5,7 @@ import { lightning } from './Lightning';
 import { phoenix } from './Phoenix';
 import { retroArcade } from './RetroArcade';
 import { starfield } from './Starfield';
-import { tokyoNight } from './TokyoNight';
+import { neonNight } from './NeonNight';
 import { volcanic } from './Volcanic';
 
 /**
@@ -20,7 +20,7 @@ export const sceneRegistry = [
   phoenix,
   auroraBorealis,
   volcanic,
-  tokyoNight,
+  neonNight,
 ] as const satisfies readonly SceneVariant[];
 
 export { SceneShell, seededRand } from './SceneShell';

@@ -3,10 +3,10 @@ import { For, Show } from 'solid-js';
 import type { SceneProps, SceneVariant } from '../engine';
 import { SceneShell, seededRand } from './SceneShell';
 
-/* ── Tokyo Night: dense neon cityscape — building silhouettes with blinking
+/* ── Neon night: dense neon cityscape — building silhouettes with blinking
    windows, driving rain, colorful puddle reflections, drifting clouds, fog,
    neon sign glows, car headlights and a distant lightning flash. Ported from
-   darkbear's TokyoNightBg. */
+   darkbear's NeonNightBg. */
 
 const WINDOW_COLORS = ['#54acf1', '#ff9e64', '#9ece6a', '#5ce0d6', '#7dcfff', '#e0af68', '#f7768e'];
 
@@ -81,7 +81,7 @@ const neons = (() => {
   ].map((n, i) => ({ ...n, w: 100 + rand() * 120, h: 30 + rand() * 25, anim: `tn-neon${i + 1}` }));
 })();
 
-function TokyoNightScene(props: SceneProps) {
+function NeonNightScene(props: SceneProps) {
   return (
     <SceneShell reducedMotion={props.reducedMotion} base="linear-gradient(180deg, #0a1420 0%, #0f1e2b 55%, #060b12 100%)">
       {/* Dark cyberpunk sky */}
@@ -217,9 +217,9 @@ function TokyoNightScene(props: SceneProps) {
   );
 }
 
-export const tokyoNight = {
-  id: 'tokyo-night',
-  label: 'Tokyo Night',
+export const neonNight = {
+  id: 'neon-night',
+  label: 'Neon night',
   kind: 'scene',
-  component: TokyoNightScene,
+  component: NeonNightScene,
 } as const satisfies SceneVariant;

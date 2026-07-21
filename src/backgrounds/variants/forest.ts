@@ -9,7 +9,7 @@ const TAU = Math.PI * 2;
 /**
  * Grove — for the jade themes, where the lapis tokens carry the green. Routed
  * through the shared signature pipeline: its own forest ground and per-variant
- * grain are retired for the shared luminance-capped ground + fixed washi grain.
+ * grain are retired for the shared luminance-capped ground + fixed paper grain.
  * Its distinctive ink layer keeps the faint canopy-dapple, slow slanted
  * light-shafts, and drifting spores in the theme's primary accent. Calm and
  * mineral — no gold beyond the pipeline's single vermilion seal.

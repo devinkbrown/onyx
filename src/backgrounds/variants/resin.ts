@@ -10,7 +10,7 @@ const TAU = Math.PI * 2;
 /**
  * Resin — for the amber themes, where gold is legitimately the primary warmth.
  * Routed through the shared signature pipeline: its own amber-depth ground and
- * per-variant grain are retired for the luminance-capped shared ground + washi
+ * per-variant grain are retired for the luminance-capped shared ground + paper
  * grain, and its distinctive ink layer — two breathing amber light-pools and the
  * motes suspended in the depth — is composited (in `screen`) over that ground so
  * the warm, luxurious character survives without lifting the legibility floor.

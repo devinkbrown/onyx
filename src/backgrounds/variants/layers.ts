@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * layers — the shared "Ink on Living Paper" signature pipeline (roadmap v1.2
- * "Washi").
+ * "Paper").
  *
  * The consolidation target is ONE layered background composition every preset
  * reuses instead of hand-rolling its own ground/grain/vignette:
  *
  *   groundLayer  → luminance-CAPPED theme-derived dark base (legibility floor)
  *   <ink layer>  → the preset's own distinctive scene drawing
- *   applyWashiGrain → the single mandatory washi grain, fixed density
+ *   applyPaperGrain → the single mandatory paper grain, fixed density
  *   applyVignette   → edge darkening so foreground text stays legible at the rim
- *   kintsugiAccent  → a quiet, edge-bound vermilion --shu seal glow
+ *   goldAccent  → a quiet, edge-bound vermilion --shu seal glow
  *
  * `composeSignature` runs that stack in order; a preset only supplies its ink
  * layer. The ground/grain/vignette all draw from the dark, low-L theme tokens
@@ -30,10 +30,10 @@ import { clearCanvas, readBackgroundTheme, rgba, seeded } from './utils';
  */
 export const GROUND_MAX_L = 0.24;
 
-/** Fixed washi-grain fleck count at full quality — no per-variant density knob. */
-export const WASHI_GRAIN_COUNT_BASE = 120;
+/** Fixed paper-grain fleck count at full quality — no per-variant density knob. */
+export const PAPER_GRAIN_COUNT_BASE = 120;
 /** Grain opacity — the whole point is a whisper, never a texture that competes. */
-export const WASHI_GRAIN_ALPHA = 0.1;
+export const PAPER_GRAIN_ALPHA = 0.1;
 /** Edge-vignette peak opacity (ink toward the rim). */
 export const VIGNETTE_MAX_ALPHA = 0.42;
 
@@ -49,9 +49,9 @@ export function capLuminance(hex: string, maxL: number = GROUND_MAX_L): string {
   return hslToHex({ ...hsl, l: maxL });
 }
 
-/** Pure: washi grain fleck count for a given quality scale (fixed base density). */
-export function washiGrainCount(qualityScale: number): number {
-  return Math.floor(WASHI_GRAIN_COUNT_BASE * Math.max(0, qualityScale));
+/** Pure: paper grain fleck count for a given quality scale (fixed base density). */
+export function paperGrainCount(qualityScale: number): number {
+  return Math.floor(PAPER_GRAIN_COUNT_BASE * Math.max(0, qualityScale));
 }
 
 /**
@@ -94,20 +94,20 @@ export function groundLayer(ctx: BackgroundFrameContext, theme: BackgroundTheme,
 }
 
 /**
- * The single mandatory washi grain: a fixed-density scatter of faint washi
+ * The single mandatory paper grain: a fixed-density scatter of faint paper
  * flecks, scaled only by the quality ladder. Promoted from the old per-variant
  * `drawGrain(density)` so every signature preset gets the exact same paper.
  */
-export function applyWashiGrain(
+export function applyPaperGrain(
   ctx: BackgroundFrameContext,
   theme: BackgroundTheme = readBackgroundTheme(ctx.canvas),
 ): void {
   const c = ctx.context;
-  const count = washiGrainCount(ctx.qualityScale);
+  const count = paperGrainCount(ctx.qualityScale);
 
   c.save();
-  c.globalAlpha = WASHI_GRAIN_ALPHA;
-  c.fillStyle = theme.washiDim;
+  c.globalAlpha = PAPER_GRAIN_ALPHA;
+  c.fillStyle = theme.paperDim;
   for (let i = 0; i < count; i += 1) {
     const x = seeded(i + 17) * ctx.width;
     const y = seeded(i + 71) * ctx.height;
@@ -154,7 +154,7 @@ export function applyVignette(
  * own ambient motion, while reduced-motion/static frames render the same calm
  * edge glow with no hidden animation state.
  */
-export function kintsugiAccent(ctx: BackgroundFrameContext, theme: BackgroundTheme, _time = 0): void {
+export function goldAccent(ctx: BackgroundFrameContext, theme: BackgroundTheme, _time = 0): void {
   const c = ctx.context;
   const radius = Math.max(24, Math.min(72, Math.min(ctx.width, ctx.height) * 0.11));
   const x = ctx.width - radius * 0.3;
@@ -176,7 +176,7 @@ export type InkLayer = (theme: BackgroundTheme, time: number) => void;
 
 /**
  * Run the full signature stack: clear → capped ground → the preset's ink layer
- * → washi grain → vignette → the peripheral vermilion seal glow. The theme is read once
+ * → paper grain → vignette → the peripheral vermilion seal glow. The theme is read once
  * (from the shared epoch cache) and threaded through every layer, so a live
  * theme switch repaints the whole stack on the next frame.
  */
@@ -185,7 +185,7 @@ export function composeSignature(ctx: BackgroundFrameContext, time: number, inkL
   clearCanvas(ctx);
   groundLayer(ctx, theme, time);
   inkLayer(theme, time);
-  applyWashiGrain(ctx, theme);
+  applyPaperGrain(ctx, theme);
   applyVignette(ctx, theme);
-  kintsugiAccent(ctx, theme, time);
+  goldAccent(ctx, theme, time);
 }

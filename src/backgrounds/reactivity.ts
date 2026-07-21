@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * Theme-reactive scene math (roadmap v1.2 "Washi").
+ * Theme-reactive scene math (roadmap v1.2 "Paper").
  *
  * Pure, DOM-free helpers that let a canvas background variant *react* to its
  * surroundings without any of them re-implementing the same trigonometry:

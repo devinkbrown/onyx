@@ -6,14 +6,14 @@ import type { BackgroundTheme } from './utils';
 import { rgba, seeded } from './utils';
 
 /**
- * Sumi-e — the ink-wash, routed through the shared signature pipeline. Its own
+ * Ink wash — the ink-wash, routed through the shared signature pipeline. Its own
  * near-black ground is retired for the shared luminance-capped ground; its ink
  * layer is the ink blooms, diagonal ink-rain, and paper flecks. The pipeline's
  * single vermilion seal reads here as the artist's hanko stamp on the sheet.
  */
-export const sumiE = {
-  id: 'sumi-e',
-  label: 'Sumi-e',
+export const inkWash = {
+  id: 'ink-wash',
+  label: 'Ink wash',
   kind: 'animated',
   init(_ctx) {},
   frame(ctx, time) {
@@ -48,9 +48,9 @@ function drawInkBlooms(ctx: BackgroundFrameContext, theme: BackgroundTheme, time
     // Bloom: a soft grey heart with a slightly denser inner ring, the way
     // wet ink feathers outward on paper.
     const bloom = c.createRadialGradient(x, y, 0, x, y, radius);
-    bloom.addColorStop(0, rgba(theme.washi, 0.026 * pulse));
-    bloom.addColorStop(0.32, rgba(theme.washi, 0.018 * pulse));
-    bloom.addColorStop(0.7, rgba(theme.washiDim, 0.008 * pulse));
+    bloom.addColorStop(0, rgba(theme.paper, 0.026 * pulse));
+    bloom.addColorStop(0.32, rgba(theme.paper, 0.018 * pulse));
+    bloom.addColorStop(0.7, rgba(theme.paperDim, 0.008 * pulse));
     bloom.addColorStop(1, rgba(theme.ink, 0));
     c.fillStyle = bloom;
     c.fillRect(x - radius, y - radius, radius * 2, radius * 2);
@@ -83,7 +83,7 @@ function drawInkRain(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: 
     const life = Math.sin(progress * Math.PI);
     const alpha = (0.022 + seeded(seed + 4) * 0.04) * life;
 
-    c.strokeStyle = rgba(theme.washi, alpha);
+    c.strokeStyle = rgba(theme.paper, alpha);
     c.lineWidth = 0.5 + seeded(seed + 5) * 0.8;
     c.beginPath();
     c.moveTo(x, y);
@@ -107,7 +107,7 @@ function drawPaperFlecks(ctx: BackgroundFrameContext, theme: BackgroundTheme, ti
     const glimmer = 0.5 + 0.5 * Math.sin(time * 0.00019 + i * 2.7);
 
     c.globalAlpha = 0.035 + glimmer * 0.03;
-    c.fillStyle = theme.washiDim;
+    c.fillStyle = theme.paperDim;
     c.fillRect(x, y, 0.9 + seeded(seed + 2) * 1.4, 0.7);
   }
 

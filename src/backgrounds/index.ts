@@ -18,13 +18,20 @@ export type {
 // is test-only and imported directly from './registry', so it never reaches the
 // app chunk through this barrel.
 export {
+  BACKGROUND_CATALOGUE,
+  SIGNATURE_FAMILIES,
+  backgroundFamilies,
   backgroundIds,
   backgroundKinds,
   backgroundLabels,
   backgroundOptions,
+  backgroundsInFamily,
   getBackgroundMeta,
+  getSignatureFamily,
+  getSignatureFamilyMeta,
   isBackgroundId,
   isSceneId,
+  resolveBackgroundId,
 } from './catalogue';
-export type { BackgroundId, BackgroundMeta } from './catalogue';
+export type { BackgroundId, BackgroundMeta, SignatureFamily, SignatureFamilyMeta } from './catalogue';
 export { loadBackgroundVariant } from './loader';

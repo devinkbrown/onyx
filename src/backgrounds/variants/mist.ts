@@ -63,8 +63,8 @@ function drawMistBands(ctx: BackgroundFrameContext, theme: BackgroundTheme, time
       c.scale(1, 0.3);
 
       const blob = c.createRadialGradient(0, 0, 0, 0, 0, radius);
-      blob.addColorStop(0, rgba(theme.washiDim, 0.028 * swell));
-      blob.addColorStop(0.55, rgba(theme.washiMute, 0.014 * swell));
+      blob.addColorStop(0, rgba(theme.paperDim, 0.028 * swell));
+      blob.addColorStop(0.55, rgba(theme.paperMute, 0.014 * swell));
       blob.addColorStop(1, rgba(theme.ink, 0));
       c.fillStyle = blob;
       c.fillRect(-radius, -radius, radius * 2, radius * 2);
@@ -93,7 +93,7 @@ function drawMineralFlecks(ctx: BackgroundFrameContext, theme: BackgroundTheme, 
     const radius = 0.4 + seeded(seed + 2) * 0.85;
 
     c.globalAlpha = bronze ? 0.05 + glimmer * 0.05 : 0.05 + glimmer * 0.075;
-    c.fillStyle = bronze ? bronzeColour : theme.washiDim;
+    c.fillStyle = bronze ? bronzeColour : theme.paperDim;
     c.beginPath();
     c.arc(x, y, radius, 0, TAU);
     c.fill();

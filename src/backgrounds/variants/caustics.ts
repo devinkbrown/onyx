@@ -7,7 +7,7 @@ import { mix, rgba } from './utils';
 /**
  * Caustic Tide — routed through the shared signature pipeline. Its own deep
  * gradient and per-variant grain are retired for the shared luminance-capped
- * ground + fixed washi grain; its distinctive ink layer keeps the rippling net
+ * ground + fixed paper grain; its distinctive ink layer keeps the rippling net
  * of light that plays across a seabed — layered sine-warped bright lines in
  * screen-blend, drifting with two interfering frequencies so the pattern never
  * obviously repeats, bright crests sinking toward the deep primary accent as the

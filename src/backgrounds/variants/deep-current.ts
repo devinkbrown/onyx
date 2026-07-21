@@ -111,7 +111,7 @@ function drawBioluminescence(ctx: BackgroundFrameContext, theme: BackgroundTheme
   for (let i = 0; i < count; i += 1) {
     const seed = i * 19 + 503;
     const pale = i % 23 === 0;
-    const color = pale ? mix(theme.lapisBright, theme.washi, 0.55) : theme.lapisBright;
+    const color = pale ? mix(theme.lapisBright, theme.paper, 0.55) : theme.lapisBright;
     const driftX = time * (0.002 + seeded(seed + 1) * 0.006);
     const driftY = time * (0.0004 + seeded(seed + 2) * 0.0016);
     const x =

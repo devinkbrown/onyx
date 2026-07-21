@@ -2,31 +2,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BackgroundFrameContext, BackgroundVariant } from './engine';
 import { hexToHsl } from './reactivity';
+import { backgroundRegistry } from './registry';
 import {
-  applyWashiGrain,
+  applyPaperGrain,
   capLuminance,
   composeSignature,
   GROUND_MAX_L,
   groundLayer,
-  kintsugiAccent,
-  WASHI_GRAIN_COUNT_BASE,
-  washiGrainCount,
+  goldAccent,
+  PAPER_GRAIN_COUNT_BASE,
+  paperGrainCount,
 } from './variants/layers';
 import { readBackgroundTheme, type BackgroundTheme } from './variants/utils';
-import { aurora } from './variants/aurora';
 import { auroraRibbons } from './variants/aurora-ribbons';
-import { bioluminescence } from './variants/bioluminescence';
-import { caustics } from './variants/caustics';
-import { ember } from './variants/ember';
-import { forest } from './variants/forest';
-import { kintsugiVeins } from './variants/kintsugi-veins';
-import { deepCurrent } from './variants/deep-current';
-import { mist } from './variants/mist';
-import { pyriteField } from './variants/pyrite-field';
-import { resin } from './variants/resin';
-import { sumiE } from './variants/sumi-e';
 import { tideBands } from './variants/tide-bands';
-import { washi } from './variants/washi';
 
 const THEME: BackgroundTheme = {
   ink: '#07090f',
@@ -43,9 +32,9 @@ const THEME: BackgroundTheme = {
   goldDeep: '#9a7a30',
   shu: '#e0452f',
   shuBright: '#ff5a40',
-  washi: '#ece4cf',
-  washiDim: '#ada590',
-  washiMute: '#6d6f86',
+  paper: '#ece4cf',
+  paperDim: '#ada590',
+  paperMute: '#6d6f86',
 };
 
 describe('capLuminance', () => {
@@ -76,28 +65,28 @@ describe('capLuminance', () => {
   });
 });
 
-describe('washiGrainCount', () => {
+describe('paperGrainCount', () => {
   it('is a fixed base density at full quality', () => {
-    expect(washiGrainCount(1)).toBe(WASHI_GRAIN_COUNT_BASE);
+    expect(paperGrainCount(1)).toBe(PAPER_GRAIN_COUNT_BASE);
   });
 
   it('scales only by the quality ladder', () => {
-    expect(washiGrainCount(0.52)).toBe(Math.floor(WASHI_GRAIN_COUNT_BASE * 0.52));
-    expect(washiGrainCount(0.76)).toBe(Math.floor(WASHI_GRAIN_COUNT_BASE * 0.76));
+    expect(paperGrainCount(0.52)).toBe(Math.floor(PAPER_GRAIN_COUNT_BASE * 0.52));
+    expect(paperGrainCount(0.76)).toBe(Math.floor(PAPER_GRAIN_COUNT_BASE * 0.76));
   });
 
   it('never returns a negative count', () => {
-    expect(washiGrainCount(0)).toBe(0);
-    expect(washiGrainCount(-1)).toBe(0);
+    expect(paperGrainCount(0)).toBe(0);
+    expect(paperGrainCount(-1)).toBe(0);
   });
 });
 
-describe('applyWashiGrain', () => {
+describe('applyPaperGrain', () => {
   it('draws exactly the fixed-density fleck count (one fillRect per fleck)', () => {
     const ctx = createFrameContext();
-    applyWashiGrain(ctx, THEME);
+    applyPaperGrain(ctx, THEME);
     const fillRect = ctx.context.fillRect as unknown as ReturnType<typeof vi.fn>;
-    expect(fillRect).toHaveBeenCalledTimes(washiGrainCount(ctx.qualityScale));
+    expect(fillRect).toHaveBeenCalledTimes(paperGrainCount(ctx.qualityScale));
   });
 });
 
@@ -136,7 +125,7 @@ describe('composeSignature', () => {
     const radialOrders = context.createRadialGradient.mock.invocationCallOrder;
     const groundGlowOrder = radialOrders[0]!; // groundLayer's top glow
     const vignetteOrder = radialOrders[1]!; // applyVignette
-    const sealOrder = radialOrders[2]!; // kintsugiAccent's edge glow
+    const sealOrder = radialOrders[2]!; // goldAccent's edge glow
 
     expect(clearOrder).toBeLessThan(inkOrder);
     expect(groundGlowOrder).toBeLessThan(inkOrder);
@@ -145,10 +134,10 @@ describe('composeSignature', () => {
   });
 });
 
-describe('kintsugiAccent', () => {
+describe('goldAccent', () => {
   it('keeps the vermilion signature at the edge without tracing a foreground path', () => {
     const ctx = createFrameContext();
-    kintsugiAccent(ctx, THEME, 1234);
+    goldAccent(ctx, THEME, 1234);
 
     const context = ctx.context as unknown as {
       createRadialGradient: ReturnType<typeof vi.fn>;
@@ -177,29 +166,26 @@ describe('kintsugiAccent', () => {
 });
 
 describe('signature presets route through the shared pipeline', () => {
-  // Every preset routed onto composeSignature must delegate its ground to the
-  // shared luminance-capped groundLayer instead of painting its own. groundLayer
-  // is the FIRST linear gradient in the stack (ink layers only stroke or draw
-  // radials/later gradients), so the first linear gradient a preset produces must
-  // be exactly the capped ink2 → stone → ink ramp. This catches any bright
-  // custom ground creeping back and proves the luminance cap holds by
-  // construction for each preset.
-  const routed: Array<{ id: string; variant: BackgroundVariant }> = [
-    { id: 'kintsugi-veins', variant: kintsugiVeins },
-    { id: 'deep-current', variant: deepCurrent },
-    { id: 'sumi-e', variant: sumiE },
-    { id: 'washi', variant: washi },
-    { id: 'mist', variant: mist },
-    { id: 'ember', variant: ember },
-    { id: 'forest', variant: forest },
-    { id: 'aurora', variant: aurora },
-    { id: 'bioluminescence', variant: bioluminescence },
-    { id: 'caustics', variant: caustics },
-    { id: 'resin', variant: resin },
-    { id: 'pyrite-field', variant: pyriteField },
-    { id: 'aurora-ribbons', variant: auroraRibbons },
-    { id: 'tide-bands', variant: tideBands },
-  ];
+  // Consolidation complete: EVERY canvas registry variant is a preset of the
+  // shared composeSignature stack. groundLayer is the FIRST linear gradient
+  // (ink layers only stroke or draw radials/later gradients), so the first
+  // linear gradient a preset produces must be exactly the capped ink2 → stone
+  // → ink ramp. This catches any bright custom ground creeping back and proves
+  // the luminance cap holds by construction for each preset — including the
+  // former holdouts (frost / lapis-gradient / obsidian).
+  const routed: Array<{ id: string; variant: BackgroundVariant }> = backgroundRegistry.map(
+    (variant) => ({ id: variant.id, variant }),
+  );
+
+  it('registers every canvas variant as a signature-pipeline preset', () => {
+    // The catalogue/registry still expose many selectable ids (theme signatureBg
+    // bindings, existing prefs); consolidation is "every id shares one pipeline",
+    // not "delete ids". This pins that every canvas entry is in the routed set.
+    expect(routed.map((entry) => entry.id).sort()).toEqual(
+      [...backgroundRegistry.map((v) => v.id)].sort(),
+    );
+    expect(routed.length).toBeGreaterThanOrEqual(17);
+  });
 
   it.each(routed)('$id paints the shared luminance-capped ground', ({ variant }) => {
     const theme = readBackgroundTheme();

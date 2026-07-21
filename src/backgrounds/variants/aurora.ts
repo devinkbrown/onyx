@@ -7,7 +7,7 @@ import { mix, rgba } from './utils';
 /**
  * Mineral Aurora — routed through the shared signature pipeline. Its own wash
  * ground and per-variant grain are retired for the shared luminance-capped
- * ground + fixed washi grain; its distinctive ink layer keeps the screen-blended
+ * ground + fixed paper grain; its distinctive ink layer keeps the screen-blended
  * aurora bands (primary accent crests sinking toward a mineral tint) with their
  * fine gold filament, over the pipeline's single vermilion seal.
  */

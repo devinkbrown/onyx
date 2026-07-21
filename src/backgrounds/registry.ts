@@ -8,15 +8,15 @@ import { deepCurrent } from './variants/deep-current';
 import { ember } from './variants/ember';
 import { forest } from './variants/forest';
 import { frost } from './variants/frost';
-import { kintsugiVeins } from './variants/kintsugi-veins';
+import { goldVeins } from './variants/gold-veins';
 import { lapisGradient } from './variants/lapis-gradient';
 import { mist } from './variants/mist';
 import { obsidian } from './variants/obsidian';
 import { pyriteField } from './variants/pyrite-field';
 import { resin } from './variants/resin';
-import { sumiE } from './variants/sumi-e';
+import { inkWash } from './variants/ink-wash';
 import { tideBands } from './variants/tide-bands';
-import { washi } from './variants/washi';
+import { paperGrain } from './variants/paper-grain';
 import { sceneRegistry } from './scenes';
 
 /** Canvas-engine variants only — everything here runs init/frame/dispose. */
@@ -26,18 +26,18 @@ export const backgroundRegistry = [
   caustics,
   aurora,
   pyriteField,
-  kintsugiVeins,
+  goldVeins,
   ember,
   forest,
   resin,
-  sumiE,
+  inkWash,
   mist,
   frost,
   auroraRibbons,
   tideBands,
   obsidian,
   lapisGradient,
-  washi,
+  paperGrain,
 ] as const satisfies readonly BackgroundVariant[];
 
 export { sceneRegistry };
@@ -57,13 +57,22 @@ export const allBackgroundVariants = [
 // Picker metadata + id types now live in ./catalogue (single source of truth,
 // no render code). Re-exported here so existing test imports keep resolving.
 export {
+  BACKGROUND_CATALOGUE,
+  SIGNATURE_FAMILIES,
   backgroundOptions,
   backgroundIds,
   backgroundLabels,
   backgroundKinds,
+  backgroundFamilies,
+  backgroundsInFamily,
   getBackgroundMeta,
+  getSignatureFamily,
+  getSignatureFamilyMeta,
   isBackgroundId,
+  resolveBackgroundId,
   type BackgroundId,
+  type SignatureFamily,
+  type SignatureFamilyMeta,
 } from './catalogue';
 
 /** Eager lookup by id — test-only; the app uses `loadBackgroundVariant`. */

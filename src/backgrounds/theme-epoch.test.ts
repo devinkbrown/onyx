@@ -79,7 +79,7 @@ describe('computeBackgroundTheme', () => {
 
     // Assert — every token name flowed through the injected reader, nothing else.
     expect(seen).toContain('--ink');
-    expect(seen).toContain('--washi-mute');
+    expect(seen).toContain('--paper-mute');
     expect(seen.length).toBeGreaterThan(0);
   });
 });

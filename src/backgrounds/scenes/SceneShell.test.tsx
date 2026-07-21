@@ -22,6 +22,22 @@ afterEach(() => {
   restoreDocumentHasFocus();
 });
 
+describe('SceneShell signature finishing layers', () => {
+  it('mounts shared grain + vignette overlays for the DOM-side legibility contract', () => {
+    // Canvas presets finish with applyPaperGrain + applyVignette; DOM scenes
+    // get the same contract via static overlay layers so text stays legible.
+    const { container } = render(() => (
+      <SceneShell reducedMotion={false} base="#05070b">
+        <div data-testid="ink-layer" />
+      </SceneShell>
+    ));
+    const root = container.querySelector('.onyx-scene');
+    expect(root?.getAttribute('data-scene-signature')).toBe('true');
+    expect(root?.querySelector('[data-scene-layer="grain"]')).not.toBeNull();
+    expect(root?.querySelector('[data-scene-layer="vignette"]')).not.toBeNull();
+  });
+});
+
 describe('SceneShell SVG timeline lifecycle', () => {
   it('pauses and resumes SMIL with visibility, focus, idle, and activity', () => {
     const timeline = createTimelineSpies();
