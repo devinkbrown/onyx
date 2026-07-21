@@ -69,6 +69,7 @@ const MAX_PENDING_WASM_FRAMES = 8;
 const MAX_MEDIA_CONTROL_PAYLOAD_CHARS = 64 * 1024;
 const LARGE_INLINE_MEDIA_SUBTYPES = new Set([
   'SCREEN_DATA',
+  // Historical media E2EE subtype (wire dual-accept); new peers use signed WS frames.
   'TSUMUGI_DATA',
   'VOICE_DATA',
   'VIDEO_DATA',
@@ -552,7 +553,8 @@ export class CadenceMediaEngine {
     if (this.activeRoom) this.mediaframeCmd(this.activeRoom, deafened ? 'DEAFEN' : 'UNDEAFEN');
   }
 
-  async getLocalTsumugiFingerprint(): Promise<string> {
+  /** Local media E2EE fingerprint for out-of-band TOFU display. */
+  async getLocalMediaE2eeFingerprint(): Promise<string> {
     const session = await this.createMooringSession();
     try {
       return await session.getFingerprint();
@@ -1889,6 +1891,7 @@ export class CadenceMediaEngine {
         if (this.client && this.activeRoom)
           this.client.send?.(`MEDIA ${this.activeRoom} MEDIA_PONG2 :${payload}`);
         break;
+      // Legacy media E2EE handshake subtype still accepted on the wire.
       case 'TSUMUGI_HANDSHAKE':
       case 'E2EE-HANDSHAKE': {
         const handshake = decodeInlineBase64(payload, MEDIA_HANDSHAKE_BYTES);
@@ -2022,6 +2025,7 @@ export class CadenceMediaEngine {
         // context; accepting it would create a downgrade beside signed WS media.
         break;
       }
+      // Legacy group-key subtype still accepted; outbound uses E2EE-GROUPKEY.
       case 'TSUMUGI_GROUP_KEY':
       case 'E2EE-GROUPKEY': {
         /* Current wire: `<sender-attachment> <target-nick>

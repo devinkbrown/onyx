@@ -80,7 +80,7 @@ describe('applyThemeToDom', () => {
     expect(getVar('--ink')).toBeTruthy();
     expect(getVar('--gold')).toBeTruthy();
     expect(getVar('--lapis')).toBeTruthy();
-    expect(getVar('--washi')).toBeTruthy();
+    expect(getVar('--paper')).toBeTruthy();
   });
 
   it('sets color-scheme to the theme scheme value', () => {
@@ -118,16 +118,16 @@ describe('ThemeProvider', () => {
       </ThemeProvider>
     ));
 
-    const base = getVar('--washi-dim');
+    const base = getVar('--paper-dim');
     expect(base).toBeTruthy();
 
     setPreference('highContrast', true);
-    const boosted = getVar('--washi-dim');
+    const boosted = getVar('--paper-dim');
     expect(boosted).toBeTruthy();
     expect(boosted).not.toBe(base);
 
     setPreference('highContrast', false);
-    expect(getVar('--washi-dim')).toBe(base);
+    expect(getVar('--paper-dim')).toBe(base);
   });
 
   it('applies the default theme on mount', () => {
@@ -182,13 +182,13 @@ describe('ThemeProvider', () => {
   it('setTheme writes the new theme to localStorage', () => {
     render(() => (
       <ThemeProvider>
-        <ThemeSetterButton id="sumi" />
+        <ThemeSetterButton id="ink" />
       </ThemeProvider>
     ));
 
     fireEvent.click(screen.getByTestId('set-theme-btn'));
 
-    expect(localStorage.getItem('onyx:theme')).toBe('sumi');
+    expect(localStorage.getItem('onyx:theme')).toBe('ink');
   });
 
   it('setTheme applies the new theme to the DOM', () => {
@@ -366,13 +366,13 @@ describe('Token catalogue', () => {
     }
   });
 
-  it('all themes define --ink, --gold, and --washi tokens', () => {
+  it('all themes define --ink, --gold, and --paper tokens', () => {
     for (const id of THEME_IDS) {
       const theme = THEMES[id];
       expect(theme).toBeDefined();
       expect(theme!.tokens['--ink']).toBeTruthy();
       expect(theme!.tokens['--gold']).toBeTruthy();
-      expect(theme!.tokens['--washi']).toBeTruthy();
+      expect(theme!.tokens['--paper']).toBeTruthy();
     }
   });
 
@@ -457,7 +457,7 @@ describe('Terracotta theme', () => {
     '--lapis', '--lapis-bright', '--lapis-deep',
     '--gold', '--gold-bright', '--gold-deep',
     '--shu', '--shu-bright',
-    '--washi', '--washi-dim', '--washi-mute',
+    '--paper', '--paper-dim', '--paper-mute',
     '--ok', '--warn',
   ];
 
@@ -516,7 +516,7 @@ describe('Pine theme', () => {
     '--lapis', '--lapis-bright', '--lapis-deep',
     '--gold', '--gold-bright', '--gold-deep',
     '--shu', '--shu-bright',
-    '--washi', '--washi-dim', '--washi-mute',
+    '--paper', '--paper-dim', '--paper-mute',
     '--ok', '--warn',
   ];
 
@@ -583,7 +583,7 @@ describe('Vermillion theme (Ink & Vermillion house identity)', () => {
     '--lapis', '--lapis-bright', '--lapis-deep',
     '--gold', '--gold-bright', '--gold-deep',
     '--shu', '--shu-bright',
-    '--washi', '--washi-dim', '--washi-mute',
+    '--paper', '--paper-dim', '--paper-mute',
     '--ok', '--warn',
   ];
 
@@ -666,7 +666,7 @@ describe('Sapphire theme', () => {
     '--lapis', '--lapis-bright', '--lapis-deep',
     '--gold', '--gold-bright', '--gold-deep',
     '--shu', '--shu-bright',
-    '--washi', '--washi-dim', '--washi-mute',
+    '--paper', '--paper-dim', '--paper-mute',
     '--ok', '--warn',
   ];
 
@@ -805,15 +805,15 @@ describe('segmented-control active segment (--ink on --lapis-bright)', () => {
 describe('applyThemeToDom high-contrast variant', () => {
   it('boosts the current theme foreground when highContrast is set', () => {
     applyThemeToDom('ocean', false);
-    const base = getVar('--washi-dim');
+    const base = getVar('--paper-dim');
     applyThemeToDom('ocean', true);
-    const boosted = getVar('--washi-dim');
+    const boosted = getVar('--paper-dim');
 
     expect(base).toBeTruthy();
     expect(boosted).toBeTruthy();
     expect(boosted).not.toBe(base);
 
-    // Boosting only raises contrast: the derived --washi-dim reads better on --ink.
+    // Boosting only raises contrast: the derived --paper-dim reads better on --ink.
     const ink = parseHex(getVar('--ink'))!;
     expect(contrastRatio(parseHex(boosted)!, ink)).toBeGreaterThanOrEqual(
       contrastRatio(parseHex(base)!, ink),
@@ -822,13 +822,13 @@ describe('applyThemeToDom high-contrast variant', () => {
 
   it('derives DIFFERENT boosted foregrounds for different themes', () => {
     applyThemeToDom('ocean', true);
-    const oceanWashiDim = getVar('--washi-dim');
+    const oceanPaperDim = getVar('--paper-dim');
     applyThemeToDom('kohaku', true);
-    const kohakuWashiDim = getVar('--washi-dim');
+    const kohakuPaperDim = getVar('--paper-dim');
 
-    expect(oceanWashiDim).toBeTruthy();
-    expect(kohakuWashiDim).toBeTruthy();
-    expect(oceanWashiDim).not.toBe(kohakuWashiDim);
+    expect(oceanPaperDim).toBeTruthy();
+    expect(kohakuPaperDim).toBeTruthy();
+    expect(oceanPaperDim).not.toBe(kohakuPaperDim);
   });
 
   it('every boosted built-in theme still passes the base AA audit', () => {
@@ -848,11 +848,11 @@ describe('applyThemeToDom high-contrast variant', () => {
 
   it('toggling highContrast off restores the base foreground values', () => {
     applyThemeToDom('ocean', false);
-    const base = getVar('--washi-dim');
+    const base = getVar('--paper-dim');
     applyThemeToDom('ocean', true);
-    expect(getVar('--washi-dim')).not.toBe(base);
+    expect(getVar('--paper-dim')).not.toBe(base);
     applyThemeToDom('ocean', false);
-    expect(getVar('--washi-dim')).toBe(base);
+    expect(getVar('--paper-dim')).toBe(base);
   });
 });
 

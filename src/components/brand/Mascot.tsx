@@ -7,7 +7,7 @@
  * not fierce — the face of the network. (Historical engine codename: Onyx Server.)
  *
  * Pure inline SVG, no external assets. It themes itself from the Onyx CSS
- * custom properties (--ink, --lapis, --lapis-bright, --gold-bright, --washi),
+ * custom properties (--ink, --lapis, --lapis-bright, --gold-bright, --paper),
  * so it follows whatever theme the document is set to. Crisp at any size and
  * accessible (role="img" + <title>).
  *

@@ -44,7 +44,7 @@ function nickColor(nick: string) {
     'var(--lapis-bright)',
     'var(--ok)',
     'var(--shu)',
-    'var(--washi)',
+    'var(--paper)',
   ];
   return swatches[hash % swatches.length] ?? swatches[0];
 }

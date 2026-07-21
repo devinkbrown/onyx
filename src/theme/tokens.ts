@@ -109,8 +109,8 @@ const accentGroup: StudioGroup = {
     },
     {
       property: '--gold',
-      label: 'Gold (kintsugi seams)',
-      hint: 'Pyrite / kintsugi warm gold — labels, seam lines, dividers.',
+      label: 'Gold (seam accents)',
+      hint: 'Pyrite warm gold — labels, seam lines, dividers.',
       type: 'color',
     },
     {
@@ -149,20 +149,20 @@ const textGroup: StudioGroup = {
   label: 'Text',
   tokens: [
     {
-      property: '--washi',
-      label: 'Washi (primary text)',
-      hint: 'Warm washi-paper tone. Must pass WCAG AA on --ink.',
+      property: '--paper',
+      label: 'Paper (primary text)',
+      hint: 'Warm paper tone. Must pass WCAG AA on --ink.',
       type: 'color',
     },
     {
-      property: '--washi-dim',
-      label: 'Washi dim (secondary text)',
-      hint: 'Dimmed washi for body copy and supporting text.',
+      property: '--paper-dim',
+      label: 'Paper dim (secondary text)',
+      hint: 'Dimmed paper for body copy and supporting text.',
       type: 'color',
     },
     {
-      property: '--washi-mute',
-      label: 'Washi mute (tertiary text)',
+      property: '--paper-mute',
+      label: 'Paper mute (tertiary text)',
       hint: 'Least prominent text — timestamps, metadata.',
       type: 'color',
     },

@@ -131,7 +131,7 @@ describe('dmCipher security contracts', () => {
     expect(envelope).not.toContain(plaintext);
     expect(envelopeBody(envelope).slice(12).length).toBeGreaterThan(0);
 
-    const wrongVersion = envelope.replace(ENVELOPE_PREFIX, 'TSUMUGI0 ');
+    const wrongVersion = envelope.replace(ENVELOPE_PREFIX, 'ONYXDM0 ');
     expect(isEnvelope(wrongVersion)).toBe(false);
     expect(await openDm(peer.publicB64, wrongVersion)).toBeNull();
   });

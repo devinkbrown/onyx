@@ -260,7 +260,7 @@ function StudioPreview() {
           </div>
           <div class="ts-pv-member ts-pv-member--plain">
             <span class="ts-pv-member__sigil"> </span>mira
-            <span class="ts-pv-member__dot" style={{"background":"var(--washi-mute)"}} />
+            <span class="ts-pv-member__dot" style={{"background":"var(--paper-mute)"}} />
           </div>
         </div>
       </div>
@@ -279,10 +279,10 @@ function StudioPreview() {
 type ContrastPair = { label: string; fg: string; bg: string; min: number };
 
 const CONTRAST_PAIRS: ContrastPair[] = [
-  { label: 'Body text', fg: '--washi', bg: '--ink', min: 4.5 },
-  { label: 'Secondary text', fg: '--washi-dim', bg: '--ink', min: 4.5 },
-  { label: 'Metadata', fg: '--washi-mute', bg: '--ink', min: 3 },
-  { label: 'Text on panel', fg: '--washi', bg: '--stone-2', min: 4.5 },
+  { label: 'Body text', fg: '--paper', bg: '--ink', min: 4.5 },
+  { label: 'Secondary text', fg: '--paper-dim', bg: '--ink', min: 4.5 },
+  { label: 'Metadata', fg: '--paper-mute', bg: '--ink', min: 3 },
+  { label: 'Text on panel', fg: '--paper', bg: '--stone-2', min: 4.5 },
   { label: 'Links / accent', fg: '--lapis-bright', bg: '--ink', min: 3 },
   { label: 'Gold accent', fg: '--gold-bright', bg: '--ink', min: 3 },
   { label: 'Status OK', fg: '--ok', bg: '--ink', min: 3 },
@@ -1679,7 +1679,7 @@ const STUDIO_CSS = `
   min-height: 100%;
   background: color-mix(in oklab, var(--ink) 90%, var(--stone));
   border: 1px solid var(--seam-faint);
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-sans);
 }
 
@@ -1700,7 +1700,7 @@ const STUDIO_CSS = `
   font-family: var(--font-serif);
   font-size: 0.88rem;
   line-height: 1.45;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 /* ── Eyebrow ── */
@@ -1734,7 +1734,7 @@ const STUDIO_CSS = `
   font-size: 0.7rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-weight: 400;
 }
 
@@ -1749,7 +1749,7 @@ const STUDIO_CSS = `
   cursor: pointer;
   border: 1px solid var(--seam-faint);
   background: color-mix(in oklab, var(--stone) 22%, transparent);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.06em;
@@ -1765,7 +1765,7 @@ const STUDIO_CSS = `
 }
 .ts-theme-chip:hover {
   border-color: var(--lapis);
-  color: var(--washi);
+  color: var(--paper);
 }
 .ts-theme-chip[data-active='true'] {
   border-color: var(--lapis-bright);
@@ -1873,7 +1873,7 @@ const STUDIO_CSS = `
   font-style: italic;
   font-size: 0.7rem;
   line-height: 1.45;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .ts-seed-colors {
   display: flex;
@@ -1892,7 +1892,7 @@ const STUDIO_CSS = `
   font-family: var(--font-mono);
   font-size: 0.66rem;
   line-height: 1.45;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 .ts-eyedropper-status--error {
   color: var(--shu-bright);
@@ -1906,7 +1906,7 @@ const STUDIO_CSS = `
   appearance: none;
   border: none;
   background: transparent;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.1em;
@@ -1917,7 +1917,7 @@ const STUDIO_CSS = `
     background var(--dur) var(--ease),
     color var(--dur) var(--ease);
 }
-.ts-scheme-toggle__btn:hover { color: var(--washi); }
+.ts-scheme-toggle__btn:hover { color: var(--paper); }
 .ts-scheme-toggle__btn[aria-pressed='true'] {
   background: color-mix(in oklab, var(--lapis-deep) 30%, var(--stone));
   color: var(--lapis-bright);
@@ -1953,7 +1953,7 @@ const STUDIO_CSS = `
   border: none;
   border-radius: var(--r-pill);
   background: transparent;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 0.95rem;
   line-height: 1;
   cursor: pointer;
@@ -2017,7 +2017,7 @@ const STUDIO_CSS = `
 .ts-token-badge {
   font-family: var(--font-mono);
   font-size: 0.64rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .ts-token-color-row {
   display: flex;
@@ -2043,7 +2043,7 @@ const STUDIO_CSS = `
 .ts-token-value {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   letter-spacing: 0.04em;
 }
 .ts-token-range {
@@ -2107,8 +2107,8 @@ const STUDIO_CSS = `
   font-size: 0.78rem;
   line-height: 1;
 }
-.ts-audit__label { font-size: 0.74rem; color: var(--washi-dim); min-width: 0; }
-.ts-audit__ratio { font-family: var(--font-mono); font-size: 0.7rem; color: var(--washi-mute); }
+.ts-audit__label { font-size: 0.74rem; color: var(--paper-dim); min-width: 0; }
+.ts-audit__ratio { font-family: var(--font-mono); font-size: 0.7rem; color: var(--paper-mute); }
 .ts-audit__badge {
   font-family: var(--font-mono);
   font-size: 0.6rem;
@@ -2124,7 +2124,7 @@ const STUDIO_CSS = `
 .ts-audit__badge--aa { color: var(--lapis-bright); border-color: color-mix(in oklab, var(--lapis-bright) 48%, transparent); }
 .ts-audit__badge--aa-large { color: var(--gold-bright); border-color: color-mix(in oklab, var(--gold-bright) 48%, transparent); }
 .ts-audit__badge--fail { color: var(--ink); background: var(--shu); border-color: var(--shu); }
-.ts-audit__badge--na { color: var(--washi-mute); border-color: var(--seam-faint); }
+.ts-audit__badge--na { color: var(--paper-mute); border-color: var(--seam-faint); }
 
 /* One-click AA repair — lives with the audit so a failing row has its fix. */
 .ts-audit__fix {
@@ -2212,7 +2212,7 @@ const STUDIO_CSS = `
   font-family: var(--font-mono);
   font-size: 0.64rem;
   letter-spacing: 0.08em;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   text-align: center;
 }
 /* The three-column chrome mock: channel rail | main | member list. */
@@ -2241,7 +2241,7 @@ const STUDIO_CSS = `
   font-size: 0.56rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--washi);
+  color: var(--paper);
   padding: 0.15rem 0.3rem 0.42rem;
   border-bottom: 1px solid var(--seam-faint);
   margin-bottom: 0.3rem;
@@ -2251,7 +2251,7 @@ const STUDIO_CSS = `
   font-size: 0.5rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   margin: 0.32rem 0.3rem 0.08rem;
 }
 .ts-pv-chan {
@@ -2259,18 +2259,18 @@ const STUDIO_CSS = `
   align-items: center;
   gap: 0.24rem;
   font-size: 0.62rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   padding: 0.16rem 0.3rem;
   border-radius: var(--r-sm);
 }
-.ts-pv-chan__hash { color: var(--washi-mute); }
+.ts-pv-chan__hash { color: var(--paper-mute); }
 .ts-pv-chan__hash--voice { color: var(--ok); font-size: 0.52rem; }
 .ts-pv-chan[data-active='true'] {
   background: color-mix(in oklab, var(--lapis-deep) 32%, transparent);
   color: var(--lapis-bright);
 }
 .ts-pv-chan[data-active='true'] .ts-pv-chan__hash { color: var(--lapis); }
-.ts-pv-chan--muted { color: var(--washi-mute); }
+.ts-pv-chan--muted { color: var(--paper-mute); }
 .ts-pv-chan__pip {
   width: 6px;
   height: 6px;
@@ -2308,7 +2308,7 @@ const STUDIO_CSS = `
   font-family: var(--font-mono);
   font-weight: 700;
   font-size: 0.66rem;
-  color: var(--washi);
+  color: var(--paper);
   flex: none;
 }
 .ts-pv-head__topic {
@@ -2320,7 +2320,7 @@ const STUDIO_CSS = `
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 0.6rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .ts-pv-badge {
   flex: none;
@@ -2359,7 +2359,7 @@ const STUDIO_CSS = `
 .ts-pv-msg__time {
   font-family: var(--font-mono);
   font-size: 0.52rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   flex: none;
 }
 .ts-pv-msg__nick {
@@ -2369,13 +2369,13 @@ const STUDIO_CSS = `
   flex: none;
   white-space: nowrap;
 }
-.ts-pv-msg__nick::after { content: ':'; color: var(--washi-mute); }
+.ts-pv-msg__nick::after { content: ':'; color: var(--paper-mute); }
 .ts-pv-msg__text {
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-sans);
   min-width: 0;
 }
-.ts-pv-msg__text--dim { color: var(--washi-mute); font-style: italic; }
+.ts-pv-msg__text--dim { color: var(--paper-mute); font-style: italic; }
 .ts-pv-msg__link {
   color: var(--lapis-bright);
   text-decoration: underline;
@@ -2436,12 +2436,12 @@ const STUDIO_CSS = `
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.6rem;
 }
 .ts-pv-composer__cursor {
-  color: var(--washi);
+  color: var(--paper);
   font-size: 0.6rem;
   animation: ts-blink 1.1s steps(1) infinite;
 }
@@ -2463,7 +2463,7 @@ const STUDIO_CSS = `
   font-size: 0.5rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   margin-bottom: 0.15rem;
 }
 .ts-pv-member {
@@ -2471,9 +2471,9 @@ const STUDIO_CSS = `
   align-items: center;
   gap: 0.26rem;
   font-size: 0.62rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
-.ts-pv-member--plain { color: var(--washi-mute); }
+.ts-pv-member--plain { color: var(--paper-mute); }
 .ts-pv-member__sigil {
   width: 0.6rem;
   text-align: center;
@@ -2528,7 +2528,7 @@ const STUDIO_CSS = `
   border: 1px solid var(--seam);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--ink) 60%, transparent);
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: 0.74rem;
   letter-spacing: 0.02em;
@@ -2538,7 +2538,7 @@ const STUDIO_CSS = `
   outline-offset: 1px;
   border-color: var(--lapis);
 }
-.ts-save-input::placeholder { color: var(--washi-mute); }
+.ts-save-input::placeholder { color: var(--paper-mute); }
 
 /* At 400% zoom the studio is a narrow editing surface, not a scaled desktop
    canvas. Collapse decorative preview chrome and let every editing group own

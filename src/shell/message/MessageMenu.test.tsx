@@ -165,7 +165,7 @@ describe('messageMenuCapabilities', () => {
     const caps = messageMenuCapabilities(input({
       msg: {
         from: 'alice',
-        text: 'TSUMUGI1 ciphertext-envelope',
+        text: 'ONYXDM1 ciphertext-envelope',
         plaintext: 'private hello',
         encrypted: true,
         type: 'msg',
@@ -182,7 +182,7 @@ describe('messageMenuCapabilities', () => {
     const caps = messageMenuCapabilities(input({
       msg: {
         from: 'alice',
-        text: 'TSUMUGI1 legacy-envelope',
+        text: 'ONYXDM1 legacy-envelope',
         type: 'msg',
       },
     }));
@@ -876,7 +876,7 @@ describe('<MessageMenu>', () => {
     const msg: ChatMessage = {
       id: 'm-edit-e2ee',
       from: 'alice',
-      text: 'TSUMUGI1 ciphertext-envelope',
+      text: 'ONYXDM1 ciphertext-envelope',
       plaintext: 'private hello',
       encrypted: true,
       time: new Date('2026-07-08T12:00:00Z'),

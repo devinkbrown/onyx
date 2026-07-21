@@ -390,7 +390,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             <Show
               when={sortedChannels().length > 0}
               fallback={
-                <li style={{ padding: '4px 10px', color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
+                <li style={{ padding: '4px 10px', color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
                   No rooms yet
                 </li>
               }

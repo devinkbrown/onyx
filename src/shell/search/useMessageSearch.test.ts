@@ -314,7 +314,7 @@ describe('useMessageSearch', () => {
       activeView: { kind: 'dm', nick: 'Mika' },
       dms: new Map([['mika', dm('Mika', [
         message('plain', 'Mika', 'ordinary remembered line', 1, 'Mika'),
-        message('legacy-envelope', 'Mika', 'TSUMUGI1 opaque-ciphertext-token', 2, 'Mika'),
+        message('legacy-envelope', 'Mika', 'ONYXDM1 opaque-ciphertext-token', 2, 'Mika'),
       ])]]),
       peerDmKeys: new Map(),
       canSearchHistory: true,
@@ -375,7 +375,7 @@ describe('useMessageSearch', () => {
         results: [message(
           'legacy-encrypted-hit',
           'Mika',
-          'TSUMUGI1 cipher-envelope',
+          'ONYXDM1 cipher-envelope',
           1,
           'Mika',
         )],

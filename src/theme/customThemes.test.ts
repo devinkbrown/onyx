@@ -76,7 +76,7 @@ describe('persistence', () => {
   it('accepts only the finite safe grammar used by palette tokens', () => {
     expect(parseCustomThemeTokenMap({
       '--lapis': '#78d5ff',
-      '--washi': 'oklch(92% 0.02 220)',
+      '--paper': 'oklch(92% 0.02 220)',
       '--seam': 'color-mix(in oklab, var(--lapis) 38%, transparent)',
       '--r-sm': '8px',
       '--dur': '260ms',
@@ -84,7 +84,7 @@ describe('persistence', () => {
       '--font-mono': "'JetBrains Mono Variable', ui-monospace, monospace",
     })).toEqual({
       '--lapis': '#78d5ff',
-      '--washi': 'oklch(92% 0.02 220)',
+      '--paper': 'oklch(92% 0.02 220)',
       '--seam': 'color-mix(in oklab, var(--lapis) 38%, transparent)',
       '--r-sm': '8px',
       '--dur': '260ms',

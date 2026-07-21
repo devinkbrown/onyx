@@ -56,8 +56,8 @@ test('contains long tooltips at 400% short reflow', async ({ page, browserName }
         --ink: #020a12;
         --stone: #123;
         --stone-2: #234;
-        --washi: #fff;
-        --washi-dim: #ddd;
+        --paper: #fff;
+        --paper-dim: #ddd;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
         --lapis-deep: #075080;

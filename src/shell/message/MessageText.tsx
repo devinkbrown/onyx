@@ -655,7 +655,7 @@ function StyledRun(props: StyledRunProps): JSX.Element {
     // Reverse video swaps fg/bg, falling back to the surface + text defaults.
     if (s.reverse) {
       const swapFg = bg ?? 'var(--ink)';
-      const swapBg = fg ?? 'var(--washi)';
+      const swapBg = fg ?? 'var(--paper)';
       fg = swapFg;
       bg = swapBg;
     }

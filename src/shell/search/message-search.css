@@ -11,7 +11,7 @@
   align-items: center;
   gap: 6px;
   pointer-events: none;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .onyx-message-search__surface {
@@ -66,7 +66,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--washi);
+  color: var(--paper);
   caret-color: var(--lapis-bright);
   font: 560 0.92rem/1.2 var(--font-sans);
 }
@@ -77,7 +77,7 @@
 }
 
 .onyx-message-search__input::placeholder {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .onyx-message-search__count {
@@ -111,7 +111,7 @@
   appearance: none;
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--stone-2) 36%, transparent);
   cursor: pointer;
   font: 700 0.9rem/1 var(--font-mono);
@@ -143,7 +143,7 @@
 }
 
 .onyx-message-search__button--close {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .onyx-message-search__recall {
@@ -173,7 +173,7 @@
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 28%, transparent);
   border-radius: 999px;
   padding: 0.22rem 0.55rem;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 10%, transparent);
   font: 740 0.68rem/1 var(--font-mono);
   letter-spacing: 0.04em;
@@ -220,7 +220,7 @@
   border: 0;
   border-inline-start: 1px solid var(--seam-faint);
   background: transparent;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   min-height: 1.9rem;
   padding: 0 0.7rem;
   font: 720 0.66rem/1 var(--font-mono);
@@ -238,7 +238,7 @@
 }
 
 .onyx-message-search__segment:hover:not([data-active='true']) {
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
 }
 
@@ -335,7 +335,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.78rem;
 }
 
@@ -362,12 +362,12 @@
   border-radius: var(--r-sm);
   padding: 0 0.6rem;
   background: color-mix(in oklab, var(--ink) 72%, transparent);
-  color: var(--washi);
+  color: var(--paper);
   font: 500 0.76rem/1 var(--font-sans);
 }
 
 .onyx-message-search__save-input::placeholder {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .onyx-message-search__save-input:focus-visible {
@@ -409,7 +409,7 @@
   align-items: baseline;
   gap: 8px;
   padding: 5px 7px;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   text-align: left;
 }
@@ -420,7 +420,7 @@
 }
 
 .onyx-message-search__saved-run strong {
-  color: var(--washi);
+  color: var(--paper);
   font-size: 0.76rem;
 }
 
@@ -440,7 +440,7 @@
 
 .onyx-message-search__saved-delete {
   padding: 5px 7px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   background: transparent;
   font-size: 0.68rem;
 }
@@ -482,7 +482,7 @@
 .onyx-message-search__server-count {
   font-family: var(--font-mono);
   font-size: 0.7rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .onyx-message-search__server-error {
   font-size: 0.72rem;
@@ -490,7 +490,7 @@
 }
 .onyx-message-search__server-notice {
   font-size: 0.72rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .onyx-message-search__server-list {
   list-style: none;
@@ -510,7 +510,7 @@
   text-align: left;
   font: inherit;
   font-size: 0.78rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: none;
   border: 0;
   border-radius: 6px;
@@ -526,9 +526,9 @@
   flex: none;
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
-.onyx-message-search__server-row strong { flex: none; color: var(--washi); font-weight: 600; }
+.onyx-message-search__server-row strong { flex: none; color: var(--paper); font-weight: 600; }
 .onyx-message-search__server-text {
   white-space: nowrap;
   overflow: hidden;
@@ -547,7 +547,7 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .onyx-message-search__vault-target {
   flex: none;

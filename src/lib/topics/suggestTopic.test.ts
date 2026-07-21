@@ -37,7 +37,7 @@ describe('suggestTopic', () => {
 
   it('uses plaintext before ciphertext-like text when available', () => {
     expect(suggestTopic([
-      { text: 'tsumugi-envelope-ciphertext', plaintext: 'Release train blockers' },
+      { text: 'onyxdm-envelope-ciphertext', plaintext: 'Release train blockers' },
     ])).toBe('release train blocker');
   });
 

@@ -21,7 +21,7 @@ test('gives admin and half-op badges distinct intentional role treatments', asyn
         --r-sm: 4px;
         --gold: rgb(218, 177, 83);
         --gold-deep: rgb(92, 63, 18);
-        --washi-mute: rgb(136, 151, 166);
+        --paper-mute: rgb(136, 151, 166);
         --seam: rgb(74, 102, 124);
         --stone-2: rgb(20, 34, 46);
       }

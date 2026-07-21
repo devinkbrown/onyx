@@ -6,8 +6,9 @@ web client for the **Onyx** network on the **Onyx Server** engine (not React,
 Next.js, or any SSR framework). The reactivity model is fine-grained signals,
 not a virtual DOM; patterns from React training data (rules-of-hooks, re-render
 mental models, `useEffect` deps) do **not** apply. Use English subsystem names
-(Cadence media, Mooring client crypto) — not retired Suimyaku/Kagura/Tsumugi
-prose names. Wire tokens `onyx/*` and `TSUMUGI_*` stay as literals.
+(Cadence media, Mooring client crypto) — not retired Japanese prose names.
+New code uses English identifiers; dual-accept historical wire tokens only
+(`TSUMUGI_*` media subtypes, `TSUMUGI1 ` envelopes, `TEGAMI` memos).
 
 Before writing code, read [`CLAUDE.md`](CLAUDE.md) (working context: layout,
 persistence conventions, IRC↔Onyx mapping) and

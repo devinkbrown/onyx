@@ -51,7 +51,7 @@
 
 .ab-hero .r-kicker::before {
   content: '// ';
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .ab-hero h1 {
@@ -62,7 +62,7 @@
   line-height: 0.86;
   letter-spacing: -0.01em;
   text-transform: uppercase;
-  color: var(--washi);
+  color: var(--paper);
   text-wrap: balance;
 }
 
@@ -91,7 +91,7 @@
   font-weight: 360;
   font-size: clamp(1.3rem, 1rem + 1.3vw, 2.2rem);
   line-height: 1.35;
-  color: var(--washi);
+  color: var(--paper);
   max-width: 28ch;
 }
 
@@ -106,7 +106,7 @@
   font-family: var(--font-sans);
   font-size: clamp(1rem, 0.9rem + 0.5vw, 1.28rem);
   line-height: 1.65;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   text-wrap: pretty;
 }
 
@@ -168,7 +168,7 @@
   font-weight: 400;
   font-size: clamp(1.3rem, 1rem + 1vw, 1.85rem);
   text-transform: uppercase;
-  color: var(--washi);
+  color: var(--paper);
   line-height: 0.97;
 }
 
@@ -177,12 +177,12 @@
   font-family: var(--font-sans);
   font-size: 0.97rem;
   line-height: 1.63;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   text-wrap: pretty;
 }
 
 .ab-proto-item p b {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 600;
 }
 
@@ -192,7 +192,7 @@
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .ab-proto-item .tag.e2ee {
@@ -219,7 +219,7 @@
   margin-bottom: 14px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--seam-faint);
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 11px;
   letter-spacing: 0.12em;
 }
@@ -247,7 +247,7 @@
 }
 
 .ab-cap-row .val {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .ab-cap-row .val b {
@@ -297,12 +297,12 @@
   font-weight: 380;
   font-size: clamp(1.02rem, 0.92rem + 0.5vw, 1.26rem);
   line-height: 1.6;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   text-wrap: pretty;
 }
 
 .ab-media-body p b {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 600;
 }
 
@@ -348,7 +348,7 @@
 }
 
 .ab-transport.fallback {
-  border-top: 2px solid var(--washi-mute);
+  border-top: 2px solid var(--paper-mute);
 }
 
 .ab-transport .t-label {
@@ -356,7 +356,7 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .ab-transport.primary .t-label {
@@ -373,7 +373,7 @@
   font-weight: 400;
   font-size: clamp(1.15rem, 1rem + 0.7vw, 1.6rem);
   text-transform: uppercase;
-  color: var(--washi);
+  color: var(--paper);
   line-height: 0.97;
 }
 
@@ -382,10 +382,10 @@
   font-family: var(--font-sans);
   font-size: 0.91rem;
   line-height: 1.58;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
-/* ───────── E2EE — Tsumugi ───────── */
+/* ───────── E2EE ───────── */
 .ab-e2ee-split {
   display: grid;
   grid-template-columns: 0.9fr 1.1fr;
@@ -411,12 +411,12 @@
   font-family: var(--font-sans);
   font-size: 0.99rem;
   line-height: 1.65;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   text-wrap: pretty;
 }
 
 .ab-e2ee-body p b {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 600;
 }
 
@@ -453,7 +453,7 @@
   font-family: var(--font-sans);
   font-size: 0.93rem;
   line-height: 1.55;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .ab-e2ee-visual {
@@ -512,12 +512,12 @@
   font-family: var(--font-sans);
   font-size: 0.99rem;
   line-height: 1.65;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   text-wrap: pretty;
 }
 
 .ab-mesh-text p b {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 600;
 }
 
@@ -569,7 +569,7 @@
 .ab-node .host {
   font-family: var(--font-mono);
   font-size: 0.9rem;
-  color: var(--washi);
+  color: var(--paper);
   letter-spacing: 0.04em;
 }
 
@@ -577,7 +577,7 @@
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 0.9rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 /* Mesh tech list */
@@ -611,7 +611,7 @@
   font-family: var(--font-sans);
   font-size: 0.91rem;
   line-height: 1.55;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 /* ───────── Services section ───────── */
@@ -664,7 +664,7 @@
   font-family: var(--font-sans);
   font-size: 1.05rem;
   font-weight: 600;
-  color: var(--washi);
+  color: var(--paper);
   line-height: 1.2;
 }
 
@@ -673,7 +673,7 @@
   font-family: var(--font-sans);
   font-size: 0.92rem;
   line-height: 1.6;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   text-wrap: pretty;
 }
 
@@ -683,7 +683,7 @@
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .ab-svc .note.live {
@@ -702,7 +702,7 @@
   font-weight: 380;
   font-size: clamp(1.1rem, 1rem + 0.8vw, 1.5rem);
   line-height: 1.5;
-  color: var(--washi);
+  color: var(--paper);
   text-wrap: pretty;
 }
 
@@ -811,7 +811,7 @@
   font-size: 12px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 /* the Onyx client card carries the sparing champagne second accent */
@@ -825,12 +825,12 @@
   font-weight: 380;
   font-size: 1.02rem;
   line-height: 1.6;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   text-wrap: pretty;
 }
 
 .ab-myth p b {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 600;
 }
 
@@ -839,7 +839,7 @@
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.1em;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   line-height: 1.7;
 }
 
@@ -899,7 +899,7 @@
   font-weight: 400;
   font-size: clamp(1.5rem, 1rem + 1.8vw, 2.4rem);
   text-transform: uppercase;
-  color: var(--washi);
+  color: var(--paper);
   line-height: 0.94;
 }
 
@@ -908,12 +908,12 @@
   font-family: var(--font-sans);
   font-size: 0.98rem;
   line-height: 1.65;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   text-wrap: pretty;
 }
 
 .ab-dev-card p b {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 600;
 }
 
@@ -921,7 +921,7 @@
   font-family: var(--font-mono);
   font-size: clamp(0.78rem, 0.68rem + 0.4vw, 0.9rem);
   line-height: 1.85;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--ink) 60%, var(--stone));
   border: 1px solid var(--seam-faint);
   border-left: 2px solid var(--lapis);
@@ -940,7 +940,7 @@
 }
 
 .ab-dev-card .code-snip .o {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .ab-dev-card .code-snip .h {
@@ -989,7 +989,7 @@
     var(--lapis) 92%,
     transparent
   );
-  /* a gentle wave crest rather than a jagged kintsugi fracture */
+  /* a gentle wave crest rather than a jagged gold seam fracture */
   clip-path: polygon(
     0 50%,
     14% 30%,

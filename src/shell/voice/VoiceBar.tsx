@@ -1190,7 +1190,7 @@ export function VoiceBar() {
                               top: '0',
                               bottom: '0',
                               width: '1px',
-                              background: 'color-mix(in oklab, var(--washi) 16%, transparent)',
+                              background: 'color-mix(in oklab, var(--paper) 16%, transparent)',
                             }}
                           />
                           <span
@@ -1201,7 +1201,7 @@ export function VoiceBar() {
                               right: '0',
                               top: '50%',
                               height: '1px',
-                              background: 'color-mix(in oklab, var(--washi) 16%, transparent)',
+                              background: 'color-mix(in oklab, var(--paper) 16%, transparent)',
                             }}
                           />
                           <span

@@ -66,7 +66,7 @@ const phases: Phase[] = [
   },
   {
     phase: 'Phase 7',
-    title: 'Washi',
+    title: 'Atmosphere',
     state: 'active',
     date: '2026-07-11',
     summary: 'Accessibility is now a public ledger and an in-client audit surface with dense-panel, Home catch-up, message-search, notification-center, channel-browser, account-panel, channel-sidebar, keyboard-shortcuts including transcript navigation, command-palette, pinned-messages, theme-import, thread-panel, voice-settings, call-overlay, message-action, member-list, notification-control, time-scrubber pass evidence, reduced-transparency controls, and user/OS high-contrast variants.',
@@ -74,7 +74,7 @@ const phases: Phase[] = [
   },
   {
     phase: 'Phase 8',
-    title: 'Torii entry',
+    title: 'Product entry',
     state: 'active',
     date: '2026-07-16',
     summary: 'Fold the master roadmap product-entry work into Onyx and the main site: rich invite previews, topic and reader handoff, instant guest entry, native onboarding, safe remembered-identity switching, install guidance, release checks, and a stricter public glossary.',

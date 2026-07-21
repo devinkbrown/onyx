@@ -56,9 +56,9 @@
   --on-danger: #1c0906;
 
   /* Text — sea-foam ivory over deep water */
-  --washi: #d1e1e9;
-  --washi-dim: #8c9ba3;
-  --washi-mute: #536771; /* deep-tide graphite, least important */
+  --paper: #d1e1e9;
+  --paper-dim: #8c9ba3;
+  --paper-mute: #536771; /* deep-tide graphite, least important */
 
   /* Functional status (kept in-palette where possible) */
   --ok: #5bc78e;
@@ -68,8 +68,8 @@
   /* Seams (bioluminescent current lines) + bands (pale tide) */
   --seam: color-mix(in oklab, var(--lapis) 42%, transparent);
   --seam-faint: color-mix(in oklab, var(--lapis) 16%, transparent);
-  --line: color-mix(in oklab, var(--washi) 14%, transparent);
-  --line-faint: color-mix(in oklab, var(--washi) 7%, transparent);
+  --line: color-mix(in oklab, var(--paper) 14%, transparent);
+  --line-faint: color-mix(in oklab, var(--paper) 7%, transparent);
 
   /* Radius — fluid and elegant for the deep-water cut. */
   --r-0: 0px;
@@ -146,9 +146,9 @@
   --shu: #e95145;
   --shu-bright: #ff7f71;
 
-  --washi: #eae8e0;
-  --washi-dim: #a4a19a;
-  --washi-mute: #6e6c63;
+  --paper: #eae8e0;
+  --paper-dim: #a4a19a;
+  --paper-mute: #6e6c63;
 
   --ok: #5bc78e;
   --warn: #e6d08c; /* warnings stay WARM — in-family with the gold inlay */
@@ -156,8 +156,8 @@
 
   --seam: color-mix(in oklab, var(--gold) 40%, transparent);
   --seam-faint: color-mix(in oklab, var(--gold) 15%, transparent);
-  --line: color-mix(in oklab, var(--washi) 13%, transparent);
-  --line-faint: color-mix(in oklab, var(--washi) 6%, transparent);
+  --line: color-mix(in oklab, var(--paper) 13%, transparent);
+  --line-faint: color-mix(in oklab, var(--paper) 6%, transparent);
 
   --r-0: 0px;
   --r-sm: 2px;

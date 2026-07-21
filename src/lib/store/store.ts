@@ -2006,8 +2006,8 @@ export interface OnyxState {
   loadPendingKeySafetyNumber(peer: string): Promise<string | null>;
   /** channel.toLowerCase() → rolling caption transcript for the live media session */
   mediaTranscripts: Map<string, Array<{ nick: string; text: string; time: Date }>>;
-  /** sender.toLowerCase() → offline (TEGAMI) delivery aggregate */
-  tegami: Map<string, { count: number; firstMsgId: string }>;
+  /** sender.toLowerCase() → offline memo (wire: MEMO / legacy TEGAMI) delivery aggregate */
+  offlineMemo: Map<string, { count: number; firstMsgId: string }>;
   /** target.toLowerCase() → server-side read marker (ISO 8601 timestamp) */
   readMarkers: Map<string, string>;
   /** Send `RENAME <channel> <newName> [:reason]` (IRCv3 draft/channel-rename). */
@@ -2016,8 +2016,8 @@ export interface OnyxState {
   setOwnMetadata(key: string, value: string | null): void;
   /** Internal: apply an inbound METADATA key/value to userMetadata + rich profile. */
   _applyMetadata(target: string, key: string, value: string): void;
-  /** Drop the TEGAMI aggregate for a sender (e.g. once the DM is opened). */
-  clearTegami(target: string): void;
+  /** Drop the offline-memo aggregate for a sender (e.g. once the DM is opened). */
+  clearOfflineMemo(target: string): void;
 
   // ── Developer mode ────────────────────────────────────────────────────────
   devMode: boolean;
@@ -2232,9 +2232,13 @@ export const MAX_TYPING_NICK_LENGTH = 128;
 const TYPING_EXPIRY_MS = 6_000;
 const TYPING_RATE_LIMIT_MS = 4_000;
 export const MAX_LIVE_DM_CONVERSATIONS = 256;
-export const MAX_TEGAMI_CONVERSATIONS = MAX_LIVE_DM_CONVERSATIONS;
+export const MAX_OFFLINE_MEMO_CONVERSATIONS = MAX_LIVE_DM_CONVERSATIONS;
+/** @deprecated Prefer MAX_OFFLINE_MEMO_CONVERSATIONS */
+export const MAX_TEGAMI_CONVERSATIONS = MAX_OFFLINE_MEMO_CONVERSATIONS;
 export const MAX_LIVE_CHANNELS = 256;
-export const MAX_TEGAMI_COUNT = 9_999;
+export const MAX_OFFLINE_MEMO_COUNT = 9_999;
+/** @deprecated Prefer MAX_OFFLINE_MEMO_COUNT */
+export const MAX_TEGAMI_COUNT = MAX_OFFLINE_MEMO_COUNT;
 export const MAX_USER_METADATA_TARGETS = 256;
 export const MAX_USER_METADATA_KEYS = 64;
 export const MAX_USER_METADATA_KEY_LENGTH = 128;
@@ -6765,8 +6769,8 @@ export const store = createStore<OnyxState>()(
         get().markRead(view.nick);
         // Clear the unread separator when switching to a DM
         get().clearFirstUnread(view.nick);
-        // Opening the DM consumes any pending offline-message (TEGAMI) badge
-        get().clearTegami(view.nick);
+        // Opening the DM consumes any pending offline-memo badge
+        get().clearOfflineMemo(view.nick);
         // Track presence via MONITOR
         get().monitorAdd(view.nick);
         // Fetch the peer's E2EE device key (METADATA ocean.dm-key) so DMs to
@@ -9050,57 +9054,61 @@ export const store = createStore<OnyxState>()(
           });
           return;
         }
-        if (standard.kind === 'NOTE' && standard.command === 'TEGAMI') {
-          // Onyx Server deliverTegami: `:server NOTE TEGAMI :from <nick> :<text>`
-          // The whole `from <nick> :<text>` arrives as one trailing param.
+        if (
+          standard.kind === 'NOTE'
+          && (standard.command === 'MEMO' || standard.command === 'TEGAMI')
+        ) {
+          // Onyx Server deliverOfflineMemo: `:server NOTE MEMO :from <nick> :<text>`
+          // (legacy command token TEGAMI still dual-accepted). The whole
+          // `from <nick> :<text>` arrives as one trailing param.
           const body = msg.params[1] ?? '';
-          const tegamiMatch = body.match(/^from (\S+) :([\s\S]*)$/) ?? body.match(/^from (\S+) ([\s\S]*)$/);
-          if (tegamiMatch) {
-            const tegamiFrom = tegamiMatch[1]!;
+          const memoMatch = body.match(/^from (\S+) :([\s\S]*)$/) ?? body.match(/^from (\S+) ([\s\S]*)$/);
+          if (memoMatch) {
+            const memoFrom = memoMatch[1]!;
             if (
-              !_validInboundWireToken(tegamiFrom, MAX_VAULT_SENDER_LENGTH)
-              || tegamiFrom.startsWith(':')
-              || tegamiFrom.includes(',')
+              !_validInboundWireToken(memoFrom, MAX_VAULT_SENDER_LENGTH)
+              || memoFrom.startsWith(':')
+              || memoFrom.includes(',')
             ) return;
-            const tegamiText = _boundedInboundMessageText(tegamiMatch[2]!);
-            const tegamiKey = tegamiFrom.toLowerCase();
-            const tegamiMsg: ChatMessage = {
+            const memoText = _boundedInboundMessageText(memoMatch[2]!);
+            const memoKey = memoFrom.toLowerCase();
+            const memoMsg: ChatMessage = {
               id: _validInboundWireToken(tags['msgid'] ?? '', MAX_VAULT_MESSAGE_ID_LENGTH)
                 ? tags['msgid']!
                 : uid(),
               time: eventTime(tags),
-              from: tegamiFrom,
-              text: tegamiText,
+              from: memoFrom,
+              text: memoText,
               type: 'msg',
-              target: tegamiFrom,
+              target: memoFrom,
               highlight: true,
             };
-            set(s => _addDMMessage(s, tegamiFrom, tegamiMsg));
+            set(s => _addDMMessage(s, memoFrom, memoMsg));
             // A saturated live DM working set refuses a new unsolicited
             // conversation rather than evicting an unread one. Keep the
             // offline-message aggregate aligned with what the user can open.
-            if (!get().dms.has(tegamiKey)) return;
-            const prev = get().tegami.get(tegamiKey);
+            if (!get().dms.has(memoKey)) return;
+            const prev = get().offlineMemo.get(memoKey);
             const agg = {
-              count: Math.min((prev?.count ?? 0) + 1, MAX_TEGAMI_COUNT),
-              firstMsgId: prev?.firstMsgId ?? tegamiMsg.id,
+              count: Math.min((prev?.count ?? 0) + 1, MAX_OFFLINE_MEMO_COUNT),
+              firstMsgId: prev?.firstMsgId ?? memoMsg.id,
             };
             set(s => {
-              const tegami = new Map(s.tegami);
+              const offlineMemo = new Map(s.offlineMemo);
               // Refresh insertion order so a bounded overflow forgets the
               // least recently updated aggregate, never the new notice.
-              tegami.delete(tegamiKey);
-              tegami.set(tegamiKey, agg);
-              while (tegami.size > MAX_TEGAMI_CONVERSATIONS) {
-                const oldest = tegami.keys().next().value;
+              offlineMemo.delete(memoKey);
+              offlineMemo.set(memoKey, agg);
+              while (offlineMemo.size > MAX_OFFLINE_MEMO_CONVERSATIONS) {
+                const oldest = offlineMemo.keys().next().value;
                 if (oldest === undefined) break;
-                tegami.delete(oldest);
+                offlineMemo.delete(oldest);
               }
-              return { tegami };
+              return { offlineMemo };
             });
             if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('ocean:tegami', {
-                detail: { channel: tegamiFrom, count: agg.count, firstMsgId: agg.firstMsgId },
+              window.dispatchEvent(new CustomEvent('onyx:offlineMemo', {
+                detail: { channel: memoFrom, count: agg.count, firstMsgId: agg.firstMsgId },
               }));
             }
           }
@@ -14682,7 +14690,7 @@ export const store = createStore<OnyxState>()(
     peerSafetyNumbers: new Map(),
     pendingKeySafetyNumbers: new Map(),
     mediaTranscripts: new Map(),
-    tegami: new Map(),
+    offlineMemo: new Map(),
     readMarkers: new Map(),
 
     renameChannel(channel, newName, reason) {
@@ -14978,13 +14986,13 @@ export const store = createStore<OnyxState>()(
       });
     },
 
-    clearTegami(target) {
+    clearOfflineMemo(target) {
       const key = target.toLowerCase();
-      if (!get().tegami.has(key)) return;
+      if (!get().offlineMemo.has(key)) return;
       set(s => {
-        const tegami = new Map(s.tegami);
-        tegami.delete(key);
-        return { tegami };
+        const offlineMemo = new Map(s.offlineMemo);
+        offlineMemo.delete(key);
+        return { offlineMemo };
       });
     },
 
@@ -15701,9 +15709,9 @@ export const selectUserMetadata = (nick: string) => (s: OnyxState): Record<strin
 export const selectMediaTranscript = (channel: string) => (s: OnyxState): Array<{ nick: string; text: string; time: Date }> =>
   s.mediaTranscripts.get(channel.toLowerCase()) ?? [];
 
-/** Offline-message (TEGAMI) aggregate for a DM target, or null. */
-export const selectTegami = (target: string) => (s: OnyxState): { count: number; firstMsgId: string } | null =>
-  s.tegami.get(target.toLowerCase()) ?? null;
+/** Offline-memo aggregate (wire MEMO / legacy TEGAMI) for a DM target, or null. */
+export const selectOfflineMemo = (target: string) => (s: OnyxState): { count: number; firstMsgId: string } | null =>
+  s.offlineMemo.get(target.toLowerCase()) ?? null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

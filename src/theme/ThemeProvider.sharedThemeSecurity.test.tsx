@@ -60,7 +60,7 @@ describe('boot-time shared theme import security', () => {
       base: 'ocean',
       overrides: {
         '--stone': '#123456',
-        '--washi': 'oklch(92% 0.02 220)',
+        '--paper': 'oklch(92% 0.02 220)',
         '--r-sm': '8px',
       },
     };

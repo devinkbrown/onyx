@@ -129,7 +129,7 @@ describe('searchServerHistory', () => {
     feed('@batch=s1;msgid=no-time :mira!m@host PRIVMSG #root :missing time');
     feed('@batch=s1;msgid=bad-time;time=not-a-date :mira!m@host PRIVMSG #root :invalid time');
     feed('@batch=s1;msgid=wrong-target;time=2026-06-03T11:00:00.000Z :mira!m@host PRIVMSG #other :wrong target');
-    feed('@batch=s1;msgid=encrypted;time=2026-06-03T11:00:00.000Z :mira!m@host PRIVMSG #root :TSUMUGI1 opaque-ciphertext');
+    feed('@batch=s1;msgid=encrypted;time=2026-06-03T11:00:00.000Z :mira!m@host PRIVMSG #root :ONYXDM1 opaque-ciphertext');
     feed(`@batch=s1;msgid=long;time=2026-06-04T11:00:00.000Z :mira!m@host PRIVMSG #root :${oversized}`);
     feed('BATCH -s1');
 
@@ -271,7 +271,7 @@ describe('searchServerHistory', () => {
     const encrypted: ChatMessage = {
       id: 'cipher',
       from: 'Mika',
-      text: 'TSUMUGI1 opaque-ciphertext',
+      text: 'ONYXDM1 opaque-ciphertext',
       target: 'Mika',
       type: 'msg',
       time: new Date('2026-06-01T10:00:00.000Z'),

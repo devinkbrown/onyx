@@ -126,9 +126,9 @@ async function renderNarrowPreferences(
         --ink: #020a12;
         --line: #345;
         --seam: #567;
-        --washi: #fff;
-        --washi-dim: #ddd;
-        --washi-mute: #aaa;
+        --paper: #fff;
+        --paper-dim: #ddd;
+        --paper-mute: #aaa;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
       }

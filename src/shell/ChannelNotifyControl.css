@@ -30,7 +30,7 @@
   border: 0;
   border-radius: var(--r-sm);
   background: transparent;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 500;
@@ -40,7 +40,7 @@
 }
 
 .chan-notify-seg:hover {
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
 }
 

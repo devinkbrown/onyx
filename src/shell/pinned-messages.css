@@ -7,7 +7,7 @@
 }
 
 .pins-empty {
-  color: var(--washi-dim, #8aa);
+  color: var(--paper-dim, #8aa);
   font-size: 0.9rem;
   line-height: 1.6;
   padding: 1rem 0.25rem;
@@ -76,17 +76,17 @@
 .pins-item-when {
   font-family: var(--font-mono, monospace);
   font-size: 0.66rem;
-  color: var(--washi-mute, #6a8);
+  color: var(--paper-mute, #6a8);
 }
 .pins-item-body {
   font-size: 0.85rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
-  color: var(--washi, #cde);
+  color: var(--paper, #cde);
 }
 .pins-item-body--missing {
   flex: 1;
-  color: var(--washi-dim, #8aa);
+  color: var(--paper-dim, #8aa);
   font-style: italic;
 }
 
@@ -100,7 +100,7 @@
   border: 1px solid transparent;
   border-radius: 50%;
   background: transparent;
-  color: var(--washi-mute, #6a8);
+  color: var(--paper-mute, #6a8);
   font-size: 1.05rem;
   line-height: 1;
   cursor: pointer;
@@ -108,5 +108,5 @@
 }
 .pins-item-unpin:hover {
   background: color-mix(in oklab, var(--shu, #ff6f61) 22%, transparent);
-  color: var(--washi, #fff);
+  color: var(--paper, #fff);
 }

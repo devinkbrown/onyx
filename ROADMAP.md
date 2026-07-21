@@ -8,7 +8,7 @@ Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
 > **Product-complete north-star (eras, exit criteria, fleet scale):**  
 > [`/home/kain/ONYX_PRODUCT_COMPLETE_ROADMAP.md`](/home/kain/ONYX_PRODUCT_COMPLETE_ROADMAP.md)  
 > Design research synthesis: [`/home/kain/research/ONYX_PLATFORM_DESIGN_SYNTHESIS.md`](/home/kain/research/ONYX_PLATFORM_DESIGN_SYNTHESIS.md)  
-> Token-preserving tri-engine ops: [`/home/kain/TRI_ENGINE_SCALED_WORKFLOW.md`](/home/kain/TRI_ENGINE_SCALED_WORKFLOW.md)  
+> Token-preserving Claude + Codex ops: [`/home/kain/CLAUDE_CODEX_SCALED_WORKFLOW.md`](/home/kain/CLAUDE_CODEX_SCALED_WORKFLOW.md)  
 > This file remains the detailed ✅ archaeology + competitive notes.
 
 ## Status at a glance (2026-07-19)
@@ -20,8 +20,8 @@ Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
 | **3** Privacy (E2EE DMs, ephemeral rooms) | Client + server | ✅ **COMPLETE** |
 | **4** Presence (pins, heatline, events) | Client + server | ✅ **COMPLETE** (Comic Chat in-Onyx **dropped**) |
 | **5** Operations (status, stats, backup) | Server + website + client harden | ✅ **COMPLETE** (ops deploy paths remain operator work) |
-| **6** Time-Native + Washi (Home, reader, a11y) | Client | 🟡 **MOSTLY SHIPPED** — remaining: richer cross-room handoffs, finish dense-surface a11y audit rows |
-| **7+** (later sections in this file) | Product entry, Sumi-e venue, etc. | 🟡 **Many slices shipped**; read per-item ✅ / ⏭️ below — do not treat headers alone as authoritative |
+| **6** Time-Native + Atmosphere (Home, reader, a11y) | Client | 🟡 **MOSTLY SHIPPED** — remaining: richer cross-room handoffs, finish dense-surface a11y audit rows |
+| **7+** (later sections in this file) | Product entry, Ink venue, etc. | 🟡 **Many slices shipped**; read per-item ✅ / ⏭️ below — do not treat headers alone as authoritative |
 | **Onyx Server CSB / MESSAGE_V2 / Helix** | Daemon | ✅ **P0s closed 2026-07-17** (see `onyx-server/CLAUDE_CSB_TAKEOVER_ROADMAP.md`); deploy is human-gated |
 | **Engine rename** | Daemon | ✅ **Source rebrand to Onyx Server 2026-07-19**; live `onyx-server.service` / `onyx-run` still production names until deploy |
 
@@ -124,7 +124,7 @@ down to TLS.
    P-256/HKDF/AES-GCM pieces in-tree.
    ✅ **SHIPPED 2026-07-02** — crypto/webpush.zig (RFC 8291 KAT-pinned +
    ES256 VAPID) + daemon worker (in-house HTTPS transport), WEBPUSH
-   SUBSCRIBE/UNSUBSCRIBE/LIST, tegami trigger, ISUPPORT `VAPID=` discovery
+   SUBSCRIBE/UNSUBSCRIBE/LIST, offline-memo trigger, ISUPPORT `VAPID=` discovery
    (no NOTE data channel — lifecycle on the Event Spine), client toggle +
    SW payload mapping. Live on both nodes (node-local subscriptions;
    cross-mesh propagation is future work).
@@ -215,7 +215,7 @@ down to TLS.
     `latest.json` manifest when served and shows snapshot readiness without
     requiring an account or operator socket.
 
-## Phase 6 — Time-Native Client + Washi Access ← NEXT
+## Phase 6 — Time-Native Client + Atmosphere & Access ← NEXT
 15. **Catch-up Home** *(client)* — promote the vault, unread state, followed
     conversations, mentions, scheduled events, and quiet room activity into the
     first screen after connection. The app should open as a place to return to,
@@ -330,7 +330,7 @@ down to TLS.
     and richer cross-room review handoffs before adding new server surface.
 16. **Reader mode** *(client)* — a calm single-pane transcript view for long
     room history, optimized for reading and sharing moments. This is the
-    Sumi-e roadmap item that makes the "network that remembers" visible.
+    Ink venue roadmap item that makes the "network that remembers" visible.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reader mode now applies a stronger
     transcript measure, reading typography, avatar-free alignment, calmer topic
     chrome, and keyboard-focus metadata/action reveals.
@@ -546,7 +546,7 @@ client or public site needs to expose the result.
     stay AA. It joins the built-in theme set (now 17,
     `src/theme/themes.ts:48`); `DEFAULT_THEME_ID` remains `ocean`.
 
-## Phase 9 — Sumi-e Venue Model ← PLANNED
+## Phase 9 — Ink Venue Model ← PLANNED
 21. **Named conversations and forum projection** *(client)* — promote existing
     topic tags into a softer Zulip-style model with topic-aware unread state,
     one-tap split/follow actions, and a durable forum projection for long-lived
@@ -610,7 +610,7 @@ client or public site needs to expose the result.
     inputs and submit controls, simplified atmosphere, and no secondary pulse
     rail before a user connects.
 
-## Phase 10 — Washi Atmosphere ← PLANNED
+## Phase 10 — Atmosphere Layer ← PLANNED
 25. **Background system consolidation** *(client)* — collapse the canvas and DOM
     scene set into a smaller Ink-on-Living-Paper system with shared layers,
     capped motion, idle deceleration, and explicit Animated/Still/Off controls.

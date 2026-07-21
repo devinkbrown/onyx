@@ -53,7 +53,7 @@ export type ThemeId =
   | 'onyx'
   | 'obsidian'
   | 'pearl'
-  | 'sumi'
+  | 'ink'
   | 'shu'
   | 'hisui'
   | 'pine'
@@ -95,9 +95,9 @@ const oceanTokens: TokenMap = {
   '--shu-bright': '#ff9484',
 
   // Text — sea-foam ivory over deep water
-  '--washi':      '#d1e1e9',
-  '--washi-dim':  '#8c9ba3',
-  '--washi-mute': '#536771',
+  '--paper':      '#d1e1e9',
+  '--paper-dim':  '#8c9ba3',
+  '--paper-mute': '#536771',
 
   // Status
   '--ok':      '#5bc78e',
@@ -107,8 +107,8 @@ const oceanTokens: TokenMap = {
   // Seams (bioluminescent current lines) + bands (pale tide)
   '--seam':       'color-mix(in oklab, var(--lapis) 42%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
-  '--line-faint': 'color-mix(in oklab, var(--washi) 7%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 14%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--paper) 7%, transparent)',
 
   // Radius — fluid, elegant
   '--r-0':    '0px',
@@ -157,9 +157,9 @@ const tideTokens: TokenMap = {
   '--shu-bright': '#ffa193',
 
   // Text — luminous sea-foam over sunlit water
-  '--washi':      '#d1e1e9',
-  '--washi-dim':  '#8c9ba2',
-  '--washi-mute': '#536770',
+  '--paper':      '#d1e1e9',
+  '--paper-dim':  '#8c9ba2',
+  '--paper-mute': '#536770',
 
   // Status
   '--ok':      '#5bc78e',
@@ -169,8 +169,8 @@ const tideTokens: TokenMap = {
   // Seams (brighter current lines) + bands (pale tide)
   '--seam':       'color-mix(in oklab, var(--lapis) 50%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 20%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 16%, transparent)',
-  '--line-faint': 'color-mix(in oklab, var(--washi) 8%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 16%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--paper) 8%, transparent)',
 
   // Radius — fluid, elegant
   '--r-0':    '0px',
@@ -219,9 +219,9 @@ const abyssTokens: TokenMap = {
   '--shu-bright': '#ff7c6e',
 
   // Text — high-contrast sea-foam ivory over the trench
-  '--washi':      '#d4e0e8',
-  '--washi-dim':  '#8f9aa1',
-  '--washi-mute': '#56666f',
+  '--paper':      '#d4e0e8',
+  '--paper-dim':  '#8f9aa1',
+  '--paper-mute': '#56666f',
 
   // Status
   '--ok':      '#5bc78e',
@@ -231,8 +231,8 @@ const abyssTokens: TokenMap = {
   // Seams (restrained current lines) + bands (faint tide)
   '--seam':       'color-mix(in oklab, var(--lapis) 36%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 13%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 11%, transparent)',
-  '--line-faint': 'color-mix(in oklab, var(--washi) 5%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 11%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--paper) 5%, transparent)',
 
   // Radius — taut, deep
   '--r-0':    '0px',
@@ -281,9 +281,9 @@ const reefTokens: TokenMap = {
   '--shu-bright': '#ff9a86',
 
   // Text — sea-foam ivory, faintly warmed
-  '--washi':      '#d2e1e8',
-  '--washi-dim':  '#8d9ba2',
-  '--washi-mute': '#54676f',
+  '--paper':      '#d2e1e8',
+  '--paper-dim':  '#8d9ba2',
+  '--paper-mute': '#54676f',
 
   // Status
   '--ok':      '#5bc78e',
@@ -293,7 +293,7 @@ const reefTokens: TokenMap = {
   // Seams — azure current lines (primary hue), coral kept to accents
   '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 14%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
 
   // Radius — fluid, elegant
@@ -343,9 +343,9 @@ const onyxTokens: TokenMap = {
   '--shu-bright': '#ff7f71',
 
   // Text — bone / ivory over black
-  '--washi':      '#eae8e0',
-  '--washi-dim':  '#a4a19a',
-  '--washi-mute': '#6e6c63',
+  '--paper':      '#eae8e0',
+  '--paper-dim':  '#a4a19a',
+  '--paper-mute': '#6e6c63',
 
   // Status
   '--ok':      '#5bc78e',
@@ -355,8 +355,8 @@ const onyxTokens: TokenMap = {
   // Seams (gold inlay) + bands (pale strata)
   '--seam':       'color-mix(in oklab, var(--gold) 40%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--gold) 15%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 13%, transparent)',
-  '--line-faint': 'color-mix(in oklab, var(--washi) 6%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 13%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--paper) 6%, transparent)',
 
   // Radius
   '--r-0':    '0px',
@@ -402,9 +402,9 @@ const obsidianTokens: TokenMap = {
   '--shu':        '#e95047',
   '--shu-bright': '#ff7f72',
 
-  '--washi':      '#d6dfe7',
-  '--washi-dim':  '#9199a1',
-  '--washi-mute': '#5a656e',
+  '--paper':      '#d6dfe7',
+  '--paper-dim':  '#9199a1',
+  '--paper-mute': '#5a656e',
 
   '--ok':   '#5bc78e',
   '--warn': '#e6d08c', // warnings stay WARM — decoupled from the steel second accent
@@ -412,8 +412,8 @@ const obsidianTokens: TokenMap = {
 
   '--seam':       'color-mix(in oklab, var(--lapis) 30%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 12%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 12%, transparent)',
-  '--line-faint': 'color-mix(in oklab, var(--washi) 5%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 12%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--paper) 5%, transparent)',
 
   '--r-0':    '0px',
   '--r-sm':   '1px',
@@ -425,7 +425,7 @@ const obsidianTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// pearl — light; warm washi-paper ground, ink text, lapis + gold accents.
+// pearl — light; warm paper ground, ink text, lapis + gold accents.
 // Seed { light, primary 250, accent 80, depth .4, vibrancy .5, warmth .7,
 // contrast 8 } + soul: hand-ramped warm paper grounds, warm near-ink text.
 // color-scheme: light is set in ThemeProvider via the scheme field.
@@ -454,9 +454,9 @@ const pearlTokens: TokenMap = {
   '--shu-bright': '#e5462b',
 
   // Text — warm near-ink on paper
-  '--washi':      '#251e15',
-  '--washi-dim':  '#494136',
-  '--washi-mute': '#71675a',
+  '--paper':      '#251e15',
+  '--paper-dim':  '#494136',
+  '--paper-mute': '#71675a',
 
   '--ok':      '#15915c',
   '--warn':    'var(--gold)',
@@ -477,13 +477,13 @@ const pearlTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// sumi — INK: monochrome brushwork. Bone-white on deepest black, greyscale
+// ink — INK: monochrome brushwork. Bone-white on deepest black, greyscale
 // accents, and a single red — the artist's seal — as the only colour.
 // Seed { dark, primary 60, accent 60, depth .95, vibrancy .05, warmth .05,
 // contrast 15 } + soul: hand-ramped inky grounds, near-zero-chroma bone
 // triads, bone-white text, the seal red untouched.
 // ---------------------------------------------------------------------------
-const sumiTokens: TokenMap = {
+const inkTokens: TokenMap = {
   '--ink':        '#000001',
   '--ink-2':      '#010102',
   '--stone':      '#030405',
@@ -505,17 +505,17 @@ const sumiTokens: TokenMap = {
   '--shu':        '#d8412c',
   '--shu-bright': '#ff5d44',
 
-  // High-contrast: near-pure washi
-  '--washi':      '#f0eae2',
-  '--washi-dim':  '#a9a49c',
-  '--washi-mute': '#706b63',
+  // High-contrast: near-pure paper
+  '--paper':      '#f0eae2',
+  '--paper-dim':  '#a9a49c',
+  '--paper-mute': '#706b63',
 
   '--ok':      '#5bc78e',
   '--warn':    '#e6d08c', // warnings stay WARM — decoupled from the greyscale second accent
   '--danger':  'var(--shu)',
 
-  '--seam':       'color-mix(in oklab, var(--washi) 16%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--washi) 7%, transparent)',
+  '--seam':       'color-mix(in oklab, var(--paper) 16%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--paper) 7%, transparent)',
   '--line':       'color-mix(in oklab, var(--lapis) 25%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--lapis) 10%, transparent)',
 
@@ -557,9 +557,9 @@ const shuTokens: TokenMap = {
   '--shu':        '#e9523b',
   '--shu-bright': '#ff806a',
 
-  '--washi':      '#ebdad5',
-  '--washi-dim':  '#a49490',
-  '--washi-mute': '#725e59',
+  '--paper':      '#ebdad5',
+  '--paper-dim':  '#a49490',
+  '--paper-mute': '#725e59',
 
   '--ok':      '#5bc78e',
   '--warn':    '#e6d08c', // warnings stay WARM — decoupled from the ember second accent
@@ -607,9 +607,9 @@ const hisuiTokens: TokenMap = {
   '--shu':        '#e95146',
   '--shu-bright': '#ff7f71',
 
-  '--washi':      '#d6e2d8',
-  '--washi-dim':  '#919c92',
-  '--washi-mute': '#5a685b',
+  '--paper':      '#d6e2d8',
+  '--paper-dim':  '#919c92',
+  '--paper-mute': '#5a685b',
 
   '--ok':      '#5bc78e',
   '--warn':    '#e6d08c', // warnings stay WARM — decoupled from the pale-jade second accent
@@ -662,9 +662,9 @@ const pineTokens: TokenMap = {
   '--shu-bright': '#ff7f72',
 
   // Text — pale sage over the forest floor
-  '--washi':      '#d8e1d6',
-  '--washi-dim':  '#939b91',
-  '--washi-mute': '#5c675a',
+  '--paper':      '#d8e1d6',
+  '--paper-dim':  '#939b91',
+  '--paper-mute': '#5c675a',
 
   // Status
   '--ok':      '#5bc78e',
@@ -674,7 +674,7 @@ const pineTokens: TokenMap = {
   // Seams follow the pine PRIMARY (never a hard-coded gold) + lichen bands
   '--seam':       'color-mix(in oklab, var(--lapis) 38%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 15%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 14%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--gold) 11%, transparent)',
 
   // Radius — organic, softly rounded
@@ -721,9 +721,9 @@ const kohakuTokens: TokenMap = {
   '--shu':        '#e85336',
   '--shu-bright': '#ff8066',
 
-  '--washi':      '#e4ddd0',
-  '--washi-dim':  '#9e988b',
-  '--washi-mute': '#6a6252',
+  '--paper':      '#e4ddd0',
+  '--paper-dim':  '#9e988b',
+  '--paper-mute': '#6a6252',
 
   '--ok':      '#5bc78e',
   '--warn':    '#e6d08c', // warnings stay WARM — in-family with the honey second accent
@@ -775,9 +775,9 @@ const terracottaTokens: TokenMap = {
   '--shu-bright': '#ff8069',
 
   // Text — warm bone / plaster over fired earth
-  '--washi':      '#e8dbd4',
-  '--washi-dim':  '#a1968f',
-  '--washi-mute': '#6f6057',
+  '--paper':      '#e8dbd4',
+  '--paper-dim':  '#a1968f',
+  '--paper-mute': '#6f6057',
 
   // Status
   '--ok':      '#5bc78e',
@@ -787,7 +787,7 @@ const terracottaTokens: TokenMap = {
   // Seams follow the clay PRIMARY (never a hard-coded gold) + blush bands
   '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 14%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
 
   // Radius — editorial, softly rounded earthenware
@@ -819,7 +819,7 @@ const terracottaTokens: TokenMap = {
 // tokens below — seams/radii/motion/fonts — are hand-set), re-run through enforceAA.
 // ---------------------------------------------------------------------------
 const vermillionTokens: TokenMap = {
-  // Ground — deepest warm-ink strata: near-black sumi warmed by the seal
+  // Ground — deepest warm-ink strata: near-black ink warmed by the seal
   '--ink':        '#060100',
   '--ink-2':      '#0a0101',
   '--stone':      '#140604',
@@ -842,9 +842,9 @@ const vermillionTokens: TokenMap = {
   '--shu-bright': '#ff7f70',
 
   // Text — warm bone / rice-paper over the ink
-  '--washi':      '#eadad6',
-  '--washi-dim':  '#a39591',
-  '--washi-mute': '#715e5a',
+  '--paper':      '#eadad6',
+  '--paper-dim':  '#a39591',
+  '--paper-mute': '#715e5a',
 
   // Status
   '--ok':      '#5bc78e',
@@ -854,7 +854,7 @@ const vermillionTokens: TokenMap = {
   // Seams follow the vermillion PRIMARY (the seal's own colour) + blush bands
   '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 14%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
 
   // Radius — taut, editorial ink
@@ -904,9 +904,9 @@ const tealTokens: TokenMap = {
   '--shu-bright': '#ff7f74',
 
   // Text — pale seafoam over deep teal
-  '--washi':      '#d3e2dc',
-  '--washi-dim':  '#8e9c97',
-  '--washi-mute': '#556861',
+  '--paper':      '#d3e2dc',
+  '--paper-dim':  '#8e9c97',
+  '--paper-mute': '#556861',
 
   // Status
   '--ok':      '#5bc78e',
@@ -916,7 +916,7 @@ const tealTokens: TokenMap = {
   // Seams (mint current) + bands (seafoam wash)
   '--seam':       'color-mix(in oklab, var(--lapis) 36%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 15%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 14%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--gold) 11%, transparent)',
 
   // Radius — fluid, elegant
@@ -967,9 +967,9 @@ const slateTokens: TokenMap = {
   '--shu-bright': '#ff806a',
 
   // Text — chalk ivory over warm graphite
-  '--washi':      '#eae7e2',
-  '--washi-dim':  '#a7a49e',
-  '--washi-mute': '#716e68',
+  '--paper':      '#eae7e2',
+  '--paper-dim':  '#a7a49e',
+  '--paper-mute': '#716e68',
 
   // Status
   '--ok':      '#5bc78e',
@@ -979,7 +979,7 @@ const slateTokens: TokenMap = {
   // Seams (mineral, NOT bronze) + bands (chalk strata)
   '--seam':       'color-mix(in oklab, var(--lapis) 28%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 12%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 13%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 13%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--lapis) 10%, transparent)',
 
   // Radius — fluid, restrained
@@ -1029,9 +1029,9 @@ const frostTokens: TokenMap = {
   '--shu-bright': '#e64344',
 
   // Text — deep slate ink on frost paper
-  '--washi':      '#202b2e',
-  '--washi-dim':  '#546063',
-  '--washi-mute': '#7a8d92',
+  '--paper':      '#202b2e',
+  '--paper-dim':  '#546063',
+  '--paper-mute': '#7a8d92',
 
   // Status
   '--ok':      '#15915c',
@@ -1041,7 +1041,7 @@ const frostTokens: TokenMap = {
   // Seams (steel-blue linework) + bands (pale steel)
   '--seam':       'color-mix(in oklab, var(--lapis) 34%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 14%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 18%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 18%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--gold) 14%, transparent)',
 
   // Radius — fluid, precise
@@ -1096,9 +1096,9 @@ const sapphireTokens: TokenMap = {
   '--shu-bright': '#ff7f72',
 
   // Text — cool sea-glass ivory over the navy
-  '--washi':      '#d4e0eb',
-  '--washi-dim':  '#8f9aa5',
-  '--washi-mute': '#576573',
+  '--paper':      '#d4e0eb',
+  '--paper-dim':  '#8f9aa5',
+  '--paper-mute': '#576573',
 
   // Status
   '--ok':      '#5bc78e',
@@ -1108,7 +1108,7 @@ const sapphireTokens: TokenMap = {
   // Seams follow the sapphire PRIMARY (never a hard-coded gold) + periwinkle bands
   '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
-  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 14%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
 
   // Radius — taut, faceted jewel
@@ -1170,7 +1170,7 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     label: 'Onyx',
     description: 'Black banded stone, gold inlay, moonstone sheen — the older cut.',
     scheme: 'dark',
-    signatureBg: 'kintsugi-veins',
+    signatureBg: 'gold-veins',
     tokens: onyxTokens,
   },
   obsidian: {
@@ -1186,16 +1186,16 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     label: 'Pearl',
     description: 'The light cut — warm paper, ink text, gold inlay.',
     scheme: 'light',
-    signatureBg: 'washi',
+    signatureBg: 'paper-grain',
     tokens: pearlTokens,
   },
-  sumi: {
-    id: 'sumi',
+  ink: {
+    id: 'ink',
     label: 'Ink',
     description: 'Monochrome brushwork — bone-white on the deepest black, one red seal.',
     scheme: 'dark',
-    signatureBg: 'sumi-e',
-    tokens: sumiTokens,
+    signatureBg: 'ink-wash',
+    tokens: inkTokens,
   },
   shu: {
     id: 'shu',

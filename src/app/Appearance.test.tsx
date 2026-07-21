@@ -107,10 +107,10 @@ describe('Appearance', () => {
     fireEvent.pointerEnter(goldVeins);
     fireEvent.click(goldVeins);
 
-    expect(preview).toHaveAttribute('data-background-id', 'kintsugi-veins');
+    expect(preview).toHaveAttribute('data-background-id', 'gold-veins');
     expect(goldVeins).toHaveAttribute('aria-pressed', 'true');
     vi.advanceTimersByTime(POINTER_PREVIEW_DELAY_MS);
-    expect(backgroundHarness.ids).toEqual(['obsidian', 'kintsugi-veins']);
+    expect(backgroundHarness.ids).toEqual(['obsidian', 'gold-veins']);
   });
 
   it('previews keyboard focus immediately and restores selection on blur', () => {

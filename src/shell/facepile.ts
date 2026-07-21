@@ -2,7 +2,7 @@
 /**
  * facepile.ts — PURE selection logic for the room-header facepile.
  *
- * "Presence-as-place" (roadmap v1.1 Sumi-e): the conversation ribbon shows a
+ * "Presence-as-place" (roadmap v1.1 Ink wash): the conversation ribbon shows a
  * small overlapping stack of the people most worth surfacing in the room, plus
  * a "+M" overflow count. This module decides *who* and *how many* — it is
  * deterministic, DOM-free, and unit-testable in isolation.

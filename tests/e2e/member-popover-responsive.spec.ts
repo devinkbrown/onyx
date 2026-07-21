@@ -72,8 +72,8 @@ test('contains member details and actions at 200% text', async ({ page, browserN
         --ink: #020a12;
         --stone: #123;
         --stone-2: #234;
-        --washi: #fff;
-        --washi-mute: #aaa;
+        --paper: #fff;
+        --paper-mute: #aaa;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
         --lapis-deep: #075080;
@@ -168,8 +168,8 @@ test('keeps member details above mobile navigation at 400% short reflow', async 
         --ink: #020a12;
         --stone: #123;
         --stone-2: #234;
-        --washi: #fff;
-        --washi-mute: #aaa;
+        --paper: #fff;
+        --paper-mute: #aaa;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
         --lapis-deep: #075080;

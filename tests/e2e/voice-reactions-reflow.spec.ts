@@ -35,8 +35,8 @@ test('keeps reduced-motion voice reactions visible at 400% short reflow', async 
         --seam-faint: #234;
         --ink: #020a12;
         --stone: #123;
-        --washi: #fff;
-        --washi-dim: #ddd;
+        --paper: #fff;
+        --paper-dim: #ddd;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
         --font-mono: monospace;

@@ -82,7 +82,7 @@ describe('parseVaultExport — vault import validation contract', () => {
     });
     const dm = message('d1', 'Trev', Date.parse('2026-07-10T10:01:00.000Z'), {
       from: 'trev',
-      text: 'tsumugi.ciphertext',
+      text: 'onyxdm.ciphertext',
       encrypted: true,
     });
     const snapshot: VaultExportSnapshot = {
@@ -249,13 +249,13 @@ describe('parseVaultExport — vault import validation contract', () => {
   it('strips decrypted E2EE plaintext from serialized messages (never at rest)', () => {
     const encryptedDm = message('dm1', 'Trev', Date.parse('2026-07-10T10:03:00.000Z'), {
       encrypted: true,
-      text: 'tsumugi.ciphertext.envelope',
+      text: 'onyxdm.ciphertext.envelope',
       plaintext: 'this decrypted DM must never be persisted',
     });
 
     const stored = serializeMessage('Trev', encryptedDm);
 
-    expect(stored.text).toBe('tsumugi.ciphertext.envelope');
+    expect(stored.text).toBe('onyxdm.ciphertext.envelope');
     expect(stored.encrypted).toBe(true);
     expect(stored.target_key).toBe('trev');
     expect(Object.prototype.hasOwnProperty.call(stored, 'plaintext')).toBe(false);
@@ -275,7 +275,7 @@ describe('parseVaultExport — vault import validation contract', () => {
             {
               id: 'dm2',
               from: 'trev',
-              text: 'tsumugi.ciphertext',
+              text: 'onyxdm.ciphertext',
               type: 'msg',
               target: 'trev',
               time: 1,
@@ -496,7 +496,7 @@ describe('parseVaultExport — vault import validation contract', () => {
           replyTo: {
             id: 'parent',
             from: 'trev',
-            text: 'TSUMUGI1 legacy-reply-envelope',
+            text: 'ONYXDM1 legacy-reply-envelope',
           },
         }],
       }],

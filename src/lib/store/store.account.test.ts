@@ -517,7 +517,7 @@ describe('account replies — state from the message handler', () => {
   it('FAIL E2EEKEY surfaces accountActionError', () => {
     const client = makeClient();
     store.setState({ client: client as never, server: seedServer('alice') });
-    store.getState().e2eeKeyAdd('laptop', 'tsumugi-p256', 'public-key');
+    store.getState().e2eeKeyAdd('laptop', 'onyx-p256', 'public-key');
     feed(':eshmaki.me FAIL E2EEKEY BAD_DEVICE :Device id must use safe characters');
     expect(store.getState().accountActionError).toMatchObject({
       command: 'E2EEKEY',
@@ -853,7 +853,7 @@ describe('account replies — state from the message handler', () => {
       id: 'alice-pin',
       time: new Date('2026-07-16T12:00:00.000Z'),
       from: 'trev',
-      text: 'TSUMUGI1 ciphertext-envelope',
+      text: 'ONYXDM1 ciphertext-envelope',
       plaintext: 'Alice private decrypted note',
       encrypted: true,
       type: 'msg',

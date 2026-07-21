@@ -299,8 +299,8 @@ export default function Landing() {
               <line x1="150" y1="180" x2="70" y2="90" /><line x1="150" y1="180" x2="60" y2="270" />
               <line x1="450" y1="180" x2="540" y2="90" /><line x1="450" y1="180" x2="535" y2="270" />
             </g>
-            <circle cx="70" cy="90" r="3" fill="var(--washi-mute)" /><circle cx="60" cy="270" r="3" fill="var(--washi-mute)" />
-            <circle cx="540" cy="90" r="3" fill="var(--washi-mute)" /><circle cx="535" cy="270" r="3" fill="var(--washi-mute)" />
+            <circle cx="70" cy="90" r="3" fill="var(--paper-mute)" /><circle cx="60" cy="270" r="3" fill="var(--paper-mute)" />
+            <circle cx="540" cy="90" r="3" fill="var(--paper-mute)" /><circle cx="535" cy="270" r="3" fill="var(--paper-mute)" />
             <circle cx="150" cy="180" r="13" fill="var(--ink)" stroke="var(--gold-bright)" stroke-width="2" />
             <circle cx="150" cy="180" r="5" fill="var(--gold-bright)" />
             <circle cx="450" cy="180" r="13" fill="var(--ink)" stroke="var(--lapis-bright)" stroke-width="2" />

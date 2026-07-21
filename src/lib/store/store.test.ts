@@ -61,11 +61,11 @@ describe('vanilla store', () => {
   });
 
   it('persists theme changes through the current ThemeProvider storage key', () => {
-    store.getState().setTheme('sumi');
+    store.getState().setTheme('ink');
 
-    expect(store.getState().activeTheme).toBe('sumi');
-    expect(store.getState().theme).toBe('sumi');
-    expect(localStorage.getItem('onyx:theme')).toBe('sumi');
+    expect(store.getState().activeTheme).toBe('ink');
+    expect(store.getState().theme).toBe('ink');
+    expect(localStorage.getItem('onyx:theme')).toBe('ink');
     expect(localStorage.getItem('onyx:active-theme')).toBeNull();
 
     store.getState().setDisplayTheme('pearl');

@@ -167,7 +167,7 @@ describe('historyVault', () => {
       // the allowlist rather than by an exclusion destructure.
       const withTransient = msg('e1', 1000, {
         encrypted: true,
-        text: 'tsumugi.ciphertext',
+        text: 'onyxdm.ciphertext',
       }) as ChatMessage & Record<string, unknown>;
       for (const key of OMIT_AT_REST) withTransient[key] = `secret-${key}`;
 
@@ -176,14 +176,14 @@ describe('historyVault', () => {
         expect(key in stored).toBe(false);
       }
       // The ciphertext envelope still persists; only the decrypted view is gone.
-      expect(stored.text).toBe('tsumugi.ciphertext');
+      expect(stored.text).toBe('onyxdm.ciphertext');
       expect(stored.encrypted).toBe(true);
       // The input message is not mutated by the strip.
       expect((withTransient as Record<string, unknown>).plaintext).toBe('secret-plaintext');
     });
 
     it('sanitizes legacy reply envelopes on both serialization and hydration', () => {
-      const envelope = 'TSUMUGI1 legacy-reply-envelope';
+      const envelope = 'ONYXDM1 legacy-reply-envelope';
       const original = msg('reply-envelope', 1000, {
         replyTo: { id: 'parent', from: 'trev', text: envelope },
       });
@@ -205,14 +205,14 @@ describe('historyVault', () => {
       const smuggled = {
         ...serializeMessage('trev', msg('cipher', 1000, {
           target: 'trev',
-          text: 'TSUMUGI1 opaque-ciphertext',
+          text: 'ONYXDM1 opaque-ciphertext',
           encrypted: true,
         })),
         plaintext: 'must-not-hydrate',
       } as ReturnType<typeof serializeMessage> & { plaintext: string };
 
       const back = deserializeMessage(smuggled);
-      expect(back.text).toBe('TSUMUGI1 opaque-ciphertext');
+      expect(back.text).toBe('ONYXDM1 opaque-ciphertext');
       expect(back.plaintext).toBeUndefined();
       expect('plaintext' in back).toBe(false);
     });
@@ -305,7 +305,7 @@ describe('historyVault', () => {
       await saveMessages('trev', [{
         ...msg('dm-cipher', Date.parse('2026-06-30T12:00:00.000Z'), {
           target: 'trev',
-          text: 'TSUMUGI1 opaque-ciphertext',
+          text: 'ONYXDM1 opaque-ciphertext',
           encrypted: true,
         }),
         plaintext: 'must never reach IndexedDB or time-travel hydrate',
@@ -313,7 +313,7 @@ describe('historyVault', () => {
 
       const loaded = await loadAround('trev', new Date('2026-06-30T12:00:00.000Z'), 5);
       expect(loaded).toHaveLength(1);
-      expect(loaded[0]!.text).toBe('TSUMUGI1 opaque-ciphertext');
+      expect(loaded[0]!.text).toBe('ONYXDM1 opaque-ciphertext');
       expect(loaded[0]!.plaintext).toBeUndefined();
       expect(JSON.stringify(loaded)).not.toContain('must never reach');
     });
@@ -442,7 +442,7 @@ describe('historyVault', () => {
       await saveMessages('mika', [
         msg('encrypted-vault', 4500, {
           target: 'mika',
-          text: 'TSUMUGI1 searchable-looking-ciphertext',
+          text: 'ONYXDM1 searchable-looking-ciphertext',
           encrypted: true,
         }),
       ]);
@@ -656,7 +656,7 @@ describe('historyVault', () => {
         msg('d1', 1500, {
           target: 'Trev',
           encrypted: true,
-          text: 'tsumugi.ciphertext',
+          text: 'onyxdm.ciphertext',
           plaintext: 'never store this',
         }),
       ]);
@@ -670,7 +670,7 @@ describe('historyVault', () => {
       expect(snapshot.targets[1]!.messages[0]).toMatchObject({
         id: 'd1',
         encrypted: true,
-        text: 'tsumugi.ciphertext',
+        text: 'onyxdm.ciphertext',
       });
       expect('plaintext' in snapshot.targets[1]!.messages[0]!).toBe(false);
     });

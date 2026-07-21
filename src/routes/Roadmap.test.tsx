@@ -76,7 +76,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Member list evidence')).toBeInTheDocument();
     expect(screen.getByText('Notification control evidence')).toBeInTheDocument();
     expect(screen.getByText('Time scrubber evidence')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Torii entry' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Product entry' })).toBeInTheDocument();
     expect(screen.getByText('Rich invite route')).toBeInTheDocument();
     expect(screen.getByText('Invite Open Graph metadata')).toBeInTheDocument();
     expect(screen.getByText('Invite topic metadata')).toBeInTheDocument();
@@ -187,7 +187,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Retention policy transfer')).toBeInTheDocument();
     expect(screen.getByText(/Sessions now resume across the mesh/i)).toBeInTheDocument();
     expect(screen.getByText('complete phases').closest('.data-metric')).toHaveTextContent('5');
-    expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Atmosphere' })).toBeInTheDocument();
   });
 
   it('links to the rest of the public website', () => {

@@ -30,7 +30,7 @@ const WS = process.env.ONYX_WS ?? 'wss://127.0.0.1:8080';
 const ONYX = '__onyx' as const;
 
 // dmCipher.ts constants — mirrored here so the e2e never imports app modules.
-const ENVELOPE_PREFIX = 'TSUMUGI1 ';
+const ENVELOPE_PREFIX = 'ONYXDM1 ';
 const LOCKED_TEXT = 'Encrypted message (sent to another device)'; // LOCKED_PLACEHOLDER body
 
 const STORE_TIMEOUT = 25_000;
@@ -330,7 +330,7 @@ test.describe('E2EE direct messages (connected DEV build)', () => {
         const bodyBytes = new Uint8Array(12 + ct.byteLength);
         bodyBytes.set(nonce, 0);
         bodyBytes.set(ct, 12);
-        return `TSUMUGI1 ${toB64url(bodyBytes)}`;
+        return `ONYXDM1 ${toB64url(bodyBytes)}`;
       }, secret);
 
       // Sanity: the envelope really is ciphertext that does not leak the plaintext.

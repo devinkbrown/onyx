@@ -1,6 +1,6 @@
 .time-scrubber {
   flex: none;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--stone) 72%, transparent);
   border-bottom: 1px solid var(--line);
 }
@@ -37,7 +37,7 @@
 }
 
 .time-scrubber__status {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
 }
@@ -83,7 +83,7 @@
   height: 100%;
   min-height: 3px;
   display: block;
-  background: color-mix(in oklab, var(--washi-mute) 34%, transparent);
+  background: color-mix(in oklab, var(--paper-mute) 34%, transparent);
   opacity: calc(0.26 + var(--scrub-heat, 0) * 0.7);
   transform: scaleY(calc(0.12 + var(--scrub-heat, 0) * 0.88));
   transform-origin: bottom;
@@ -91,7 +91,7 @@
 }
 
 .time-scrubber__bar--live .time-scrubber__bar-fill {
-  background: color-mix(in oklab, var(--lapis) 78%, var(--washi));
+  background: color-mix(in oklab, var(--lapis) 78%, var(--paper));
 }
 
 .time-scrubber__bar--now .time-scrubber__bar-fill {
@@ -103,7 +103,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.08em;
@@ -114,7 +114,7 @@
 .time-scrubber__date input {
   width: 9.5rem;
   min-width: 0;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--stone) 70%, transparent);
   border: 1px solid var(--line);
   padding: 5px 7px;

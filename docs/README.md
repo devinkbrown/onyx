@@ -8,7 +8,7 @@ documentation hub; each entry is labelled by audience.
 **Naming (branded house):** **Onyx** is the public network + **first-party client**
 (product sauce — not marketed as FOSS). **Onyx Server** is the **AGPL pure-Zig
 engine** you self-host. English subsystems: **Undertow**, **Mooring**, **Cadence**
-(CadenceVox/Vis). Wire: `onyx/*` caps, `TSUMUGI1` envelopes. "IRCXNet" is retired.
+(CadenceVox/Vis). Wire: `onyx/*` caps, `ONYXDM1` envelopes (legacy `TSUMUGI1` dual-open). "IRCXNet" is retired.
 See [`../NOTICE.md`](../NOTICE.md). Public glossary: https://eshmaki.me/glossary/
 
 ## Start here

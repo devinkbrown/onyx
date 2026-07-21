@@ -15,11 +15,11 @@ export const ENCRYPTED_NOTIFICATION_BODY = 'New encrypted message';
 const MAX_BODY_CHARS = 180;
 
 /**
- * True when `text` is a Tsumugi DM envelope, including after leading whitespace.
+ * True when `text` is a E2EE DM envelope, including after leading whitespace.
  *
  * Crypto (`isEnvelope`) stays strict so seal/open never invent a wire form.
  * Display redaction is deliberately broader: a buggy or hostile peer that
- * prefixes ` TSUMUGI1 …` must still fail closed on a lock-screen alert body.
+ * prefixes ` ONYXDM1 …` must still fail closed on a lock-screen alert body.
  */
 export function isNotificationEnvelope(text: string): boolean {
   if (isEnvelope(text)) return true;
@@ -30,7 +30,7 @@ export function isNotificationEnvelope(text: string): boolean {
 
 /**
  * Body string for an OS notification.
- * - E2EE envelope (`TSUMUGI1 …`, optionally whitespace-prefixed) → neutral placeholder
+ * - E2EE envelope (`ONYXDM1 …`, optionally whitespace-prefixed) → neutral placeholder
  * - otherwise truncate at 180 characters
  */
 export function notificationBodyFor(text: string): string {

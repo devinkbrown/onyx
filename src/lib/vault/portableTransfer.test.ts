@@ -271,7 +271,7 @@ describe('portableTransfer', () => {
     saveDMPins(new Map([['trev', [msg('alice-private-pin', 7_000, {
       target: 'alice',
       encrypted: true,
-      text: 'TSUMUGI1 alice-pin-ciphertext',
+      text: 'ONYXDM1 alice-pin-ciphertext',
       plaintext: 'Alice pinned decrypted plaintext',
     })]]]), alice);
 
@@ -476,7 +476,7 @@ describe('portableTransfer', () => {
     saveDMPins(new Map([['trev', [msg('private-pin', 2_000, {
       target: 'alice',
       encrypted: true,
-      text: 'TSUMUGI1 private-pin-ciphertext',
+      text: 'ONYXDM1 private-pin-ciphertext',
       plaintext: 'pinned decrypted plaintext',
     })]]]), owner);
     const exported = await exportPortableTransfer();

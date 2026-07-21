@@ -18,7 +18,7 @@ function encryptedPin(id: string, plaintext: string): ChatMessage {
     id,
     time: new Date('2026-07-16T12:00:00.000Z'),
     from: 'trev',
-    text: `TSUMUGI1 ${id}-ciphertext`,
+    text: `ONYXDM1 ${id}-ciphertext`,
     plaintext,
     encrypted: true,
     type: 'msg',

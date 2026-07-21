@@ -99,7 +99,7 @@ describe('useMessageSearch vault-only DM privacy', () => {
   });
 
   it('never sends a query for a vault-only encrypted DM while hydration is deferred', async () => {
-    const encrypted = message('cipher-1', 'TSUMUGI1 opaque-ciphertext', true);
+    const encrypted = message('cipher-1', 'ONYXDM1 opaque-ciphertext', true);
     await vault.saveMessages('Mika', [encrypted], MEMORY_OWNER);
     const hydration = deferred<ChatMessage[]>();
     vi.spyOn(vault, 'loadRecent').mockImplementation(() => hydration.promise);

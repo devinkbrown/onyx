@@ -12,7 +12,7 @@ Read `AGENTS.md`, `CLAUDE.md`, `docs/architecture.md`, `CONTRIBUTING.md`, and `/
 Stay in Onyx. Do not modify `/home/kain/onyx-server`. Choose one observable, testable slice. Prioritize in this order unless the user names a different target:
 
 1. Regressions in identity, session resume, navigation, nicklist, active surfaces, or browser rendering.
-2. Remaining Sumi-e/Washi evidence: reader and time handoffs, dense-surface accessibility/reflow, background guardrails.
+2. Remaining atmosphere evidence: reader and time handoffs, dense-surface accessibility/reflow, background guardrails.
 3. Torii entry integrity: invite, guest, claim, remembered identity, route/deploy metadata.
 4. Local-first and extension safety boundaries.
 5. Only then planned media or local-intelligence work backed by existing client contracts.

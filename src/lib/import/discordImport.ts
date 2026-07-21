@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * discordImport.ts — sovereign, credential-free Discord history import
- * (Roadmap v1.0 "Torii": the highest-leverage switching-cost destroyer).
+ * (product-entry roadmap: the highest-leverage switching-cost destroyer).
  *
  * A community leaving Discord exports its own channels with DiscordChatExporter
  * (https://github.com/Tyrrrz/DiscordChatExporter) in **JSON** mode and drops the

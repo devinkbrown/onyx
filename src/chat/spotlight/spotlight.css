@@ -10,7 +10,7 @@
   display: grid;
   place-items: start center;
   padding: clamp(1rem, 9svh, 6rem) 1rem 1rem;
-  color: var(--washi);
+  color: var(--paper);
   /* Light filtering down through deep water onto a darkened scrim. */
   background:
     radial-gradient(
@@ -114,7 +114,7 @@
 }
 
 .onyx-spotlight__grammar-label {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font: 700 0.64rem/1 var(--font-mono);
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -136,7 +136,7 @@
   appearance: none;
   border: 1px solid color-mix(in oklab, var(--lapis) 22%, transparent);
   border-radius: var(--r-sm);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--lapis) 8%, transparent);
   cursor: pointer;
   font: 600 0.68rem/1.2 var(--font-mono);
@@ -149,7 +149,7 @@
 
 .onyx-spotlight__grammar-example:hover,
 .onyx-spotlight__grammar-example:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   border-color: color-mix(in oklab, var(--lapis-bright) 48%, transparent);
   background: color-mix(in oklab, var(--lapis) 14%, transparent);
   outline: none;
@@ -161,7 +161,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font: 0.7rem/1.25 var(--font-mono);
 }
 
@@ -190,14 +190,14 @@
   appearance: none;
   border: 0;
   outline: 0;
-  color: var(--washi);
+  color: var(--paper);
   background: transparent;
   font: 500 1.05rem/1.4 var(--font-sans);
   caret-color: var(--lapis-bright);
 }
 
 .onyx-spotlight__input::placeholder {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .onyx-spotlight__close {
@@ -208,7 +208,7 @@
   appearance: none;
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--stone-2) 40%, transparent);
   cursor: pointer;
   font: 400 1.1rem/1 var(--font-mono);
@@ -261,7 +261,7 @@
 .onyx-spotlight__section {
   display: block;
   padding: 0.6rem 0.75rem 0.4rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font: 700 0.66rem/1 var(--font-mono);
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -276,7 +276,7 @@
   padding: 0.6rem 0.7rem;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
-  color: var(--washi);
+  color: var(--paper);
   cursor: pointer;
   transition:
     background-color 120ms var(--ease),
@@ -303,9 +303,9 @@
 
 /* DMs tinted sea-foam, Actions tinted champagne gold (sparingly). */
 .onyx-spotlight__group[data-section='DMs'] .onyx-spotlight__icon {
-  color: var(--washi-dim);
-  background: color-mix(in oklab, var(--washi) 9%, transparent);
-  border-color: color-mix(in oklab, var(--washi) 16%, transparent);
+  color: var(--paper-dim);
+  background: color-mix(in oklab, var(--paper) 9%, transparent);
+  border-color: color-mix(in oklab, var(--paper) 16%, transparent);
 }
 
 .onyx-spotlight__group[data-section='Actions'] .onyx-spotlight__icon {
@@ -369,7 +369,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font: 0.72rem/1.2 var(--font-mono);
 }
 
@@ -391,12 +391,12 @@
 }
 
 .onyx-spotlight__empty-text {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font: 500 0.92rem/1.4 var(--font-sans);
 }
 
 .onyx-spotlight__empty-sub {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font: 0.74rem/1.4 var(--font-mono);
 }
 

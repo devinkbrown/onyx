@@ -5,7 +5,7 @@
 .chb-filter {
   flex: 1;
   font: inherit;
-  color: var(--washi);
+  color: var(--paper);
   background: var(--stone);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
@@ -15,14 +15,14 @@
 .chb-refresh {
   font: inherit;
   font-size: 0.85rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   padding: 8px 14px;
   cursor: pointer;
 }
-.chb-refresh:hover:not(:disabled) { color: var(--washi); border-color: var(--stone-line); }
+.chb-refresh:hover:not(:disabled) { color: var(--paper); border-color: var(--stone-line); }
 .chb-refresh:disabled { opacity: 0.6; cursor: default; }
 .chb-refresh:focus-visible { outline: 2px solid var(--lapis); outline-offset: 1px; }
 
@@ -32,7 +32,7 @@
   gap: 10px;
   justify-content: center;
   padding: 40px 12px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 0.9rem;
   text-align: center;
 }
@@ -58,7 +58,7 @@
 }
 .chb-row:last-child { border-bottom: 0; }
 .chb-row-main { grid-area: main; display: flex; align-items: baseline; gap: 10px; }
-.chb-name { font-family: var(--font-mono); font-weight: 600; color: var(--washi); }
+.chb-name { font-family: var(--font-mono); font-weight: 600; color: var(--paper); }
 .chb-count {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -69,12 +69,12 @@
   grid-area: topic;
   margin: 0;
   font-size: 0.8rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.chb-topic.is-empty { color: var(--washi-mute); font-style: italic; }
+.chb-topic.is-empty { color: var(--paper-mute); font-style: italic; }
 .chb-join {
   grid-area: join;
   font: inherit;
@@ -88,7 +88,7 @@
   cursor: pointer;
   transition: background 160ms var(--ease), color 160ms var(--ease);
 }
-.chb-join:hover { background: color-mix(in oklab, var(--gold) 16%, transparent); color: var(--washi); }
+.chb-join:hover { background: color-mix(in oklab, var(--gold) 16%, transparent); color: var(--paper); }
 .chb-join:focus-visible { outline: 2px solid var(--lapis); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {

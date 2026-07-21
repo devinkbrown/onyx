@@ -28,7 +28,7 @@ function encryptedMessage(
   return {
     id,
     from,
-    text: `TSUMUGI1 envelope-${id}`,
+    text: `ONYXDM1 envelope-${id}`,
     ...(plaintext === undefined ? {} : { plaintext }),
     encrypted: true,
     time: new Date('2026-07-16T10:00:00Z'),
@@ -106,7 +106,7 @@ describe('E2EE reply and edit boundary', () => {
     store.setState({ dms: new Map([['alice', dm([parent])]]) });
 
     feed('@+draft/reply=parent :alice!u@h PRIVMSG me :tagged child');
-    feed(':alice!u@h PRIVMSG me :\u0001REPLY old alice|TSUMUGI1 legacy-envelope\u0001 legacy child');
+    feed(':alice!u@h PRIVMSG me :\u0001REPLY old alice|ONYXDM1 legacy-envelope\u0001 legacy child');
 
     const messages = store.getState().dms.get('alice')!.messages;
     expect(messages.at(-2)!.replyTo?.text).toBe(LOCKED_PLACEHOLDER);

@@ -111,7 +111,7 @@ describe('Composer accessibility', () => {
       replyingTo: {
         id: 'encrypted-parent',
         from: 'alice',
-        text: 'TSUMUGI1 ciphertext-envelope',
+        text: 'ONYXDM1 ciphertext-envelope',
         plaintext: 'private hello',
         encrypted: true,
         time: new Date(),
@@ -123,7 +123,7 @@ describe('Composer accessibility', () => {
     const { getByRole, queryByText } = render(() => <Composer />);
 
     expect(getByRole('status')).toHaveTextContent('replying to aliceprivate hello');
-    expect(queryByText(/TSUMUGI1 ciphertext-envelope/)).toBeNull();
+    expect(queryByText(/ONYXDM1 ciphertext-envelope/)).toBeNull();
   });
 
   it('uses the fixed locked placeholder and never an encrypted reply envelope', () => {
@@ -132,7 +132,7 @@ describe('Composer accessibility', () => {
       replyingTo: {
         id: 'locked-parent',
         from: 'alice',
-        text: 'TSUMUGI1 locked-envelope',
+        text: 'ONYXDM1 locked-envelope',
         encrypted: true,
         time: new Date(),
         type: 'msg',
@@ -143,7 +143,7 @@ describe('Composer accessibility', () => {
     const { getByRole, queryByText } = render(() => <Composer />);
 
     expect(getByRole('status')).toHaveTextContent(LOCKED_PLACEHOLDER);
-    expect(queryByText(/TSUMUGI1 locked-envelope/)).toBeNull();
+    expect(queryByText(/ONYXDM1 locked-envelope/)).toBeNull();
   });
 
   it('clears a legacy encrypted edit context instead of exposing or submitting it', () => {
@@ -152,7 +152,7 @@ describe('Composer accessibility', () => {
       editingMessage: {
         id: 'encrypted-edit',
         from: 'me',
-        text: 'TSUMUGI1 edit-envelope',
+        text: 'ONYXDM1 edit-envelope',
         plaintext: 'private edit',
         encrypted: true,
         time: new Date(),
@@ -165,7 +165,7 @@ describe('Composer accessibility', () => {
 
     expect(store.getState().editingMessage).toBeNull();
     expect(getByRole('button', { name: 'Send message' })).toBeDefined();
-    expect(queryByText(/private edit|TSUMUGI1 edit-envelope/)).toBeNull();
+    expect(queryByText(/private edit|ONYXDM1 edit-envelope/)).toBeNull();
   });
 
   it('hides a reply banner when the armed parent belongs to another target', () => {

@@ -7,10 +7,13 @@
  *
  * Usage:
  *   const id = await MooringIdentity.load();
- *   const pub = await id.exportPublicKey();   // send in TSUMUGI_HANDSHAKE
+ *   const pub = await id.exportPublicKey();   // send in media E2EE handshake
  */
 
-const DB_NAME    = 'nexus-tsumugi';
+/** Current IndexedDB name for the media E2EE identity key. */
+const DB_NAME = 'onyx-mooring';
+/** Historical DB name — dual-open so existing browser installs keep their key. */
+const LEGACY_DB_NAME = 'nexus-tsumugi';
 const DB_VERSION = 1;
 const STORE_NAME = 'identity';
 const KEY_ID     = 'cadence-identity-v1';
@@ -28,6 +31,15 @@ export class MooringIdentity {
       const stored = await MooringIdentity.dbGet();
       if (stored) return new MooringIdentity(stored);
     } catch { /* IndexedDB unavailable */ }
+
+    // Migrate a key that still lives under the historical DB name.
+    try {
+      const legacy = await MooringIdentity.dbGetFrom(LEGACY_DB_NAME);
+      if (legacy) {
+        try { await MooringIdentity.dbPut(legacy); } catch { /* non-fatal */ }
+        return new MooringIdentity(legacy);
+      }
+    } catch { /* legacy DB unavailable */ }
 
     const kp = await crypto.subtle.generateKey(
       { name: 'ECDH', namedCurve: CURVE },
@@ -54,7 +66,7 @@ export class MooringIdentity {
   async getFingerprint(): Promise<string> {
     const raw   = await this.exportPublicKey();
     const hash  = await crypto.subtle.digest('SHA-256', raw.buffer as ArrayBuffer);
-    return tsumugiIdentityBase58(new Uint8Array(hash)).slice(0, 12).padStart(12, '1');
+    return fingerprintBase58(new Uint8Array(hash)).slice(0, 12).padStart(12, '1');
   }
 
   /** Delete the persisted identity key (forces regeneration on next load). */
@@ -77,9 +89,9 @@ export class MooringIdentity {
   // IndexedDB helpers
   // -------------------------------------------------------------------
 
-  private static openDb(): Promise<IDBDatabase> {
+  private static openDb(name: string = DB_NAME): Promise<IDBDatabase> {
     return new Promise((res, rej) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      const req = indexedDB.open(name, DB_VERSION);
       req.onupgradeneeded = e => {
         const db = (e.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains(STORE_NAME))
@@ -91,14 +103,18 @@ export class MooringIdentity {
   }
 
   private static async dbGet(): Promise<CryptoKeyPair | null> {
-    const db = await MooringIdentity.openDb();
+    return MooringIdentity.dbGetFrom(DB_NAME);
+  }
+
+  private static async dbGetFrom(name: string): Promise<CryptoKeyPair | null> {
+    const db = await MooringIdentity.openDb(name);
     try {
       return await new Promise((res, rej) => {
         const tx  = db.transaction(STORE_NAME, 'readonly');
         const req = tx.objectStore(STORE_NAME).get(KEY_ID);
         req.onsuccess = () => {
           const result = req.result;
-          res(isTsumugiKeyPair(result) ? result : null);
+          res(isMediaKeyPair(result) ? result : null);
         };
         req.onerror   = () => rej(req.error);
       });
@@ -108,8 +124,8 @@ export class MooringIdentity {
   }
 
   private static async dbPut(kp: CryptoKeyPair): Promise<void> {
-    if (!isTsumugiKeyPair(kp)) throw new Error('MooringIdentity: invalid key pair');
-    const db = await MooringIdentity.openDb();
+    if (!isMediaKeyPair(kp)) throw new Error('MooringIdentity: invalid key pair');
+    const db = await MooringIdentity.openDb(DB_NAME);
     try {
       return await new Promise((res, rej) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -123,7 +139,7 @@ export class MooringIdentity {
   }
 }
 
-function isTsumugiKeyPair(value: unknown): value is CryptoKeyPair {
+function isMediaKeyPair(value: unknown): value is CryptoKeyPair {
   if (!value || typeof value !== 'object') return false;
   const pair = value as Partial<CryptoKeyPair>;
   const publicKey = pair.publicKey;
@@ -143,7 +159,7 @@ function isP256Key(key: unknown, type: KeyType): key is CryptoKey {
 type EcKeyAlgorithm = KeyAlgorithm & { namedCurve?: string };
 
 /** Base58 encode bytes without BigInt (ES2017 compatible). */
-function tsumugiIdentityBase58(bytes: Uint8Array): string {
+function fingerprintBase58(bytes: Uint8Array): string {
   const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
   const digits = [0];
   for (const byte of bytes) {

@@ -81,7 +81,7 @@ export function Facepile(props: FacepileProps): JSX.Element {
               'border-radius': 'var(--space-5)',
               'box-shadow': '0 0 0 2px var(--stone-2)',
               background: 'var(--stone-3)',
-              color: 'var(--washi-dim)',
+              color: 'var(--paper-dim)',
               'font-family': 'var(--font-mono)',
               'font-size': '0.72rem',
               'font-weight': '600',

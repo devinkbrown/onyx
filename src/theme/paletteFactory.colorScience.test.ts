@@ -89,9 +89,9 @@ describe('paletteFactory AA enforcement and audit contracts', () => {
     const base = generatePalette(DEFAULT_SEED);
     const lowContrast: TokenMap = {
       ...base,
-      '--washi': requiredHex(base, '--ink'),
-      '--washi-dim': requiredHex(base, '--ink'),
-      '--washi-mute': requiredHex(base, '--ink'),
+      '--paper': requiredHex(base, '--ink'),
+      '--paper-dim': requiredHex(base, '--ink'),
+      '--paper-mute': requiredHex(base, '--ink'),
       '--lapis-bright': requiredHex(base, '--ink'),
       '--gold-bright': requiredHex(base, '--ink'),
       '--ok': requiredHex(base, '--ink'),
@@ -110,9 +110,9 @@ describe('paletteFactory AA enforcement and audit contracts', () => {
     const good = generatePalette(DEFAULT_SEED);
     const bad: TokenMap = {
       ...good,
-      '--washi': requiredHex(good, '--ink'),
-      '--washi-dim': requiredHex(good, '--ink'),
-      '--washi-mute': requiredHex(good, '--ink'),
+      '--paper': requiredHex(good, '--ink'),
+      '--paper-dim': requiredHex(good, '--ink'),
+      '--paper-mute': requiredHex(good, '--ink'),
       '--lapis-bright': requiredHex(good, '--ink'),
       '--gold-bright': requiredHex(good, '--ink'),
       '--ok': requiredHex(good, '--ink'),

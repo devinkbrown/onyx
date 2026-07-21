@@ -7,7 +7,7 @@ import {
   selectFirstUnreadId,
   selectMediaTranscript,
   selectReadMarker,
-  selectTegami,
+  selectOfflineMemo,
   selectUnreadCount,
   selectUserMetadata,
   selectUserMetaProfile,
@@ -139,12 +139,12 @@ describe('store selectors', () => {
     expect(selectUserMetadata('bob')(store.getState())).toEqual({});
   });
 
-  it('selectMediaTranscript and selectTegami read normalized aggregate keys', () => {
+  it('selectMediaTranscript and selectOfflineMemo read normalized aggregate keys', () => {
     const at = new Date('2026-07-12T10:20:00.000Z');
     const transcript: Array<{ nick: string; text: string; time: Date }> = [
       { nick: 'Alice', text: 'caption one', time: at },
     ];
-    const tegami = { count: 2, firstMsgId: 'offline-1' };
+    const offlineMemo = { count: 2, firstMsgId: 'offline-1' };
     const message: ChatMessage = {
       id: 'offline-1',
       time: at,
@@ -156,13 +156,13 @@ describe('store selectors', () => {
     store.setState({
       ...initialState,
       mediaTranscripts: new Map([['#stage', transcript]]),
-      tegami: new Map([['alice', tegami]]),
+      offlineMemo: new Map([['alice', offlineMemo]]),
       dms: new Map([['alice', { ...dm('Alice', 1), messages: [message] }]]),
     }, true);
 
     expect(selectMediaTranscript('#STAGE')(store.getState())).toBe(transcript);
     expect(selectMediaTranscript('#empty')(store.getState())).toEqual([]);
-    expect(selectTegami('ALICE')(store.getState())).toBe(tegami);
-    expect(selectTegami('bob')(store.getState())).toBeNull();
+    expect(selectOfflineMemo('ALICE')(store.getState())).toBe(offlineMemo);
+    expect(selectOfflineMemo('bob')(store.getState())).toBeNull();
   });
 });

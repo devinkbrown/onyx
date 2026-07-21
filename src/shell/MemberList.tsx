@@ -476,7 +476,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
             <Show
               when={isLoadingRoster()}
               fallback={
-                <p style={{ padding: '10px 12px', color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
+                <p style={{ padding: '10px 12px', color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
                   No one here yet
                 </p>
               }

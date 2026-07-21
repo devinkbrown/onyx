@@ -67,7 +67,7 @@ describe('private bookmark ownership', () => {
     const alice = { serverUrl, identity: 'alice' } as const;
     store.setState({ server: server('alice'), ourNick: 'alice', bookmarks: [] });
     store.getState().addBookmark({
-      ...bookmark('encrypted', 'TSUMUGI1 bookmark-ciphertext'),
+      ...bookmark('encrypted', 'ONYXDM1 bookmark-ciphertext'),
       encrypted: true,
       plaintext: 'bookmark decrypted plaintext',
       replyTo: { id: 'reply', from: 'trev', text: 'bookmark decrypted reply' },

@@ -36,11 +36,11 @@ describe('ThreadPanel accessibility', () => {
 
   it('never paints E2EE ciphertext in the thread panel body or accessible name', () => {
     const lockedParent: ChatMessage = {
-      ...message('m1', 'alice', 'TSUMUGI1 ciphertext-must-not-leak'),
+      ...message('m1', 'alice', 'ONYXDM1 ciphertext-must-not-leak'),
       encrypted: true,
     };
     const lockedReply: ChatMessage = {
-      ...message('m2', 'bob', 'TSUMUGI1 reply-ciphertext', { id: 'm1', from: 'alice', text: 'TSUMUGI1 ciphertext-must-not-leak' }),
+      ...message('m2', 'bob', 'ONYXDM1 reply-ciphertext', { id: 'm1', from: 'alice', text: 'ONYXDM1 ciphertext-must-not-leak' }),
       encrypted: true,
     };
 

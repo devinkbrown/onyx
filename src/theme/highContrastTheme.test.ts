@@ -78,8 +78,8 @@ describe('highContrastOverrides — per-theme derivation', () => {
   it('lifts every text token to at least AA body (4.5) on all its grounds', () => {
     // In high-contrast mode all body/secondary/metadata text must clear the AA
     // body floor (4.5) on every ground it can sit on — a stronger, per-theme
-    // guarantee than the base palette (which only floors --washi-mute at 3:1).
-    const TEXT = new Set(['--washi', '--washi-dim', '--washi-mute']);
+    // guarantee than the base palette (which only floors --paper-mute at 3:1).
+    const TEXT = new Set(['--paper', '--paper-dim', '--paper-mute']);
     for (const id of THEME_IDS) {
       const merged = boosted(id);
       for (const { fg, grounds } of HIGH_CONTRAST_PAIRS) {
@@ -107,15 +107,15 @@ describe('highContrastOverrides — per-theme derivation', () => {
 
     // The secondary text token is boosted in both, to DIFFERENT values — the
     // signature of a per-palette derivation rather than one shared override.
-    expect(a['--washi-dim']).toBeDefined();
-    expect(b['--washi-dim']).toBeDefined();
-    expect(a['--washi-dim']).not.toBe(b['--washi-dim']);
+    expect(a['--paper-dim']).toBeDefined();
+    expect(b['--paper-dim']).toBeDefined();
+    expect(a['--paper-dim']).not.toBe(b['--paper-dim']);
   });
 
-  it('spans three distinct themes with three distinct --washi-dim boosts', () => {
+  it('spans three distinct themes with three distinct --paper-dim boosts', () => {
     const seen = new Set(
       (['ocean', 'shu', 'frost'] as const).map(
-        (id) => highContrastOverrides(THEMES[id].tokens)['--washi-dim'],
+        (id) => highContrastOverrides(THEMES[id].tokens)['--paper-dim'],
       ),
     );
     expect(seen.size).toBe(3);

@@ -27,7 +27,7 @@ function message(id: string, encrypted = false): ChatMessage {
   return {
     id,
     from: 'Mika',
-    text: encrypted ? 'TSUMUGI1 opaque-ciphertext' : 'ordinary line',
+    text: encrypted ? 'ONYXDM1 opaque-ciphertext' : 'ordinary line',
     target: 'Mika',
     type: 'msg',
     time: new Date('2026-07-16T08:00:00.000Z'),

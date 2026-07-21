@@ -100,9 +100,9 @@ test('contains message overflow actions at 400% short reflow', async ({ page, br
         --stone: #123;
         --stone-2: #234;
         --stone-3: #345;
-        --washi: #fff;
-        --washi-dim: #ddd;
-        --washi-mute: #aaa;
+        --paper: #fff;
+        --paper-dim: #ddd;
+        --paper-mute: #aaa;
         --shu: #d44;
         --shu-bright: #f66;
         --lapis: #168ce0;

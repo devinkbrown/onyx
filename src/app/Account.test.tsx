@@ -141,11 +141,13 @@ describe('Account panel — signed in', () => {
     expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
   });
 
-  it('mounts the Sessions & devices skeleton with this browser active', () => {
-    renderPanel({ account: 'alice' });
+  it('mounts Sessions & devices and requests SESSION LIST without fabricating rows', () => {
+    const { client } = renderPanel({ account: 'alice' });
     expect(screen.getByTestId('sessions-devices-section')).toBeInTheDocument();
-    expect(screen.getByTestId('sessions-current-device')).toHaveTextContent(/this browser/i);
-    expect(screen.getByTestId('sessions-remote-placeholder')).toHaveTextContent(/era 2 \(b8\)/i);
+    expect(client.sendRaw).toHaveBeenCalledWith('SESSION', 'LIST');
+    // Honest empty until the daemon folds SESSION LIST — never invent remote devices.
+    expect(screen.getByTestId('sessions-empty')).toBeInTheDocument();
+    expect(screen.queryByTestId('sessions-remote-placeholder')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /revoke/i })).not.toBeInTheDocument();
   });
 
@@ -459,7 +461,7 @@ describe('Account panel — signed in', () => {
     await waitFor(() => {
       expect(addSpy).toHaveBeenCalledWith(
         'web-stable-device-id',
-        'tsumugi-p256',
+        'onyx-p256',
         'validated-public-key',
       );
     });

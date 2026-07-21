@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*
- * MooringSession.ts — Browser-side TSUMUGI encrypted media session.
+ * MooringSession.ts — Browser-side E2EE media session.
  *
- * Implements the TSUMUGI_HANDSHAKE / TSUMUGI_RATCHET / TSUMUGI_DATA protocol
+ * Implements the media E2EE handshake / ratchet / data protocol (wire subtypes keep historical frozen labels)
  * using Web Crypto (P-256 ECDH + HKDF + AES-256-GCM).
  *
  * Usage:
  *   const v = await MooringSession.create();
- *   const offer = v.exportPublicKey();  // send to peer via TSUMUGI_HANDSHAKE
- *   await v.ingestPeerKey(peerPublicKeyBytes); // on receiving TSUMUGI_HANDSHAKE
+ *   const offer = v.exportPublicKey();  // send to peer via media E2EE handshake
+ *   await v.ingestPeerKey(peerPublicKeyBytes); // on receiving media E2EE handshake
  *   const ct = await v.encrypt(plaintext);
  *   const pt = await v.decrypt(ct);
  */
@@ -22,6 +22,15 @@ const GCM_TAG  = 128;
 const HKDF_ALG = 'HKDF';
 const IV_LEN   = 12;
 const IV_PREFIX_LEN = 8;
+
+/**
+ * Historical HKDF domain labels for media E2EE (wire-stable byte strings).
+ * Renaming the bytes would desync sessions with existing peers.
+ */
+const MOORING_HKDF_INFO_V1 = 'tsumugi-v1';
+function mooringRatchetInfo(epoch: number): string {
+  return `tsumugi-ratchet-${epoch}`;
+}
 
 type AesGcmKey = CryptoKey & { _gcm: true };
 type Direction = 'low-to-high' | 'high-to-low';
@@ -62,10 +71,14 @@ export class MooringSession {
   }
 
   /**
-   * Ingest peer's raw public key (from TSUMUGI_HANDSHAKE frame) and derive
+   * Ingest peer's raw public key (from media E2EE handshake frame) and derive
    * the shared AES-256-GCM session key via ECDH + HKDF.
    */
-  async ingestPeerKey(peerRawKey: Uint8Array, info = 'tsumugi-v1'): Promise<void> {
+  /**
+   * @param info Frozen HKDF domain label. Default is the historical
+   *   media-session domain (`tsumugi-v1` wire bytes — do not change).
+   */
+  async ingestPeerKey(peerRawKey: Uint8Array, info = MOORING_HKDF_INFO_V1): Promise<void> {
     this.assertLive();
     const peerBytes = copyPublicKey(peerRawKey);
     const localBytes = await this.exportPublicKey();
@@ -104,7 +117,7 @@ export class MooringSession {
   }
 
   /**
-   * Ratchet the session key forward (called on TSUMUGI_RATCHET frame).
+   * Ratchet the session key forward (called on media E2EE ratchet frame).
    * Derives a new key by HKDF-expanding the current key with the new epoch.
    */
   async ratchet(): Promise<void> {
@@ -232,7 +245,7 @@ export class MooringSession {
     this.assertLive();
     const raw   = await crypto.subtle.exportKey('raw', this.keyPair.publicKey);
     const hash  = await crypto.subtle.digest('SHA-256', raw);
-    return tsumugiBase58(new Uint8Array(hash)).slice(0, 12).padStart(12, '1');
+    return fingerprintBase58(new Uint8Array(hash)).slice(0, 12).padStart(12, '1');
   }
 }
 
@@ -273,7 +286,7 @@ async function ratchetKey(rawKey: ArrayBuffer, epoch: number): Promise<AesGcmKey
       name: HKDF_ALG,
       hash: 'SHA-256',
       salt:  new Uint8Array(32),
-      info:  new TextEncoder().encode(`tsumugi-ratchet-${epoch}`),
+      info:  new TextEncoder().encode(mooringRatchetInfo(epoch)),
     },
     hkdfKey,
     { name: GCM_ALG, length: GCM_LEN },
@@ -330,7 +343,7 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 /** Base58 encode bytes without BigInt (compatible with ES2017 target). */
-function tsumugiBase58(bytes: Uint8Array): string {
+function fingerprintBase58(bytes: Uint8Array): string {
   const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
   const digits = [0];
   for (const byte of bytes) {

@@ -80,7 +80,7 @@ function setEncryptedDirectMessage(plaintext: string): void {
         id: 'encrypted-dm',
         time: new Date(),
         from: 'alice',
-        text: 'TSUMUGI1 ciphertext stays private',
+        text: 'ONYXDM1 ciphertext stays private',
         type: 'msg',
         target: 'me',
         encrypted: true,
@@ -287,7 +287,7 @@ describe('NotificationRuntime coalesced policy', () => {
 
     store.getState().addNotification({
       type: 'dm',
-      text: 'TSUMUGI1 opaque-ciphertext-blob-must-not-leak',
+      text: 'ONYXDM1 opaque-ciphertext-blob-must-not-leak',
       from: 'alice',
     });
 
@@ -304,7 +304,7 @@ describe('NotificationRuntime coalesced policy', () => {
 
     store.getState().addNotification({
       type: 'dm',
-      text: ' \tTSUMUGI1 padded-ciphertext-must-not-leak',
+      text: ' \tONYXDM1 padded-ciphertext-must-not-leak',
       from: 'alice',
     });
 

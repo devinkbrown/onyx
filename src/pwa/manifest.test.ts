@@ -290,7 +290,7 @@ describe('PWA manifest', () => {
         json: () => ({
           type: 'dm',
           from: 'Bob',
-          text: 'TSUMUGI1 AAAA_ciphertext_must_not_leak_to_lock_screen',
+          text: 'ONYXDM1 AAAA_ciphertext_must_not_leak_to_lock_screen',
         }),
       },
       waitUntil: (work: Promise<unknown>) => {
@@ -313,7 +313,7 @@ describe('PWA manifest', () => {
         json: () => ({
           type: 'dm',
           from: 'Bob',
-          text: ' \tTSUMUGI1 padded_ciphertext_must_not_leak',
+          text: ' \tONYXDM1 padded_ciphertext_must_not_leak',
         }),
       },
       waitUntil: (work: Promise<unknown>) => {

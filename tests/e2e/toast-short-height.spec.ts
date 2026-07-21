@@ -66,9 +66,9 @@ test('contains stacked toasts at 400% short reflow', async ({ page, browserName 
         --ink: #020a12;
         --stone: #123;
         --stone-2: #234;
-        --washi: #fff;
-        --washi-dim: #ddd;
-        --washi-mute: #aaa;
+        --paper: #fff;
+        --paper-dim: #ddd;
+        --paper-mute: #aaa;
         --danger: #d44;
         --ok: #4b8;
         --gold: #da4;

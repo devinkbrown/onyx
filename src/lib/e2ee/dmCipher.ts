@@ -2,13 +2,14 @@
 /**
  * dmCipher.ts — end-to-end encryption for DMs (Roadmap Phase 3.6).
  *
- * No new cryptography: the same Web Crypto primitives the Tsumugi media
+ * No new cryptography: the same Web Crypto primitives the Cadence media
  * engine already ships (P-256 ECDH + HKDF-SHA-256 + AES-GCM), arranged
  * static-static so BOTH directions and replayed history derive the same key:
  *
  *   shared  = ECDH(my_device_secret, peer_device_public)
  *   aes_key = HKDF(shared, salt="onyx-dm-v1", info=sorted(pubA ‖ pubB))
- *   wire    = "TSUMUGI1 " ‖ b64url(nonce12 ‖ ciphertext‖tag)
+ *   wire    = "ONYXDM1 " ‖ b64url(nonce12 ‖ ciphertext‖tag)
+ *   (legacy "TSUMUGI1 " prefixes are still accepted when opening history)
  *
  * The envelope rides an ordinary PRIVMSG, so CHATHISTORY, session-sync and
  * the outbox all carry ciphertext untouched; the server (and its search
@@ -25,7 +26,11 @@ const DB_VERSION = 1;
 const STORE = 'device';
 const KEY_ID = 'dm-v1';
 
-export const ENVELOPE_PREFIX = 'TSUMUGI1 ';
+/** On-wire E2EE DM envelope prefix (current). */
+export const ENVELOPE_PREFIX = 'ONYXDM1 ';
+/** Historical prefix still accepted when opening old vault/history rows. */
+export const LEGACY_ENVELOPE_PREFIX = 'TSUMUGI1 ';
+
 /** Rendered in place of ciphertext we cannot open (wrong device, lost key). */
 export const LOCKED_PLACEHOLDER = '🔒 Encrypted message (sent to another device)';
 
@@ -304,7 +309,14 @@ export function _sharedKeyCacheSizeForTests(): number {
 // ── envelope ─────────────────────────────────────────────────────────────────
 
 export function isEnvelope(text: string): boolean {
-  return text.startsWith(ENVELOPE_PREFIX);
+  return text.startsWith(ENVELOPE_PREFIX) || text.startsWith(LEGACY_ENVELOPE_PREFIX);
+}
+
+/** Body offset after a recognized envelope prefix, or -1. */
+export function envelopeBodyOffset(text: string): number {
+  if (text.startsWith(ENVELOPE_PREFIX)) return ENVELOPE_PREFIX.length;
+  if (text.startsWith(LEGACY_ENVELOPE_PREFIX)) return LEGACY_ENVELOPE_PREFIX.length;
+  return -1;
 }
 
 /** Encrypt plaintext for the peer. Null when E2EE is unavailable. */
@@ -329,10 +341,11 @@ export async function sealDm(peerPublicB64: string, plaintext: string): Promise<
 
 /** Decrypt an envelope from the peer. Null when it isn't ours to open. */
 export async function openDm(peerPublicB64: string, envelope: string): Promise<string | null> {
-  if (!isEnvelope(envelope)) return null;
+  const prefixLen = envelopeBodyOffset(envelope);
+  if (prefixLen < 0) return null;
   const key = await sharedKeyWith(peerPublicB64);
   if (!key) return null;
-  const body = fromB64url(envelope.slice(ENVELOPE_PREFIX.length));
+  const body = fromB64url(envelope.slice(prefixLen));
   // A real body is nonce(12) ‖ ciphertext ‖ tag(16); anything below 28 bytes
   // cannot even carry an empty-plaintext GCM tag, so reject it fast fail-closed.
   if (!body || body.length < MIN_BODY_BYTES) return null;

@@ -34,7 +34,7 @@
   margin: 2px 0 0;
   font-family: var(--font-display);
   font-size: 0.98rem;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .guest-claim__nick {
@@ -46,7 +46,7 @@
   margin: var(--space-1) 0 0;
   font-size: 0.82rem;
   line-height: 1.4;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .guest-claim__head-actions {
@@ -65,15 +65,15 @@
   border: 1px solid transparent;
   border-radius: var(--r-pill);
   background: transparent;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   cursor: pointer;
   transition: color var(--duration-fast, 150ms) ease, background var(--duration-fast, 150ms) ease;
 }
 
 .guest-claim__dismiss:hover,
 .guest-claim__dismiss:focus-visible {
-  color: var(--washi);
-  background: color-mix(in oklch, var(--washi) 8%, transparent);
+  color: var(--paper);
+  background: color-mix(in oklch, var(--paper) 8%, transparent);
 }
 
 .guest-claim__form {

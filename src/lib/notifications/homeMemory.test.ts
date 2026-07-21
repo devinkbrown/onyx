@@ -63,7 +63,7 @@ describe('summarizeHomeMemory', () => {
 
   test('does not expose ciphertext for encrypted vaulted DMs', () => {
     const summary = summarizeHomeMemory('mira', [
-      msg({ encrypted: true, text: 'tsumugi:v1:opaque-ciphertext' }),
+      msg({ encrypted: true, text: 'onyxdm:v1:opaque-ciphertext' }),
     ]);
 
     expect(summary?.preview).toBe('Encrypted message');
@@ -71,7 +71,7 @@ describe('summarizeHomeMemory', () => {
 
   test('does not expose a vault envelope when a legacy row lacks its flag', () => {
     const summary = summarizeHomeMemory('mira', [
-      msg({ text: 'TSUMUGI1 opaque-ciphertext' }),
+      msg({ text: 'ONYXDM1 opaque-ciphertext' }),
     ]);
 
     expect(summary?.preview).toBe('Encrypted message');

@@ -218,8 +218,8 @@ describe('About page — source structure', () => {
     expect(srcContains('CHANNEL')).toBe(true);
   });
 
-  it('contains the TEGAMI service command', () => {
-    expect(srcContains('TEGAMI')).toBe(true);
+  it('contains the MEMO service command', () => {
+    expect(srcContains('MEMO')).toBe(true);
   });
 
   it('has a no-bot manifesto (.ab-nobot)', () => {
@@ -402,7 +402,7 @@ describe('About page — CSS source', () => {
     expect(/\bpurple\b|\bindigo\b/.test(cssNoComments)).toBe(false);
   });
 
-  it('defines the .ab-seam kintsugi divider', () => {
+  it('defines the .ab-seam seam divider', () => {
     expect(css.includes('.ab-seam')).toBe(true);
   });
 

@@ -63,8 +63,8 @@ test('keeps mobile member drawer content outside the right safe area', async ({ 
         --dur: 0ms;
         --ease: linear;
         --ink: #07101a;
-        --washi: #f4f8fb;
-        --washi-mute: #9ba9b5;
+        --paper: #f4f8fb;
+        --paper-mute: #9ba9b5;
         --seam-faint: #365064;
       }
       ${shellCss}
@@ -140,8 +140,8 @@ test('keeps the modal close reachable and contained at 400% text in forced color
         --ink: #07101a;
         --stone: #102234;
         --stone-2: #173047;
-        --washi: #f4f8fb;
-        --washi-mute: #9ba9b5;
+        --paper: #f4f8fb;
+        --paper-mute: #9ba9b5;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
         --seam: #45677d;

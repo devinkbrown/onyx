@@ -109,7 +109,7 @@ export async function buildHomeMemory(
 
 function previewText(message: ChatMessage): string {
   // Fail closed on ciphertext: honor the encrypted flag and detect legacy vault
-  // rows that stored a TSUMUGI1 envelope without setting `encrypted`.
+  // rows that stored a ONYXDM1 envelope without setting `encrypted`.
   if ((message.encrypted || isEnvelope(message.text)) && !message.plaintext) {
     return 'Encrypted message';
   }

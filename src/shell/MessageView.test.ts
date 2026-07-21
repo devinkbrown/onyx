@@ -182,7 +182,7 @@ describe('messageAccessibleLabel (dense transcript a11y)', () => {
 
   it('never exposes E2EE ciphertext when the seal is locked', () => {
     const locked: ChatMessage = {
-      ...message('m2', 'alice', 'TSUMUGI1 ciphertext-must-not-leak', 0),
+      ...message('m2', 'alice', 'ONYXDM1 ciphertext-must-not-leak', 0),
       encrypted: true,
       // plaintext omitted → sealed body is unreadable on this device
     };
@@ -194,7 +194,7 @@ describe('messageAccessibleLabel (dense transcript a11y)', () => {
 
   it('prefers decrypted plaintext over the sealed wire body', () => {
     const open: ChatMessage = {
-      ...message('m3', 'bob', 'TSUMUGI1 still-on-wire', 0),
+      ...message('m3', 'bob', 'ONYXDM1 still-on-wire', 0),
       encrypted: true,
       plaintext: 'secret hello',
     };

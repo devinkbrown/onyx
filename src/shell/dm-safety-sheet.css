@@ -21,7 +21,7 @@
   border: 0;
   align-items: center;
   gap: var(--space-1);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   font: 600 0.72rem/1 var(--font-sans);
   letter-spacing: 0.02em;
@@ -32,7 +32,7 @@
 .dm-safety__trigger:hover,
 .dm-safety__trigger:focus-visible,
 .dm-safety__trigger[aria-expanded='true'] {
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 10%, transparent);
 }
 
@@ -71,7 +71,7 @@
   border: 1px solid color-mix(in oklab, var(--lapis) 32%, var(--line));
   border-radius: var(--r-md);
   overflow: auto;
-  color: var(--washi);
+  color: var(--paper);
   background:
     linear-gradient(112deg, color-mix(in oklab, var(--lapis-deep) 17%, transparent), transparent 46%),
     color-mix(in oklab, var(--stone) 94%, var(--ink));
@@ -121,7 +121,7 @@
 
 .dm-safety__header h2 {
   margin: 0.2rem 0 0;
-  color: var(--washi);
+  color: var(--paper);
   font: 430 1.15rem/1.2 var(--font-display);
   letter-spacing: 0.01em;
 }
@@ -132,14 +132,14 @@
   height: 2.25rem;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   font: 300 1.35rem/1 var(--font-sans);
   cursor: pointer;
 }
 
 .dm-safety__close:hover {
-  color: var(--washi);
+  color: var(--paper);
   border-color: color-mix(in oklab, var(--lapis) 42%, var(--line));
 }
 
@@ -147,7 +147,7 @@
 .dm-safety__warning {
   max-width: 68ch;
   margin: var(--space-2) 0 0;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font: 400 0.78rem/1.5 var(--font-sans);
 }
 
@@ -172,14 +172,14 @@
 
 .dm-safety__readiness-row span {
   overflow: hidden;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font: 400 0.67rem/1.2 var(--font-sans);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .dm-safety__readiness-row strong {
-  color: var(--washi);
+  color: var(--paper);
   font: 600 0.72rem/1.2 var(--font-sans);
 }
 
@@ -205,7 +205,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 0.35rem;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--ink) 48%, transparent);
   font: 500 0.78rem/1 var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -213,7 +213,7 @@
 }
 
 .dm-safety__number-group small {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font: 500 0.52rem/1 var(--font-mono);
 }
 
@@ -223,7 +223,7 @@
   padding: var(--space-2);
   border: 1px dashed var(--line);
   border-radius: var(--r-sm);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font: 400 0.76rem/1.4 var(--font-sans);
 }
 

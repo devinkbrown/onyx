@@ -66,7 +66,7 @@
 .voice-call-name {
   margin: 0;
   max-width: min(24rem, 78vw);
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-display);
   font-size: clamp(1.8rem, 1.1rem + 2vw, 2.65rem);
   font-weight: 400;
@@ -78,7 +78,7 @@
 .voice-call-subtext {
   margin: 0;
   max-width: 24rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-family: var(--font-serif);
   font-size: 0.98rem;
   line-height: 1.45;
@@ -97,7 +97,7 @@
 }
 
 .voice-call-error {
-  color: color-mix(in oklab, var(--shu) 72%, var(--washi));
+  color: color-mix(in oklab, var(--shu) 72%, var(--paper));
 }
 
 .voice-call-actions {
@@ -118,22 +118,22 @@
 .voice-pip__actions .onyx-button--primary {
   color: var(--ink);
   background: linear-gradient(110deg, var(--lapis), var(--lapis-bright));
-  border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--washi));
+  border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--paper));
   box-shadow: 0 14px 34px -24px color-mix(in oklab, var(--lapis-bright) 80%, transparent);
 }
 
 .voice-call-actions .onyx-button--ghost,
 .voice-pip__actions .onyx-button--ghost {
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--stone-2) 38%, transparent);
   border-color: var(--seam-faint);
 }
 
 .voice-call-actions .onyx-button--danger,
 .voice-pip__actions .onyx-button--danger {
-  color: var(--washi);
+  color: var(--paper);
   background: linear-gradient(180deg, color-mix(in oklab, var(--shu) 72%, var(--stone)), color-mix(in oklab, var(--shu) 58%, var(--ink)));
-  border-color: color-mix(in oklab, var(--shu) 64%, var(--washi));
+  border-color: color-mix(in oklab, var(--shu) 64%, var(--paper));
   box-shadow: 0 14px 34px -24px color-mix(in oklab, var(--shu) 80%, transparent);
 }
 
@@ -232,7 +232,7 @@
   gap: 0.35rem;
   padding: 0.75rem 0.9rem;
   pointer-events: none;
-  color: var(--washi);
+  color: var(--paper);
   background:
     radial-gradient(circle at 18% 0%, color-mix(in oklab, var(--lapis) 14%, transparent), transparent 48%),
     linear-gradient(90deg, color-mix(in oklab, var(--ink) 86%, transparent), color-mix(in oklab, var(--stone) 62%, transparent));
@@ -241,7 +241,7 @@
   border-radius: var(--r-md);
   box-shadow:
     0 24px 70px -52px color-mix(in oklab, var(--ink) 96%, transparent),
-    inset 0 1px 0 color-mix(in oklab, var(--washi) 8%, transparent);
+    inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent);
   transform: translateX(-50%);
   backdrop-filter: blur(18px);
 }
@@ -252,7 +252,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem 0.65rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.64rem;
   font-weight: 800;
@@ -274,7 +274,7 @@
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, transparent);
   border-radius: var(--r-sm);
   padding: 0.28rem 0.48rem;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 14%, transparent);
   font: inherit;
   letter-spacing: 0.08em;
@@ -293,7 +293,7 @@
 }
 
 .voice-captions__copy-state {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   letter-spacing: 0.08em;
 }
 
@@ -326,7 +326,7 @@
 
 .voice-caption-text {
   min-width: 0;
-  color: var(--washi);
+  color: var(--paper);
   font-size: clamp(0.95rem, 0.88rem + 0.24vw, 1.1rem);
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -478,7 +478,7 @@
 .voice-reaction__nick {
   max-width: 7rem;
   padding: 0.12rem 0.48rem;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--ink) 82%, transparent);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-pill);
@@ -515,7 +515,7 @@
   left: 0;
   z-index: 82;
   width: min(20rem, calc(100vw - 1rem));
-  color: var(--washi);
+  color: var(--paper);
   background:
     radial-gradient(circle at 26% 0%, color-mix(in oklab, var(--lapis) 18%, transparent), transparent 44%),
     linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 56%, var(--ink)), color-mix(in oklab, var(--ink) 94%, var(--stone)));
@@ -523,7 +523,7 @@
   border-radius: var(--r-md);
   box-shadow:
     0 24px 80px -48px color-mix(in oklab, var(--ink) 96%, transparent),
-    inset 0 1px 0 color-mix(in oklab, var(--washi) 8%, transparent);
+    inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent);
   transform: translate3d(var(--voice-pip-x, 1rem), var(--voice-pip-y, 1rem), 0);
   touch-action: none;
   backdrop-filter: blur(18px);
@@ -566,7 +566,7 @@
 
 .voice-pip__target {
   min-width: 0;
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-display);
   font-size: 1.15rem;
   font-weight: 400;
@@ -582,7 +582,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-family: var(--font-mono);
   font-size: 0.66rem;
   letter-spacing: 0.08em;
@@ -641,7 +641,7 @@
   width: 2rem;
   height: 2rem;
   margin-left: 0.35rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--ink) 46%, transparent);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-pill);

@@ -16,7 +16,7 @@ body,
 body {
   margin: 0;
   background: var(--ink);
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -40,7 +40,7 @@ a {
 
 ::selection {
   background: color-mix(in oklab, var(--lapis) 35%, transparent);
-  color: var(--washi);
+  color: var(--paper);
 }
 
 /* ── Background canvas visibility ────────────────────────────────────────────

@@ -14,7 +14,7 @@
   font-size: 11px;
   letter-spacing: 0.26em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .cpulse-eyebrow::after {
   content: '';
@@ -33,7 +33,7 @@
   font-family: var(--font-mono);
   font-size: 0.74rem;
   line-height: 1.55;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   overflow-wrap: anywhere;
 }
 /* A small live-pulse dot instead of a cryptic IRC numeric. */
@@ -56,13 +56,13 @@
   .cpulse-wire-live { animation: none; }
 }
 .cpulse-wire-body b {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .cpulse-wire-sep {
   margin: 0 7px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .cpulse-deeplink {
@@ -79,7 +79,7 @@
   font-size: 0.66rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .cpulse-deeplink-chan {
   font-family: var(--font-mono);
@@ -112,7 +112,7 @@
   font-family: var(--font-mono);
   font-weight: 600;
   font-size: 0.85rem;
-  color: var(--washi);
+  color: var(--paper);
 }
 .cpulse-room-meta {
   margin-left: auto;
@@ -123,12 +123,12 @@
 .cpulse-room-topic {
   margin: 3px 0 0;
   font-size: 0.76rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cpulse-room-topic.is-empty { color: var(--washi-mute); font-style: italic; }
+.cpulse-room-topic.is-empty { color: var(--paper-mute); font-style: italic; }
 
 .cpulse-nodes {
   display: flex;
@@ -142,21 +142,21 @@
   gap: 7px;
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .cpulse-node-dot {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--washi-mute);
+  background: var(--paper-mute);
   flex: none;
 }
 .cpulse-node[data-nearest='true'] .cpulse-node-dot {
   background: var(--lapis);
   box-shadow: 0 0 8px color-mix(in oklab, var(--lapis) 60%, transparent);
 }
-.cpulse-node[data-nearest='true'] .cpulse-node-host { color: var(--washi); }
-.cpulse-node-ms { color: var(--washi-mute); }
+.cpulse-node[data-nearest='true'] .cpulse-node-host { color: var(--paper); }
+.cpulse-node-ms { color: var(--paper-mute); }
 
 /* Stage layout — the CARD is dead-center in the viewport; the pulse lives
    in the right gutter as a secondary rail. Symmetric 1fr spacers keep the

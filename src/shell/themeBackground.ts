@@ -2,7 +2,7 @@
 // Theme ⇄ background composition.
 //
 // The animated background used to be a standalone preference that defaulted to
-// a gold "kintsugi" scene, so every theme read as gold regardless of its
+// a gold "gold seam" scene, so every theme read as gold regardless of its
 // palette. The `'auto'` mode (now the default) follows the ACTIVE theme: each
 // theme declares a `signatureBg` in src/theme/themes.ts and the shell resolves
 // it here. Users can still pin a specific background from the appearance panel.

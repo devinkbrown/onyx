@@ -209,7 +209,7 @@ describe('travelTo', () => {
     // Home cold cards open exact retained rows via openVaultResult — DMs must
     // paint local scrollback the same way channels do, without inventing plaintext.
     await vault.saveMessages('trev', [{
-      ...live('dm-cold', '2026-06-30T12:00:00.000Z', 'TSUMUGI1 opaque-ciphertext', 'trev'),
+      ...live('dm-cold', '2026-06-30T12:00:00.000Z', 'ONYXDM1 opaque-ciphertext', 'trev'),
       encrypted: true,
       plaintext: 'must never hydrate from disk',
     }], MEMORY_OWNER);
@@ -220,7 +220,7 @@ describe('travelTo', () => {
     await waitForExpect(() => {
       const row = store.getState().dms.get('trev')?.messages[0];
       expect(row?.id).toBe('dm-cold');
-      expect(row?.text).toBe('TSUMUGI1 opaque-ciphertext');
+      expect(row?.text).toBe('ONYXDM1 opaque-ciphertext');
       expect(row?.plaintext).toBeUndefined();
     });
   });
@@ -298,7 +298,7 @@ describe('travelTo', () => {
 
   it('time-travels an encrypted DM from ciphertext only (no plaintext at rest)', async () => {
     await vault.saveMessages('trev', [{
-      ...live('dm-cipher', '2026-06-30T12:00:00.000Z', 'TSUMUGI1 opaque-ciphertext', 'trev'),
+      ...live('dm-cipher', '2026-06-30T12:00:00.000Z', 'ONYXDM1 opaque-ciphertext', 'trev'),
       encrypted: true,
       plaintext: 'must never hydrate from disk',
     }], MEMORY_OWNER);
@@ -317,7 +317,7 @@ describe('travelTo', () => {
     await waitForExpect(() => {
       const row = store.getState().dms.get('trev')?.messages[0];
       expect(row?.id).toBe('dm-cipher');
-      expect(row?.text).toBe('TSUMUGI1 opaque-ciphertext');
+      expect(row?.text).toBe('ONYXDM1 opaque-ciphertext');
       expect(row?.plaintext).toBeUndefined();
       expect(store.getState().timeTravelLandingId).toBe('dm-cipher');
     });

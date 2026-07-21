@@ -76,7 +76,7 @@ async function peerSeal(peer: Awaited<ReturnType<typeof makePeer>>, myPublicB64:
   const body = new Uint8Array(12 + ct.byteLength);
   body.set(nonce, 0);
   body.set(new Uint8Array(ct), 12);
-  return `TSUMUGI1 ${toB64url(body)}`;
+  return `ONYXDM1 ${toB64url(body)}`;
 }
 
 beforeEach(() => {
@@ -200,7 +200,7 @@ describe('sealDmTrusted (send-side anti-MITM gate)', () => {
     expect(await pinnedPeerKey('Alice')).toBe(peer.publicB64);
     // The peer can actually open it (static-static round-trip preserved).
     const peerKey = await peerDerive(peer, (await deviceKeys())!.publicB64);
-    const body = fromB64url(out.envelope.slice('TSUMUGI1 '.length))!;
+    const body = fromB64url(out.envelope.slice('ONYXDM1 '.length))!;
     const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: body.slice(0, 12) }, peerKey, body.slice(12));
     expect(new TextDecoder().decode(pt)).toBe('quiet water, quiet wire');
   });
@@ -272,7 +272,7 @@ describe('openDmTrusted (receive-side anti-MITM gate)', () => {
   it('locks (undecryptable) on a non-envelope or garbage body', async () => {
     const peer = await makePeer();
     expect((await openDmTrusted('Bob', peer.publicB64, 'plain text')).status).toBe('locked');
-    const out = await openDmTrusted('Bob', peer.publicB64, `TSUMUGI1 ${toB64url(new Uint8Array(4))}`);
+    const out = await openDmTrusted('Bob', peer.publicB64, `ONYXDM1 ${toB64url(new Uint8Array(4))}`);
     expect(out.status).toBe('locked');
     if (out.status === 'locked') expect(out.reason).toBe('undecryptable');
   });

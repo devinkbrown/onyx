@@ -93,7 +93,7 @@ describe('searchVaultSemantic', () => {
   it('does not pass encrypted vault envelopes to an embedding provider', async () => {
     await saveMessages('mika', [
       msg('plain', 'remembered public phrase', { target: 'mika' }),
-      msg('cipher', 'TSUMUGI1 opaque-envelope-token', {
+      msg('cipher', 'ONYXDM1 opaque-envelope-token', {
         target: 'mika',
         encrypted: true,
       }),

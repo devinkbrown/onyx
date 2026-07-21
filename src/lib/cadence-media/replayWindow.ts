@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*
- * replayWindow.ts — Bounded anti-replay guard for TSUMUGI media IVs.
+ * replayWindow.ts — Bounded anti-replay guard for media E2EE IVs.
  *
- * TSUMUGI IVs are structured as an 8-byte random per-sender prefix followed by
+ * Media E2EE IVs are structured as an 8-byte random per-sender prefix followed by
  * a 4-byte big-endian u32 counter that is strictly monotonic per sender. A
  * grow-forever `Set<ivHex>` therefore leaks memory across a long call (every
  * authentic received frame permanently adds a string).

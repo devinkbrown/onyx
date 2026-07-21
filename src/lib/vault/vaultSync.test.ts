@@ -180,7 +180,7 @@ describe('vaultSync', () => {
   it('cold-starts an encrypted DM from ciphertext only', async () => {
     await saveOwnedMessages('trev', [{
       ...msg('cipher-1', 1000, 'trev'),
-      text: 'TSUMUGI1 opaque-ciphertext',
+      text: 'ONYXDM1 opaque-ciphertext',
       plaintext: 'must never reach IndexedDB',
       encrypted: true,
     }]);
@@ -190,7 +190,7 @@ describe('vaultSync', () => {
 
     await until(() => (store.getState().dms.get('trev')?.messages.length ?? 0) === 1);
     const hydrated = store.getState().dms.get('trev')?.messages[0];
-    expect(hydrated?.text).toBe('TSUMUGI1 opaque-ciphertext');
+    expect(hydrated?.text).toBe('ONYXDM1 opaque-ciphertext');
     expect(hydrated?.plaintext).toBeUndefined();
     expect(JSON.stringify(await loadOwnedRecent('trev'))).not.toContain('must never reach IndexedDB');
   });

@@ -26,12 +26,14 @@ function boundedPushString(value, maxLength) {
   return typeof value === 'string' ? value.slice(0, maxLength) : '';
 }
 
-// E2EE DM envelopes ride ordinary PRIVMSG/tegami text as `TSUMUGI1 ` + b64url.
+// E2EE DM envelopes ride ordinary PRIVMSG/memo text as `ONYXDM1 ` + b64url
+// (legacy `TSUMUGI1 ` still accepted so old push payloads stay private).
 // The service worker cannot open them (keys live in the page's IndexedDB), so
 // any envelope that reaches a push payload must fail closed to a neutral body —
 // never put ciphertext on a lock screen. Leading whitespace is also redacted:
 // crypto stays strict, but a lock-screen body must not surface a padded envelope.
-const E2EE_ENVELOPE_PREFIX = 'TSUMUGI1 ';
+const E2EE_ENVELOPE_PREFIX = 'ONYXDM1 ';
+const E2EE_LEGACY_ENVELOPE_PREFIX = 'TSUMUGI1 ';
 const ENCRYPTED_PUSH_BODY = 'New encrypted message';
 
 function isPushEnvelope(text) {

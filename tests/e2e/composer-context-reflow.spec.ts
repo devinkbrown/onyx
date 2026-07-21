@@ -55,9 +55,9 @@ test('contains composer context and controls at 400% short reflow', async ({ pag
         --ink: #020a12;
         --stone: #123;
         --stone-2: #234;
-        --washi: #fff;
-        --washi-dim: #ddd;
-        --washi-mute: #aaa;
+        --paper: #fff;
+        --paper-dim: #ddd;
+        --paper-mute: #aaa;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
         --lapis-deep: #075080;

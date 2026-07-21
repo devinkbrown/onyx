@@ -8,8 +8,8 @@
  * Catch-up surface (--stone / --ink). The label previously used
  * `color-mix(in oklab, var(--ink) 55%, transparent)`, which composited the
  * near-black --ink token to ~1:1 and dodged auditPalette (var()/color-mix are
- * skipped). It now uses `var(--washi-dim)`, asserted below to clear 4.5:1 on
- * both surfaces in every shipped theme. --washi-mute would NOT qualify: it
+ * skipped). It now uses `var(--paper-dim)`, asserted below to clear 4.5:1 on
+ * both surfaces in every shipped theme. --paper-mute would NOT qualify: it
  * only carries a 3:1 floor and measures < 4.5:1 on stone/ink in most themes.
  */
 import { describe, expect, it } from 'vitest';
@@ -21,7 +21,7 @@ import { highContrastFg, contrastRatio as oklchContrastRatio } from '@/theme/con
 const AA_NORMAL = 4.5;
 
 /** The token the tier-label CSS resolves to. Change here if the CSS changes. */
-const LABEL_TOKEN = '--washi-dim';
+const LABEL_TOKEN = '--paper-dim';
 const SURFACES = ['--stone', '--ink'] as const;
 
 describe('.home-catchup-tier-label token clears AA on the Catch-up surface', () => {

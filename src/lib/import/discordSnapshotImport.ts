@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * discordSnapshotImport.ts — import a Discord server's history over a BOT TOKEN
- * (Roadmap v1.0 "Torii"). This is the credential-bearing sibling of the two
+ * (product-entry roadmap). This is the credential-bearing sibling of the two
  * credential-free Discord importers: {@link parseDiscordExport} (a
  * DiscordChatExporter run) and {@link parseDiscordPackage} (the official
  * self-serve data package). Here the operator supplies a bot token and ONE

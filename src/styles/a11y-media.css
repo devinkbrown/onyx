@@ -5,20 +5,20 @@
    src/chat/spotlight/spotlight.css, src/shell/keyboard-help.css, and
    src/shell/search/message-search.css.
 
-   The foreground colour tokens (--washi, --washi-dim, --washi-mute, and the
+   The foreground colour tokens (--paper, --paper-dim, --paper-mute, and the
    bright accents) are NOT boosted here: ThemeProvider derives a per-theme,
    OKLCH-solved high-contrast variant of each theme's OWN palette and writes it
    as inline custom properties (src/theme/highContrastTheme.ts), so the boost
    follows the active theme's hue instead of one shared static override. These
    seam/line tokens stay static because they are color-mix() expressions that
-   reference var(--washi)/var(--lapis-bright); they automatically pick up the
+   reference var(--paper)/var(--lapis-bright); they automatically pick up the
    boosted inline values above. */
 @media (prefers-contrast: more) {
   :root {
-    --line: color-mix(in oklab, var(--washi) 42%, transparent);
-    --line-faint: color-mix(in oklab, var(--washi) 26%, transparent);
-    --seam: color-mix(in oklab, var(--lapis-bright) 72%, var(--washi) 28%);
-    --seam-faint: color-mix(in oklab, var(--lapis-bright) 46%, var(--washi) 54%);
+    --line: color-mix(in oklab, var(--paper) 42%, transparent);
+    --line-faint: color-mix(in oklab, var(--paper) 26%, transparent);
+    --seam: color-mix(in oklab, var(--lapis-bright) 72%, var(--paper) 28%);
+    --seam-faint: color-mix(in oklab, var(--lapis-bright) 46%, var(--paper) 54%);
   }
 
   :focus-visible {
@@ -156,9 +156,9 @@
     --gold-deep: LinkText;
     --shu: Mark;
     --shu-bright: Mark;
-    --washi: CanvasText;
-    --washi-dim: CanvasText;
-    --washi-mute: CanvasText;
+    --paper: CanvasText;
+    --paper-dim: CanvasText;
+    --paper-mute: CanvasText;
     --line: CanvasText;
     --line-faint: CanvasText;
     --seam: CanvasText;

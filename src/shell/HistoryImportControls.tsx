@@ -625,7 +625,7 @@ const BOT_IMPORT_SINCE_DAYS = 365;
 
 /**
  * Import a whole Discord SERVER's history over a bot token (Roadmap v1.0
- * "Torii"). Unlike the file-based Discord importers, this walks the guild LIVE
+ * "product entry"). Unlike the file-based Discord importers, this walks the guild LIVE
  * via the same-origin read-only proxy (`/discord-import/…` → discord.com/api/v10):
  * it enumerates the server's text/announcement/forum channels and pulls each
  * one's scrollback + pins. The bot token is SESSION-ONLY: it lives in a Solid

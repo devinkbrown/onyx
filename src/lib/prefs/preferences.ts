@@ -61,7 +61,7 @@ export interface Preferences {
   clock: Clock;
   /** Local-first scrollback: persist conversations to this device (vault). */
   localHistory: boolean;
-  /** Encrypt DMs end-to-end (Tsumugi) when the other party has a device key. */
+  /** Encrypt DMs end-to-end  (end-to-end) when the other party has a device key. */
   e2eeDms: boolean;
   /** Show the channel activity time scrubber. */
   timeScrubber: boolean;

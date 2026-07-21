@@ -22,7 +22,7 @@
 .catchup-totals {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .catchup-mentions {
@@ -33,7 +33,7 @@
 .catchup-empty {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .catchup-list {
@@ -58,7 +58,7 @@
   background: var(--stone);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  color: var(--washi);
+  color: var(--paper);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -93,7 +93,7 @@
 .catchup-when {
   flex: 0 0 auto;
   font-size: 0.72rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-variant-numeric: tabular-nums;
 }
 
@@ -119,7 +119,7 @@
 
 .catchup-badge--unread {
   background: var(--lapis);
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .catchup-badge--mention {

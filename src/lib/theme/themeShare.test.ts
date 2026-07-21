@@ -13,7 +13,7 @@ const MINIMAL_THEME: CustomTheme = {
   base: 'ocean',
   overrides: {
     '--lapis': '#78d5ff',
-    '--washi': 'oklch(92% 0.02 220)',
+    '--paper': 'oklch(92% 0.02 220)',
     '--font-mono': "'JetBrains Mono Variable', monospace",
   },
 };

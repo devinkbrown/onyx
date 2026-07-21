@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * DiscordBotImportControls.test.tsx — integration tests for the bot-token
- * Discord importer UI (Roadmap v1.0 "Torii", full-guild snapshot): enter token +
+ * Discord importer UI (product-entry roadmap, full-guild snapshot): enter token +
  * Server ID → enumerate the guild's channels + pull each one's scrollback and
  * pins over the (stubbed) same-origin proxy → preview → confirm → merged into the
  * vault. Also pins the two load-bearing contracts: the MESSAGE-CONTENT-intent

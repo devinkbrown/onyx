@@ -17,9 +17,9 @@
 }
 
 .provenance-badge[data-scope='server'] {
-  border-color: color-mix(in oklab, var(--washi-dim) 36%, var(--line));
+  border-color: color-mix(in oklab, var(--paper-dim) 36%, var(--line));
   background: color-mix(in oklab, var(--stone-2) 42%, transparent);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .provenance-badge[data-scope='external'] {

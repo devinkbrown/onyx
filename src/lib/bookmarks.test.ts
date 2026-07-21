@@ -39,7 +39,7 @@ describe('account-scoped bookmarks', () => {
 
   it('isolates owners and strips decrypted bodies and reply previews', () => {
     const encrypted = {
-      ...bookmark('alice', 'TSUMUGI1 alice-ciphertext'),
+      ...bookmark('alice', 'ONYXDM1 alice-ciphertext'),
       encrypted: true,
       plaintext: 'Alice decrypted plaintext',
       replyTo: { id: 'reply', from: 'trev', text: 'decrypted reply preview' },
@@ -57,7 +57,7 @@ describe('account-scoped bookmarks', () => {
 
   it('fails closed for a legacy envelope whose encrypted flag was omitted', () => {
     const legacy = {
-      ...bookmark('legacy-envelope', 'TSUMUGI1 legacy-ciphertext'),
+      ...bookmark('legacy-envelope', 'ONYXDM1 legacy-ciphertext'),
       replyTo: { id: 'reply', from: 'trev', text: 'legacy decrypted preview' },
     };
 

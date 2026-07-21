@@ -681,7 +681,7 @@ export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
         <Show
           when={threadMessages().length > 0}
           fallback={
-            <p style={{ color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.78rem' }}>
+            <p style={{ color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.78rem' }}>
               no replies yet
             </p>
           }
@@ -1874,7 +1874,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         {fmtTime(msg.time)}
                       </time>
                       <Show when={msg.edited}>
-                        <span style={{ color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.62rem' }}>
+                        <span style={{ color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.62rem' }}>
                           (edited)
                         </span>
                       </Show>

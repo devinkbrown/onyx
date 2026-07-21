@@ -211,32 +211,32 @@ export default function About() {
             {/* SFU center */}
             <rect x="230" y="120" width="120" height="80" fill="none" stroke="var(--seam)" stroke-width="1.5" />
             <text x="290" y="152" font-family="'JetBrains Mono Variable', monospace" font-size="10" fill="var(--lapis-bright)" text-anchor="middle" letter-spacing="1">SFU</text>
-            <text x="290" y="168" font-family="'JetBrains Mono Variable', monospace" font-size="8.5" fill="var(--washi-mute)" text-anchor="middle">forward only</text>
-            <text x="290" y="182" font-family="'JetBrains Mono Variable', monospace" font-size="8.5" fill="var(--washi-mute)" text-anchor="middle">no encode/decode</text>
+            <text x="290" y="168" font-family="'JetBrains Mono Variable', monospace" font-size="8.5" fill="var(--paper-mute)" text-anchor="middle">forward only</text>
+            <text x="290" y="182" font-family="'JetBrains Mono Variable', monospace" font-size="8.5" fill="var(--paper-mute)" text-anchor="middle">no encode/decode</text>
 
             {/* Desktop client left */}
             <rect x="30" y="60" width="100" height="50" fill="none" stroke="var(--lapis-bright)" stroke-width="1" rx="2" />
             <text x="80" y="82" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle">Desktop</text>
-            <text x="80" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
-            <text x="80" y="108" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">native</text>
+            <text x="80" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
+            <text x="80" y="108" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">native</text>
 
             {/* Browser client left-lower */}
             <rect x="30" y="200" width="100" height="50" fill="none" stroke="var(--ok)" stroke-width="1" rx="2" />
             <text x="80" y="222" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--ok)" text-anchor="middle">Browser</text>
-            <text x="80" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
-            <text x="80" y="248" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">WASM</text>
+            <text x="80" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
+            <text x="80" y="248" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">WASM</text>
 
             {/* Mobile right-upper */}
             <rect x="450" y="60" width="100" height="50" fill="none" stroke="var(--ok)" stroke-width="1" rx="2" />
             <text x="500" y="82" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--ok)" text-anchor="middle">Mobile</text>
-            <text x="500" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
-            <text x="500" y="108" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">WASM</text>
+            <text x="500" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
+            <text x="500" y="108" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">WASM</text>
 
             {/* Desktop right-lower */}
             <rect x="450" y="200" width="100" height="50" fill="none" stroke="var(--lapis-bright)" stroke-width="1" rx="2" />
             <text x="500" y="222" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle">Desktop</text>
-            <text x="500" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
-            <text x="500" y="248" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">native</text>
+            <text x="500" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">CADENCEVOX/CADENCEVIS</text>
+            <text x="500" y="248" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">native</text>
 
             {/* Arrows from left clients to SFU */}
             <path d="M130 85 L228 148" fill="none" stroke="var(--lapis)" stroke-width="1.2" stroke-dasharray="3 5" />
@@ -248,9 +248,9 @@ export default function About() {
 
             {/* Frame label */}
             <text x="175" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">cadence frame</text>
-            <text x="175" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--washi-mute)" text-anchor="middle">(security state labelled)</text>
+            <text x="175" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--paper-mute)" text-anchor="middle">(security state labelled)</text>
             <text x="405" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">cadence frame</text>
-            <text x="405" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--washi-mute)" text-anchor="middle">(identical bytes)</text>
+            <text x="405" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--paper-mute)" text-anchor="middle">(identical bytes)</text>
           </svg>
 
           <div class="ab-media-body">
@@ -394,18 +394,18 @@ export default function About() {
             <text x="350" y="194" font-family="'JetBrains Mono Variable', monospace" font-size="7" fill="var(--lapis-bright)" text-anchor="middle">D</text>
 
             {/* Labels */}
-            <text x="90" y="215" font-family="'JetBrains Mono Variable', monospace" font-size="7" fill="var(--washi-mute)" text-anchor="middle">leaf key</text>
-            <text x="190" y="215" font-family="'JetBrains Mono Variable', monospace" font-size="7" fill="var(--washi-mute)" text-anchor="middle">leaf key</text>
-            <text x="250" y="215" font-family="'JetBrains Mono Variable', monospace" font-size="7" fill="var(--washi-mute)" text-anchor="middle">leaf key</text>
-            <text x="350" y="215" font-family="'JetBrains Mono Variable', monospace" font-size="7" fill="var(--washi-mute)" text-anchor="middle">leaf key</text>
+            <text x="90" y="215" font-family="'JetBrains Mono Variable', monospace" font-size="7" fill="var(--paper-mute)" text-anchor="middle">leaf key</text>
+            <text x="190" y="215" font-family="'JetBrains Mono Variable', monospace" font-size="7" fill="var(--paper-mute)" text-anchor="middle">leaf key</text>
+            <text x="250" y="215" font-family="'JetBrains Mono Variable', monospace" font-size="7" fill="var(--paper-mute)" text-anchor="middle">leaf key</text>
+            <text x="350" y="215" font-family="'JetBrains Mono Variable', monospace" font-size="7" fill="var(--paper-mute)" text-anchor="middle">leaf key</text>
 
             {/* Encrypted frame flow */}
             <rect x="60" y="248" width="320" height="40" fill="none" stroke="var(--seam-faint)" rx="2" />
             <text x="220" y="263" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">AES-GCM encrypted cadence payload</text>
-            <text x="220" y="279" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">outer routing context authenticated</text>
+            <text x="220" y="279" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">outer routing context authenticated</text>
 
             {/* Arrow to server */}
-            <text x="220" y="320" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">↓ relay forwards ciphertext unchanged ↓</text>
+            <text x="220" y="320" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">↓ relay forwards ciphertext unchanged ↓</text>
             <text x="220" y="338" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--shu)" text-anchor="middle">server never receives room key</text>
           </svg>
         </div>
@@ -443,26 +443,26 @@ export default function About() {
               <line x1="450" y1="180" x2="542" y2="88" />
               <line x1="450" y1="180" x2="537" y2="272" />
             </g>
-            <circle cx="68" cy="88" r="3" fill="var(--washi-mute)" />
-            <circle cx="58" cy="272" r="3" fill="var(--washi-mute)" />
-            <circle cx="542" cy="88" r="3" fill="var(--washi-mute)" />
-            <circle cx="537" cy="272" r="3" fill="var(--washi-mute)" />
+            <circle cx="68" cy="88" r="3" fill="var(--paper-mute)" />
+            <circle cx="58" cy="272" r="3" fill="var(--paper-mute)" />
+            <circle cx="542" cy="88" r="3" fill="var(--paper-mute)" />
+            <circle cx="537" cy="272" r="3" fill="var(--paper-mute)" />
 
             {/* eshmaki node */}
             <circle cx="150" cy="180" r="14" fill="var(--ink)" stroke="var(--lapis)" stroke-width="2" />
             <circle cx="150" cy="180" r="5" fill="var(--lapis)" />
             <text x="150" y="212" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis)" text-anchor="middle">eshmaki.me</text>
-            <text x="150" y="225" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">:8080 wss</text>
+            <text x="150" y="225" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">:8080 wss</text>
 
             {/* ircx node */}
             <circle cx="450" cy="180" r="14" fill="var(--ink)" stroke="var(--lapis-bright)" stroke-width="2" />
             <circle cx="450" cy="180" r="5" fill="var(--lapis-bright)" />
             <text x="450" y="212" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle">ircx.us</text>
-            <text x="450" y="225" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">:8080 wss</text>
+            <text x="450" y="225" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">:8080 wss</text>
 
             {/* Convergence label */}
             <text x="300" y="155" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle" letter-spacing="1">CRDT convergent</text>
-            <text x="300" y="170" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">delta-state sync</text>
+            <text x="300" y="170" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">delta-state sync</text>
           </svg>
 
           <div class="ab-mesh-text">
@@ -600,7 +600,7 @@ export default function About() {
           </article>
 
           <article class="ab-svc">
-            <span class="cmd">TEGAMI</span>
+            <span class="cmd">MEMO</span>
             <h3>Offline messages</h3>
             <p>
               Leave a message for someone who isn't online — it's delivered the

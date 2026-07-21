@@ -76,7 +76,7 @@
   height: 28px;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   background: transparent;
   cursor: pointer;
   transition:
@@ -164,7 +164,7 @@
   cursor: pointer;
   text-align: left;
   font-size: 0.82rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   transition:
     color var(--dur) var(--ease),
@@ -174,13 +174,13 @@
 
 .msg-menu-item:hover,
 .msg-menu-item:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--seam-faint);
   background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
 }
 
 .msg-menu-item--danger {
-  color: color-mix(in oklab, var(--shu) 80%, var(--washi-dim));
+  color: color-mix(in oklab, var(--shu) 80%, var(--paper-dim));
 }
 
 .msg-menu-item--danger:hover,
@@ -201,7 +201,7 @@
   border: 1px solid color-mix(in oklab, var(--shu) 34%, var(--seam-faint));
   border-left: 3px solid var(--shu);
   border-radius: var(--r-sm);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--shu) 8%, var(--ink));
 }
 
@@ -211,13 +211,13 @@
 }
 
 .msg-menu-delete-confirm__title {
-  color: var(--washi);
+  color: var(--paper);
   font-size: 0.84rem;
   font-weight: 650;
 }
 
 .msg-menu-delete-confirm__copy {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 0.76rem;
   line-height: 1.45;
 }
@@ -235,7 +235,7 @@
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   cursor: pointer;
   font: inherit;
@@ -243,7 +243,7 @@
 
 .msg-menu-delete-confirm__cancel:hover,
 .msg-menu-delete-confirm__cancel:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--lapis);
 }
 
@@ -255,7 +255,7 @@
 
 .msg-menu-delete-confirm__delete:hover,
 .msg-menu-delete-confirm__delete:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--shu-bright);
   background: color-mix(in oklab, var(--shu) 24%, transparent);
 }
@@ -273,7 +273,7 @@
   padding: var(--space-2);
   border: 1px solid color-mix(in oklab, var(--lapis) 34%, var(--seam-faint));
   border-radius: var(--r-sm);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--lapis-deep) 14%, var(--ink));
   font-size: 0.78rem;
   line-height: 1.4;
@@ -289,7 +289,7 @@
 }
 
 .msg-menu-translation-head > span:last-child {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.08em;
@@ -298,13 +298,13 @@
 
 .msg-menu-translation-text {
   margin: var(--space-2) 0;
-  color: var(--washi);
+  color: var(--paper);
   overflow-wrap: anywhere;
 }
 
 .msg-menu-translation-copy-status {
   margin: var(--space-2) 0 0;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 0.72rem;
 }
 
@@ -313,7 +313,7 @@
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   cursor: pointer;
   font: inherit;
@@ -321,7 +321,7 @@
 
 .msg-menu-translation-action:hover,
 .msg-menu-translation-action:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--lapis);
   outline: none;
 }
@@ -338,7 +338,7 @@
   padding: 0 var(--space-2);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
-  color: var(--washi);
+  color: var(--paper);
   font-size: 0.82rem;
   background: color-mix(in oklab, var(--ink) 64%, var(--stone-2));
 }
@@ -386,7 +386,7 @@
   text-align: center;
   font-family: var(--font-mono);
   font-size: 0.74rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 /* Honour reduced-motion: drop the lift/scale, keep instant reveal. */

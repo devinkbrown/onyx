@@ -254,8 +254,8 @@ describe('useMessageSearch — hybrid vault mode', () => {
   it('drops a legacy DM envelope without a flag but preserves the same text in a channel', async () => {
     setState({ activeView: { kind: 'home' } });
     searchVaultHybridMock.mockResolvedValueOnce([
-      hit('legacy-dm', 'Mika', 'TSUMUGI1 hidden-token', 1, 'Mika'),
-      hit('channel-example', 'Kai', 'TSUMUGI1 hidden-token', 2, '#examples'),
+      hit('legacy-dm', 'Mika', 'ONYXDM1 hidden-token', 1, 'Mika'),
+      hit('channel-example', 'Kai', 'ONYXDM1 hidden-token', 2, '#examples'),
     ]);
 
     let dispose!: () => void;

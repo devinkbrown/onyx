@@ -39,11 +39,11 @@ describe('notificationBodyFor', () => {
   });
 
   it('does not treat ordinary text that merely mentions the prefix word as an envelope', () => {
-    // isEnvelope requires the exact "TSUMUGI1 " wire prefix at the start.
-    expect(notificationBodyFor('talking about TSUMUGI1 offline')).toBe(
-      'talking about TSUMUGI1 offline',
+    // isEnvelope requires the exact "ONYXDM1 " wire prefix at the start.
+    expect(notificationBodyFor('talking about ONYXDM1 offline')).toBe(
+      'talking about ONYXDM1 offline',
     );
-    expect(isNotificationEnvelope('talking about TSUMUGI1 offline')).toBe(false);
+    expect(isNotificationEnvelope('talking about ONYXDM1 offline')).toBe(false);
   });
 
   it('fail-closes even when the envelope is shorter than the display truncate limit', () => {

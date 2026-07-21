@@ -54,7 +54,7 @@ export function ServerRail(props: ServerRailProps): JSX.Element {
         aria-label={`Onyx — active server${unreadTotal() > 0 ? `, ${unreadTotal()} unread` : ''}${mentionTotal() > 0 ? `, ${mentionTotal()} mentions` : ''}`}
         aria-current="true"
       >
-        {/* kin / kintsugi ideogram stands in for a proper server icon */}
+        {/* kin / server mark stands in for a proper server icon */}
         <span aria-hidden="true" style={{ 'font-family': 'var(--font-display)', 'font-size': '0.7rem', 'line-height': '1' }}>
           IR
         </span>

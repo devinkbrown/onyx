@@ -69,9 +69,9 @@ test('keeps the channel drawer dense and keyboard reachable at 400% short reflow
         --ink: #020a12;
         --stone: #123;
         --stone-2: #234;
-        --washi: #fff;
-        --washi-dim: #ddd;
-        --washi-mute: #aaa;
+        --paper: #fff;
+        --paper-dim: #ddd;
+        --paper-mute: #aaa;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
         --lapis-deep: #075080;

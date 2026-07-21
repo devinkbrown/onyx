@@ -17,7 +17,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .calm-segments {
@@ -43,14 +43,14 @@
   border: 0;
   border-radius: var(--r-sm);
   background: transparent;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font: inherit;
   text-align: left;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 
 .calm-segment:hover {
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
 }
 
@@ -73,7 +73,7 @@
 
 .calm-segment-desc {
   overflow-wrap: anywhere;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 0.74rem;
   line-height: 1.35;
 }

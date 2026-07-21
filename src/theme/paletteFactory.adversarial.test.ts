@@ -98,18 +98,18 @@ describe('paletteFactory adversarial contracts', () => {
   it('enforceAA raises a failing audited pair to its AA floor', () => {
     const broken: TokenMap = {
       ...generatePalette(DEFAULT_SEED),
-      '--washi': '#1d232b',
+      '--paper': '#1d232b',
     };
-    const washiBefore = parseHex(broken['--washi']!)!;
+    const paperBefore = parseHex(broken['--paper']!)!;
     const ink = parseHex(broken['--ink']!)!;
-    const beforeRatio = contrastRatio(washiBefore, ink);
+    const beforeRatio = contrastRatio(paperBefore, ink);
 
     expect(beforeRatio).toBeLessThan(4.5);
 
     const fixed = enforceAA(broken, 'dark');
-    const washiAfter = parseHex(fixed['--washi']!)!;
-    const afterRatio = contrastRatio(washiAfter, ink);
-    const auditRow = auditPalette(fixed).find((row) => row.fg === '--washi' && row.bg === '--ink');
+    const paperAfter = parseHex(fixed['--paper']!)!;
+    const afterRatio = contrastRatio(paperAfter, ink);
+    const auditRow = auditPalette(fixed).find((row) => row.fg === '--paper' && row.bg === '--ink');
 
     expect(afterRatio).toBeGreaterThan(beforeRatio);
     expect(auditRow).toMatchObject({ min: 4.5, pass: true });

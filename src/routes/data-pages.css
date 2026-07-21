@@ -1,5 +1,5 @@
 .data-page .r-status nav a[aria-current='page'] {
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .data-page .r-status nav a[aria-current='page']::after {
@@ -18,7 +18,7 @@
   line-height: 0.88;
   letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--washi);
+  color: var(--paper);
   text-wrap: balance;
 }
 
@@ -28,7 +28,7 @@
   font-family: var(--font-serif);
   font-size: clamp(1.14rem, 1rem + 0.8vw, 1.6rem);
   line-height: 1.48;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 /* Stats is a live ledger: the ruled strip is deliberately dense, while each
@@ -42,7 +42,7 @@
   padding: 12px 0;
   border-top: 1px solid var(--seam-faint);
   border-bottom: 1px solid var(--seam-faint);
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.76rem;
   letter-spacing: 0.03em;
@@ -53,7 +53,7 @@
   min-width: 0;
 }
 
-.stats-ledger strong { color: var(--washi); font-weight: 600; }
+.stats-ledger strong { color: var(--paper); font-weight: 600; }
 
 .stats-ledger-mark {
   width: 9px;
@@ -84,7 +84,7 @@
 }
 
 .stats-refresh:hover,
-.stats-refresh:focus-visible { color: var(--washi); outline: none; }
+.stats-refresh:focus-visible { color: var(--paper); outline: none; }
 
 .stats-summary { margin-top: 20px; }
 
@@ -130,13 +130,13 @@
   font-weight: 400;
   font-size: clamp(2rem, 1.2rem + 2.2vw, 3.6rem);
   line-height: 0.96;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .data-metric .note {
   font-size: 0.92rem;
   line-height: 1.45;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .data-grid {
@@ -166,7 +166,7 @@
   font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .data-card h2 {
@@ -181,7 +181,7 @@
 .data-card p {
   margin: 14px 0 0;
   line-height: 1.6;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .stats-card-heading {
@@ -192,7 +192,7 @@
 }
 
 .stats-card-quiet {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.08em;
@@ -224,14 +224,14 @@
   grid-template-columns: 1fr auto 1fr;
   gap: 10px;
   margin-top: 10px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.04em;
 }
 
 .stats-chart-caption strong {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 500;
 }
 
@@ -308,7 +308,7 @@
 .data-room-numbers dt,
 .data-room-numbers dd { margin: 0; }
 .data-room-numbers dt {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.58rem;
   letter-spacing: 0.08em;
@@ -316,7 +316,7 @@
 }
 .data-room-numbers dd {
   margin-top: 3px;
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: 0.78rem;
 }
@@ -327,14 +327,14 @@
 
 .data-row strong {
   display: block;
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 650;
 }
 
 .data-row span,
 .data-row p {
   margin: 5px 0 0;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 0.92rem;
   line-height: 1.42;
 }
@@ -350,7 +350,7 @@
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--washi);
+  color: var(--paper);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-pill);
   padding: 6px 10px;
@@ -403,7 +403,7 @@
 
 .invite-runway__grid span {
   margin-top: 18px;
-  color: var(--washi);
+  color: var(--paper);
   font-size: clamp(1rem, 0.92rem + 0.35vw, 1.18rem);
   line-height: 1.42;
 }
@@ -437,7 +437,7 @@
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .data-empty {
@@ -445,14 +445,14 @@
   padding: clamp(22px, 3vw, 34px);
   border: 1px dashed var(--seam);
   border-radius: var(--r-md);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--ink) 70%, transparent);
 }
 
 .stats-section-note {
   max-width: 68ch;
   margin: 16px 0 0;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-serif);
   font-size: 1.05rem;
   line-height: 1.55;
@@ -479,7 +479,7 @@
   border: 1px solid transparent;
   border-radius: var(--r-pill);
   padding: 7px 10px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   background: transparent;
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -490,7 +490,7 @@
 .stats-control-group button:hover,
 .stats-control-group button:focus-visible {
   border-color: var(--seam);
-  color: var(--washi);
+  color: var(--paper);
   outline: none;
 }
 
@@ -504,7 +504,7 @@
 .stats-result-count {
   grid-column: 1 / -1;
   margin: 0;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.69rem;
   letter-spacing: 0.04em;
@@ -579,11 +579,11 @@
 }
 
 .peer-table td {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .peer-table td:first-child {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 650;
 }
 
@@ -634,8 +634,8 @@
 }
 
 .roadmap-phase[data-state='planned'] .roadmap-phase__rail span {
-  background: var(--washi-mute);
-  box-shadow: 0 0 16px color-mix(in oklab, var(--washi-mute) 45%, transparent);
+  background: var(--paper-mute);
+  box-shadow: 0 0 16px color-mix(in oklab, var(--paper-mute) 45%, transparent);
 }
 
 .roadmap-phase__body {
@@ -663,13 +663,13 @@
   font-size: clamp(1.9rem, 1rem + 2.4vw, 3.8rem);
   line-height: 0.95;
   text-transform: uppercase;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .roadmap-phase p {
   margin: 14px 0 0;
   max-width: 68ch;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   line-height: 1.6;
 }
 
@@ -690,11 +690,11 @@
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .roadmap-phase[data-state='planned'] .roadmap-phase__meta {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 @media (max-width: 640px) {

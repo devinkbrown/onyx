@@ -383,21 +383,23 @@ export function selectSaslMechanism(
 
 export const MAX_STANDARD_REPLY_PARAMS = 32;
 export const MAX_STANDARD_REPLY_TOKEN_LENGTH = 4 * 1024;
-const MAX_STANDARD_REPLY_TEGAMI_LENGTH = 128 * 1024;
+/** Larger ceiling for offline-memo body on NOTE MEMO / legacy NOTE TEGAMI. */
+const MAX_STANDARD_REPLY_MEMO_LENGTH = 128 * 1024;
 
 export function parseStandardReply(msg: IRCMessage): StandardReply | null {
   if (msg.command !== 'NOTE' && msg.command !== 'FAIL' && msg.command !== 'WARN') return null;
   if (msg.params.length === 0 || msg.params.length > MAX_STANDARD_REPLY_PARAMS) return null;
   const command = msg.params[0]!;
   const code = msg.params[1] ?? '';
-  // Onyx Server's offline TEGAMI delivery predates standard-reply framing and puts
+  // Onyx Server's offline memo delivery predates standard-reply framing and puts
   // `from <nick> :<text>` in the apparent code slot. Preserve the vault's
   // bounded 64 KiB message path without granting the larger ceiling to error
   // codes, notifications, or other standard replies.
+  const cmdUpper = command.toUpperCase();
   const codeLimit = msg.command === 'NOTE'
-    && command.toUpperCase() === 'TEGAMI'
+    && (cmdUpper === 'MEMO' || cmdUpper === 'TEGAMI')
     && msg.params.length === 2
-    ? MAX_STANDARD_REPLY_TEGAMI_LENGTH
+    ? MAX_STANDARD_REPLY_MEMO_LENGTH
     : MAX_STANDARD_REPLY_TOKEN_LENGTH;
   if (
     !command

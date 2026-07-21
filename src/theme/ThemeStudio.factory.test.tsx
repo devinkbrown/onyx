@@ -118,7 +118,7 @@ describe('Generate', () => {
     const expected = generatePalette(DEFAULT_SEED);
     expect(getVar('--lapis')).toBe(expected['--lapis']);
     expect(getVar('--ink')).toBe(expected['--ink']);
-    expect(getVar('--washi')).toBe(expected['--washi']);
+    expect(getVar('--paper')).toBe(expected['--paper']);
   });
 
   it('changing the applied --lapis var enables the studio reset button', () => {
@@ -219,11 +219,11 @@ describe('Auto-fix contrast', () => {
   it('repairs a deliberately broken text token so auditPalette passes', () => {
     mountStudio();
 
-    // Break --washi via the manual editor's own control (too dark on dark ink).
-    const washiInput = document.getElementById('ts-control-washi') as HTMLInputElement;
-    expect(washiInput).toBeTruthy();
-    fireEvent.input(washiInput, { target: { value: '#232a33' } });
-    expect(getVar('--washi')).toBe('#232a33');
+    // Break --paper via the manual editor's own control (too dark on dark ink).
+    const paperInput = document.getElementById('ts-control-paper') as HTMLInputElement;
+    expect(paperInput).toBeTruthy();
+    fireEvent.input(paperInput, { target: { value: '#232a33' } });
+    expect(getVar('--paper')).toBe('#232a33');
     expect(auditPalette(liveAaTokens()).every((r) => r.pass)).toBe(false);
 
     fireEvent.click(screen.getByTestId('ts-autofix'));

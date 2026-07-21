@@ -28,16 +28,16 @@
   font-size: clamp(1.9rem, 1.3rem + 2.4vw, 3rem);
   letter-spacing: 0.015em;
   line-height: 1.06;
-  color: var(--washi);
+  color: var(--paper);
 }
 .home-sub {
   margin: 0;
   max-width: 56ch;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.95rem;
 }
 .home-sub b {
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-weight: 600;
   font-size: 0.85em;
@@ -55,7 +55,7 @@
   border-left: 2px solid var(--gold);
   border-radius: var(--r-md);
   background: color-mix(in oklab, var(--gold) 9%, var(--stone));
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.8rem;
   line-height: 1.4;
 }
@@ -71,15 +71,15 @@
 .home-outbox__detail {
   margin: 0 0 6px;
   font-size: 0.82rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   max-width: 52ch;
 }
 .home-outbox--error .home-outbox__detail {
-  color: color-mix(in oklab, var(--shu) 70%, var(--washi));
+  color: color-mix(in oklab, var(--shu) 70%, var(--paper));
 }
 .home-outbox__item--expiring .home-outbox__age,
 .home-outbox__item--expired .home-outbox__age {
-  color: color-mix(in oklab, var(--shu) 65%, var(--washi));
+  color: color-mix(in oklab, var(--shu) 65%, var(--paper));
 }
 .home-outbox {
   display: grid;
@@ -106,7 +106,7 @@
 
 .home-outbox__privacy {
   margin: var(--space-1) 0 0;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 0.76rem;
   line-height: 1.45;
 }
@@ -132,13 +132,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-weight: 800;
 }
 
 .home-outbox__age {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.68rem;
 }
@@ -154,7 +154,7 @@
   border: 1px solid var(--seam);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--stone) 58%, transparent);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   cursor: pointer;
   font: 800 0.68rem/1 var(--font-mono);
 }
@@ -165,7 +165,7 @@
 .home-outbox__retry:focus-visible {
   outline: none;
   border-color: var(--lapis-bright);
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .home-outbox__actions button.is-confirming {
@@ -230,7 +230,7 @@
 .home-events-summary {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-events-list {
   list-style: none;
@@ -252,7 +252,7 @@
   border-left: 2px solid var(--lapis-bright);
   border-radius: var(--r-md);
   background: color-mix(in oklab, var(--lapis) 10%, var(--stone));
-  color: var(--washi);
+  color: var(--paper);
   cursor: pointer;
   transition: border-color var(--dur, 200ms) var(--ease),
     background var(--dur, 200ms) var(--ease);
@@ -276,7 +276,7 @@
 .home-event-time {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-event-state {
   width: fit-content;
@@ -292,7 +292,7 @@
 .home-event-title {
   font-size: 0.94rem;
   font-weight: 650;
-  color: var(--washi);
+  color: var(--paper);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -301,7 +301,7 @@
 .home-event-open {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-event-open {
   color: var(--lapis-bright);
@@ -329,14 +329,14 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 1.35rem;
-  color: var(--washi);
+  color: var(--paper);
   line-height: 1.15;
 }
 .home-pulse-label {
   font-size: 0.68rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 /* Actions */
@@ -360,7 +360,7 @@
 .home-cta:hover { transform: translateY(-1px); filter: brightness(1.08); }
 .home-action {
   font: inherit;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -368,7 +368,7 @@
   cursor: pointer;
   transition: color var(--dur, 200ms) var(--ease), border-color var(--dur, 200ms) var(--ease);
 }
-.home-action:hover { color: var(--washi); border-color: var(--stone-line); }
+.home-action:hover { color: var(--paper); border-color: var(--stone-line); }
 
 /* Room rhythm */
 .home-rhythm {
@@ -385,7 +385,7 @@
   margin: 0;
 }
 .home-rhythm-summary {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -401,7 +401,7 @@
   align-items: center;
   gap: 14px;
   padding: 11px 14px;
-  color: var(--washi);
+  color: var(--paper);
   text-align: left;
   background: color-mix(in oklab, var(--stone) 78%, transparent);
   border: 1px solid var(--line);
@@ -435,7 +435,7 @@
 .home-rhythm-title span:first-child {
   min-width: 0;
   overflow: hidden;
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: 0.86rem;
   font-weight: 750;
@@ -451,13 +451,13 @@
 .home-rhythm-topic {
   min-width: 0;
   overflow: hidden;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .home-rhythm-topic.is-empty {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-style: italic;
 }
 .home-rhythm-heat {
@@ -471,7 +471,7 @@
   width: 6px;
   height: calc(4px + var(--heat, 0) * 18px);
   border-radius: 2px 2px 1px 1px;
-  background: color-mix(in oklab, var(--washi) 14%, transparent);
+  background: color-mix(in oklab, var(--paper) 14%, transparent);
 }
 .home-rhythm-bar.is-active {
   background: color-mix(in oklab, var(--lapis-bright) calc(34% + var(--heat, 0) * 45%), transparent);
@@ -482,7 +482,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.68rem;
 }
@@ -511,14 +511,14 @@
 .home-memory-head .home-section-label {
   margin: 0;
   /* Soften relative to catch-up thesis band — memory is archive, not alarm. */
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   letter-spacing: 0.2em;
   font-weight: 500;
 }
 .home-memory-summary {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-memory-grid {
   display: grid;
@@ -533,16 +533,16 @@
   gap: 10px;
   padding: 14px 16px;
   text-align: left;
-  border: 1px solid color-mix(in oklab, var(--line) 90%, var(--washi));
+  border: 1px solid color-mix(in oklab, var(--line) 90%, var(--paper));
   border-radius: var(--r-md);
   background:
     linear-gradient(
       160deg,
-      color-mix(in oklab, var(--washi) 4%, transparent),
+      color-mix(in oklab, var(--paper) 4%, transparent),
       transparent 48%
     ),
     color-mix(in oklab, var(--stone) 78%, transparent);
-  color: var(--washi);
+  color: var(--paper);
   cursor: pointer;
   transition: border-color var(--dur, 200ms) var(--ease),
     background var(--dur, 200ms) var(--ease),
@@ -553,7 +553,7 @@
   background:
     linear-gradient(
       160deg,
-      color-mix(in oklab, var(--washi) 6%, transparent),
+      color-mix(in oklab, var(--paper) 6%, transparent),
       transparent 50%
     ),
     color-mix(in oklab, var(--stone) 70%, transparent);
@@ -575,20 +575,20 @@
   font-family: var(--font-mono);
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 .home-memory-when,
 .home-memory-foot {
   flex: none;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-memory-preview {
   min-width: 0;
   /* Soul face for remembered prose — calm local-first voice (synthesis A9). */
   font-family: var(--font-serif);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.9rem;
   line-height: 1.5;
   font-weight: 450;
@@ -598,7 +598,7 @@
   overflow: hidden;
 }
 .home-memory-preview b {
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-serif);
   font-weight: 600;
 }
@@ -618,14 +618,14 @@
 }
 .home-quiet-head .home-section-label {
   margin: 0;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-weight: 500;
   letter-spacing: 0.2em;
 }
 .home-quiet-summary {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-quiet-list {
   display: grid;
@@ -643,7 +643,7 @@
   border: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
   border-radius: var(--r-md);
   background: color-mix(in oklab, var(--stone) 64%, transparent);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   cursor: pointer;
   transition: border-color var(--dur, 200ms) var(--ease),
     background var(--dur, 200ms) var(--ease);
@@ -666,25 +666,25 @@
   font-family: var(--font-mono);
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 .home-quiet-topic {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.8rem;
 }
 .home-quiet-topic.is-empty {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-style: italic;
 }
 .home-quiet-when {
   flex: none;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 /* Quiet boosts */
@@ -704,7 +704,7 @@
 .home-boosts-summary {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-boosts-list {
   display: grid;
@@ -729,7 +729,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: color-mix(in oklab, var(--stone) 70%, transparent);
-  color: var(--washi);
+  color: var(--paper);
   cursor: pointer;
   transition: border-color var(--dur, 200ms) var(--ease),
     background var(--dur, 200ms) var(--ease);
@@ -747,7 +747,7 @@
   font-family: var(--font-mono);
   font-size: 0.82rem;
   font-weight: 800;
-  color: var(--washi);
+  color: var(--paper);
 }
 .home-boost-card__badges {
   grid-area: badges;
@@ -776,7 +776,7 @@
 .home-boost-card__preview {
   grid-area: preview;
   min-width: 0;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.82rem;
   line-height: 1.45;
   display: -webkit-box;
@@ -792,7 +792,7 @@
   grid-area: when;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 /* Directory */
@@ -803,7 +803,7 @@
   font-size: 11px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-grid {
   display: grid;
@@ -835,7 +835,7 @@
   font-family: var(--font-mono);
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--washi);
+  color: var(--paper);
 }
 .home-card-when {
   margin-left: auto;
@@ -846,14 +846,14 @@
 .home-card-topic {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   min-height: 2.4em;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.home-card-topic.is-empty { color: var(--washi-mute); font-style: italic; }
+.home-card-topic.is-empty { color: var(--paper-mute); font-style: italic; }
 .home-spark { width: 100%; height: 26px; display: block; }
 .home-spark-line {
   fill: none;
@@ -872,7 +872,7 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 0.7rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-card-join {
   margin-left: auto;
@@ -897,7 +897,7 @@
 .home-recent-chip {
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -905,7 +905,7 @@
   cursor: pointer;
   transition: color var(--dur, 200ms) var(--ease), border-color var(--dur, 200ms) var(--ease);
 }
-.home-recent-chip:hover { color: var(--washi); border-color: var(--stone-line); }
+.home-recent-chip:hover { color: var(--paper); border-color: var(--stone-line); }
 
 @media (max-width: 700px) {
   .home-pulse { grid-template-columns: 1fr 1fr; }
@@ -1041,7 +1041,7 @@
 .home-catchup-head .home-section-label {
   margin: 0;
   /* Catch-up is the thesis band — slightly stronger than ambient section labels. */
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   letter-spacing: 0.18em;
   font-size: 0.72rem;
   font-weight: 650;
@@ -1049,7 +1049,7 @@
 /* Provenance kicker (live / offline recall) — demoted mono meta under the
    mention gold count. Real Onyx mute token only; never --text-muted/--fg-muted. */
 .home-catchup-source {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 400;
@@ -1066,7 +1066,7 @@
 .home-catchup-clear {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-catchup-summary b {
   color: var(--gold-bright);
@@ -1088,15 +1088,15 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  /* Real audited text token (secondary). --washi-dim clears 4.5:1 on the
+  /* Real audited text token (secondary). --paper-dim clears 4.5:1 on the
      Catch-up --stone/--ink surface in every theme (worst case 4.94:1); the
      former color-mix(--ink 55% transparent) composited to ~1:1 near-black
      text and was effectively invisible. Never alpha-fade a text foreground. */
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 /* ── Stratum: Needs you (attention) — strongest visual weight ───────────────
-   Label text stays on the audited --washi-dim token (AA small text). Hierarchy
+   Label text stays on the audited --paper-dim token (AA small text). Hierarchy
    is size/weight + gold surface chrome — never a decorative token on body text. */
 .home-catchup-tier--attention {
   gap: var(--space-2);
@@ -1118,7 +1118,7 @@
   font-size: 0.78rem;
   font-weight: 750;
   letter-spacing: 0.08em;
-  color: var(--washi);
+  color: var(--paper);
 }
 .home-catchup-tier--attention .home-catchup-item {
   min-height: 48px;
@@ -1137,8 +1137,8 @@
   font-size: 0.98rem;
 }
 .home-catchup-tier--attention .home-catchup-unread {
-  /* Unread chip is solid gold-bright on ink-facing washi text: use on-accent
-     only if present; washi on gold-bright is the badge convention elsewhere. */
+  /* Unread chip is solid gold-bright on ink-facing paper text: use on-accent
+     only if present; paper on gold-bright is the badge convention elsewhere. */
   color: var(--ink);
   background: var(--gold-bright);
   font-weight: 650;
@@ -1158,7 +1158,7 @@
   font-size: 0.74rem;
   font-weight: 700;
   /* Keep audited secondary text token; lapis lives on borders/badges only. */
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 .home-catchup-tier--followed .home-catchup-item {
   min-height: 44px;
@@ -1176,7 +1176,7 @@
 
 /* ── Stratum: Quiet — demoted, collapsed ambient tail ───────────────────────
    Demotion is size + weight + quieter chrome. No opacity veil on the section
-   (that would drop washi-dim below AA and encode meaning by opacity alone). */
+   (that would drop paper-dim below AA and encode meaning by opacity alone). */
 .home-catchup-quiet,
 .home-catchup-tier--quiet {
   margin-top: var(--space-3);
@@ -1188,18 +1188,18 @@
   cursor: pointer;
   padding: var(--space-1) 0;
   user-select: none;
-  /* Keep washi-dim (AA) for the summary text; quiet is demoted via size/weight
+  /* Keep paper-dim (AA) for the summary text; quiet is demoted via size/weight
      and item chrome, not by dropping below 4.5:1. */
   font-size: 0.68rem;
   font-weight: 500;
   letter-spacing: 0.04em;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 .home-catchup-quiet > summary:hover,
 .home-catchup-tier--quiet > summary:hover,
 .home-catchup-quiet > summary:focus-visible,
 .home-catchup-tier--quiet > summary:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   outline: none;
 }
 .home-catchup-quiet > summary:focus-visible,
@@ -1218,7 +1218,7 @@
   border-left-width: 1px;
   border-left-color: var(--line);
   background: color-mix(in oklab, var(--stone) 70%, transparent);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 .home-catchup-tier--quiet .home-catchup-item:hover {
   border-color: var(--line);
@@ -1229,8 +1229,8 @@
   font-size: 0.9rem;
 }
 .home-catchup-tier--quiet .home-catchup-unread {
-  background: color-mix(in oklab, var(--washi) 10%, transparent);
-  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--paper) 10%, transparent);
+  color: var(--paper-dim);
   font-size: 11px;
 }
 .home-catchup-list {
@@ -1253,7 +1253,7 @@
   border: 1px solid var(--line);
   border-left: 2px solid transparent;
   border-radius: var(--r-md);
-  color: var(--washi);
+  color: var(--paper);
   cursor: pointer;
   transition: border-color var(--dur, 200ms) var(--ease),
     background var(--dur, 200ms) var(--ease);
@@ -1279,7 +1279,7 @@
   white-space: nowrap;
 }
 .home-catchup-kind {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
 }
 .home-catchup-meta {
@@ -1308,13 +1308,13 @@
 .home-catchup-unread {
   min-width: 22px;
   text-align: center;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 22%, transparent);
   border-radius: 999px;
   padding: 2px 8px;
 }
 .home-catchup-when {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 /* Resume — reading handoff band (between Followed weight and Quiet demotion) */
 .home-resume {
@@ -1329,13 +1329,13 @@
 }
 .home-resume-head .home-section-label {
   margin: 0;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-weight: 600;
 }
 .home-resume-summary {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-resume-list {
   list-style: none;
@@ -1357,7 +1357,7 @@
   border: 1px solid var(--line);
   border-left: 2px solid transparent;
   border-radius: var(--r-md);
-  color: var(--washi);
+  color: var(--paper);
   cursor: pointer;
   transition: border-color var(--dur, 200ms) var(--ease),
     background var(--dur, 200ms) var(--ease);
@@ -1384,7 +1384,7 @@
   white-space: nowrap;
 }
 .home-resume-kind {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
 }
 .home-resume-meta {
@@ -1411,7 +1411,7 @@
   font-size: 11px;
 }
 .home-resume-count {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .home-resume-cue {
   color: var(--gold-bright);
@@ -1455,7 +1455,7 @@
 .home-recap-card__target {
   min-width: 0;
   overflow: hidden;
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: 0.78rem;
   font-weight: 750;
@@ -1484,7 +1484,7 @@
 .home-recap-card__preview {
   /* Fraunces for recap prose — thesis "soul" face on since-you-left digests. */
   font-family: var(--font-serif);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.88rem;
   line-height: 1.45;
   display: -webkit-box;
@@ -1520,7 +1520,7 @@
   border: 1px solid transparent;
 }
 .home-recap-card__spotlight {
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, transparent);
 }
@@ -1546,7 +1546,7 @@
   margin: 0;
 }
 .home-review-history__summary {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -1575,7 +1575,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.7rem;
 }
@@ -1583,7 +1583,7 @@
   min-width: 0;
   max-width: 18ch;
   overflow: hidden;
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1593,7 +1593,7 @@
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.78rem;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -1609,7 +1609,7 @@
   min-height: 30px;
   border-radius: 999px;
   padding: 5px 10px;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--stone) 62%, transparent);
   border: 1px solid var(--line);
   font: inherit;

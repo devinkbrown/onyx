@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Generation fence for async write-backs across a call teardown boundary.
 //
-// The media engine schedules crypto continuations (TSUMUGI handshake/session
+// The media engine schedules crypto continuations (media E2EE handshake/session
 // establishment, group-key import/creation) that resolve on a later microtask.
 // If the user hangs up (setIdle) — or hangs up and rejoins — between scheduling
 // and resolution, a stale continuation must NOT resurrect E2EE key material into

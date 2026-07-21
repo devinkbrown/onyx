@@ -5,10 +5,13 @@ Modern web client for the **Onyx** network, running on the **Onyx Server** engin
 The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
 Branded house: **Onyx** = network/product/client; **Onyx Server** = engine/daemon/
 protocol; "IRCXNet" = retired public identity, legacy/wire token only.
-Wire/config leftovers that still say `onyx/*` (caps/tags) or `TSUMUGI_*` (MEDIA
-verbs) are **literals**, not product names — never rename them for branding.
-English subsystem names on the engine/media side: Cadence (CadenceVox/CadenceVis),
-MooringSession/MooringGroup (client crypto names), Event Spine.
+Wire/config leftovers: `onyx/*` caps/tags; DM envelopes prefer `ONYXDM1 ` and
+dual-open legacy `TSUMUGI1 `; media E2EE outbound uses `E2EE-HANDSHAKE` /
+`E2EE-GROUPKEY` and dual-accepts historical `TSUMUGI_*` subtypes; offline memos
+prefer `MEMO` and dual-accept `TEGAMI`. Those historical tokens are **wire
+literals**, not product names — do not reintroduce Japanese names in new code or UI.
+English subsystem names: Cadence (CadenceVox/CadenceVis), MooringSession/MooringGroup,
+Event Spine.
 
 **License: AGPL-3.0-or-later** (see `LICENSE`). Onyx is copyleft-licensed but NOT yet
 publicly released — it lives only in the PRIVATE `github.com/devinkbrown/onyx` repo. The
@@ -41,8 +44,9 @@ separate, deliberate decision (the AGPL grant only takes effect on public distri
 - Tokens: `src/styles/tokens.css` (+ `global.css`)
 - Primitives: `src/primitives/` — reusable UI building blocks
 - Media engine: `src/lib/cadence-media/` — **Cadence** (CadenceVox/CadenceVis,
-  Cadence frames). Internals: MooringSession ECDH/AES-GCM (wire MEDIA verbs
-  still `TSUMUGI_*`), MediaEngine, MooringGroup, ChunkAssembler, PeerRegistry.
+  Cadence frames). Internals: MooringSession ECDH/AES-GCM, MediaEngine,
+  MooringGroup, ChunkAssembler, PeerRegistry. Outbound media E2EE subtypes are
+  English (`E2EE-*`); legacy `TSUMUGI_*` remains dual-accepted only.
   Signaling = `MEDIA` subcommands + Event Spine `EVENT ... MEDIA ...` events.
 - Backgrounds: `src/backgrounds/` — animated canvas scenes
 - Uploads: `src/lib/upload/` — multipart POST (field `file`) to

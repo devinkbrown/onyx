@@ -15,7 +15,7 @@
   background: var(--stone);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
-  color: var(--washi);
+  color: var(--paper);
   font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
@@ -42,7 +42,7 @@
   padding: 0 0.4rem;
   border-radius: var(--r-pill);
   background: var(--lapis);
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
@@ -52,7 +52,7 @@
 .mark-caught-up__status {
   margin: 0;
   font-size: 0.78rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .mark-caught-up__status:empty {

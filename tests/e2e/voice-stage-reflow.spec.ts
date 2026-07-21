@@ -67,9 +67,9 @@ test('reflows participant tiles and exposes their actions at 400% short zoom', a
         --stone: #123;
         --stone-2: #234;
         --stone-3: #345;
-        --washi: #fff;
-        --washi-dim: #ddd;
-        --washi-mute: #aaa;
+        --paper: #fff;
+        --paper-dim: #ddd;
+        --paper-mute: #aaa;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
         --lapis-deep: #075080;
@@ -226,9 +226,9 @@ test('keeps the spotlight filmstrip pointer and keyboard reachable at 400% zoom'
         --stone: #123;
         --stone-2: #234;
         --stone-3: #345;
-        --washi: #fff;
-        --washi-dim: #ddd;
-        --washi-mute: #aaa;
+        --paper: #fff;
+        --paper-dim: #ddd;
+        --paper-mute: #aaa;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
         --lapis-deep: #075080;
@@ -344,9 +344,9 @@ test('docks the video tray without covering the chat feed', async ({ page }) => 
         --ink: #020a12;
         --stone: #123;
         --stone-2: #234;
-        --washi: #fff;
-        --washi-dim: #ddd;
-        --washi-mute: #aaa;
+        --paper: #fff;
+        --paper-dim: #ddd;
+        --paper-mute: #aaa;
         --lapis: #168ce0;
         --lapis-bright: #55baff;
         --lapis-deep: #075080;
@@ -394,7 +394,7 @@ test('keeps chat usable in a compact desktop conversation', async ({ page }) => 
   await page.addStyleTag({
     content: `
       *, *::before, *::after { box-sizing: border-box; }
-      :root { --r-md: 8px; --seam-faint: #234; --ink: #020a12; --stone: #123; --stone-2: #234; --washi: #fff; --lapis: #168ce0; --lapis-bright: #55baff; --lapis-deep: #075080; }
+      :root { --r-md: 8px; --seam-faint: #234; --ink: #020a12; --stone: #123; --stone-2: #234; --paper: #fff; --lapis: #168ce0; --lapis-bright: #55baff; --lapis-deep: #075080; }
       html, body { margin: 0; }
       .conversation { display: flex; flex-direction: column; height: 395px; overflow: hidden; }
       .message-feed { flex: 1; min-height: 0; overflow: auto; }

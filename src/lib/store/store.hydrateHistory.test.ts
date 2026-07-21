@@ -71,7 +71,7 @@ describe('hydrateHistory cold-start activation', () => {
     store.getState().hydrateHistory('Trev', [message({
       id: 'cipher-1',
       target: 'Trev',
-      text: 'TSUMUGI1 opaque-ciphertext',
+      text: 'ONYXDM1 opaque-ciphertext',
       encrypted: true,
       plaintext: undefined,
     })], { activate: 'dm' });
@@ -79,7 +79,7 @@ describe('hydrateHistory cold-start activation', () => {
     const state = store.getState();
     const hydrated = state.dms.get('trev')?.messages[0];
     expect(state.activeView).toEqual({ kind: 'dm', nick: 'trev' });
-    expect(hydrated?.text).toBe('TSUMUGI1 opaque-ciphertext');
+    expect(hydrated?.text).toBe('ONYXDM1 opaque-ciphertext');
     expect(hydrated?.plaintext).toBeUndefined();
     expect(state.channels.has('trev')).toBe(false);
   });

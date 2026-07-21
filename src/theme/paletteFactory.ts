@@ -206,7 +206,7 @@ export function generatePalette(seedInput: PaletteSeed): TokenMap {
   const inkRgb = parseHex(ground(0))!;
   const textHue = avoidBannedHue(pHue + warmHueShift * 1.5);
   const textChroma = 0.012 + 0.01 * seed.vibrancy;
-  const washiL = solveTextLightness(inkRgb, textHue, textChroma, seed.contrast, dark);
+  const paperL = solveTextLightness(inkRgb, textHue, textChroma, seed.contrast, dark);
 
   // Vermilion hot accent — a warm red-orange, nudged by warmth, never purple.
   const shuHue = avoidBannedHue(28 + seed.warmth * 6);
@@ -230,9 +230,9 @@ export function generatePalette(seedInput: PaletteSeed): TokenMap {
     '--shu': oklchToHex({ l: dark ? 0.64 : 0.55, c: 0.19, h: shuHue }),
     '--shu-bright': oklchToHex({ l: dark ? 0.74 : 0.62, c: 0.2, h: shuHue }),
 
-    '--washi': oklchToHex({ l: washiL, c: textChroma, h: textHue }),
-    '--washi-dim': oklchToHex({ l: dark ? washiL - 0.22 : washiL + 0.2, c: textChroma, h: textHue }),
-    '--washi-mute': oklchToHex({ l: dark ? washiL - 0.4 : washiL + 0.38, c: textChroma * 1.4, h: textHue }),
+    '--paper': oklchToHex({ l: paperL, c: textChroma, h: textHue }),
+    '--paper-dim': oklchToHex({ l: dark ? paperL - 0.22 : paperL + 0.2, c: textChroma, h: textHue }),
+    '--paper-mute': oklchToHex({ l: dark ? paperL - 0.4 : paperL + 0.38, c: textChroma * 1.4, h: textHue }),
 
     '--ok': oklchToHex({ l: dark ? 0.75 : 0.58, c: 0.13, h: 158 }),
     '--warn': oklchToHex({ l: dark ? 0.86 : 0.62, c: 0.09, h: 92 }),
@@ -242,8 +242,8 @@ export function generatePalette(seedInput: PaletteSeed): TokenMap {
     // as the theme's colour.
     '--seam': 'color-mix(in oklab, var(--lapis) 38%, transparent)',
     '--seam-faint': 'color-mix(in oklab, var(--lapis) 15%, transparent)',
-    '--line': 'color-mix(in oklab, var(--washi) 14%, transparent)',
-    '--line-faint': 'color-mix(in oklab, var(--washi) 7%, transparent)',
+    '--line': 'color-mix(in oklab, var(--paper) 14%, transparent)',
+    '--line-faint': 'color-mix(in oklab, var(--paper) 7%, transparent)',
   };
 
   return enforceAA(tokens, seed.scheme);
@@ -274,11 +274,11 @@ function solveTextLightness(bg: RGB, hue: number, chroma: number, target: number
  * status, danger) at the 3:1 UI-component / large-text bar. [fg, bg, minRatio]
  */
 export const AA_PAIRS: ReadonlyArray<[string, string, number]> = [
-  ['--washi', '--ink', 4.5],
-  ['--washi', '--stone', 4.5],
-  ['--washi', '--stone-2', 4.5],
-  ['--washi-dim', '--ink', 4.5],
-  ['--washi-mute', '--ink', 3],
+  ['--paper', '--ink', 4.5],
+  ['--paper', '--stone', 4.5],
+  ['--paper', '--stone-2', 4.5],
+  ['--paper-dim', '--ink', 4.5],
+  ['--paper-mute', '--ink', 3],
   // Primary accent doubles as an interactive fill (segmented-control active
   // segment renders --ink text on a --lapis-bright ground). That small bold
   // label needs body-text AA, so lapis-bright holds a 4.5 floor vs the ground
@@ -291,7 +291,7 @@ export const AA_PAIRS: ReadonlyArray<[string, string, number]> = [
 
 /**
  * Nudge text-token lightness until every AA_PAIR passes. Only text tokens move
- * (washi/dim/mute); accents get a large-text (3:1) floor. Non-hex/var tokens
+ * (paper/dim/mute); accents get a large-text (3:1) floor. Non-hex/var tokens
  * are left untouched.
  */
 export function enforceAA(tokens: TokenMap, scheme: 'dark' | 'light'): TokenMap {
@@ -306,7 +306,7 @@ export function enforceAA(tokens: TokenMap, scheme: 'dark' | 'light'): TokenMap 
     const fgOk = hexToOklch(fgHex);
     if (!bgRgb || !fgOk) continue; // skip var()/color-mix tokens
 
-    // Only push the text tokens (washi*) toward the contrast extreme; accents
+    // Only push the text tokens (paper*) toward the contrast extreme; accents
     // keep their hue and just need the large-text floor, handled the same way.
     let { l } = fgOk;
     const dir = dark ? 0.015 : -0.015;
@@ -352,7 +352,7 @@ export interface PaletteTransform {
   contrast?: number;
 }
 
-const TEXT_TOKENS = new Set(['--washi', '--washi-dim', '--washi-mute']);
+const TEXT_TOKENS = new Set(['--paper', '--paper-dim', '--paper-mute']);
 
 /**
  * Apply a global transform to every hex colour token. var()/color-mix/font/

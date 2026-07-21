@@ -21,7 +21,7 @@
   height: 100svh;
   overflow: hidden;
   font-family: var(--font-sans);
-  color: var(--washi);
+  color: var(--paper);
   /* Light legibility wash ONLY — let the real animated Background canvas (z-index
      -1) read through just like it does in the Theme Factory. A faint top glow and
      a soft bottom fade keep the header and composer legible without a heavy ink
@@ -155,7 +155,7 @@
   border-radius: var(--r-md);
   cursor: pointer;
   background: transparent;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.08em;
@@ -329,7 +329,7 @@
 }
 
 .shell-sidebar-dot--connecting { background: var(--lapis-bright); }
-.shell-sidebar-dot--disconnected { background: var(--washi-mute); }
+.shell-sidebar-dot--disconnected { background: var(--paper-mute); }
 .shell-sidebar-dot--error { background: var(--shu); }
 
 .shell-notify-controls {
@@ -347,7 +347,7 @@
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--ink) 64%, transparent);
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 0.62rem;
@@ -361,7 +361,7 @@
 
 .shell-notify-btn:hover:not(:disabled),
 .shell-notify-btn:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--seam);
   outline: none;
 }
@@ -397,7 +397,7 @@
 .shell-notify-btn--blocked,
 .shell-notify-btn:disabled {
   cursor: not-allowed;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   opacity: 0.56;
 }
 
@@ -421,7 +421,7 @@
   font-size: 0.64rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   padding: 0 0 var(--space-1);
 }
 
@@ -446,7 +446,7 @@
   cursor: pointer;
   font-size: 0.86rem;
   text-align: left;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   transition:
     color var(--dur) var(--ease),
@@ -458,13 +458,13 @@
 }
 
 .shell-channel-item:hover {
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--lapis-deep) 12%, transparent);
   border-color: var(--seam-faint);
 }
 
 .shell-channel-item--active {
-  color: var(--washi);
+  color: var(--paper);
   background:
     linear-gradient(
       90deg,
@@ -493,7 +493,7 @@
 
 /* Unread but not active: the name brightens and a small azure pip marks it. */
 .shell-channel-item--unread {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 600;
 }
 
@@ -522,7 +522,7 @@
 }
 
 .shell-channel-sigil {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.78rem;
   flex: none;
@@ -584,7 +584,7 @@
   padding: var(--space-2);
   font-family: var(--font-mono);
   font-size: 0.76rem;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--ink) 72%, var(--stone));
   border: 1px solid var(--seam-faint);
   border-right: none;
@@ -598,7 +598,7 @@
 }
 
 .shell-join-input::placeholder {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-join-btn {
@@ -717,7 +717,7 @@
   width: min(100%, 360px);
   min-height: 42px;
   padding: 6px 9px;
-  color: var(--washi);
+  color: var(--paper);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
   background: color-mix(in oklab, var(--stone) 50%, transparent);
@@ -768,7 +768,7 @@
 
 .shell-watch-start__launcher-copy span {
   overflow: hidden;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -790,7 +790,7 @@
 }
 
 .shell-watch-start__dialog-content {
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
 }
 
@@ -803,7 +803,7 @@
 .shell-watch-start__summary {
   max-width: 70ch;
   margin: 0;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 10px;
   line-height: 1.5;
 }
@@ -819,7 +819,7 @@
   align-content: start;
   gap: 5px;
   min-width: 0;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -835,7 +835,7 @@
   min-width: 0;
   min-height: 34px;
   padding: 6px 8px;
-  color: var(--washi);
+  color: var(--paper);
   border: 1px solid var(--seam);
   border-radius: var(--r-sm);
   outline: none;
@@ -852,7 +852,7 @@
 }
 
 .shell-watch-start__feedback {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 10px;
   line-height: 1.4;
 }
@@ -893,7 +893,7 @@
 }
 
 .shell-watch-start__secondary {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
 }
 
@@ -904,7 +904,7 @@
 
 .shell-watch-start__secondary:hover,
 .shell-watch-start__secondary:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--lapis-bright);
 }
 
@@ -924,7 +924,7 @@
 }
 
 .shell-watch-start__review-details dt {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 8px;
   font-weight: 800;
   letter-spacing: 0.07em;
@@ -934,7 +934,7 @@
 .shell-watch-start__review-details dd {
   overflow-wrap: anywhere;
   margin: 3px 0 0;
-  color: var(--washi);
+  color: var(--paper);
   font-size: 10px;
   line-height: 1.4;
 }
@@ -981,7 +981,7 @@
 }
 
 .shell-watch-together__label {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -991,7 +991,7 @@
 .shell-watch-together__title {
   min-width: 0;
   overflow: hidden;
-  color: var(--washi);
+  color: var(--paper);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1003,7 +1003,7 @@
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 10px;
   font-weight: 700;
 }
@@ -1028,7 +1028,7 @@
 .shell-watch-together__join {
   min-height: 28px;
   padding: 4px 8px;
-  color: var(--washi);
+  color: var(--paper);
   border: 1px solid var(--seam);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
@@ -1062,7 +1062,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 9px;
   font-weight: 800;
   text-transform: uppercase;
@@ -1072,7 +1072,7 @@
   width: clamp(76px, 8vw, 108px);
   min-height: 28px;
   padding: 3px 20px 3px 6px;
-  color: var(--washi);
+  color: var(--paper);
   border: 1px solid var(--seam);
   border-radius: var(--r-sm);
   background: var(--stone-2);
@@ -1092,7 +1092,7 @@
 
 .shell-watch-together__open:hover,
 .shell-watch-together__open:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
 }
 
 /* ── Presence ribbon ── */
@@ -1176,7 +1176,7 @@
   font-weight: 750;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--washi);
+  color: var(--paper);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1185,7 +1185,7 @@
 }
 
 .shell[data-room-identity] .shell-ribbon-channel {
-  color: color-mix(in oklab, var(--washi) 88%, var(--room-accent-strong));
+  color: color-mix(in oklab, var(--paper) 88%, var(--room-accent-strong));
 }
 
 .shell-ribbon-sigil--status { color: var(--gold-bright); }
@@ -1203,7 +1203,7 @@
 }
 
 .shell-ribbon-sigil--dm {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-ribbon-sep {
@@ -1218,7 +1218,7 @@
   min-width: 0;
   font-family: var(--font-sans);
   font-size: 0.82rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1254,7 +1254,7 @@
   border: 1px solid color-mix(in oklab, var(--gold) 48%, var(--line));
   border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--gold) 14%, var(--stone) 48%);
-  color: var(--washi);
+  color: var(--paper);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 0.66rem;
@@ -1314,7 +1314,7 @@
   border: 1px solid color-mix(in oklab, var(--lapis) 38%, var(--line));
   border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--lapis) 14%, var(--stone) 48%);
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: 0.66rem;
   font-weight: 750;
@@ -1332,7 +1332,7 @@
 .shell-ribbon-voice-chip:hover {
   border-color: color-mix(in oklab, var(--lapis) 55%, var(--line));
   background: color-mix(in oklab, var(--lapis) 18%, var(--stone) 54%);
-  color: var(--washi);
+  color: var(--paper);
   transform: translate3d(0, -1px, 0);
 }
 
@@ -1381,7 +1381,7 @@
   height: 32px;
   min-width: 32px;
   padding: 0;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
@@ -1464,7 +1464,7 @@
 
 /* Default: mute chrome so event/voice chips win. Hover/open re-light to lapis. */
 .shell-ribbon-more-trigger {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-ribbon-group .onyx-popover__trigger:hover .shell-ribbon-more-trigger,
@@ -1504,7 +1504,7 @@
   font-size: 0.62rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 /* In-menu scope kickers (Channel / Workspace) — visual hierarchy only. */
@@ -1549,7 +1549,7 @@
   text-align: left;
   font-family: var(--font-sans);
   font-size: 0.82rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   transition:
     color var(--dur) var(--ease),
@@ -1559,7 +1559,7 @@
 
 .shell-ribbon-more-item:hover,
 .shell-ribbon-more-item:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--seam-faint);
   background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
   outline: none;
@@ -1581,7 +1581,7 @@
   font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.04em;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1592,7 +1592,7 @@
 }
 
 .shell-ribbon-more-item--account[data-guest='true'] .shell-ribbon-account-name {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 /* ── Account chip (opens the account panel) ───────────────────────────────── */
@@ -1640,7 +1640,7 @@
 }
 
 .shell-ribbon-account[data-guest='true'] .shell-ribbon-account-name {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1660,7 +1660,7 @@
   font-size: 0.62rem;
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-ribbon-conn[data-state='connected'] {
@@ -1678,9 +1678,9 @@
   border-color: color-mix(in oklab, var(--shu) 36%, var(--seam-faint));
 }
 
-.shell-ribbon-conn-label { line-height: 1; color: var(--washi-mute); }
+.shell-ribbon-conn-label { line-height: 1; color: var(--paper-mute); }
 .shell-ribbon-conn[data-state='connected'] .shell-ribbon-conn-label {
-  color: color-mix(in oklab, var(--ok) 48%, var(--washi-dim));
+  color: color-mix(in oklab, var(--ok) 48%, var(--paper-dim));
 }
 .shell-ribbon-conn[data-state='connecting'] .shell-ribbon-conn-label,
 .shell-ribbon-conn[data-state='reconnecting'] .shell-ribbon-conn-label {
@@ -1724,7 +1724,7 @@
 
 .shell-ribbon-call:hover,
 .shell-ribbon-call:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   border-color: color-mix(in oklab, var(--lapis-bright) 52%, var(--seam));
   background: color-mix(in oklab, var(--lapis) 20%, var(--stone));
 }
@@ -1748,7 +1748,7 @@
 }
 
 .shell-ribbon-preferences:hover {
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--stone-2) 56%, transparent);
 }
 
@@ -1771,7 +1771,7 @@
   font-size: 0.66rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .ap-panel-heading-row {
@@ -1867,7 +1867,7 @@
 .ap-theme-name {
   font-family: var(--font-sans);
   font-size: 0.8rem;
-  color: var(--washi);
+  color: var(--paper);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1907,7 +1907,7 @@
 .ap-bg-name {
   font-family: var(--font-sans);
   font-size: 0.84rem;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .ap-bg-kind {
@@ -1915,7 +1915,7 @@
   font-size: 0.6rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   padding: 2px 6px;
   border-radius: var(--r-pill);
   border: 1px solid var(--seam-faint);
@@ -1967,7 +1967,7 @@
   font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.06em;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .shell-chset-topic-form {
@@ -1982,7 +1982,7 @@
   padding: var(--space-3);
   font-family: var(--font-serif);
   font-size: 0.9rem;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--ink) 18%, transparent);
   border: 1px solid var(--seam);
   border-radius: var(--r-md);
@@ -1998,7 +1998,7 @@
   width: min(100%, 18rem);
   min-height: 2.4rem;
   padding: 0 var(--space-3);
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--ink) 18%, transparent);
   border: 1px solid var(--seam);
   border-radius: var(--r-md);
@@ -2014,7 +2014,7 @@
 .shell-chset-hint {
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   line-height: 1.45;
 }
 
@@ -2037,13 +2037,13 @@
   font-size: 0.64rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-chset-readonly-value {
   font-family: var(--font-serif);
   font-size: 0.9rem;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .shell-chset-modes-mono {
@@ -2113,7 +2113,7 @@
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  background: var(--washi);
+  background: var(--paper);
   transition: transform var(--dur) var(--ease);
 }
 
@@ -2129,18 +2129,18 @@
 .shell-chset-toggle-label {
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  color: var(--washi);
+  color: var(--paper);
   letter-spacing: 0.03em;
 }
 
 .shell-chset-toggle-letter {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-chset-toggle-hint {
   font-family: var(--font-mono);
   font-size: 0.62rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   line-height: 1.4;
 }
 
@@ -2208,7 +2208,7 @@
 .shell-chset-access-level {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .shell-chset-access-mask {
@@ -2218,7 +2218,7 @@
 
 .shell-chset-access-extra {
   font-size: 0.75rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-chset-access-form {
@@ -2261,7 +2261,7 @@
   font-family: var(--font-mono);
   font-size: 0.66rem;
   line-height: 1.45;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2322,7 +2322,7 @@
   border-radius: var(--r-pill);
   appearance: none;
   background: color-mix(in oklab, var(--stone) 70%, transparent);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -2332,7 +2332,7 @@
 .shell-topic-follow:hover,
 .shell-topic-follow:focus-visible {
   border-color: var(--lapis-bright);
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .shell-topic-follow:focus-visible {
@@ -2361,7 +2361,7 @@
   border-radius: var(--r-pill);
   appearance: none;
   background: transparent;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -2376,7 +2376,7 @@
 .shell-topic-action:hover,
 .shell-topic-action:focus-visible {
   border-color: var(--lapis-bright);
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .shell-topic-action.is-active {
@@ -2399,14 +2399,14 @@
   padding: 0 var(--space-2);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--stone) 58%, transparent);
   font-family: var(--font-mono);
   font-size: 0.72rem;
 }
 
 .shell-topic-create-input::placeholder {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-topic-create-input:focus-visible {
@@ -2469,7 +2469,7 @@
   outline: none;
   border-color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .shell-topic-card-follow.is-active {
@@ -2483,7 +2483,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 800;
 }
 
@@ -2495,7 +2495,7 @@
   flex-wrap: wrap;
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-topic-card-unread {
@@ -2527,7 +2527,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.78rem;
 }
 
@@ -2547,7 +2547,7 @@
   place-items: center;
   height: 100%;
   padding: var(--space-7);
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 0.96rem;
@@ -2725,7 +2725,7 @@
   font-family: var(--font-sans);
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--washi);
+  color: var(--paper);
   letter-spacing: 0.01em;
   cursor: default;
   transition: color var(--dur) var(--ease);
@@ -2739,7 +2739,7 @@
 .shell-msg-ts {
   font-family: var(--font-mono);
   font-size: 0.62rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   letter-spacing: 0.08em;
   flex: none;
   opacity: 0.78;
@@ -2748,7 +2748,7 @@
 .shell-msg-text {
   font-size: 0.91rem;
   line-height: 1.56;
-  color: var(--washi);
+  color: var(--paper);
   word-break: break-word;
   overflow-wrap: break-word;
 }
@@ -2766,7 +2766,7 @@
 .shell-msg-text a:hover,
 .shell-msg-text a:focus-visible,
 .shell-thread-msg-text a:hover {
-  color: var(--washi);
+  color: var(--paper);
   border-bottom-color: var(--lapis-bright);
 }
 
@@ -2797,13 +2797,13 @@
 }
 
 .shell-msg-text--deleted {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-style: italic;
   font-size: 0.84rem;
 }
 
 .shell-msg-text--action {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-style: italic;
 }
 
@@ -2827,7 +2827,7 @@
   align-self: center;
   font-family: var(--font-mono);
   font-size: 0.58rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   letter-spacing: 0.04em;
   text-align: right;
   padding-right: 2px;
@@ -2852,7 +2852,7 @@
   margin-inline: auto;
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   letter-spacing: 0.03em;
   display: flex;
   align-items: center;
@@ -2860,7 +2860,7 @@
   transition: color var(--dur) var(--ease);
 }
 
-.shell-msg-system:hover { color: var(--washi-dim); }
+.shell-msg-system:hover { color: var(--paper-dim); }
 
 .shell-msg-system::before {
   content: '';
@@ -2933,7 +2933,7 @@
 }
 
 .shell-since-digest__headline {
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-serif);
   font-size: 0.92rem;
 }
@@ -2943,7 +2943,7 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-family: var(--font-mono);
   font-size: 0.68rem;
 }
@@ -2965,7 +2965,7 @@
   margin: var(--space-3) auto var(--space-4);
   padding: var(--space-3) 0;
   border-block: 1px solid color-mix(in oklab, var(--seam) 62%, transparent);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .shell-reader-memory__kicker {
@@ -2990,7 +2990,7 @@
 }
 
 .shell-reader-memory__body strong {
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-sans);
   font-size: 0.9rem;
 }
@@ -2998,14 +2998,14 @@
 .shell-reader-memory__body span:not(:first-of-type)::before {
   content: '/';
   margin-right: 0.7rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-reader-memory__voices span {
   padding: 2px 7px;
   border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: 0.66rem;
 }
@@ -3036,7 +3036,7 @@
 }
 
 .shell-reader-memory__review-meta {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-reader-memory__review-source {
@@ -3055,7 +3055,7 @@
 .shell-reader-memory__review-preview {
   min-width: 0;
   overflow: hidden;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.74rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3070,7 +3070,7 @@
 }
 
 .shell-reader-memory__trail-label {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 900;
@@ -3095,7 +3095,7 @@
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 24%, var(--seam));
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--lapis-deep) 11%, transparent);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -3104,7 +3104,7 @@
 .shell-reader-memory__trail-item:hover,
 .shell-reader-memory__trail-item:focus-visible {
   border-color: color-mix(in oklab, var(--lapis-bright) 52%, transparent);
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .shell-reader-memory__trail-item strong,
@@ -3120,7 +3120,7 @@
 }
 
 .shell-reader-memory__trail-item strong {
-  color: var(--washi);
+  color: var(--paper);
   font-weight: 800;
 }
 
@@ -3141,7 +3141,7 @@
 }
 
 .shell-reader-memory__peers-label {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 900;
@@ -3167,7 +3167,7 @@
   border: 1px solid color-mix(in oklab, var(--gold) 28%, var(--seam));
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--gold) 7%, transparent);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -3176,13 +3176,13 @@
 .shell-reader-memory__peer-item:hover,
 .shell-reader-memory__peer-item:focus-visible {
   border-color: color-mix(in oklab, var(--gold-bright) 52%, transparent);
-  color: var(--washi);
+  color: var(--paper);
   outline: 2px solid var(--lapis-bright);
   outline-offset: 2px;
 }
 
 .shell-reader-memory__peer-item strong {
-  color: var(--washi);
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 800;
@@ -3209,7 +3209,7 @@
   border: 1px solid color-mix(in oklab, var(--seam) 68%, transparent);
   border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--ink) 18%, transparent);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-family: var(--font-mono);
   font-size: 0.66rem;
   font-weight: 800;
@@ -3219,7 +3219,7 @@
 .shell-reader-memory__nav button:hover,
 .shell-reader-memory__nav button:focus-visible {
   border-color: color-mix(in oklab, var(--lapis-bright) 52%, transparent);
-  color: var(--washi);
+  color: var(--paper);
 }
 
 @media (max-width: 720px) {
@@ -3271,7 +3271,7 @@
   border-left: 2px solid var(--seam);
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
   font-size: 0.78rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3280,7 +3280,7 @@
 }
 
 .shell-msg-reply:hover {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   border-left-color: var(--lapis-bright);
 }
 
@@ -3338,7 +3338,7 @@
   border-radius: var(--r-pill);
   cursor: pointer;
   font-size: 0.82rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--stone-2) 34%, transparent);
   /* Gentle scale-in when a pill appears — quick enough to feel like feedback
      on react, calm enough not to be busy when a channel's reactions mount. */
@@ -3362,7 +3362,7 @@
 .shell-reaction:hover {
   border-color: var(--seam);
   background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
-  color: var(--washi);
+  color: var(--paper);
   transform: translateY(-1px);
 }
 
@@ -3374,7 +3374,7 @@
 .shell-reaction--mine {
   border-color: var(--seam);
   background: color-mix(in oklab, var(--lapis) 18%, transparent);
-  color: var(--washi);
+  color: var(--paper);
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent);
 }
 
@@ -3396,7 +3396,7 @@
   font-family: var(--font-mono);
   font-size: 0.64rem;
   font-weight: 700;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-msg-actions {
@@ -3434,7 +3434,7 @@
   font-size: 0.62rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   background: color-mix(in oklab, var(--stone-2) 28%, transparent);
   transition:
     color var(--dur) var(--ease),
@@ -3544,7 +3544,7 @@
   padding: var(--space-2);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--stone-2) 38%, transparent);
 }
 
@@ -3558,7 +3558,7 @@
   padding: var(--space-1) var(--space-2);
   border: 1px solid color-mix(in oklab, var(--lapis) 34%, var(--seam-faint));
   border-radius: var(--r-md);
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--lapis-deep) 16%, var(--stone-2));
 }
 
@@ -3576,7 +3576,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.75rem;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .shell-composer-topic-clear {
@@ -3587,13 +3587,13 @@
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   cursor: pointer;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   background: transparent;
   line-height: 1;
 }
 
 .shell-composer-topic-clear:hover {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--seam-faint);
   background: color-mix(in oklab, var(--stone-2) 48%, transparent);
 }
@@ -3621,7 +3621,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.78rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .shell-composer-context-close {
@@ -3632,13 +3632,13 @@
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   cursor: pointer;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   background: transparent;
   line-height: 1;
 }
 
 .shell-composer-context-close:hover {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--seam);
   background: color-mix(in oklab, var(--stone-2) 48%, transparent);
 }
@@ -3690,7 +3690,7 @@
   font-size: 0.56rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-attachment-meta {
@@ -3704,18 +3704,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.78rem;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .shell-attachment-size,
 .shell-attachment-error {
   font-family: var(--font-mono);
   font-size: 0.6rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-attachment-error {
-  color: color-mix(in oklab, var(--shu) 70%, var(--washi));
+  color: color-mix(in oklab, var(--shu) 70%, var(--paper));
 }
 
 .shell-attachment-progress {
@@ -3732,13 +3732,13 @@
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   cursor: pointer;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   background: transparent;
   line-height: 1;
 }
 
 .shell-attachment-remove:hover:not(:disabled) {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--seam);
 }
 
@@ -3780,13 +3780,13 @@
   border-radius: var(--r-sm);
   cursor: pointer;
   text-align: left;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
 }
 
 .shell-command-item:hover,
 .shell-command-item--active {
-  color: var(--washi);
+  color: var(--paper);
   border-color: var(--seam-faint);
   background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
 }
@@ -3815,7 +3815,7 @@
   padding: 0 var(--space-2);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--ink) 64%, var(--stone-2));
 }
 
@@ -3860,7 +3860,7 @@
   font-size: 0.7rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-schedule-presets {
@@ -3877,7 +3877,7 @@
   border-radius: var(--r-sm);
   cursor: pointer;
   text-align: left;
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--ink) 40%, var(--stone-2));
 }
 
@@ -3890,7 +3890,7 @@
 
 .shell-schedule-custom-label {
   font-size: 0.72rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .shell-schedule-custom {
@@ -3905,7 +3905,7 @@
   padding: 0 var(--space-2);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
-  color: var(--washi);
+  color: var(--paper);
   background: color-mix(in oklab, var(--ink) 64%, var(--stone-2));
 }
 
@@ -3932,7 +3932,7 @@
 
 /* ── Scheduled queue Sheet list ── */
 .shell-scheduled-empty {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .shell-scheduled-list {
@@ -3967,7 +3967,7 @@
 
 .shell-scheduled-text {
   margin: 0;
-  color: var(--washi);
+  color: var(--paper);
   overflow-wrap: anywhere;
 }
 
@@ -3978,13 +3978,13 @@
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   cursor: pointer;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
 }
 
 .shell-scheduled-cancel:hover {
   border-color: var(--danger, #e5484d);
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .shell-typing-indicator {
@@ -3994,7 +3994,7 @@
   min-height: 18px;
   margin: 0 var(--space-4) calc(var(--space-1) * -1);
   padding-top: 2px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.66rem;
   letter-spacing: 0.05em;
@@ -4066,14 +4066,14 @@
   font-family: var(--font-sans);
   font-size: 0.91rem;
   line-height: 1.52;
-  color: var(--washi);
+  color: var(--paper);
   background: transparent;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--seam-faint) transparent;
 }
 
-.shell-composer-textarea::placeholder { color: var(--washi-mute); }
+.shell-composer-textarea::placeholder { color: var(--paper-mute); }
 
 .shell-composer-tool {
   flex: none;
@@ -4085,7 +4085,7 @@
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
   cursor: pointer;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: transparent;
   transition:
     color var(--dur) var(--ease),
@@ -4101,7 +4101,7 @@
 }
 
 .shell-composer-tool:disabled {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -4149,7 +4149,7 @@
 }
 
 .shell-composer-send:disabled {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   border-color: var(--seam-faint);
   background: transparent;
   cursor: not-allowed;
@@ -4164,28 +4164,28 @@
   margin: 0 0 var(--space-2);
   padding: 6px 10px;
   border-radius: 8px;
-  border: 1px solid color-mix(in oklab, var(--washi) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--paper) 14%, transparent);
   background: color-mix(in oklab, var(--ink) 55%, transparent);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.04em;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 .shell-composer-outbox--offline {
-  border-color: color-mix(in oklab, var(--washi) 18%, transparent);
-  color: var(--washi-mute);
+  border-color: color-mix(in oklab, var(--paper) 18%, transparent);
+  color: var(--paper-mute);
 }
 .shell-composer-outbox--queued {
   border-color: color-mix(in oklab, var(--lapis-bright) 35%, transparent);
-  color: color-mix(in oklab, var(--lapis-bright) 70%, var(--washi));
+  color: color-mix(in oklab, var(--lapis-bright) 70%, var(--paper));
 }
 .shell-composer-outbox--warning {
   border-color: color-mix(in oklab, var(--warn) 40%, transparent);
-  color: color-mix(in oklab, var(--warn) 75%, var(--washi));
+  color: color-mix(in oklab, var(--warn) 75%, var(--paper));
 }
 .shell-composer-outbox--error {
   border-color: color-mix(in oklab, var(--shu) 45%, transparent);
-  color: color-mix(in oklab, var(--shu) 72%, var(--washi));
+  color: color-mix(in oklab, var(--shu) 72%, var(--paper));
   background: color-mix(in oklab, var(--shu) 10%, var(--ink));
 }
 .shell-composer-outbox-label {
@@ -4214,7 +4214,7 @@
   margin: var(--space-2) 0 0;
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  color: color-mix(in oklab, var(--shu) 72%, var(--washi));
+  color: color-mix(in oklab, var(--shu) 72%, var(--paper));
 }
 
 .shell-composer-hint {
@@ -4223,7 +4223,7 @@
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.07em;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
 }
@@ -4304,7 +4304,7 @@
 }
 
 .shell-members-count {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-size: 0.62rem;
 }
 
@@ -4348,7 +4348,7 @@
   font-size: 0.6rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 /* Member groups are real lists for assistive tech; strip the default list
@@ -4420,7 +4420,7 @@
 }
 
 .shell-member-presence--away {
-  background: var(--washi-mute);
+  background: var(--paper-mute);
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--stone-2) 80%, var(--ink));
 }
 
@@ -4453,15 +4453,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.84rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   transition: color var(--dur) var(--ease);
 }
 
-.shell-member-row:hover .shell-member-nick { color: var(--washi); }
+.shell-member-row:hover .shell-member-nick { color: var(--paper); }
 
 .shell-member-row--away { opacity: 0.66; }
 .shell-member-row--away:hover { opacity: 1; }
-.shell-member-nick--away { color: var(--washi-mute); font-style: italic; }
+.shell-member-nick--away { color: var(--paper-mute); font-style: italic; }
 
 /* Dense roster: forced-colors away signal (SC 1.4.1). Opacity dimming and the
    presence-dot colour alone vanish under High Contrast — keep italic nick and
@@ -4541,7 +4541,7 @@
 
 /* Half-op — deliberately muted, but still distinct from an unbadged member. */
 .shell-role-badge--halfop {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   border-color: var(--seam);
   background: color-mix(in oklab, var(--stone-2) 38%, transparent);
 }
@@ -4586,7 +4586,7 @@
   font-family: var(--font-mono);
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--washi);
+  color: var(--paper);
   letter-spacing: 0.06em;
   overflow-wrap: anywhere;
 }
@@ -4594,7 +4594,7 @@
 .shell-member-card-account {
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   overflow-wrap: anywhere;
 }
 
@@ -4672,7 +4672,7 @@
   flex: 1;
   display: grid;
   place-items: center;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   text-align: center;
   padding: var(--space-7);
   background:
@@ -4699,7 +4699,7 @@
   font-family: var(--font-serif);
   font-size: 1rem;
   font-style: italic;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   max-width: 36ch;
   line-height: 1.55;
   margin: 0 auto;
@@ -4763,7 +4763,7 @@
   font-size: 0.78rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--stone-2) 26%, transparent);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
@@ -4794,7 +4794,7 @@
   font-size: 0.62rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .shell-home-recent-chips {
   display: flex;
@@ -4805,7 +4805,7 @@
 .shell-home-recent-chip {
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   background: color-mix(in oklab, var(--stone-2) 20%, transparent);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-pill);
@@ -4837,7 +4837,7 @@
   margin-bottom: var(--space-1);
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 .shell-thread-msg-from { color: var(--lapis-bright); }
@@ -4845,7 +4845,7 @@
 .shell-thread-msg-text {
   font-size: 0.88rem;
   line-height: 1.5;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 /* ── Mobile layout ── */
@@ -5190,7 +5190,7 @@
     border-top: 1px solid var(--seam);
     box-shadow:
       0 -22px 54px -34px color-mix(in oklab, var(--ink) 92%, transparent),
-      inset 0 1px 0 color-mix(in oklab, var(--washi) 7%, transparent);
+      inset 0 1px 0 color-mix(in oklab, var(--paper) 7%, transparent);
     -webkit-backdrop-filter: blur(18px) saturate(1.2);
     backdrop-filter: blur(18px) saturate(1.2);
   }
@@ -5206,7 +5206,7 @@
     gap: 2px;
     min-height: 50px;
     padding: 4px 3px 6px;
-    color: var(--washi-mute);
+    color: var(--paper-mute);
     font-family: var(--font-mono);
     font-size: 0.52rem;
     letter-spacing: 0.08em;
@@ -5853,7 +5853,7 @@
   font-family: var(--font-mono);
   font-size: 0.82em;
   line-height: 1.55;
-  color: var(--washi);
+  color: var(--paper);
   overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--seam-faint) transparent;
@@ -5882,7 +5882,7 @@
   font-size: 0.64em;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   pointer-events: none;
   user-select: none;
 }
@@ -5895,7 +5895,7 @@
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
   background: color-mix(in oklab, var(--lapis-deep) 10%, transparent);
   font-style: italic;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 /* Spoiler — ||...|| */
@@ -5919,7 +5919,7 @@
 }
 
 .shell-msg-spoiler-label {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.72em;
   letter-spacing: 0.08em;
@@ -5928,7 +5928,7 @@
 
 .shell-msg-spoiler--revealed {
   background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
-  color: var(--washi);
+  color: var(--paper);
 }
 
 /* Explicit link class (separate from .shell-msg-text a for specificity) */
@@ -5941,7 +5941,7 @@
 
 .shell-msg-link:hover,
 .shell-msg-link:focus-visible {
-  color: var(--washi);
+  color: var(--paper);
   border-bottom-color: var(--lapis-bright);
 }
 
@@ -5992,7 +5992,7 @@
   border: 1px dashed color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--lapis) 8%, var(--stone));
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font: 700 0.72rem var(--font-mono);
   text-align: left;
   cursor: pointer;
@@ -6000,7 +6000,7 @@
 
 .shell-msg-media-consent small {
   overflow: hidden;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font: 500 0.64rem var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6063,13 +6063,13 @@
 }
 
 .shell-msg-blockkit-title {
-  color: var(--washi);
+  color: var(--paper);
   font-size: 0.84rem;
   font-weight: 700;
 }
 
 .shell-msg-blockkit-text {
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   font-size: 0.78rem;
 }
 
@@ -6085,7 +6085,7 @@
 }
 
 .shell-msg-blockkit-fields dt {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 800;
@@ -6095,7 +6095,7 @@
 .shell-msg-blockkit-fields dd {
   margin: 2px 0 0;
   overflow: hidden;
-  color: var(--washi);
+  color: var(--paper);
   font-size: 0.76rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6111,7 +6111,7 @@
   display: grid;
   gap: 3px;
   min-width: 148px;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 800;
@@ -6123,7 +6123,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--ink) 66%, var(--stone));
-  color: var(--washi);
+  color: var(--paper);
   font: 0.76rem var(--font-sans);
 }
 
@@ -6140,7 +6140,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--lapis) 13%, var(--stone));
-  color: var(--washi);
+  color: var(--paper);
   font: 700 0.74rem var(--font-mono);
   text-decoration: none;
   cursor: pointer;
@@ -6154,7 +6154,7 @@
 .shell-msg-blockkit-actions button[data-copied='true'] {
   border-color: color-mix(in oklab, var(--ok) 62%, var(--line));
   background: color-mix(in oklab, var(--ok) 18%, var(--stone));
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .shell-msg-blockkit-actions a:hover,
@@ -6166,7 +6166,7 @@
 }
 
 .shell-msg-blockkit-hint {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-family: var(--font-mono);
   font-size: 0.62rem;
 }
@@ -6188,7 +6188,7 @@
 }
 
 .shell-msg-blockkit-confirm__preview dt {
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font: 800 0.66rem var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -6209,7 +6209,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--ink) 72%, var(--stone));
-  color: var(--washi);
+  color: var(--paper);
   font: 0.78rem/1.45 var(--font-mono);
   white-space: pre-wrap;
 }
@@ -6232,7 +6232,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   background: var(--stone-2);
-  color: var(--washi);
+  color: var(--paper);
   font: 700 0.76rem var(--font-mono);
   cursor: pointer;
 }
@@ -6246,7 +6246,7 @@
 .shell-msg-blockkit-confirm__actions .shell-msg-blockkit-confirm__send {
   border-color: color-mix(in oklab, var(--gold-bright) 66%, var(--line));
   background: color-mix(in oklab, var(--gold-bright) 16%, var(--stone));
-  color: var(--washi);
+  color: var(--paper);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6329,7 +6329,7 @@
   font-size: 0.66rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 .shell-msg-preview-title {
   font-size: 0.86rem;
@@ -6343,7 +6343,7 @@
 .shell-msg-preview-link:hover .shell-msg-preview-title { text-decoration: underline; }
 .shell-msg-preview-desc {
   font-size: 0.78rem;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -6367,7 +6367,7 @@
   border: 1px dashed color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
   border-radius: 8px;
   background: color-mix(in oklab, var(--lapis) 8%, var(--ink));
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font: 700 0.62rem/1.25 var(--font-mono);
   cursor: pointer;
 }
@@ -6389,11 +6389,11 @@
   font-family: var(--font-mono);
   font-size: 0.6rem;
   letter-spacing: 0.06em;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   opacity: 0.85;
   transition: color var(--dur) var(--ease);
 }
-.shell-channel-item:hover .shell-channel-time { color: var(--washi-dim); }
+.shell-channel-item:hover .shell-channel-time { color: var(--paper-dim); }
 .shell-channel-item--active .shell-channel-time { color: var(--lapis-bright); opacity: 1; }
 
 /* ── Professional scrollbars across the shell ──────────────────────────── */
@@ -6454,7 +6454,7 @@
   font-weight: 500;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   padding: 2px 12px;
   border: 1px solid var(--line-faint);
   border-radius: 999px;
@@ -6488,14 +6488,14 @@
   font-family: var(--font-display);
   font-size: 1.5rem;
   letter-spacing: 0.02em;
-  color: var(--washi);
+  color: var(--paper);
 }
 .shell-channel-intro-note {
   margin: 0 0 var(--space-2);
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 0.9rem;
-  color: var(--washi-mute);
+  color: var(--paper-mute);
 }
 
 
@@ -6508,7 +6508,7 @@
 }
 .shell-msg-system[data-event='part']::before,
 .shell-msg-system[data-event='quit']::before {
-  background: var(--washi-mute);
+  background: var(--paper-mute);
   box-shadow: none;
 }
 
@@ -6538,7 +6538,7 @@
   padding-left: 0 !important;
 }
 .shell-thread-indicator:hover {
-  color: var(--washi) !important;
+  color: var(--paper) !important;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -6556,7 +6556,7 @@
 .shell-msg-pending .shell-msg-ts::after,
 .shell-msg-pending .shell-msg-cont-ts::after {
   content: ' · queued';
-  color: var(--washi-mute);
+  color: var(--paper-mute);
   font-style: italic;
 }
 @keyframes shell-msg-echo-in {
@@ -6583,7 +6583,7 @@
   height: 16px;
   margin-left: 0.6rem;
   padding-left: 0.6rem;
-  border-left: 1px solid var(--seam, color-mix(in oklab, var(--washi, #cde) 12%, transparent));
+  border-left: 1px solid var(--seam, color-mix(in oklab, var(--paper, #cde) 12%, transparent));
   flex: none;
 }
 /* Fixed track height + scaleY (compositor-only) instead of animating `height`
@@ -6593,7 +6593,7 @@
   width: 2px;
   height: 16px;
   border-radius: 1px;
-  background: color-mix(in oklab, var(--washi, #9ab) 22%, transparent);
+  background: color-mix(in oklab, var(--paper, #9ab) 22%, transparent);
   transform: scaleY(calc(0.1875 + var(--heat, 0) * 0.8125));
   transform-origin: bottom;
   transition:
@@ -6641,14 +6641,14 @@
 .shell-event-title {
   font-weight: 600;
   font-size: 0.9rem;
-  color: var(--washi, #dfe);
+  color: var(--paper, #dfe);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .shell-event-when {
   font-size: 0.74rem;
-  color: var(--washi-dim, #9ab);
+  color: var(--paper-dim, #9ab);
 }
 .shell-event-when strong { color: var(--lapis-bright, #6fc3e8); font-weight: 600; }
 .shell-event-line--live .shell-event-when strong { color: var(--shu, #ff6f61); }
@@ -6672,12 +6672,12 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  color: var(--washi-mute, #6a8);
+  color: var(--paper-mute, #6a8);
   font-size: 1.05rem;
   line-height: 1;
   transition: background 150ms ease, color 150ms ease;
 }
 .shell-event-clear:hover {
-  background: color-mix(in oklab, var(--washi, #cde) 14%, transparent);
-  color: var(--washi, #fff);
+  background: color-mix(in oklab, var(--paper, #cde) 14%, transparent);
+  color: var(--paper, #fff);
 }

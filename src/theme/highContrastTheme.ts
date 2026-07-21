@@ -51,9 +51,9 @@ interface HighContrastPair {
  * WCAG rung: body/secondary text to AAA, metadata and UI accents to body AA.
  */
 export const HIGH_CONTRAST_PAIRS: readonly HighContrastPair[] = [
-  { fg: '--washi', grounds: TEXT_GROUNDS, target: AAA },
-  { fg: '--washi-dim', grounds: TEXT_GROUNDS, target: AAA },
-  { fg: '--washi-mute', grounds: TEXT_GROUNDS, target: AA_BODY },
+  { fg: '--paper', grounds: TEXT_GROUNDS, target: AAA },
+  { fg: '--paper-dim', grounds: TEXT_GROUNDS, target: AAA },
+  { fg: '--paper-mute', grounds: TEXT_GROUNDS, target: AA_BODY },
   { fg: '--lapis-bright', grounds: ACCENT_GROUND, target: AAA },
   { fg: '--gold-bright', grounds: ACCENT_GROUND, target: AA_BODY },
   { fg: '--ok', grounds: ACCENT_GROUND, target: AA_BODY },

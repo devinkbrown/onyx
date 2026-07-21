@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*
- * MooringGroup.ts — Multi-party TSUMUGI group key for encrypted channel media.
+ * MooringGroup.ts — Multi-party group key for encrypted channel media.
  *
  * The channel creator generates a 256-bit AES-GCM group key, encrypts it
  * pairwise for each participant using their MooringSession, and distributes it.
- * All subsequent TSUMUGI_DATA frames use the single group key instead of
+ * All subsequent media E2EE frames use the single group key instead of
  * per-peer keys, reducing the number of crypto operations by O(N).
  *
  * Usage:

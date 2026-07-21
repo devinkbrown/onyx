@@ -44,19 +44,19 @@ describe('OKLCH ⇄ sRGB', () => {
 describe('generatePalette', () => {
   it('produces a full token set with every accent + ground', () => {
     const t = generatePalette(DEFAULT_SEED);
-    for (const key of ['--ink', '--stone', '--lapis', '--lapis-bright', '--gold', '--shu', '--washi', '--ok', '--seam']) {
+    for (const key of ['--ink', '--stone', '--lapis', '--lapis-bright', '--gold', '--shu', '--paper', '--ok', '--seam']) {
       expect(t[key], key).toBeTruthy();
     }
   });
 
-  it('guarantees washi passes AA on the ground it generates (dark + light)', () => {
+  it('guarantees paper passes AA on the ground it generates (dark + light)', () => {
     for (const scheme of ['dark', 'light'] as const) {
       const t = generatePalette({ ...DEFAULT_SEED, scheme, primaryHue: 232 });
-      const washi = parseHex(t['--washi']!)!;
+      const paper = parseHex(t['--paper']!)!;
       const ink = parseHex(t['--ink']!)!;
       const stone = parseHex(t['--stone']!)!;
-      expect(contrastRatio(washi, ink)).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(washi, stone)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(paper, ink)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(paper, stone)).toBeGreaterThanOrEqual(4.5);
     }
   });
 
@@ -97,7 +97,7 @@ describe('generatePalette', () => {
     // text hues are derived by adding a warmth shift (±12° ground, ±18° text)
     // AFTER the snap — so they must be re-checked against the ban, or a warm
     // seed near the edge drags the neutral grounds/text back into the arc.
-    const keys = ['--ink', '--stone', '--stone-2', '--stone-3', '--stone-line', '--washi', '--washi-dim', '--washi-mute'];
+    const keys = ['--ink', '--stone', '--stone-2', '--stone-3', '--stone-line', '--paper', '--paper-dim', '--paper-mute'];
     // Worst cases: primary snaps to the band edge, then a strong warmth nudge
     // (±12° ground / ±18° text) would otherwise carry the derived hues 3–11°
     // INTO the arc at chroma well past the 0.03 "meaningful colour" line.
@@ -152,19 +152,19 @@ describe('adjustPalette', () => {
 
   it('does not push text below AA when raising contrast', () => {
     const out = adjustPalette(base, { contrast: 0.5 }, 'dark');
-    const washi = parseHex(out['--washi']!)!;
+    const paper = parseHex(out['--paper']!)!;
     const ink = parseHex(out['--ink']!)!;
-    expect(contrastRatio(washi, ink)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(paper, ink)).toBeGreaterThanOrEqual(4.5);
   });
 });
 
 describe('enforceAA', () => {
   it('repairs a deliberately low-contrast text token', () => {
-    const broken = { ...generatePalette(DEFAULT_SEED), '--washi': '#232a33' }; // too dark on dark ink
+    const broken = { ...generatePalette(DEFAULT_SEED), '--paper': '#232a33' }; // too dark on dark ink
     const fixed = enforceAA(broken, 'dark');
-    const washi = parseHex(fixed['--washi']!)!;
+    const paper = parseHex(fixed['--paper']!)!;
     const ink = parseHex(fixed['--ink']!)!;
-    expect(contrastRatio(washi, ink)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(paper, ink)).toBeGreaterThanOrEqual(4.5);
   });
 });
 

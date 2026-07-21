@@ -25,8 +25,8 @@ import {
   MAX_MOTD_TEXT_LENGTH,
   MAX_SERVER_AUX_TEXT_LENGTH,
   MAX_SERVER_RULE_LINES,
-  MAX_TEGAMI_CONVERSATIONS,
-  MAX_TEGAMI_COUNT,
+  MAX_OFFLINE_MEMO_CONVERSATIONS,
+  MAX_OFFLINE_MEMO_COUNT,
   MAX_WHOIS_CACHE_ENTRIES,
   MAX_WHOIS_CHANNELS,
   store,
@@ -252,35 +252,35 @@ describe('live inbound message bounds', () => {
     expect(stored?.replyTo).toBeUndefined();
   });
 
-  it('applies vault field bounds to offline TEGAMI delivery', () => {
-    feed(`@msgid=${'m'.repeat(MAX_VAULT_MESSAGE_ID_LENGTH + 1)} :eshmaki.me NOTE TEGAMI :from alice :${'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH + 8)}`);
+  it('applies vault field bounds to offline memo delivery', () => {
+    feed(`@msgid=${'m'.repeat(MAX_VAULT_MESSAGE_ID_LENGTH + 1)} :eshmaki.me NOTE MEMO :from alice :${'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH + 8)}`);
 
     const stored = store.getState().dms.get('alice')?.messages[0];
     expect(stored?.text).toHaveLength(MAX_VAULT_MESSAGE_TEXT_LENGTH);
     expect(stored?.id).toBeTruthy();
     expect(stored?.id.length).toBeLessThanOrEqual(MAX_VAULT_MESSAGE_ID_LENGTH);
-    expect(store.getState().tegami.get('alice')).toEqual({ count: 1, firstMsgId: stored?.id });
+    expect(store.getState().offlineMemo.get('alice')).toEqual({ count: 1, firstMsgId: stored?.id });
 
-    feed(`:eshmaki.me NOTE TEGAMI :from ${'a'.repeat(MAX_VAULT_SENDER_LENGTH + 1)} :rejected`);
+    feed(`:eshmaki.me NOTE MEMO :from ${'a'.repeat(MAX_VAULT_SENDER_LENGTH + 1)} :rejected`);
     expect(store.getState().dms.size).toBe(1);
-    expect(store.getState().tegami.size).toBe(1);
+    expect(store.getState().offlineMemo.size).toBe(1);
   });
 
   it('caps offline aggregates and repairs an oversized legacy aggregate map', () => {
-    feed(':eshmaki.me NOTE TEGAMI :from alice :first');
+    feed(':eshmaki.me NOTE MEMO :from alice :first');
     store.setState({
-      tegami: new Map([
+      offlineMemo: new Map([
         ...Array.from(
-          { length: MAX_TEGAMI_CONVERSATIONS + 8 },
+          { length: MAX_OFFLINE_MEMO_CONVERSATIONS + 8 },
           (_, index) => [`legacy-${index}`, { count: 1, firstMsgId: `old-${index}` }] as const,
         ),
-        ['alice', { count: MAX_TEGAMI_COUNT, firstMsgId: 'first' }],
+        ['alice', { count: MAX_OFFLINE_MEMO_COUNT, firstMsgId: 'first' }],
       ]),
     });
 
-    feed(':eshmaki.me NOTE TEGAMI :from alice :again');
-    expect(store.getState().tegami.size).toBe(MAX_TEGAMI_CONVERSATIONS);
-    expect(store.getState().tegami.get('alice')?.count).toBe(MAX_TEGAMI_COUNT);
+    feed(':eshmaki.me NOTE MEMO :from alice :again');
+    expect(store.getState().offlineMemo.size).toBe(MAX_OFFLINE_MEMO_CONVERSATIONS);
+    expect(store.getState().offlineMemo.get('alice')?.count).toBe(MAX_OFFLINE_MEMO_COUNT);
   });
 
   it('bounds unsolicited DM conversations without evicting unread rows', () => {

@@ -393,7 +393,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
         || current.client !== clientAtStart
         || currentAccount !== accountAtStart
       ) return;
-      current.e2eeKeyAdd(deviceId, 'tsumugi-p256', keys.publicB64);
+      current.e2eeKeyAdd(deviceId, 'onyx-p256', keys.publicB64);
     } finally {
       if (!disposed && epoch === e2eePublishEpoch) setE2eeDeviceBusy(false);
     }

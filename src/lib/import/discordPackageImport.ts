@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * discordPackageImport.ts — import Discord's OFFICIAL self-serve data package
- * (Roadmap v1.0 "Torii"). Unlike {@link parseDiscordExport} (which reads a
+ * (product-entry roadmap). Unlike {@link parseDiscordExport} (which reads a
  * DiscordChatExporter run and needs that third-party tool), this reads the
  * export EVERY Discord user can request themselves with no tooling:
  * Settings → Privacy & Safety → "Request all of my Data".

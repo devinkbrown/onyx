@@ -86,7 +86,7 @@ describe('HomeView cold-return recap', () => {
       {
         target: 'mira',
         messages: [{
-          ...message('encrypted-1', 'TSUMUGI1 opaque-ciphertext', 3_000, 'mira'),
+          ...message('encrypted-1', 'ONYXDM1 opaque-ciphertext', 3_000, 'mira'),
           target: 'mira',
         }],
       },

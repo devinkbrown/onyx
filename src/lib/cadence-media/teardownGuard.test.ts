@@ -14,7 +14,7 @@ describe('TeardownGuard — async write-back lifetime fencing', () => {
     const g = new TeardownGuard();
     const before = g.capture();
     g.bump();
-    // A stale async continuation (e.g. a TSUMUGI group-key import that resolves
+    // A stale async continuation (e.g. a media E2EE group-key import that resolves
     // after hangup) must not be allowed to write back into the engine.
     expect(g.isCurrent(before)).toBe(false);
   });

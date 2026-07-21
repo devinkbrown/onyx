@@ -56,7 +56,7 @@ async function peerSeal(peer: Awaited<ReturnType<typeof makePeer>>, myPublicB64:
   const body = new Uint8Array(12 + ct.byteLength);
   body.set(nonce, 0);
   body.set(new Uint8Array(ct), 12);
-  return `TSUMUGI1 ${toB64url(body)}`;
+  return `ONYXDM1 ${toB64url(body)}`;
 }
 
 async function putRawPin(account: string, value: unknown): Promise<void> {
@@ -131,7 +131,7 @@ describe('anti-MITM: a Byzantine node swaps the peer key mid-conversation', () =
     // first-contact body must stay locked AND must NOT establish a pin — else it
     // would block the real peer's later legitimate key.
     const impostor = await makePeer();
-    const garbage = `TSUMUGI1 ${toB64url(crypto.getRandomValues(new Uint8Array(60)))}`;
+    const garbage = `ONYXDM1 ${toB64url(crypto.getRandomValues(new Uint8Array(60)))}`;
     const out = await openDmTrusted('Alice', impostor.publicB64, garbage);
     expect(out.status).toBe('locked');
     expect(await pinnedPeerKey('Alice')).toBeNull(); // no pin poisoned

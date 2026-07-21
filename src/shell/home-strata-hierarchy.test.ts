@@ -29,7 +29,7 @@ function block(css: string, selector: string): string {
 describe('Home catch-up residual hierarchy (A9)', () => {
   it('demotes catch-up source with a real mute token (never --text-muted)', () => {
     const body = block(homeCss, '.home-catchup-source');
-    expect(body).toMatch(/var\(--washi-mute\)/);
+    expect(body).toMatch(/var\(--paper-mute\)/);
     expect(body).not.toMatch(/--text-muted|--fg-muted/);
     expect(homeCss).not.toMatch(/var\(--text-muted/);
     expect(homeCss).not.toMatch(/var\(--fg-muted/);
@@ -61,7 +61,7 @@ describe('Home catch-up residual hierarchy (A9)', () => {
 describe('Presence ribbon residual hierarchy (A8)', () => {
   it('defaults More trigger quieter than place chrome', () => {
     const more = block(shellCss, '.shell-ribbon-more-trigger');
-    expect(more).toMatch(/var\(--washi-mute\)/);
+    expect(more).toMatch(/var\(--paper-mute\)/);
   });
 
   it('keeps place chips (event/voice) on semantic accent seals', () => {

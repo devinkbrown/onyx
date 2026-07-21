@@ -73,7 +73,7 @@
   font-size: 1.05rem;
   font-weight: 400;
   letter-spacing: 0.01em;
-  color: var(--washi);
+  color: var(--paper);
 }
 
 .dm-keychange__peer {
@@ -86,7 +86,7 @@
   font-family: var(--font-sans);
   font-size: 0.82rem;
   line-height: 1.45;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 /* ── Actions ── */
@@ -135,14 +135,14 @@
 .dm-keychange__dismiss {
   border: 1px solid var(--line);
   background: transparent;
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 .dm-keychange__dismiss:hover,
 .dm-keychange__dismiss:focus-visible {
-  border-color: color-mix(in oklab, var(--washi) 24%, transparent);
-  color: var(--washi);
-  background: color-mix(in oklab, var(--washi) 8%, transparent);
+  border-color: color-mix(in oklab, var(--paper) 24%, transparent);
+  color: var(--paper);
+  background: color-mix(in oklab, var(--paper) 8%, transparent);
 }
 
 /* ── Safety-number comparison instrument ── */
@@ -176,9 +176,9 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   /* This label ("Current (trusted)" / "New (unverified)") is the PROGRAMMATIC
-     pinned-vs-pending distinction, so it must clear AA — --washi-mute lands at
-     3.36:1 on the column ground, --washi-dim at 6.95:1. */
-  color: var(--washi-dim);
+     pinned-vs-pending distinction, so it must clear AA — --paper-mute lands at
+     3.36:1 on the column ground, --paper-dim at 6.95:1. */
+  color: var(--paper-dim);
 }
 
 .dm-keychange__col[data-tone='pending'] .dm-keychange__col-label {
@@ -195,7 +195,7 @@
   font-family: var(--font-mono);
   font-size: 0.82rem;
   letter-spacing: 0.06em;
-  color: var(--washi);
+  color: var(--paper);
   font-variant-numeric: tabular-nums;
 }
 
@@ -204,7 +204,7 @@
   font-family: var(--font-mono);
   font-size: 0.76rem;
   /* Status text ("Computing…" / "unavailable") — AA on the column ground. */
-  color: var(--washi-dim);
+  color: var(--paper-dim);
 }
 
 /* ── Forced colors (Windows High Contrast) ──
