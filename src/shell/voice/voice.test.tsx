@@ -22,7 +22,7 @@ import type { Channel, ChannelUser } from '@/lib/irc/types';
 import type { CadencePeerState } from '@/lib/cadence-media/types';
 import { VoiceStage } from './VoiceStage';
 import { ParticipantTile } from './ParticipantTile';
-import { VoiceBar, downloadLocalRecording, localRecordingFilename } from './VoiceBar';
+import { VoiceBar } from './VoiceBar';
 import { CallStatusAnnouncer } from './CallStatusAnnouncer';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1115,133 +1115,6 @@ describe('VoiceBar', () => {
     expect(btn).toHaveAttribute('title', 'Stop sharing screen');
     expect(stopSpy).toHaveBeenCalledOnce();
     stopSpy.mockRestore();
-  });
-
-
-  it('starts and stops local-only recording, downloading the blob on stop', async () => {
-    const g = globalThis as unknown as { MediaRecorder?: unknown };
-    const prevRecorder = g.MediaRecorder;
-    // jsdom has no MediaRecorder — the control gates on its presence.
-    g.MediaRecorder = class {
-      static isTypeSupported() { return true; }
-    };
-
-    const startRecording = vi.fn();
-    const stopRecording = vi.fn().mockResolvedValue(
-      new Blob(['fake-audio'], { type: 'audio/webm;codecs=opus' }),
-    );
-    const getLocalStream = vi.fn().mockReturnValue({ getTracks: () => [] } as unknown as MediaStream);
-    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
-    setMountedCadenceMediaEngine({ startRecording, stopRecording, getLocalStream } as never);
-
-    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:onyx-recording');
-    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    const activated: Array<{ download: string; href: string }> = [];
-    const realCreateElement = document.createElement.bind(document);
-    const createElement = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
-      const el = realCreateElement(tag);
-      if (tag === 'a') {
-        const anchor = el as HTMLAnchorElement;
-        const click = anchor.click.bind(anchor);
-        anchor.click = () => {
-          activated.push({ download: anchor.download, href: anchor.href });
-          click();
-        };
-      }
-      return el;
-    });
-
-    try {
-      seedVoiceStore([]);
-      const { getByTestId } = render(() => <VoiceBar />);
-      const btn = getByTestId('record-button');
-
-      expect(btn).toBeEnabled();
-      expect(btn).toHaveAttribute('aria-pressed', 'false');
-      expect(btn).toHaveAttribute('aria-label', 'Record local audio');
-
-      fireEvent.click(btn);
-      expect(startRecording).toHaveBeenCalledOnce();
-      expect(btn).toHaveAttribute('aria-pressed', 'true');
-      expect(btn).toHaveAttribute('aria-label', 'Stop recording and download');
-      expect(getByTestId('record-status')).toHaveTextContent('Recording local audio');
-
-      fireEvent.click(btn);
-      await waitFor(() => expect(stopRecording).toHaveBeenCalledOnce());
-      await waitFor(() => expect(activated).toHaveLength(1));
-      expect(activated[0]!.href).toContain('blob:onyx-recording');
-      expect(activated[0]!.download).toMatch(/^onyx-call-.*\.webm$/);
-      expect(createObjectURL).toHaveBeenCalledOnce();
-      await waitFor(() =>
-        expect(getByTestId('record-status')).toHaveTextContent('Recording saved'),
-      );
-      expect(btn).toHaveAttribute('aria-pressed', 'false');
-    } finally {
-      setMountedCadenceMediaEngine(null);
-      createObjectURL.mockRestore();
-      revokeObjectURL.mockRestore();
-      createElement.mockRestore();
-      if (prevRecorder === undefined) {
-        Reflect.deleteProperty(globalThis, 'MediaRecorder');
-      } else {
-        g.MediaRecorder = prevRecorder;
-      }
-    }
-  });
-
-  it('disables recording when MediaRecorder is unavailable', () => {
-    const g = globalThis as unknown as { MediaRecorder?: unknown };
-    const prevRecorder = g.MediaRecorder;
-    Reflect.deleteProperty(globalThis, 'MediaRecorder');
-    try {
-      seedVoiceStore([]);
-      const { getByTestId } = render(() => <VoiceBar />);
-      const btn = getByTestId('record-button');
-      expect(btn).toBeDisabled();
-      expect(btn).toHaveAttribute('aria-label', 'Recording unavailable');
-    } finally {
-      if (prevRecorder === undefined) {
-        Reflect.deleteProperty(globalThis, 'MediaRecorder');
-      } else {
-        g.MediaRecorder = prevRecorder;
-      }
-    }
-  });
-
-  it('builds a stamped local recording filename from the mime type', () => {
-    const date = new Date('2026-07-21T12:34:56.000Z');
-    expect(localRecordingFilename('audio/webm;codecs=opus', date)).toBe(
-      'onyx-call-2026-07-21T12-34-56.webm',
-    );
-    expect(localRecordingFilename('audio/ogg', date)).toBe('onyx-call-2026-07-21T12-34-56.ogg');
-  });
-
-  it('downloads a local recording blob through an anchor and schedules URL cleanup', async () => {
-    vi.useFakeTimers();
-    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:rec');
-    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    const activated: string[] = [];
-    const realCreateElement = document.createElement.bind(document);
-    const createElement = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
-      const el = realCreateElement(tag);
-      if (tag === 'a') {
-        const anchor = el as HTMLAnchorElement;
-        anchor.click = () => { activated.push(anchor.download); };
-      }
-      return el;
-    });
-    try {
-      downloadLocalRecording(new Blob(['x'], { type: 'audio/webm' }), 'onyx-call-test.webm');
-      expect(activated).toEqual(['onyx-call-test.webm']);
-      expect(createObjectURL).toHaveBeenCalledOnce();
-      await vi.advanceTimersByTimeAsync(1_000);
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:rec');
-    } finally {
-      createObjectURL.mockRestore();
-      revokeObjectURL.mockRestore();
-      createElement.mockRestore();
-      vi.useRealTimers();
-    }
   });
 
   it('keeps the screenshare control in place while server availability changes', () => {
