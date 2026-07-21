@@ -9213,7 +9213,7 @@ export const store = createStore<OnyxState>()(
               // Live captions feed the CaptionsOverlay. Onyx Server fans out
               // complete utterances, so each caption line is final.
               if (mediaVerb === 'CAPTION' && typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('ocean:caption', {
+                window.dispatchEvent(new CustomEvent('onyx:caption', {
                   detail: { channel: capChannel, nick: capNick, text: capText, final: true },
                 }));
               }
@@ -9322,7 +9322,7 @@ export const store = createStore<OnyxState>()(
                 && _hasCaseInsensitive(get().voiceChannelParticipants.get(chKey), actor)
                 && typeof window !== 'undefined'
               ) {
-                window.dispatchEvent(new CustomEvent('ocean:voice-reaction', {
+                window.dispatchEvent(new CustomEvent('onyx:voice-reaction', {
                   detail: { emoji: arg, nick: actor },
                 }));
               }
@@ -15283,7 +15283,7 @@ export const store = createStore<OnyxState>()(
       const engine = getMountedCadenceMediaEngine();
       if (raised) {
         engine?.sendReaction('✋');
-        _dispatchVoiceEvent('ocean:voice-reaction', { nick: ourNick || 'you', emoji: '✋' });
+        _dispatchVoiceEvent('onyx:voice-reaction', { nick: ourNick || 'you', emoji: '✋' });
       }
     },
 
@@ -15309,7 +15309,7 @@ export const store = createStore<OnyxState>()(
       const { ourNick } = get();
       getMountedCadenceMediaEngine()?.sendReaction(trimmed);
       // Echo locally so the sender sees their own reaction float up immediately.
-      _dispatchVoiceEvent('ocean:voice-reaction', { nick: ourNick || 'you', emoji: trimmed });
+      _dispatchVoiceEvent('onyx:voice-reaction', { nick: ourNick || 'you', emoji: trimmed });
     },
 
     openVoiceSettings() {
@@ -15427,7 +15427,7 @@ export const store = createStore<OnyxState>()(
       client.sendRaw('MEDIA', 'JOIN', channel, mode === 'screen' ? 'screen' : 'video');
       client.sendRaw('MEDIA', 'OFFER', channel, 'cadencevox,cadencevis', 'transport=webrtc');
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('ocean:stream-start', {
+        window.dispatchEvent(new CustomEvent('onyx:stream-start', {
           detail: { channel, mode, quality },
         }));
       }
@@ -15441,7 +15441,7 @@ export const store = createStore<OnyxState>()(
       // MEDIA JOIN — no phantom `%%` channel to PART.
       client.sendRaw('MEDIA', 'LEAVE', channel);
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('ocean:stream-stop', {
+        window.dispatchEvent(new CustomEvent('onyx:stream-stop', {
           detail: { channel },
         }));
       }
@@ -15509,13 +15509,13 @@ subscribeVerifiedDeviceHistoryClear(() => {
 // ── ONYX-INTEGRATION: window event bridge (UI intent → live server action) ──
 // UI packages dispatch CustomEvents; the store owns the protocol side.
 if (typeof window !== 'undefined') {
-  window.addEventListener('ocean:channel-rename', (e: Event) => {
+  window.addEventListener('onyx:channel-rename', (e: Event) => {
     const d = (e as CustomEvent<{ channel?: string; newName?: string; reason?: string }>).detail;
     if (d?.channel && d?.newName) {
       store.getState().renameChannel(d.channel, d.newName, d.reason);
     }
   });
-  window.addEventListener('ocean:metadata-set', (e: Event) => {
+  window.addEventListener('onyx:metadata-set', (e: Event) => {
     const d = (e as CustomEvent<{ key?: string; value?: string | null }>).detail;
     if (d?.key) {
       store.getState().setOwnMetadata(d.key, d.value ?? null);

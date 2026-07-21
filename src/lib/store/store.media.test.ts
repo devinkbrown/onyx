@@ -263,14 +263,14 @@ describe('MEDIA live state (speaking / mute / hand / react) — drives the call 
     expect(store.getState().voice.raisedHands.has('alice')).toBe(false);
   });
 
-  it('REACT dispatches an ocean:voice-reaction event', () => {
+  it('REACT dispatches an onyx:voice-reaction event', () => {
     seedChannel('#root');
     feed(':eshmaki.me EVENT me MEDIA JOIN #root alice voice');
     const got: Array<{ emoji: string; nick: string }> = [];
     const h = (e: Event) => got.push((e as CustomEvent).detail);
-    window.addEventListener('ocean:voice-reaction', h);
+    window.addEventListener('onyx:voice-reaction', h);
     feed(':eshmaki.me EVENT me MEDIA REACT #root alice tada');
-    window.removeEventListener('ocean:voice-reaction', h);
+    window.removeEventListener('onyx:voice-reaction', h);
     expect(got).toEqual([{ emoji: 'tada', nick: 'alice' }]);
   });
 
@@ -325,14 +325,14 @@ describe('MEDIA live state (speaking / mute / hand / react) — drives the call 
     seedChannel('#root');
     const got: Array<{ emoji: string; nick: string }> = [];
     const handler = (event: Event) => got.push((event as CustomEvent).detail);
-    window.addEventListener('ocean:voice-reaction', handler);
+    window.addEventListener('onyx:voice-reaction', handler);
 
     feed(':eshmaki.me EVENT me MEDIA SPEAKING #root stranger voice');
     feed(':eshmaki.me EVENT me MEDIA MUTE #root stranger voice');
     feed(':eshmaki.me EVENT me MEDIA HAND #root stranger up');
     feed(':eshmaki.me EVENT me MEDIA REACT #root stranger wave');
 
-    window.removeEventListener('ocean:voice-reaction', handler);
+    window.removeEventListener('onyx:voice-reaction', handler);
     expect(store.getState().speakingNicks).toEqual(new Set());
     expect(store.getState().mutedNicks).toEqual(new Set());
     expect(store.getState().voice.raisedHands).toEqual(new Set());

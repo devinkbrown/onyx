@@ -48,9 +48,9 @@ export function ReactionsOverlay() {
       timers.set(id, timer);
     };
 
-    window.addEventListener('ocean:voice-reaction', onReaction);
+    window.addEventListener('onyx:voice-reaction', onReaction);
     onCleanup(() => {
-      window.removeEventListener('ocean:voice-reaction', onReaction);
+      window.removeEventListener('onyx:voice-reaction', onReaction);
     });
   });
 
