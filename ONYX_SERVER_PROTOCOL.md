@@ -7,7 +7,7 @@ authoritative surface for refactoring Onyx's IRC layer (`src/lib/irc/`).
 Onyx Server is **modern-only**: there is **no STARTTLS**, **no WEBIRC**, **no identd /
 RFC1413**, **no DCC proxy/filehost**, **no `OPER` command** (operator status is
 granted at SASL login), and **no pseudo-clients** — services are real server
-commands (`REGISTER`, `CHANNEL`, `TEGAMI`, …), never ChanServ/NickServ fake users.
+commands (`REGISTER`, `CHANNEL`, `MEMO`, …), never ChanServ/NickServ fake users.
 
 > Source of truth lives in the Onyx Server repo under `docs/reference/` and
 > `docs/architecture/`. This file consolidates it for Onyx. When something here
@@ -262,7 +262,7 @@ Onyx should reconnect instantly into its live session instead of a JOIN storm.
 | `AUTOJOIN <LIST\|ADD\|DEL\|CLEAR> [#chan]` | Account autojoin list (applied after login) |
 | `GROUP …` | Account grouping |
 | `SEEN <account>` | Last seen/login + recent login history |
-| `TEGAMI [LIST\|CLEAR\|SEND <account> :msg]` (alias `MEMO`) | Offline account messages (手紙); delivered + cleared on login |
+| `MEMO [LIST\|CLEAR\|SEND <account> :msg\|FORWARD <account>\|OFF\|IGNORE ADD\|DEL\|LIST <account>]` | Offline account messages; delivered + cleared on login. Command name is **`MEMO` only** (no `TEGAMI` alias). |
 | `VHOST [USE\|OFF\|CLAIM\|REQUEST\|LIST\|…]` | Visible host personas; applying broadcasts native `CHGHOST` to capable peers |
 | `CERTADD` / `CERTLIST` / `CERTDEL <fp>` | Bind/list/remove TLS client-cert fingerprints for SASL EXTERNAL |
 
