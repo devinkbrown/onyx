@@ -140,6 +140,20 @@ describe('NotificationRuntime coalesced policy', () => {
     expect(showDesktopNotification).toHaveBeenCalledTimes(1);
   });
 
+  it('drops a throttled alert when quiet hours become active before its timer fires', () => {
+    render(() => <NotificationRuntime />);
+    addMention(1);
+    addMention(2);
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+
+    // isDndActive is the standing quiet-hours axis (third OR term). Flip it
+    // on before the coalesced flush so the pending desktop alert is dropped.
+    store.setState({ isDndActive: () => true });
+    vi.advanceTimersByTime(6000);
+
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+  });
+
   it('drops a throttled alert when the app regains focus before its timer fires', () => {
     render(() => <NotificationRuntime />);
     addMention(1);

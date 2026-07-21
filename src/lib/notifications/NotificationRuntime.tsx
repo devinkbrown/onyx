@@ -72,6 +72,15 @@ function notificationTarget(note: StoreNotification): { key: string; label: stri
   return null;
 }
 
+/**
+ * Three independent silence axes, ORed:
+ *  1. Manual always-on DND (`dndEnabled`)
+ *  2. Timed mute (`dndUntil`)
+ *  3. Standing daily quiet-hours schedule (`isDndActive` → quietHours.ts)
+ *
+ * Quiet hours are NOT gated on dndEnabled — the schedule is a standing window
+ * (default 22:00–08:00 local). Equal start/end disables the schedule (empty).
+ */
 function isNotificationDndActive(): boolean {
   const state = getState();
   if (state.dndEnabled) return true;

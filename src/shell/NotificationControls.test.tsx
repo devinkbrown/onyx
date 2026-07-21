@@ -242,6 +242,38 @@ describe('NotificationControls accessibility', () => {
     expect(screen.getByRole('button', { name: /Notification mode Regular/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('exposes quiet-hours start/end selects bound to setDndQuietHours', () => {
+    store.setState({ dndQuietStart: 22, dndQuietEnd: 8 });
+    render(() => <NotificationControls />);
+
+    const start = screen.getByRole('combobox', { name: 'Quiet hours start' });
+    const end = screen.getByRole('combobox', { name: 'Quiet hours end' });
+    expect(start).toHaveValue('22');
+    expect(end).toHaveValue('8');
+    expect(screen.getByRole('group', {
+      name: 'Notification controls',
+      description: /quiet hours 10:00 PM to 8:00 AM/i,
+    })).toBeInTheDocument();
+
+    fireEvent.change(start, { target: { value: '21' } });
+    expect(store.getState()).toMatchObject({ dndQuietStart: 21, dndQuietEnd: 8 });
+    expect(localStorage.getItem('onyx:dnd-quiet-start')).toBe('21');
+
+    fireEvent.change(end, { target: { value: '7' } });
+    expect(store.getState()).toMatchObject({ dndQuietStart: 21, dndQuietEnd: 7 });
+    expect(localStorage.getItem('onyx:dnd-quiet-end')).toBe('7');
+  });
+
+  it('reports quiet hours off when start and end hours are equal', () => {
+    store.setState({ dndQuietStart: 22, dndQuietEnd: 22 });
+    render(() => <NotificationControls />);
+
+    expect(screen.getByRole('group', {
+      name: 'Notification controls',
+      description: /quiet hours off/i,
+    })).toBeInTheDocument();
+  });
+
   it('does not let a stale initial push check overwrite a completed enable action', async () => {
     const readiness = deferred<boolean>();
     webPushMocks.supported.mockReturnValue(true);

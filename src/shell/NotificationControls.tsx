@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createEffect, createSignal, onCleanup, onMount, Show, untrack, type JSX } from 'solid-js';
+import { createEffect, createSignal, For, onCleanup, onMount, Show, untrack, type JSX } from 'solid-js';
 
 import { useStore, getState, selectAccount } from '@/lib/store';
 import {
@@ -14,6 +14,7 @@ import {
   setCalmPreset,
   type CalmPreset,
 } from '@/lib/notifications/calmMode';
+import { isQuietHoursActive } from '@/lib/notifications/quietHours';
 import {
   disableWebPush,
   enableWebPush,
@@ -34,6 +35,21 @@ const CALM_PRESET_HINTS: Record<CalmPreset, string> = {
   regular: 'mentions and followed conversations notify',
   power: 'all alertable activity notifies',
 };
+
+/** Hour options 0–23 for the quiet-hours schedule selects. */
+const QUIET_HOUR_OPTIONS: readonly number[] = Array.from({ length: 24 }, (_, hour) => hour);
+
+function formatQuietHour(hour: number): string {
+  if (hour === 0) return '12:00 AM';
+  if (hour === 12) return '12:00 PM';
+  if (hour < 12) return `${hour}:00 AM`;
+  return `${hour - 12}:00 PM`;
+}
+
+function quietHoursSummary(start: number, end: number): string {
+  if (start === end) return 'quiet hours off';
+  return `quiet hours ${formatQuietHour(start)} to ${formatQuietHour(end)}`;
+}
 
 function permissionLabel(active: boolean, permission: DesktopNotificationPermission): string {
   if (permission === 'unsupported') return 'Desktop notifications are not supported';
@@ -63,6 +79,8 @@ export function NotificationControls(): JSX.Element {
   const soundEnabled = useStore((s) => s.soundEnabled);
   const dndEnabled = useStore((s) => s.dndEnabled);
   const dndUntil = useStore((s) => s.dndUntil);
+  const dndQuietStart = useStore((s) => s.dndQuietStart);
+  const dndQuietEnd = useStore((s) => s.dndQuietEnd);
   const account = useStore(selectAccount);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const webPushOwnerScope = useStore((s) => (
@@ -232,7 +250,24 @@ export function NotificationControls(): JSX.Element {
     return dndEnabled() || (until !== null && dndNowMs() < until);
   };
 
+  /** Standing quiet-hours window currently silencing (independent of the D toggle). */
+  const quietHoursSilencing = (): boolean => isQuietHoursActive({
+    enabled: true,
+    startMinute: dndQuietStart() * 60,
+    endMinute: dndQuietEnd() * 60,
+  }, new Date(dndNowMs()));
+
   const desktopActive = (): boolean => pushEnabled() && permission() === 'granted';
+
+  function handleQuietStartChange(event: Event & { currentTarget: HTMLSelectElement }): void {
+    const next = Number(event.currentTarget.value);
+    getState().setDndQuietHours(next, dndQuietEnd());
+  }
+
+  function handleQuietEndChange(event: Event & { currentTarget: HTMLSelectElement }): void {
+    const next = Number(event.currentTarget.value);
+    getState().setDndQuietHours(dndQuietStart(), next);
+  }
 
   async function handleDesktopToggle(): Promise<void> {
     const operation = ++desktopOperation;
@@ -280,7 +315,7 @@ export function NotificationControls(): JSX.Element {
     >
       <span id="notify-controls-title" class="sr-only">Notification controls</span>
       <span id="notify-controls-state" class="sr-only">
-        {desktopStateLabel(desktopActive(), permission())}; notification mode {CALM_PRESET_LABELS[calmPreset()]}; notification sound {soundEnabled() ? 'on' : 'off'}; do not disturb {dndActive() ? 'on' : 'off'}.
+        {desktopStateLabel(desktopActive(), permission())}; notification mode {CALM_PRESET_LABELS[calmPreset()]}; notification sound {soundEnabled() ? 'on' : 'off'}; do not disturb {dndActive() ? 'on' : 'off'}; {quietHoursSummary(dndQuietStart(), dndQuietEnd())}{quietHoursSilencing() ? ', currently active' : ''}.
       </span>
       <button
         type="button"
@@ -345,6 +380,38 @@ export function NotificationControls(): JSX.Element {
         <span aria-hidden="true">D</span>
         <span class="sr-only">Do not disturb {dndActive() ? 'on' : 'off'}</span>
       </button>
+      <div
+        class={`shell-notify-quiet${quietHoursSilencing() ? ' shell-notify-quiet--active' : ''}`}
+        title={quietHoursSummary(dndQuietStart(), dndQuietEnd())}
+      >
+        <label class="shell-notify-quiet-field">
+          <span class="sr-only">Quiet hours start</span>
+          <select
+            class="shell-notify-quiet-select"
+            aria-label="Quiet hours start"
+            value={dndQuietStart()}
+            onChange={handleQuietStartChange}
+          >
+            <For each={QUIET_HOUR_OPTIONS}>
+              {(hour) => <option value={hour}>{formatQuietHour(hour)}</option>}
+            </For>
+          </select>
+        </label>
+        <span class="shell-notify-quiet-sep" aria-hidden="true">–</span>
+        <label class="shell-notify-quiet-field">
+          <span class="sr-only">Quiet hours end</span>
+          <select
+            class="shell-notify-quiet-select"
+            aria-label="Quiet hours end"
+            value={dndQuietEnd()}
+            onChange={handleQuietEndChange}
+          >
+            <For each={QUIET_HOUR_OPTIONS}>
+              {(hour) => <option value={hour}>{formatQuietHour(hour)}</option>}
+            </For>
+          </select>
+        </label>
+      </div>
     </div>
   );
 }

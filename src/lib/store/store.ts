@@ -130,6 +130,7 @@ import {
   saveHighlightWords,
 } from '@/lib/notifications/highlightMemory';
 import { channelNotifyMode as computeChannelNotifyMode, shouldNotify as computeShouldNotify, modeToLevel, type NotifyMode } from '@/lib/notifications/channelNotifyMode';
+import { isQuietHoursActive } from '@/lib/notifications/quietHours';
 import { parseScheduledEvent, type ScheduledEvent } from '@/lib/notifications/scheduledEvents';
 import {
   composerDraftKey,
@@ -13838,13 +13839,18 @@ export const store = createStore<OnyxState>()(
       set({ dndEnabled: enabled });
     },
     setDndQuietHours: (start, end) => {
+      const { dndQuietStart, dndQuietEnd } = get();
+      // Untrusted UI / scripted callers: keep the previous hour rather than
+      // writing a non-hour into the schedule (fail closed on the bad field).
+      const nextStart = Number.isInteger(start) && start >= 0 && start <= 23 ? start : dndQuietStart;
+      const nextEnd = Number.isInteger(end) && end >= 0 && end <= 23 ? end : dndQuietEnd;
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem('onyx:dnd-quiet-start', String(start));
-          localStorage.setItem('onyx:dnd-quiet-end', String(end));
+          localStorage.setItem('onyx:dnd-quiet-start', String(nextStart));
+          localStorage.setItem('onyx:dnd-quiet-end', String(nextEnd));
         } catch {}
       }
-      set({ dndQuietStart: start, dndQuietEnd: end });
+      set({ dndQuietStart: nextStart, dndQuietEnd: nextEnd });
     },
     setDndUntil: (until) => {
       if (typeof window !== 'undefined') {
@@ -13855,17 +13861,16 @@ export const store = createStore<OnyxState>()(
       }
       set({ dndUntil: until });
     },
+    // Standing daily quiet-hours window only. Manual DND (`dndEnabled`) and
+    // timed mute (`dndUntil`) are separate axes ORed by NotificationRuntime.
+    // start === end is an empty window (never active) so equal hours disable.
     isDndActive: () => {
-      const { dndEnabled, dndQuietStart, dndQuietEnd, dndUntil } = get();
-      // Timed override takes precedence
-      if (dndUntil !== null && Date.now() < dndUntil) return true;
-      if (!dndEnabled) return false;
-      const hour = new Date().getHours();
-      if (dndQuietStart <= dndQuietEnd) {
-        return hour >= dndQuietStart && hour < dndQuietEnd;
-      }
-      // Overnight wrap (e.g. 22–8: active if hour >= 22 OR hour < 8)
-      return hour >= dndQuietStart || hour < dndQuietEnd;
+      const { dndQuietStart, dndQuietEnd } = get();
+      return isQuietHoursActive({
+        enabled: true,
+        startMinute: dndQuietStart * 60,
+        endMinute: dndQuietEnd * 60,
+      }, new Date());
     },
     openDndModal: () => set({ showDndModal: true }),
     closeDndModal: () => set({ showDndModal: false }),
