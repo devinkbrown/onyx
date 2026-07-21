@@ -763,6 +763,41 @@ describe('VoiceBar', () => {
     expect(screen.getByRole('dialog', { name: /call privacy/i })).toBeTruthy();
   });
 
+  it('surfaces the local media E2EE fingerprint in the Privacy sheet', async () => {
+    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+    const getLocalMediaE2eeFingerprint = vi.fn().mockResolvedValue('AbC1Def2GhI3');
+    setMountedCadenceMediaEngine({ getLocalMediaE2eeFingerprint } as never);
+
+    try {
+      seedVoiceStore([]);
+      const { getByTestId } = render(() => <VoiceBar />);
+
+      fireEvent.click(getByTestId('call-security-chip'));
+
+      const fingerprint = await screen.findByTestId('call-privacy-local-fingerprint');
+      await waitFor(() => {
+        expect(fingerprint.textContent).toContain('AbC1Def2GhI3');
+      });
+      expect(getLocalMediaE2eeFingerprint).toHaveBeenCalled();
+      expect(screen.getByText(/compare this code out of band/i)).toBeTruthy();
+    } finally {
+      setMountedCadenceMediaEngine(null);
+    }
+  });
+
+  it('shows fingerprint unavailable when the media engine is not mounted', async () => {
+    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+    setMountedCadenceMediaEngine(null);
+
+    seedVoiceStore([]);
+    const { getByTestId } = render(() => <VoiceBar />);
+
+    fireEvent.click(getByTestId('call-security-chip'));
+
+    const fingerprint = await screen.findByTestId('call-privacy-local-fingerprint');
+    expect(fingerprint.textContent?.toLowerCase()).toContain('unavailable');
+  });
+
   it('offers a turn-off-camera soft prompt after sustained poor CQ with camera on', async () => {
     vi.useFakeTimers();
     const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');

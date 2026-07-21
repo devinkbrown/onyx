@@ -824,6 +824,16 @@
   border: 1px solid color-mix(in oklab, var(--shu) 36%, transparent);
 }
 
+/* Active local recording — coral so the armed state is unmistakable */
+.voice-bar .onyx-icon-button--recording {
+  background: color-mix(in oklab, var(--shu) 22%, var(--ink));
+  color: var(--paper);
+  border: 1px solid color-mix(in oklab, var(--shu) 48%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--shu) 28%, transparent),
+    0 0 18px color-mix(in oklab, var(--shu) 24%, transparent);
+}
+
 /* Leave button — coral, restrained */
 .voice-bar__leave.onyx-icon-button {
   background:
@@ -1129,6 +1139,13 @@
 .voice-privacy__code {
   font-family: var(--font-mono);
   letter-spacing: 0.08em;
+}
+
+.voice-privacy__hint {
+  margin: 0;
+  color: var(--paper-mute);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .voice-cq__bars {

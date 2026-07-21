@@ -4,7 +4,7 @@
  *
  * Control cluster (grouped left → right):
  *   Identity:  self Avatar + channel name + live duration timer + participant count
- *   Media:     Mic · Deafen · Camera · Screenshare
+ *   Media:     Mic · Deafen · Camera · Screenshare · Record (local-only download)
  *   Engage:    Raise hand · Reactions · Captions
  *   View:      Grid ↔ Spotlight · Settings
  *   Exit:      Hang up
@@ -17,6 +17,10 @@
  * Toggle buttons expose aria-pressed; every control has an aria-label and a
  * Tooltip. The duration timer is announced politely via aria-live. The whole
  * bar is a role="toolbar". Reduced-motion is handled in voice.css.
+ *
+ * Record captures the local MediaStream only (mic/camera already on the engine)
+ * via MediaEngine.startRecording/stopRecording and downloads a WebM blob — it
+ * does not mix remote peers and is never uploaded.
  */
 
 import { For, createEffect, createMemo, createSignal, onCleanup, Show, untrack } from 'solid-js';
@@ -45,7 +49,8 @@ import { createCallMediaSessionController } from '@/lib/callMediaSession';
 import { Avatar, Popover, Sheet, Tooltip } from '@/primitives';
 import {
   MicIcon, MicOffIcon, DeafenIcon, DeafenOffIcon, CameraIcon, CameraOffIcon,
-  ScreenShareIcon, ScreenShareStopIcon, CaptionsIcon, HandIcon, ReactionIcon,
+  ScreenShareIcon, ScreenShareStopIcon, RecordIcon, RecordStopIcon,
+  CaptionsIcon, HandIcon, ReactionIcon,
   GridIcon, SpotlightIcon, SpatialAudioIcon, SettingsIcon, HangupIcon,
   ShieldIcon, LockIcon, LockOpenIcon, WarningIcon, StageIcon,
 } from './icons';
@@ -158,6 +163,49 @@ function CallPrivacySheet(props: {
     mediaE2eeDegraded: props.mediaE2eeDegraded,
   }));
 
+  // Local media E2EE public-key fingerprint for out-of-band TOFU. Fetched from
+  // the mounted engine only while the sheet is open — no invented crypto.
+  type FingerprintState =
+    | { kind: 'idle' }
+    | { kind: 'loading' }
+    | { kind: 'ready'; value: string }
+    | { kind: 'unavailable' };
+  const [fingerprint, setFingerprint] = createSignal<FingerprintState>({ kind: 'idle' });
+  const readyFingerprint = createMemo(() => {
+    const state = fingerprint();
+    return state.kind === 'ready' ? state.value : null;
+  });
+
+  createEffect(() => {
+    if (!props.open || props.callState === 'idle') {
+      setFingerprint({ kind: 'idle' });
+      return;
+    }
+
+    let cancelled = false;
+    setFingerprint({ kind: 'loading' });
+    const engine = getMountedCadenceMediaEngine();
+    if (!engine) {
+      setFingerprint({ kind: 'unavailable' });
+      return;
+    }
+
+    void engine.getLocalMediaE2eeFingerprint()
+      .then((value) => {
+        if (cancelled) return;
+        const trimmed = value.trim();
+        setFingerprint(trimmed ? { kind: 'ready', value: trimmed } : { kind: 'unavailable' });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFingerprint({ kind: 'unavailable' });
+      });
+
+    onCleanup(() => {
+      cancelled = true;
+    });
+  });
+
   return (
     <Sheet
       open={props.open}
@@ -190,7 +238,28 @@ function CallPrivacySheet(props: {
                   </Show>
                 </dd>
               </div>
+              <div class="voice-privacy__fact">
+                <dt>Your media fingerprint</dt>
+                <dd
+                  data-testid="call-privacy-local-fingerprint"
+                  aria-describedby="call-privacy-fingerprint-hint"
+                >
+                  <Show
+                    when={readyFingerprint()}
+                    fallback={
+                      fingerprint().kind === 'loading'
+                        ? 'Loading…'
+                        : 'Unavailable until the media engine is ready.'
+                    }
+                  >
+                    {(code) => <span class="voice-privacy__code">{code()}</span>}
+                  </Show>
+                </dd>
+              </div>
             </dl>
+            <p class="voice-privacy__hint" id="call-privacy-fingerprint-hint">
+              Compare this code out of band to confirm your media identity. It does not prove end-to-end encryption by itself.
+            </p>
           </div>
         )}
       </Show>
@@ -246,6 +315,39 @@ function formatBitrate(bps: number): string {
 function supportsDisplayCapture(): boolean {
   return typeof navigator !== 'undefined'
     && typeof navigator.mediaDevices?.getDisplayMedia === 'function';
+}
+
+function supportsLocalRecording(): boolean {
+  return typeof MediaRecorder !== 'undefined';
+}
+
+/** Filename for a local call recording download (local-only; never uploaded). */
+export function localRecordingFilename(mimeType: string, date: Date = new Date()): string {
+  const stamp = date.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const ext = mimeType.includes('webm') ? 'webm'
+    : mimeType.includes('ogg') ? 'ogg'
+      : mimeType.includes('mp4') ? 'mp4'
+        : 'bin';
+  return `onyx-call-${stamp}.${ext}`;
+}
+
+/** Trigger a browser download for a local recording blob and release the object URL. */
+export function downloadLocalRecording(blob: Blob, filename?: string): void {
+  const name = filename ?? localRecordingFilename(blob.type || 'application/octet-stream');
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.rel = 'noopener';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    // Defer revoke so the download pipeline can start reading the blob.
+    setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  }
 }
 
 interface NetSample {
@@ -488,10 +590,15 @@ export function VoiceBar() {
   );
   const [screensharePending, setScreensharePending] = createSignal(false);
   const [screenshareStatus, setScreenshareStatus] = createSignal('');
+  // Local-only MediaRecorder state (engine-owned; not mirrored in the store).
+  const [recording, setRecording] = createSignal(false);
+  const [recordingPending, setRecordingPending] = createSignal(false);
+  const [recordingStatus, setRecordingStatus] = createSignal('');
 
   let spatialPadRef: HTMLDivElement | undefined;
   const reactionButtons: (HTMLButtonElement | undefined)[] = [];
   let screenshareOperationEpoch = 0;
+  let recordingOperationEpoch = 0;
   let disposed = false;
 
   const isActive = createMemo(() =>
@@ -586,7 +693,15 @@ export function VoiceBar() {
   onCleanup(() => {
     disposed = true;
     screenshareOperationEpoch += 1;
+    recordingOperationEpoch += 1;
     setSpatialDragging(false);
+    // Best-effort stop without download if the whole bar is torn down mid-record
+    // (route leave). Call-end path uses the effect below and still downloads.
+    if (recording()) {
+      const engine = getMountedCadenceMediaEngine();
+      void engine?.stopRecording().catch(() => null);
+      setRecording(false);
+    }
     screenWakeLock.dispose();
     callMediaSession.dispose();
   });
@@ -775,6 +890,75 @@ export function VoiceBar() {
       if (!disposed && epoch === screenshareOperationEpoch) setScreensharePending(false);
     }
   };
+
+  const recordingUnavailable = createMemo(() =>
+    !recording() && (!supportsLocalRecording() || voice().callState !== 'in_call')
+  );
+  const recordingLabel = createMemo(() => {
+    if (recording()) return 'Stop recording and download';
+    if (recordingPending()) return 'Saving recording';
+    if (!supportsLocalRecording()) return 'Recording unavailable';
+    if (voice().callState !== 'in_call') return 'Recording available in call';
+    return 'Record local audio';
+  });
+
+  /** Stop the local MediaRecorder, optionally download the blob, clear UI state. */
+  const finalizeRecording = async (opts: { download: boolean }): Promise<void> => {
+    if (!recording() && !recordingPending()) return;
+    const epoch = ++recordingOperationEpoch;
+    const engine = getMountedCadenceMediaEngine();
+    setRecordingPending(true);
+    setRecording(false);
+    if (opts.download) setRecordingStatus('Saving recording');
+    try {
+      const blob = await engine?.stopRecording() ?? null;
+      if (disposed || epoch !== recordingOperationEpoch) return;
+      if (!opts.download) {
+        setRecordingStatus('');
+        return;
+      }
+      if (!blob || blob.size === 0) {
+        setRecordingStatus('Recording was empty');
+        return;
+      }
+      downloadLocalRecording(blob);
+      setRecordingStatus('Recording saved');
+    } catch {
+      if (disposed || epoch !== recordingOperationEpoch) return;
+      setRecordingStatus(opts.download ? 'Could not save recording' : '');
+    } finally {
+      if (!disposed && epoch === recordingOperationEpoch) setRecordingPending(false);
+    }
+  };
+
+  const handleToggleRecording = (): void => {
+    if (recordingPending()) return;
+    if (recording()) {
+      void finalizeRecording({ download: true });
+      return;
+    }
+    if (recordingUnavailable()) return;
+    const engine = getMountedCadenceMediaEngine();
+    if (!engine) {
+      setRecordingStatus('Recording unavailable');
+      return;
+    }
+    if (!engine.getLocalStream()) {
+      setRecordingStatus('No local media to record');
+      return;
+    }
+    recordingOperationEpoch += 1;
+    engine.startRecording();
+    setRecording(true);
+    setRecordingStatus('Recording local audio');
+  };
+
+  // If the call ends while recording, stop and download so the user still gets the file.
+  createEffect(() => {
+    if (isActive()) return;
+    if (!untrack(() => recording() || recordingPending())) return;
+    void finalizeRecording({ download: true });
+  });
 
   const handleLeave = () => getState().leaveVoiceChannel();
 
@@ -1045,6 +1229,33 @@ export function VoiceBar() {
               data-testid="screenshare-status"
             >
               {screenshareStatus()}
+            </span>
+
+            <Tooltip content={recordingLabel()} placement="top">
+              <button
+                type="button"
+                class={`onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md${recording() ? ' onyx-icon-button--recording' : ''}`}
+                aria-label={recordingLabel()}
+                aria-pressed={recording()}
+                aria-busy={recordingPending()}
+                title={recordingLabel()}
+                disabled={recordingUnavailable() || recordingPending()}
+                onClick={handleToggleRecording}
+                data-testid="record-button"
+              >
+                <span class="onyx-icon-button__glyph" aria-hidden="true">
+                  <Show when={recording()} fallback={<RecordIcon />}><RecordStopIcon /></Show>
+                </span>
+              </button>
+            </Tooltip>
+            <span
+              class="sr-only"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="record-status"
+            >
+              {recordingStatus()}
             </span>
           </div>
 
