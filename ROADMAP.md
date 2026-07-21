@@ -1,6 +1,6 @@
 # Onyx Roadmap — what sets this apart, and what to build next
 
-*Started 2026-07-02 · **status refresh 2026-07-19** · covers **Onyx Server**
+*Started 2026-07-02 · **status refresh 2026-07-21** · covers **Onyx Server**
 (daemon), **Onyx** (SolidJS client), the community site (landing), and stats.
 Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
 "IRCXNet" is retired public identity only.*
@@ -11,19 +11,35 @@ Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
 > Token-preserving Claude + Codex ops: [`/home/kain/CLAUDE_CODEX_SCALED_WORKFLOW.md`](/home/kain/CLAUDE_CODEX_SCALED_WORKFLOW.md)  
 > This file remains the detailed ✅ archaeology + competitive notes.
 
-## Status at a glance (2026-07-19)
+## Status at a glance (2026-07-21)
 
 | Phase | Theme | Status |
 |-------|--------|--------|
 | **1** Memory (vault, time-travel, search) | Client | ✅ **COMPLETE** |
-| **2** Reach (Web Push, offline outbox) | Client + server | ✅ **COMPLETE** |
+| **2** Reach (Web Push, offline outbox) | Client + server | ✅ **COMPLETE** (client offline memos are **MEMO-only**, no `TEGAMI`) |
 | **3** Privacy (E2EE DMs, ephemeral rooms) | Client + server | ✅ **COMPLETE** |
 | **4** Presence (pins, heatline, events) | Client + server | ✅ **COMPLETE** (Comic Chat in-Onyx **dropped**) |
 | **5** Operations (status, stats, backup) | Server + website + client harden | ✅ **COMPLETE** (ops deploy paths remain operator work) |
-| **6** Time-Native + Atmosphere (Home, reader, a11y) | Client | 🟡 **MOSTLY SHIPPED** — remaining: richer cross-room handoffs, finish dense-surface a11y audit rows |
-| **7+** (later sections in this file) | Product entry, Ink venue, etc. | 🟡 **Many slices shipped**; read per-item ✅ / ⏭️ below — do not treat headers alone as authoritative |
+| **6** Time-Native + Atmosphere (Home, reader, a11y) | Client | 🟡 **MOSTLY SHIPPED** — remaining: richer cross-room handoffs, finish remaining dense-surface a11y audit rows (dense nicklist AppShell e2e **closed**) |
+| **7+** (later sections in this file) | Product entry, Atmosphere, Cadence media, etc. | 🟡 **Many slices shipped**; read per-item ✅ / ⏭️ below — do not treat headers alone as authoritative |
 | **Onyx Server CSB / MESSAGE_V2 / Helix** | Daemon | ✅ **P0s closed 2026-07-17** (see `onyx-server/CLAUDE_CSB_TAKEOVER_ROADMAP.md`); deploy is human-gated |
 | **Engine rename** | Daemon | ✅ **Source rebrand to Onyx Server 2026-07-19**; live `onyx-server.service` / `onyx-run` still production names until deploy |
+| **Era 2 B2 / B8 (client)** | Media polish + sessions | ✅ **B2 R1–R6 closed**; 🟡 **B8** list+`SESSION DROP` closed, recovery codes still open |
+
+**Wiring audit notes (2026-07-21)** — evidence in
+[`.ai/roadmap-source-ledger.md`](.ai/roadmap-source-ledger.md):
+
+- **B2 R3/R5** — bandwidth-ladder soft toasts (`bandwidthLadderFeedback` →
+  `VoiceBar`) and codec-failure toasts (`codecFailure` → `useCadenceMedia`
+  `onError` / `onDecodeError`) are wired; not pure-module stubs.
+- **B8** — Account **Sessions & devices** lists attachments and revokes via
+  `SESSION DROP #<n>`; no recovery-code UX under `src/`.
+- **Background consolidation** — all canvas presets on shared
+  `composeSignature` pipeline (five signature families + scenes).
+- **Dense nicklist e2e** — real AppShell 48-member roster journey
+  (`tests/e2e/member-list-dense-reflow.spec.ts`).
+- **Offline memos** — client accepts **`NOTE MEMO` only** (no `TEGAMI`
+  dual-accept).
 
 **Active client bugs fixed this refresh (2026-07-19)**
 
@@ -128,6 +144,10 @@ down to TLS.
    (no NOTE data channel — lifecycle on the Event Spine), client toggle +
    SW payload mapping. Live on both nodes (node-local subscriptions;
    cross-mesh propagation is future work).
+   ✅ **CLIENT WIRE HONESTY 2026-07-21** — Offline memo delivery is **MEMO-only**
+   on the client: `NOTE MEMO :from <nick> :<text>` folds into `offlineMemo`;
+   historical `TEGAMI` is **not** dual-accepted (`store.ts` / `parser.ts`,
+   `427209d`). DM sidebar surfaces calm “N offline” counts (`708a8c5`).
 5. **Offline outbox** — messages composed offline queue in the vault and send
    on reconnect (labeled-response for acks).
    ✅ **SHIPPED 2026-07-02** — vault `outbox` store (DB v2, 24h expiry),
@@ -470,6 +490,12 @@ down to TLS.
     then restore focus to the initiating chooser or token field after cancel or
     successful merge. This closes the conditional-review focus-loss boundary
     while retaining the existing polite live-status announcements.
+    ✅ **CLIENT E2E EVIDENCE SHIPPED 2026-07-21** — Dense nicklist reflow is
+    proven on a real AppShell journey: `tests/e2e/member-list-dense-reflow.spec.ts`
+    seeds a 48-member mixed-role roster through the production runtime store and
+    asserts mobile drawer + desktop column containment, scroll-to-tail, and focus
+    reachability (`e65675a`; ledger **Dense nicklist browser evidence** closed).
+    Static `member-list-reflow.spec.ts` remains a CSS-only companion.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 
@@ -531,6 +557,12 @@ client or public site needs to expose the result.
     the signed-in account instead of reverting the top-bar chip to “Guest”. Own
     account-notify updates remain scoped to the local nick, preventing a peer's
     logout from clobbering that identity.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-21 (Era 2 B8 list+DROP)** — Account
+    **Sessions & devices** (`SessionsDevicesSection`) pulls authoritative
+    `SESSION LIST` rows and offers `SESSION DROP #<n>` for non-current
+    attachments only (`sessionList.ts` + store fold; never fabricates devices).
+    ⏭️ **CLIENT NEXT (B8 remainder)** — recovery codes (generate/view/consume)
+    remain open; no client implementation under `src/` yet.
 20. **Brand and glossary cleanup** *(main site + client)* — enforce one public
     glossary across home, about, status, roadmap, accessibility, app chrome,
     invite unfurls, and docs. Track the master-roadmap direction to make
@@ -626,6 +658,14 @@ client or public site needs to expose the result.
     misreporting the user's Animated mode as Still. The shared hold also pauses
     feature-detected SVG SMIL timelines, and the Appearance picker debounces
     transient pointer sweeps so they do not request every crossed scene chunk.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-21** — Consolidation closed: every canvas
+    catalogue preset routes through the shared `composeSignature` pipeline
+    (capped ground → ink → paper grain → vignette → edge seal), including the
+    frost / lapis-gradient / obsidian holdouts. Twenty-four selectable ids remain
+    for theme `signatureBg` / prefs and group into five signature families plus
+    a `scene` family; SceneShell adds static grain + vignette for DOM legibility.
+    Animated/Still/Off, reduced-motion freeze, 30fps cap, and idle hold stay
+    engine-owned (`9629f2d`; ledger **Background consolidation** closed).
 26. **Theme-reactive community identity** *(client + main site)* — allow bounded
     accent, tint, banner, and wordmark expression within contrast-locked OKLCH
     tokens so rooms can feel distinct without unbounded CSS or broken access.
@@ -668,6 +708,14 @@ client or public site needs to expose the result.
     speaking counts from the complete case-insensitive local/peer/mesh roster.
     Large calls therefore retain truthful count and active-speaker summaries
     without expanding the compact overlay.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-21 (Era 2 B2 R1–R6)** — Full MEDIA UI
+    polish closed for the researched soft-feedback set: join-muted option,
+    connection-quality soft “turn off camera” prompt, Privacy sheet, EVENT MEDIA
+    roster, **R3** bandwidth-ladder one-shot toasts
+    (`bandwidthLadderFeedback` → `VoiceBar` `ConnectionQualityPip`), and **R5**
+    fail-closed codec init/mismatch/decode toasts (`codecFailure` →
+    `useCadenceMedia` `onError` / `onDecodeError`, never silent black video)
+    (`d415302`; ledger **B2** closed).
 29. **Spatial audio and screenshare controls** *(client)* — add explicit spatial
     audio, screenshare, and watch-together controls that degrade cleanly when a
     node or browser lacks the underlying media feature.
