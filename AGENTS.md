@@ -7,8 +7,11 @@ Next.js, or any SSR framework). The reactivity model is fine-grained signals,
 not a virtual DOM; patterns from React training data (rules-of-hooks, re-render
 mental models, `useEffect` deps) do **not** apply. Use English subsystem names
 (Cadence media, Mooring client crypto) — not retired Japanese prose names.
-New code uses English identifiers; dual-accept historical wire tokens only
-(`TSUMUGI_*` media subtypes, `TSUMUGI1 ` envelopes, `TEGAMI` memos).
+New code uses English identifiers. Offline memos are `MEMO` only. Wire media
+codecs are `cadencevox` / `cadencevis`. Historical crypto envelope bytes
+`TSUMUGI1 ` may still open in `src/lib/e2ee/dmCipher.ts` (legacy open-path
+only — not a command); inbound media may dual-accept historical `TSUMUGI_*`
+subtypes.
 
 Before writing code, read [`CLAUDE.md`](CLAUDE.md) (working context: layout,
 persistence conventions, IRC↔Onyx mapping) and
