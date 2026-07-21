@@ -2006,7 +2006,7 @@ export interface OnyxState {
   loadPendingKeySafetyNumber(peer: string): Promise<string | null>;
   /** channel.toLowerCase() → rolling caption transcript for the live media session */
   mediaTranscripts: Map<string, Array<{ nick: string; text: string; time: Date }>>;
-  /** sender.toLowerCase() → offline memo (wire: MEMO / legacy TEGAMI) delivery aggregate */
+  /** sender.toLowerCase() → offline memo (wire: MEMO) delivery aggregate */
   offlineMemo: Map<string, { count: number; firstMsgId: string }>;
   /** target.toLowerCase() → server-side read marker (ISO 8601 timestamp) */
   readMarkers: Map<string, string>;
@@ -2233,12 +2233,8 @@ const TYPING_EXPIRY_MS = 6_000;
 const TYPING_RATE_LIMIT_MS = 4_000;
 export const MAX_LIVE_DM_CONVERSATIONS = 256;
 export const MAX_OFFLINE_MEMO_CONVERSATIONS = MAX_LIVE_DM_CONVERSATIONS;
-/** @deprecated Prefer MAX_OFFLINE_MEMO_CONVERSATIONS */
-export const MAX_TEGAMI_CONVERSATIONS = MAX_OFFLINE_MEMO_CONVERSATIONS;
 export const MAX_LIVE_CHANNELS = 256;
 export const MAX_OFFLINE_MEMO_COUNT = 9_999;
-/** @deprecated Prefer MAX_OFFLINE_MEMO_COUNT */
-export const MAX_TEGAMI_COUNT = MAX_OFFLINE_MEMO_COUNT;
 export const MAX_USER_METADATA_TARGETS = 256;
 export const MAX_USER_METADATA_KEYS = 64;
 export const MAX_USER_METADATA_KEY_LENGTH = 128;
@@ -9056,11 +9052,10 @@ export const store = createStore<OnyxState>()(
         }
         if (
           standard.kind === 'NOTE'
-          && (standard.command === 'MEMO' || standard.command === 'TEGAMI')
+          && standard.command === 'MEMO'
         ) {
-          // Onyx Server deliverOfflineMemo: `:server NOTE MEMO :from <nick> :<text>`
-          // (legacy command token TEGAMI still dual-accepted). The whole
-          // `from <nick> :<text>` arrives as one trailing param.
+          // Onyx Server deliverOfflineMemo: `:server NOTE MEMO :from <nick> :<text>`.
+          // The whole `from <nick> :<text>` arrives as one trailing param.
           const body = msg.params[1] ?? '';
           const memoMatch = body.match(/^from (\S+) :([\s\S]*)$/) ?? body.match(/^from (\S+) ([\s\S]*)$/);
           if (memoMatch) {
@@ -15709,7 +15704,7 @@ export const selectUserMetadata = (nick: string) => (s: OnyxState): Record<strin
 export const selectMediaTranscript = (channel: string) => (s: OnyxState): Array<{ nick: string; text: string; time: Date }> =>
   s.mediaTranscripts.get(channel.toLowerCase()) ?? [];
 
-/** Offline-memo aggregate (wire MEMO / legacy TEGAMI) for a DM target, or null. */
+/** Offline-memo aggregate (wire MEMO) for a DM target, or null. */
 export const selectOfflineMemo = (target: string) => (s: OnyxState): { count: number; firstMsgId: string } | null =>
   s.offlineMemo.get(target.toLowerCase()) ?? null;
 

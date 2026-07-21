@@ -383,7 +383,7 @@ export function selectSaslMechanism(
 
 export const MAX_STANDARD_REPLY_PARAMS = 32;
 export const MAX_STANDARD_REPLY_TOKEN_LENGTH = 4 * 1024;
-/** Larger ceiling for offline-memo body on NOTE MEMO / legacy NOTE TEGAMI. */
+/** Larger ceiling for offline-memo body on NOTE MEMO. */
 const MAX_STANDARD_REPLY_MEMO_LENGTH = 128 * 1024;
 
 export function parseStandardReply(msg: IRCMessage): StandardReply | null {
@@ -397,7 +397,7 @@ export function parseStandardReply(msg: IRCMessage): StandardReply | null {
   // codes, notifications, or other standard replies.
   const cmdUpper = command.toUpperCase();
   const codeLimit = msg.command === 'NOTE'
-    && (cmdUpper === 'MEMO' || cmdUpper === 'TEGAMI')
+    && cmdUpper === 'MEMO'
     && msg.params.length === 2
     ? MAX_STANDARD_REPLY_MEMO_LENGTH
     : MAX_STANDARD_REPLY_TOKEN_LENGTH;
