@@ -14,7 +14,10 @@
     var(--shell-sidebar-w, 224px)
     1fr
     var(--shell-members-w, 220px);
-  grid-template-rows: 1fr;
+  /* minmax(0, 1fr): plain `1fr` is minmax(auto, 1fr), so a dense nicklist (or
+     long sidebar/feed) could inflate the row past 100svh and clip under
+     overflow:hidden instead of scrolling inside its column. */
+  grid-template-rows: minmax(0, 1fr);
   height: 100svh;
   overflow: hidden;
   font-family: var(--font-sans);
@@ -4241,6 +4244,9 @@
   grid-column: 4;
   display: flex;
   flex-direction: column;
+  /* Allow the grid item to shrink below content height so .shell-members-scroll
+     owns overflow for dense rosters (grid default min-height:auto prevents it). */
+  min-height: 0;
   background:
     linear-gradient(
       180deg,
