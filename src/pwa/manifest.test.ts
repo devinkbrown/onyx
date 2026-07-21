@@ -327,6 +327,49 @@ describe('PWA manifest', () => {
     expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('TSUMUGI1');
     expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('ciphertext');
 
+    // Legacy dual-open envelope prefix must also fail closed on the lock screen.
+    pushWork = undefined;
+    showNotification.mockClear();
+    push!({
+      data: {
+        json: () => ({
+          type: 'dm',
+          from: 'Carol',
+          text: 'TSUMUGI1 legacy_ciphertext_must_not_leak_to_lock_screen',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith('Message from Carol', expect.objectContaining({
+      body: 'New encrypted message',
+    }));
+    expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('TSUMUGI1');
+    expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('legacy_ciphertext');
+
+    pushWork = undefined;
+    showNotification.mockClear();
+    push!({
+      data: {
+        json: () => ({
+          type: 'dm',
+          from: 'Carol',
+          text: ' \tTSUMUGI1 padded_legacy_ciphertext_must_not_leak',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith('Message from Carol', expect.objectContaining({
+      body: 'New encrypted message',
+    }));
+    expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('TSUMUGI1');
+    expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('padded_legacy');
+
     const click = listeners.get('notificationclick');
     expect(click).toBeDefined();
     let clickWork: Promise<unknown> | undefined;

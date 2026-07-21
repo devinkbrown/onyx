@@ -37,9 +37,22 @@ const E2EE_LEGACY_ENVELOPE_PREFIX = 'TSUMUGI1 ';
 const ENCRYPTED_PUSH_BODY = 'New encrypted message';
 
 function isPushEnvelope(text) {
-  if (text.startsWith(E2EE_ENVELOPE_PREFIX)) return true;
+  // Mirror dmCipher isEnvelope dual-open: current + legacy prefixes, plus
+  // leading-whitespace forms so lock-screen bodies never show ciphertext.
+  if (
+    text.startsWith(E2EE_ENVELOPE_PREFIX)
+    || text.startsWith(E2EE_LEGACY_ENVELOPE_PREFIX)
+  ) {
+    return true;
+  }
   const trimmed = text.replace(/^\s+/u, '');
-  return trimmed !== text && trimmed.startsWith(E2EE_ENVELOPE_PREFIX);
+  return (
+    trimmed !== text
+    && (
+      trimmed.startsWith(E2EE_ENVELOPE_PREFIX)
+      || trimmed.startsWith(E2EE_LEGACY_ENVELOPE_PREFIX)
+    )
+  );
 }
 
 function pushBodyFor(text) {
