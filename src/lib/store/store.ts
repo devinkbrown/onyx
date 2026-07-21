@@ -877,12 +877,9 @@ export interface OnyxState {
   // ── Friends / Contacts ───────────────────────────────────────────────
   /** Friends list persisted in the active owner's local device namespace. */
   friends: Map<string, FriendEntry>;
-  showFriendsPanel: boolean;
   addFriend(nick: string): void;
   removeFriend(nick: string): void;
   setFriendOnline(nick: string, online: boolean): void;
-  openFriendsPanel(): void;
-  closeFriendsPanel(): void;
 
   // ── Pinned / followed channels ───────────────────────────────────────
   /** Channels pinned to the top of their server group in owner-scoped navigation memory. */
@@ -995,10 +992,6 @@ export interface OnyxState {
   channelList: ChannelListEntry[];
   channelListLoading: boolean;
 
-  // ── Onboarding ────────────────────────────────────────────────────────
-  showOnboarding: boolean;
-  onboardingStep: number; // 0-3
-
   // ── Audit Log ────────────────────────────────────────────────────────
   auditLog: AuditEntry[];
 
@@ -1058,11 +1051,6 @@ export interface OnyxState {
   openMessageSearch: () => void;
   closeMessageSearch: () => void;
   searchMessages: (channel: string, query: string) => void;
-
-  // ── Whiteboard panel ─────────────────────────────────────────────────
-  showWhiteboard: boolean;
-  openWhiteboard: () => void;
-  closeWhiteboard: () => void;
 
   // ── Actions ─────────────────────────────────────────────────────────
 
@@ -1384,11 +1372,6 @@ export interface OnyxState {
   openChannelBrowser(): void;
   closeChannelBrowser(): void;
   refreshChannelList(): void;
-
-  // onboarding
-  startOnboarding(): void;
-  nextOnboardingStep(): void;
-  skipOnboarding(): void;
 
   // audit log
   addAuditEntry(entry: Omit<AuditEntry, 'id' | 'timestamp'>): void;
@@ -3999,7 +3982,6 @@ function _resetAccountBoundState(
       userMetadata,
       userProfiles,
       friends: new Map(),
-      showFriendsPanel: false,
       watchList: [],
       monitoredNicks: new Set(),
       serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
@@ -5265,7 +5247,6 @@ export const store = createStore<OnyxState>()(
     monitoredNicks: new Set(),
     // Contact lists are private and load only after a server owner exists.
     friends: new Map(),
-    showFriendsPanel: false,
     pinnedChannels: new Set(),
     followedChannels: new Set(),
     // Contact moderation is private per identity and loads only after the
@@ -5356,8 +5337,6 @@ export const store = createStore<OnyxState>()(
     showChannelBrowser: false,
     channelList: [],
     channelListLoading: false,
-    showOnboarding: false,
-    onboardingStep: 0,
     auditLog: [],
     historyLoading: new Map(),
     historyExhausted: new Map(),
@@ -5369,7 +5348,6 @@ export const store = createStore<OnyxState>()(
     messageSearchQuery: '',
     messageSearchLoading: false,
     showMediaGallery: false,
-    showWhiteboard: false,
     showServices: false,
     servicesTab: 'account',
     serviceNotices: [],
@@ -7950,9 +7928,6 @@ export const store = createStore<OnyxState>()(
         return { friends };
       });
     },
-    openFriendsPanel() { set({ showFriendsPanel: true }); },
-    closeFriendsPanel() { set({ showFriendsPanel: false }); },
-
     // ── user presence status ──────────────────────────────────────────────
     setUserStatus(status) {
       set({ userStatus: status });
@@ -8294,29 +8269,6 @@ export const store = createStore<OnyxState>()(
       get().client?.sendRaw('LIST');
     },
 
-    // ── onboarding ────────────────────────────────────────────────────────
-    startOnboarding() {
-      set({ showOnboarding: true, onboardingStep: 0 });
-    },
-    nextOnboardingStep() {
-      const { onboardingStep } = get();
-      if (onboardingStep >= 3) {
-        get().skipOnboarding();
-      } else {
-        set({ onboardingStep: onboardingStep + 1 });
-      }
-    },
-    skipOnboarding() {
-      set({ showOnboarding: false });
-      const hostname = get().server?.url ?? 'unknown';
-      const key = `onyx:onboarded-${hostname}`;
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(key, '1');
-        }
-      } catch { /* ignore */ }
-    },
-
     // ── audit log ─────────────────────────────────────────────────────────
     addAuditEntry(entry) {
       const full: AuditEntry = {
@@ -8469,14 +8421,6 @@ export const store = createStore<OnyxState>()(
     },
     closeMediaGallery() {
       set({ showMediaGallery: false });
-    },
-
-    // ── whiteboard panel ──────────────────────────────────────────────────
-    openWhiteboard() {
-      set({ showWhiteboard: true });
-    },
-    closeWhiteboard() {
-      set({ showWhiteboard: false });
     },
 
     // ── services panel ────────────────────────────────────────────────────
@@ -9411,12 +9355,6 @@ export const store = createStore<OnyxState>()(
           // Publish this device's E2EE public key (METADATA ocean.dm-key) so
           // peers can encrypt DMs to us. Idempotent across reconnects.
           get().publishDeviceKey();
-          // Show onboarding if this server hasn't been visited before
-          const hostname = get().server?.url ?? 'unknown';
-          const onboardKey = `onyx:onboarded-${hostname}`;
-          if (typeof window !== 'undefined' && !localStorage.getItem(onboardKey)) {
-            get().startOnboarding();
-          }
           // A new socket owns no MONITOR state. Restore this identity's bounded
           // friend/watch union without trusting stale local subscription flags.
           _replaceOwnedMonitorContacts(get, set, false);
@@ -11558,10 +11496,6 @@ export const store = createStore<OnyxState>()(
           }
           break;
         }
-
-        // ── Whiteboard — handled by useWhiteboard() hook via client.extraMessageHandlers ──
-        // WHITEBOARD messages are consumed directly in hooks/useWhiteboard.ts
-        // using client.extraMessageHandlers; no global store state needed.
 
         // ── IRCv3 draft/channel-rename ────────────────────────────────────
         // :renamer!u@h RENAME <#old> <#new> [:reason]
