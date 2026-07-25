@@ -94,6 +94,11 @@ import {
   type E2eeMessageKind,
   type EncryptionPolicy,
 } from '@/lib/e2ee/policy';
+import {
+  HISTORY_POLICY_PROP,
+  parseHistoryPolicy,
+  type HistoryPolicy,
+} from '@/lib/irc/historyPolicy';
 import { AI_POLICY_PROP, parseAiPolicyProp, type AiPolicy } from '@/lib/irc/aiPolicyProp';
 import {
   MAX_ACCESS_LIST_CHANNELS,
@@ -1320,6 +1325,8 @@ export interface OnyxState {
   // Ephemeral room history (IRCX EPHEMERAL channel prop; seconds, 0 = off)
   setChannelEphemeral(channel: string, seconds: number): void;
   setChannelEncryptionPolicy(channel: string, policy: EncryptionPolicy): void;
+  /** IRCX history-policy (public | members | opers) — gates CHATHISTORY who-can-read. */
+  setChannelHistoryPolicy(channel: string, policy: HistoryPolicy): void;
 
   // MONITOR (presence)
   monitorAdd(nick: string): void;
@@ -8008,6 +8015,10 @@ export const store = createStore<OnyxState>()(
 
     setChannelEncryptionPolicy(channel, policy) {
       get()._writeChannelProp(channel, ENCRYPTION_POLICY_PROP, parseEncryptionPolicy(policy));
+    },
+
+    setChannelHistoryPolicy(channel, policy) {
+      get()._writeChannelProp(channel, HISTORY_POLICY_PROP, parseHistoryPolicy(policy));
     },
 
     // ── IRCX PROP requests ────────────────────────────────────────────────
@@ -15778,6 +15789,11 @@ export const selectChannelEphemeralSeconds = (channel: string) => (s: OnyxState)
 export const selectChannelEncryptionPolicy = (channel: string) => (s: OnyxState): EncryptionPolicy => {
   const props = s.channelProps.get(channel.toLowerCase());
   return parseEncryptionPolicy(props?.[ENCRYPTION_POLICY_PROP]);
+};
+
+export const selectChannelHistoryPolicy = (channel: string) => (s: OnyxState): HistoryPolicy => {
+  const props = s.channelProps.get(channel.toLowerCase());
+  return parseHistoryPolicy(props?.[HISTORY_POLICY_PROP]);
 };
 
 export const selectIsChannelOp = (channel: string) => (s: OnyxState): boolean => {

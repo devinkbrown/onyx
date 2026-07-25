@@ -7,7 +7,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store, selectChannelEncryptionPolicy, selectChannelEphemeralSeconds, selectChannelEvent } from './store';
+import {
+  store,
+  selectChannelEncryptionPolicy,
+  selectChannelEphemeralSeconds,
+  selectChannelEvent,
+  selectChannelHistoryPolicy,
+} from './store';
 
 const initialState = store.getInitialState();
 
@@ -128,5 +134,25 @@ describe('channel encryption policy prop', () => {
 
     expect(sendRaw).toHaveBeenCalledWith('PROP', '#room', 'encryption-policy', 'optional');
     expect(selectChannelEncryptionPolicy('#room')(store.getState())).toBe('optional');
+  });
+});
+
+describe('channel history policy prop', () => {
+  it('parses history-policy values and defaults invalid values to public', () => {
+    store.setState({ channelProps: new Map([['#room', { 'history-policy': 'opers' }]]) });
+    expect(selectChannelHistoryPolicy('#room')(store.getState())).toBe('opers');
+
+    store.setState({ channelProps: new Map([['#room', { 'history-policy': 'friends' }]]) });
+    expect(selectChannelHistoryPolicy('#room')(store.getState())).toBe('public');
+  });
+
+  it('setChannelHistoryPolicy writes the prop and updates locally', () => {
+    const sendRaw = vi.fn();
+    store.setState({ client: mockClient(sendRaw) });
+
+    store.getState().setChannelHistoryPolicy('#room', 'members');
+
+    expect(sendRaw).toHaveBeenCalledWith('PROP', '#room', 'history-policy', 'members');
+    expect(selectChannelHistoryPolicy('#room')(store.getState())).toBe('members');
   });
 });

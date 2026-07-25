@@ -25,6 +25,7 @@ Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
 | **Onyx Server CSB / MESSAGE_V2 / Helix** | Daemon | ✅ **P0s closed 2026-07-17** (see `onyx-server/CLAUDE_CSB_TAKEOVER_ROADMAP.md`); deploy is human-gated |
 | **Engine rename** | Daemon | ✅ **Source rebrand to Onyx Server 2026-07-19**; live `onyx-server.service` / `onyx-run` still production names until deploy |
 | **Era 2 B2 / B8 (client)** | Media polish + sessions | ✅ **B2 R1–R6 closed**; ✅ **B8** list+`SESSION DROP` + recovery codes closed |
+| **Era 2 B4 / B5 / B7 / B11** | Room policy, push, history targets, Halloy matrix | ✅ **B4** ACCESS + encryption-policy + **history-policy** UI; ✅ **B5** recoverWebPush + SW E2EE body; ✅ **B7** TARGETS discovery; ✅ **B11** `docs/protocol/halloy-cap-matrix.md` |
 
 **Wiring audit notes (2026-07-21)** — evidence in
 [`.ai/roadmap-source-ledger.md`](.ai/roadmap-source-ledger.md):
@@ -36,6 +37,13 @@ Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
   `SESSION DROP #<n>`; **Recovery codes** UI + Connect LOGIN path wire
   `RECOVERYCODES` STATUS/GENERATE/CLEAR/LOGIN (`recoveryCodes.ts`,
   `RecoveryCodesSection`, store fold).
+- **B4** — Channel settings: IRCX ACCESS roles, `encryption-policy`, and
+  `history-policy` (public/members/opers) via PROP.
+- **B5** — `recoverWebPush` on reconnect; SW + in-tab bodies fail closed on
+  ciphertext (`notificationBody` / `sw.js`).
+- **B7** — `CHATHISTORY TARGETS` reconnect discovery
+  (`store.chathistoryTargets.test.ts` + Home cold catch-up).
+- **B11** — Halloy CAP matrix artifact: `docs/protocol/halloy-cap-matrix.md`.
 - **Background consolidation** — all canvas presets on shared
   `composeSignature` pipeline (five signature families + scenes).
 - **Dense nicklist e2e** — real AppShell 48-member roster journey

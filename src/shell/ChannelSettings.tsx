@@ -35,10 +35,12 @@ import {
   getState,
   selectChannelEncryptionPolicy,
   selectChannelEphemeralSeconds,
+  selectChannelHistoryPolicy,
   selectChannelModeState,
   selectDeviceMemoryOwner,
   selectIsChannelOp,
 } from '@/lib/store';
+import { isHistoryPolicy, type HistoryPolicy } from '@/lib/irc/historyPolicy';
 import {
   readChannelTopicDraft,
   saveChannelTopicDraft,
@@ -101,6 +103,24 @@ const ENCRYPTION_POLICIES = [
   { value: 'required', label: 'Required', hint: 'Clients should send only E2EE-tagged payloads here.' },
 ] as const;
 
+const HISTORY_POLICIES: ReadonlyArray<{ value: HistoryPolicy; label: string; hint: string }> = [
+  {
+    value: 'public',
+    label: 'Public',
+    hint: 'Anyone who can open CHATHISTORY may read this room’s history (server default).',
+  },
+  {
+    value: 'members',
+    label: 'Members only',
+    hint: 'Only people currently in the channel may request history.',
+  },
+  {
+    value: 'opers',
+    label: 'Ops only',
+    hint: 'Only channel ops (and network operators) may request history.',
+  },
+];
+
 function formatEphemeral(seconds: number | null): string {
   if (!seconds) return 'Full history';
   const preset = EPHEMERAL_PRESETS.find((p) => p.seconds === seconds);
@@ -125,6 +145,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   const modeState = useStore((s) => selectChannelModeState(local.channel)(s));
   const ephemeralSeconds = useStore((s) => selectChannelEphemeralSeconds(local.channel)(s));
   const encryptionPolicy = useStore((s) => selectChannelEncryptionPolicy(local.channel)(s));
+  const historyPolicy = useStore((s) => selectChannelHistoryPolicy(local.channel)(s));
   const serviceNotices = useStore((s) => s.serviceNotices);
   const channelProps = useStore((s) => s.channelProps);
   const channelAccessMap = useStore((s) => s.channelAccess);
@@ -392,6 +413,25 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     if (next === encryptionPolicy()) return;
     if (next !== 'off' && next !== 'optional' && next !== 'required') return;
     getState().setChannelEncryptionPolicy(channel()?.name ?? local.channel, next);
+  }
+
+  // ── History visibility (IRCX history-policy prop) ─────────────────────────
+  const [historyDraft, setHistoryDraft] = createSignal<HistoryPolicy>('public');
+  createEffect(() => {
+    if (local.open) setHistoryDraft(historyPolicy());
+  });
+
+  const historyPolicyLabel = createMemo(() =>
+    HISTORY_POLICIES.find((policy) => policy.value === historyPolicy())?.label ?? 'Public',
+  );
+
+  function applyHistoryPolicy(event: Event): void {
+    event.preventDefault();
+    if (!isOp() || !isConnected()) return;
+    const next = historyDraft();
+    if (next === historyPolicy()) return;
+    if (!isHistoryPolicy(next)) return;
+    getState().setChannelHistoryPolicy(channel()?.name ?? local.channel, next);
   }
 
   // ── IRCX ACCESS roles (persistent on-join ranks / deny / grant) ─────────
@@ -952,6 +992,53 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               </p>
               <Button type="submit" variant="ghost" size="sm" disabled={!isConnected() || encryptionDraft() === encryptionPolicy()}>
                 Apply policy
+              </Button>
+            </form>
+          </Show>
+        </section>
+
+        {/* ── History visibility policy ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-history-heading">
+          <h3 id="chset-history-heading" class="shell-chset-heading">History visibility</h3>
+
+          <Show
+            when={isOp()}
+            fallback={
+              <div class="shell-chset-readonly">
+                <p class="shell-chset-readonly-label">Who can request history</p>
+                <p class="shell-chset-readonly-value shell-chset-modes-mono">
+                  {historyPolicyLabel()}
+                </p>
+                <p class="shell-chset-hint">Only ops can change the channel history policy.</p>
+              </div>
+            }
+          >
+            <form onSubmit={applyHistoryPolicy} class="shell-chset-param shell-chset-retention">
+              <label class="shell-chset-label" for="chset-history">Who can request history</label>
+              <select
+                id="chset-history"
+                class="shell-chset-select"
+                value={historyDraft()}
+                aria-describedby="chset-history-hint"
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  if (isHistoryPolicy(v)) setHistoryDraft(v);
+                }}
+              >
+                <For each={HISTORY_POLICIES}>
+                  {(policy) => <option value={policy.value}>{policy.label}</option>}
+                </For>
+              </select>
+              <p id="chset-history-hint" class="shell-chset-hint">
+                {HISTORY_POLICIES.find((policy) => policy.value === historyDraft())?.hint}
+              </p>
+              <Button
+                type="submit"
+                variant="ghost"
+                size="sm"
+                disabled={!isConnected() || historyDraft() === historyPolicy()}
+              >
+                Apply history policy
               </Button>
             </form>
           </Show>

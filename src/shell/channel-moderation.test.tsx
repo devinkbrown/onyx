@@ -369,6 +369,27 @@ describe('ChannelSettings panel', () => {
     expect(screen.getByText('Only ops can change the channel encryption policy.')).toBeInTheDocument();
   });
 
+  it('lets an op set the channel history-policy', () => {
+    const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
+
+    openSettings();
+    fireEvent.change(screen.getByLabelText('Who can request history'), { target: { value: 'opers' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply history policy' }));
+
+    expect(client.sendRaw).toHaveBeenCalledWith('PROP', '#general', 'history-policy', 'opers');
+    expect(store.getState().channelProps.get('#general')?.['history-policy']).toBe('opers');
+  });
+
+  it('shows history policy read-only to a non-op', () => {
+    seedChannel({ ourNick: 'me', users: [makeUser('me', [])], props: { 'history-policy': 'members' } });
+
+    openSettings();
+
+    expect(screen.queryByLabelText('Who can request history')).toBeNull();
+    expect(screen.getByText('Members only')).toBeInTheDocument();
+    expect(screen.getByText('Only ops can change the channel history policy.')).toBeInTheDocument();
+  });
+
   it('lets an op create, list, and delete webhooks', () => {
     // Arrange — op
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
