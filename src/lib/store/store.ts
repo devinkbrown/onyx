@@ -7103,6 +7103,61 @@ export const store = createStore<OnyxState>()(
           get().openMessageSearch();
           return;
         }
+        if (lc === 'ignore' || lc === 'unignore') {
+          const nick = (args[0] ?? '').trim();
+          if (!nick) {
+            get().addToast({
+              variant: 'warning',
+              title: lc === 'ignore' ? 'Ignore whom?' : 'Unignore whom?',
+              description: `Use /${lc} <nick>.`,
+            });
+            return;
+          }
+          if (lc === 'ignore') {
+            get().ignoreUser(nick);
+            get().addToast({
+              variant: 'info',
+              title: `Ignoring ${nick}`,
+              description: 'Their messages are hidden on this device. Notifications are silenced too.',
+            });
+          } else {
+            get().unignoreUser(nick);
+            get().addToast({
+              variant: 'info',
+              title: `Unignored ${nick}`,
+              description: 'Messages and notifications from this nick resume on this device.',
+            });
+          }
+          return;
+        }
+        if (lc === 'read' || lc === 'markread') {
+          get().markRead(target);
+          get().addToast({
+            variant: 'info',
+            title: 'Marked read',
+            description: `Unread badges for ${target} were cleared on this device.`,
+          });
+          return;
+        }
+        if (lc === 'star' || lc === 'unstar') {
+          const ch = targetIsChannel ? target : (args[0] ?? '').trim();
+          if (!ch || !(client.isupport.CHANTYPES ?? '#&').includes(ch[0]!)) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Star a channel',
+              description: 'Use /star in a channel, or /star #room.',
+            });
+            return;
+          }
+          const key = ch.toLowerCase();
+          const starred = get().starredChannels;
+          if (lc === 'unstar' || starred.has(key) || starred.has(ch)) {
+            get().unstarChannel(ch);
+          } else {
+            get().starChannel(ch);
+          }
+          return;
+        }
         client.sendRaw(cmd!.toUpperCase(), ...args);
         return;
       }

@@ -83,6 +83,41 @@ describe('platform more wave', () => {
     expect(msgs.some((m) => m.text === 'plain secret')).toBe(false);
   });
 
+  it('ignores a nick with /ignore without a wire IGNORE', () => {
+    const sendRaw = vi.fn();
+    store.setState({
+      connectionStatus: 'connected',
+      client: mockClient(sendRaw) as never,
+      ourNick: 'me',
+      server: {
+        id: 't',
+        name: 'T',
+        network: 'Onyx',
+        url: 'wss://example/ws',
+        icon: '',
+        nick: 'me',
+        account: 'me',
+        connected: true,
+      },
+    });
+    store.getState().sendMessage('#ops', '/ignore spammer');
+    expect(sendRaw).not.toHaveBeenCalled();
+    expect(store.getState().isIgnored('spammer')).toBe(true);
+  });
+
+  it('marks the active target read with /read', () => {
+    const sendRaw = vi.fn();
+    const channels = new Map([['#ops', { ...makeChannel('#ops'), unread: 3, highlights: 1 }]]);
+    store.setState({
+      connectionStatus: 'connected',
+      client: mockClient(sendRaw) as never,
+      channels,
+      ourNick: 'me',
+    });
+    store.getState().sendMessage('#ops', '/read');
+    expect(store.getState().channels.get('#ops')?.unread).toBe(0);
+  });
+
   it('publishes ocean.dm-key and ocean.dm-keys on publishDeviceKey', async () => {
     const sendRaw = vi.fn();
     // Prefer e2ee on

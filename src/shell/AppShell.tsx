@@ -48,6 +48,7 @@ import { GuestClaimPrompt } from './GuestClaimPrompt';
 import { DmKeyChangeBanner } from './DmKeyChangeBanner';
 import { DmSafetySheet } from './DmSafetySheet';
 import { ReconnectStatusBanner } from './ReconnectStatusBanner';
+import { OfflineMemoToast } from './OfflineMemoToast';
 import { CapabilityMatrixSection } from './CapabilityMatrixSection';
 import { TimeScrubber } from './TimeScrubber';
 import { WatchTogetherActivity } from './WatchTogetherActivity';
@@ -791,6 +792,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   return (
     <>
       <NotificationRuntime />
+      <OfflineMemoToast />
       <TopicReadRuntime />
 
       {/* Fixed background canvas behind everything */}

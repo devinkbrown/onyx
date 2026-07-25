@@ -538,6 +538,26 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 </Show>
               </button>
             </Show>
+            {/* Mark read — only when this channel has unread (badge hygiene). */}
+            <Show when={(activeChannel()?.unread ?? 0) > 0 || (activeChannel()?.highlights ?? 0) > 0}>
+              <button
+                type="button"
+                class="shell-ribbon-iconbtn shell-ribbon-mark-read"
+                data-testid="ribbon-mark-read"
+                aria-label={`Mark ${activeChannel()?.name ?? 'channel'} as read`}
+                title="Mark as read"
+                onClick={() => {
+                  const ch = activeChannel();
+                  if (!ch) return;
+                  getState().markRead(ch.name);
+                }}
+              >
+                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </button>
+            </Show>
             {/* Member count is presence-as-place (stable roster trigger), not chrome. */}
             <Show when={memberCount() > 0}>
               <button

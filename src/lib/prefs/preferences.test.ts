@@ -73,7 +73,7 @@ describe('preferences store', () => {
         e2eeDms: true,
         timeScrubber: true,
         voiceEntry: true,
-        topicTools: false,
+        topicTools: true,
         watchTogether: true,
         reactionDensity: 'full',
       });
@@ -101,7 +101,7 @@ describe('preferences store', () => {
         e2eeDms: true,
         timeScrubber: true,
         voiceEntry: true,
-        topicTools: false,
+        topicTools: true,
         watchTogether: true,
         reactionDensity: DEFAULT_PREFERENCES.reactionDensity,
       });

@@ -99,7 +99,7 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   e2eeDms: true,
   timeScrubber: true,
   voiceEntry: true,
-  topicTools: false,
+  topicTools: true,
   watchTogether: true,
   reactionDensity: 'full',
 };

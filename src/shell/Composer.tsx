@@ -243,7 +243,8 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (activeEditing()) return 'Edit message';
     if (isOffline()) return t ? `Offline — queues for ${t}` : 'Reconnecting…';
     if (!t) return 'Pick a room or a person to begin';
-    return `Message ${t}`;
+    // Light discoverability for platform slash commands without crowding the field.
+    return `Message ${t}  ·  /search  /clear  /read  /star`;
   });
 
   const emojiMatches = createMemo(() => searchEmojis(emojiQuery(), 36));
