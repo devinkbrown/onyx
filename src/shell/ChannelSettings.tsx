@@ -69,6 +69,7 @@ import { Button, FormField, Sheet, toast } from '@/primitives/index';
 import { buildInviteLink } from '@/lib/invite/inviteLink';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { BridgeStatusBadge } from './BridgeStatusBadge';
+import { RoomInsightsStrip } from './RoomInsightsStrip';
 
 // Common simple channel flags exposed as toggles. Letters match Onyx Server's
 // CHANMODES group D (flags) — see ISUPPORT `imnstCTNMSgWOA`.
@@ -1042,6 +1043,12 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               </Button>
             </form>
           </Show>
+        </section>
+
+        {/* ── Public room insights (B10) ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-insights-heading">
+          <h3 id="chset-insights-heading" class="shell-chset-heading">Public insights</h3>
+          <RoomInsightsStrip />
         </section>
 
         {/* ── Integrations ── */}

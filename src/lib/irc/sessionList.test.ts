@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 import {
+  formatSessionAge,
   isSessionListEnd,
+  otherAttachedSessions,
   parseSessionDropOk,
   parseSessionListLine,
   sessionRowLabel,
@@ -36,6 +38,20 @@ describe('sessionList parse helpers', () => {
     expect(isSessionListEnd('SESSION LIST * #1 signon=1 attached')).toBe(false);
     expect(parseSessionDropOk('SESSION DROP #3 ok')).toBe(3);
     expect(parseSessionDropOk('SESSION DROP ok')).toBeNull();
+  });
+
+  it('formats session age and lists other attached devices', () => {
+    const now = 1_700_000_000_000;
+    expect(formatSessionAge(now - 30_000, now)).toBe('just now');
+    expect(formatSessionAge(now - 10 * 60_000, now)).toBe('10m active');
+    expect(formatSessionAge(now - 5 * 3_600_000, now)).toBe('5h active');
+    const rows = [
+      { index: 1, current: true, signonMs: now, state: 'attached' as const },
+      { index: 2, current: false, signonMs: now, state: 'attached' as const },
+      { index: 3, current: false, signonMs: now, state: 'detached' as const },
+    ];
+    expect(otherAttachedSessions(rows).map((r) => r.index)).toEqual([2]);
+    expect(sessionRowLabel(rows[0]!)).toBe('This connection');
   });
 
   it('labels rows for UI without inventing device names', () => {

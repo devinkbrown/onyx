@@ -72,6 +72,24 @@ describe('SessionsDevicesSection', () => {
     expect(sendRaw).toHaveBeenCalledWith('SESSION', 'DROP', '#2');
   });
 
+  it('revokes every other attached session in one action', () => {
+    const sendRaw = vi.fn();
+    store.setState({ client: { sendRaw } as never }, false);
+    render(() => <SessionsDevicesSection account="alice" />);
+    store.setState({
+      accountSessions: [
+        { index: 1, current: true, signonMs: 1_710_000_000_000, state: 'attached' },
+        { index: 2, current: false, signonMs: 1_710_000_100_000, state: 'attached' },
+        { index: 3, current: false, signonMs: 1_710_000_200_000, state: 'attached' },
+      ],
+      accountSessionsPending: false,
+    }, false);
+
+    fireEvent.click(screen.getByTestId('sessions-revoke-others'));
+    expect(sendRaw).toHaveBeenCalledWith('SESSION', 'DROP', '#2');
+    expect(sendRaw).toHaveBeenCalledWith('SESSION', 'DROP', '#3');
+  });
+
   it('points at Passkeys for device credentials', () => {
     render(() => <SessionsDevicesSection account="alice" />);
     const hint = screen.getByTestId('sessions-passkeys-hint');

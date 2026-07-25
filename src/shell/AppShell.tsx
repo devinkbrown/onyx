@@ -43,6 +43,7 @@ import { HomeView } from './HomeView';
 const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
 const WhoisSheet = lazy(() => import('./WhoisSheet').then((m) => ({ default: m.WhoisSheet })));
 import { PresenceRibbon } from './PresenceRibbon';
+import { StagePanel } from './StagePanel';
 import { GuestClaimPrompt } from './GuestClaimPrompt';
 import { DmKeyChangeBanner } from './DmKeyChangeBanner';
 import { DmSafetySheet } from './DmSafetySheet';
@@ -839,6 +840,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
           />
+          {/* Discord Stages-class strip (B13) — self-gates per active channel. */}
+          <StagePanel />
           {/* Call stage docks immediately under the ribbon so guest-claim /
               time-scrubber / watch-together cannot sit on top of the video. */}
           {/* Keep the stage mounted for the whole in-call surface. Gating on

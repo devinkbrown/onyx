@@ -513,14 +513,18 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 <span class="shell-ribbon-action-label">Call</span>
               </button>
             </Show>
-            {/* Pins chip — one click to the shared pins drawer when the channel
-                has any. Buried-in-More is too quiet for a room-level signal. */}
-            <Show when={pinCount() > 0}>
+            {/* Pins chip — always one click away in a channel (B3 polish). Count
+                badges only when pins exist so empty rooms stay quiet. */}
+            <Show when={activeView().kind === 'channel'}>
               <button
                 type="button"
                 class="shell-ribbon-iconbtn shell-ribbon-pins"
-                aria-label={`${pinCount()} pinned message${pinCount() === 1 ? '' : 's'}`}
-                title={`${pinCount()} pinned`}
+                aria-label={
+                  pinCount() > 0
+                    ? `${pinCount()} pinned message${pinCount() === 1 ? '' : 's'}`
+                    : 'Pinned messages'
+                }
+                title={pinCount() > 0 ? `${pinCount()} pinned` : 'Pinned messages'}
                 data-testid="ribbon-pins"
                 onClick={() => getState().openPinnedMessages()}
               >
@@ -529,7 +533,9 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                   <path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" />
                   <path d="M12 14v6" />
                 </svg>
-                <span class="shell-ribbon-count">{pinCount()}</span>
+                <Show when={pinCount() > 0}>
+                  <span class="shell-ribbon-count">{pinCount()}</span>
+                </Show>
               </button>
             </Show>
             {/* Member count is presence-as-place (stable roster trigger), not chrome. */}

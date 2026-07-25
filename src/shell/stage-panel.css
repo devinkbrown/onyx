@@ -1,0 +1,128 @@
+/* Stage panel — Discord Stages-class strip under the presence ribbon. */
+.stage-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  background: color-mix(in oklab, var(--surface, #12141a) 92%, transparent);
+}
+
+.stage-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+}
+
+.stage-panel__title {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #9aa3b2);
+}
+
+.stage-panel__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--fg-muted, #b6bfcc);
+}
+
+.stage-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.stage-panel__invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.4rem;
+  background: color-mix(in oklab, var(--accent, #6ea8fe) 18%, transparent);
+}
+
+.stage-panel__invite p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.stage-panel__hands {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stage-panel__hand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.room-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.room-insights__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.room-insights__title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.room-insights__link {
+  font-size: 0.8rem;
+  color: var(--accent, #6ea8fe);
+  text-decoration: none;
+}
+
+.room-insights__link:hover {
+  text-decoration: underline;
+}
+
+.room-insights__empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted, #9aa3b2);
+}
+
+.room-insights__metrics {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem 0.75rem;
+}
+
+.room-insights__metrics li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.8rem;
+}
+
+.room-insights__metrics span {
+  color: var(--muted, #9aa3b2);
+}
+
+.room-insights__metrics strong {
+  font-size: 0.95rem;
+}

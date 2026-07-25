@@ -13399,8 +13399,13 @@ export const store = createStore<OnyxState>()(
     pendingSpeakInvite: null,
     joinStage: (channel) => {
       const target = _normalizeStageChannel(channel);
+      if (!target) return;
       const client = get().client;
-      if (!target || !client || !client.sendRaw('JOIN', target)) return;
+      const key = target.toLowerCase();
+      // Already a member → enter audience state without re-JOINing.
+      if (!get().channels.has(key)) {
+        if (!client || !client.sendRaw('JOIN', target)) return;
+      }
       set({
         stageChannel: target,
         stageRaisedHands: [],

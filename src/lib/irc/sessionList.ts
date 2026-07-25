@@ -63,7 +63,25 @@ export function formatSessionSignon(signonMs: number, _nowMs = Date.now()): stri
   }
 }
 
+/** Relative age for multi-device session lists (B1 polish). */
+export function formatSessionAge(signonMs: number, nowMs = Date.now()): string {
+  if (!Number.isFinite(signonMs) || signonMs <= 0) return 'unknown age';
+  const delta = Math.max(0, nowMs - signonMs);
+  const minutes = Math.floor(delta / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m active`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours}h active`;
+  const days = Math.floor(hours / 24);
+  return `${days}d active`;
+}
+
 export function sessionRowLabel(row: AccountSessionRow): string {
   if (row.current) return 'This connection';
   return row.state === 'attached' ? `Session #${row.index}` : `Detached session #${row.index}`;
+}
+
+/** Non-current attached sessions — bulk revoke targets (B1 multi-device). */
+export function otherAttachedSessions(rows: readonly AccountSessionRow[]): AccountSessionRow[] {
+  return rows.filter((row) => !row.current && row.state === 'attached');
 }

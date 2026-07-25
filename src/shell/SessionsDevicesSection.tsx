@@ -11,7 +11,9 @@
 import { createEffect, For, Show, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import {
+  formatSessionAge,
   formatSessionSignon,
+  otherAttachedSessions,
   sessionRowLabel,
   type AccountSessionRow,
 } from '@/lib/irc/sessionList';
@@ -41,6 +43,12 @@ export function SessionsDevicesSection(props: SessionsDevicesSectionProps): JSX.
   function onDrop(row: AccountSessionRow): void {
     if (row.current) return;
     getState().dropAccountSession(row.index);
+  }
+
+  function onRevokeOthers(): void {
+    for (const row of otherAttachedSessions(sessions())) {
+      getState().dropAccountSession(row.index);
+    }
   }
 
   return (
@@ -74,6 +82,18 @@ export function SessionsDevicesSection(props: SessionsDevicesSectionProps): JSX.
               >
                 {pending() ? 'Refreshing…' : 'Refresh list'}
               </Button>
+              <Show when={otherAttachedSessions(sessions()).length > 0}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={pending()}
+                  onClick={onRevokeOthers}
+                  data-testid="sessions-revoke-others"
+                >
+                  Revoke other devices
+                </Button>
+              </Show>
             </div>
 
             <Show when={error()}>
@@ -122,7 +142,8 @@ export function SessionsDevicesSection(props: SessionsDevicesSectionProps): JSX.
                         </span>
                       </div>
                       <p class="acct-session-meta">
-                        #{row.index} · signed on {formatSessionSignon(row.signonMs)}
+                        #{row.index} · {formatSessionAge(row.signonMs)} · signed on{' '}
+                        {formatSessionSignon(row.signonMs)}
                       </p>
                       <Show when={!row.current}>
                         <div class="acct-session-actions">

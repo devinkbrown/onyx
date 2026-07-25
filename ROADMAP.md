@@ -26,6 +26,7 @@ Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
 | **Engine rename** | Daemon | ✅ **Source rebrand to Onyx Server 2026-07-19**; live `onyx-server.service` / `onyx-run` still production names until deploy |
 | **Era 2 B2 / B8 (client)** | Media polish + sessions | ✅ **B2 R1–R6 closed**; ✅ **B8** list+`SESSION DROP` + recovery codes closed |
 | **Era 2 B4 / B5 / B7 / B11** | Room policy, push, history targets, Halloy matrix | ✅ **B4** ACCESS + encryption-policy + **history-policy** UI; ✅ **B5** recoverWebPush + SW E2EE body; ✅ **B7** TARGETS discovery; ✅ **B11** `docs/protocol/halloy-cap-matrix.md` |
+| **Era 2 B1 / B3 / B9 / B10 / B13** | Multi-device, pins, topics, insights, stages | ✅ **B1** revoke-others + session age; ✅ **B3** always-on pins chip; ✅ **B9** TopicFilterBar; ✅ **B10** RoomInsightsStrip; ✅ **B13** StagePanel |
 
 **Wiring audit notes (2026-07-21)** — evidence in
 [`.ai/roadmap-source-ledger.md`](.ai/roadmap-source-ledger.md):
