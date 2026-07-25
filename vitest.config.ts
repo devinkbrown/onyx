@@ -35,8 +35,9 @@ export default defineConfig({
     testTimeout: 60_000,
     hookTimeout: 30_000,
     // Cap concurrency so fake-indexeddb + jsdom suites do not thrash each other
-    // when the host is already running a heavy `zig build test`.
-    maxWorkers: 4,
+    // (PreferencesPanel toggle/import flaked under full-suite IDB pollution).
+    maxWorkers: 2,
+    fileParallelism: true,
     server: { deps: { inline: [/solid-js/, /@solidjs\/.*/] } },
     coverage: {
       provider: 'v8',

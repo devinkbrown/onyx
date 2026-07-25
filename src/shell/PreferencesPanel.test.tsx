@@ -204,6 +204,11 @@ function renderPreferences(category: PreferenceCategoryLabel = 'Display') {
 
 describe('PreferencesPanel', () => {
   beforeEach(() => {
+    // Fresh IDB + vault every case — full-suite workers share fake-indexeddb state
+    // across files otherwise, and toggle/import assertions flake as false clears.
+    globalThis.indexedDB = new IDBFactory();
+    _resetVaultForTests();
+    _resetSavedSearchesForTests();
     localStorage.clear();
     clearFollowed();
     resetPreferences();
