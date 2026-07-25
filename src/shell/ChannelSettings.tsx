@@ -707,7 +707,13 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
           </div>
 
           {/* Always-mounted polite live region so the copy result is announced. */}
-          <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          <span
+            class="sr-only"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-testid="chset-invite-status"
+          >
             {copyStatus()}
           </span>
         </section>

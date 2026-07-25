@@ -84,8 +84,10 @@ describe('PresenceRibbon place-strip compression (A8)', () => {
     expect(screen.queryByTestId('ribbon-preferences')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-settings-gear')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-account-chip')).not.toBeInTheDocument();
-    // No pins prop → no pins chip (chip appears only when the channel has pins).
-    expect(screen.queryByTestId('ribbon-pins')).not.toBeInTheDocument();
+    // B3 always-on pins chip: present in a channel even with zero pins (no count badge).
+    const pins = screen.getByTestId('ribbon-pins');
+    expect(pins).toBeInTheDocument();
+    expect(pins).toHaveAttribute('aria-label', 'Pinned messages');
   });
 
   it('keeps event and voice chips on the primary strip when present', () => {

@@ -256,9 +256,10 @@ describe('ChannelSettings — Share invite a11y', () => {
 
     expect(await screen.findByText('Invite shared.')).toHaveAttribute('role', 'status');
     expect(share).toHaveBeenCalledTimes(1);
+    // Share payload includes encryption-policy chip when known (E2EE optional/required/off).
     expect(share).toHaveBeenCalledWith(expect.objectContaining({
       title: '#general on Onyx',
-      text: 'Join #general on Onyx.',
+      text: expect.stringMatching(/^Join #general on Onyx/),
       url: expect.stringContaining('/invite/?join=%23general'),
     }));
   });
@@ -343,7 +344,8 @@ describe('ChannelSettings — Share invite a11y', () => {
     resolveCopy?.();
     await pendingCopy;
     await Promise.resolve();
-    expect(screen.getByRole('status')).toHaveTextContent('');
+    // Invite-status live region (not other polite regions on the panel).
+    expect(screen.getByTestId('chset-invite-status')).toHaveTextContent('');
   });
 
   it('announces a copy failure in the same region', async () => {
