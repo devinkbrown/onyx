@@ -363,6 +363,7 @@
   outline-offset: 1px;
 }
 
+.shell-sidebar-filter-unread,
 .shell-sidebar-filter-clear {
   appearance: none;
   flex: none;
@@ -378,11 +379,19 @@
   padding: 0.25rem 0.5rem;
 }
 
+.shell-sidebar-filter-unread--on {
+  color: var(--paper);
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--seam-faint));
+  background: color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+.shell-sidebar-filter-unread:hover,
 .shell-sidebar-filter-clear:hover {
   color: var(--paper);
   background: color-mix(in oklab, var(--ink) 65%, transparent);
 }
 
+.shell-sidebar-filter-unread:focus-visible,
 .shell-sidebar-filter-clear:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;

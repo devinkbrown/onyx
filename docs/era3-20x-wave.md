@@ -78,6 +78,10 @@ already-merged main-tree wave. Server repo untouched (client-only integrate).
 | Message menu: Quote in composer | **SHIPPED** |
 | Member card: Mention into composer | **SHIPPED** |
 | Composer inject path (store one-shot) | **SHIPPED** |
+| Sidebar Unread-only toggle | **SHIPPED** |
+| Member double-click → DM | **SHIPPED** |
+| Member card Copy nick | **SHIPPED** |
+| Composer nick completion popup list | **SHIPPED** |
 
 ## See also
 

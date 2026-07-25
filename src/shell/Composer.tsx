@@ -32,7 +32,12 @@ import {
   getSlashCommandSuggestions,
   type SlashCommand,
 } from '@/lib/commands/registry';
-import { cycleNickCompletion, nickTokenAt } from '@/lib/composer/nickComplete';
+import {
+  applyNickCompletion,
+  cycleNickCompletion,
+  nickTokenAt,
+  rankNickCompletions,
+} from '@/lib/composer/nickComplete';
 import { mergeComposerInsert } from '@/lib/composer/composerInject';
 import { composerDraftKey } from '@/lib/composer/drafts';
 import { UploadError, uploadFile } from '@/lib/upload/upload';
@@ -137,6 +142,9 @@ export function Composer(props: ComposerProps): JSX.Element {
   const [emojiQuery, setEmojiQuery] = createSignal('');
   const [slashDismissed, setSlashDismissed] = createSignal(false);
   const [slashIndex, setSlashIndex] = createSignal(0);
+  const [nickDismissed, setNickDismissed] = createSignal(false);
+  const [nickIndex, setNickIndex] = createSignal(0);
+  const [caretPos, setCaretPos] = createSignal(0);
   const [scheduleOpen, setScheduleOpen] = createSignal(false);
   const [scheduleWhen, setScheduleWhen] = createSignal('');
   const [scheduleError, setScheduleError] = createSignal<string | null>(null);
@@ -282,6 +290,18 @@ export function Composer(props: ComposerProps): JSX.Element {
   let nickCycleIndex = -1;
   let nickCycleQuery = '';
 
+  const activeNickToken = createMemo(() => nickTokenAt(text(), caretPos()));
+  const nickMatches = createMemo(() => {
+    const token = activeNickToken();
+    if (!token) return [] as string[];
+    // Require @ or at least one typed char so idle composer stays quiet.
+    if (!token.at && token.query.length < 1) return [] as string[];
+    return rankNickCompletions(token.query, nickCandidates());
+  });
+  const nickVisible = createMemo(
+    () => !nickDismissed() && !slashVisible() && nickMatches().length > 0,
+  );
+
   const canSend = createMemo(() => {
     if (isSending()) return false;
     if (activeEditing()) return text().trim().length > 0 && attachments().length === 0;
@@ -291,6 +311,11 @@ export function Composer(props: ComposerProps): JSX.Element {
   createEffect(() => {
     slashCommands();
     setSlashIndex(0);
+  });
+
+  createEffect(() => {
+    nickMatches();
+    setNickIndex(0);
   });
 
   // When the emoji dialog opens, move keyboard focus into it (to the search
@@ -474,11 +499,32 @@ export function Composer(props: ComposerProps): JSX.Element {
     focusTextarea(next.length);
   }
 
+  function completeNick(nick: string): void {
+    const token = activeNickToken();
+    if (!token) return;
+    const applied = applyNickCompletion(text(), token, nick);
+    setComposerText(applied.text);
+    setNickDismissed(true);
+    nickCycleIndex = -1;
+    nickCycleQuery = '';
+    setCaretPos(applied.caret);
+    focusTextarea(applied.caret);
+  }
+
+  function syncCaretFromEvent(e: { currentTarget: EventTarget | null }): void {
+    const el = e.currentTarget as HTMLTextAreaElement | null;
+    if (!el) return;
+    setCaretPos(el.selectionStart ?? el.value.length);
+  }
+
   function handleInput(e: InputEvent): void {
-    const next = (e.currentTarget as HTMLTextAreaElement).value;
+    const el = e.currentTarget as HTMLTextAreaElement;
+    const next = el.value;
     setComposerText(next);
+    setCaretPos(el.selectionStart ?? next.length);
     setComposerError(null);
     setSlashDismissed(false);
+    setNickDismissed(false);
     // Broadcast typing presence (the store rate-limits 'active' to once / 4s, and
     // recipients auto-expire after a few seconds of silence). Empty input or a
     // slash command isn't "composing a message", so signal a stop instead.
@@ -525,10 +571,37 @@ export function Composer(props: ComposerProps): JSX.Element {
       }
     }
 
-    // Tab completes a nick prefix (or @mention) when slash suggestions are idle.
+    // Nick suggestion list (same keys as slash) when @ or a nick prefix is active.
+    if (nickVisible()) {
+      const matches = nickMatches();
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setNickIndex((i) => (i + 1) % matches.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setNickIndex((i) => (i - 1 + matches.length) % matches.length);
+        return;
+      }
+      if ((e.key === 'Tab' || e.key === 'Enter') && matches.length > 0) {
+        e.preventDefault();
+        completeNick(matches[nickIndex()] ?? matches[0]!);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setNickDismissed(true);
+        return;
+      }
+    }
+
+    // Tab completes a nick prefix (or @mention) when slash suggestions are idle
+    // and the popup is dismissed or not yet visible.
     if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
       const el = e.currentTarget as HTMLTextAreaElement;
       const caret = el.selectionStart ?? text().length;
+      setCaretPos(caret);
       const current = text();
       // Reset cycle when the incomplete query changes.
       const token = nickTokenAt(current, caret);
@@ -541,7 +614,9 @@ export function Composer(props: ComposerProps): JSX.Element {
       if (result) {
         e.preventDefault();
         nickCycleIndex = result.index;
+        setNickIndex(result.index);
         setComposerText(result.text);
+        setCaretPos(result.caret);
         focusTextarea(result.caret);
         return;
       }
@@ -1006,6 +1081,35 @@ export function Composer(props: ComposerProps): JSX.Element {
           </div>
         </Show>
 
+        <Show when={nickVisible()}>
+          <div
+            id="shell-nick-menu"
+            class="shell-command-menu shell-nick-menu"
+            role="listbox"
+            aria-label="Nick completions"
+            data-testid="composer-nick-menu"
+          >
+            <For each={nickMatches()}>
+              {(nick, index) => (
+                <button
+                  type="button"
+                  id={`shell-nick-option-${index()}`}
+                  class={`shell-command-item${index() === nickIndex() ? ' shell-command-item--active' : ''}`}
+                  role="option"
+                  tabindex={-1}
+                  aria-selected={index() === nickIndex()}
+                  data-testid={`composer-nick-option-${nick}`}
+                  onMouseEnter={() => setNickIndex(index())}
+                  onClick={() => completeNick(nick)}
+                >
+                  <span class="shell-command-usage">{nick}</span>
+                  <span class="shell-command-desc">Complete nick</span>
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+
         <Show when={emojiOpen()}>
           <div
             id="shell-emoji-picker"
@@ -1219,15 +1323,28 @@ export function Composer(props: ComposerProps): JSX.Element {
           value={text()}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
+          onClick={syncCaretFromEvent}
+          onSelect={syncCaretFromEvent}
+          onKeyUp={syncCaretFromEvent}
           onPaste={handlePaste}
           aria-label={accessibleName()}
           aria-disabled={!isEnabled()}
           aria-multiline="true"
-          aria-controls={slashVisible() ? 'shell-command-menu' : undefined}
-          aria-expanded={slashVisible()}
-          aria-autocomplete={slashVisible() ? 'list' : undefined}
+          aria-controls={
+            slashVisible()
+              ? 'shell-command-menu'
+              : nickVisible()
+                ? 'shell-nick-menu'
+                : undefined
+          }
+          aria-expanded={slashVisible() || nickVisible()}
+          aria-autocomplete={slashVisible() || nickVisible() ? 'list' : undefined}
           aria-activedescendant={
-            slashVisible() ? `shell-command-option-${slashIndex()}` : undefined
+            slashVisible()
+              ? `shell-command-option-${slashIndex()}`
+              : nickVisible()
+                ? `shell-nick-option-${nickIndex()}`
+                : undefined
           }
         />
         <button
@@ -1260,7 +1377,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         )}
       </Show>
       <p class="shell-composer-hint" aria-hidden="true">
-        Enter to send · Tab completes nick · Shift+Enter for newline · Paste or drop files to attach
+        Enter to send · @ or Tab for nicks · Shift+Enter for newline · Paste or drop files to attach
       </p>
       </div>
     </section>

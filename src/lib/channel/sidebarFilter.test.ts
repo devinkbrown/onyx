@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   filterSidebarNames,
+  hasSidebarAttention,
   matchesSidebarQuery,
   normalizeSidebarQuery,
 } from './sidebarFilter';
@@ -28,5 +29,23 @@ describe('sidebarFilter', () => {
   it('filters objects by nameOf', () => {
     const items = [{ name: '#ops' }, { name: '#lobby' }, { name: 'dave' }];
     expect(filterSidebarNames(items, 'op', (i) => i.name)).toEqual([{ name: '#ops' }]);
+  });
+
+  it('unreadOnly keeps rows with unread or highlights', () => {
+    expect(hasSidebarAttention({ unread: 0, highlights: 0 })).toBe(false);
+    expect(hasSidebarAttention({ unread: 2, highlights: 0 })).toBe(true);
+    expect(hasSidebarAttention({ unread: 0, highlights: 1 })).toBe(true);
+
+    const items = [
+      { name: '#a', unread: 0, highlights: 0 },
+      { name: '#b', unread: 3, highlights: 0 },
+      { name: '#c', unread: 0, highlights: 1 },
+    ];
+    expect(
+      filterSidebarNames(items, '', (i) => i.name, { unreadOnly: true }).map((i) => i.name),
+    ).toEqual(['#b', '#c']);
+    expect(
+      filterSidebarNames(items, 'c', (i) => i.name, { unreadOnly: true }).map((i) => i.name),
+    ).toEqual(['#c']);
   });
 });

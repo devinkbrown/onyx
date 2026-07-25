@@ -32,6 +32,7 @@ import { useStore, getState, selectIsChannelOp } from '@/lib/store';
 import type { ChannelUser } from '@/lib/irc/types';
 import { createGroupReconciler, type ResolvedRole } from '@/lib/memberGroups';
 import { formatMentionInsert } from '@/lib/composer/composerInject';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { Avatar, Popover, Button, IconButton } from '@/primitives/index';
 
 // Role resolution, grouping, and identity-stable reconciliation live in
@@ -136,6 +137,19 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     });
     queueMicrotask(() => {
       document.querySelector<HTMLElement>('[data-composer-input]')?.focus();
+    });
+  }
+
+  async function handleCopyNick(): Promise<void> {
+    const nick = local.user.nick.trim();
+    if (!nick) return;
+    const ok = await writeClipboardText(nick);
+    getState().addToast({
+      variant: ok ? 'success' : 'warning',
+      title: ok ? 'Nick copied' : 'Could not copy nick',
+      description: ok
+        ? `${nick} is on the clipboard.`
+        : 'Clipboard access was denied in this browser.',
     });
   }
 
@@ -247,6 +261,15 @@ function MemberCard(props: MemberCardProps): JSX.Element {
         <Button
           variant="ghost"
           size="sm"
+          onClick={() => void handleCopyNick()}
+          data-testid="member-card-copy-nick"
+          aria-label={`Copy nick ${local.user.nick}`}
+        >
+          Copy nick
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={handleWhois}
           aria-label={`View profile of ${local.user.nick}`}
         >
@@ -326,6 +349,7 @@ type MemberRowProps = {
 
 function MemberRow(props: MemberRowProps): JSX.Element {
   let itemRef: HTMLLIElement | undefined;
+  const ourNick = useStore((s) => s.ourNick);
 
   // A PART removes this control; a MODE update can move it between role groups
   // and replace the DOM row. If keyboard focus was inside the outgoing row,
@@ -347,6 +371,15 @@ function MemberRow(props: MemberRowProps): JSX.Element {
     });
   });
 
+  function openDmFromRow(): void {
+    if (props.user.nick.toLowerCase() === ourNick().toLowerCase()) return;
+    if (props.onOpenDm) {
+      props.onOpenDm(props.user.nick);
+      return;
+    }
+    getState().navigate({ kind: 'dm', nick: props.user.nick });
+  }
+
   return (
     <li
       ref={itemRef}
@@ -359,6 +392,13 @@ function MemberRow(props: MemberRowProps): JSX.Element {
         trigger={
           <div
             class={`shell-member-row${props.user.away ? ' shell-member-row--away' : ''}`}
+            onDblClick={(e) => {
+              // Double-click is a classic IRC comfort: open DM without the card.
+              e.preventDefault();
+              e.stopPropagation();
+              openDmFromRow();
+            }}
+            title="Double-click to message"
           >
             <span class="shell-member-avatar">
               <Avatar

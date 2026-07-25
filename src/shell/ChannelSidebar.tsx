@@ -23,7 +23,10 @@ import {
 import { useStore, getState, selectDeviceMemoryOwner } from '@/lib/store';
 import type { Channel } from '@/lib/irc/types';
 import type { ActiveView, ChannelFolder, DMConversation } from '@/lib/store/store';
-import { filterSidebarNames, matchesSidebarQuery } from '@/lib/channel/sidebarFilter';
+import {
+  filterSidebarNames,
+  matchesSidebarQuery,
+} from '@/lib/channel/sidebarFilter';
 import { NotificationControls } from './NotificationControls';
 
 export type ChannelSidebarProps = {
@@ -234,14 +237,17 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
 
   // ── sidebar filter (channels + DMs) ──
   const [listFilter, setListFilter] = createSignal('');
-  const filterActive = createMemo(() => listFilter().trim().length > 0);
+  const [unreadOnly, setUnreadOnly] = createSignal(false);
+  const filterActive = createMemo(() => listFilter().trim().length > 0 || unreadOnly());
 
   // ── sorted channel list (alpha base; stars + folders layer on top) ──
   const sortedChannels = createMemo(() => {
     const entries: Channel[] = [];
     channels().forEach((ch) => entries.push(ch));
     const sorted = entries.sort((a, b) => a.name.localeCompare(b.name));
-    return filterSidebarNames(sorted, listFilter(), (ch) => ch.name);
+    return filterSidebarNames(sorted, listFilter(), (ch) => ch.name, {
+      unreadOnly: unreadOnly(),
+    });
   });
 
   const channelByName = createMemo(() => {
@@ -317,7 +323,9 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     const entries: DMConversation[] = [];
     dms().forEach((dm) => entries.push(dm));
     const sorted = entries.sort((a, b) => a.nick.localeCompare(b.nick));
-    return filterSidebarNames(sorted, listFilter(), (dm) => dm.nick);
+    return filterSidebarNames(sorted, listFilter(), (dm) => dm.nick, {
+      unreadOnly: unreadOnly(),
+    });
   });
 
   const filterEmpty = createMemo(() => {
@@ -528,20 +536,34 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
           value={listFilter()}
           onInput={(e) => setListFilter(e.currentTarget.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Escape' && listFilter()) {
+            if (e.key === 'Escape' && (listFilter() || unreadOnly())) {
               e.preventDefault();
               e.stopPropagation();
               setListFilter('');
+              setUnreadOnly(false);
             }
           }}
         />
-        <Show when={filterActive()}>
+        <button
+          type="button"
+          class={`shell-sidebar-filter-unread${unreadOnly() ? ' shell-sidebar-filter-unread--on' : ''}`}
+          data-testid="sidebar-unread-only"
+          aria-pressed={unreadOnly()}
+          title={unreadOnly() ? 'Showing unread only — click to show all' : 'Show unread only'}
+          onClick={() => setUnreadOnly((v) => !v)}
+        >
+          Unread
+        </button>
+        <Show when={listFilter().trim().length > 0 || unreadOnly()}>
           <button
             type="button"
             class="shell-sidebar-filter-clear"
             data-testid="sidebar-filter-clear"
             aria-label="Clear filter"
-            onClick={() => setListFilter('')}
+            onClick={() => {
+              setListFilter('');
+              setUnreadOnly(false);
+            }}
           >
             Clear
           </button>
@@ -579,7 +601,9 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
 
         <Show when={filterEmpty()}>
           <p class="shell-sidebar-filter-empty" data-testid="sidebar-filter-empty" role="status">
-            No channels or DMs match “{listFilter().trim()}”.
+            {unreadOnly() && !listFilter().trim()
+              ? 'Nothing unread right now.'
+              : `No channels or DMs match “${listFilter().trim() || 'unread'}”.`}
           </p>
         </Show>
 
