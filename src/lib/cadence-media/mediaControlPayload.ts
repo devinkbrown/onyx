@@ -73,12 +73,26 @@ export function parseRoomStats(payload: string): CadenceRoomStats | null {
   if (activeSenders === null || totalViewers === null || videoFps === null || audioKbps === null) {
     return null;
   }
-  return {
+  const stats: CadenceRoomStats = {
     active_senders: activeSenders,
     total_viewers: totalViewers,
     video_fps: videoFps,
     audio_kbps: audioKbps,
   };
+  // Optional cascade topology — only accept finite non-negative integers /
+  // fractions; invalid optionals are dropped (do not reject the whole STATS).
+  if ('remote_forwarders' in parsed) {
+    const hops = boundedNumber(parsed.remote_forwarders, 64, true);
+    if (hops !== null) stats.remote_forwarders = hops;
+  }
+  if ('packet_loss' in parsed) {
+    const loss = boundedNumber(parsed.packet_loss, 1, false);
+    if (loss !== null) stats.packet_loss = loss;
+  }
+  if ('local_sfu' in parsed && typeof parsed.local_sfu === 'boolean') {
+    stats.local_sfu = parsed.local_sfu;
+  }
+  return stats;
 }
 
 export function parseSuggestedBitrate(payload: string): number | null {

@@ -33,6 +33,11 @@
  * global newest-first row cap in addition to per-target retention before the
  * embed pass starts.
  */
+import {
+  boostedScore,
+  DEFAULT_BOOSTS,
+  type BoostWeights,
+} from '@/lib/search/rankingBoost';
 import { readAllVaultHits, type DeviceMemoryOwner, type VaultSearchHit } from './historyVault';
 import {
   defaultEmbeddingProvider,
@@ -105,6 +110,18 @@ export interface HybridSearchOptions {
   signal?: AbortSignal;
   /** Exact server/account namespace whose remembered rows may be searched. */
   owner?: DeviceMemoryOwner;
+  /**
+   * Active conversation key ('#channel' or DM nick). When set, same-room hits
+   * get the {@link DEFAULT_BOOSTS}.sameRoom affinity nudge after RRF.
+   */
+  activeTarget?: string;
+  /**
+   * Local nick. When set, hits authored by self take a mild self-penalty so
+   * peer replies surface slightly ahead of echo.
+   */
+  selfNick?: string;
+  /** Override post-RRF boost weights (tests / experiments). */
+  boosts?: BoostWeights;
 }
 
 const DEFAULT_LIMIT = 40;
@@ -130,6 +147,33 @@ function newestFirst(a: VaultSearchHit, b: VaultSearchHit): number {
   const ka = hitKey(a);
   const kb = hitKey(b);
   return ka < kb ? -1 : ka > kb ? 1 : 0;
+}
+
+/**
+ * Age in ms for post-RRF recency boost, from {@link VaultSearchHit.message.time}
+ * only. The hit shape has no top-level `time` — reading anything else silently
+ * drops the recency nudge (age becomes undefined). Accepts Date, epoch-ms
+ * number, or ISO string for defensive rehydrate edges; returns undefined when
+ * unusable. Pure.
+ */
+export function vaultHitAgeMs(
+  hit: VaultSearchHit,
+  nowMs: number = Date.now(),
+): number | undefined {
+  // VaultSearchHit is always `{ target, message }`; recency lives on the message.
+  const t = hit.message.time as Date | number | string | undefined;
+  if (t instanceof Date) {
+    const ms = t.getTime();
+    return Number.isFinite(ms) ? Math.max(0, nowMs - ms) : undefined;
+  }
+  if (typeof t === 'number' && Number.isFinite(t)) {
+    return Math.max(0, nowMs - t);
+  }
+  if (typeof t === 'string' && t.length > 0) {
+    const ms = Date.parse(t);
+    return Number.isFinite(ms) ? Math.max(0, nowMs - ms) : undefined;
+  }
+  return undefined;
 }
 
 /**
@@ -179,5 +223,33 @@ export async function searchVaultHybrid(
     hitKey,
     { tieBreak: newestFirst },
   );
-  return fused.slice(0, limit).map((entry) => entry.item);
+
+  // Second-pass boost via rankingBoost: keep RRF as the primary score, then
+  // apply exact/same-room/recency/self weights from lib/search/rankingBoost.
+  // Recency MUST use hit.message.time (VaultSearchHit) — see vaultHitAgeMs.
+  const lexicalKeys = new Set(lexicalRanking.map(hitKey));
+  const now = Date.now();
+  const activeKey = opts.activeTarget?.trim().toLocaleLowerCase() || null;
+  const selfKey = opts.selfNick?.trim().toLocaleLowerCase() || null;
+  const weights = opts.boosts ?? DEFAULT_BOOSTS;
+  const boosted = fused
+    .map((entry) => {
+      const hit = entry.item;
+      const key = hitKey(hit);
+      const from = typeof hit.message.from === 'string'
+        ? hit.message.from.toLocaleLowerCase()
+        : '';
+      const score = boostedScore({
+        id: key,
+        score: entry.score,
+        exact: lexicalKeys.has(key),
+        sameRoom: activeKey !== null && hit.target.toLocaleLowerCase() === activeKey,
+        fromSelf: selfKey !== null && from.length > 0 && from === selfKey,
+        ageMs: vaultHitAgeMs(hit, now),
+      }, weights);
+      return { hit, score };
+    })
+    .sort((a, b) => b.score - a.score || newestFirst(a.hit, b.hit));
+
+  return boosted.slice(0, limit).map((entry) => entry.hit);
 }

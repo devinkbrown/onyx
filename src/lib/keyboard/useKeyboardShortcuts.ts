@@ -12,10 +12,17 @@
  * the individual shortcut handlers. The listener is removed automatically via
  * `onCleanup` when the owning component unmounts.
  *
+ * SOURCE OF TRUTH: single-chord matching uses `matchShortcut` against
+ * `shortcutsRegistry.SHORTCUTS`. Sequence chords (G then H/D) and transcript
+ * J/K nav live only here because they are not single-key chords. Command
+ * palette open (⌘K) is owned by SpotlightProvider so it is intentionally
+ * absent from the live handler map.
+ *
  * GUARD: shortcuts never fire while an aria-modal dialog owns the keyboard or
  * when focus is inside an editable element (input, textarea, contenteditable,
- * or data-spotlight-ignore). The one exception is Escape, which always closes
- * overlays.
+ * or data-spotlight-ignore). Exceptions: Escape always closes overlays;
+ * preferences (⌘,) works from any editable; schedule/attach work from the
+ * composer textarea only.
  */
 
 import { onCleanup, onMount } from 'solid-js';
@@ -23,6 +30,13 @@ import { getState, selectDeviceMemoryOwner } from '@/lib/store';
 import { closeSpotlight, useSpotlight } from '@/chat/spotlight/useSpotlight';
 import { openPreferences, preferences, setPreference } from '@/lib/prefs/preferences';
 import { toggleFollow } from '@/lib/notifications/followed';
+import { openMessageSearch } from '@/shell/search/useMessageSearch';
+import {
+  formatChordDisplay,
+  matchShortcut,
+  shortcutById,
+  type Shortcut,
+} from '@/lib/keyboard/shortcutsRegistry';
 
 // ── Shortcut definitions ──────────────────────────────────────────────────────
 
@@ -45,16 +59,53 @@ export type ShortcutGroup =
   | 'Voice & Video'
   | 'Palette';
 
+/** Map registry groups onto help-overlay groups. */
+function overlayGroupFor(shortcut: Shortcut): ShortcutGroup {
+  switch (shortcut.group) {
+    case 'Composing':
+      return 'Chat';
+    case 'Reading':
+      return 'Chat';
+    case 'Appearance':
+      return 'View';
+    case 'Navigation':
+      return shortcut.id === 'command.palette' || shortcut.id === 'overlay.close'
+        ? 'Palette'
+        : shortcut.id === 'keyboard.help' || shortcut.id === 'preferences.open'
+          ? 'View'
+          : 'Navigation';
+    default:
+      return 'Navigation';
+  }
+}
+
+function descriptorFromRegistry(id: string, overrides?: Partial<ShortcutDescriptor>): ShortcutDescriptor {
+  const entry = shortcutById(id);
+  if (!entry) {
+    throw new Error(`shortcutsRegistry is missing id "${id}" required by the live keyboard hook`);
+  }
+  return {
+    keys: formatChordDisplay(entry.chord),
+    description: entry.label,
+    group: overlayGroupFor(entry),
+    ...overrides,
+  };
+}
+
 /**
  * All registered shortcut descriptors — exported so the help overlay can
  * render them without coupling to implementation details.
+ *
+ * Single-chord rows are derived from shortcutsRegistry so the help sheet
+ * cannot drift from the matcher. Sequence / dual-chord rows that the pure
+ * registry cannot express remain hand-listed here.
  */
 export const SHORTCUTS: ShortcutDescriptor[] = [
-  {
+  descriptorFromRegistry('command.palette', {
     keys: '⌘K / Ctrl+K',
     description: 'Open command palette',
     group: 'Palette',
-  },
+  }),
   {
     keys: '/',
     description: 'Open command palette (when not typing)',
@@ -65,26 +116,26 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
     description: 'Show keyboard shortcuts',
     group: 'Palette',
   },
-  {
+  descriptorFromRegistry('overlay.close', {
     keys: 'Esc',
     description: 'Close palette / overlay',
     group: 'Palette',
-  },
-  {
+  }),
+  descriptorFromRegistry('navigation.channel.previous', {
     keys: 'Alt+↑',
     description: 'Previous channel / DM',
     group: 'Navigation',
-  },
-  {
+  }),
+  descriptorFromRegistry('navigation.channel.next', {
     keys: 'Alt+↓',
     description: 'Next channel / DM',
     group: 'Navigation',
-  },
-  {
+  }),
+  descriptorFromRegistry('navigation.unread.next', {
     keys: 'N',
     description: 'Jump to next unread channel / DM',
     group: 'Navigation',
-  },
+  }),
   {
     keys: 'J',
     description: 'Move to next message',
@@ -105,31 +156,63 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
     description: 'Open jump-to-date',
     group: 'Navigation',
   },
-  {
+  descriptorFromRegistry('conversation.follow.toggle', {
     keys: 'U',
     description: 'Follow current channel / DM',
     group: 'Chat',
-  },
-  {
+  }),
+  descriptorFromRegistry('members.toggle', {
     keys: 'Alt+M',
     description: 'Toggle member list',
     group: 'View',
-  },
-  {
+  }),
+  descriptorFromRegistry('sidebar.focus', {
+    description: 'Focus channel sidebar',
+    group: 'View',
+  }),
+  descriptorFromRegistry('reader.mode.toggle', {
     keys: '⌘⇧R / Ctrl+Shift+R',
     description: 'Toggle Reader mode',
     group: 'View',
-  },
-  {
+  }),
+  descriptorFromRegistry('preferences.open', {
     keys: '⌘, / Ctrl+,',
     description: 'Open preferences',
     group: 'View',
-  },
-  {
+  }),
+  descriptorFromRegistry('search.open', {
+    description: 'Search messages',
+    group: 'Chat',
+  }),
+  descriptorFromRegistry('account.open', {
+    description: 'Open account',
+    group: 'Navigation',
+  }),
+  descriptorFromRegistry('mark.read', {
+    description: 'Mark conversation read',
+    group: 'Chat',
+  }),
+  descriptorFromRegistry('star.channel', {
+    description: 'Star / unstar channel',
+    group: 'Chat',
+  }),
+  descriptorFromRegistry('dnd.toggle', {
+    description: 'Toggle do not disturb',
+    group: 'View',
+  }),
+  descriptorFromRegistry('composer.attach', {
+    description: 'Attach a file',
+    group: 'Chat',
+  }),
+  descriptorFromRegistry('composer.schedule', {
+    description: 'Schedule message to send later',
+    group: 'Chat',
+  }),
+  descriptorFromRegistry('composer.focus', {
     keys: 'Enter / Alt+Enter',
     description: 'Focus message composer',
     group: 'Chat',
-  },
+  }),
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -329,6 +412,157 @@ function focusRelativeMessage(delta: 1 | -1): void {
   getState().focusMessage(id);
 }
 
+function toggleKeyboardHelp(): void {
+  const state = getState();
+  if (state.showKeyboardShortcuts) {
+    state.closeKeyboardShortcuts();
+  } else {
+    state.openKeyboardShortcuts();
+  }
+}
+
+function markActiveRead(): void {
+  const state = getState();
+  const view = state.activeView;
+  if (view.kind === 'channel') {
+    state.markRead(view.channel);
+    state.markChannelRead(view.channel);
+  } else if (view.kind === 'dm') {
+    state.markRead(view.nick);
+  }
+}
+
+function toggleActiveStar(): void {
+  const state = getState();
+  if (state.activeView.kind !== 'channel') return;
+  const channel = state.activeView.channel;
+  const key = channel.toLowerCase();
+  if (state.starredChannels.has(key) || state.starredChannels.has(channel)) {
+    state.unstarChannel(channel);
+  } else {
+    state.starChannel(channel);
+  }
+}
+
+function toggleDnd(): void {
+  const state = getState();
+  state.setDndEnabled(!state.dndEnabled);
+}
+
+function focusSidebar(): void {
+  const active = document.querySelector<HTMLElement>(
+    '[data-sidebar-item][aria-current="page"]',
+  );
+  const el = active ?? document.querySelector<HTMLElement>('[data-sidebar-item]');
+  el?.focus();
+}
+
+function isComposerInputTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.matches('[data-composer-input]')
+    || !!target.closest('[data-composer-input]');
+}
+
+/** Click a discoverable composer control; returns whether the click ran. */
+function clickComposerControl(selector: string): boolean {
+  const button = document.querySelector<HTMLButtonElement>(selector);
+  if (!button || button.disabled) return false;
+  button.click();
+  return true;
+}
+
+// ── Registry-backed live handlers ─────────────────────────────────────────────
+//
+// Ids intentionally NOT wired here:
+//   - command.palette  → SpotlightProvider (⌘K / Ctrl+K + "/")
+//   - navigation.home  → G then H sequence (mod+H collides with browser History)
+//
+// keyboard.help is also reachable via a bare "?" special-case so synthetic
+// tests that omit shiftKey still open the overlay (browsers send key="?").
+
+type ShortcutHandler = (event: KeyboardEvent) => boolean;
+
+const REGISTRY_HANDLERS: Readonly<Record<string, ShortcutHandler>> = {
+  'overlay.close': () => {
+    // Escape is handled before the dispatcher so modal/spotlight ordering is
+    // preserved; this entry exists so matchShortcut remains complete.
+    return false;
+  },
+  'preferences.open': () => {
+    openPreferences();
+    return true;
+  },
+  'reader.mode.toggle': () => {
+    setPreference('readerMode', !preferences().readerMode);
+    return true;
+  },
+  'navigation.unread.next': () => {
+    navigateNextUnread();
+    return true;
+  },
+  'conversation.follow.toggle': () => {
+    toggleActiveFollow();
+    return true;
+  },
+  'keyboard.help': () => {
+    toggleKeyboardHelp();
+    return true;
+  },
+  'navigation.channel.previous': () => {
+    navigateRelative(-1);
+    return true;
+  },
+  'navigation.channel.next': () => {
+    navigateRelative(1);
+    return true;
+  },
+  'members.toggle': () => {
+    getState().toggleMemberList();
+    return true;
+  },
+  'sidebar.focus': () => {
+    focusSidebar();
+    return true;
+  },
+  'composer.focus': (event) => {
+    if (isInteractiveTarget(event.target)) return false;
+    focusComposer();
+    return true;
+  },
+  'search.open': () => {
+    openMessageSearch();
+    return true;
+  },
+  'account.open': () => {
+    getState().openAccount();
+    return true;
+  },
+  'mark.read': () => {
+    markActiveRead();
+    return true;
+  },
+  'star.channel': () => {
+    toggleActiveStar();
+    return true;
+  },
+  'dnd.toggle': () => {
+    toggleDnd();
+    return true;
+  },
+  'composer.attach': () => clickComposerControl('button[aria-label="Attach files"]'),
+  // Prefer the stable data hook the composer already exposes.
+  'composer.schedule': () => clickComposerControl('[data-composer-schedule]'),
+};
+
+/** Registry ids that may fire while focus is inside an editable field. */
+const EDITABLE_ALLOWED_IDS = new Set(['preferences.open', 'overlay.close']);
+
+/**
+ * Composer-local chords that must remain available while the message box is
+ * focused (schedule send later is only useful mid-compose).
+ */
+const COMPOSER_EDITABLE_ALLOWED_IDS = new Set(['composer.schedule', 'composer.attach']);
+
 // ── Main hook ─────────────────────────────────────────────────────────────────
 
 const KEY_SEQUENCE_TIMEOUT_MS = 1200;
@@ -370,6 +604,7 @@ export function useKeyboardShortcuts(): void {
       return;
     }
     const inEditable = isEditableTarget(event.target);
+    const matched = matchShortcut(event);
 
     // ── Escape — always close overlays regardless of focus ──────────────────
     if (event.key === 'Escape') {
@@ -395,11 +630,25 @@ export function useKeyboardShortcuts(): void {
       return;
     }
 
-    // ── Cmd/Ctrl+, — preferences panel ─────────────────────────────────────
-    if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key === ',') {
+    // ── Preferences — allowed from editable targets ────────────────────────
+    if (matched?.id === 'preferences.open') {
       clearPendingPrefix();
       event.preventDefault();
       openPreferences();
+      return;
+    }
+
+    // ── Composer-local chords (schedule / attach) from the message box ─────
+    if (
+      matched &&
+      COMPOSER_EDITABLE_ALLOWED_IDS.has(matched.id) &&
+      isComposerInputTarget(event.target)
+    ) {
+      const handler = REGISTRY_HANDLERS[matched.id];
+      clearPendingPrefix();
+      if (handler?.(event)) {
+        event.preventDefault();
+      }
       return;
     }
 
@@ -409,23 +658,7 @@ export function useKeyboardShortcuts(): void {
       return;
     }
 
-    // ── Cmd/Ctrl+Shift+R — reader mode ─────────────────────────────────────
-    if ((event.metaKey || event.ctrlKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'r') {
-      clearPendingPrefix();
-      event.preventDefault();
-      setPreference('readerMode', !preferences().readerMode);
-      return;
-    }
-
-    // ── N — jump to next unread conversation ──────────────────────────────
-    if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'n') {
-      clearPendingPrefix();
-      event.preventDefault();
-      navigateNextUnread();
-      return;
-    }
-
-    // ── J/K — transcript message navigation ──────────────────────────────
+    // ── J/K — transcript message navigation (not a registry chord) ────────
     if (
       !event.metaKey &&
       !event.ctrlKey &&
@@ -442,7 +675,7 @@ export function useKeyboardShortcuts(): void {
       }
     }
 
-    // ── G sequences — time-native navigation ─────────────────────────────
+    // ── G sequences — time-native navigation (not single chords) ──────────
     if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'g') {
       event.preventDefault();
       armPrefix('g');
@@ -475,53 +708,18 @@ export function useKeyboardShortcuts(): void {
       clearPendingPrefix();
     }
 
-    // ── U — follow/unfollow current conversation ──────────────────────────
-    if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'u') {
-      clearPendingPrefix();
-      event.preventDefault();
-      toggleActiveFollow();
-      return;
-    }
-
-    // ── ? (Shift+/) — keyboard shortcuts help ───────────────────────────────
+    // ── Bare "?" — help overlay (shift optional for synthetic events) ─────
     if (event.key === '?') {
       clearPendingPrefix();
       event.preventDefault();
-      const state = getState();
-      if (state.showKeyboardShortcuts) {
-        state.closeKeyboardShortcuts();
-      } else {
-        state.openKeyboardShortcuts();
-      }
+      toggleKeyboardHelp();
       return;
     }
 
-    // ── Alt+↑ / Alt+↓ — channel navigation ──────────────────────────────────
-    if (event.altKey && event.key === 'ArrowUp') {
-      clearPendingPrefix();
-      event.preventDefault();
-      navigateRelative(-1);
-      return;
-    }
-
-    if (event.altKey && event.key === 'ArrowDown') {
-      clearPendingPrefix();
-      event.preventDefault();
-      navigateRelative(1);
-      return;
-    }
-
-    // ── Alt+M — toggle member list ───────────────────────────────────────────
-    if (event.altKey && event.key.toLowerCase() === 'm') {
-      clearPendingPrefix();
-      event.preventDefault();
-      getState().toggleMemberList();
-      return;
-    }
-
-    // ── Enter / Alt+Enter — focus composer ──────────────────────────────────
+    // ── Alt+Enter — dual of plain Enter for composer focus ────────────────
     if (
       event.key === 'Enter' &&
+      event.altKey &&
       !event.metaKey &&
       !event.ctrlKey &&
       !event.shiftKey &&
@@ -531,6 +729,18 @@ export function useKeyboardShortcuts(): void {
       event.preventDefault();
       focusComposer();
       return;
+    }
+
+    // ── Registry dispatch for remaining single-chord shortcuts ────────────
+    if (matched && !EDITABLE_ALLOWED_IDS.has(matched.id)) {
+      const handler = REGISTRY_HANDLERS[matched.id];
+      if (handler) {
+        clearPendingPrefix();
+        if (handler(event)) {
+          event.preventDefault();
+        }
+        return;
+      }
     }
   }
 

@@ -172,6 +172,23 @@ describe('channel management — raw command dispatch', () => {
     });
   });
 
+  it('flattens channel NOTICE bodies that are Discord webhook JSON', () => {
+    seed('#general', [makeUser('me', ['o'])]);
+    const body = JSON.stringify({
+      username: 'DeployBot',
+      content: 'Ship complete',
+      embeds: [{ title: 'Release', description: 'v2', fields: [{ name: 'sha', value: 'deadbeef' }] }],
+    });
+    feed(`:hook!bot@host NOTICE #general :${body}`);
+
+    const last = store.getState().channels.get('#general')?.messages.at(-1);
+    expect(last).toMatchObject({ type: 'notice', from: 'hook' });
+    expect(last?.text).toContain('DeployBot');
+    expect(last?.text).toContain('Ship complete');
+    expect(last?.text).toContain('sha: deadbeef');
+    expect(last?.text).not.toContain('{');
+  });
+
   it('stores Onyx Server topic tags on channel messages', () => {
     seed('#general', [makeUser('me', ['o'])]);
     feed(`@${TOPIC_TAG}=roadmap;msgid=m-topic :alice!a@host PRIVMSG #general :next milestone`);

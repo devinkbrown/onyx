@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@solidjs/testing-library';
 import { store } from '@/lib/store';
+import { emptyEventReplayFeed } from '@/lib/irc/eventReplayJson';
 import { OperEventConsole } from './OperEventConsole';
 
 const initial = store.getInitialState();
@@ -37,19 +38,49 @@ describe('OperEventConsole', () => {
     expect(screen.getByText(/WEBPUSH/)).toBeInTheDocument();
   });
 
-  it('offers EVENT REPLAY and sends when connected', () => {
+  it('offers EVENT REPLAY JSON and sends when connected', () => {
     const sendRaw = vi.fn();
     store.setState({
       isOper: true,
       connectionStatus: 'connected',
       client: { sendRaw } as never,
       serviceNotices: [],
+      operEventReplay: emptyEventReplayFeed(),
     });
     render(() => <OperEventConsole />);
     const btn = screen.getByTestId('oper-event-replay');
     expect(btn).not.toBeDisabled();
     btn.click();
-    expect(sendRaw).toHaveBeenCalledWith('EVENT', 'REPLAY', '50');
-    expect(screen.getByTestId('oper-event-replay-status')).toHaveTextContent(/EVENT REPLAY 50/);
+    expect(sendRaw).toHaveBeenCalledWith('EVENT', 'REPLAY', 'JSON', 'ALL', '50');
+    expect(screen.getByTestId('oper-event-replay-status')).toHaveTextContent(/EVENT REPLAY JSON ALL 50/);
+  });
+
+  it('renders structured JSON feed rows from store', () => {
+    store.setState({
+      isOper: true,
+      serviceNotices: [],
+      operEventReplay: {
+        pending: false,
+        severityFloor: 'debug',
+        expectedCount: 1,
+        complete: true,
+        receivedAt: Date.now(),
+        events: [
+          {
+            ts: 1_720_000_000_000,
+            category: 'kill',
+            categoryCode: 'KILL',
+            severity: 'warn',
+            origin: 'node-a',
+            message: 'killed badactor',
+          },
+        ],
+      },
+    });
+    render(() => <OperEventConsole />);
+    expect(screen.getByTestId('oper-event-json-list')).toBeInTheDocument();
+    expect(screen.getByTestId('oper-event-json-cat')).toHaveTextContent('KILL');
+    expect(screen.getByTestId('oper-event-json-sev')).toHaveTextContent('warn');
+    expect(screen.getByTestId('oper-event-json-text')).toHaveTextContent(/killed badactor/);
   });
 });

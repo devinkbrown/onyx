@@ -153,10 +153,13 @@ import '@/lib/prefs/preferences.css';
 import { CLOCKS,
   DENSITIES,
   FONT_SCALES,
+  REACTION_DENSITIES,
   WIDTHS,
   closePreferences,
+  formatBlockedHosts,
   isPreferencesOpen,
   openPreferences,
+  parseBlockedHosts,
   preferenceOpenRequest,
   preferences,
   resetPreferences,
@@ -164,6 +167,7 @@ import { CLOCKS,
   type Density,
   type FontScale,
   type PreferenceCategory,
+  type ReactionDensityPref,
   type Width,
 } from '@/lib/prefs/preferences';
 
@@ -171,6 +175,13 @@ const CLOCK_LABELS = { '24h': '24-hour', '12h': '12-hour' } as const;
 const DENSITY_LABELS: Record<Density, string> = { compact: 'Compact', cozy: 'Cozy', roomy: 'Roomy' };
 const FONT_SCALE_LABELS: Record<FontScale, string> = { sm: 'Small', md: 'Medium', lg: 'Large' };
 const WIDTH_LABELS: Record<Width, string> = { measured: 'Measured', full: 'Full-width' };
+/** Labels avoid "Compact" so they never collide with Message density radios. */
+const REACTION_DENSITY_LABELS: Record<ReactionDensityPref, string> = {
+  full: 'Full',
+  compact: 'Fewer',
+  'counts-only': 'Total',
+  hidden: 'Hidden',
+};
 const SCENE_MOTION_LABELS: Record<SceneMotion, string> = {
   animated: 'Animated',
   still: 'Still',
@@ -511,6 +522,65 @@ function Toggle(props: ToggleProps): JSX.Element {
         <span class="pref-switch" aria-hidden="true" />
       </button>
       {props.children}
+    </section>
+  );
+}
+
+/**
+ * Comma-separated host suffix blocklist for link unfurls. Draft text stays
+ * local until blur/Enter so partial typing is not persisted mid-keystroke.
+ */
+function BlockedHostsControl(): JSX.Element {
+  const descId = createUniqueId();
+  const inputId = createUniqueId();
+  const [draft, setDraft] = createSignal(formatBlockedHosts(preferences().blockedHosts));
+  let lastCommitted = formatBlockedHosts(preferences().blockedHosts);
+
+  createEffect(() => {
+    const next = formatBlockedHosts(preferences().blockedHosts);
+    // External preference writes (import / reset) should refresh the field.
+    if (next !== lastCommitted) {
+      lastCommitted = next;
+      setDraft(next);
+    }
+  });
+
+  const commit = (): void => {
+    const hosts = parseBlockedHosts(draft());
+    const formatted = formatBlockedHosts(hosts);
+    setDraft(formatted);
+    lastCommitted = formatted;
+    setPreference('blockedHosts', hosts);
+  };
+
+  return (
+    <section class="pref-group">
+      <div class="pref-group-head">
+        <h3 class="pref-label">Blocked hosts</h3>
+      </div>
+      <p class="pref-desc" id={descId}>
+        Never unfurl links whose hostname matches these suffixes (comma-separated), e.g. intranet.local, tracker.example.
+      </p>
+      <label class="pref-label" for={inputId}>Host suffixes</label>
+      <input
+        id={inputId}
+        class="pref-text-input"
+        type="text"
+        data-testid="pref-blocked-hosts"
+        aria-describedby={descId}
+        spellcheck={false}
+        autocomplete="off"
+        placeholder="intranet.local, ads.example"
+        value={draft()}
+        onInput={(event) => setDraft(event.currentTarget.value)}
+        onBlur={() => commit()}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+          }
+        }}
+      />
     </section>
   );
 }
@@ -3502,6 +3572,22 @@ export function PreferencesPanel(): JSX.Element {
               description="Show link details fetched through this server. Same-site media loads inline; external images wait for you to approve them."
               value={() => preferences().linkPreviews}
               onToggle={(value) => setPreference('linkPreviews', value)}
+            />
+            <Toggle
+              legend="HTTPS-only previews"
+              title="Only unfurl https links"
+              description="When on, plain http links never fetch a preview or media unfurl. Recommended for privacy."
+              value={() => preferences().httpsOnly}
+              onToggle={(value) => setPreference('httpsOnly', value)}
+            />
+            <BlockedHostsControl />
+            <Segmented
+              legend="Reaction density"
+              description="How densely boost and reaction pills render under messages — full chips, fewer chips, a single total, or hidden."
+              options={REACTION_DENSITIES}
+              labels={REACTION_DENSITY_LABELS}
+              value={() => preferences().reactionDensity}
+              onSelect={(value) => setPreference('reactionDensity', value)}
             />
             <Toggle
               legend="Encrypted DMs"

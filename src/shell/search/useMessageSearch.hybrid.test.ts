@@ -19,6 +19,8 @@ import {
 interface OwnedSearchOptions {
   signal?: AbortSignal;
   owner?: DeviceMemoryOwner;
+  activeTarget?: string;
+  selfNick?: string;
 }
 const searchVaultMock = vi.fn<(
   query: string,
@@ -142,7 +144,12 @@ describe('useMessageSearch — hybrid vault mode', () => {
     expect(searchVaultHybridMock).toHaveBeenCalledTimes(1);
     expect(searchVaultHybridMock).toHaveBeenCalledWith(
       'migration',
-      expect.objectContaining({ owner: MEMORY_OWNER, signal: expect.any(AbortSignal) }),
+      expect.objectContaining({
+        owner: MEMORY_OWNER,
+        signal: expect.any(AbortSignal),
+        activeTarget: '#root',
+        selfNick: 'alice',
+      }),
     );
     expect(searchVaultMock).not.toHaveBeenCalled();
     expect(searchVaultSemanticMock).not.toHaveBeenCalled();

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ENVELOPE_PREFIX } from '@/lib/e2ee/dmCipher';
+import { GROUP_ENVELOPE_PREFIX } from '@/lib/e2ee/groupEnvelope';
 
 import {
   ENCRYPTED_NOTIFICATION_BODY,
@@ -49,5 +50,16 @@ describe('notificationBodyFor', () => {
   it('fail-closes even when the envelope is shorter than the display truncate limit', () => {
     const shortEnvelope = `${ENVELOPE_PREFIX}abc`;
     expect(notificationBodyFor(shortEnvelope)).toBe(ENCRYPTED_NOTIFICATION_BODY);
+  });
+
+  it('fail-closes ONYXROOM1 group envelopes (never leaks room ciphertext)', () => {
+    const envelope = `${GROUP_ENVELOPE_PREFIX}opaque-room-ciphertext-blob`;
+    expect(isNotificationEnvelope(envelope)).toBe(true);
+    expect(notificationBodyFor(envelope)).toBe(ENCRYPTED_NOTIFICATION_BODY);
+    expect(notificationBodyFor(envelope)).not.toContain('opaque-room');
+    expect(notificationBodyFor(` \t${envelope}`)).toBe(ENCRYPTED_NOTIFICATION_BODY);
+    expect(notificationBodyFor('talking about ONYXROOM1 offline')).toBe(
+      'talking about ONYXROOM1 offline',
+    );
   });
 });

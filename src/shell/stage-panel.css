@@ -150,11 +150,27 @@
   border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.06));
 }
 
+.oper-event-console__row--json {
+  grid-template-columns: 5.5rem 3.5rem 1fr;
+}
+
 .oper-event-console__src {
   color: var(--muted, #9aa3b2);
   font-family: ui-monospace, monospace;
 }
 
+.oper-event-console__sev {
+  color: var(--accent, #8ab4ff);
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  text-transform: lowercase;
+}
+
 .oper-event-console__text {
   word-break: break-word;
+}
+
+.oper-event-console__list--json {
+  margin-bottom: 0.75rem;
+  border-color: color-mix(in srgb, var(--accent, #8ab4ff) 35%, var(--border, rgba(255, 255, 255, 0.08)));
 }

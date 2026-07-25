@@ -86,6 +86,60 @@ export const SHORTCUTS: readonly Shortcut[] = [
     label: 'Open preferences',
     group: 'Appearance',
   },
+  {
+    id: 'search.open',
+    chord: { key: 'f', mod: true },
+    label: 'Search messages',
+    group: 'Reading',
+  },
+  {
+    id: 'account.open',
+    chord: { key: 'a', mod: true, shift: true },
+    label: 'Open account',
+    group: 'Navigation',
+  },
+  {
+    id: 'members.toggle',
+    chord: { key: 'm', alt: true },
+    label: 'Toggle member list',
+    group: 'Navigation',
+  },
+  {
+    id: 'sidebar.focus',
+    chord: { key: 's', alt: true },
+    label: 'Focus channel sidebar',
+    group: 'Navigation',
+  },
+  {
+    id: 'mark.read',
+    chord: { key: 'e', mod: true, shift: true },
+    label: 'Mark conversation read',
+    group: 'Reading',
+  },
+  {
+    id: 'composer.attach',
+    chord: { key: 'u', mod: true, shift: true },
+    label: 'Attach a file',
+    group: 'Composing',
+  },
+  {
+    id: 'composer.schedule',
+    chord: { key: 'l', mod: true, shift: true },
+    label: 'Schedule send later',
+    group: 'Composing',
+  },
+  {
+    id: 'dnd.toggle',
+    chord: { key: 'd', mod: true, shift: true },
+    label: 'Toggle do not disturb',
+    group: 'Appearance',
+  },
+  {
+    id: 'star.channel',
+    chord: { key: 'b', mod: true },
+    label: 'Star / unstar channel',
+    group: 'Reading',
+  },
 ] as const;
 
 type ElementLikeTarget = EventTarget & {
@@ -141,4 +195,58 @@ export function isTypingTarget(target: EventTarget | null): boolean {
     target.isContentEditable === true ||
     hasContentEditableAttribute(target)
   );
+}
+
+/**
+ * Format a chord for the help overlay.
+ * Modifier chords show dual macOS / Windows labels (e.g. "⌘K / Ctrl+K").
+ */
+export function formatChordDisplay(chord: Chord): string {
+  const keyPart = displayKey(chord.key);
+
+  if (chord.mod) {
+    const mac = `⌘${chord.shift ? '⇧' : ''}${chord.alt ? '⌥' : ''}${keyPart}`;
+    const win: string[] = ['Ctrl'];
+    if (chord.shift) win.push('Shift');
+    if (chord.alt) win.push('Alt');
+    win.push(keyPart);
+    return `${mac} / ${win.join('+')}`;
+  }
+
+  const parts: string[] = [];
+  if (chord.alt) parts.push('Alt');
+  if (chord.shift) parts.push('Shift');
+  parts.push(keyPart);
+  return parts.join('+');
+}
+
+function displayKey(key: string): string {
+  switch (key) {
+    case 'ArrowUp':
+      return '↑';
+    case 'ArrowDown':
+      return '↓';
+    case 'ArrowLeft':
+      return '←';
+    case 'ArrowRight':
+      return '→';
+    case 'Escape':
+      return 'Esc';
+    case 'Enter':
+      return 'Enter';
+    case ' ':
+      return 'Space';
+    default:
+      return key.length === 1 ? key.toUpperCase() : key;
+  }
+}
+
+/**
+ * Look up a registry entry by stable id.
+ */
+export function shortcutById(
+  id: string,
+  registry: readonly Shortcut[] = SHORTCUTS,
+): Shortcut | undefined {
+  return registry.find((shortcut) => shortcut.id === id);
 }

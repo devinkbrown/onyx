@@ -20,6 +20,50 @@ export const DEFAULT_UNFURL_PRIVACY: UnfurlPrivacyPrefs = {
   blockedHosts: [],
 };
 
+/**
+ * SSRF / scheme gate only — does **not** enforce user unfurl prefs.
+ * Used by import/emoji URL safety and as the default for `isPreviewableUrl`
+ * when no privacy object is supplied. Unfurl sinks (MessageText OG cards)
+ * must pass an explicit prefs object from `unfurlPrivacyFromPrefs`.
+ */
+export const PREVIEW_SSRF_ONLY: UnfurlPrivacyPrefs = {
+  linkPreviews: true,
+  httpsOnly: false,
+  blockedHosts: [],
+};
+
+/**
+ * Map the user's `linkPreviews` preference into full unfurl privacy prefs.
+ * Fail closed: inherits https-only + blocked-host defaults from
+ * `DEFAULT_UNFURL_PRIVACY`.
+ */
+export function unfurlPrivacyFromLinkPreviews(
+  linkPreviews: boolean,
+  overrides: Partial<Omit<UnfurlPrivacyPrefs, 'linkPreviews'>> = {},
+): UnfurlPrivacyPrefs {
+  return {
+    ...DEFAULT_UNFURL_PRIVACY,
+    ...overrides,
+    linkPreviews,
+  };
+}
+
+/**
+ * Map display preferences onto the unfurl privacy gate. Missing optional fields
+ * inherit fail-closed defaults from `DEFAULT_UNFURL_PRIVACY`. Prefer this at
+ * MessageText / OG sinks so PreferencesPanel https-only + host blocklist apply.
+ */
+export function unfurlPrivacyFromPrefs(input: {
+  readonly linkPreviews: boolean;
+  readonly httpsOnly?: boolean;
+  readonly blockedHosts?: readonly string[];
+}): UnfurlPrivacyPrefs {
+  return unfurlPrivacyFromLinkPreviews(input.linkPreviews, {
+    ...(input.httpsOnly !== undefined ? { httpsOnly: input.httpsOnly } : {}),
+    ...(input.blockedHosts !== undefined ? { blockedHosts: [...input.blockedHosts] } : {}),
+  });
+}
+
 export function mayUnfurlUrl(url: string, prefs: UnfurlPrivacyPrefs = DEFAULT_UNFURL_PRIVACY): boolean {
   if (!prefs.linkPreviews) return false;
   let parsed: URL;

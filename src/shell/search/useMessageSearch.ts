@@ -8,7 +8,7 @@ import {
   useStore,
 } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
-import { isEnvelope } from '@/lib/e2ee/dmCipher';
+import { isEncryptedWireText } from '@/lib/e2ee/replyPrivacy';
 import { preferences } from '@/lib/prefs/preferences';
 import { VAULT_SEARCH_MODES, loadDefaultVaultSearchMode } from '@/lib/prefs/vaultSearchMode';
 import {
@@ -211,8 +211,9 @@ function sortedMessages(messages: readonly ChatMessage[]): ChatMessage[] {
  * text and must not enter recall terms; decrypted plaintext is transient store
  * state and remains device-only.
  */
-function visibleSearchText(message: ChatMessage, dmContext: boolean): string | null {
-  if (!message.encrypted && !(dmContext && isEnvelope(message.text))) return message.text;
+function visibleSearchText(message: ChatMessage, _dmContext: boolean): string | null {
+  // Fail closed on any wire envelope (DM or room), not only when `encrypted` is set.
+  if (!message.encrypted && !isEncryptedWireText(message.text)) return message.text;
   return typeof message.plaintext === 'string' && message.plaintext.length > 0
     ? message.plaintext
     : null;
@@ -292,6 +293,7 @@ export function useMessageSearch(): UseMessageSearch {
   const serverSearch = useStore((s) => s.serverSearch);
   const peerDmKeys = useStore((s) => s.peerDmKeys);
   const client = useStore((s) => s.client);
+  const ourNick = useStore((s) => s.ourNick);
   const memoryOwner = useStore(
     selectDeviceMemoryOwner,
     (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
@@ -345,7 +347,7 @@ export function useMessageSearch(): UseMessageSearch {
     // key-based capability; it must never reclassify existing ciphertext as a
     // conversation whose query is safe to send to server history.
     const containsEncryptedHistory = conversation?.messages.some(
-      (message) => message.encrypted || isEnvelope(message.text),
+      (message) => message.encrypted || isEncryptedWireText(message.text),
     ) ?? false;
     return containsEncryptedHistory
       || activeDmVaultPrivacy() !== 'plain'
@@ -385,12 +387,11 @@ export function useMessageSearch(): UseMessageSearch {
       // injected/stale store state can never turn a result click into a jump to
       // a conversation other than the one that was searched.
       .filter((message) => {
-        const view = activeView();
         const target = searchTarget();
         return target !== null
           && sameSearchTarget(message.target, target)
           && !message.encrypted
-          && !(view.kind === 'dm' && isEnvelope(message.text));
+          && !isEncryptedWireText(message.text);
       })
       .map((message, ordinal) => ({
         id: message.id,
@@ -526,6 +527,8 @@ export function useMessageSearch(): UseMessageSearch {
     const mode = vaultSearchMode();
     const localHistory = preferences().localHistory;
     const chantypes = channelTypes();
+    const affinityTarget = searchTarget();
+    const affinityNick = ourNick();
     const memoryContext = captureDeviceMemoryContext(getState());
     const owner = memoryContext?.owner;
     const ownerKey = owner ? deviceMemoryOwnerKey(owner) : null;
@@ -549,7 +552,13 @@ export function useMessageSearch(): UseMessageSearch {
         mode === 'semantic'
           ? searchVaultSemantic(query, { signal: abort.signal, owner })
           : mode === 'hybrid'
-            ? searchVaultHybrid(query, { signal: abort.signal, owner })
+            ? searchVaultHybrid(query, {
+              signal: abort.signal,
+              owner,
+              // Room + self affinity for rankingBoost second-pass after RRF.
+              ...(affinityTarget ? { activeTarget: affinityTarget } : {}),
+              ...(affinityNick ? { selfNick: affinityNick } : {}),
+            })
             : searchVault(query, 80, owner);
       void run
         .then((hits) => {
@@ -562,11 +571,13 @@ export function useMessageSearch(): UseMessageSearch {
             hits
               // Vault serialization strips plaintext by construction. An
               // encrypted hit is therefore only a ciphertext envelope.
+              // Channel targets may legitimately discuss envelope prefixes in
+              // plaintext; only drop envelopes for non-channel (DM) targets.
               .filter((hit) => (
                 !hit.message.encrypted
                 && (
                   (hit.target.length > 0 && chantypes.includes(hit.target[0]!))
-                  || !isEnvelope(hit.message.text)
+                  || !isEncryptedWireText(hit.message.text)
                 )
               ))
               .map((h) => ({

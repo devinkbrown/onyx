@@ -5,7 +5,14 @@
  * Unit tests for the pure shortcut registry matcher.
  */
 import { describe, expect, it } from 'vitest';
-import { isTypingTarget, matchShortcut, SHORTCUTS, type Shortcut } from './shortcutsRegistry';
+import {
+  formatChordDisplay,
+  isTypingTarget,
+  matchShortcut,
+  shortcutById,
+  SHORTCUTS,
+  type Shortcut,
+} from './shortcutsRegistry';
 
 type ShortcutEvent = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>;
 
@@ -84,6 +91,28 @@ describe('matchShortcut', () => {
     expect(modifiedMatch).toBeNull();
   });
 
+  it('matches composer.schedule with mod+shift+L', () => {
+    const match = matchShortcut(makeEvent({ key: 'l', ctrlKey: true, shiftKey: true }));
+    const metaMatch = matchShortcut(makeEvent({ key: 'L', metaKey: true, shiftKey: true }));
+    const withoutShift = matchShortcut(makeEvent({ key: 'l', ctrlKey: true }));
+
+    expect(match?.id).toBe('composer.schedule');
+    expect(metaMatch?.id).toBe('composer.schedule');
+    expect(withoutShift).toBeNull();
+  });
+
+  it('matches star.channel with mod+B only', () => {
+    const match = matchShortcut(makeEvent({ key: 'b', ctrlKey: true }));
+    const metaMatch = matchShortcut(makeEvent({ key: 'B', metaKey: true }));
+    const withShift = matchShortcut(makeEvent({ key: 'b', ctrlKey: true, shiftKey: true }));
+    const plain = matchShortcut(makeEvent({ key: 'b' }));
+
+    expect(match?.id).toBe('star.channel');
+    expect(metaMatch?.id).toBe('star.channel');
+    expect(withShift).toBeNull();
+    expect(plain).toBeNull();
+  });
+
   it('returns null for an unknown key', () => {
     expect(matchShortcut(makeEvent({ key: 'Unidentified' }))).toBeNull();
   });
@@ -131,6 +160,28 @@ describe('matchShortcut', () => {
     ];
 
     expect(matchShortcut(makeEvent({ key: 'x', ctrlKey: true }), registry)?.id).toBe('first');
+  });
+});
+
+describe('formatChordDisplay', () => {
+  it('formats dual platform labels for mod chords', () => {
+    expect(formatChordDisplay({ key: 'k', mod: true })).toBe('⌘K / Ctrl+K');
+    expect(formatChordDisplay({ key: 'r', mod: true, shift: true })).toBe('⌘⇧R / Ctrl+Shift+R');
+    expect(formatChordDisplay({ key: ',', mod: true })).toBe('⌘, / Ctrl+,');
+  });
+
+  it('formats alt and plain chords', () => {
+    expect(formatChordDisplay({ key: 'ArrowUp', alt: true })).toBe('Alt+↑');
+    expect(formatChordDisplay({ key: 'm', alt: true })).toBe('Alt+M');
+    expect(formatChordDisplay({ key: 'n' })).toBe('N');
+    expect(formatChordDisplay({ key: 'Escape' })).toBe('Esc');
+  });
+});
+
+describe('shortcutById', () => {
+  it('returns the registry entry for a stable id', () => {
+    expect(shortcutById('search.open')?.label).toBe('Search messages');
+    expect(shortcutById('missing.shortcut')).toBeUndefined();
   });
 });
 

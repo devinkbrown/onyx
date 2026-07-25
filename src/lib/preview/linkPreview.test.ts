@@ -39,6 +39,25 @@ describe('pickPreviewUrl', () => {
     ];
     expect(pickPreviewUrl(hrefs)).toBeNull();
   });
+  it('returns null when privacy disables linkPreviews', () => {
+    expect(pickPreviewUrl(['https://example.com/a'], {
+      linkPreviews: false,
+      httpsOnly: true,
+      blockedHosts: [],
+    })).toBeNull();
+  });
+  it('skips http candidates under httpsOnly privacy', () => {
+    expect(pickPreviewUrl(
+      ['http://insecure.example/a', 'https://secure.example/b'],
+      { linkPreviews: true, httpsOnly: true, blockedHosts: [] },
+    )).toBe('https://secure.example/b');
+  });
+  it('skips blocked host suffixes under privacy prefs', () => {
+    expect(pickPreviewUrl(
+      ['https://app.blocked.example/x', 'https://ok.example/y'],
+      { linkPreviews: true, httpsOnly: true, blockedHosts: ['blocked.example'] },
+    )).toBe('https://ok.example/y');
+  });
 });
 
 describe('isPreviewableUrl (SSRF defense in depth)', () => {
@@ -46,6 +65,16 @@ describe('isPreviewableUrl (SSRF defense in depth)', () => {
     expect(isPreviewableUrl('https://example.com/page')).toBe(true);
     expect(isPreviewableUrl('http://example.com')).toBe(true);
     expect(isPreviewableUrl('https://github.com/onyx/onyx?tab=readme')).toBe(true);
+  });
+
+  it('honors linkPreviews / httpsOnly / blockedHosts via mayUnfurlUrl when privacy is supplied', () => {
+    const off = { linkPreviews: false, httpsOnly: false, blockedHosts: [] as string[] };
+    const privacy = { linkPreviews: true, httpsOnly: true, blockedHosts: ['corp.example', 'evil.test'] };
+    expect(isPreviewableUrl('https://example.com/page', off)).toBe(false);
+    expect(isPreviewableUrl('http://example.com/page', privacy)).toBe(false);
+    expect(isPreviewableUrl('https://example.com/page', privacy)).toBe(true);
+    expect(isPreviewableUrl('https://intranet.corp.example/x', privacy)).toBe(false);
+    expect(isPreviewableUrl('https://tracker.evil.test/x', privacy)).toBe(false);
   });
 
   it('rejects dangerous / non-http(s) schemes', () => {
@@ -146,6 +175,17 @@ describe('fetchLinkPreview', () => {
     ]) {
       expect(await fetchLinkPreview(href)).toBeNull();
     }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('NEVER issues a fetch when linkPreviews privacy is off', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await fetchLinkPreview('https://example.com/page', {
+      linkPreviews: false,
+      httpsOnly: true,
+      blockedHosts: [],
+    })).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { ChatMessage } from '@/lib/irc/types';
-import { isEnvelope } from '@/lib/e2ee/dmCipher';
+import { isEncryptedWireText } from '@/lib/e2ee/replyPrivacy';
 
 export interface HomeMemoryItem {
   target: string;
@@ -109,8 +109,8 @@ export async function buildHomeMemory(
 
 function previewText(message: ChatMessage): string {
   // Fail closed on ciphertext: honor the encrypted flag and detect legacy vault
-  // rows that stored a ONYXDM1 envelope without setting `encrypted`.
-  if ((message.encrypted || isEnvelope(message.text)) && !message.plaintext) {
+  // rows that stored an ONYXDM1/ONYXROOM1 envelope without setting `encrypted`.
+  if ((message.encrypted || isEncryptedWireText(message.text)) && !message.plaintext) {
     return 'Encrypted message';
   }
 

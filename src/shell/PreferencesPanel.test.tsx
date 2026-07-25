@@ -809,6 +809,12 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('switch', { name: /Show join voice\/video controls/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('switch', { name: /Show topic, forum, and follow controls/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: /Show shared watch activity/i })).toHaveAttribute('aria-checked', 'true');
+    const reactionDensity = screen.getByRole('radiogroup', { name: 'Reaction density' });
+    expect(reactionDensity).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Full' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Fewer' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: 'Total' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: 'Hidden' })).toHaveAttribute('aria-checked', 'false');
     selectPreferenceCategory('Import & export');
     expect(screen.getByRole('heading', { name: 'Portable vault' })).toBeInTheDocument();
     expect(screen.getByText(/Saved query text is included/i)).toBeInTheDocument();
@@ -1631,6 +1637,21 @@ describe('PreferencesPanel', () => {
 
     fireEvent.keyDown(group, { key: 'ArrowLeft' });
     expect(screen.getByRole('radio', { name: 'Roomy' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('persists reaction density from the Conversation segmented control', () => {
+    renderPreferences('Conversation');
+
+    expect(preferences().reactionDensity).toBe('full');
+    fireEvent.click(screen.getByRole('radio', { name: 'Fewer' }));
+    expect(preferences().reactionDensity).toBe('compact');
+    expect(screen.getByRole('radio', { name: 'Fewer' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Total' }));
+    expect(preferences().reactionDensity).toBe('counts-only');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Hidden' }));
+    expect(preferences().reactionDensity).toBe('hidden');
   });
 
   it('exposes toggles as switches without a conflicting aria-pressed state', () => {

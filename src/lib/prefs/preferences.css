@@ -1185,6 +1185,25 @@
   outline-offset: 2px;
 }
 
+.pref-text-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 62%, transparent);
+  color: var(--paper);
+  font: 0.8rem/1.4 var(--font-mono);
+  padding: var(--space-2) var(--space-3);
+}
+
+.pref-text-input:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.pref-text-input::placeholder {
+  color: var(--paper-dim);
+}
+
 .pref-extension-review {
   display: grid;
   gap: var(--space-2);

@@ -8,6 +8,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Channel, ChatMessage } from '@/lib/irc/types';
+import { revisionsFor } from '@/lib/vault/editHistory';
 import { store } from './store';
 
 const initialState = store.getInitialState();
@@ -75,6 +76,7 @@ describe('outbound EDIT', () => {
     const mine = textMsg({ id: 'm1', from: 'me', target: '#room', text: 'old body' });
     store.setState({
       channels: new Map([channel('#room', [mine])]),
+      editHistory: {},
     });
 
     store.getState().editMessage('#room', 'm1', 'new body');
@@ -90,30 +92,49 @@ describe('outbound EDIT', () => {
       text: 'new body',
       edited: true,
     });
+    expect(revisionsFor(store.getState().editHistory, 'm1').map((r) => r.body)).toEqual(['old body']);
+  });
+
+  it('stacks prior bodies across successive local edits', () => {
+    const mine = textMsg({ id: 'm1', from: 'me', target: '#room', text: 'v1' });
+    store.setState({
+      channels: new Map([channel('#room', [mine])]),
+      editHistory: {},
+    });
+
+    store.getState().editMessage('#room', 'm1', 'v2');
+    store.getState().editMessage('#room', 'm1', 'v3');
+
+    expect(store.getState().channels.get('#room')!.messages[0]!.text).toBe('v3');
+    expect(revisionsFor(store.getState().editHistory, 'm1').map((r) => r.body)).toEqual(['v1', 'v2']);
   });
 
   it('refuses to edit someone else’s message', () => {
     const theirs = textMsg({ id: 'm1', from: 'alice', target: '#room' });
     store.setState({
       channels: new Map([channel('#room', [theirs])]),
+      editHistory: {},
     });
 
     store.getState().editMessage('#room', 'm1', 'hijack');
 
     expect(store.getState().client!.sendRaw).not.toHaveBeenCalled();
     expect(store.getState().channels.get('#room')!.messages[0]!.text).toBe('original');
+    expect(store.getState().editHistory).toEqual({});
   });
 
   it('is a no-op without draft/message-editing', () => {
     store.setState({
       client: mockClient([]),
       channels: new Map([channel('#room', [textMsg({ id: 'm1', from: 'me', target: '#room' })])]),
+      editHistory: {},
     });
 
     store.getState().editMessage('#room', 'm1', 'nope');
 
     expect(store.getState().client!.sendRaw).not.toHaveBeenCalled();
     expect(store.getState().channels.get('#room')!.messages[0]!.edited).toBeUndefined();
+    expect(store.getState().editHistory).toEqual({});
   });
 });
 

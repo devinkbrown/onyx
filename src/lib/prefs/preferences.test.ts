@@ -6,14 +6,18 @@ import {
   applyPreferences,
   applyPreferencesSnapshot,
   closePreferences,
+  formatBlockedHosts,
   isPreferencesOpen,
   loadPreferences,
+  MAX_BLOCKED_HOSTS,
   MAX_PREFERENCES_STORAGE_CHARS,
   openPreferences,
+  parseBlockedHosts,
   parsePreferencesSnapshot,
   preferenceOpenRequest,
   preferences,
   resetPreferences,
+  sanitizeBlockedHost,
   setPreference,
   type Preferences,
 } from './preferences';
@@ -62,6 +66,8 @@ describe('preferences store', () => {
         reduceTransparency: true,
         highContrast: false,
         linkPreviews: true,
+        httpsOnly: true,
+        blockedHosts: [],
         clock: '24h',
         localHistory: true,
         e2eeDms: true,
@@ -69,6 +75,7 @@ describe('preferences store', () => {
         voiceEntry: true,
         topicTools: false,
         watchTogether: true,
+        reactionDensity: 'full',
       });
     });
 
@@ -87,6 +94,8 @@ describe('preferences store', () => {
         reduceTransparency: DEFAULT_PREFERENCES.reduceTransparency,
         highContrast: DEFAULT_PREFERENCES.highContrast,
         linkPreviews: true,
+        httpsOnly: true,
+        blockedHosts: [],
         clock: '24h',
         localHistory: true,
         e2eeDms: true,
@@ -94,6 +103,7 @@ describe('preferences store', () => {
         voiceEntry: true,
         topicTools: false,
         watchTogether: true,
+        reactionDensity: DEFAULT_PREFERENCES.reactionDensity,
       });
     });
 
@@ -117,6 +127,7 @@ describe('preferences store', () => {
           voiceEntry: true,
           topicTools: 'yes',
           watchTogether: false,
+          reactionDensity: 'not-a-mode',
         }),
       );
 
@@ -130,6 +141,7 @@ describe('preferences store', () => {
         e2eeDms: false,
         voiceEntry: true,
         watchTogether: false,
+        reactionDensity: DEFAULT_PREFERENCES.reactionDensity,
       });
     });
 
@@ -189,6 +201,8 @@ describe('preferences store', () => {
           reduceTransparency: true,
           highContrast: true,
           linkPreviews: false,
+          httpsOnly: false,
+          blockedHosts: ['Intranet.Local', '  ads.example  ', 'https://evil', 'ads.example'],
           clock: '12h',
           localHistory: false,
           e2eeDms: false,
@@ -196,6 +210,7 @@ describe('preferences store', () => {
           voiceEntry: false,
           topicTools: true,
           watchTogether: false,
+          reactionDensity: 'counts-only',
         }),
       );
 
@@ -209,6 +224,8 @@ describe('preferences store', () => {
         reduceTransparency: true,
         highContrast: true,
         linkPreviews: false,
+        httpsOnly: false,
+        blockedHosts: ['intranet.local', 'ads.example'],
         clock: '12h',
         localHistory: false,
         e2eeDms: false,
@@ -216,7 +233,39 @@ describe('preferences store', () => {
         voiceEntry: false,
         topicTools: true,
         watchTogether: false,
+        reactionDensity: 'counts-only',
       });
+    });
+
+    it('restores a valid reactionDensity value', () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ reactionDensity: 'hidden' }));
+      expect(loadPreferences().reactionDensity).toBe('hidden');
+    });
+  });
+
+  describe('blocked host helpers', () => {
+    it('sanitizes hostname suffixes and rejects schemes/paths', () => {
+      expect(sanitizeBlockedHost('  .Corp.Local.  ')).toBe('corp.local');
+      expect(sanitizeBlockedHost('https://evil.example')).toBeNull();
+      expect(sanitizeBlockedHost('evil.example/path')).toBeNull();
+      expect(sanitizeBlockedHost('user@host')).toBeNull();
+      expect(sanitizeBlockedHost('')).toBeNull();
+    });
+
+    it('parses comma-separated free text and caps list length', () => {
+      expect(parseBlockedHosts('a.example, b.example, a.example')).toEqual(['a.example', 'b.example']);
+      expect(formatBlockedHosts(['a.example', 'b.example'])).toBe('a.example, b.example');
+      const many = Array.from({ length: MAX_BLOCKED_HOSTS + 5 }, (_, i) => `h${i}.example`);
+      expect(parseBlockedHosts(many)).toHaveLength(MAX_BLOCKED_HOSTS);
+    });
+
+    it('persists httpsOnly and blockedHosts via setPreference', () => {
+      setPreference('httpsOnly', false);
+      setPreference('blockedHosts', ['tracker.example']);
+      expect(preferences().httpsOnly).toBe(false);
+      expect(preferences().blockedHosts).toEqual(['tracker.example']);
+      expect(readStored().httpsOnly).toBe(false);
+      expect(readStored().blockedHosts).toEqual(['tracker.example']);
     });
   });
 
@@ -254,6 +303,15 @@ describe('preferences store', () => {
       expect(before.density).toBe(DEFAULT_PREFERENCES.density);
     });
 
+    it('updates reactionDensity immutably and persists it', () => {
+      const before = preferences();
+      setPreference('reactionDensity', 'counts-only');
+      expect(preferences().reactionDensity).toBe('counts-only');
+      expect(before.reactionDensity).toBe(DEFAULT_PREFERENCES.reactionDensity);
+      expect(before).not.toBe(preferences());
+      expect(readStored().reactionDensity).toBe('counts-only');
+    });
+
     it('persists each change to localStorage', () => {
       setPreference('fontScale', 'lg');
       setPreference('hideEvents', true);
@@ -282,6 +340,8 @@ describe('preferences store', () => {
         reduceTransparency: true,
         highContrast: true,
         linkPreviews: false,
+        httpsOnly: true,
+        blockedHosts: [],
         clock: '12h',
         localHistory: false,
         e2eeDms: false,
@@ -289,6 +349,7 @@ describe('preferences store', () => {
         voiceEntry: false,
         topicTools: true,
         watchTogether: false,
+        reactionDensity: 'compact',
       });
       const ds = document.documentElement.dataset;
       expect(ds.density).toBe('compact');

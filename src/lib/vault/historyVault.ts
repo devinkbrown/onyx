@@ -14,8 +14,10 @@
  *    reply metadata survive; functions/Sets never enter a ChatMessage.
  */
 import type { ChatMessage } from '@/lib/irc/types';
-import { isEnvelope } from '@/lib/e2ee/dmCipher';
-import { sanitizePersistedReplyPreviewText } from '@/lib/e2ee/replyPrivacy';
+import {
+  isEncryptedWireText,
+  sanitizePersistedReplyPreviewText,
+} from '@/lib/e2ee/replyPrivacy';
 import {
   deviceMemoryOwnerKey,
   normalizeDeviceMemoryOwner,
@@ -417,7 +419,7 @@ export async function saveMessages(
   if (msgs.length === 0) return true;
   const physicalTarget = physicalTargetKey(target, safeOwner ?? undefined);
   const privacyTracked = isVaultDmSearchPrivacyTracked(physicalTarget)
-    || msgs.some((message) => message.encrypted || isEnvelope(message.text));
+    || msgs.some((message) => message.encrypted || isEncryptedWireText(message.text));
   // Invalidate before the first await. SEARCH is synchronous, so even the small
   // window while a write is opening IndexedDB must not reuse an older `plain`.
   if (privacyTracked) invalidateVaultDmSearchPrivacy(physicalTarget);
@@ -526,7 +528,7 @@ export async function classifyVaultDmSearchPrivacy(
         const cursor = req.result;
         if (!cursor) return;
         const row = cursor.value as StoredMessage;
-        if (row.encrypted || isEnvelope(row.text)) {
+        if (row.encrypted || isEncryptedWireText(row.text)) {
           result = 'encrypted';
           return;
         }

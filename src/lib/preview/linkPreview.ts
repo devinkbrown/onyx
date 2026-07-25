@@ -16,6 +16,11 @@
  * hostile URLs (javascript:/data:, localhost, 169.254.169.254, …) off the wire.
  */
 import { fetchPublicJson } from '@/lib/stats/fetchPublicJson';
+import {
+  mayUnfurlUrl,
+  PREVIEW_SSRF_ONLY,
+  type UnfurlPrivacyPrefs,
+} from './unfurlPrivacy';
 
 export interface LinkPreview {
   url: string;
@@ -97,8 +102,15 @@ function isPrivateIPv6(host: string): boolean {
  * IP literals). This is defense in depth — the server endpoint is the real
  * SSRF boundary — but it keeps obviously-hostile URLs off the wire entirely.
  */
-export function isPreviewableUrl(href: string): boolean {
+export function isPreviewableUrl(
+  href: string,
+  privacy: UnfurlPrivacyPrefs = PREVIEW_SSRF_ONLY,
+): boolean {
   if (href.length === 0 || href.length > LINK_PREVIEW_URL_MAX) return false;
+  // Shared privacy gate (linkPreviews off, https-only, blocked hosts, private
+  // nets) — fail closed. Unfurl sinks must pass privacy from
+  // `unfurlPrivacyFromPrefs(preferences())` so https-only + host blocklist apply.
+  if (!mayUnfurlUrl(href, privacy)) return false;
   let parsed: URL;
   try {
     parsed = new URL(href);
@@ -123,10 +135,16 @@ export function isPreviewableUrl(href: string): boolean {
  * Pick the URL to preview from a message's link hrefs: the first plain http(s)
  * web link that is not one of our own uploads (those render as inline media)
  * and is not an internal / non-routable target.
+ *
+ * Pass `privacy` from user preferences at unfurl sinks so `linkPreviews` /
+ * https-only / blocked hosts are enforced via `mayUnfurlUrl`.
  */
-export function pickPreviewUrl(hrefs: readonly string[]): string | null {
+export function pickPreviewUrl(
+  hrefs: readonly string[],
+  privacy: UnfurlPrivacyPrefs = PREVIEW_SSRF_ONLY,
+): string | null {
   for (const href of hrefs.slice(0, LINK_PREVIEW_HREF_SCAN_MAX)) {
-    if (!isPreviewableUrl(href)) continue;
+    if (!isPreviewableUrl(href, privacy)) continue;
     const parsed = new URL(href);
     if (SKIP_HOSTS.has(parsed.hostname) && parsed.pathname.startsWith('/uploads/')) continue;
     return href;
@@ -158,11 +176,18 @@ function normalize(raw: unknown, url: string): LinkPreview | null {
 const cache = new Map<string, Promise<LinkPreview | null>>();
 const CACHE_CAP = 300;
 
-/** Fetch (or replay) the preview for a URL. Resolves null on any failure. */
-export function fetchLinkPreview(url: string): Promise<LinkPreview | null> {
-  // Fail closed: an unsafe target never reaches the network. Not cached — a
-  // rejected URL is cheap to re-validate and we don't want it holding a slot.
-  if (!isPreviewableUrl(url)) return Promise.resolve(null);
+/**
+ * Fetch (or replay) the preview for a URL. Resolves null on any failure.
+ * Pass `privacy` at unfurl sinks so disabled `linkPreviews` never hits the wire.
+ */
+export function fetchLinkPreview(
+  url: string,
+  privacy: UnfurlPrivacyPrefs = PREVIEW_SSRF_ONLY,
+): Promise<LinkPreview | null> {
+  // Fail closed: an unsafe / privacy-blocked target never reaches the network.
+  // Not cached — a rejected URL is cheap to re-validate and we don't want it
+  // holding a slot.
+  if (!isPreviewableUrl(url, privacy)) return Promise.resolve(null);
 
   const cached = cache.get(url);
   if (cached) return cached;

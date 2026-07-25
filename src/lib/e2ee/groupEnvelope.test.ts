@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   GROUP_ENVELOPE_PREFIX,
+  GROUP_LOCKED_PLACEHOLDER,
+  groupMessageDisplayText,
   isGroupEnvelope,
   openGroupMessage,
   packGroupEnvelope,
@@ -41,5 +43,15 @@ describe('groupEnvelope (C1 foundation)', () => {
     expect(parseGroupEnvelope('not-an-envelope')).toBeNull();
     expect(packGroupEnvelope(-1, new Uint8Array(12), new Uint8Array(16))).toBeNull();
     expect(packGroupEnvelope(1, new Uint8Array(8), new Uint8Array(16))).toBeNull();
+  });
+
+  it('display helper never paints ONYXROOM1 ciphertext (fail closed)', async () => {
+    const key = await testKey();
+    const envelope = (await sealGroupMessage(key, 1, 'room secret'))!;
+    expect(groupMessageDisplayText(envelope)).toBe(GROUP_LOCKED_PLACEHOLDER);
+    expect(groupMessageDisplayText(envelope)).not.toContain('room secret');
+    expect(groupMessageDisplayText(envelope)).not.toContain(GROUP_ENVELOPE_PREFIX.trim());
+    expect(groupMessageDisplayText(envelope, 'opened body')).toBe('opened body');
+    expect(groupMessageDisplayText('ordinary room chat')).toBe('ordinary room chat');
   });
 });

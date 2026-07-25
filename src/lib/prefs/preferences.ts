@@ -27,6 +27,9 @@ export type Width = (typeof WIDTHS)[number];
 export const CLOCKS = ['24h', '12h'] as const;
 export type Clock = (typeof CLOCKS)[number];
 
+export const REACTION_DENSITIES = ['full', 'compact', 'counts-only', 'hidden'] as const;
+export type ReactionDensityPref = (typeof REACTION_DENSITIES)[number];
+
 export const PREFERENCE_CATEGORY_IDS = [
   'display',
   'conversation',
@@ -57,6 +60,10 @@ export interface Preferences {
   highContrast: boolean;
   /** Unfurl the first web link in a message into an OG preview card. */
   linkPreviews: boolean;
+  /** When true, only https targets may unfurl (http blocked). Default on. */
+  httpsOnly: boolean;
+  /** Host suffixes that must never unfurl (lowercase), e.g. "intranet.local". */
+  blockedHosts: string[];
   /** Timestamp clock format for messages and sidebar activity. */
   clock: Clock;
   /** Local-first scrollback: persist conversations to this device (vault). */
@@ -71,6 +78,8 @@ export interface Preferences {
   topicTools: boolean;
   /** Show shared watch-together activity above the feed. */
   watchTogether: boolean;
+  /** How densely reaction/boost pills render under messages. */
+  reactionDensity: ReactionDensityPref;
 }
 
 export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
@@ -83,6 +92,8 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   reduceTransparency: false,
   highContrast: false,
   linkPreviews: true,
+  httpsOnly: true,
+  blockedHosts: [],
   clock: '24h',
   localHistory: true,
   e2eeDms: true,
@@ -90,7 +101,55 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   voiceEntry: true,
   topicTools: false,
   watchTogether: true,
+  reactionDensity: 'full',
 };
+
+/** Cap on blocked host suffixes persisted with preferences. */
+export const MAX_BLOCKED_HOSTS = 32;
+/** DNS label upper bound for a single blocked host suffix. */
+export const MAX_BLOCKED_HOST_CHARS = 253;
+
+/**
+ * Sanitize a free-form host blocklist entry. Rejects schemes, paths, spaces,
+ * credentials, and oversized labels. Returns lowercase hostname or null.
+ */
+export function sanitizeBlockedHost(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  let host = raw.trim().toLowerCase();
+  if (!host || host.length > MAX_BLOCKED_HOST_CHARS) return null;
+  // Strip a single leading/trailing dot so users can paste ".corp.local".
+  host = host.replace(/^\.+/, '').replace(/\.+$/, '');
+  if (!host || host.length > MAX_BLOCKED_HOST_CHARS) return null;
+  // No scheme, path, port, credentials, or whitespace.
+  if (/[/:\s@?#]/.test(host)) return null;
+  // Hostname characters only (labels + dots). Allow bare "localhost".
+  if (host !== 'localhost' && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(host)) {
+    return null;
+  }
+  return host;
+}
+
+/** Parse a stored or free-form list of blocked host suffixes. Fail closed. */
+export function parseBlockedHosts(raw: unknown): string[] {
+  const items: unknown[] = Array.isArray(raw)
+    ? raw
+    : typeof raw === 'string'
+      ? raw.split(',')
+      : [];
+  const out: string[] = [];
+  for (const item of items) {
+    const host = sanitizeBlockedHost(item);
+    if (!host || out.includes(host)) continue;
+    out.push(host);
+    if (out.length >= MAX_BLOCKED_HOSTS) break;
+  }
+  return out;
+}
+
+/** Format blocked hosts for a comma-separated preference field. */
+export function formatBlockedHosts(hosts: readonly string[]): string {
+  return hosts.join(', ');
+}
 
 // ── persistence ─────────────────────────────────────────────────────────────
 
@@ -125,6 +184,10 @@ function preferencesFromRecord(raw: Record<string, unknown>): Preferences {
       ? raw.highContrast
       : DEFAULT_PREFERENCES.highContrast,
     linkPreviews: typeof raw.linkPreviews === 'boolean' ? raw.linkPreviews : DEFAULT_PREFERENCES.linkPreviews,
+    httpsOnly: typeof raw.httpsOnly === 'boolean' ? raw.httpsOnly : DEFAULT_PREFERENCES.httpsOnly,
+    blockedHosts: 'blockedHosts' in raw
+      ? parseBlockedHosts(raw.blockedHosts)
+      : [...DEFAULT_PREFERENCES.blockedHosts],
     clock: isOneOf(raw.clock, CLOCKS) ? raw.clock : DEFAULT_PREFERENCES.clock,
     localHistory: typeof raw.localHistory === 'boolean' ? raw.localHistory : DEFAULT_PREFERENCES.localHistory,
     e2eeDms: typeof raw.e2eeDms === 'boolean' ? raw.e2eeDms : DEFAULT_PREFERENCES.e2eeDms,
@@ -132,6 +195,9 @@ function preferencesFromRecord(raw: Record<string, unknown>): Preferences {
     voiceEntry: typeof raw.voiceEntry === 'boolean' ? raw.voiceEntry : DEFAULT_PREFERENCES.voiceEntry,
     topicTools: typeof raw.topicTools === 'boolean' ? raw.topicTools : DEFAULT_PREFERENCES.topicTools,
     watchTogether: typeof raw.watchTogether === 'boolean' ? raw.watchTogether : DEFAULT_PREFERENCES.watchTogether,
+    reactionDensity: isOneOf(raw.reactionDensity, REACTION_DENSITIES)
+      ? raw.reactionDensity
+      : DEFAULT_PREFERENCES.reactionDensity,
   };
 }
 

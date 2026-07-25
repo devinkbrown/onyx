@@ -171,6 +171,44 @@ describe('E2EE DMs', () => {
     expect(msg?.encrypted).toBeUndefined();
   });
 
+  it('fail-closes inbound ONYXROOM1 channel envelopes (locked, no ciphertext notify)', async () => {
+    const { GROUP_ENVELOPE_PREFIX, GROUP_LOCKED_PLACEHOLDER, sealGroupMessage } =
+      await import('@/lib/e2ee/groupEnvelope');
+    const roomKey = await crypto.subtle.generateKey(
+      { name: 'AES-GCM', length: 256 },
+      true,
+      ['encrypt', 'decrypt'],
+    );
+    const envelope = (await sealGroupMessage(roomKey, 2, 'secret room body mentioning me'))!;
+    expect(envelope.startsWith(GROUP_ENVELOPE_PREFIX)).toBe(true);
+
+    seedChannel('#room');
+    store.setState({
+      channelNotify: new Map([['#room', 'all']]),
+      // Follow the room so a non-mention still tries to notify — must not leak.
+      friends: new Map(),
+    });
+    // Follow via the topic follow ledger if available; otherwise just assert
+    // the stored message boundary.
+    const notesBefore = store.getState().notifications.length;
+    feed(`@msgid=room1;+onyx/e2ee=mls :alice!u@h PRIVMSG #room :${envelope}`);
+
+    const msg = store.getState().channels.get('#room')?.messages.at(-1);
+    expect(msg).toBeDefined();
+    expect(msg!.encrypted).toBe(true);
+    expect(msg!.text).toBe(envelope);
+    expect(msg!.plaintext).toBeUndefined();
+    expect(msg!.highlight).toBe(false);
+    expect(msg!.e2ee).toBe('mls');
+    // Ciphertext must not appear in any notification body.
+    const notes = store.getState().notifications.slice(notesBefore);
+    for (const note of notes) {
+      expect(note.text).not.toContain(GROUP_ENVELOPE_PREFIX.trim());
+      expect(note.text).not.toContain('secret room body');
+      expect(note.text).toBe(GROUP_LOCKED_PLACEHOLDER);
+    }
+  });
+
   it('decrypts an inbound envelope in place once the peer key is known', async () => {
     const mine = await deviceKeys();
     const peer = await makePeer(mine!.publicB64);

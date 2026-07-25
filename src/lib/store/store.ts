@@ -34,6 +34,12 @@ import {
   type AccountSessionRow,
 } from '@/lib/irc/sessionList';
 import {
+  applyEventReplayNotice,
+  emptyEventReplayFeed,
+  eventReplayJsonParams,
+  type EventReplayFeed,
+} from '@/lib/irc/eventReplayJson';
+import {
   isRecoveryCodesCleared,
   isRecoveryCodesGenerated,
   isRecoveryCodesLoginOk,
@@ -66,17 +72,22 @@ import { decideOutboxFlushTerminal } from '@/lib/vault/outboxFlushDecision';
 import { getVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
 import {
-  MAX_SCHEDULED_CHANNEL_LENGTH,
-  MAX_SCHEDULED_MESSAGES,
-  MAX_SCHEDULED_TEXT_LENGTH,
   parseScheduledMessages,
   selectDueMessages,
   type ScheduledMessage,
   type ScheduledMessageOwner,
 } from '@/lib/schedule/dispatch';
+import {
+  cancelScheduled,
+  createScheduledSend,
+  enqueueScheduled,
+} from '@/lib/composer/scheduledSend';
 import { deviceKeys, isEnvelope, isValidPeerPublicKey, normalizePeerDeviceKeys } from '@/lib/e2ee/dmCipher';
+import { isGroupEnvelope } from '@/lib/e2ee/groupEnvelope';
 import {
   hasEncryptedMessageBoundary,
+  isEncryptedWireText,
+  lockedPlaceholderForText,
   persistedReplyPreviewText,
   sanitizePersistedReplyPreviewText,
 } from '@/lib/e2ee/replyPrivacy';
@@ -114,6 +125,7 @@ import {
   type ChannelAccessEntry,
 } from '@/lib/irc/channelAccess';
 import { preferences } from '@/lib/prefs/preferences';
+import { formatWebhookNoticeBody } from '@/lib/integrations/webhookBlockKit';
 import { parseEventTime } from '@/lib/deeplink';
 import {
   isValidTopicLabel,
@@ -135,6 +147,10 @@ import {
   saveTopicHistory,
   type TopicHistory,
 } from '@/lib/topics/topicHistory';
+import {
+  recordEdit,
+  type EditHistoryMap,
+} from '@/lib/vault/editHistory';
 import { isFollowed } from '@/lib/notifications/followed';
 import { loadChannelNotify, saveChannelNotify } from '@/lib/notifications/channelNotifyMemory';
 import {
@@ -827,6 +843,13 @@ export interface OnyxState {
   accountSessions: AccountSessionRow[];
   accountSessionsPending: boolean;
   accountSessionsError: string | null;
+  /**
+   * Structured `EVENT REPLAY JSON` feed for operators (header + events + end).
+   * Populated only from server NOTICEs that parse as event-replay payloads.
+   */
+  operEventReplay: EventReplayFeed;
+  /** `EVENT REPLAY JSON ALL <limit>` — bounded structured Event Spine history. */
+  requestOperEventReplay(limit?: number): void;
   /** `SESSION LIST` — refresh the account session roster from the server. */
   refreshAccountSessions(): void;
   /**
@@ -994,6 +1017,11 @@ export interface OnyxState {
   composerDrafts: ComposerDrafts;
   /** Message currently being edited through the composer, if any. */
   editingMessage: ChatMessage | null;
+  /**
+   * Local-only prior bodies for messages we edited this session (messageId →
+   * revisions). Never persists ciphertext; E2EE rows are refused by editMessage.
+   */
+  editHistory: EditHistoryMap;
   getComposerDraft(target: string): string;
   setComposerDraft(target: string, text: string): void;
   clearComposerDraft(target: string): void;
@@ -2508,7 +2536,7 @@ function _collectServerSearchMessage(
     return;
   }
   seenIds.add(id);
-  if (message.encrypted || isEnvelope(message.text)) {
+  if (message.encrypted || isEncryptedWireText(message.text)) {
     collector.encryptedDropped = true;
     return;
   }
@@ -3990,6 +4018,7 @@ function _resetAccountBoundState(
       accountSessions: [],
       accountSessionsPending: false,
       accountSessionsError: null,
+      operEventReplay: emptyEventReplayFeed(),
       passkeyBusy: false,
       passkeyError: preservePasskeyError ? s.passkeyError : null,
       passkeyNotice: null,
@@ -4102,6 +4131,7 @@ function _resetAccountPrivateMessageState(set: SetFn): void {
       typingUsers: new Map(),
       replyingTo: null,
       editingMessage: null,
+      editHistory: {},
       forwardingMessage: null,
       composerDrafts: {},
       showThreadPanel: false,
@@ -5410,6 +5440,7 @@ export const store = createStore<OnyxState>()(
     accountSessions: [],
     accountSessionsPending: false,
     accountSessionsError: null,
+    operEventReplay: emptyEventReplayFeed(),
     notifications: [],
     serverSearch: { target: '', query: '', status: 'idle', results: [], error: null },
     canSearchHistory: false,
@@ -5425,6 +5456,7 @@ export const store = createStore<OnyxState>()(
     // soon as registration establishes a server/account context.
     composerDrafts: {},
     editingMessage: null,
+    editHistory: {},
     replyingTo: null,
     typingUsers: new Map(),
     showThreadPanel: false,
@@ -5994,6 +6026,7 @@ export const store = createStore<OnyxState>()(
         accountSessions: [],
         accountSessionsPending: false,
         accountSessionsError: null,
+        operEventReplay: emptyEventReplayFeed(),
         ...(searchWasPending
           ? {
               serverSearch: {
@@ -6788,7 +6821,7 @@ export const store = createStore<OnyxState>()(
 
       const dm = state.dms.get(targetKey);
       const encryptedDm = dm?.messages.some(
-        (message) => message.encrypted || isEnvelope(message.text),
+        (message) => message.encrypted || isEncryptedWireText(message.text),
       ) ?? false;
       const chantypes = client.isupport.CHANTYPES ?? '#&';
       const targetIsDm = !chantypes.includes(cleanTarget[0]!);
@@ -7210,6 +7243,22 @@ export const store = createStore<OnyxState>()(
         accountSessionsError: null,
       });
       client.sendRaw('SESSION', 'LIST');
+    },
+
+    requestOperEventReplay(limit = 50) {
+      const { client, connectionStatus, isOper } = get();
+      if (!client || connectionStatus !== 'connected' || !isOper) return;
+      const params = eventReplayJsonParams(limit);
+      // Open a pending feed immediately so the UI shows "waiting" even before
+      // the first NOTICE; the header notice will reset expectedCount.
+      set({
+        operEventReplay: {
+          ...emptyEventReplayFeed(),
+          pending: true,
+          receivedAt: Date.now(),
+        },
+      });
+      client.sendRaw('EVENT', ...params);
     },
 
     dropAccountSession(index) {
@@ -7804,6 +7853,9 @@ export const store = createStore<OnyxState>()(
         || hasEncryptedMessageBoundary(current)
       ) return;
 
+      // Snapshot prior plaintext body for local audit history before we fold.
+      const priorBody = current.text;
+
       // Send EDIT command to the server (draft/message-editing cap)
       client.sendRaw('EDIT', target, messageId, newText);
 
@@ -7816,19 +7868,21 @@ export const store = createStore<OnyxState>()(
         );
 
       set(s => {
+        const editHistory = recordEdit(s.editHistory, messageId, priorBody);
         const channels = new Map(s.channels);
         const ch = channels.get(key);
         if (ch) {
           channels.set(key, { ...ch, messages: applyEdit(ch.messages) });
-          return { channels };
+          return { channels, editHistory };
         }
         const dms = new Map(s.dms);
         const dm = dms.get(key);
         if (dm) {
           dms.set(key, { ...dm, messages: applyEdit(dm.messages) });
-          return { dms };
+          return { dms, editHistory };
         }
-        return {};
+        // Still keep the revision even if the row left live memory mid-edit.
+        return { editHistory };
       });
     },
 
@@ -10432,6 +10486,18 @@ export const store = createStore<OnyxState>()(
               break;
             }
 
+            // ── EVENT REPLAY JSON (operator Event Spine history) ──────────
+            // Structured notices only — prose REPLAY still falls through to
+            // announcements/status. Fail closed: parse rejects hostile bodies.
+            if (text.startsWith('{')) {
+              const prev = get().operEventReplay;
+              const next = applyEventReplayNotice(prev, text);
+              if (next !== prev) {
+                set({ operEventReplay: next });
+                break;
+              }
+            }
+
             // ── SESSION LIST / DROP (account multi-device roster) ─────────
             const sessionRow = parseSessionListLine(text);
             if (sessionRow) {
@@ -10952,12 +11018,30 @@ export const store = createStore<OnyxState>()(
           }
 
           const isAction = resolvedText.startsWith('\x01ACTION ') && resolvedText.endsWith('\x01');
-          const displayText = isAction ? resolvedText.slice(8, -1) : resolvedText;
           const msgType = isAction ? 'action' : (command === 'NOTICE' ? 'notice' : 'msg');
+          // NOTICE bodies that are Discord webhook JSON flatten to IRC-safe text
+          // (client parity with server webhook_render). Plain notices unchanged.
+          const rawDisplay = isAction ? resolvedText.slice(8, -1) : resolvedText;
+          const displayText = msgType === 'notice'
+            ? formatWebhookNoticeBody(rawDisplay)
+            : rawDisplay;
 
+          // E2EE bodies (DM ONYXDM1/ONYXDMN1 or room ONYXROOM1) never yield
+          // nick-highlight classification from ciphertext — fail closed.
+          // Check both raw resolved text and display text so CTCP ACTION wrappers
+          // cannot reclassify a sealed body as a plain mention.
+          const isEncryptedBody =
+            isEncryptedWireText(displayText) || isEncryptedWireText(resolvedText);
+          const isGroupCipher =
+            isGroupEnvelope(displayText) || isGroupEnvelope(resolvedText);
+          // DM open path is only for Mooring DM envelopes (not ONYXROOM1).
+          const isEncryptedDm =
+            !isChannel && (isEnvelope(displayText) || isEnvelope(resolvedText));
           const highlight = !isChannel
             ? true
-            : mentionsMe(resolvedText, ourNick);
+            : isEncryptedBody
+              ? false
+              : mentionsMe(resolvedText, ourNick);
 
           const msgTarget = isChannel ? target : (isSelf ? target : sender);
           const msgKey = msgTarget.toLowerCase();
@@ -10976,10 +11060,10 @@ export const store = createStore<OnyxState>()(
             ? rawServerMsgId
             : undefined;
           const e2eeTag = parseE2eeMessageTag(tags);
-          // E2EE: a DM carrying a Mooring envelope stays ciphertext in the
-          // store (and thus in CHATHISTORY/vault) until decrypted in place.
-          // The view shows a locked placeholder while `text` is an envelope.
-          const isEncryptedDm = !isChannel && isEnvelope(displayText);
+          // E2EE: DM Mooring envelopes and room ONYXROOM1 envelopes stay
+          // ciphertext in the store (and thus in CHATHISTORY/vault). The view
+          // shows a locked placeholder while `text` is an envelope; room keys
+          // are not wired yet so group envelopes remain locked (fail closed).
           const chatMsg: ChatMessage = {
             id: serverMsgId ?? uid(),
             time,
@@ -10989,10 +11073,15 @@ export const store = createStore<OnyxState>()(
             highlight,
             target: msgTarget,
             topic: messageTopic,
-            ...(isEncryptedDm ? { encrypted: true } : {}),
+            ...(isEncryptedBody ? { encrypted: true } : {}),
             ...(e2eeTag ? { e2ee: e2eeTag } : {}),
             ...(replyTo ? { replyTo } : {}),
           };
+          // Never put wire ciphertext into notification rows (in-app center
+          // renders note.text directly). Neutral placeholder only.
+          const safeNotifyText = isEncryptedBody
+            ? lockedPlaceholderForText(displayText)
+            : displayText;
 
           // ── If this PRIVMSG is part of a CHATHISTORY batch, collect it ────
           // Two routing paths:
@@ -11129,7 +11218,12 @@ export const store = createStore<OnyxState>()(
             }
             get().updateChannelActivity(msgTarget);
             if (effectiveHighlight) {
-              get().addNotification({ type: 'mention', text: displayText, from: sender, channel: msgTarget });
+              get().addNotification({
+                type: 'mention',
+                text: safeNotifyText,
+                from: sender,
+                channel: msgTarget,
+              });
             } else if (!isSelf && !isVisibleConversation && notifyLevel !== 'none') {
               const memoryOwner = selectDeviceMemoryOwner(get());
               const followedTopic = Boolean(
@@ -11146,7 +11240,7 @@ export const store = createStore<OnyxState>()(
                 // topic destination; when both match, the narrower one wins.
                 get().addNotification({
                   type: 'follow',
-                  text: displayText,
+                  text: safeNotifyText,
                   from: sender,
                   channel: msgTarget,
                   topic: followedTopic ? messageTopic : null,
@@ -11172,6 +11266,16 @@ export const store = createStore<OnyxState>()(
                 get().client?.sendRaw('METADATA', sender, 'GET', 'ocean.dm-key');
               }
               get()._decryptDm(msgTarget, chatMsg.id);
+            } else if (isGroupCipher) {
+              // ONYXROOM1 on a DM target: no room-key open path yet — stay
+              // locked and never put ciphertext in the notification inbox.
+              if (!isSelf && !get().isDMMuted(sender)) {
+                get().addNotification({
+                  type: 'dm',
+                  text: safeNotifyText,
+                  from: sender,
+                });
+              }
             } else if (!isSelf && highlight && !get().isDMMuted(sender)) {
               get().addNotification({ type: 'dm', text: displayText, from: sender });
             }
@@ -13606,31 +13710,15 @@ export const store = createStore<OnyxState>()(
     })(),
     showScheduledMessages: false,
     scheduleMessage: (channel, text, sendAt) => {
-      // Defense-in-depth: the composer already guards these, but the action is
-      // the state boundary and localStorage is finite. Validate the exact same
-      // shape as the reload parser before allocating or persisting a row.
-      const target = channel.trim();
-      if (
-        !_validInboundWireToken(target, MAX_SCHEDULED_CHANNEL_LENGTH)
-        || target.startsWith(':')
-        || target.includes(',')
-        || !text.trim()
-        || text.length > MAX_SCHEDULED_TEXT_LENGTH
-        || !Number.isSafeInteger(sendAt)
-        || sendAt <= 0
-      ) return;
+      // Defense-in-depth: pure createScheduledSend / enqueueScheduled own the
+      // shape checks; owner is required so rows never dispatch under a peer.
       const owner = _scheduledMessageOwner(get());
       if (!owner) return;
-      const entry: ScheduledMessage = {
-        id: `sched-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        channel: target,
-        text,
-        sendAt,
-        owner,
-      };
+      const entry = createScheduledSend({ channel, text, sendAt, owner });
+      if (!entry) return;
       set(s => {
-        if (s.scheduledMessages.length >= MAX_SCHEDULED_MESSAGES) return {};
-        const next = [...s.scheduledMessages, entry].sort((a, b) => a.sendAt - b.sendAt);
+        const next = enqueueScheduled(s.scheduledMessages, entry);
+        if (!next) return {};
         _persistScheduledMessages(next);
         return { scheduledMessages: next };
       });
@@ -13640,7 +13728,7 @@ export const store = createStore<OnyxState>()(
         const owner = _scheduledMessageOwner(s);
         const entry = s.scheduledMessages.find((message) => message.id === id);
         if (!owner || !entry || !_sameScheduledMessageOwner(entry.owner, owner)) return {};
-        const next = s.scheduledMessages.filter(m => m.id !== id);
+        const next = cancelScheduled(s.scheduledMessages, id);
         _persistScheduledMessages(next);
         return { scheduledMessages: next };
       });
@@ -15748,6 +15836,7 @@ subscribeVerifiedDeviceHistoryClear(() => {
     showDMPins: false,
     dmPinsNick: null,
     topicHistory: {},
+    editHistory: {},
   });
 });
 
@@ -16152,6 +16241,10 @@ function isChannelUnreadHighlight(
   state: Pick<OnyxState, 'highlightWords'>,
   message: ChatMessage,
 ): boolean {
+  // Sealed bodies never yield highlight matches from ciphertext (fail closed).
+  if (message.encrypted || isEncryptedWireText(message.text)) {
+    return message.highlight === true;
+  }
   if (message.highlight) return true;
   if (/@(everyone|here)\b/i.test(message.text)) return true;
   const lower = message.text.toLowerCase();

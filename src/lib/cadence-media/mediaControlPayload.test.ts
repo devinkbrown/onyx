@@ -37,6 +37,33 @@ describe('media control payload validation', () => {
     expect(parseRoomStats('null')).toBeNull();
   });
 
+  it('accepts optional SFU cascade topology fields on room STATS', () => {
+    const base = {
+      active_senders: 2,
+      total_viewers: 5,
+      video_fps: 30,
+      audio_kbps: 64,
+    };
+    expect(parseRoomStats(JSON.stringify({
+      ...base,
+      remote_forwarders: 2,
+      packet_loss: 0.05,
+      local_sfu: false,
+    }))).toEqual({
+      ...base,
+      remote_forwarders: 2,
+      packet_loss: 0.05,
+      local_sfu: false,
+    });
+    // Invalid optionals are dropped; required fields still parse.
+    expect(parseRoomStats(JSON.stringify({
+      ...base,
+      remote_forwarders: -1,
+      packet_loss: 2,
+      local_sfu: 'yes',
+    }))).toEqual(base);
+  });
+
   it('rejects fractional and unsafe bitrate controls', () => {
     expect(parseSuggestedBitrate('300000')).toBe(300_000);
     expect(parseSuggestedBitrate('{"suggested_bps":150000}')).toBe(150_000);

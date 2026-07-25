@@ -7,7 +7,7 @@
  * put ciphertext (or key material) on a lock screen. Envelopes fail closed to a
  * neutral placeholder; plaintext is truncated for display.
  */
-import { isEnvelope } from '@/lib/e2ee/dmCipher';
+import { isEncryptedWireText } from '@/lib/e2ee/replyPrivacy';
 
 /** Neutral body when the note text is still (or only) an E2EE envelope. */
 export const ENCRYPTED_NOTIFICATION_BODY = 'New encrypted message';
@@ -15,22 +15,23 @@ export const ENCRYPTED_NOTIFICATION_BODY = 'New encrypted message';
 const MAX_BODY_CHARS = 180;
 
 /**
- * True when `text` is a E2EE DM envelope, including after leading whitespace.
+ * True when `text` is a E2EE envelope (DM or room), including after leading whitespace.
  *
- * Crypto (`isEnvelope`) stays strict so seal/open never invent a wire form.
- * Display redaction is deliberately broader: a buggy or hostile peer that
- * prefixes ` ONYXDM1 …` must still fail closed on a lock-screen alert body.
+ * Crypto stays strict so seal/open never invent a wire form. Display redaction is
+ * deliberately broader: a buggy or hostile peer that prefixes ` ONYXDM1 …` or
+ * ` ONYXROOM1 …` must still fail closed on a lock-screen alert body.
  */
 export function isNotificationEnvelope(text: string): boolean {
-  if (isEnvelope(text)) return true;
+  if (isEncryptedWireText(text)) return true;
   // Strip only leading whitespace — never rewrite the envelope body itself.
   const trimmed = text.replace(/^\s+/u, '');
-  return trimmed !== text && isEnvelope(trimmed);
+  return trimmed !== text && isEncryptedWireText(trimmed);
 }
 
 /**
  * Body string for an OS notification.
- * - E2EE envelope (`ONYXDM1 …`, optionally whitespace-prefixed) → neutral placeholder
+ * - E2EE envelope (`ONYXDM1 …` / `ONYXROOM1 …`, optionally whitespace-prefixed)
+ *   → neutral placeholder
  * - otherwise truncate at 180 characters
  */
 export function notificationBodyFor(text: string): string {

@@ -1099,6 +1099,55 @@
   outline-offset: 2px;
 }
 
+/* ── SFU cascade hop badge (live topology from engine + room STATS) ─────────── */
+
+.voice-sfu {
+  display: inline-flex;
+  align-items: center;
+  max-width: 12rem;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 52%, transparent);
+  color: var(--paper-mute);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.voice-sfu__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.voice-sfu--ok {
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 36%, var(--seam-faint));
+  background: color-mix(in oklab, var(--ok) 10%, color-mix(in oklab, var(--ink) 60%, transparent));
+}
+
+.voice-sfu--warn {
+  color: var(--gold-bright, var(--warn));
+  border-color: color-mix(in oklab, var(--gold-bright, var(--warn)) 36%, var(--seam-faint));
+  background: color-mix(in oklab, var(--gold-bright, var(--warn)) 10%, color-mix(in oklab, var(--ink) 60%, transparent));
+}
+
+.voice-sfu--danger {
+  color: var(--shu, var(--danger));
+  border-color: color-mix(in oklab, var(--shu, var(--danger)) 40%, var(--seam-faint));
+  background: color-mix(in oklab, var(--shu, var(--danger)) 12%, color-mix(in oklab, var(--ink) 60%, transparent));
+}
+
+.voice-sfu--neutral {
+  color: var(--paper-mute);
+}
+
 /* ── Call security chip (hop shield vs E2EE padlock) ────────────────────────── */
 
 .voice-sec {

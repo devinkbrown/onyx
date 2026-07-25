@@ -28,9 +28,11 @@ import {
   peerKeyStatus,
   peerSafetyNumber,
   pinPeerKey,
+  pinPeerKeys,
   pinPeerTrustBinding,
   pinnedPeerKey,
   safetyNumber,
+  safetyNumberForDeviceSet,
   sealDmTrusted,
   unpinPeerKey,
 } from './keyPinning';
@@ -126,6 +128,46 @@ describe('safetyNumber', () => {
     const a = await makePeer();
     expect(await safetyNumber(a.publicB64, 'not-a-key')).toBeNull();
     expect(await safetyNumber('!!!', a.publicB64)).toBeNull();
+  });
+});
+
+describe('safetyNumberForDeviceSet (multi-device)', () => {
+  it('matches pairwise safetyNumber for a single peer device', async () => {
+    const local = await makePeer();
+    const peer = await makePeer();
+    const pair = await safetyNumber(local.publicB64, peer.publicB64);
+    const set = await safetyNumberForDeviceSet(local.publicB64, [peer.publicB64]);
+    expect(set).toBe(pair);
+  });
+
+  it('is order-independent over the peer device set', async () => {
+    const local = await makePeer();
+    const d1 = await makePeer();
+    const d2 = await makePeer();
+    const ab = await safetyNumberForDeviceSet(local.publicB64, [d1.publicB64, d2.publicB64]);
+    const ba = await safetyNumberForDeviceSet(local.publicB64, [d2.publicB64, d1.publicB64]);
+    expect(ab).not.toBeNull();
+    expect(ab).toBe(ba);
+    expect(ab!.replace(/ /g, '')).toHaveLength(60);
+  });
+
+  it('changes when any peer device is added or swapped', async () => {
+    const local = await makePeer();
+    const d1 = await makePeer();
+    const d2 = await makePeer();
+    const d3 = await makePeer();
+    const two = await safetyNumberForDeviceSet(local.publicB64, [d1.publicB64, d2.publicB64]);
+    const one = await safetyNumberForDeviceSet(local.publicB64, [d1.publicB64]);
+    const swapped = await safetyNumberForDeviceSet(local.publicB64, [d1.publicB64, d3.publicB64]);
+    expect(two).not.toBe(one);
+    expect(two).not.toBe(swapped);
+  });
+
+  it('returns null when the peer set is empty or all invalid', async () => {
+    const local = await makePeer();
+    expect(await safetyNumberForDeviceSet(local.publicB64, [])).toBeNull();
+    expect(await safetyNumberForDeviceSet(local.publicB64, ['!!!', 'also-bad'])).toBeNull();
+    expect(await safetyNumberForDeviceSet('not-a-key', [(await makePeer()).publicB64])).toBeNull();
   });
 });
 
@@ -285,6 +327,17 @@ describe('peerSafetyNumber (surface hook)', () => {
     const mine = (await deviceKeys())!.publicB64;
     const expected = await safetyNumber(mine, peer.publicB64);
     expect(await peerSafetyNumber('Alice')).toBe(expected);
+  });
+
+  it('binds the full multi-device pin set into one conversation number', async () => {
+    const d1 = await makePeer();
+    const d2 = await makePeer();
+    await pinPeerKeys('Alice', [d1.publicB64, d2.publicB64]);
+    const mine = (await deviceKeys())!.publicB64;
+    const expected = await safetyNumberForDeviceSet(mine, [d1.publicB64, d2.publicB64]);
+    expect(await peerSafetyNumber('Alice')).toBe(expected);
+    // Not merely the first device — multi-pin must cover every sealed device.
+    expect(await peerSafetyNumber('Alice')).not.toBe(await safetyNumber(mine, d1.publicB64));
   });
 
   it('returns null when the peer is not yet pinned', async () => {

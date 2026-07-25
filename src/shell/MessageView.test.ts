@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
+import { GROUP_LOCKED_PLACEHOLDER } from '@/lib/e2ee/groupEnvelope';
 import type { ChatMessage } from '@/lib/irc/types';
 import type { ReviewHistoryEntry } from '@/lib/notifications/reviewHistory';
 import {
@@ -190,6 +191,17 @@ describe('messageAccessibleLabel (dense transcript a11y)', () => {
     expect(label).toContain(LOCKED_PLACEHOLDER);
     expect(label).not.toContain('TSUMUGI1');
     expect(label).not.toContain('ciphertext-must-not-leak');
+  });
+
+  it('never exposes ONYXROOM1 ciphertext when the room seal is locked', () => {
+    const locked: ChatMessage = {
+      ...message('m2r', 'alice', 'ONYXROOM1 room-ciphertext-must-not-leak', 0),
+      encrypted: true,
+    };
+    const label = messageAccessibleLabel(locked);
+    expect(label).toContain(GROUP_LOCKED_PLACEHOLDER);
+    expect(label).not.toContain('ONYXROOM1');
+    expect(label).not.toContain('room-ciphertext-must-not-leak');
   });
 
   it('prefers decrypted plaintext over the sealed wire body', () => {

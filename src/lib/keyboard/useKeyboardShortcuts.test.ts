@@ -13,6 +13,7 @@ import type { Channel } from '@/lib/irc/types';
 import { closePreferences, isPreferencesOpen, preferences, resetPreferences } from '@/lib/prefs/preferences';
 import { store, type Server } from '@/lib/store/store';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
+import * as messageSearch from '@/shell/search/useMessageSearch';
 import { SHORTCUTS, type ShortcutGroup } from './useKeyboardShortcuts';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
@@ -129,6 +130,13 @@ describe('SHORTCUTS descriptor', () => {
     expect(found!.group).toBe('Chat');
   });
 
+  it('includes Cmd/Ctrl+B for starring the current channel', () => {
+    const found = SHORTCUTS.find((s) => s.keys.includes('Ctrl+B'));
+    expect(found).toBeDefined();
+    expect(found!.description).toBe('Star / unstar channel');
+    expect(found!.group).toBe('Chat');
+  });
+
   it('includes Cmd/Ctrl+Shift+R for reader mode', () => {
     const found = SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+R'));
     expect(found).toBeDefined();
@@ -147,9 +155,29 @@ describe('SHORTCUTS descriptor', () => {
     expect(found!.group).toBe('Chat');
   });
 
+  it('includes Cmd/Ctrl+Shift+L for schedule send later', () => {
+    const found = SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+L'));
+    expect(found).toBeDefined();
+    expect(found!.description).toBe('Schedule message to send later');
+    expect(found!.group).toBe('Chat');
+  });
+
   it('includes Esc shortcut', () => {
     const found = SHORTCUTS.find((s) => s.keys.includes('Esc'));
     expect(found).toBeDefined();
+  });
+
+  it('includes registry-backed chords wired through the live hook', () => {
+    expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+F'))?.description).toBe('Search messages');
+    expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+A'))?.description).toBe('Open account');
+    expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+E'))?.description).toBe('Mark conversation read');
+    expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+B'))?.description).toBe('Star / unstar channel');
+    expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+D'))?.description).toBe('Toggle do not disturb');
+    expect(SHORTCUTS.find((s) => s.keys.includes('Alt+S'))?.description).toBe('Focus channel sidebar');
+    expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+U'))?.description).toBe('Attach a file');
+    expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+L'))?.description).toBe(
+      'Schedule message to send later',
+    );
   });
 
   it('has no duplicate keys strings', () => {
@@ -408,6 +436,52 @@ describe('SHORTCUTS descriptor', () => {
     dispose();
   });
 
+  it('toggles starring the active channel with Ctrl+B', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({
+      activeView: { kind: 'channel', channel: '#general' },
+      starredChannels: new Set(),
+    });
+
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(store.getState().starredChannels.has('#general')).toBe(true);
+
+    fireEvent.keyDown(window, { key: 'B', metaKey: true });
+    expect(store.getState().starredChannels.has('#general')).toBe(false);
+    dispose();
+  });
+
+  it('does not star from Ctrl+B on home or DM views', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({
+      activeView: { kind: 'home' },
+      starredChannels: new Set(),
+    });
+
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(store.getState().starredChannels.size).toBe(0);
+
+    store.setState({ activeView: { kind: 'dm', nick: 'trev' } });
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(store.getState().starredChannels.size).toBe(0);
+    dispose();
+  });
+
+  it('does not star from Ctrl+B inside editable targets', () => {
+    const dispose = mountKeyboardHarness();
+    const input = document.createElement('input');
+    document.body.append(input);
+    store.setState({
+      activeView: { kind: 'channel', channel: '#general' },
+      starredChannels: new Set(),
+    });
+
+    fireEvent.keyDown(input, { key: 'b', ctrlKey: true });
+    expect(store.getState().starredChannels.size).toBe(0);
+    input.remove();
+    dispose();
+  });
+
   it('toggles the selected named conversation with U instead of the whole room', () => {
     const dispose = mountKeyboardHarness();
     store.setState({
@@ -637,6 +711,209 @@ describe('SHORTCUTS descriptor', () => {
     expect(document.activeElement).toBe(trigger);
     trigger.remove();
     textarea.remove();
+    dispose();
+  });
+
+  it('opens message search with Ctrl+F', () => {
+    const dispose = mountKeyboardHarness();
+    const openSpy = vi.spyOn(messageSearch, 'openMessageSearch');
+
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    openSpy.mockRestore();
+    dispose();
+  });
+
+  it('opens account with Ctrl+Shift+A', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({ showAccount: false });
+
+    fireEvent.keyDown(window, { key: 'a', ctrlKey: true, shiftKey: true });
+
+    expect(store.getState().showAccount).toBe(true);
+    store.getState().closeAccount();
+    dispose();
+  });
+
+  it('marks the active channel read with Ctrl+Shift+E', () => {
+    const dispose = mountKeyboardHarness();
+    const channel: Channel = {
+      name: '#general',
+      topic: '',
+      topicSetBy: '',
+      topicSetAt: null,
+      modes: '',
+      users: new Map(),
+      unread: 4,
+      highlights: 1,
+      createdAt: null,
+      messages: [],
+    };
+    store.setState({
+      channels: new Map([['#general', channel]]),
+      activeView: { kind: 'channel', channel: '#general' },
+      channelUnread: { '#general': 4 },
+      channelMentions: { '#general': 1 },
+    });
+
+    fireEvent.keyDown(window, { key: 'e', ctrlKey: true, shiftKey: true });
+
+    expect(store.getState().channels.get('#general')?.unread).toBe(0);
+    expect(store.getState().channels.get('#general')?.highlights).toBe(0);
+    expect(store.getState().channelUnread['#general']).toBe(0);
+    dispose();
+  });
+
+  it('toggles do-not-disturb with Ctrl+Shift+D', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({ dndEnabled: false });
+
+    fireEvent.keyDown(window, { key: 'd', ctrlKey: true, shiftKey: true });
+    expect(store.getState().dndEnabled).toBe(true);
+
+    fireEvent.keyDown(window, { key: 'd', ctrlKey: true, shiftKey: true });
+    expect(store.getState().dndEnabled).toBe(false);
+    dispose();
+  });
+
+  it('focuses the channel sidebar with Alt+S', () => {
+    const dispose = mountKeyboardHarness();
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.setAttribute('data-sidebar-item', '');
+    item.setAttribute('aria-current', 'page');
+    document.body.append(item);
+
+    fireEvent.keyDown(window, { key: 's', altKey: true });
+
+    expect(document.activeElement).toBe(item);
+    item.remove();
+    dispose();
+  });
+
+  it('clicks the attach tool with Ctrl+Shift+U', () => {
+    const dispose = mountKeyboardHarness();
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('aria-label', 'Attach files');
+    const click = vi.fn();
+    button.addEventListener('click', click);
+    document.body.append(button);
+
+    fireEvent.keyDown(window, { key: 'u', ctrlKey: true, shiftKey: true });
+
+    expect(click).toHaveBeenCalledTimes(1);
+    button.remove();
+    dispose();
+  });
+
+  it('opens the schedule picker with Ctrl+Shift+L from the composer', () => {
+    const dispose = mountKeyboardHarness();
+    const textarea = document.createElement('textarea');
+    textarea.setAttribute('data-composer-input', '');
+    const scheduleBtn = document.createElement('button');
+    scheduleBtn.type = 'button';
+    scheduleBtn.setAttribute('data-composer-schedule', '');
+    const click = vi.fn();
+    scheduleBtn.addEventListener('click', click);
+    document.body.append(textarea, scheduleBtn);
+    textarea.focus();
+
+    fireEvent.keyDown(textarea, { key: 'l', ctrlKey: true, shiftKey: true });
+
+    expect(click).toHaveBeenCalledTimes(1);
+    textarea.remove();
+    scheduleBtn.remove();
+    dispose();
+  });
+
+  it('opens the schedule picker with Ctrl+Shift+L outside editable targets', () => {
+    const dispose = mountKeyboardHarness();
+    const scheduleBtn = document.createElement('button');
+    scheduleBtn.type = 'button';
+    scheduleBtn.setAttribute('data-composer-schedule', '');
+    const click = vi.fn();
+    scheduleBtn.addEventListener('click', click);
+    document.body.append(scheduleBtn);
+
+    fireEvent.keyDown(window, { key: 'L', ctrlKey: true, shiftKey: true });
+
+    expect(click).toHaveBeenCalledTimes(1);
+    scheduleBtn.remove();
+    dispose();
+  });
+
+  it('does not open schedule with Ctrl+Shift+L from non-composer editables', () => {
+    const dispose = mountKeyboardHarness();
+    const input = document.createElement('input');
+    const scheduleBtn = document.createElement('button');
+    scheduleBtn.type = 'button';
+    scheduleBtn.setAttribute('data-composer-schedule', '');
+    const click = vi.fn();
+    scheduleBtn.addEventListener('click', click);
+    document.body.append(input, scheduleBtn);
+    input.focus();
+
+    fireEvent.keyDown(input, { key: 'l', ctrlKey: true, shiftKey: true });
+
+    expect(click).not.toHaveBeenCalled();
+    input.remove();
+    scheduleBtn.remove();
+    dispose();
+  });
+
+  it('does not click a disabled schedule control', () => {
+    const dispose = mountKeyboardHarness();
+    const scheduleBtn = document.createElement('button');
+    scheduleBtn.type = 'button';
+    scheduleBtn.disabled = true;
+    scheduleBtn.setAttribute('data-composer-schedule', '');
+    const click = vi.fn();
+    scheduleBtn.addEventListener('click', click);
+    document.body.append(scheduleBtn);
+
+    fireEvent.keyDown(window, { key: 'l', ctrlKey: true, shiftKey: true });
+
+    expect(click).not.toHaveBeenCalled();
+    scheduleBtn.remove();
+    dispose();
+  });
+
+  it('stars and unstars the active channel with Ctrl+B', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(store.getState().starredChannels.has('#general')).toBe(true);
+
+    fireEvent.keyDown(window, { key: 'B', metaKey: true });
+    expect(store.getState().starredChannels.has('#general')).toBe(false);
+    dispose();
+  });
+
+  it('does not star channels from home or DM views', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({ activeView: { kind: 'home' } });
+
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(store.getState().starredChannels.size).toBe(0);
+
+    store.setState({ activeView: { kind: 'dm', nick: 'trev' } });
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(store.getState().starredChannels.size).toBe(0);
+    dispose();
+  });
+
+  it('does not star a channel from editable targets', () => {
+    const dispose = mountKeyboardHarness();
+    const input = document.createElement('input');
+    document.body.append(input);
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+
+    fireEvent.keyDown(input, { key: 'b', ctrlKey: true });
+    expect(store.getState().starredChannels.has('#general')).toBe(false);
+    input.remove();
     dispose();
   });
 });

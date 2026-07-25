@@ -16,12 +16,97 @@ export type SfuCascadeView = {
   detail: string;
 };
 
-export function sfuCascadeView(input: {
+export type SfuCascadeViewInput = {
   localSfu?: boolean;
   remoteForwarders?: number;
   packetLoss?: number;
   known?: boolean;
-}): SfuCascadeView {
+};
+
+/**
+ * Live metrics available from the Cadence media engine + room STATS surface.
+ * All topology fields are optional: absent means "not advertised" — never
+ * invent cascade hops from unrelated mesh link counts.
+ */
+export type SfuCascadeLiveMetrics = {
+  /** True while the call lifecycle is active (in-call or ringing). */
+  inCall: boolean;
+  /** Engine is mounted and has produced at least one network sample. */
+  engineReady?: boolean;
+  /** Engine loss rate in [0, 1] when sampled. */
+  packetLoss?: number | null;
+  /**
+   * Remote SFU forwarders from media-plane advertisement (room STATS).
+   * null/undefined = not advertised yet.
+   */
+  remoteForwarders?: number | null;
+  /**
+   * Explicit local-SFU advertisement from the media plane.
+   * null/undefined = not advertised.
+   */
+  localSfu?: boolean | null;
+  /** True when room STATS (or topology subtype) arrived for this call channel. */
+  roomStatsSeen?: boolean;
+};
+
+function finiteNonNegative(value: number | null | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null;
+  return value;
+}
+
+/**
+ * Map live engine / room metrics onto `sfuCascadeView` inputs without inventing
+ * cascade hops. Prefer `known: false` until the media plane is sampling or has
+ * advertised topology.
+ */
+export function sfuCascadeLiveInput(metrics: SfuCascadeLiveMetrics): SfuCascadeViewInput {
+  if (!metrics.inCall) {
+    return { known: false };
+  }
+
+  const lossRaw = finiteNonNegative(metrics.packetLoss ?? null);
+  const loss = lossRaw === null ? undefined : Math.min(1, lossRaw);
+  const forwardersRaw = finiteNonNegative(metrics.remoteForwarders ?? null);
+
+  if (forwardersRaw !== null) {
+    const remoteForwarders = Math.floor(forwardersRaw);
+    return {
+      known: true,
+      localSfu: remoteForwarders === 0,
+      remoteForwarders,
+      packetLoss: loss ?? 0,
+    };
+  }
+
+  if (metrics.localSfu === true) {
+    return {
+      known: true,
+      localSfu: true,
+      remoteForwarders: 0,
+      packetLoss: loss ?? 0,
+    };
+  }
+
+  // In-call with engine samples or room STATS but no cascade advertisement:
+  // honest local SFU path (single-node fanout). Do not invent remote hops.
+  if (metrics.engineReady || metrics.roomStatsSeen) {
+    return {
+      known: true,
+      localSfu: true,
+      remoteForwarders: 0,
+      packetLoss: loss ?? 0,
+    };
+  }
+
+  return { known: false };
+}
+
+/** Convenience: live metrics → cascade view in one step. */
+export function sfuCascadeFromLive(metrics: SfuCascadeLiveMetrics): SfuCascadeView {
+  return sfuCascadeView(sfuCascadeLiveInput(metrics));
+}
+
+export function sfuCascadeView(input: SfuCascadeViewInput): SfuCascadeView {
   if (input.known === false) {
     return {
       mode: 'unknown',

@@ -737,10 +737,12 @@ describe('VoiceBar', () => {
     const { getByTestId } = render(() => <VoiceBar />);
     const chip = getByTestId('call-security-chip');
 
-    // Assert — shield hop honesty (Era 1 A5 / research R1)
+    // Assert — shield hop honesty (Era 1 A5 / research R1 / C7 unify)
     expect(chip).toBeDefined();
     expect(chip.getAttribute('data-security-level')).toBe('hop_protected');
     expect(chip.getAttribute('data-uses-padlock')).toBe('false');
+    expect(chip.getAttribute('data-honest-private')).toBe('false');
+    expect(chip.getAttribute('data-padlock-tone')).toBe('public');
     expect(chip.getAttribute('aria-label')?.toLowerCase()).toContain('encrypted to this server');
     expect(chip.textContent?.toLowerCase()).toContain('protected connection');
     // No padlock SVG path for hop-only (LockIcon uses a keyed rect body)
@@ -798,6 +800,109 @@ describe('VoiceBar', () => {
 
     const fingerprint = await screen.findByTestId('call-privacy-local-fingerprint');
     expect(fingerprint.textContent?.toLowerCase()).toContain('unavailable');
+  });
+
+  it('surfaces live local SFU topology from engine stats (not hardcoded)', async () => {
+    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+    setMountedCadenceMediaEngine({
+      getLocalMediaE2eeFingerprint: vi.fn().mockResolvedValue(''),
+      getNetworkStats: () => ({
+        tier: 0 as const,
+        suggestedBps: 0,
+        jitterMs: 5,
+        lossRate: 0.01,
+      }),
+    } as never);
+
+    try {
+      seedVoiceStore([]);
+      const { getByTestId } = render(() => <VoiceBar />);
+
+      // Badge polls on mount (engineReady → local SFU).
+      await waitFor(() => {
+        expect(getByTestId('sfu-cascade-badge').getAttribute('data-sfu-cascade-mode')).toBe('local');
+      });
+      expect(getByTestId('sfu-cascade-badge').textContent).toMatch(/local sfu/i);
+
+      fireEvent.click(getByTestId('call-security-chip'));
+      const cascade = await screen.findByTestId('call-privacy-sfu-cascade');
+      await waitFor(() => {
+        expect(cascade.getAttribute('data-sfu-cascade-mode')).toBe('local');
+      });
+      expect(cascade.textContent?.toLowerCase()).toContain('local sfu');
+      expect(cascade.textContent?.toLowerCase()).toContain('this mesh node');
+    } finally {
+      setMountedCadenceMediaEngine(null);
+    }
+  });
+
+  it('surfaces mesh cascade hops from room STATS advertisement', async () => {
+    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+    setMountedCadenceMediaEngine({
+      getLocalMediaE2eeFingerprint: vi.fn().mockResolvedValue(''),
+      getNetworkStats: () => ({
+        tier: 1 as const,
+        suggestedBps: 200_000,
+        jitterMs: 20,
+        lossRate: 0.02,
+      }),
+    } as never);
+
+    try {
+      const roomStats = new Map([
+        ['#media', {
+          active_senders: 2,
+          total_viewers: 4,
+          video_fps: 30,
+          audio_kbps: 64,
+          remote_forwarders: 2,
+        }],
+      ]);
+      seedVoiceStore([], [], { roomStats });
+      const { getByTestId } = render(() => <VoiceBar />);
+
+      // Room STATS alone advertise cascade (no need to wait on engine poll).
+      expect(getByTestId('sfu-cascade-badge').getAttribute('data-sfu-cascade-mode')).toBe('cascade');
+      expect(getByTestId('sfu-cascade-badge').getAttribute('data-sfu-cascade-hops')).toBe('3');
+      expect(getByTestId('sfu-cascade-badge').textContent).toMatch(/3 hops/i);
+
+      fireEvent.click(getByTestId('call-security-chip'));
+      const cascade = await screen.findByTestId('call-privacy-sfu-cascade');
+      expect(cascade.getAttribute('data-sfu-cascade-mode')).toBe('cascade');
+      expect(cascade.textContent?.toLowerCase()).toContain('mesh cascade');
+    } finally {
+      setMountedCadenceMediaEngine(null);
+    }
+  });
+
+  it('marks cascade degraded when engine reports high loss', async () => {
+    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+    setMountedCadenceMediaEngine({
+      getLocalMediaE2eeFingerprint: vi.fn().mockResolvedValue(''),
+      getNetworkStats: () => ({
+        tier: 3 as const,
+        suggestedBps: 50_000,
+        jitterMs: 120,
+        lossRate: 0.22,
+      }),
+    } as never);
+
+    try {
+      seedVoiceStore([]);
+      const { getByTestId } = render(() => <VoiceBar />);
+      await waitFor(() => {
+        expect(getByTestId('sfu-cascade-badge').getAttribute('data-sfu-cascade-mode')).toBe('degraded');
+      });
+
+      fireEvent.click(getByTestId('call-security-chip'));
+      const cascade = await screen.findByTestId('call-privacy-sfu-cascade');
+      await waitFor(() => {
+        expect(cascade.getAttribute('data-sfu-cascade-mode')).toBe('degraded');
+      });
+      expect(cascade.textContent?.toLowerCase()).toContain('degraded');
+    } finally {
+      setMountedCadenceMediaEngine(null);
+    }
   });
 
   it('offers a turn-off-camera soft prompt after sustained poor CQ with camera on', async () => {

@@ -14,28 +14,28 @@ Evidence ledger for the “40 big things” Onyx platform wave. Item-level truth
 | 6 | Topic-as-thread history keys (C6) | partial prior | `lib/topics/*`, TopicFilterBar (B9) |
 | 7 | Quiet-hours DND | **DONE** prior | `quietHours.ts` + store `isDndActive` |
 | 8 | Portable identity export/import (C10) | **DONE** | `lib/identity/portableIdentity.ts` |
-| 9 | Oper Event Spine REPLAY console (B14) | **DONE+WIRED** | `shell/OperEventConsole.tsx` EVENT REPLAY |
+| 9 | Oper Event Spine REPLAY console (B14) | **DONE+WIRED** | `shell/OperEventConsole.tsx` + `eventReplayJson` EVENT REPLAY JSON |
 | 10 | Call/mention push (C3) | **DONE** server+client | `webpushNotifyKind`; binary `0.5.6+a969f5a` |
 | 11 | Read-marker multi-device | prior | draft/read-marker + store markers |
 | 12 | Invite encryption-policy badge | **DONE** | `lib/invite/encryptionPolicyBadge.ts` |
 | 13 | Composer draft persistence | prior | `lib/composer/drafts.ts` |
-| 14 | Search hybrid ranking boost | **DONE** | `lib/search/rankingBoost.ts` |
-| 15 | Webhook Block-Kit flatten | **DONE** | `lib/integrations/webhookBlockKit.ts` |
+| 14 | Search hybrid ranking boost | **DONE+WIRED** | `rankingBoost` + `searchVaultHybrid.vaultHitAgeMs` (`hit.message.time`) + hybrid search UI |
+| 15 | Webhook Block-Kit flatten | **DONE+WIRED** | `lib/integrations/webhookBlockKit.ts` → NOTICE store + MsgBody |
 | 16 | Cold vault paint before 001 | prior | `hydrateHistory` on connect |
-| 17 | Mesh SFU cascade indicator (C8 UX) | **DONE** | `lib/media/sfuCascade.ts` |
-| 18 | Media E2EE padlock honesty (C7) | **DONE** | `lib/media/padlockHonesty.ts` |
-| 19 | Safety number multi-device display | partial | `keyPinning` multi pin + safety numbers |
+| 17 | Mesh SFU cascade indicator (C8 UX) | **DONE+WIRED** | `lib/media/sfuCascade.ts` → VoiceBar cascade chip |
+| 18 | Media E2EE padlock honesty (C7) | **DONE+WIRED** | `lib/media/padlockHonesty.ts` → `callSecurity` / VoiceBar chip |
+| 19 | Safety number multi-device display | **DONE+WIRED** | `safetyNumberForDeviceSet` + `DmSafetySheet` device count |
 | 20 | KEYTRANS / E2EEKEY Account surface | prior | Account + store commands |
 | 21 | Presence heatline | prior | Phase 4 |
 | 22 | Channel bookmarks / favorites | **DONE** | `lib/channel/bookmarks.ts` |
 | 23 | Smart mute (keyword + noise) | **DONE+WIRED** decision | `smartMute.ts` + `decision.smartMuted` |
-| 24 | Scheduled / delayed send | **DONE** | `lib/composer/scheduledSend.ts` |
-| 25 | Message edit history (local) | **DONE** | `lib/vault/editHistory.ts` |
-| 26 | Reaction density modes | **DONE** | `lib/reactions/density.ts` |
-| 27 | Link unfurl privacy | **DONE** | `lib/preview/unfurlPrivacy.ts` |
+| 24 | Scheduled / delayed send | **DONE+WIRED** | `scheduledSend.ts` + `dispatch.ts` + store queue |
+| 25 | Message edit history (local) | **DONE+WIRED** | `lib/vault/editHistory.ts` + historyVault hooks |
+| 26 | Reaction density modes | **DONE+WIRED** | `density.ts` + prefs `reactionDensity` + BoostBar modes |
+| 27 | Link unfurl privacy | **DONE+WIRED** | `unfurlPrivacy` + `linkPreview` mayUnfurl + prefs httpsOnly/blockedHosts |
 | 28 | Guest → account upgrade | prior | Connect / Account flows |
 | 29 | Network / partition banner | **DONE** | `lib/net/partitionBanner.ts` |
-| 30 | Keyboard chord map | prior | fkeys / spotlight |
+| 30 | Keyboard chord map | **DONE+WIRED** | `shortcutsRegistry` expanded chords + `formatChordDisplay` / `useKeyboardShortcuts` |
 | 31 | Mobile composer gestures | prior | mobile primitives |
 | 32 | Accessibility live regions | prior | a11y audits ongoing |
 | 33 | Theme accent per-room | later | theme factory |

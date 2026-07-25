@@ -10,13 +10,26 @@ import { DmSafetySheet } from './DmSafetySheet';
 const initialState = store.getInitialState();
 const SAFETY_NUMBER = '11111 22222 33333 44444 55555 66666 77777 88888 99999 00000 12121 34343';
 
-function seedDm(peer = 'Trev', options?: { peerKey?: boolean; safetyNumber?: string | null }): void {
+function seedDm(
+  peer = 'Trev',
+  options?: {
+    peerKey?: boolean;
+    safetyNumber?: string | null;
+    /** Multi-device directory (ocean.dm-keys). When set, count drives readiness UI. */
+    deviceKeys?: string[];
+  },
+): void {
   const key = peer.toLowerCase();
+  const deviceKeys = options?.deviceKeys;
+  const hasKey = options?.peerKey !== false;
   store.setState({
     activeView: { kind: 'dm', nick: peer },
-    peerDmKeys: options?.peerKey === false
-      ? new Map()
-      : new Map([[key, 'redacted-public-key-material']]),
+    peerDmKeys: hasKey || (deviceKeys && deviceKeys.length > 0)
+      ? new Map([[key, deviceKeys?.[0] ?? 'redacted-public-key-material']])
+      : new Map(),
+    peerDmDeviceKeys: deviceKeys && deviceKeys.length > 0
+      ? new Map([[key, deviceKeys]])
+      : new Map(),
     peerSafetyNumbers: options?.safetyNumber
       ? new Map([[key, options.safetyNumber]])
       : new Map(),
@@ -70,9 +83,35 @@ describe('DmSafetySheet', () => {
     expect(visibleGroups).toEqual(SAFETY_NUMBER.split(' '));
     expect(output).toHaveAttribute('aria-live', 'off');
     expect(screen.getByText('Ready to compare')).toBeInTheDocument();
-    expect(screen.getByText('Received')).toBeInTheDocument();
+    expect(screen.getByText('1 device received')).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent('redacted-public-key-material');
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('shows multi-device count and labels the safety number across all devices', async () => {
+    const loadSafetyNumber = vi.fn(async () => {
+      store.setState({ peerSafetyNumbers: new Map([['trev', SAFETY_NUMBER]]) });
+      return SAFETY_NUMBER;
+    });
+    seedDm('Trev', {
+      safetyNumber: SAFETY_NUMBER,
+      deviceKeys: ['redacted-device-a', 'redacted-device-b', 'redacted-device-c'],
+    });
+    store.setState({ loadSafetyNumber });
+    render(() => <DmSafetySheet />);
+
+    fireEvent.click(screen.getByRole('button', { name: /verify encryption/i }));
+    expect(await screen.findByText('3 devices received')).toBeInTheDocument();
+    expect(screen.getByText(/Current safety number · 3 devices/i)).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText(`Safety number for Trev across 3 devices: ${SAFETY_NUMBER}`),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/all 3 of their remembered device keys/i)).toBeInTheDocument();
+    expect(screen.getByText(/or a new device appears/i)).toBeInTheDocument();
+    // Seal badge reflects advertised device count, never raw keys.
+    expect(document.body).not.toHaveTextContent('redacted-device-a');
+    const seal = document.querySelector('.dm-safety__seal');
+    expect(seal?.textContent).toMatch(/03/);
   });
 
   it('shows loading and a clear no-key state without claiming encryption is verified', async () => {

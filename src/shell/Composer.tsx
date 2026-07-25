@@ -1102,6 +1102,7 @@ export function Composer(props: ComposerProps): JSX.Element {
           aria-haspopup="dialog"
           aria-expanded={scheduleOpen()}
           aria-controls={scheduleOpen() ? 'shell-schedule-picker' : undefined}
+          data-composer-schedule=""
           onClick={() => setScheduleOpen((open) => !open)}
         >
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

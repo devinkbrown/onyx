@@ -11,9 +11,10 @@ import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { ChatMessage } from '@/lib/irc/types';
+import { boostedScore } from '@/lib/search/rankingBoost';
 import type { EmbeddingProvider } from './embeddingIndex';
-import { _resetVaultForTests, saveMessages } from './historyVault';
-import { searchVaultHybrid } from './searchVaultHybrid';
+import { _resetVaultForTests, saveMessages, type VaultSearchHit } from './historyVault';
+import { searchVaultHybrid, vaultHitAgeMs } from './searchVaultHybrid';
 
 function msg(id: string, text: string, over: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -25,6 +26,10 @@ function msg(id: string, text: string, over: Partial<ChatMessage> = {}): ChatMes
     target: '#room',
     ...over,
   } as ChatMessage;
+}
+
+function hit(id: string, text: string, over: Partial<ChatMessage> = {}): VaultSearchHit {
+  return { target: '#room', message: msg(id, text, over) };
 }
 
 describe('searchVaultHybrid', () => {
@@ -165,5 +170,100 @@ describe('searchVaultHybrid', () => {
     const ids = hits.map((h) => h.message.id);
     expect(ids).toContain('m1');
     expect(ids).not.toContain('m2'); // orthogonal → cosine 0 → below minScore
+  });
+
+  it('boosts same-room hits when activeTarget is set (rankingBoost affinity)', async () => {
+    // Two lexical hits with the same body across rooms; active room affinity
+    // must lift the in-room hit after RRF via rankingBoost.sameRoom.
+    await saveMessages('#here', [msg('local', 'deploy window tonight')]);
+    await saveMessages('#elsewhere', [
+      msg('remote', 'deploy window tonight', { target: '#elsewhere' }),
+    ]);
+    const hits = await searchVaultHybrid('deploy window', { activeTarget: '#here' });
+    expect(hits[0]!.target).toBe('#here');
+    expect(hits[0]!.message.id).toBe('local');
+  });
+
+  it('applies selfNick penalty so peer authors can outrank self on ties', async () => {
+    await saveMessages('#ops', [
+      msg('self', 'outage timeline update', { from: 'me' }),
+      msg('peer', 'outage timeline update', { from: 'alice' }),
+    ]);
+    const hits = await searchVaultHybrid('outage timeline', { selfNick: 'me' });
+    expect(hits[0]!.message.from).toBe('alice');
+  });
+
+  it('recency-boosts a newer lexical twin above an older one via message.time', async () => {
+    // Identical bodies so RRF lexical+semantic contributions match; only
+    // VaultSearchHit.message.time differs. Post-RRF rankingBoost recency must
+    // prefer the recent hit (and must not look for a phantom top-level hit.time).
+    const now = Date.now();
+    await saveMessages('#ops', [
+      msg('old', 'identical twin deploy phrase', {
+        time: new Date(now - 1000 * 60 * 60 * 24 * 40),
+      }),
+      msg('new', 'identical twin deploy phrase', {
+        time: new Date(now - 1000),
+      }),
+    ]);
+    const hits = await searchVaultHybrid('identical twin deploy', {
+      // Keep exact equal for both; recency is the only post-RRF differentiator.
+      boosts: {
+        exact: 0,
+        sameRoom: 0,
+        recencyHalfLifeMs: 1000 * 60 * 60 * 24 * 14,
+        selfPenalty: 0,
+      },
+    });
+    expect(hits.map((h) => h.message.id).slice(0, 2)).toEqual(['new', 'old']);
+    expect(hits[0]!.message.time.getTime()).toBeGreaterThan(hits[1]!.message.time.getTime());
+  });
+});
+
+describe('vaultHitAgeMs', () => {
+  const now = 1_700_000_100_000;
+
+  it('reads age from hit.message.time (VaultSearchHit shape), not a top-level time', () => {
+    const base = hit('m1', 'hello', { time: new Date(now - 5_000) });
+    // A mistaken top-level `time` must never drive recency — only message.time.
+    const poisoned = {
+      ...base,
+      time: new Date(now - 999_999_999),
+    } as VaultSearchHit & { time: Date };
+    expect(vaultHitAgeMs(poisoned, now)).toBe(5_000);
+  });
+
+  it('accepts epoch-ms and ISO strings on message.time for rehydrate edges', () => {
+    const asNumber = hit('n', 'x', { time: (now - 2_000) as unknown as Date });
+    // Force a raw number through the ChatMessage.time slot (vault edge).
+    (asNumber.message as unknown as { time: number }).time = now - 2_000;
+    expect(vaultHitAgeMs(asNumber, now)).toBe(2_000);
+
+    const asIso = hit('i', 'x');
+    (asIso.message as unknown as { time: string }).time = new Date(now - 3_000).toISOString();
+    expect(vaultHitAgeMs(asIso, now)).toBe(3_000);
+  });
+
+  it('returns undefined for missing/invalid message.time so recency is skipped', () => {
+    const broken = hit('b', 'x');
+    (broken.message as { time: unknown }).time = undefined;
+    expect(vaultHitAgeMs(broken, now)).toBeUndefined();
+
+    const invalid = hit('z', 'x');
+    (invalid.message as { time: Date }).time = new Date(Number.NaN);
+    expect(vaultHitAgeMs(invalid, now)).toBeUndefined();
+  });
+
+  it('feeds rankingBoost so recent hits outscore older ones at equal base score', () => {
+    const recentAge = vaultHitAgeMs(hit('a', 'x', { time: new Date(now - 1_000) }), now);
+    const oldAge = vaultHitAgeMs(
+      hit('b', 'x', { time: new Date(now - 1000 * 60 * 60 * 24 * 40) }),
+      now,
+    );
+    expect(recentAge).toBe(1_000);
+    expect(oldAge).toBe(1000 * 60 * 60 * 24 * 40);
+    expect(boostedScore({ id: 'a', score: 0.5, ageMs: recentAge })).toBeGreaterThan(
+      boostedScore({ id: 'b', score: 0.5, ageMs: oldAge }),
+    );
   });
 });

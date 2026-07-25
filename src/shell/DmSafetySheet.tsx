@@ -5,7 +5,9 @@
  * This is deliberately not a modal Sheet. Verification should remain available
  * beside the conversation without hiding the transcript a person may need to
  * inspect. The panel self-gates to direct messages, loads the store-owned stable
- * safety number on demand, and never renders either device's raw public key.
+ * safety number on demand (one conversation number over the full multi-device
+ * pin set), shows the advertised peer device count from peerDmDeviceKeys, and
+ * never renders either device's raw public key.
  */
 
 import './dm-safety-sheet.css';
@@ -26,14 +28,20 @@ function safetyGroups(value: string | null): string[] {
 export function DmSafetySheet(): JSX.Element {
   const activeView = useStore((state) => state.activeView);
   const peerDmKeys = useStore((state) => state.peerDmKeys);
+  const peerDmDeviceKeys = useStore((state) => state.peerDmDeviceKeys);
   const peerSafetyNumbers = useStore((state) => state.peerSafetyNumbers);
 
   const peer = createMemo(() => dmPeer(activeView()));
   const peerKey = createMemo(() => peer()?.toLowerCase() ?? null);
-  const advertisedKeyAvailable = createMemo(() => {
+  /** Advertised multi-device directory size (ocean.dm-keys), never raw key material. */
+  const peerDeviceCount = createMemo(() => {
     const key = peerKey();
-    return key !== null && peerDmKeys().has(key);
+    if (key === null) return 0;
+    const multi = peerDmDeviceKeys().get(key);
+    if (multi && multi.length > 0) return multi.length;
+    return peerDmKeys().has(key) ? 1 : 0;
   });
+  const advertisedKeyAvailable = createMemo(() => peerDeviceCount() > 0);
   const cachedSafetyNumber = createMemo(() => {
     const key = peerKey();
     return key === null ? null : peerSafetyNumbers().get(key) ?? null;
@@ -52,6 +60,16 @@ export function DmSafetySheet(): JSX.Element {
 
   const safetyNumber = createMemo(() => loadedSafetyNumber() ?? cachedSafetyNumber());
   const groups = createMemo(() => safetyGroups(safetyNumber()));
+  const sealDeviceLabel = createMemo(() => {
+    const n = Math.max(1, peerDeviceCount());
+    return String(Math.min(n, 99)).padStart(2, '0');
+  });
+  const peerDeviceReadiness = createMemo(() => {
+    const n = peerDeviceCount();
+    if (n <= 0) return 'Not received';
+    if (n === 1) return '1 device received';
+    return `${n} devices received`;
+  });
 
   // A verification receipt belongs to exactly one peer. Switching views closes
   // it and invalidates an in-flight computation so another DM never inherits
@@ -139,7 +157,7 @@ export function DmSafetySheet(): JSX.Element {
             >
               <div class="dm-safety__seal" aria-hidden="true">
                 <span>DM</span>
-                <span>01</span>
+                <span>{sealDeviceLabel()}</span>
               </div>
 
               <div class="dm-safety__content">
@@ -159,7 +177,9 @@ export function DmSafetySheet(): JSX.Element {
                 <p id="dm-safety-guidance" class="dm-safety__guidance">
                   Compare every group with {name()} in person, on a trusted voice call,
                   or through another channel you already trust. A matching number ties
-                  this device to the peer key Onyx remembered.
+                  this device to {peerDeviceCount() > 1
+                    ? `all ${peerDeviceCount()} of their remembered device keys`
+                    : 'the peer key Onyx remembered'}.
                 </p>
 
                 <div class="dm-safety__readiness" role="list" aria-label="Encryption key readiness">
@@ -168,8 +188,8 @@ export function DmSafetySheet(): JSX.Element {
                     <strong>{safetyNumber() ? 'Ready to compare' : 'Not ready to compare'}</strong>
                   </div>
                   <div class="dm-safety__readiness-row" role="listitem">
-                    <span>{name()}'s device key</span>
-                    <strong>{advertisedKeyAvailable() ? 'Received' : 'Not received'}</strong>
+                    <span>{name()}'s device keys</span>
+                    <strong>{peerDeviceReadiness()}</strong>
                   </div>
                   <div class="dm-safety__readiness-row" role="listitem">
                     <span>Manual comparison</span>
@@ -178,7 +198,11 @@ export function DmSafetySheet(): JSX.Element {
                 </div>
 
                 <div class="dm-safety__number-block">
-                  <p class="dm-safety__number-label">Current safety number</p>
+                  <p class="dm-safety__number-label">
+                    {peerDeviceCount() > 1
+                      ? `Current safety number · ${peerDeviceCount()} devices`
+                      : 'Current safety number'}
+                  </p>
                   <Show
                     when={groups().length > 0}
                     fallback={
@@ -193,7 +217,11 @@ export function DmSafetySheet(): JSX.Element {
                   >
                     <output
                       class="dm-safety__number"
-                      aria-label={`Safety number for ${name()}: ${safetyNumber()}`}
+                      aria-label={
+                        peerDeviceCount() > 1
+                          ? `Safety number for ${name()} across ${peerDeviceCount()} devices: ${safetyNumber()}`
+                          : `Safety number for ${name()}: ${safetyNumber()}`
+                      }
                       aria-live="off"
                     >
                       <For each={groups()}>
@@ -211,7 +239,8 @@ export function DmSafetySheet(): JSX.Element {
                 <p class="dm-safety__warning">
                   Onyx uses trust on first use: the first key is remembered, not
                   automatically proven to belong to {name()}. Until you compare this
-                  number, treat the identity as unverified. If their key changes,
+                  number, treat the identity as unverified. If their key changes
+                  {peerDeviceCount() > 1 ? ' or a new device appears' : ''},
                   encrypted messages fail closed until you review the warning.
                 </p>
               </div>

@@ -132,3 +132,17 @@ export async function openGroupMessage(
 
 /** Placeholder shown when a room ciphertext cannot be opened. */
 export const GROUP_LOCKED_PLACEHOLDER = '🔒 Encrypted room message (missing room key)';
+
+/**
+ * Display body for a (possibly sealed) room message.
+ * Ciphertext never leaves this helper — missing key / failed open shows the
+ * locked placeholder so hostile or unreadable ONYXROOM1 traffic fail closed.
+ */
+export function groupMessageDisplayText(
+  text: string,
+  plaintext?: string,
+): string {
+  if (plaintext !== undefined) return plaintext;
+  if (isGroupEnvelope(text)) return GROUP_LOCKED_PLACEHOLDER;
+  return text;
+}

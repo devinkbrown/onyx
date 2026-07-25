@@ -54,14 +54,18 @@ import {
   GridIcon, SpotlightIcon, SpatialAudioIcon, SettingsIcon, HangupIcon,
   ShieldIcon, LockIcon, LockOpenIcon, WarningIcon, StageIcon,
 } from './icons';
-import type { CallState, NetworkQualityTier } from '@/lib/cadence-media/types';
+import type { CadenceRoomStats, CallState, NetworkQualityTier } from '@/lib/cadence-media/types';
 import {
   resolveCallSecurity,
   type CallSecurityAffordance,
   type CallSecurityIcon,
 } from '@/lib/cadence-media/callSecurity';
 import { resolveCallPrivacy } from '@/lib/cadence-media/callPrivacy';
-import { sfuCascadeView } from '@/lib/media/sfuCascade';
+import {
+  sfuCascadeFromLive,
+  type SfuCascadeLiveMetrics,
+  type SfuCascadeView,
+} from '@/lib/media/sfuCascade';
 import {
   advanceConnectionQualityAction,
   connectionQualityActionCopy,
@@ -88,8 +92,9 @@ const TIER_META: Record<NetworkQualityTier, { label: string; color: string; bars
 };
 
 // ── Call security chip ────────────────────────────────────────────────────────
-// Honest hop-vs-E2EE affordance (research R1 / Era 1 A5). Padlock only when
-// resolveCallSecurity says usesPadlock — hop-only media never claims E2EE.
+// Honest hop-vs-E2EE affordance (research R1 / Era 1 A5 / C7). Padlock only when
+// resolveCallSecurity says usesPadlock — gated via padlockHonesty.honestPrivate.
+// Hop-only media never claims E2EE.
 
 function SecurityIcon(props: { kind: CallSecurityIcon }) {
   // Single JSX return keeps Solid's one-shot component model reactive to
@@ -139,6 +144,7 @@ function CallSecurityChip(props: {
 
   // Discoverable Privacy sheet (research R2): chip is a button, not a status
   // ornament — keyboard and pointer both open the honest call-details panel.
+  // C7 honesty attrs mirror padlockHonesty so tests can assert the unify gate.
   return (
     <Tooltip content={`${a().detail} Open call privacy details.`} placement="top">
       <button
@@ -149,6 +155,9 @@ function CallSecurityChip(props: {
         data-testid="call-security-chip"
         data-security-level={a().level}
         data-uses-padlock={a().usesPadlock ? 'true' : 'false'}
+        data-honest-private={a().padlock.honestPrivate ? 'true' : 'false'}
+        data-padlock-tone={a().padlock.tone}
+        data-padlock-glyph={a().padlock.glyph}
         onClick={() => props.onOpenPrivacy()}
       >
         <span class="voice-sec__icon" aria-hidden="true" data-testid="call-security-icon">
@@ -160,10 +169,41 @@ function CallSecurityChip(props: {
   );
 }
 
+/** Look up room STATS for a call channel (exact or case-folded key). */
+function roomStatsForChannel(
+  roomStats: Map<string, CadenceRoomStats>,
+  channel: string | null | undefined,
+): CadenceRoomStats | undefined {
+  if (!channel) return undefined;
+  return roomStats.get(channel) ?? roomStats.get(channel.toLowerCase());
+}
+
+function liveCascadeMetrics(input: {
+  callState: CallState;
+  lossRate: number | null;
+  engineReady: boolean;
+  roomStats: CadenceRoomStats | undefined;
+}): SfuCascadeLiveMetrics {
+  const inCall =
+    input.callState === 'in_call'
+    || input.callState === 'ringing_out'
+    || input.callState === 'ringing_in';
+  const stats = input.roomStats;
+  return {
+    inCall,
+    engineReady: input.engineReady,
+    packetLoss: stats?.packet_loss ?? input.lossRate,
+    remoteForwarders: stats?.remote_forwarders ?? null,
+    localSfu: stats?.local_sfu ?? null,
+    roomStatsSeen: !!stats,
+  };
+}
+
 function CallPrivacySheet(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   callState: CallState;
+  callChannel: string | null;
   mediaE2eeActive: boolean;
   mediaE2eeDegraded: boolean;
 }) {
@@ -173,6 +213,21 @@ function CallPrivacySheet(props: {
     mediaE2eeActive: props.mediaE2eeActive,
     mediaE2eeDegraded: props.mediaE2eeDegraded,
   }));
+
+  const roomStatsMap = useStore(s => s.voice.roomStats);
+  // Live engine loss sample — polled only while the privacy sheet is open.
+  const [netLoss, setNetLoss] = createSignal<number | null>(null);
+  const [engineReady, setEngineReady] = createSignal(false);
+
+  const cascade = createMemo((): SfuCascadeView => {
+    const stats = roomStatsForChannel(roomStatsMap(), props.callChannel);
+    return sfuCascadeFromLive(liveCascadeMetrics({
+      callState: props.callState,
+      lossRate: netLoss(),
+      engineReady: engineReady(),
+      roomStats: stats,
+    }));
+  });
 
   // Local media E2EE public-key fingerprint for out-of-band TOFU. Fetched from
   // the mounted engine only while the sheet is open — no invented crypto.
@@ -190,6 +245,8 @@ function CallPrivacySheet(props: {
   createEffect(() => {
     if (!props.open || props.callState === 'idle') {
       setFingerprint({ kind: 'idle' });
+      setNetLoss(null);
+      setEngineReady(false);
       return;
     }
 
@@ -198,6 +255,7 @@ function CallPrivacySheet(props: {
     const engine = getMountedCadenceMediaEngine();
     if (!engine) {
       setFingerprint({ kind: 'unavailable' });
+      setEngineReady(false);
       return;
     }
 
@@ -212,8 +270,23 @@ function CallPrivacySheet(props: {
         setFingerprint({ kind: 'unavailable' });
       });
 
+    // Sample loss for cascade degraded mode (same surface as CQ pip).
+    const pollLoss = () => {
+      const eng = getMountedCadenceMediaEngine();
+      if (!eng || typeof eng.getNetworkStats !== 'function') {
+        setEngineReady(false);
+        return;
+      }
+      const sample = eng.getNetworkStats();
+      setEngineReady(true);
+      setNetLoss(typeof sample.lossRate === 'number' ? sample.lossRate : null);
+    };
+    pollLoss();
+    const lossInterval = setInterval(pollLoss, 1000);
+
     onCleanup(() => {
       cancelled = true;
+      clearInterval(lossInterval);
     });
   });
 
@@ -240,14 +313,14 @@ function CallPrivacySheet(props: {
               </div>
               <div class="voice-privacy__fact">
                 <dt>SFU topology</dt>
-                <dd data-testid="call-privacy-sfu-cascade">
-                  {sfuCascadeView({
-                    localSfu: true,
-                    remoteForwarders: 0,
-                    known: true,
-                  }).label}
+                <dd
+                  data-testid="call-privacy-sfu-cascade"
+                  data-sfu-cascade-mode={cascade().mode}
+                  data-sfu-cascade-hops={String(cascade().hops)}
+                >
+                  {cascade().label}
                   <span class="voice-privacy__hint">
-                    {' '}— {sfuCascadeView({ localSfu: true, remoteForwarders: 0, known: true }).detail}
+                    {' '}— {cascade().detail}
                   </span>
                 </dd>
               </div>
@@ -379,6 +452,82 @@ interface NetSample {
   suggestedBps: number;
   jitterMs: number;
   lossRate: number;
+}
+
+/**
+ * Compact SFU cascade hop badge for the voice toolbar. Driven by live engine
+ * loss + room STATS topology — never invents remote hops.
+ */
+function SfuCascadeBadge() {
+  const callState = useStore(s => s.voice.callState);
+  const callChannel = useStore(s => s.voice.callChannel);
+  const roomStatsMap = useStore(s => s.voice.roomStats);
+  const [netLoss, setNetLoss] = createSignal<number | null>(null);
+  const [engineReady, setEngineReady] = createSignal(false);
+
+  createEffect(() => {
+    const state = callState();
+    const active =
+      state === 'in_call' || state === 'ringing_out' || state === 'ringing_in';
+    if (!active) {
+      setNetLoss(null);
+      setEngineReady(false);
+      return;
+    }
+    const poll = () => {
+      const engine = getMountedCadenceMediaEngine();
+      if (!engine || typeof engine.getNetworkStats !== 'function') {
+        setEngineReady(false);
+        return;
+      }
+      const stats = engine.getNetworkStats();
+      setEngineReady(true);
+      setNetLoss(typeof stats.lossRate === 'number' ? stats.lossRate : null);
+    };
+    poll();
+    const id = setInterval(poll, 1000);
+    onCleanup(() => clearInterval(id));
+  });
+
+  const cascade = createMemo((): SfuCascadeView => {
+    const stats = roomStatsForChannel(roomStatsMap(), callChannel());
+    return sfuCascadeFromLive(liveCascadeMetrics({
+      callState: callState(),
+      lossRate: netLoss(),
+      engineReady: engineReady(),
+      roomStats: stats,
+    }));
+  });
+
+  const tone = createMemo(() => {
+    switch (cascade().mode) {
+      case 'local':
+        return 'ok';
+      case 'cascade':
+        return 'warn';
+      case 'degraded':
+        return 'danger';
+      default:
+        return 'neutral';
+    }
+  });
+
+  return (
+    <Show when={cascade().mode !== 'unknown'}>
+      <Tooltip content={cascade().detail} placement="top">
+        <span
+          class={`voice-sfu voice-sfu--${tone()}`}
+          role="status"
+          aria-label={cascade().detail}
+          data-testid="sfu-cascade-badge"
+          data-sfu-cascade-mode={cascade().mode}
+          data-sfu-cascade-hops={String(cascade().hops)}
+        >
+          <span class="voice-sfu__label">{cascade().label}</span>
+        </span>
+      </Tooltip>
+    </Show>
+  );
 }
 
 function ConnectionQualityPip() {
@@ -1567,7 +1716,7 @@ export function VoiceBar() {
           </Tooltip>
         </div>
 
-        {/* Right: security honesty chip + connection quality */}
+        {/* Right: security honesty chip + SFU cascade + connection quality */}
         <div class="voice-bar__right">
           <Show when={securityAffordance()} keyed>
             {(affordance) => (
@@ -1577,6 +1726,7 @@ export function VoiceBar() {
               />
             )}
           </Show>
+          <SfuCascadeBadge />
           <ConnectionQualityPip />
         </div>
       </div>
@@ -1585,6 +1735,7 @@ export function VoiceBar() {
         open={privacyOpen()}
         onOpenChange={setPrivacyOpen}
         callState={voice().callState}
+        callChannel={voice().callChannel}
         mediaE2eeActive={voice().mediaE2eeActive}
         mediaE2eeDegraded={voice().mediaE2eeDegraded}
       />

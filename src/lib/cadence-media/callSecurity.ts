@@ -11,10 +11,16 @@
  *   - which icon the VoiceBar security chip may show
  *   - honest user-facing copy for each security level
  *
- * DOM-free and deterministic so unit tests can lock the fail-closed contract:
- * `usesPadlock` is true only when media E2EE is actually established.
+ * Padlock permission is gated exclusively through `padlockHonesty` (C7):
+ * `usesPadlock` is true only when `mediaPadlockView(...).honestPrivate` is true.
+ * DOM-free and deterministic so unit tests can lock the fail-closed contract.
  */
 
+import {
+  deriveMediaCryptoState,
+  mediaPadlockView,
+  type PadlockView,
+} from '@/lib/media/padlockHonesty';
 import type { CallState } from './types';
 
 /** Discrete security levels the call UI can present. */
@@ -48,9 +54,15 @@ export interface CallSecurityAffordance {
   readonly detail: string;
   /**
    * True only when the affordance uses a padlock (true media E2EE).
-   * Callers must not invent a padlock when this is false.
+   * Always equal to `padlock.honestPrivate` — callers must not invent a
+   * padlock when this is false.
    */
   readonly usesPadlock: boolean;
+  /**
+   * C7 media padlock honesty view for this call. Chip UI may surface
+   * `tone` / `glyph` / `honestPrivate` without re-deriving flags.
+   */
+  readonly padlock: PadlockView;
 }
 
 /**
@@ -80,54 +92,114 @@ export interface CallSecurityInput {
   readonly transportInsecure?: boolean;
 }
 
-const CONNECTING: CallSecurityAffordance = {
+type CallSecurityBase = Omit<CallSecurityAffordance, 'usesPadlock' | 'padlock'>;
+
+const CONNECTING: CallSecurityBase = {
   level: 'connecting',
   icon: 'spinner',
   label: 'Connecting…',
   detail: 'Establishing a protected connection to this server.',
-  usesPadlock: false,
 };
 
-const HOP_PROTECTED: CallSecurityAffordance = {
+const HOP_PROTECTED: CallSecurityBase = {
   level: 'hop_protected',
   icon: 'shield',
   label: 'Protected connection',
   detail:
     'Protected connection — encrypted to this server. Server operators can access call media.',
-  usesPadlock: false,
 };
 
-const E2EE: CallSecurityAffordance = {
+const E2EE: CallSecurityBase = {
   level: 'e2ee',
   icon: 'lock',
   label: 'End-to-end encrypted',
   detail: 'End-to-end encrypted — only people in this call can hear or see.',
-  usesPadlock: true,
 };
 
-const E2EE_DEGRADED: CallSecurityAffordance = {
+const E2EE_DEGRADED: CallSecurityBase = {
   level: 'e2ee_degraded',
   icon: 'lock_open',
   label: 'Not end-to-end',
   detail: 'Not end-to-end encrypted while outdated clients are present.',
-  usesPadlock: false,
 };
 
-const INSECURE: CallSecurityAffordance = {
+const INSECURE: CallSecurityBase = {
   level: 'insecure',
   icon: 'warning',
   label: 'Not secure',
   detail: 'Call not secure — leave if you expected a protected connection.',
-  usesPadlock: false,
 };
 
-const STAGE: CallSecurityAffordance = {
+const STAGE: CallSecurityBase = {
   level: 'stage',
   icon: 'stage',
   label: 'Stage broadcast',
   detail: 'Stage — broadcast mode. Not a private call.',
-  usesPadlock: false,
 };
+
+/**
+ * Map call-level security inputs onto media crypto flags for the C7 honesty
+ * table. Prefer fail-open (no private claim) when flags disagree.
+ *
+ * Stage / insecure / connecting always refuse a closed padlock. Full media
+ * E2EE is claimed only when the engine reports active E2EE and the room is
+ * not degraded.
+ */
+export function mediaCryptoFlagsFromCall(input: CallSecurityInput): {
+  mooringUp?: boolean;
+  mediaMacOk?: boolean;
+  e2eeSealed?: boolean;
+  connecting?: boolean;
+  error?: boolean;
+} {
+  if (input.transportInsecure) return { error: true };
+  if (input.callState === 'ringing_out' || input.callState === 'ringing_in') {
+    return { connecting: true };
+  }
+  // Stage / broadcast is server-processed — never sealed for padlock purposes.
+  if (input.stageMode) {
+    return { mooringUp: false, e2eeSealed: false };
+  }
+  // Mixed-room: path may authenticate but content is not fully E2E sealed.
+  if (input.mediaE2eeDegraded) {
+    return { mediaMacOk: true, e2eeSealed: false };
+  }
+  if (input.mediaE2eeActive) {
+    return { mooringUp: true, e2eeSealed: true, mediaMacOk: true };
+  }
+  // Hop-only: SFU path without client E2E.
+  return { mooringUp: false, e2eeSealed: false };
+}
+
+/** C7 honesty view for the current call security inputs. */
+export function mediaPadlockForCall(input: CallSecurityInput): PadlockView {
+  return mediaPadlockView(deriveMediaCryptoState(mediaCryptoFlagsFromCall(input)));
+}
+
+/**
+ * Attach the C7 padlock gate onto a level/icon/label base.
+ * Closed padlock (`usesPadlock`) only when honesty says `honestPrivate`.
+ * If honesty refuses privacy but the base still asked for a lock icon,
+ * force an open lock so the UI cannot paint a false closed padlock.
+ */
+function withPadlockHonesty(
+  base: CallSecurityBase,
+  padlock: PadlockView,
+): CallSecurityAffordance {
+  const usesPadlock = padlock.honestPrivate;
+  const icon: CallSecurityIcon =
+    usesPadlock
+      ? 'lock'
+      : base.icon === 'lock'
+        ? 'lock_open'
+        : base.icon;
+  return {
+    ...base,
+    icon,
+    usesPadlock,
+    padlock,
+  };
+}
 
 /**
  * Resolve the security chip for the current call.
@@ -137,7 +209,7 @@ const STAGE: CallSecurityAffordance = {
  *   1. stage mode (never lock / never private claim)
  *   2. transport insecure
  *   3. E2EE degraded (mixed room)
- *   4. media E2EE established (padlock allowed)
+ *   4. media E2EE established (padlock allowed only via C7 honesty)
  *   5. connecting (ringing)
  *   6. hop protected (in_call default today)
  */
@@ -147,23 +219,25 @@ export function resolveCallSecurity(
   const { callState } = input;
   if (callState === 'idle') return null;
 
-  // Stage is a separate trust model — never promote to padlock.
-  if (input.stageMode) return STAGE;
+  const padlock = mediaPadlockForCall(input);
 
-  if (input.transportInsecure) return INSECURE;
+  // Stage is a separate trust model — never promote to padlock.
+  if (input.stageMode) return withPadlockHonesty(STAGE, padlock);
+
+  if (input.transportInsecure) return withPadlockHonesty(INSECURE, padlock);
 
   // Degraded E2EE (partial room) is not full E2EE — no closed padlock.
-  if (input.mediaE2eeDegraded) return E2EE_DEGRADED;
+  if (input.mediaE2eeDegraded) return withPadlockHonesty(E2EE_DEGRADED, padlock);
 
-  // True media E2EE only when explicitly established.
-  if (input.mediaE2eeActive) return E2EE;
+  // True media E2EE only when explicitly established AND honesty agrees.
+  if (input.mediaE2eeActive) return withPadlockHonesty(E2EE, padlock);
 
   if (callState === 'ringing_out' || callState === 'ringing_in') {
-    return CONNECTING;
+    return withPadlockHonesty(CONNECTING, padlock);
   }
 
   // in_call without media E2EE: hop crypto only → shield, never padlock.
-  return HOP_PROTECTED;
+  return withPadlockHonesty(HOP_PROTECTED, padlock);
 }
 
 /** True when the resolved affordance may render a padlock glyph. */

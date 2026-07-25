@@ -11,6 +11,8 @@ describe('MessageText external media hardening', () => {
   afterEach(async () => {
     cleanup();
     setPreference('linkPreviews', true);
+    setPreference('httpsOnly', true);
+    setPreference('blockedHosts', []);
     await clearVault();
   });
 
@@ -98,6 +100,24 @@ describe('MessageText external media hardening', () => {
     expect(container.querySelector('img, video, audio')).toBeNull();
     expect(container.querySelector('.shell-msg-media-consent')).toBeNull();
     expect(container.querySelector('.shell-msg-preview')).toBeNull();
+  });
+
+  it('does not unfurl external media on a blocked host', () => {
+    setPreference('blockedHosts', ['cdn.example.test']);
+    const { container } = render(() => (
+      <MessageText text="https://cdn.example.test/photos/harbour.png" />
+    ));
+    expect(container.querySelector('img, video, audio')).toBeNull();
+    expect(container.querySelector('.shell-msg-media-consent')).toBeNull();
+  });
+
+  it('does not unfurl plain http media when httpsOnly is on', () => {
+    setPreference('httpsOnly', true);
+    const { container } = render(() => (
+      <MessageText text="http://cdn.example.test/photos/harbour.png" />
+    ));
+    expect(container.querySelector('img, video, audio')).toBeNull();
+    expect(container.querySelector('.shell-msg-media-consent')).toBeNull();
   });
 
   it('keeps imported vault image URLs inert until the viewer consents', async () => {

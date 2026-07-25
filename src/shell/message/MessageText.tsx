@@ -32,6 +32,11 @@ import {
 import { createResource } from 'solid-js';
 import { preferences } from '@/lib/prefs/preferences';
 import { fetchLinkPreview, isPreviewableUrl, pickPreviewUrl } from '@/lib/preview/linkPreview';
+import {
+  mayUnfurlUrl,
+  unfurlPrivacyFromPrefs,
+  type UnfurlPrivacyPrefs,
+} from '@/lib/preview/unfurlPrivacy';
 import { parseMessage } from '@/lib/format/parseMessage';
 import { lookupEmoji } from '@/lib/format/emoji';
 import {
@@ -83,14 +88,20 @@ function isHttpUrl(url: string): boolean {
   }
 }
 
+/** Live unfurl privacy from display preferences (https-only + host blocklist). */
+function liveUnfurlPrivacy(): UnfurlPrivacyPrefs {
+  return unfurlPrivacyFromPrefs(preferences());
+}
+
 /**
  * Resource candidates get a stricter boundary than user-activated links:
  * credential-bearing URLs are always rejected, and internal/private hosts are
  * admitted only when they are the app's own origin. Public cross-origin URLs
- * still require explicit consent at the render sink below.
+ * still require explicit consent at the render sink below, and honor the
+ * https-only / blocked-host preferences.
  */
 function isAutoLoadableHttpUrl(url: string): boolean {
-  return isSameOriginHttpUrl(url) || isPreviewableUrl(url);
+  return isSameOriginHttpUrl(url) || isPreviewableUrl(url, liveUnfurlPrivacy());
 }
 
 /** Same-origin resources do not disclose the viewer to a third-party host. */
@@ -932,11 +943,13 @@ export type MessageTextProps = {
  * Usage:
  *   <MessageText text={msg.text} selfNick={selfNick()} />
  */
-function LinkPreviewCard(props: { url: string }): JSX.Element {
-  const [local] = splitProps(props, ['url']);
+function LinkPreviewCard(props: { url: string; privacy: UnfurlPrivacyPrefs }): JSX.Element {
+  const [local] = splitProps(props, ['url', 'privacy']);
   const [preview] = createResource(
-    () => local.url,
-    fetchLinkPreview,
+    // Re-key when privacy flips (e.g. linkPreviews toggled off) so we never
+    // keep serving a cached card after the user disables unfurls.
+    () => ({ url: local.url, privacy: local.privacy }),
+    ({ url, privacy }) => fetchLinkPreview(url, privacy),
     // A preview is optional decoration for an already-renderable message. Keep
     // its network wait out of the route Suspense boundary so one URL can never
     // blank the transcript, composer, or roster.
@@ -1043,7 +1056,8 @@ export function MessageText(props: MessageTextProps): JSX.Element {
 
   /** First plain web link → OG preview card (preference-gated). */
   const previewUrl = createMemo<string | null>(() => {
-    if (!preferences().linkPreviews) return null;
+    const privacy = liveUnfurlPrivacy();
+    if (!privacy.linkPreviews) return null;
     const hrefs: string[] = [];
     for (const t of tokens()) {
       if (t.type === 'link') {
@@ -1051,18 +1065,21 @@ export function MessageText(props: MessageTextProps): JSX.Element {
         if (detectMediaKind(href) === null) hrefs.push(href);
       }
     }
-    return pickPreviewUrl(hrefs);
+    return pickPreviewUrl(hrefs, privacy);
   });
 
   /** Collect top-level link tokens that are media URLs for unfurling. */
   const mediaLinks = createMemo<Array<{ href: string; kind: NonNullable<MediaKind> }>>(() => {
-    if (!preferences().linkPreviews) return [];
+    const privacy = liveUnfurlPrivacy();
+    if (!privacy.linkPreviews) return [];
     const result: Array<{ href: string; kind: NonNullable<MediaKind> }> = [];
     for (const t of tokens()) {
       if (t.type === 'link') {
         const href = (t as { href: string }).href;
         const kind = detectMediaKind(href);
-        if (kind !== null) {
+        if (kind === null) continue;
+        // Same-origin media always eligible; cross-origin honors https-only + blocklist.
+        if (isSameOriginHttpUrl(href) || mayUnfurlUrl(href, privacy)) {
           result.push({ href, kind });
         }
       }
@@ -1083,7 +1100,7 @@ export function MessageText(props: MessageTextProps): JSX.Element {
         </For>
       </Show>
       <Show when={previewUrl()}>
-        {(url) => <LinkPreviewCard url={url()} />}
+        {(url) => <LinkPreviewCard url={url()} privacy={liveUnfurlPrivacy()} />}
       </Show>
       <Show when={blockKit().blocks.length > 0}>
         <For each={blockKit().blocks}>

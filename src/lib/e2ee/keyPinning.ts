@@ -20,9 +20,10 @@
  * KNOWN LIMITATION (inherent to TOFU): if an attacker is present on the VERY
  * FIRST contact, we pin the attacker's key. That residual risk is exactly what
  * the safety number closes — two humans compare the 60-digit number out-of-band
- * and detect a MITM even on first contact. Follow-ups: surface the safety number
- * + the blocking key-change warning in the DM UI (onyx-render / onyx-ui), and
- * bind the KEYTRANS proof to the pinned key (onyx-crypto + a daemon co-check).
+ * and detect a MITM even on first contact. Multi-device pins use one conversation
+ * number over the full device set (`safetyNumberForDeviceSet`); the DM sheet
+ * surfaces device count without exposing raw keys. Follow-ups: bind the KEYTRANS
+ * proof to the pinned key (onyx-crypto + a daemon co-check).
  *
  * Storage: its OWN IndexedDB ('onyx-key-pins'), deliberately SEPARATE from the
  * device-key store ('onyx-keys'). Keeping trust state in a sibling DB means we
@@ -541,27 +542,48 @@ function encodeGroups(bytes: Uint8Array, count: number): string {
  * Returns null if either key is structurally invalid.
  */
 export async function safetyNumber(keyA_b64: string, keyB_b64: string): Promise<string | null> {
-  if (!isValidPeerPublicKey(keyA_b64) || !isValidPeerPublicKey(keyB_b64)) return null;
+  return safetyNumberForDeviceSet(keyA_b64, [keyB_b64]);
+}
 
-  const [lo, hi] = [keyA_b64, keyB_b64].sort();
-  const material = new TextEncoder().encode(`${SAFETY_LABEL}\x00${lo}\x00${hi}`);
+/**
+ * Conversation safety number over OUR local device key and a peer's full
+ * multi-device key set (Era 3 C2). One number per DM — never per-device nags.
+ *
+ * Construction matches pairwise `safetyNumber` when `peerKeys` has a single
+ * valid key: sort every key (local + peers), then domain-separated SHA-512 over
+ * `label 0x00 k1 0x00 k2 …`. Adding or removing a peer device changes the
+ * number, so out-of-band compare covers the whole trusted fan-out set.
+ *
+ * Returns null when the local key is invalid or no valid peer keys remain.
+ */
+export async function safetyNumberForDeviceSet(
+  localKey_b64: string,
+  peerKeys_b64: readonly string[],
+): Promise<string | null> {
+  if (!isValidPeerPublicKey(localKey_b64)) return null;
+  const peers = normalizePeerDeviceKeys(peerKeys_b64);
+  if (peers.length === 0) return null;
+
+  const sorted = [localKey_b64, ...peers].sort();
+  const material = new TextEncoder().encode(`${SAFETY_LABEL}\x00${sorted.join('\x00')}`);
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-512', material.buffer as ArrayBuffer));
   // SHA-512 = 64 bytes; encodeGroups consumes the first 60 (12 x 5).
   return encodeGroups(digest, GROUP_COUNT);
 }
 
 /**
- * The safety number binding OUR device key to the peer's PINNED key — the value
- * the DM UI surfaces for out-of-band verification. Null if we have no device key
- * or the peer is not yet pinned.
+ * The safety number binding OUR device key to the peer's PINNED key set — the
+ * value the DM UI surfaces for out-of-band verification. Multi-device pins use
+ * the full set (one conversation number). Null if we have no device key or the
+ * peer is not yet pinned.
  */
 export async function peerSafetyNumber(
   account: string,
   owner?: DeviceMemoryOwner,
 ): Promise<string | null> {
-  const pinned = await pinnedPeerKey(account, owner);
-  if (!pinned) return null;
+  const pinned = await pinnedPeerKeys(account, owner);
+  if (!pinned || pinned.length === 0) return null;
   const mine = await deviceKeys();
   if (!mine) return null;
-  return safetyNumber(mine.publicB64, pinned);
+  return safetyNumberForDeviceSet(mine.publicB64, pinned);
 }

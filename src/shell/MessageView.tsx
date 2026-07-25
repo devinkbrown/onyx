@@ -56,12 +56,16 @@ import {
   useStore,
 } from '@/lib/store';
 import { deviceMemoryOwnerKey, loadRecent } from '@/lib/vault/historyVault';
-import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
-import { sanitizePersistedReplyPreviewText } from '@/lib/e2ee/replyPrivacy';
+import { revisionsFor, type EditRevision } from '@/lib/vault/editHistory';
+import {
+  lockedPlaceholderForText,
+  sanitizePersistedReplyPreviewText,
+} from '@/lib/e2ee/replyPrivacy';
 import { ScheduledEventLine } from './ScheduledEventLine';
 import type { ChatMessage } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';
+import { formatWebhookNoticeBody } from '@/lib/integrations/webhookBlockKit';
 import { MessageText } from '@/shell/message/MessageText';
 import { MessageMenu } from '@/shell/message/MessageMenu';
 import { activeMessageSearchResultId, openMessageSearchWithQuery } from './search/useMessageSearch';
@@ -166,12 +170,14 @@ export function messageAccessibleLabel(msg: ChatMessage): string {
   if (msg.deleted || msg.redacted) {
     body = '[message deleted]';
   } else if (locked) {
-    body = LOCKED_PLACEHOLDER;
+    body = lockedPlaceholderForText(msg.text);
   } else if (msg.type === 'action') {
     body = `* ${msg.from} ${msg.plaintext ?? msg.text}`;
   } else {
     // Prefer decrypted plaintext; never read ciphertext when a sealed body is open.
-    body = msg.encrypted ? (msg.plaintext ?? LOCKED_PLACEHOLDER) : msg.text;
+    body = msg.encrypted
+      ? (msg.plaintext ?? lockedPlaceholderForText(msg.text))
+      : msg.text;
   }
 
   const flags: string[] = [];
@@ -580,8 +586,9 @@ type MsgBodyProps = {
 function MsgBody(props: MsgBodyProps): JSX.Element {
   const [local] = splitProps(props, ['msg', 'selfNick', 'onChannelClick', 'origin']);
 
-  // An E2EE DM with no decrypted plaintext yet (no key, or sent to a different
-  // device) shows a locked placeholder; `text` is always the ciphertext.
+  // An E2EE body with no decrypted plaintext yet (missing DM/room key, or
+  // sealed to a different device) shows a locked placeholder; `text` stays
+  // ciphertext at rest.
   const locked = createMemo(() => local.msg.encrypted && local.msg.plaintext === undefined);
   const bodyText = createMemo(() =>
     local.msg.encrypted ? (local.msg.plaintext ?? '') : local.msg.text,
@@ -596,8 +603,11 @@ function MsgBody(props: MsgBodyProps): JSX.Element {
 
   const displayText = createMemo(() => {
     if (local.msg.deleted || local.msg.redacted) return '[message deleted]';
-    if (locked()) return LOCKED_PLACEHOLDER;
+    if (locked()) return lockedPlaceholderForText(local.msg.text);
     if (local.msg.type === 'action') return `* ${local.msg.from} ${bodyText()}`;
+    // Discord webhook JSON that arrived as NOTICE (or was vaulted raw) flattens
+    // to IRC-safe text; plain notices pass through unchanged.
+    if (local.msg.type === 'notice') return formatWebhookNoticeBody(bodyText());
     return bodyText();
   });
 
@@ -632,6 +642,74 @@ function SplitTopicAction(props: SplitTopicActionProps): JSX.Element {
   );
 }
 
+/** Stable empty list so useStore equality does not thrash when no history exists. */
+const EMPTY_EDIT_REVISIONS: EditRevision[] = [];
+
+/** Local-only prior bodies for messages we edited on this device. */
+function EditedMarker(props: { messageId: string }): JSX.Element {
+  const revisions = useStore((s): EditRevision[] => {
+    const revs = revisionsFor(s.editHistory, props.messageId);
+    return revs.length > 0 ? revs : EMPTY_EDIT_REVISIONS;
+  });
+  const [open, setOpen] = createSignal(false);
+  const hasHistory = createMemo(() => revisions().length > 0);
+
+  return (
+    <span class="shell-msg-edited">
+      <Show
+        when={hasHistory()}
+        fallback={
+          <span
+            class="shell-msg-edited-label"
+            style={{ color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.62rem' }}
+          >
+            (edited)
+          </span>
+        }
+      >
+        <button
+          type="button"
+          class="shell-msg-edited-btn"
+          aria-expanded={open()}
+          aria-controls={`edit-history-${props.messageId}`}
+          title="Show local edit history"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
+          }}
+        >
+          (edited)
+        </button>
+        <Show when={open()}>
+          <div
+            id={`edit-history-${props.messageId}`}
+            class="shell-msg-edit-history"
+            role="region"
+            aria-label="Local edit history"
+          >
+            <p class="shell-msg-edit-history-note">Prior versions on this device only</p>
+            <ol class="shell-msg-edit-history-list">
+              <For each={revisions()}>
+                {(rev) => (
+                  <li class="shell-msg-edit-history-item">
+                    <time
+                      class="shell-msg-edit-history-ts"
+                      dateTime={new Date(rev.editedAt).toISOString()}
+                    >
+                      {fmtTime(new Date(rev.editedAt))}
+                    </time>
+                    <span class="shell-msg-edit-history-body">{rev.body}</span>
+                  </li>
+                )}
+              </For>
+            </ol>
+          </div>
+        </Show>
+      </Show>
+    </span>
+  );
+}
+
 // ── Thread panel content ─────────────────────────────────────────────────────
 
 type ThreadPanelProps = {
@@ -643,9 +721,13 @@ type ThreadPanelProps = {
  *  so the side panel never paints E2EE ciphertext or withdrawn text. */
 function threadDisplayText(msg: ChatMessage): string {
   if (msg.deleted || msg.redacted) return '[message deleted]';
-  if (msg.encrypted && msg.plaintext === undefined) return LOCKED_PLACEHOLDER;
+  if (msg.encrypted && msg.plaintext === undefined) {
+    return lockedPlaceholderForText(msg.text);
+  }
   if (msg.type === 'action') return `* ${msg.from} ${msg.plaintext ?? msg.text}`;
-  return msg.encrypted ? (msg.plaintext ?? LOCKED_PLACEHOLDER) : msg.text;
+  return msg.encrypted
+    ? (msg.plaintext ?? lockedPlaceholderForText(msg.text))
+    : msg.text;
 }
 
 export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
@@ -1874,9 +1956,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         {fmtTime(msg.time)}
                       </time>
                       <Show when={msg.edited}>
-                        <span style={{ color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.62rem' }}>
-                          (edited)
-                        </span>
+                        <EditedMarker messageId={msg.id} />
                       </Show>
                     </div>
                     <Show when={msg.replyTo}>

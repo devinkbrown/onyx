@@ -22,6 +22,15 @@ export interface CadenceRoomStats {
   total_viewers:  number;
   video_fps:      number;
   audio_kbps:     number;
+  /**
+   * Optional mesh SFU cascade advertisement (remote forwarder count).
+   * Absent when the media plane has not published topology yet.
+   */
+  remote_forwarders?: number;
+  /** Optional path loss fraction [0,1] when the SFU advertises it on STATS. */
+  packet_loss?: number;
+  /** Optional explicit local-SFU flag from room STATS. */
+  local_sfu?: boolean;
 }
 
 /** 0 = excellent  1 = good  2 = fair  3 = poor */
