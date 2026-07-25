@@ -158,6 +158,28 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     getState().banMask(local.channel, `${local.user.nick}!*@*`);
   }
 
+  const isIgnored = useStore((s) => s.isIgnored(local.user.nick));
+
+  function handleIgnore(event: MouseEvent): void {
+    closeCardForHandoff(event, true);
+    const nick = local.user.nick;
+    if (isIgnored()) {
+      getState().unignoreUser(nick);
+      getState().addToast({
+        variant: 'info',
+        title: `Unignored ${nick}`,
+        description: 'Messages and notifications from this nick resume on this device.',
+      });
+      return;
+    }
+    getState().ignoreUser(nick);
+    getState().addToast({
+      variant: 'info',
+      title: `Ignoring ${nick}`,
+      description: 'Their messages are hidden on this device. Notifications are silenced too.',
+    });
+  }
+
   return (
     <div
       class="shell-member-card"
@@ -206,6 +228,21 @@ function MemberCard(props: MemberCardProps): JSX.Element {
         >
           Profile
         </Button>
+        <Show when={!isSelf()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleIgnore}
+            data-testid="member-card-ignore"
+            aria-label={
+              isIgnored()
+                ? `Stop ignoring ${local.user.nick} on this device`
+                : `Ignore ${local.user.nick} on this device`
+            }
+          >
+            {isIgnored() ? 'Unignore' : 'Ignore'}
+          </Button>
+        </Show>
       </div>
 
       {/* Moderation — op (or higher) only, and never against yourself. */}

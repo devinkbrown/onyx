@@ -240,6 +240,23 @@ describe('ChannelSettings — Export transcript', () => {
   });
 });
 
+describe('ChannelSettings — Leave channel', () => {
+  it('requires confirm before parting the active channel', () => {
+    const sendRaw = vi.fn();
+    seed(undefined, { client: { sendRaw } });
+    const onOpenChange = vi.fn();
+    render(() => (
+      <ChannelSettings channel="#general" open={true} onOpenChange={onOpenChange} />
+    ));
+
+    fireEvent.click(screen.getByTestId('chset-leave'));
+    expect(sendRaw).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('chset-leave-confirm'));
+    expect(sendRaw).toHaveBeenCalledWith('PART', '#general', 'Goodbye');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
+
 describe('ChannelSettings — Share invite a11y', () => {
   it('names the invite preview and copy affordances for assistive tech', () => {
     seed();

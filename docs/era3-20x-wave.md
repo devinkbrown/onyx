@@ -69,6 +69,11 @@ already-merged main-tree wave. Server repo untouched (client-only integrate).
 | Composer Tab nick / @-mention completion | **SHIPPED** |
 | Message menu: Ignore nick (device-local) | **SHIPPED** |
 | Document title attention `(N) Onyx` for mentions | **SHIPPED** |
+| Preferences: Ignored nicks list (add/unignore) | **SHIPPED** |
+| Member card: Ignore / Unignore | **SHIPPED** |
+| Message menu: toggle Unignore when already ignored | **SHIPPED** |
+| `/ignore` with no args lists current device ignore list | **SHIPPED** |
+| Channel settings: Leave channel (confirm + PART) | **SHIPPED** |
 
 ## See also
 

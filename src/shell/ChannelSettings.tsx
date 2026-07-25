@@ -342,6 +342,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
   // ── Local transcript export (this device only; never server-complete) ────
   const [exportStatus, setExportStatus] = createSignal('');
+  const [leaveConfirming, setLeaveConfirming] = createSignal(false);
   const messageCount = createMemo(() => channel()?.messages.length ?? 0);
 
   function exportTranscript(format: 'txt' | 'json'): void {
@@ -798,6 +799,67 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
           >
             {exportStatus()}
           </span>
+        </section>
+
+        {/* ── Leave channel ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-leave-heading">
+          <h3 id="chset-leave-heading" class="shell-chset-heading">Leave channel</h3>
+          <p class="shell-chset-hint" id="chset-leave-hint">
+            Parts {channel()?.name ?? local.channel} on this connection. You can rejoin later with /join
+            or the channel browser. Local scrollback stays on this device.
+          </p>
+          <Show
+            when={leaveConfirming()}
+            fallback={
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                data-testid="chset-leave"
+                aria-describedby="chset-leave-hint"
+                disabled={!isConnected()}
+                onClick={() => setLeaveConfirming(true)}
+              >
+                Leave channel
+              </Button>
+            }
+          >
+            <div
+              class="shell-chset-inline-actions"
+              role="group"
+              aria-label={`Confirm leave ${channel()?.name ?? local.channel}`}
+            >
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                data-testid="chset-leave-confirm"
+                disabled={!isConnected()}
+                onClick={() => {
+                  const name = channel()?.name ?? local.channel;
+                  getState().partChannel(name);
+                  setLeaveConfirming(false);
+                  local.onOpenChange(false);
+                  getState().addToast({
+                    variant: 'info',
+                    title: `Left ${name}`,
+                    description: 'You parted this channel on this connection.',
+                  });
+                }}
+              >
+                Confirm leave
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-testid="chset-leave-cancel"
+                onClick={() => setLeaveConfirming(false)}
+              >
+                Stay
+              </Button>
+            </div>
+          </Show>
         </section>
 
         {/* ── Notifications (personal) ── */}

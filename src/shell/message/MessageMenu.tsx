@@ -541,6 +541,10 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   // Pin/unpin (ops only, channels only). Reactive to the live PINS prop.
   const canPin = useStore((s) => isChannelTarget() && selectIsChannelOp(local.target)(s));
   const isPinned = useStore((s) => selectChannelPins(local.target)(s).includes(local.msg.id));
+  const senderIgnored = useStore((s) => {
+    const nick = typeof local.msg.from === 'string' ? local.msg.from.trim() : '';
+    return nick.length > 0 && s.isIgnored(nick);
+  });
   function togglePin(): void {
     if (!canPin()) return;
     if (isPinned()) getState().unpinMessage(local.target, local.msg.id);
@@ -890,21 +894,38 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                 class="msg-menu-item"
                 role="menuitem"
                 data-testid="msg-menu-ignore"
-                aria-label={`Ignore ${local.msg.from} on this device`}
+                aria-label={
+                  senderIgnored()
+                    ? `Stop ignoring ${local.msg.from} on this device`
+                    : `Ignore ${local.msg.from} on this device`
+                }
                 onClick={() => {
                   const nick = local.msg.from.trim();
                   if (!nick) return;
-                  getState().ignoreUser(nick);
-                  getState().addToast({
-                    variant: 'info',
-                    title: `Ignoring ${nick}`,
-                    description: 'Their messages are hidden on this device. /unignore to reverse.',
-                  });
+                  if (senderIgnored()) {
+                    getState().unignoreUser(nick);
+                    getState().addToast({
+                      variant: 'info',
+                      title: `Unignored ${nick}`,
+                      description: 'Messages and notifications from this nick resume on this device.',
+                    });
+                  } else {
+                    getState().ignoreUser(nick);
+                    getState().addToast({
+                      variant: 'info',
+                      title: `Ignoring ${nick}`,
+                      description: 'Their messages are hidden on this device. Preferences → Conversation manages the list.',
+                    });
+                  }
                   local.onMenuOpenChange?.(false);
                 }}
               >
                 <span class="msg-menu-item-icon" aria-hidden="true">⊘</span>
-                <span>Ignore {local.msg.from}</span>
+                <span>
+                  {senderIgnored()
+                    ? `Unignore ${local.msg.from}`
+                    : `Ignore ${local.msg.from}`}
+                </span>
               </button>
             </Show>
             <Show when={caps().canDelete}>

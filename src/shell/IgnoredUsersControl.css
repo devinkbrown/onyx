@@ -1,0 +1,95 @@
+/**
+ * IgnoredUsersControl.css — device ignore list in Preferences.
+ * Token-only; imported by IgnoredUsersControl.tsx.
+ */
+
+.ignored-users-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ignored-users-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.ignored-users-add .pref-text-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.ignored-users-add-btn,
+.ignored-users-unignore {
+  appearance: none;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 40%, transparent);
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  min-height: 2.25rem;
+}
+
+.ignored-users-add-btn:hover,
+.ignored-users-unignore:hover {
+  background: color-mix(in oklab, var(--ink) 55%, transparent);
+}
+
+.ignored-users-add-btn:focus-visible,
+.ignored-users-unignore:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ignored-users-empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--paper-dim);
+}
+
+.ignored-users-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.ignored-users-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0.4rem 0.65rem;
+  background: color-mix(in oklab, var(--ink) 28%, transparent);
+}
+
+.ignored-users-row + .ignored-users-row {
+  border-top: 1px solid var(--line);
+}
+
+.ignored-users-nick {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--paper);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ignored-users-unignore {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+  min-height: 2rem;
+}

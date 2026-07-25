@@ -141,6 +141,7 @@ import {
   type PwaUpdateRecoveryResult,
 } from '@/pwa/updateRecovery';
 import { CalmModeControl } from './CalmModeControl';
+import { IgnoredUsersControl } from './IgnoredUsersControl';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import {
   SCENE_MOTIONS,
@@ -3596,6 +3597,7 @@ export function PreferencesPanel(): JSX.Element {
               value={() => preferences().e2eeDms}
               onToggle={(value) => setPreference('e2eeDms', value)}
             />
+            <IgnoredUsersControl />
           </section>
 
           <section

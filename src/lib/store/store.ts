@@ -7106,10 +7106,21 @@ export const store = createStore<OnyxState>()(
         if (lc === 'ignore' || lc === 'unignore') {
           const nick = (args[0] ?? '').trim();
           if (!nick) {
+            if (lc === 'ignore') {
+              const list = [...get().ignoredUsers].sort((a, b) => a.localeCompare(b, 'en'));
+              get().addToast({
+                variant: 'info',
+                title: list.length === 0 ? 'Ignore list empty' : `Ignoring ${list.length}`,
+                description: list.length === 0
+                  ? 'Use /ignore <nick>, the message menu, or Preferences → Conversation.'
+                  : list.slice(0, 12).join(', ') + (list.length > 12 ? '…' : ''),
+              });
+              return;
+            }
             get().addToast({
               variant: 'warning',
-              title: lc === 'ignore' ? 'Ignore whom?' : 'Unignore whom?',
-              description: `Use /${lc} <nick>.`,
+              title: 'Unignore whom?',
+              description: 'Use /unignore <nick>, or Preferences → Conversation.',
             });
             return;
           }
