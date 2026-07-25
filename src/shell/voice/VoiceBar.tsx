@@ -23,7 +23,7 @@
  * does not mix remote peers and is never uploaded.
  */
 
-import { For, createEffect, createMemo, createSignal, onCleanup, Show, untrack } from 'solid-js';
+import { For, Match, Switch, createEffect, createMemo, createSignal, onCleanup, Show, untrack } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import { getMountedCadenceMediaEngine } from '@/lib/cadence-media/MediaEngine';
 import {
@@ -91,20 +91,30 @@ const TIER_META: Record<NetworkQualityTier, { label: string; color: string; bars
 // resolveCallSecurity says usesPadlock — hop-only media never claims E2EE.
 
 function SecurityIcon(props: { kind: CallSecurityIcon }) {
-  switch (props.kind) {
-    case 'shield':
-      return <ShieldIcon />;
-    case 'lock':
-      return <LockIcon />;
-    case 'lock_open':
-      return <LockOpenIcon />;
-    case 'warning':
-      return <WarningIcon />;
-    case 'stage':
-      return <StageIcon />;
-    case 'spinner':
-      return <span class="voice-sec__spinner" aria-hidden="true" />;
-  }
+  // Single JSX return keeps Solid's one-shot component model reactive to
+  // props.kind changes (no switch early-returns that freeze the first branch).
+  return (
+    <Switch>
+      <Match when={props.kind === 'shield'}>
+        <ShieldIcon />
+      </Match>
+      <Match when={props.kind === 'lock'}>
+        <LockIcon />
+      </Match>
+      <Match when={props.kind === 'lock_open'}>
+        <LockOpenIcon />
+      </Match>
+      <Match when={props.kind === 'warning'}>
+        <WarningIcon />
+      </Match>
+      <Match when={props.kind === 'stage'}>
+        <StageIcon />
+      </Match>
+      <Match when={props.kind === 'spinner'}>
+        <span class="voice-sec__spinner" aria-hidden="true" />
+      </Match>
+    </Switch>
+  );
 }
 
 function CallSecurityChip(props: {

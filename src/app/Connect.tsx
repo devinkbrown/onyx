@@ -301,6 +301,9 @@ export function Connect(props: ConnectProps): JSX.Element {
   const [mode, setMode] = createSignal<Mode>('guest');
   /** When passkeys are primary, password fields stay collapsed until the user asks. */
   const [passwordPathOpen, setPasswordPathOpen] = createSignal(false);
+  /** Offline recovery-code path under sign-in (RECOVERYCODES LOGIN after 001). */
+  const [recoveryPathOpen, setRecoveryPathOpen] = createSignal(false);
+  const [recoveryCode, setRecoveryCode] = createSignal('');
 
   // Website → app handoff: /app/?join=%23channel (+ optional &at=<moment> for
   // time travel). Validated before it goes anywhere near a JOIN; a bad link is
@@ -815,6 +818,18 @@ export function Connect(props: ConnectProps): JSX.Element {
     );
 
     if (m === 'signin') {
+      if (recoveryPathOpen()) {
+        const code = recoveryCode().replace(/[-\s]/g, '');
+        if (code.length < 8) {
+          setPasswordError('Enter a recovery code from your saved list.');
+          return;
+        }
+        setPasswordError(undefined);
+        // Queue RECOVERYCODES LOGIN for after 001, then open a plain socket.
+        getState().recoveryCodesLogin(n, recoveryCode());
+        doConnect(n, '');
+        return;
+      }
       const pErr = password() ? undefined : 'Password is required to sign in.';
       setPasswordError(pErr);
       if (pErr) return;
@@ -1462,12 +1477,49 @@ export function Connect(props: ConnectProps): JSX.Element {
                             class="conn-password-path-toggle"
                             data-testid="conn-password-path-open"
                             disabled={!isFormReady()}
-                            onClick={() => setPasswordPathOpen(true)}
+                            onClick={() => {
+                              setRecoveryPathOpen(false);
+                              setPasswordPathOpen(true);
+                            }}
                           >
                             Use password instead
                           </button>
                         </Show>
+                        <Show when={!recoveryPathOpen()}>
+                          <button
+                            type="button"
+                            class="conn-password-path-toggle"
+                            data-testid="conn-recovery-path-open"
+                            disabled={!isFormReady()}
+                            onClick={() => {
+                              setPasswordPathOpen(true);
+                              setRecoveryPathOpen(true);
+                            }}
+                          >
+                            Use a recovery code
+                          </button>
+                        </Show>
                       </div>
+                    </Show>
+
+                    <Show when={mode() === 'signin' && recoveryPathOpen()}>
+                      <label class="onyx-field" for="conn-recovery-code">
+                        <span class="onyx-field__label">Recovery code</span>
+                        <input
+                          id="conn-recovery-code"
+                          class="onyx-field__input"
+                          type="text"
+                          autocomplete="one-time-code"
+                          spellcheck={false}
+                          placeholder="ABCDE-FGHIJ"
+                          value={recoveryCode()}
+                          data-testid="conn-recovery-code"
+                          onInput={(e) => setRecoveryCode(e.currentTarget.value)}
+                        />
+                      </label>
+                      <p class="conn-mode-hint">
+                        Connects, then spends one offline recovery code for your account nick.
+                      </p>
                     </Show>
 
                     {/* Strength meter + confirm — register only */}

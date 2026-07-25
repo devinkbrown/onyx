@@ -51,6 +51,7 @@ import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import { deviceKeys, deviceRegistryId } from '@/lib/e2ee/dmCipher';
 import { PasskeysSection } from '@/shell/PasskeysSection';
 import { SessionsDevicesSection } from '@/shell/SessionsDevicesSection';
+import { RecoveryCodesSection } from '@/shell/RecoveryCodesSection';
 import { ModalShell } from '@/primitives/index';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
@@ -856,6 +857,9 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
           {/* Sessions & devices — current browser + Era 2 (B8) remote list skeleton */}
           <SessionsDevicesSection account={account()} />
+
+          {/* Offline recovery codes — B8 remainder */}
+          <RecoveryCodesSection account={account()} />
 
           {/* Passkeys — WebAuthn passwordless login: register, list, rename, remove */}
           <PasskeysSection account={account()} owner={memoryOwner()} active={local.open} />

@@ -283,12 +283,6 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     return `Event: ${event.title} · ${ribbonEventCountdown()}`;
   });
 
-  const ribbonEventCompactLabel = createMemo(() => {
-    const event = ribbonEvent();
-    if (!event) return '';
-    return `Event · ${ribbonEventCountdown()}`;
-  });
-
   const ribbonEventAria = createMemo(() => {
     const channel = settingsChannel();
     const event = ribbonEvent();

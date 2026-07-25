@@ -49,7 +49,7 @@ export function parseSessionDropOk(text: string): number | null {
   return Number.isFinite(index) && index > 0 ? index : null;
 }
 
-export function formatSessionSignon(signonMs: number, nowMs = Date.now()): string {
+export function formatSessionSignon(signonMs: number, _nowMs = Date.now()): string {
   if (!Number.isFinite(signonMs) || signonMs <= 0) return 'unknown start';
   const date = new Date(signonMs);
   if (Number.isNaN(date.getTime())) return 'unknown start';

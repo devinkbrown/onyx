@@ -457,6 +457,16 @@ export interface TotpState {
   busy: boolean;
 }
 
+/** Offline recovery codes (RECOVERYCODES notices) — Era 2 B8. */
+export interface RecoveryCodesState {
+  remaining: number | null;
+  /** Just-generated plaintext codes (shown once). */
+  freshCodes: string[];
+  busy: boolean;
+  error: string | null;
+  info: string | null;
+}
+
 /** One Guise persona (VHOST wardrobe entry). */
 export interface PersonaEntry {
   name: string;
@@ -715,6 +725,8 @@ export interface OnyxState {
   canSearchHistory: boolean;
   /** TOTP 2FA state (server `TOTP:` notices) */
   totp: TotpState;
+  /** Offline recovery codes (RECOVERYCODES notices) */
+  recoveryCodes: RecoveryCodesState;
   /** Guise persona wardrobe (VHOST LIST) */
   personas: PersonaEntry[];
   /** Operator-published VHOST offer templates the account can CLAIM */
@@ -1187,6 +1199,13 @@ export interface OnyxState {
   totpConfirm(code: string): void;
   totpDisable(): void;
   totpStatus(): void;
+
+  /** Offline recovery codes (RECOVERYCODES) */
+  recoveryCodesStatus(): void;
+  recoveryCodesGenerate(password?: string): void;
+  recoveryCodesClear(password?: string): void;
+  recoveryCodesLogin(account: string, code: string): void;
+  recoveryCodesDismissFresh(): void;
 
   /** Guise personas: refresh the wardrobe (VHOST LIST) */
   vhostList(): void;
@@ -3130,6 +3149,8 @@ let _passkeyListReplyContext: AccountReplyContext | null = null;
 let _passkeyActionReplyContext: AccountReplyContext | null = null;
 let _passkeyAuthReplyContext: AccountReplyContext | null = null;
 let _totpReplyContext: AccountReplyContext | null = null;
+/** Queued RECOVERYCODES LOGIN until 001 (Connect recovery path). */
+let _pendingRecoveryLogin: { account: string; code: string } | null = null;
 let _vhostReplyContext: AccountReplyContext | null = null;
 let _e2eeKeyReplyContext: AccountReplyContext | null = null;
 let _keyTransparencyReplyContext: AccountReplyContext | null = null;
@@ -3958,6 +3979,7 @@ function _resetAccountBoundState(
         ? { passkeySupported: null, passkeyRenameUnsupported: false }
         : {}),
       totp: { status: 'unknown', secret: null, otpauth: null, error: null, busy: false },
+      recoveryCodes: { remaining: null, freshCodes: [], busy: false, error: null, info: null },
       personas: [],
       personaOffers: [],
       notifications: [],
@@ -5338,6 +5360,7 @@ export const store = createStore<OnyxState>()(
     serverSearch: { target: '', query: '', status: 'idle', results: [], error: null },
     canSearchHistory: false,
     totp: { status: 'unknown', secret: null, otpauth: null, error: null, busy: false },
+    recoveryCodes: { remaining: null, freshCodes: [], busy: false, error: null, info: null },
     personas: [],
     personaOffers: [],
     readNotificationIds: new Set(),
@@ -6594,6 +6617,46 @@ export const store = createStore<OnyxState>()(
       if (!client) return;
       _totpReplyContext = _captureAccountReplyContext(get);
       client.sendRaw('TOTP', 'STATUS');
+    },
+
+    recoveryCodesStatus() {
+      const { client } = get();
+      if (!client) return;
+      set(st => ({ recoveryCodes: { ...st.recoveryCodes, busy: true, error: null } }));
+      client.sendRaw('RECOVERYCODES', 'STATUS');
+    },
+    recoveryCodesGenerate(password) {
+      const { client } = get();
+      if (!client) return;
+      set(st => ({
+        recoveryCodes: { ...st.recoveryCodes, busy: true, error: null, info: null, freshCodes: [] },
+      }));
+      if (password && password.length > 0) client.sendRaw('RECOVERYCODES', 'GENERATE', password);
+      else client.sendRaw('RECOVERYCODES', 'GENERATE');
+    },
+    recoveryCodesClear(password) {
+      const { client } = get();
+      if (!client) return;
+      set(st => ({ recoveryCodes: { ...st.recoveryCodes, busy: true, error: null, info: null } }));
+      if (password && password.length > 0) client.sendRaw('RECOVERYCODES', 'CLEAR', password);
+      else client.sendRaw('RECOVERYCODES', 'CLEAR');
+    },
+    recoveryCodesLogin(account, code) {
+      const { client, connectionStatus } = get();
+      const acct = account.trim();
+      const raw = code.replace(/[-\s]/g, '').toUpperCase();
+      if (!acct || raw.length < 8) return;
+      // Queue until after 001 when connecting with a recovery code from Connect.
+      if (!client || connectionStatus !== 'connected') {
+        _pendingRecoveryLogin = { account: acct, code: raw };
+        set(st => ({ recoveryCodes: { ...st.recoveryCodes, busy: true, error: null, info: null } }));
+        return;
+      }
+      set(st => ({ recoveryCodes: { ...st.recoveryCodes, busy: true, error: null, info: null } }));
+      client.sendRaw('RECOVERYCODES', 'LOGIN', acct, raw);
+    },
+    recoveryCodesDismissFresh() {
+      set(st => ({ recoveryCodes: { ...st.recoveryCodes, freshCodes: [], info: null } }));
     },
 
     vhostList() {
@@ -9152,6 +9215,16 @@ export const store = createStore<OnyxState>()(
           set(st => ({ totp: { ...st.totp, busy: false, error: standard.description || 'TOTP command failed' } }));
           return;
         }
+        if (standard.kind === 'FAIL' && standard.command === 'RECOVERYCODES') {
+          set(st => ({
+            recoveryCodes: {
+              ...st.recoveryCodes,
+              busy: false,
+              error: standard.description || 'Recovery codes command failed',
+            },
+          }));
+          return;
+        }
         if (standard.kind === 'FAIL' && standard.command === 'SEARCH') {
           const pending = _pendingServerSearch;
           _pendingServerSearch = null;
@@ -9423,6 +9496,12 @@ export const store = createStore<OnyxState>()(
           // available on registration. MEDIA EVENTs keep it true.
           set({ ourNick: params[0], mediaAvailable: true });
           get().addServerLog(params[1] ?? `Welcome, ${params[0]}.`, msg.prefix ?? '');
+          // Offline recovery-code login queued from Connect before the socket was up.
+          if (_pendingRecoveryLogin) {
+            const pending = _pendingRecoveryLogin;
+            _pendingRecoveryLogin = null;
+            get().client?.sendRaw('RECOVERYCODES', 'LOGIN', pending.account, pending.code);
+          }
           // Subscribe to the IRCX MEDIA event plane so the server delivers live
           // voice/video presence as `:server EVENT <me> MEDIA …`. The feed is
           // membership-gated server-side, so the `*` mask only yields calls in
@@ -10366,6 +10445,43 @@ export const store = createStore<OnyxState>()(
                 else if (/disabled|was not enabled/i.test(body)) { totp.status = 'disabled'; totp.secret = null; totp.otpauth = null; }
                 else if (/add this to your authenticator/i.test(body)) totp.status = 'pending';
                 return { totp };
+              });
+              get().addServiceNotice('Account', text);
+              break;
+            }
+
+            // ── RECOVERYCODES: offline recovery codes (B8) ───────────────
+            if (text.startsWith('RECOVERYCODES:')) {
+              const body = text.slice('RECOVERYCODES:'.length).trim();
+              const statusMatch = body.match(/^(\d+)\s+unused code/i);
+              const codeLine = body.match(/^(\d+)\.\s*([0-9A-HJ-NP-Z]{5}-[0-9A-HJ-NP-Z]{5})\s*$/i);
+              set(st => {
+                const recoveryCodes = { ...st.recoveryCodes, busy: false, error: null };
+                if (statusMatch) {
+                  recoveryCodes.remaining = Number.parseInt(statusMatch[1]!, 10);
+                  recoveryCodes.info = null;
+                } else if (/^generated\s+\d+\s+single-use codes/i.test(body)) {
+                  recoveryCodes.freshCodes = [];
+                  recoveryCodes.info = body;
+                } else if (codeLine) {
+                  const dashed = codeLine[2]!.toUpperCase();
+                  if (!recoveryCodes.freshCodes.includes(dashed)) {
+                    recoveryCodes.freshCodes = [...recoveryCodes.freshCodes, dashed];
+                  }
+                  recoveryCodes.remaining = recoveryCodes.freshCodes.length;
+                } else if (/all recovery codes cleared/i.test(body)) {
+                  recoveryCodes.remaining = 0;
+                  recoveryCodes.freshCodes = [];
+                  recoveryCodes.info = body;
+                } else if (/login ok/i.test(body)) {
+                  recoveryCodes.info = body;
+                  if (typeof recoveryCodes.remaining === 'number' && recoveryCodes.remaining > 0) {
+                    recoveryCodes.remaining -= 1;
+                  }
+                } else {
+                  recoveryCodes.info = body;
+                }
+                return { recoveryCodes };
               });
               get().addServiceNotice('Account', text);
               break;

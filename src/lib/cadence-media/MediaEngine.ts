@@ -264,18 +264,6 @@ const BW_AUDIO_ONLY =  30_000;
 // Minimal msgpack helpers
 // -------------------------------------------------------------------
 
-function msgpackArray3(a: string, b: string, c: number): Uint8Array {
-  const enc = new TextEncoder();
-  const aB = enc.encode(a), bB = enc.encode(b);
-  const out = new Uint8Array(1 + 1 + aB.length + 1 + bB.length + 3);
-  let i = 0;
-  out[i++] = 0x93;
-  out[i++] = 0xa0 | (aB.length & 0x1f); out.set(aB, i); i += aB.length;
-  out[i++] = 0xa0 | (bB.length & 0x1f); out.set(bB, i); i += bB.length;
-  out[i++] = 0xcd; out[i++] = (c >> 8) & 0xff; out[i] = c & 0xff;
-  return out;
-}
-
 function msgpackArray1(a: string): Uint8Array {
   const enc = new TextEncoder();
   const aB = enc.encode(a);
