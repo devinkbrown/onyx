@@ -5628,9 +5628,16 @@ export const store = createStore<OnyxState>()(
           // through the entire reconnect backoff before finally returning the
           // user to Connect. Stop immediately and keep the original auth error
           // visible instead.
+          //
+          // WebSocket close code 4003 is reserved for auth fatals in IRCClient
+          // (SASL fail + registered-nick reject). Some environments strip the
+          // reason string and only deliver `code 4003` — still fail closed.
+          const registeredNickAuthFatal =
+            reason === 'Registered nickname requires authentication';
           const authFatal = reason === 'SASL authentication failed'
             || reason === 'Unsupported SASL mechanism'
-            || reason === 'Registered nickname requires authentication';
+            || registeredNickAuthFatal
+            || reason === 'code 4003';
           const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
           _batchCollectors.clear();
           _openChathistoryByTarget.clear();
@@ -5671,6 +5678,20 @@ export const store = createStore<OnyxState>()(
               ? { autoReconnect: false, connectionStatus: 'disconnected' as const, reconnectIn: 0 }
               : {}),
           }));
+          // If the 432 text frame was lost and only the close reason arrived,
+          // still surface an error-type notice so Connect can route to sign-in
+          // (it keys off error notifications, not system disconnect lines).
+          if (registeredNickAuthFatal) {
+            const hasRegisteredNickError = get().notifications.some(
+              (n) => n.type === 'error' && /nickname is registered/i.test(n.text),
+            );
+            if (!hasRegisteredNickError) {
+              get().addNotification({
+                type: 'error',
+                text: 'That nickname is registered. Sign in as its account before using it.',
+              });
+            }
+          }
           get().addNotification({ type: 'system', text: `Disconnected: ${reason}` });
           get().addServerLog(`Disconnected: ${reason}`, '', 'error');
 

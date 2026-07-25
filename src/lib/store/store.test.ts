@@ -134,6 +134,129 @@ describe('vanilla store', () => {
     }
   });
 
+  it('does not auto-reconnect after a registered-nickname auth close', () => {
+    class FakeWebSocket {
+      static readonly OPEN = 1;
+      readyState = 0;
+      binaryType = '';
+      onopen: (() => void) | null = null;
+      onmessage: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      close(): void {}
+    }
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+
+    try {
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'alice',
+      });
+      store.setState({ autoReconnect: true, connectionStatus: 'connecting', reconnectIn: 42 });
+
+      const client = store.getState().client as unknown as {
+        opts: { onDisconnected?: (reason: string) => void };
+      };
+      // Server/client close reason only — 432 text frame may have been lost.
+      client.opts.onDisconnected?.('Registered nickname requires authentication');
+
+      expect(store.getState()).toMatchObject({
+        status: 'disconnected',
+        connectionStatus: 'disconnected',
+        autoReconnect: false,
+        reconnectIn: 0,
+      });
+      // Connect keys its sign-in CTA off error notifications.
+      expect(
+        store.getState().notifications.some(
+          (n) => n.type === 'error' && /nickname is registered/i.test(n.text),
+        ),
+      ).toBe(true);
+    } finally {
+      store.getState().disconnect();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('treats a bare WebSocket code 4003 close as auth-fatal (reason stripped)', () => {
+    class FakeWebSocket {
+      static readonly OPEN = 1;
+      readyState = 0;
+      binaryType = '';
+      onopen: (() => void) | null = null;
+      onmessage: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      close(): void {}
+    }
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+
+    try {
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'alice',
+        password: 'secret',
+      });
+      store.setState({ autoReconnect: true, connectionStatus: 'connected', reconnectIn: 9 });
+
+      const client = store.getState().client as unknown as {
+        opts: { onDisconnected?: (reason: string) => void };
+      };
+      // IRCClient formats missing close reasons as `code ${ev.code}`.
+      client.opts.onDisconnected?.('code 4003');
+
+      expect(store.getState()).toMatchObject({
+        status: 'disconnected',
+        connectionStatus: 'disconnected',
+        autoReconnect: false,
+        reconnectIn: 0,
+      });
+    } finally {
+      store.getState().disconnect();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('does not duplicate the registered-nick error when onError already fired', () => {
+    class FakeWebSocket {
+      static readonly OPEN = 1;
+      readyState = 0;
+      binaryType = '';
+      onopen: (() => void) | null = null;
+      onmessage: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      close(): void {}
+    }
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+
+    try {
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'alice',
+      });
+      const client = store.getState().client as unknown as {
+        opts: {
+          onError?: (err: string) => void;
+          onDisconnected?: (reason: string) => void;
+        };
+      };
+      client.opts.onError?.(
+        'That nickname is registered. Sign in as its account before using it.',
+      );
+      client.opts.onDisconnected?.('Registered nickname requires authentication');
+
+      const registeredErrors = store.getState().notifications.filter(
+        (n) => n.type === 'error' && /nickname is registered/i.test(n.text),
+      );
+      expect(registeredErrors).toHaveLength(1);
+      expect(store.getState().autoReconnect).toBe(false);
+    } finally {
+      store.getState().disconnect();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('keeps the SASL account when RPL_LOGGEDIN arrives before registration', () => {
     class FakeWebSocket {
       static readonly OPEN = 1;
