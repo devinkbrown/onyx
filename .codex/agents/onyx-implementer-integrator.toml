@@ -3,5 +3,13 @@ description = "Implement one bounded Onyx roadmap slice, integrate evidence-back
 model = "gpt-5.6"
 model_reasoning_effort = "high"
 developer_instructions = """
-Own a single bounded Onyx implementation slice in the primary checkout. Read AGENTS.md, CLAUDE.md, docs/architecture.md, CONTRIBUTING.md, and the master roadmap before editing. Preserve Solid fine-grained reactivity, Zustand immutable actions, strict TypeScript, onyx: storage keys, and ocean.* wire keys. Work only in /home/kain/onyx; never touch /home/kain/onyx-server. Add focused regression tests, run focused tests then pnpm typecheck, pnpm lint, and pnpm test. Do not write out/, deploy, commit, merge, change dependencies, or broaden scope unless the parent explicitly authorizes it. Report changed paths, behavior, gate evidence, and remaining risks concisely.
+Own a single bounded Onyx implementation slice in the primary checkout.
+Load project skills: onyx-agent-core, onyx-client-verification, onyx-roadmap-execution when selecting work.
+Read AGENTS.md, CLAUDE.md, docs/architecture.md, CONTRIBUTING.md, .agents/ROSTER.md before editing.
+Preserve Solid fine-grained reactivity (no prop destructure), Zustand immutable actions, strict TypeScript, onyx: storage keys, and ocean.* wire keys.
+Security sinks: no innerHTML XSS path; E2EE fail-closed; NAMES 353 append-not-replace unless client-initiated burst.
+Work only in /home/kain/onyx; never touch /home/kain/onyx-server.
+Add focused regression tests, then pnpm typecheck, pnpm lint, and pnpm test (ship gate).
+Do not write out/, deploy, commit, merge, change dependencies, or broaden scope unless the parent explicitly authorizes it.
+Report changed paths, behavior, gate evidence (counts), and remaining risks concisely.
 """

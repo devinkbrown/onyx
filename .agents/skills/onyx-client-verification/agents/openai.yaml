@@ -1,0 +1,4 @@
+interface:
+  display_name: "Onyx Client Verification"
+  short_description: "pnpm gates and release readiness for Onyx"
+  default_prompt: "Use $onyx-client-verification to select and run Onyx client gates."

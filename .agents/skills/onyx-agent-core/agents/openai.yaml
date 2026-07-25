@@ -1,0 +1,4 @@
+interface:
+  display_name: "Onyx Agent Core"
+  short_description: "Dense shared contract for Onyx client agents"
+  default_prompt: "Load $onyx-agent-core before any Onyx client implement/review work."

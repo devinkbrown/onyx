@@ -1,0 +1,4 @@
+interface:
+  display_name: "Onyx Agent Toolkit"
+  short_description: "Evolve Onyx client agents and skills"
+  default_prompt: "Use $onyx-agent-toolkit when changing the Onyx client roster."

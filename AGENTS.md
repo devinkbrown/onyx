@@ -49,4 +49,27 @@ network/product/client; **Onyx Server** = engine (not "Onyx" in public docs).
 - Gates before finishing: `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 - **Only `deploy.sh` writes `out/`.** `pnpm build` emits `dist/`. Never point a
   build or test at `out/`.
+
+## Agent roster (AI routing)
+
+Full map: [`.agents/ROSTER.md`](.agents/ROSTER.md).  
+Shared bar/gates/security sinks: skill **`onyx-agent-core`**.  
+Verification: skill **`onyx-client-verification`**.
+
+| Need | Agent |
+|------|-------|
+| General implement / review | `solidjs-coder` or project `onyx-coder-leaf` |
+| Trace before code | `onyx-explorer` |
+| Blueprint | `onyx-spec-architect` |
+| Adversarial review | `onyx-adversarial-reviewer` |
+| Security sinks | `onyx-security-boundary-reviewer` (+ `onyx-render` / `onyx-crypto`) |
+| IRC wire | `onyx-irc` |
+| Store fold-back | `onyx-store` |
+| Vault / outbox | `onyx-vault` |
+| Media | `onyx-media` |
+| a11y | `onyx-a11y` / `onyx-a11y-browser-auditor` |
+| E2E | `onyx-e2e` |
+| Daemon work | **not here** → `/home/kain/onyx-server` roster |
+
+Roadmap slices: skill `onyx-roadmap-execution`. Cross-model: `cross-model-handoff`.
 <!-- END:onyx-agent-rules -->
