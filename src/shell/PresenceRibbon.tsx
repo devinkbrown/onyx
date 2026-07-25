@@ -272,10 +272,21 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     return !!event && now() >= event.at * 1000;
   });
 
+  const ribbonEventCountdown = createMemo(() => {
+    const event = ribbonEvent();
+    return event ? eventCountdown(event, now()) : '';
+  });
+
   const ribbonEventLabel = createMemo(() => {
     const event = ribbonEvent();
     if (!event) return '';
-    return `${event.title} · ${eventCountdown(event, now())}`;
+    return `Event: ${event.title} · ${ribbonEventCountdown()}`;
+  });
+
+  const ribbonEventCompactLabel = createMemo(() => {
+    const event = ribbonEvent();
+    if (!event) return '';
+    return `Event · ${ribbonEventCountdown()}`;
   });
 
   const ribbonEventAria = createMemo(() => {
@@ -463,7 +474,14 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 onClick={handleEventChipClick}
               >
                 <span class="shell-ribbon-event-mark" aria-hidden="true" />
-                <span class="shell-ribbon-event-text">{ribbonEventLabel()}</span>
+                <span class="shell-ribbon-event-text shell-ribbon-event-text--full" aria-hidden="true">
+                  <span class="shell-ribbon-event-title">Event: {ribbonEvent()?.title}</span>
+                  <span class="shell-ribbon-event-countdown"> · {ribbonEventCountdown()}</span>
+                </span>
+                <span class="shell-ribbon-event-text shell-ribbon-event-text--compact" aria-hidden="true">
+                  <span class="shell-ribbon-event-title">Event</span>
+                  <span class="shell-ribbon-event-countdown"> · {ribbonEventCountdown()}</span>
+                </span>
               </button>
             </Show>
             <AiPolicyBadge policy={aiPolicy()} channel={settingsChannel() ?? channelName() ?? 'channel'} />
@@ -480,12 +498,15 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 <span class="shell-ribbon-voice-text">{voiceChipLabel()}</span>
               </button>
             </Show>
+            {/* One entry for the shared call stage — voice + camera are toggles
+                on the in-call bar, not separate ribbon actions. */}
             <Show when={local.showJoinVoice && local.onJoinVoice}>
               <button
                 type="button"
                 class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-call"
-                aria-label="Join voice"
-                title="Join voice"
+                aria-label="Join call"
+                title="Join call"
+                data-testid="ribbon-join-call"
                 onClick={() => local.onJoinVoice?.(false)}
               >
                 <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
@@ -493,22 +514,9 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                   <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
                   <path d="M4 14h3v6H4a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z" />
                   <path d="M20 14h-3v6h3a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2Z" />
+                  <path d="M15 9.5 19 7v6l-4-2.5" />
                 </svg>
-                <span class="shell-ribbon-action-label">Voice</span>
-              </button>
-              <button
-                type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-call"
-                aria-label="Join video"
-                title="Join video"
-                onClick={() => local.onJoinVoice?.(true)}
-              >
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
-                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M15 10 20 7v10l-5-3" />
-                  <rect x="3" y="6" width="12" height="12" rx="2" />
-                </svg>
-                <span class="shell-ribbon-action-label">Video</span>
+                <span class="shell-ribbon-action-label">Call</span>
               </button>
             </Show>
             {/* Pins chip — one click to the shared pins drawer when the channel

@@ -748,10 +748,12 @@ export class CadenceMediaEngine {
       const aq: 0 | 1 | 2 = mq?.audioQuality ?? (AUDIO_QUALITY as 0 | 1 | 2);
       const ns2 = mq?.noiseSuppress ?? true;
       this.audEnc = wasm.audioEncoder(SAMPLE_RATE, aq, ns2);
-    } catch {
+    } catch (err) {
       this.cb.onError('Codec unavailable — audio capture disabled');
       this.setIdle();
-      return;
+      // Rethrow so joinVoice/joinVideo roll the provisional call panel back
+      // instead of looking "in call" with no media path.
+      throw err instanceof Error ? err : new Error('Codec unavailable — audio capture disabled');
     }
     const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
     this.audioCtx = ctx;
@@ -1272,7 +1274,8 @@ export class CadenceMediaEngine {
     } else {
       return;
     }
-    if (!channel || !verb || channel !== this.activeRoom) return;
+    // Channel tokens on EVENT lines may differ in case from activeRoom.
+    if (!channel || !verb || channel.toLowerCase() !== (this.activeRoom ?? '').toLowerCase()) return;
 
     if (verb === 'MACKEY') {
       const b64 = arg;
@@ -1282,7 +1285,9 @@ export class CadenceMediaEngine {
       this.wsMyNick = this.client?.currentNick ?? this.wsMyNick;
       this.wsAudSeq = 0;
       this.wsVidSeq = 0;
-      this.streamRouter.setRoster(channel, this.wsMyNick ? [this.wsMyNick] : []);
+      // Never wipe the peer map on MACKEY re-issue (video JOIN re-sends MACKEY).
+      // Ensure the local nick is routable, then keep every already-seen peer.
+      if (this.wsMyNick) this.streamRouter.addParticipant(this.wsMyNick);
       importMediaMacKey(macKey)
         .then((k) => { this.wsMediaKey = k; })
         .catch(() => {});
@@ -1293,7 +1298,15 @@ export class CadenceMediaEngine {
     }
   }
 
-  /** Decode one inbound media datagram and route it to the sending peer. */
+  /**
+   * Decode one inbound media datagram and route it to the sending peer.
+   *
+   * Per-participant MAC tags are verified on the **server** at ingress
+   * (`handleWsMediaDatagram` + sender's MACKEY). Relayed frames keep the
+   * sender's tag; receivers cannot re-verify with their own MACKEY. Authenticity
+   * for peers is E2EE (group AES-GCM + Ed25519) under the TLS WS hop.
+   * `decodeCadenceFrame` tolerates an optional trailing 16-byte tag.
+   */
   private handleMediaDatagram(data: Uint8Array) {
     const room = this.activeRoom;
     if (!room) return;
@@ -1335,7 +1348,8 @@ export class CadenceMediaEngine {
         .then((plaintext) => {
           if (this.mooringGroupKey !== groupKey
             || this.mediaE2eeGeneration !== groupGeneration
-            || this.mediaE2eeEpoch !== groupEpoch) return;
+            || this.mediaE2eeEpoch !== groupEpoch
+            || this.activeRoom !== room) return;
           this.reportMediaE2ee(true, false);
           if (frame.bandId === WS_BAND_E2EE_AUDIO) {
             const pm = this.registry.getOrCreate(src.nick, room, 'voice');
@@ -1348,11 +1362,9 @@ export class CadenceMediaEngine {
         .catch(() => this.reportMediaE2ee(false, true));
       return;
     }
-    if (src.kind === 'audio') {
-      this.reportMediaE2ee(false, true);
-    } else {
-      this.reportMediaE2ee(false, true);
-    }
+    // Plaintext Cadence bands (64/65) are intentionally fail-closed on the
+    // browser plane: server WS admission requires an E2EE attachment prefix.
+    this.reportMediaE2ee(false, true);
   }
 
   private mediaframeCmd(channel: string, subtype: string, payload = '') {
@@ -1360,6 +1372,9 @@ export class CadenceMediaEngine {
     switch (subtype) {
       case 'VOICE_JOIN':
         this.client.sendRaw('MEDIA', 'JOIN', channel, 'voice');
+        // Browser path is Cadence frames over WS binary (onyx.irc-media.v1).
+        // Codecs are CadenceVox/Vis; transport=webrtc only marks the server-side
+        // bridge leg / ICE advertisement — this client does not use RTCPeerConnection.
         this.client.sendRaw('MEDIA', 'OFFER', channel, 'cadencevox,cadencevis', 'transport=webrtc');
         break;
       case 'VIDEO_JOIN':
@@ -1367,8 +1382,13 @@ export class CadenceMediaEngine {
         this.client.sendRaw('MEDIA', 'OFFER', channel, 'cadencevox,cadencevis', 'transport=webrtc');
         break;
       case 'VOICE_LEAVE':
-      case 'VIDEO_LEAVE':
+        // Full hangup: leave the media room entirely.
         this.client.sendRaw('MEDIA', 'LEAVE', channel);
+        break;
+      case 'VIDEO_LEAVE':
+        // Camera-off must NOT leave the voice room. Stop publishing video kind
+        // while remaining a voice participant (MUTE video is the server verb).
+        this.client.sendRaw('MEDIA', 'MUTE', channel, 'video');
         break;
       case 'MUTE':
       case 'UNMUTE':
@@ -1391,14 +1411,21 @@ export class CadenceMediaEngine {
 
   async joinVoice(channel: string, preacquired?: MediaStream | null) {
     try {
+      // WS media requires enrolled device identity + signing keys before any
+      // E2EE frame is admitted by the server. Fail before capture when missing.
+      await this.ensureMediaIdentity();
+      await this.ensureMediaSigningIdentity();
       const stream = preacquired
         ? this.adoptLocalStream(preacquired, 'voice')
         : await this.capture('voice');
       await this.ensureWasm();
       this.setActiveRoom(channel);
+      // Solo-ready group key so encode is live immediately; peers get a
+      // redistributed epoch when the deterministic leader rotates on JOIN.
+      await this.ensureLocalMediaGroupKey();
       this.mediaframeCmd(channel, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
       this.mediaframeCmd(channel, 'ROSTER');
-      this.sendMooringHandshake(channel).catch(() => {});
+      await this.sendMooringHandshake(channel);
       await this.startAudioCapture(stream);
       this.startSpeakingMeter(stream);
       this.startGc();
@@ -1415,17 +1442,20 @@ export class CadenceMediaEngine {
 
   async joinVideo(channel: string, preacquired?: MediaStream | null) {
     try {
+      await this.ensureMediaIdentity();
+      await this.ensureMediaSigningIdentity();
       const stream = preacquired
         ? this.adoptLocalStream(preacquired, 'video')
         : await this.capture('video');
       const profile = videoProfileFor('video');
       await this.ensureWasm();
       this.setActiveRoom(channel);
+      await this.ensureLocalMediaGroupKey();
       this.mediaframeCmd(channel, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
       this.mediaframeCmd(channel, 'VIDEO_JOIN',
         `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
       this.mediaframeCmd(channel, 'ROSTER');
-      this.sendMooringHandshake(channel).catch(() => {});
+      await this.sendMooringHandshake(channel);
       await this.startAudioCapture(stream);
       await this.startVideoCapture(stream, profile);
       this.startSpeakingMeter(stream);
@@ -1439,8 +1469,11 @@ export class CadenceMediaEngine {
 
   leaveRoom(channel: string) {
     const ch = channel || this.activeRoom || '';
-    if (this.localKind === 'voice' || this.localKind === 'video') this.mediaframeCmd(ch, 'VOICE_LEAVE');
-    if (this.localKind === 'video') this.mediaframeCmd(ch, 'VIDEO_LEAVE');
+    // One LEAVE hangs up every published kind. Do not also emit VIDEO_LEAVE
+    // (that now means "mute video", not hangup).
+    if (this.localKind === 'voice' || this.localKind === 'video' || this.localKind === 'screen') {
+      this.mediaframeCmd(ch, 'VOICE_LEAVE');
+    }
     this.setIdle();
   }
 
@@ -1673,13 +1706,21 @@ export class CadenceMediaEngine {
   }
 
   private handleControl(fromNick: string, channel: string, subtype: string, payload: string) {
-    switch (subtype) {
+    // Server EVENT verb is `JOIN` with kind in the detail (`voice|video|screen`).
+    // Legacy peer control used VOICE_JOIN / VIDEO_JOIN — accept both.
+    const kindToken = payload.trim().split(/\s+/u)[0]?.toLowerCase() ?? '';
+    const joinSubtype =
+      subtype === 'JOIN'
+        ? (kindToken === 'video' || kindToken === 'screen' ? 'VIDEO_JOIN' : 'VOICE_JOIN')
+        : subtype;
+
+    switch (joinSubtype) {
       case 'VOICE_JOIN': {
+        this.streamRouter.addParticipant(fromNick);
         const pm = this.registry.getOrCreate(fromNick, channel, 'voice');
         this.cb.onPeerState?.(pm.state);
         if (this.callState === 'in_call' && this.activeRoom) {
           const localNick = this.getLocalNick();
-          this.sendFrame(this.activeRoom, 'NEGO_OFFER', msgpackArray3(localNick, 'opus', 2000));
           if (fromNick.toLowerCase() !== localNick.toLowerCase()) {
             this.sendMooringHandshake(this.activeRoom).catch(() => {
               this.reportMediaE2ee(false, true);
@@ -1689,10 +1730,19 @@ export class CadenceMediaEngine {
         break;
       }
       case 'VIDEO_JOIN': {
+        this.streamRouter.addParticipant(fromNick);
         const profile = parseVideoJoinPayload(payload);
         const pm = this.registry.getOrCreate(fromNick, channel, 'video');
         this.registry.setVideoParams(fromNick, profile.width, profile.height, profile.screenShare ? 'screen' : 'video', profile.fps);
         this.cb.onPeerState?.(pm.state);
+        if (this.callState === 'in_call' && this.activeRoom) {
+          const localNick = this.getLocalNick();
+          if (fromNick.toLowerCase() !== localNick.toLowerCase()) {
+            this.sendMooringHandshake(this.activeRoom).catch(() => {
+              this.reportMediaE2ee(false, true);
+            });
+          }
+        }
         break;
       }
       case 'VOICE_LEAVE':
@@ -2337,7 +2387,10 @@ export class CadenceMediaEngine {
     this.wsMediaKey = null;
     this.wsAudSeq = 0;
     this.wsVidSeq = 0;
-    this.streamRouter.clear();
+    // Bind routing to this channel with an empty peer set so later
+    // addParticipant (MACKEY/JOIN) can resolve stream ids. clear() alone
+    // leaves channel='' and silently drops every addParticipant.
+    this.streamRouter.setRoster(channel, []);
     if (newRoom) {
       this.mediaE2eeEpoch = detachedEpochFloor;
       this.reportMediaE2ee(false, true);
@@ -2564,6 +2617,42 @@ export class CadenceMediaEngine {
         this.audEnc = this.wasm.audioEncoder(SAMPLE_RATE, targetQ);
       }
       if (bps < BW_AUDIO_ONLY && (this.vidEnc || this.vidWorker)) this.stopVideoCapture();
+    }
+  }
+
+  /**
+   * Create a room group key even with zero peers so encode is not stuck
+   * "degraded" in solo preview, and the first peer can receive a distribution
+   * immediately when they become the non-leader (or we re-run as leader).
+   */
+  private async ensureLocalMediaGroupKey(): Promise<void> {
+    if (this.mooringGroupKey) {
+      this.reportMediaE2ee(true, false);
+      return;
+    }
+    const gen = this.callGuard.capture();
+    const groupGeneration = this.mediaE2eeGeneration;
+    if (!this.mooringGroupKeyPromise) {
+      this.mooringGroupKeyPromise = MooringGroup.create()
+        .then((g) => {
+          if (!this.callGuard.isCurrent(gen)
+            || groupGeneration !== this.mediaE2eeGeneration) {
+            g.destroy();
+            return g;
+          }
+          this.mooringGroupKey = g;
+          this.mediaE2eeEpoch = Math.max(1, this.mediaE2eeEpoch + 1);
+          this.reportMediaE2ee(true, false);
+          return g;
+        })
+        .catch((err) => {
+          this.mooringGroupKeyPromise = null;
+          throw err;
+        });
+    }
+    await this.mooringGroupKeyPromise;
+    if (!this.callGuard.isCurrent(gen) || groupGeneration !== this.mediaE2eeGeneration) {
+      throw new Error('Call ended while preparing media encryption');
     }
   }
 

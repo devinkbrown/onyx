@@ -99,8 +99,9 @@ describe('PresenceRibbon place-strip compression (A8)', () => {
 
     expect(screen.getByRole('button', { name: /Scheduled room event/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /1 person in voice/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Join voice' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Join video' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Join call' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Join voice' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Join video' })).not.toBeInTheDocument();
     expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
   });
 

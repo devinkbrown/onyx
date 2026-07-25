@@ -10,16 +10,14 @@
   isolation: isolate;
   display: flex;
   flex-direction: column;
-  /* The call is a docked tray inside the conversation, not a replacement for
-     it. A full-height stage pushed the message feed out of the clipped shell,
-     which read as the video panel covering chat. Keep a useful video canvas
-     while reserving the majority of the column for messages and composing. */
-  flex: 0 1 clamp(7rem, 18vh, 18rem);
+  /* Shared call tray for voice + video. Default size is compact so the panel
+     never eats the column; --size-expanded / --size-fullscreen grow on demand. */
+  flex: 0 0 auto;
   width: 100%;
-  height: clamp(7rem, 18vh, 18rem);
-  min-height: min(7rem, 18vh);
-  max-height: 22vh;
+  min-height: 5.5rem;
   overflow: hidden;
+  flex-shrink: 0;
+  z-index: 4; /* above guest-claim / scrubber siblings if they reappear */
   background:
     radial-gradient(circle at 50% -12%, color-mix(in oklab, var(--lapis-deep) 26%, transparent), transparent 42%),
     radial-gradient(circle at 12% 18%, color-mix(in oklab, var(--lapis) 12%, transparent), transparent 30%),
@@ -32,14 +30,199 @@
   padding: clamp(10px, 1.3vw, 16px);
   gap: clamp(8px, 1vw, 12px);
   box-sizing: border-box;
+  margin: 0 var(--space-3, 12px);
+}
+
+/* Size chrome (compact / expand / fullscreen) */
+.voice-stage__chrome {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 5;
+  display: inline-flex;
+  gap: 4px;
+  padding: 2px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 62%, transparent);
+  border: 1px solid var(--seam-faint);
+}
+
+.voice-stage__size-btn {
+  appearance: none;
+  width: 28px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-sm, 6px);
+  background: transparent;
+  color: var(--paper-mute);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.voice-stage__size-btn:hover,
+.voice-stage__size-btn:focus-visible {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--lapis) 22%, transparent);
+  outline: none;
+}
+
+.voice-stage__size-btn[aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--lapis-bright);
+}
+
+.voice-stage__starting {
+  margin: 0;
+  padding: 8px 4px;
+  color: var(--paper-mute);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+/* Compact (default): small tray — video is a 16:9 box, NOT a full-width banner. */
+.voice-stage--size-compact {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 5.5rem;
+  max-height: 12rem;
+  padding: 10px 12px;
+  padding-top: 28px; /* room for size chrome */
+}
+
+.voice-stage--size-compact .voice-tile {
+  aspect-ratio: 16 / 9;
+  width: min(100%, 11rem);
+  max-width: 11rem;
+  height: auto;
+  min-height: 0;
+  flex: 0 0 auto;
+  justify-self: center;
+}
+
+.voice-stage--size-compact .voice-stage__grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  gap: 8px;
+  min-height: 0;
+}
+
+.voice-stage--size-compact.voice-stage--video {
+  max-height: 13rem;
+}
+
+.voice-stage--size-compact.voice-stage--video .voice-tile {
+  width: min(100%, 14rem);
+  max-width: 14rem;
+}
+
+/* Expanded: usable video boxes, still centered — not stretched edge-to-edge. */
+.voice-stage--size-expanded {
+  flex: 0 0 clamp(12rem, 32vh, 24rem);
+  height: clamp(12rem, 32vh, 24rem);
+  min-height: 12rem;
+  max-height: min(40vh, 26rem);
+  padding-top: 28px;
+}
+
+.voice-stage--size-expanded .voice-stage__grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.voice-stage--size-expanded .voice-tile {
+  aspect-ratio: 16 / 9;
+  width: min(100%, 28rem);
+  max-width: min(100%, 28rem);
+  height: auto;
+  max-height: 100%;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.voice-stage--size-expanded .voice-stage__grid[data-count='2'] .voice-tile,
+.voice-stage--size-expanded .voice-stage__grid[data-count='3'] .voice-tile,
+.voice-stage--size-expanded .voice-stage__grid[data-count='4'] .voice-tile {
+  width: min(48%, 18rem);
+  max-width: min(48%, 18rem);
+}
+
+/* Fullscreen: cover the viewport; tiles stay 16:9 and centered. */
+.voice-stage--size-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  border-radius: 0;
+  padding: 16px;
+  padding-top: 40px;
+  background:
+    radial-gradient(circle at 50% -12%, color-mix(in oklab, var(--lapis-deep) 26%, transparent), transparent 42%),
+    linear-gradient(180deg, var(--ink), color-mix(in oklab, var(--stone) 40%, var(--ink)));
+}
+
+.voice-stage--size-fullscreen .voice-stage__grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
+.voice-stage--size-fullscreen .voice-tile {
+  aspect-ratio: 16 / 9;
+  width: min(90vw, 56rem);
+  max-width: min(90vw, 56rem);
+  max-height: min(70vh, calc(90vw * 9 / 16));
+  height: auto;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+/* Legacy mode hooks still used by loading shells / tests. */
+.voice-stage--audio {
+  /* size-* rules win; keep as a no-op mode marker */
+}
+
+.voice-stage--video {
+  /* size-* rules win; keep as a no-op mode marker */
 }
 
 @media (max-width: 900px) {
-  .voice-stage {
-    flex-basis: clamp(6rem, 18dvh, 14rem);
-    height: clamp(6rem, 18dvh, 14rem);
-    min-height: min(6rem, 18dvh);
-    max-height: 22dvh;
+  .voice-stage--size-compact {
+    min-height: 5rem;
+    max-height: 10rem;
+  }
+
+  .voice-stage--size-compact.voice-stage--video {
+    max-height: 11rem;
+  }
+
+  .voice-stage--size-expanded {
+    flex: 0 0 clamp(10rem, 30dvh, 20rem);
+    height: clamp(10rem, 30dvh, 20rem);
+    min-height: 10rem;
+    max-height: min(38dvh, 22rem);
   }
 }
 
@@ -135,7 +318,8 @@
 
 .voice-stage__primary .voice-tile {
   height: 100%;
-  min-height: min(28rem, 54vh);
+  /* Stay inside the docked tray — 54vh here forced overflow:hidden clipping. */
+  min-height: 0;
   aspect-ratio: auto;
 }
 
@@ -188,17 +372,24 @@
   content: '';
   position: absolute;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
 }
 
-.voice-tile::before {
+/* Decorative wash only when there is no video — never dim a live feed. */
+.voice-tile:not(:has(.voice-tile__video))::before {
   background:
     linear-gradient(125deg, transparent 0 42%, color-mix(in oklab, var(--lapis-bright) 12%, transparent) 48%, transparent 56%),
     radial-gradient(circle at 20% 14%, color-mix(in oklab, var(--paper) 8%, transparent), transparent 24%);
   opacity: 0.28;
 }
 
+.voice-tile:has(.voice-tile__video)::before {
+  display: none;
+}
+
 .voice-tile::after {
+  z-index: 2;
   border: 1px solid color-mix(in oklab, var(--paper) 8%, transparent);
   border-radius: inherit;
 }
@@ -225,15 +416,19 @@
     inset 0 1px 0 color-mix(in oklab, var(--paper) 12%, transparent);
 }
 
-/* Video feed */
+/* Video feed — letterbox inside the 16:9 tile (contain), never stretch the
+   frame into a full-width banner. */
 .voice-tile__video {
   position: absolute;
   inset: 0;
+  z-index: 1;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   display: block;
   border-radius: inherit;
+  background: #000;
 }
 
 /* Avatar fallback (centered) */
@@ -269,6 +464,7 @@
   bottom: 0;
   left: 0;
   right: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1202,6 +1398,16 @@
   .voice-stage {
     gap: 8px;
     padding: 8px;
+    /* Rem-based min-heights explode at 400% zoom — allow the short-viewport
+       reflow to own the box instead of forcing a tall empty tray. */
+    min-height: 0;
+    max-height: 34dvh;
+  }
+
+  .voice-stage--size-compact,
+  .voice-stage--size-expanded {
+    min-height: 0;
+    height: auto;
     max-height: 34dvh;
   }
 

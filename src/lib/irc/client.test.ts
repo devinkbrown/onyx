@@ -257,6 +257,28 @@ describe('IRCClient WebSocket subprotocol', () => {
 });
 
 describe('IRCClient WebSocket frame handling', () => {
+  it('never retries a registered nickname as an anonymous alias', () => {
+    const errors: string[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'alice',
+      onMessage: () => {},
+      onError: (error) => errors.push(error),
+    });
+    const { sent, closed } = attachSocket(client);
+
+    feed(client, ':onyx 432 * alice :Nickname is registered; authenticate as this account before using it');
+
+    expect(sent).toEqual([]);
+    expect(errors).toEqual([
+      'That nickname is registered. Sign in as its account before using it.',
+    ]);
+    expect(closed).toEqual([{
+      code: 4003,
+      reason: 'Registered nickname requires authentication',
+    }]);
+  });
+
   it('processes a single frame that has NO trailing CRLF', () => {
     const { client, commands } = makeClient();
     feed(client, ':eshmaki.me NOTICE * :no trailing newline here');

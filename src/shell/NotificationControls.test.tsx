@@ -246,6 +246,11 @@ describe('NotificationControls accessibility', () => {
     store.setState({ dndQuietStart: 22, dndQuietEnd: 8 });
     render(() => <NotificationControls />);
 
+    const quietHours = screen.getByRole('button', { name: 'Quiet hours' });
+    expect(quietHours).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('combobox', { name: 'Quiet hours start' })).not.toBeInTheDocument();
+    fireEvent.click(quietHours);
+
     const start = screen.getByRole('combobox', { name: 'Quiet hours start' });
     const end = screen.getByRole('combobox', { name: 'Quiet hours end' });
     expect(start).toHaveValue('22');

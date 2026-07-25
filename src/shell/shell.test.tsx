@@ -1207,7 +1207,7 @@ describe('AppShell', () => {
 
       // Act
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Join call' }));
 
       // Assert — publish the in-flow call surface; settings stay closed (gear
       // on the bar). The pending-engine test below owns media invocation.
@@ -1230,7 +1230,7 @@ describe('AppShell', () => {
       setMountedCadenceMediaEngine(null);
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Join call' }));
 
       // The dynamic import continuation cannot run until this synchronous turn
       // yields. The call surface must nevertheless be visible immediately.
@@ -1264,7 +1264,7 @@ describe('AppShell', () => {
       _setMediaModuleLoaderForTests(() => coldBoot);
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Join call' }));
       expect(store.getState().voice.callState).toBe('in_call');
 
       store.getState().leaveVoiceChannel();
@@ -1274,6 +1274,7 @@ describe('AppShell', () => {
       await Promise.resolve();
 
       expect(engine.joinVideo).not.toHaveBeenCalled();
+      expect(engine.joinVoice).not.toHaveBeenCalled();
       expect(store.getState().voice.callState).toBe('idle');
       expect(screen.queryByRole('region', { name: 'Voice call participants' })).not.toBeInTheDocument();
     });
@@ -1295,7 +1296,7 @@ describe('AppShell', () => {
       const toastCount = store.getState().toasts.length;
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Join call' }));
       store.getState().leaveVoiceChannel();
       rejectBoot(new Error('cold media chunk failed'));
       await coldBoot.catch(() => undefined);
@@ -1316,8 +1317,8 @@ describe('AppShell', () => {
         } as never,
       });
       const engine = {
-        joinVideo: vi.fn(async () => { throw new Error('camera permission denied'); }),
-        joinVoice: vi.fn(async () => undefined),
+        joinVideo: vi.fn(async () => undefined),
+        joinVoice: vi.fn(async () => { throw new Error('microphone permission denied'); }),
         getLocalStream: vi.fn(() => null),
         setMuted: vi.fn(),
         leaveRoom: vi.fn(),
@@ -1325,11 +1326,11 @@ describe('AppShell', () => {
       setMountedCadenceMediaEngine(engine as never);
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Join call' }));
 
       await waitFor(() => {
-        expect(engine.joinVideo).toHaveBeenCalledWith('#general', null);
-        expect(store.getState().toasts.at(-1)?.title).toBe('Video could not start');
+        expect(engine.joinVoice).toHaveBeenCalledWith('#general', null);
+        expect(store.getState().toasts.at(-1)?.title).toBe('Voice could not start');
       });
       expect(store.getState().voice.callState).toBe('idle');
     });
@@ -1369,11 +1370,11 @@ describe('AppShell', () => {
       setMountedCadenceMediaEngine(engine as never);
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Join call' }));
 
       await waitFor(() => {
         expect(getUserMedia).toHaveBeenCalled();
-        expect(engine.joinVideo).toHaveBeenCalledWith('#general', gestureStream);
+        expect(engine.joinVoice).toHaveBeenCalledWith('#general', gestureStream);
       });
       expect(store.getState().voice.callState).toBe('in_call');
       expect(store.getState().voice.callStartedAt).not.toBeNull();
@@ -1397,18 +1398,18 @@ describe('AppShell', () => {
         getVideoTracks: () => [],
       } as unknown as MediaStream;
       const engine = {
-        joinVideo: vi.fn(() => pendingJoin),
-        joinVoice: vi.fn(async () => undefined),
+        joinVideo: vi.fn(async () => undefined),
+        joinVoice: vi.fn(() => pendingJoin),
         getLocalStream: vi.fn(() => stream),
         setMuted: vi.fn(),
       };
       setMountedCadenceMediaEngine(engine as never);
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Join call' }));
 
       await waitFor(() => {
-        expect(engine.joinVideo).toHaveBeenCalledWith('#general', null);
+        expect(engine.joinVoice).toHaveBeenCalledWith('#general', null);
         expect(screen.getByRole('region', { name: 'Voice call participants' })).toBeInTheDocument();
       });
       expect(store.getState().voice.callChannel).toBe('#general');
@@ -1431,7 +1432,7 @@ describe('AppShell', () => {
       });
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Join voice' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Join call' }));
 
       expect(store.getState().voice.callState).toBe('in_call');
       expect(store.getState().voice.callChannel).toBe('#general');

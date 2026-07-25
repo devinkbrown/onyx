@@ -134,18 +134,45 @@ function Atmosphere(): JSX.Element {
 
 type Mode = 'guest' | 'signin' | 'register';
 
-const MODES: ReadonlyArray<{ id: Mode; label: string }> = [
-  { id: 'guest',    label: 'Guest' },
-  { id: 'signin',   label: 'Sign in' },
-  { id: 'register', label: 'Register' },
+const MODES: ReadonlyArray<{
+  id: Mode;
+  label: string;
+  short: string;
+}> = [
+  { id: 'guest', label: 'Guest', short: 'Enter quickly' },
+  { id: 'signin', label: 'Sign in', short: 'Resume your identity' },
+  { id: 'register', label: 'Register', short: 'Claim a name' },
 ];
 
-const CLAIM_STEPS = [
-  { key: 'guest', label: 'Guest nick', detail: 'Try a room without claiming the name.' },
-  { key: 'account', label: 'Registered account', detail: 'Create the account from this screen.' },
-  { key: 'recovery', label: 'Recovery email', detail: 'Optional during registration, editable later.' },
-  { key: 'device', label: 'Device login', detail: 'Add a passkey or certificate after sign-in.' },
-] as const;
+const MODE_GUIDANCE: Record<Mode, {
+  eyebrow: string;
+  title: string;
+  body: string;
+  identity: string;
+  continuity: string;
+}> = {
+  guest: {
+    eyebrow: 'Fast entry',
+    title: 'Arrive without an account',
+    body: 'Explore first. Nothing is published as an account, and you can claim your name later.',
+    identity: 'Guest identity',
+    continuity: 'Until disconnect',
+  },
+  signin: {
+    eyebrow: 'Returning member',
+    title: 'Resume your Onyx identity',
+    body: 'Use a passkey when available, or open the password route deliberately. Your rooms and sessions follow your account.',
+    identity: 'Existing account',
+    continuity: 'Account sessions',
+  },
+  register: {
+    eyebrow: 'New identity',
+    title: 'Claim a name on Onyx',
+    body: 'Create a portable account, verify it, then add passkeys or device credentials from your profile.',
+    identity: 'New account',
+    continuity: 'Recovery ready',
+  },
+};
 
 /** Account passwords must be at least this long to register. */
 const MIN_PASSWORD_LEN = 8;
@@ -257,42 +284,6 @@ function PasswordInput(props: PasswordInputProps): JSX.Element {
         <p class="onyx-field__error" id={errorId()}>{props.error}</p>
       </Show>
     </div>
-  );
-}
-
-function ClaimPath(props: { mode: Mode; onRegister: () => void }): JSX.Element {
-  const current = createMemo(() => {
-    switch (props.mode) {
-      case 'register':
-        return 'account';
-      case 'signin':
-        return 'device';
-      default:
-        return 'guest';
-    }
-  });
-  return (
-    <section class="conn-claim" aria-labelledby="conn-claim-title">
-      <div class="conn-claim-head">
-        <h2 id="conn-claim-title" class="conn-claim-title">Claim path</h2>
-        <button type="button" class="conn-claim-action" onClick={() => props.onRegister()}>
-          Register
-        </button>
-      </div>
-      <ol class="conn-claim-steps">
-        <For each={CLAIM_STEPS}>
-          {(step) => (
-            <li class="conn-claim-step" data-current={current() === step.key ? 'true' : 'false'}>
-              <span class="conn-claim-dot" aria-hidden="true" />
-              <span class="conn-claim-copy">
-                <span class="conn-claim-label">{step.label}</span>
-                <span class="conn-claim-detail">{step.detail}</span>
-              </span>
-            </li>
-          )}
-        </For>
-      </ol>
-    </section>
   );
 }
 
@@ -513,6 +504,9 @@ export function Connect(props: ConnectProps): JSX.Element {
     if (currentNickIsAlias()) return true;
     return /nick(?:name)?\s+in\s+use/i.test(lastErrorText());
   });
+  const registeredNickNeedsSignIn = createMemo<boolean>(() =>
+    /nickname is registered|registered nickname requires authentication/i.test(lastErrorText()),
+  );
 
   // ── Derived phase for the form status bar ───────────────────────────────────
   const formPhase = createMemo<'idle' | 'connecting' | 'error'>(() => {
@@ -560,6 +554,9 @@ export function Connect(props: ConnectProps): JSX.Element {
       case 'connecting':
         return 'Opening an encrypted channel…';
       case 'error':
+        if (registeredNickNeedsSignIn()) {
+          return 'That name belongs to an account. Sign in to use it; Onyx will not connect it as a guest.';
+        }
         if (nickInUse()) {
           return 'That name is already in the water — reclaim it, or pick another.';
         }
@@ -583,7 +580,7 @@ export function Connect(props: ConnectProps): JSX.Element {
       case 'register':
         return 'Claim a name that is yours — registration takes a moment.';
       default:
-        return 'Pick a name and slip into the water — Onyx finds the nearest node for you.';
+        return 'Pick an unregistered name to explore — Onyx finds the nearest node for you.';
     }
   }
 
@@ -1095,6 +1092,12 @@ export function Connect(props: ConnectProps): JSX.Element {
   );
   const showReclaim = createMemo(() => formPhase() === 'error' && nickInUse());
   const inVerifyStep = createMemo(() => registerPhase() === 'verifying');
+  const modeGuidance = createMemo(() => MODE_GUIDANCE[mode()]);
+  const destinationLabel = createMemo(() => {
+    const entered = room().trim();
+    if (entered) return entered.startsWith('#') ? entered : `#${entered}`;
+    return 'Home';
+  });
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -1121,11 +1124,10 @@ export function Connect(props: ConnectProps): JSX.Element {
                   <Mascot variant="mark" class="conn-brand-mark" />
                 </span>
                 <span class="conn-eyebrow">Onyx</span>
-                <h1 class="conn-title">Connect</h1>
+                <h1 class="conn-title">Enter Onyx</h1>
                 <p class="conn-sub">
-                  Choose how you arrive. Onyx finds the nearest node by latency
-                  and runs the handshake — no server to choose, nothing to
-                  configure.
+                  Choose an identity, confirm where you want to land, and Onyx
+                  handles the route. There is no server list to configure.
                 </p>
               </header>
 
@@ -1218,8 +1220,6 @@ export function Connect(props: ConnectProps): JSX.Element {
                 </section>
               </Show>
 
-              <ClaimPath mode={mode()} onRegister={() => switchMode('register')} />
-
               {/* Mode switch */}
               <div
                 class="conn-modes"
@@ -1238,21 +1238,51 @@ export function Connect(props: ConnectProps): JSX.Element {
                       disabled={!isFormReady()}
                       onClick={() => switchMode(m.id)}
                     >
-                      {m.label}
+                      <span class="conn-mode-label">{m.label}</span>
+                      <span class="conn-mode-short">{m.short}</span>
                     </button>
                   )}
                 </For>
               </div>
 
-              <div class="conn-seam" aria-hidden="true" />
-
-              {/* Auto-routing indicator — never reveals which server is used */}
-              <p class="conn-route" data-routing={routing() ? 'true' : 'false'}>
-                <span class="conn-route-dot" aria-hidden="true" />
-                <Show when={routing()} fallback="Routed to the nearest node">
-                  Locating the nearest node…
-                </Show>
-              </p>
+              <section class="conn-arrival" aria-labelledby="conn-arrival-title">
+                <div class="conn-arrival-copy">
+                  <span class="conn-arrival-eyebrow">{modeGuidance().eyebrow}</span>
+                  <h2 id="conn-arrival-title" class="conn-arrival-title">
+                    {modeGuidance().title}
+                  </h2>
+                  <p class="conn-arrival-body">{modeGuidance().body}</p>
+                  <Show when={mode() !== 'register'}>
+                    <button
+                      type="button"
+                      class="conn-arrival-switch"
+                      onClick={() => switchMode('register')}
+                    >
+                      {mode() === 'guest' ? 'Claim a name' : 'Create an account instead'}
+                    </button>
+                  </Show>
+                </div>
+                <dl class="conn-arrival-map" aria-label="Arrival summary">
+                  <div>
+                    <dt>Identity</dt>
+                    <dd>{modeGuidance().identity}</dd>
+                  </div>
+                  <div>
+                    <dt>Destination</dt>
+                    <dd>{mode() === 'register' ? 'Home after verification' : destinationLabel()}</dd>
+                  </div>
+                  <div>
+                    <dt>Continuity</dt>
+                    <dd>{mode() === 'guest' && staySignedIn() ? 'This device' : modeGuidance().continuity}</dd>
+                  </div>
+                </dl>
+                <p class="conn-route" data-routing={routing() ? 'true' : 'false'}>
+                  <span class="conn-route-dot" aria-hidden="true" />
+                  <Show when={routing()} fallback="Private route ready · nearest healthy node">
+                    Measuring a private route…
+                  </Show>
+                </p>
+              </section>
 
               {/* ── Verify step (register only) ── */}
               <Show when={inVerifyStep()}>
@@ -1321,7 +1351,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                   <div class="conn-fields">
                     <FormField
                       id="conn-nick"
-                      label={mode() === 'register' ? 'Desired account / nick' : 'Nick'}
+                      label={mode() === 'register' ? 'Desired account / nick' : mode() === 'guest' ? 'Guest nick' : 'Nick'}
                       type="text"
                       placeholder="your-nick"
                       autocomplete="username"
@@ -1479,18 +1509,18 @@ export function Connect(props: ConnectProps): JSX.Element {
                     </Show>
                   </div>
 
-                  {/* Stay signed in — guest & password sign-in only (stores password) */}
+                  {/* Explicit continuity choice for guest or password sign-in. */}
                   <Show when={showStaySignedIn()}>
                     <div class="conn-seam" style={{ margin: '20px 0' }} aria-hidden="true" />
                     <div class="conn-toggle">
                       <div class="conn-toggle-body">
                         <label class="conn-toggle-label" for="conn-stay-signed-in">
-                          Stay signed in
+                          {mode() === 'guest' ? 'Remember on this device' : 'Stay signed in'}
                         </label>
                         <p class="conn-toggle-description" id="conn-session-desc">
-                          Off by default. When enabled, Onyx stores your account password in this
-                          browser so it can sign in and request a SESSION token on reconnect. Use
-                          only on a private device.
+                          {mode() === 'guest'
+                            ? 'Off by default. Onyx keeps a resumable session token when the network provides one. This does not reserve your nick or create an account.'
+                            : 'Off by default. When enabled, Onyx stores your account password in this browser so it can sign in and request a SESSION token on reconnect. Use only on a private device.'}
                         </p>
                       </div>
                       <label class="conn-toggle-switch">
@@ -1527,6 +1557,18 @@ export function Connect(props: ConnectProps): JSX.Element {
                       <span class="conn-status-msg">{statusMsg()}</span>
                     </div>
                   </div>
+
+                  <Show when={registeredNickNeedsSignIn() && mode() === 'guest'}>
+                    <div class="conn-auth-required" role="alert" data-testid="conn-auth-required">
+                      <div>
+                        <strong>This nick is protected</strong>
+                        <span>Authenticate before Onyx can present it on IRC.</span>
+                      </div>
+                      <button type="button" onClick={() => switchMode('signin')}>
+                        Sign in as {nickTrimmed() || 'this account'}
+                      </button>
+                    </div>
+                  </Show>
 
                   {/* GHOST reclaim — appears when the nick is in use */}
                   <Show when={showReclaim()}>

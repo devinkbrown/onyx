@@ -26,6 +26,9 @@
  */
 
 import './shell.css';
+// Eager voice stage styles: the call tray can paint (provisional loading) before
+// the lazy VoiceStage chunk arrives — without this, the panel looks unstyled/missing.
+import './voice/voice.css';
 
 import { lazy, createEffect, createMemo, createSignal, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, Suspense, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
@@ -271,9 +274,13 @@ export function AppShell(props: AppShellProps): JSX.Element {
   });
   const viewingCall = createMemo(() => {
     const v = activeView();
-    return inCall()
-      && v.kind === 'channel'
-      && (v.channel === voice().callChannel || v.channel === callSurfaceChannel());
+    if (!inCall() || v.kind !== 'channel') return false;
+    // Channel maps are case-insensitive; strict === made the stage vanish when
+    // activeView used a different casing than callChannel (common after JOIN).
+    const here = v.channel.toLowerCase();
+    const call = (voice().callChannel ?? '').toLowerCase();
+    const surface = (callSurfaceChannel() ?? '').toLowerCase();
+    return here.length > 0 && (here === call || here === surface);
   });
   createEffect(() => {
     const current = voice();
@@ -347,7 +354,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
         if (attempt !== voiceJoinAttempt) return;
         const current = getState().voice;
         const stillOurs = current.callState === 'in_call'
-          && current.callChannel === channel
+          && (current.callChannel ?? '').toLowerCase() === channel.toLowerCase()
           && current.callStartedAt === null;
         if (!stillOurs) return;
 
@@ -384,7 +391,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
         const current = getState().voice;
         if (
           current.callState === 'in_call'
-          && current.callChannel === channel
+          && (current.callChannel ?? '').toLowerCase() === channel.toLowerCase()
           && current.callStartedAt === null
         ) {
           getState().setVoiceCallState({ localStream: preacquired });
@@ -404,7 +411,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
       const current = getState().voice;
       return attempt === voiceJoinAttempt
         && current.callState === 'in_call'
-        && current.callChannel === channel
+        && (current.callChannel ?? '').toLowerCase() === channel.toLowerCase()
         && current.callStartedAt === null;
     };
     const rollbackProvisionalJoin = () => {
@@ -465,17 +472,17 @@ export function AppShell(props: AppShellProps): JSX.Element {
         preacquired?.getTracks().forEach((t) => t.stop());
         return;
       }
-      if (!storeJoinStarted) rollbackProvisionalJoin();
-      else {
+      if (!storeJoinStarted) {
+        rollbackProvisionalJoin();
+        getState().addToast({
+          variant: 'error',
+          title: withVideo ? 'Video could not start' : 'Voice could not start',
+          description: 'The media engine did not load. Try joining again.',
+        });
+      } else {
+        // Store already rolled back + toasted with a specific identity/codec message.
         preacquired?.getTracks().forEach((t) => t.stop());
       }
-      getState().addToast({
-        variant: 'error',
-        title: withVideo ? 'Video could not start' : 'Voice could not start',
-        description: storeJoinStarted
-          ? 'Media startup failed after permission was granted. Check camera/mic permissions and try again.'
-          : 'The media engine did not load. Try joining again.',
-      });
     }
   }
 
@@ -832,6 +839,28 @@ export function AppShell(props: AppShellProps): JSX.Element {
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
           />
+          {/* Call stage docks immediately under the ribbon so guest-claim /
+              time-scrubber / watch-together cannot sit on top of the video. */}
+          {/* Keep the stage mounted for the whole in-call surface. Gating on
+              callStartedAt unmounted it every provisional re-join and made the
+              panel look like it "kept closing". VoiceStage shows starting UI
+              until streams land. */}
+          <Show when={viewingCall()}>
+            <Suspense
+              fallback={
+                <div
+                  class="voice-stage voice-stage--audio voice-stage--size-compact"
+                  aria-label="Voice call participants"
+                  role="region"
+                  data-testid="voice-stage-loading"
+                >
+                  <p role="status">Starting call…</p>
+                </div>
+              }
+            >
+              <VoiceStage />
+            </Suspense>
+          </Show>
           {/* Always-available DM trust receipt. It self-gates outside DMs and
               expands in flow so verification never covers the transcript. */}
           <DmSafetySheet />
@@ -839,10 +868,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
           <GuestClaimPrompt />
           {/* E2EE key-change warning (self-gates on the active DM having a pending change) */}
           <DmKeyChangeBanner />
-          <Show when={preferences().timeScrubber}>
+          {/* While a call is up, hide the history scrubber + watch launcher —
+              they steal the column above the stage and look like they cover video. */}
+          <Show when={preferences().timeScrubber && !inCall()}>
             <TimeScrubber />
           </Show>
-          <Show when={preferences().watchTogether}>
+          <Show when={preferences().watchTogether && !inCall()}>
             <WatchTogetherActivity />
           </Show>
 
@@ -852,37 +883,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
             when={hasConversation()}
             fallback={<HomeView />}
           >
-            {/* In-call stage when viewing the voice channel you're in */}
-            <Show when={viewingCall()}>
-              <Show
-                when={voice().callStartedAt !== null}
-                fallback={
-                  <div
-                    class="voice-stage"
-                    aria-label="Voice call participants"
-                    role="region"
-                    data-testid="voice-stage-loading"
-                  >
-                    <p role="status">Starting voice and video…</p>
-                  </div>
-                }
-              >
-                <Suspense
-                  fallback={
-                    <div
-                      class="voice-stage"
-                      aria-label="Voice call participants"
-                      role="region"
-                      data-testid="voice-stage-loading"
-                    >
-                      <p role="status">Starting voice and video…</p>
-                    </div>
-                  }
-                >
-                  <VoiceStage />
-                </Suspense>
-              </Show>
-            </Show>
             <MessageView selfNick={displayNick()} />
             {/* Persistent call controls while in a call */}
             <Show when={inCall()}>

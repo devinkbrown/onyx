@@ -182,6 +182,48 @@ describe('offline outbox', () => {
     expect(store.getState().toasts.some((t) => t.title.includes('still waiting'))).toBe(true);
   });
 
+  it('does not false-positive outboxDeliveryFailed when the connection drops mid-flush', async () => {
+    // Residual: with the auto-retry budget already exhausted, a drop during
+    // the walk used to mark deliveryFailed even though the only problem was a
+    // transient disconnect. Rows stay durable for reconnect flush.
+    store.getState().sendMessage('#room', 'held across flap');
+    await until(async () => (await loadOutbox()).length === 1);
+
+    const failWhileConnected = vi.fn(() => false);
+    store.setState({ connectionStatus: 'connected', client: mockClient(failWhileConnected) });
+
+    // Burn the full auto-retry budget while still "connected" (admission fails).
+    for (let i = 0; i < 6; i += 1) {
+      store.getState().flushOutbox();
+      await until(() => failWhileConnected.mock.calls.length >= i + 1);
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    await until(() => store.getState().outboxDeliveryFailed);
+    expect(store.getState().outboxDeliveryFailed).toBe(true);
+    const waitingToastsAfterExhaustion = store.getState().toasts
+      .filter((t) => t.title.includes('still waiting')).length;
+
+    // Manual retry (composer "retry") after clearing the sticky flag: admission
+    // races a socket drop. The drop must land before the flush terminal so the
+    // pure decision sees connected=false and defers instead of mark-failed.
+    store.setState({ outboxDeliveryFailed: false });
+    const dropOnAdmit = vi.fn(() => {
+      store.setState({ connectionStatus: 'reconnecting' });
+      return false;
+    });
+    store.setState({ connectionStatus: 'connected', client: mockClient(dropOnAdmit) });
+    store.getState().flushOutbox();
+    await until(() => dropOnAdmit.mock.calls.length >= 1);
+    await new Promise((r) => setTimeout(r, 40));
+
+    expect(store.getState().outboxDeliveryFailed).toBe(false);
+    expect(await loadOutbox()).toHaveLength(1);
+    // No *new* "still waiting" toast from the drop — only the earlier connected exhaustion.
+    expect(
+      store.getState().toasts.filter((t) => t.title.includes('still waiting')),
+    ).toHaveLength(waitingToastsAfterExhaustion);
+  });
+
   it('reopens a persisted queued send and restores its placeholder after reload', async () => {
     const entry = await queueOutbox('#reloaded', 'survived the reload', ALICE_OWNER);
     expect(entry).not.toBeNull();

@@ -3,6 +3,7 @@ import './landing.css';
 import './data-pages.css';
 import { createMemo, createResource, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
+import { fetchChannelDetail, type ChannelDetail } from '@/lib/stats/channelDetail';
 import { fetchStatsIndex, relTime, type NetworkDay, type StatsChannel } from '@/lib/stats/networkIndex';
 import { publicFeedFreshness, type PublicFeedFreshness } from '@/lib/stats/feedBounds';
 import { setPageMeta } from './pageMeta';
@@ -70,12 +71,21 @@ function roomPulse(channel: StatsChannel): number {
 
 function activityLabel(channel: StatsChannel, nowMs: number): string {
   if (channel.present > 0) return `${channel.present} present now`;
-  if (channel.active_users > 0) return `${channel.active_users} active recently`;
   return `last active ${relTime(channel.last_active, nowMs)}`;
 }
 
+const RECENT_ROOM_WINDOW_SECONDS = 24 * 60 * 60;
+
+function roomActiveRecently(channel: StatsChannel, nowMs: number): boolean {
+  if (channel.present > 0) return true;
+  const nowSeconds = Math.floor(nowMs / 1000);
+  return channel.last_active > 0
+    && channel.last_active <= nowSeconds + 5 * 60
+    && nowSeconds - channel.last_active <= RECENT_ROOM_WINDOW_SECONDS;
+}
+
 type RoomSort = 'messages' | 'pulse' | 'presence' | 'recent';
-type RoomScope = 'all' | 'active';
+type RoomScope = 'all' | 'present' | 'recent';
 
 const roomSortLabels: Record<RoomSort, string> = {
   messages: 'Messages',
@@ -83,6 +93,18 @@ const roomSortLabels: Record<RoomSort, string> = {
   presence: 'Presence',
   recent: 'Most recent',
 };
+
+const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+function formatHour(hour: number | null): string {
+  if (hour === null) return '—';
+  return `${String(hour).padStart(2, '0')}:00 UTC`;
+}
+
+function averageWords(detail: ChannelDetail): string {
+  if (detail.totals.messages <= 0) return '0';
+  return (detail.totals.words / detail.totals.messages).toFixed(1);
+}
 
 // JS Date can only represent ±8.64e15 ms; toISOString() throws RangeError past it.
 const MAX_TIME_MS = 8.64e15;
@@ -98,12 +120,17 @@ export function roomDeepLink(channel: string, lastActiveUnixSec = 0): string {
   return `/app/?${params.toString()}`;
 }
 
-function ChannelRow(props: { channel: StatsChannel; nowMs: number; rank: number }) {
+function ChannelRow(props: {
+  channel: StatsChannel;
+  nowMs: number;
+  rank: number;
+  selected: boolean;
+  onInspect: (channel: string) => void;
+}) {
   const c = () => props.channel;
-  const active = () => c().present || c().active_users;
   const maxSpark = createMemo(() => Math.max(0, ...c().spark));
   return (
-    <article class="data-row data-room-row">
+    <article class="data-row data-room-row" data-selected={props.selected ? 'true' : undefined}>
       <span class="data-room-rank" aria-label={`Rank ${props.rank}`}>{String(props.rank).padStart(2, '0')}</span>
       <div class="data-room-copy">
         <div class="data-room-heading">
@@ -132,10 +159,20 @@ function ChannelRow(props: { channel: StatsChannel; nowMs: number; rank: number 
         </div>
         <dl class="data-room-numbers">
           <div><dt>messages</dt><dd>{formatCount(c().messages)}</dd></div>
-          <div><dt>pulse</dt><dd>{formatCount(roomPulse(c()))}</dd></div>
-          <div><dt>present</dt><dd>{formatCount(active())}</dd></div>
+          <div><dt>14-day pulse</dt><dd>{formatCount(roomPulse(c()))}</dd></div>
+          <div><dt>present</dt><dd>{formatCount(c().present)}</dd></div>
         </dl>
-        <a class="data-action" href={roomDeepLink(c().channel, c().last_active)}>Open room</a>
+        <div class="data-room-actions">
+          <button
+            type="button"
+            class="data-action data-action--inspect"
+            aria-pressed={props.selected}
+            onClick={() => props.onInspect(c().channel)}
+          >
+            Inspect
+          </button>
+          <a class="data-action" href={roomDeepLink(c().channel, c().last_active)}>Open room</a>
+        </div>
       </div>
     </article>
   );
@@ -151,6 +188,8 @@ export default function StatsRoute() {
   const [nowMs, setNowMs] = createSignal(Date.now());
   const [roomSort, setRoomSort] = createSignal<RoomSort>('messages');
   const [roomScope, setRoomScope] = createSignal<RoomScope>('all');
+  const [roomQuery, setRoomQuery] = createSignal('');
+  const [inspectedRoom, setInspectedRoom] = createSignal('');
   const timer = setInterval(() => {
     setNowMs(Date.now());
     void refetchStats();
@@ -167,23 +206,32 @@ export default function StatsRoute() {
   const latestDay = createMemo(() => days()[days().length - 1] ?? null);
   const previousDay = createMemo(() => days()[days().length - 2] ?? null);
   const tideDelta = createMemo(() => (latestDay()?.messages ?? 0) - (previousDay()?.messages ?? 0));
-  const activeRooms = createMemo(() => channels().filter((channel) => channel.present > 0 || channel.active_users > 0).length);
+  const activeRooms = createMemo(() => channels().filter((channel) => roomActiveRecently(channel, nowMs())).length);
+  const roomsWithPeople = createMemo(() => channels().filter((channel) => channel.present > 0).length);
+  const inspectedChannel = createMemo(() => inspectedRoom() || busiest()?.channel || '');
+  const [channelDetail, { refetch: refetchChannelDetail }] = createResource(inspectedChannel, fetchChannelDetail, { initialValue: null });
   const visibleChannels = createMemo(() => {
-    const scoped = roomScope() === 'active'
-      ? channels().filter((channel) => channel.present > 0 || channel.active_users > 0)
-      : channels();
+    const query = roomQuery().trim().toLocaleLowerCase('en');
+    const scoped = channels().filter((channel) => {
+      if (roomScope() === 'present' && channel.present <= 0) return false;
+      if (roomScope() === 'recent' && !roomActiveRecently(channel, nowMs())) return false;
+      return !query
+        || channel.channel.toLocaleLowerCase('en').includes(query)
+        || channel.topic.toLocaleLowerCase('en').includes(query);
+    });
     const sort = roomSort();
     return [...scoped].sort((left, right) => {
       const delta = sort === 'pulse'
         ? roomPulse(right) - roomPulse(left)
         : sort === 'presence'
-          ? (right.present || right.active_users) - (left.present || left.active_users)
+          ? right.present - left.present
           : sort === 'recent'
             ? right.last_active - left.last_active
             : right.messages - left.messages;
       return delta || left.channel.localeCompare(right.channel);
     });
   });
+  const heatmapMax = createMemo(() => Math.max(0, ...(channelDetail.latest?.heatmap.flat() ?? [])));
   const feedState = createMemo<PublicFeedFreshness | 'partial' | 'unavailable'>(() => {
     const data = stats.latest;
     if (!data) return 'unavailable';
@@ -208,7 +256,16 @@ export default function StatsRoute() {
               <div class="stats-ledger" aria-label="Live feed ledger">
                 <span class="stats-ledger-mark" data-state={feedState()} aria-hidden="true" />
                 <p><strong>{data().network || 'Onyx'} activity ledger</strong> · {data().node || 'network export'} · refreshed {relTime(data().generated_at, nowMs())}</p>
-                <button type="button" class="stats-refresh" onClick={() => void refetchStats()}>Refresh data</button>
+                <button
+                  type="button"
+                  class="stats-refresh"
+                  onClick={() => {
+                    void refetchStats();
+                    if (inspectedChannel()) void refetchChannelDetail();
+                  }}
+                >
+                  Refresh data
+                </button>
               </div>
               <div class="data-summary stats-summary" aria-label="Network summary">
                 <div class="data-metric stats-primary-metric">
@@ -217,14 +274,14 @@ export default function StatsRoute() {
                   <span class="note">authoritative network presence</span>
                 </div>
                 <div class="data-metric">
-                  <span class="label">rooms alive</span>
+                  <span class="label">active in 24 hours</span>
                   <span class="value">{formatCount(activeRooms())}</span>
-                  <span class="note">{formatCount(data().channels.length)} rooms tracked</span>
+                  <span class="note">{formatCount(roomsWithPeople())} with people present now</span>
                 </div>
                 <div class="data-metric">
-                  <span class="label">in the current index</span>
+                  <span class="label">tracked messages</span>
                   <span class="value">{formatCount(totalMessages())}</span>
-                  <span class="note">{data().channels_complete ? 'complete public room index' : 'partial public room index'}</span>
+                  <span class="note">{data().channels_complete ? 'across the complete public room index' : 'across a partial public room index'}</span>
                 </div>
                 <div class="data-metric">
                   <span class="label">latest tide</span>
@@ -327,14 +384,165 @@ export default function StatsRoute() {
         </aside>
       </section>
 
+      <section class="r-wrap r-section stats-inspector" aria-labelledby="inspector-heading">
+        <div class="stats-inspector-head">
+          <div>
+            <span class="r-eyebrow">room inspector</span>
+            <h2 class="r-title" id="inspector-heading">
+              <Show when={inspectedChannel()} fallback="Choose a room">
+                {(channel) => <>Inside <span class="gold">{channel()}</span></>}
+              </Show>
+            </h2>
+          </div>
+          <Show when={inspectedChannel()}>
+            {(channel) => (
+              <a class="r-btn ghost stats-inspector-open" href={roomDeepLink(channel())}>
+                Open room <span aria-hidden="true">&rarr;</span>
+              </a>
+            )}
+          </Show>
+        </div>
+
+        <Show
+          when={channelDetail.latest}
+          fallback={
+            <div class="data-empty" role="status">
+              {channelDetail.loading
+                ? `Loading ${inspectedChannel() || 'room'} insights…`
+                : 'Detailed room telemetry is unavailable. The public index above is still usable.'}
+            </div>
+          }
+        >
+          {(detail) => (
+            <>
+              <div class="stats-inspector-ledger">
+                <p>
+                  <strong>{detail().channel}</strong> · observed since {detail().firstSeen > 0 ? new Date(detail().firstSeen * 1000).toLocaleDateString() : 'an unknown date'}
+                  {' '}· last activity {relTime(detail().lastActive, nowMs())}
+                </p>
+                <span data-state={detail().complete ? 'complete' : 'partial'}>
+                  {detail().complete ? 'complete room feed' : 'partial room feed'}
+                </span>
+              </div>
+
+              <div class="stats-inspector-metrics" aria-label={`${detail().channel} summary`}>
+                <div><span>present now</span><strong>{formatCount(detail().present)}</strong><small>live mesh roster</small></div>
+                <div><span>messages tracked</span><strong>{formatCount(detail().totals.messages)}</strong><small>durable public aggregate</small></div>
+                <div><span>contributors</span><strong>{formatCount(detail().totals.activeUsers)}</strong><small>distinct recorded authors</small></div>
+                <div><span>words / message</span><strong>{averageWords(detail())}</strong><small>aggregate average</small></div>
+                <div><span>busiest day</span><strong>{formatCount(detail().busiestDay?.messages ?? 0)}</strong><small>{detail().busiestDay?.date ?? 'not enough history'}</small></div>
+                <div><span>peak hour</span><strong>{formatHour(detail().peakHour)}</strong><small>all recorded activity</small></div>
+              </div>
+
+              <div class="stats-inspector-grid">
+                <article class="data-card stats-hour-card">
+                  <div class="stats-card-heading">
+                    <span class="label">daily rhythm</span>
+                    <span class="stats-card-quiet">UTC · all recorded days</span>
+                  </div>
+                  <h3>When the room talks</h3>
+                  <div class="stats-hour-chart" aria-hidden="true">
+                    <For each={detail().hours}>
+                      {(messages, hour) => (
+                        <i
+                          title={`${String(hour()).padStart(2, '0')}:00 UTC: ${formatCount(messages)} messages`}
+                          style={{ '--h': String(Math.max(3, Math.round((messages / Math.max(1, ...detail().hours)) * 100))) }}
+                        />
+                      )}
+                    </For>
+                  </div>
+                  <div class="stats-hour-axis" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+                  <p class="stats-chart-explanation">Each bar is one UTC hour accumulated across the room’s retained statistics.</p>
+                  <ol class="sr-only" aria-label={`${detail().channel} messages by UTC hour`}>
+                    <For each={detail().hours}>
+                      {(messages, hour) => <li>{String(hour()).padStart(2, '0')}:00 UTC: {formatCount(messages)} messages</li>}
+                    </For>
+                  </ol>
+                </article>
+
+                <article class="data-card stats-flow-card">
+                  <div class="stats-card-heading">
+                    <span class="label">room flow</span>
+                    <span class="stats-card-quiet">aggregate events</span>
+                  </div>
+                  <h3>Arrivals and changes</h3>
+                  <dl class="stats-flow-list">
+                    <div><dt>joins</dt><dd>{formatCount(detail().totals.joins)}</dd></div>
+                    <div><dt>parts</dt><dd>{formatCount(detail().totals.parts)}</dd></div>
+                    <div><dt>quits</dt><dd>{formatCount(detail().totals.quits)}</dd></div>
+                    <div><dt>kicks</dt><dd>{formatCount(detail().totals.kicks)}</dd></div>
+                    <div><dt>topic changes</dt><dd>{formatCount(detail().totals.topicChanges)}</dd></div>
+                    <div><dt>last speaker</dt><dd>{detail().lastSpeaker || '—'}</dd></div>
+                  </dl>
+                </article>
+              </div>
+
+              <article class="data-card stats-heatmap-card">
+                <div class="stats-card-heading">
+                  <span class="label">week × hour</span>
+                  <span class="stats-card-quiet">darker means more messages</span>
+                </div>
+                <h3>The room’s weekly current</h3>
+                <div class="stats-heatmap-scroll" tabindex="0" role="region" aria-label={`${detail().channel} weekly activity table`}>
+                  <table class="stats-heatmap">
+                    <caption class="sr-only">Messages by weekday and UTC hour for {detail().channel}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Day</th>
+                        <For each={detail().hours}>{(_, hour) => <th scope="col">{String(hour()).padStart(2, '0')}</th>}</For>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={detail().heatmap}>
+                        {(row, day) => (
+                          <tr>
+                            <th scope="row">{weekdayLabels[day()]}</th>
+                            <For each={row}>
+                              {(messages, hour) => (
+                                <td
+                                  style={{ '--heat': `${Math.round((heatmapMax() <= 0 ? 0 : messages / heatmapMax()) * 82) + 4}%` }}
+                                  title={`${weekdayLabels[day()]} ${String(hour()).padStart(2, '0')}:00 UTC: ${formatCount(messages)} messages`}
+                                >
+                                  <span class="sr-only">{formatCount(messages)}</span>
+                                </td>
+                              )}
+                            </For>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <p class="stats-method-note">
+                This page reports aggregate activity from public, non-ephemeral rooms. It does not publish message text,
+                private-room traffic, participant rankings, or word-frequency profiles. Presence is live; other totals are retained server counters.
+              </p>
+            </>
+          )}
+        </Show>
+      </section>
+
       <section class="r-wrap r-section" aria-labelledby="rooms-heading">
         <span class="r-eyebrow">rooms</span>
         <h2 class="r-title" id="rooms-heading">Room by room,<br />in the open</h2>
-        <p class="stats-section-note">Choose how to read the public index. Pulse is the sum of a room’s recent exported samples; presence is a current or recently active count.</p>
+        <p class="stats-section-note">Search the complete bounded index or filter by live presence and activity in the last 24 hours. The 14-day pulse sums the daily samples exported for each room.</p>
         <div class="stats-room-controls" aria-label="Room list controls">
+          <label class="stats-room-search">
+            <span>Find a room or topic</span>
+            <input
+              type="search"
+              value={roomQuery()}
+              onInput={(event) => setRoomQuery(event.currentTarget.value)}
+              placeholder="#room or topic"
+              autocomplete="off"
+            />
+          </label>
           <div class="stats-control-group" role="group" aria-label="Room scope">
             <button type="button" classList={{ 'is-active': roomScope() === 'all' }} aria-pressed={roomScope() === 'all'} onClick={() => setRoomScope('all')}>All rooms</button>
-            <button type="button" classList={{ 'is-active': roomScope() === 'active' }} aria-pressed={roomScope() === 'active'} onClick={() => setRoomScope('active')}>Active rooms</button>
+            <button type="button" classList={{ 'is-active': roomScope() === 'present' }} aria-pressed={roomScope() === 'present'} onClick={() => setRoomScope('present')}>People here now</button>
+            <button type="button" classList={{ 'is-active': roomScope() === 'recent' }} aria-pressed={roomScope() === 'recent'} onClick={() => setRoomScope('recent')}>Active in 24h</button>
           </div>
           <div class="stats-control-group" role="group" aria-label="Sort rooms">
             <For each={Object.entries(roomSortLabels) as [RoomSort, string][]}>
@@ -347,8 +555,16 @@ export default function StatsRoute() {
         </div>
         <div class="data-list">
           <Show when={visibleChannels().length > 0} fallback={<div class="data-empty">No rooms match this view. Switch back to all rooms to see the full public index.</div>}>
-            <For each={visibleChannels().slice(0, 18)}>
-              {(channel, index) => <ChannelRow channel={channel} nowMs={nowMs()} rank={index() + 1} />}
+            <For each={visibleChannels()}>
+              {(channel, index) => (
+                <ChannelRow
+                  channel={channel}
+                  nowMs={nowMs()}
+                  rank={index() + 1}
+                  selected={inspectedChannel().toLowerCase() === channel.channel.toLowerCase()}
+                  onInspect={setInspectedRoom}
+                />
+              )}
             </For>
           </Show>
         </div>

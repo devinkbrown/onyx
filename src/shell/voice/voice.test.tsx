@@ -109,6 +109,8 @@ function seedVoiceStore(
         ...initialState.voice,
         callState: 'in_call',
         callChannel: '#media',
+        // Stage only paints participants once the call is "started".
+        callStartedAt: Date.now(),
         peers: peersMap,
         muted: false,
         deafened: false,

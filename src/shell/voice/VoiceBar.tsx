@@ -620,6 +620,7 @@ export function VoiceBar() {
     }),
   );
   const isSpotlight = createMemo(() => voice().callLayout === 'spotlight');
+  const stageSize = createMemo(() => voice().stageSize ?? 'compact');
   const spatialPositionCount = createMemo(() => {
     const channel = channelLabel();
     if (!channel) return 0;
@@ -658,6 +659,12 @@ export function VoiceBar() {
   const handleToggleHand = () => getState().toggleRaiseHand();
   const handleToggleCaptions = () => getState().toggleCaptions();
   const handleToggleLayout = () => getState().setCallLayout(isSpotlight() ? 'grid' : 'spotlight');
+  const handleCycleStageSize = () => {
+    const next = stageSize() === 'compact' ? 'expanded'
+      : stageSize() === 'expanded' ? 'fullscreen'
+        : 'compact';
+    getState().setCallStageSize(next);
+  };
   const handleOpenSettings = () => getState().openVoiceSettings();
 
   // Ringing surfaces can remain mounted for a long time, but only an accepted
@@ -1479,6 +1486,30 @@ export function VoiceBar() {
                 <span class="onyx-icon-button__glyph" aria-hidden="true">
                   <Show when={isSpotlight()} fallback={<GridIcon />}><SpotlightIcon /></Show>
                 </span>
+              </button>
+            </Tooltip>
+
+            <Tooltip
+              content={
+                stageSize() === 'compact' ? 'Expand call stage'
+                  : stageSize() === 'expanded' ? 'Fullscreen call stage'
+                    : 'Compact call stage'
+              }
+              placement="top"
+            >
+              <button
+                type="button"
+                class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
+                aria-label={
+                  stageSize() === 'compact' ? 'Expand call stage'
+                    : stageSize() === 'expanded' ? 'Fullscreen call stage'
+                      : 'Compact call stage'
+                }
+                aria-pressed={stageSize() !== 'compact'}
+                onClick={handleCycleStageSize}
+                data-testid="stage-size-button"
+              >
+                <span class="onyx-icon-button__glyph" aria-hidden="true"><StageIcon /></span>
               </button>
             </Tooltip>
 

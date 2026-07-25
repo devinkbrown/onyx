@@ -48,7 +48,7 @@ describe('StatsRoute', () => {
     expect(screen.getByLabelText(/#root recent activity/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /refresh data/i })).toBeInTheDocument();
     expect(screen.getByText(/activity ledger/i)).toBeInTheDocument();
-    expect(screen.getByText('pulse')).toBeInTheDocument();
+    expect(screen.getByText('14-day pulse')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /open/i }).some((a) =>
       a.getAttribute('href')?.startsWith('/app/?join=%23root&at='),
     )).toBe(true);
@@ -77,11 +77,11 @@ describe('StatsRoute', () => {
     render(() => <StatsRoute />);
 
     expect(await screen.findByText('stats incomplete')).toHaveAttribute('data-feed-state', 'partial');
-    expect(screen.getAllByText('partial public room index').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/partial public room index/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/duplicate day rows were omitted/i)).toBeInTheDocument();
   });
 
-  it('filters to active rooms and changes the room ranking without refetching', async () => {
+  it('filters to rooms with people present, searches topics, and changes ranking without refetching', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       generated_at: Math.floor(Date.now() / 1000),
       network_days: [],
@@ -95,14 +95,53 @@ describe('StatsRoute', () => {
 
     await screen.findAllByText('#quiet');
     expect(screen.getByText(/showing 2 of 2 rooms/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Active rooms' }));
+    fireEvent.click(screen.getByRole('button', { name: 'People here now' }));
     const rooms = document.querySelector<HTMLElement>('.data-list');
     expect(rooms).not.toBeNull();
     expect(within(rooms!).getByText('#root')).toBeInTheDocument();
     expect(within(rooms!).queryByText('#quiet')).not.toBeInTheDocument();
     expect(screen.getByText(/showing 1 of 2 rooms/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'All rooms' }));
+    fireEvent.input(screen.getByRole('searchbox', { name: 'Find a room or topic' }), { target: { value: 'root' } });
+    expect(within(rooms!).getByText('#root')).toBeInTheDocument();
+    expect(within(rooms!).queryByText('#quiet')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Pulse' }));
     expect(screen.getByRole('button', { name: 'Pulse' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('drills into bounded aggregate room insights without participant rankings', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/root.json')) {
+        return new Response(JSON.stringify({
+          channel: '#root', generated_at: now, first_seen: now - 86_400, last_active: now - 60,
+          present: 3, last_speaker: 'alice',
+          totals: { messages: 12, words: 72, active_users: 4, joins: 9, parts: 2, quits: 1, kicks: 0, topic_changes: 2 },
+          hours: Array.from({ length: 24 }, (_, hour) => hour),
+          days: [{ date: '2026-07-21', messages: 12 }],
+          heatmap: Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 1)),
+          records: { busiest_day: { date: '2026-07-21', messages: 12 }, peak_hour: 23 },
+          top_users: [{ nick: 'private-ranking', messages: 12 }],
+          top_words: [{ word: 'private-profile', count: 12 }],
+        }));
+      }
+      return new Response(JSON.stringify({
+        generated_at: now,
+        users_online: 4,
+        network_days: [{ date: '2026-07-21', messages: 12 }],
+        channels: [{ channel: '#root', messages: 12, present: 3, last_active: now - 60, spark: [12] }],
+      }));
+    }));
+
+    render(() => <StatsRoute />);
+
+    expect(await screen.findByRole('heading', { name: 'When the room talks' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '#root weekly activity table' })).toBeInTheDocument();
+    expect(screen.getByText('23:00 UTC')).toBeInTheDocument();
+    expect(screen.getByText(/does not publish message text/i)).toBeInTheDocument();
+    expect(screen.queryByText('private-ranking')).not.toBeInTheDocument();
+    expect(screen.queryByText('private-profile')).not.toBeInTheDocument();
   });
 
   it('omits the moment (never throws) when last_active is an out-of-range outlier', () => {

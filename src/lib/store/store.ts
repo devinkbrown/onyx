@@ -55,6 +55,7 @@ import {
   type OutboxEntry,
   type OutboxOwner,
 } from '@/lib/vault/historyVault';
+import { decideOutboxFlushTerminal } from '@/lib/vault/outboxFlushDecision';
 import { getVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
 import {
@@ -378,6 +379,12 @@ export interface VoiceState {
   // ── In-call layout & overlays ──────────────────────────────────────────────
   /** Stage layout — even grid vs. one large active-speaker tile + filmstrip. */
   callLayout: CallLayout;
+  /**
+   * Docked stage size. Default `compact` is a small tray so chat chrome
+   * (guest claim / scrubber / messages) is not buried under a full-height video
+   * panel. `expanded` grows the tray; `fullscreen` covers the viewport.
+   */
+  stageSize: CallStageSize;
   /** Nick pinned to the spotlight slot, or null to auto-follow active speaker. */
   pinnedParticipant: string | null;
   /** Live-captions overlay visibility toggle. */
@@ -395,6 +402,9 @@ export interface VoiceState {
 
 /** Voice-stage layout mode. */
 export type CallLayout = 'grid' | 'spotlight';
+
+/** Docked call stage size — compact by default, user can grow. */
+export type CallStageSize = 'compact' | 'expanded' | 'fullscreen';
 
 const VOICE_SETTINGS_KEY = 'onyx:voice-settings';
 
@@ -1807,6 +1817,8 @@ export interface OnyxState {
   toggleVideo(): Promise<void>;
   /** Set the stage layout (grid ↔ spotlight). */
   setCallLayout(layout: CallLayout): void;
+  /** Set docked stage size (compact tray / expanded / fullscreen). */
+  setCallStageSize(size: CallStageSize): void;
   /** Pin a participant to the spotlight, or null to auto-follow the speaker. */
   pinParticipant(nick: string | null): void;
   /** Toggle the live-captions overlay. */
@@ -3038,6 +3050,27 @@ function _failLabeledPending(
     title: 'Message not delivered',
     description: description || `Could not deliver to ${pending.target}.`,
   });
+}
+
+function _isMessagingCommand(command: string): boolean {
+  const c = command.toUpperCase();
+  return c === 'PRIVMSG' || c === 'NOTICE' || c === 'TAGMSG' || c === 'WHISPER';
+}
+
+/** Prefer operator-actionable copy for mesh durable-admit FAILs. */
+function _humanizeMeshSendFail(command: string, code: string, description?: string): string {
+  const desc = (description || '').trim();
+  if (code === 'TEMPORARILY_UNAVAILABLE' && _isMessagingCommand(command)) {
+    if (/mesh durable admit failed/i.test(desc) || /could not durably admit/i.test(desc)) {
+      return desc || 'Mesh is busy or peers are down — message was not sent. Retry in a moment.';
+    }
+    if (/mesh authority rejected/i.test(desc) || /authority rejected/i.test(desc)) {
+      return desc || 'Mesh rejected the message — it was not delivered.';
+    }
+    if (desc) return desc;
+    return 'Server temporarily unavailable — message not sent. Retry shortly.';
+  }
+  return desc || `${command} failed (${code})`;
 }
 
 /**
@@ -5386,6 +5419,7 @@ export const store = createStore<OnyxState>()(
       cameraOn: false,
       cameraStream: null,
       callLayout: 'grid',
+      stageSize: 'compact',
       pinnedParticipant: null,
       captionsEnabled: false,
       handRaised: false,
@@ -5595,7 +5629,8 @@ export const store = createStore<OnyxState>()(
           // user to Connect. Stop immediately and keep the original auth error
           // visible instead.
           const authFatal = reason === 'SASL authentication failed'
-            || reason === 'Unsupported SASL mechanism';
+            || reason === 'Unsupported SASL mechanism'
+            || reason === 'Registered nickname requires authentication';
           const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
           _batchCollectors.clear();
           _openChathistoryByTarget.clear();
@@ -6081,31 +6116,42 @@ export const store = createStore<OnyxState>()(
               description: 'Already sent, but device storage could not clear the local copy. Retry from Home if it reappears.',
             });
           }
-          if (waiting > 0 && _outboxRetries < 5) {
-            _outboxRetries += 1;
+          // Terminal classification is pure: a mid-flush connection drop must
+          // defer (keep durable rows, no false deliveryFailed) rather than burn
+          // auto-retry budget or toast "couldn't send". Reconnect 001 re-arms.
+          const terminal = decideOutboxFlushTerminal({
+            waiting,
+            pruneFailed,
+            retriesUsed: _outboxRetries,
+            connected: get().connectionStatus === 'connected',
+          });
+          if (terminal.action === 'schedule-retry') {
+            _outboxRetries = terminal.nextRetries;
             // Still auto-retrying — not a terminal failure yet.
             if (get().outboxDeliveryFailed) set({ outboxDeliveryFailed: false });
-            setTimeout(() => get().flushOutbox(), 4000);
-          } else if (waiting > 0) {
-            // Auto-retry budget exhausted: keep durable rows, surface chrome + toast.
+            setTimeout(() => get().flushOutbox(), terminal.delayMs);
+          } else if (terminal.action === 'mark-failed') {
+            // Auto-retry budget exhausted while still connected: keep durable
+            // rows, surface chrome + toast.
             if (!get().outboxDeliveryFailed) {
               set({ outboxDeliveryFailed: true });
-              const deliveryWaiting = waiting - pruneFailed;
               // pruneFailed already got an honest storage toast above — only
               // toast "still waiting" for rows that never made it onto the wire.
-              if (deliveryWaiting > 0) {
+              if (terminal.deliveryWaiting > 0) {
                 get().addToast({
                   variant: 'warning',
-                  title: deliveryWaiting === 1
+                  title: terminal.deliveryWaiting === 1
                     ? 'Queued message still waiting'
-                    : `${deliveryWaiting} queued messages still waiting`,
+                    : `${terminal.deliveryWaiting} queued messages still waiting`,
                   description: 'Could not send yet. Open Home or retry from the composer.',
                 });
               }
             }
-          } else if (get().outboxDeliveryFailed) {
-            set({ outboxDeliveryFailed: false });
+          } else if (terminal.action === 'clear-failed') {
+            if (get().outboxDeliveryFailed) set({ outboxDeliveryFailed: false });
           }
+          // action === 'defer': connection dropped mid-flush — leave chrome to
+          // the offline "will send on reconnect" path; do not mark failed.
         } catch {
           // Unexpected flush failure must never leave the outbox silent: mark
           // delivery failed and toast so composer/Home chrome stays honest.
@@ -9286,14 +9332,23 @@ export const store = createStore<OnyxState>()(
         // rejected after `@label=`). Prefer this over a generic service notice.
         if (standard.kind === 'FAIL') {
           const pending = _takePendingLabeledSend(tags['label']);
+          const human = _humanizeMeshSendFail(standard.command, standard.code, standard.description);
           if (pending) {
             _failLabeledPending(
               set,
               get,
               pending,
-              standard.description || `${standard.command} failed (${standard.code})`,
+              human || `${standard.command} failed (${standard.code})`,
             );
             return;
+          }
+          // Unlabeled messaging FAILs still deserve a toast (not only a notice).
+          if (human && _isMessagingCommand(standard.command)) {
+            get().addToast({
+              variant: 'error',
+              title: 'Message not delivered',
+              description: human,
+            });
           }
         }
         get().addServiceNotice(standard.command, `${standard.kind} ${standard.code}${standard.description ? `: ${standard.description}` : ''}`);
@@ -15011,6 +15066,20 @@ export const store = createStore<OnyxState>()(
         });
         return;
       }
+      // text.ircv3.net cannot carry Cadence binary frames — fail closed early.
+      if (
+        client
+        && typeof (client as { admitsMediaBinary?: boolean }).admitsMediaBinary === 'boolean'
+        && !(client as { admitsMediaBinary: boolean }).admitsMediaBinary
+      ) {
+        preacquired?.getTracks().forEach((t) => t.stop());
+        get().addToast({
+          variant: 'error',
+          title: withVideo ? 'Video unavailable' : 'Voice unavailable',
+          description: 'This connection does not support media frames (need onyx.irc-media.v1). Reconnect and try again.',
+        });
+        return;
+      }
       const joinAttempt = ++_voiceJoinAttempt;
 
       // Publish the call surface before awaiting browser permission, device
@@ -15040,6 +15109,15 @@ export const store = createStore<OnyxState>()(
           // Superseded — caller owns stopping only if we never adopted.
           return;
         }
+        const message = error instanceof Error ? error.message : String(error);
+        const identityMissing = /device identity|E2EE|signing|UNENROLLED|AUTH_REQUIRED/i.test(message);
+        get().addToast({
+          variant: 'error',
+          title: withVideo ? 'Video could not start' : 'Voice could not start',
+          description: identityMissing
+            ? 'Media calls need an enrolled account device identity. Sign in and ensure passkey/device keys are available, then try again.'
+            : (message || 'Media startup failed. Check microphone/camera permissions and try again.'),
+        });
         get().setVoiceCallState({
           callState: 'idle',
           callChannel: null,
@@ -15136,6 +15214,7 @@ export const store = createStore<OnyxState>()(
         peers: new Map(),
         callStartedAt: null,
         pinnedParticipant: null,
+        stageSize: 'compact',
         handRaised: false,
         raisedHands: new Set<string>(),
       });
@@ -15196,6 +15275,11 @@ export const store = createStore<OnyxState>()(
 
     setCallLayout(layout) {
       get().setVoiceCallState({ callLayout: layout });
+    },
+
+    setCallStageSize(size) {
+      if (size !== 'compact' && size !== 'expanded' && size !== 'fullscreen') return;
+      get().setVoiceCallState({ stageSize: size });
     },
 
     pinParticipant(nick) {

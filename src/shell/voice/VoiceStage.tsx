@@ -29,8 +29,9 @@
  * Renders calm over the app background — no heavyweight overlay.
  */
 
-import { createMemo, Index, Show } from 'solid-js';
+import { createEffect, createMemo, Index, onCleanup, Show } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
+import type { CallStageSize } from '@/lib/store';
 import type { CadencePeerState } from '@/lib/cadence-media/types';
 import { ParticipantTile } from './ParticipantTile';
 import { CallStatusAnnouncer } from './CallStatusAnnouncer';
@@ -166,23 +167,102 @@ export function VoiceStage() {
 
   const handlePin = (nick: string) => getState().pinParticipant(nick);
 
+  // Video mode when self camera/screenshare is live or any peer has a decoded
+  // video track. Audio-only stays a compact avatar strip — not a cut-off 16:9 tray.
+  const hasLiveVideo = createMemo(() => {
+    if (screenshareActive()) return true;
+    if (voice().cameraOn && voice().cameraStream) return true;
+    for (const stream of voice().videoParticipants.values()) {
+      if (stream) return true;
+    }
+    return false;
+  });
+
+  const stageSize = createMemo(() => voice().stageSize ?? 'compact');
+
   const stageClass = createMemo(() => {
     const cls = ['voice-stage'];
+    if (hasLiveVideo()) cls.push('voice-stage--video');
+    else cls.push('voice-stage--audio');
+    cls.push(`voice-stage--size-${stageSize()}`);
     if (screenshareActive()) cls.push('voice-stage--screenshare');
     else if (isSpotlight()) cls.push('voice-stage--spotlight');
     return cls.join(' ');
   });
 
+  // Esc drops fullscreen so the chat chrome is reachable again.
+  createEffect(() => {
+    if (stageSize() !== 'fullscreen') return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') getState().setCallStageSize('compact');
+    };
+    window.addEventListener('keydown', onKey);
+    onCleanup(() => window.removeEventListener('keydown', onKey));
+  });
+
+  const setSize = (size: CallStageSize) => getState().setCallStageSize(size);
+  // Ready once the store marks the call started — stream can briefly be null
+  // during a camera toggle without unmounting the whole stage.
+  const callReady = createMemo(() => voice().callStartedAt !== null);
+
   return (
     <div
       class={stageClass()}
-      aria-label="Voice call participants"
+      aria-label={hasLiveVideo() ? 'Video call participants' : 'Voice call participants'}
       role="region"
       data-testid="voice-stage"
+      data-mode={hasLiveVideo() ? 'video' : 'audio'}
+      data-size={stageSize()}
       data-layout={screenshareActive() ? 'screenshare' : voice().callLayout}
     >
+      {/* Size chrome — compact by default; expand / fullscreen on demand. */}
+      <div class="voice-stage__chrome" role="toolbar" aria-label="Call stage size">
+        <button
+          type="button"
+          class="voice-stage__size-btn"
+          aria-label="Compact stage"
+          aria-pressed={stageSize() === 'compact'}
+          data-testid="stage-size-compact"
+          onClick={() => setSize('compact')}
+          title="Compact"
+        >
+          ▬
+        </button>
+        <button
+          type="button"
+          class="voice-stage__size-btn"
+          aria-label="Expand stage"
+          aria-pressed={stageSize() === 'expanded'}
+          data-testid="stage-size-expanded"
+          onClick={() => setSize('expanded')}
+          title="Expand"
+        >
+          ▤
+        </button>
+        <button
+          type="button"
+          class="voice-stage__size-btn"
+          aria-label={stageSize() === 'fullscreen' ? 'Exit fullscreen stage' : 'Fullscreen stage'}
+          aria-pressed={stageSize() === 'fullscreen'}
+          data-testid="stage-size-fullscreen"
+          onClick={() => setSize(stageSize() === 'fullscreen' ? 'compact' : 'fullscreen')}
+          title={stageSize() === 'fullscreen' ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          {stageSize() === 'fullscreen' ? '↙' : '⛶'}
+        </button>
+      </div>
       {/* Polite roster announcements (joins/leaves) for screen-reader users — SC 4.1.3. */}
       <CallStatusAnnouncer />
+      <Show
+        when={callReady()}
+        fallback={
+          <p class="voice-stage__starting" role="status" data-testid="voice-stage-loading">
+            {voice().cameraOn || voice().cameraStream || hasLiveVideo()
+              ? 'Starting video…'
+              : 'Starting voice…'}
+          </p>
+        }
+      >
       <Show
         when={screenshareActive()}
         fallback={
@@ -306,6 +386,7 @@ export function VoiceStage() {
             )}
           </Index>
         </div>
+      </Show>
       </Show>
     </div>
   );

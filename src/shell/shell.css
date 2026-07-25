@@ -304,8 +304,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-3) var(--space-3);
+  gap: 4px;
+  padding: 8px;
   border-bottom: 1px solid var(--seam-faint);
 }
 
@@ -335,7 +335,7 @@
 .shell-notify-controls {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 2px;
   flex: none;
 }
 
@@ -401,30 +401,99 @@
   opacity: 0.56;
 }
 
-/* Compact quiet-hours From–To selects beside the DND toggle. */
-.shell-notify-quiet {
+/* Quiet hours are a deliberate instrument, not two mystery timestamps jammed
+   into the 224px sidebar header. The Q trigger keeps the control row bounded;
+   its labelled range opens in the top-layer popover. */
+.shell-notify-quiet-popover {
   display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: 2px;
-  min-width: 0;
+  flex: none;
+}
+
+.shell-notify-quiet-popover > .onyx-popover__trigger {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.shell-notify-quiet-popover > .onyx-popover__trigger:hover,
+.shell-notify-quiet-popover > .onyx-popover__trigger[aria-expanded='true'] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.shell-notify-quiet-trigger--active {
+  color: var(--ink);
+  border-color: transparent;
+  background: var(--shu);
+}
+
+.shell-notify-quiet-panel {
+  display: grid;
+  gap: var(--space-3);
+  min-width: min(17rem, calc(100vw - 2rem));
+}
+
+.shell-notify-quiet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.shell-notify-quiet-title,
+.shell-notify-quiet-summary,
+.shell-notify-quiet-copy {
+  margin: 0;
+}
+
+.shell-notify-quiet-title {
+  color: var(--paper);
+  font-weight: 750;
+}
+
+.shell-notify-quiet-summary {
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.shell-notify-quiet-copy {
+  color: var(--paper-dim);
+  font-size: 0.78rem;
+}
+
+.shell-notify-quiet-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-2);
 }
 
 .shell-notify-quiet-field {
-  display: inline-flex;
+  display: grid;
+  gap: 5px;
   min-width: 0;
+  color: var(--paper-mute);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .shell-notify-quiet-select {
-  max-width: 5.6rem;
-  height: 24px;
-  padding: 0 2px;
+  width: 100%;
+  height: 34px;
+  padding: 0 7px;
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--ink) 64%, transparent);
   color: var(--paper-mute);
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -436,18 +505,13 @@
   outline: none;
 }
 
-.shell-notify-quiet--active .shell-notify-quiet-select {
-  color: var(--ink);
-  border-color: transparent;
-  background: var(--shu);
-}
-
 .shell-notify-quiet-sep {
   color: var(--paper-mute);
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: 0.82rem;
   font-weight: 700;
   line-height: 1;
+  padding-bottom: 10px;
   user-select: none;
 }
 
@@ -697,6 +761,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  container-name: conversation;
+  container-type: inline-size;
   min-width: 0;
   background:
     linear-gradient(
@@ -1349,9 +1415,25 @@
 }
 
 .shell-ribbon-event-text {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.shell-ribbon-event-text--compact { display: none; }
+
+/* The event name yields first; its countdown is the useful instrument and must
+   never disappear beneath the following scope divider. */
+.shell-ribbon-event-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-ribbon-event-countdown {
+  flex: none;
+  white-space: nowrap;
 }
 
 .shell-ribbon-voice-chip {
@@ -1800,6 +1882,60 @@
 .shell-ribbon-preferences:hover {
   color: var(--paper);
   background: color-mix(in oklab, var(--stone-2) 56%, transparent);
+}
+
+/* Desktop sidebars can leave the conversation column much narrower than the
+   viewport. Compress against the space the ribbon actually owns, so the event
+   countdown and far-edge controls remain intact instead of being clipped by
+   the full-bleed header. Keep this after the base ribbon rules so the compact
+   state wins the cascade. */
+@container conversation (max-width: 760px) {
+  .shell-ribbon {
+    padding-inline: 10px;
+  }
+
+  .shell-ribbon-inner,
+  .shell-ribbon-right,
+  .shell-ribbon-group {
+    gap: 4px;
+  }
+
+  .shell-ribbon-topic,
+  .shell-ribbon-sep,
+  .shell-ribbon-divider,
+  .shell-ribbon-conn {
+    display: none;
+  }
+
+  .shell-ribbon-channel {
+    max-width: min(18vw, 12ch);
+  }
+
+  .shell-ribbon-action {
+    width: 34px;
+    min-width: 34px;
+    padding-inline: 0;
+  }
+
+  .shell-ribbon-action-label {
+    display: none;
+  }
+
+  .shell-ribbon-event-chip {
+    max-width: 9.5rem;
+  }
+
+  .shell-ribbon-event-text--full { display: none; }
+  .shell-ribbon-event-text--compact { display: inline-flex; }
+
+  .shell-ribbon-voice-chip {
+    max-width: 7rem;
+  }
+
+  .shell-ribbon-event-text,
+  .shell-ribbon-voice-text {
+    text-overflow: ellipsis;
+  }
 }
 
 /* ── Appearance panel (in-shell theme + background picker) ── */

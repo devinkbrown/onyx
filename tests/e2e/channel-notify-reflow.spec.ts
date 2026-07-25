@@ -25,8 +25,7 @@ test('keeps channel notification and settings controls reachable at 400% reflow'
           </div>
           <div class="shell-ribbon-right">
             <div class="shell-ribbon-group" role="group" aria-label="Channel actions">
-              <button class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-call" aria-label="Join voice">V</button>
-              <button class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-call" aria-label="Join video">C</button>
+              <button class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-call" aria-label="Join call">Call</button>
               <button class="shell-ribbon-iconbtn shell-ribbon-members" aria-label="12 members">12</button>
               <div class="chan-notify" role="radiogroup" aria-label="Notifications for #accessibility">
                 <button class="chan-notify-seg" role="radio" aria-checked="true" aria-label="All messages">All</button>

@@ -15,6 +15,7 @@ import {
   type CalmPreset,
 } from '@/lib/notifications/calmMode';
 import { isQuietHoursActive } from '@/lib/notifications/quietHours';
+import { Popover } from '@/primitives/Popover';
 import {
   disableWebPush,
   enableWebPush,
@@ -89,6 +90,7 @@ export function NotificationControls(): JSX.Element {
   const [permission, setPermission] = createSignal(getDesktopNotificationPermission());
   const [webPushOn, setWebPushOn] = createSignal(false);
   const [webPushBusy, setWebPushBusy] = createSignal(false);
+  const [quietHoursOpen, setQuietHoursOpen] = createSignal(false);
   const [dndNowMs, setDndNowMs] = createSignal(Date.now());
   // Bumps to re-run recovery after an external permission grant or SW update
   // without treating those events as a user toggle.
@@ -380,38 +382,60 @@ export function NotificationControls(): JSX.Element {
         <span aria-hidden="true">D</span>
         <span class="sr-only">Do not disturb {dndActive() ? 'on' : 'off'}</span>
       </button>
-      <div
-        class={`shell-notify-quiet${quietHoursSilencing() ? ' shell-notify-quiet--active' : ''}`}
-        title={quietHoursSummary(dndQuietStart(), dndQuietEnd())}
-      >
-        <label class="shell-notify-quiet-field">
-          <span class="sr-only">Quiet hours start</span>
-          <select
-            class="shell-notify-quiet-select"
-            aria-label="Quiet hours start"
-            value={dndQuietStart()}
-            onChange={handleQuietStartChange}
-          >
-            <For each={QUIET_HOUR_OPTIONS}>
-              {(hour) => <option value={hour}>{formatQuietHour(hour)}</option>}
-            </For>
-          </select>
-        </label>
-        <span class="shell-notify-quiet-sep" aria-hidden="true">–</span>
-        <label class="shell-notify-quiet-field">
-          <span class="sr-only">Quiet hours end</span>
-          <select
-            class="shell-notify-quiet-select"
-            aria-label="Quiet hours end"
-            value={dndQuietEnd()}
-            onChange={handleQuietEndChange}
-          >
-            <For each={QUIET_HOUR_OPTIONS}>
-              {(hour) => <option value={hour}>{formatQuietHour(hour)}</option>}
-            </For>
-          </select>
-        </label>
-      </div>
+      <span class="shell-notify-quiet-popover">
+        <Popover
+          open={quietHoursOpen()}
+          onOpenChange={setQuietHoursOpen}
+          placement="bottom"
+          panelLabel="Quiet hours"
+          trigger={
+            <span
+              class={`shell-notify-btn shell-notify-quiet-trigger${quietHoursSilencing() ? ' shell-notify-quiet-trigger--active' : ''}`}
+              title={`Quiet hours — ${quietHoursSummary(dndQuietStart(), dndQuietEnd())}`}
+            >
+              <span aria-hidden="true">Q</span>
+              <span class="sr-only">Quiet hours</span>
+            </span>
+          }
+        >
+          <div class="shell-notify-quiet-panel">
+          <div class="shell-notify-quiet-head">
+            <p class="shell-notify-quiet-title">Quiet hours</p>
+            <p class="shell-notify-quiet-summary">{quietHoursSummary(dndQuietStart(), dndQuietEnd())}</p>
+          </div>
+          <p class="shell-notify-quiet-copy">Silence alerts on this daily schedule.</p>
+          <div class="shell-notify-quiet-range">
+            <label class="shell-notify-quiet-field">
+              <span>Start</span>
+              <select
+                class="shell-notify-quiet-select"
+                aria-label="Quiet hours start"
+                value={dndQuietStart()}
+                onChange={handleQuietStartChange}
+              >
+                <For each={QUIET_HOUR_OPTIONS}>
+                  {(hour) => <option value={hour}>{formatQuietHour(hour)}</option>}
+                </For>
+              </select>
+            </label>
+            <span class="shell-notify-quiet-sep" aria-hidden="true">→</span>
+            <label class="shell-notify-quiet-field">
+              <span>End</span>
+              <select
+                class="shell-notify-quiet-select"
+                aria-label="Quiet hours end"
+                value={dndQuietEnd()}
+                onChange={handleQuietEndChange}
+              >
+                <For each={QUIET_HOUR_OPTIONS}>
+                  {(hour) => <option value={hour}>{formatQuietHour(hour)}</option>}
+                </For>
+              </select>
+            </label>
+          </div>
+          </div>
+        </Popover>
+      </span>
     </div>
   );
 }

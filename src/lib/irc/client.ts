@@ -492,6 +492,17 @@ export class IRCClient {
     return this.opts.nick;
   }
 
+  /**
+   * True when this socket can carry Cadence binary media frames.
+   * `text.ircv3.net` is control-only; media requires `onyx.irc-media.v1` or
+   * the legacy empty-protocol path (binary-admitting).
+   */
+  get admitsMediaBinary(): boolean {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    return ws.protocol !== IRC_WEBSOCKET_SUBPROTOCOL;
+  }
+
   /** Send a media datagram as a binary WebSocket frame (browser media plane). */
   sendBinary(bytes: Uint8Array): boolean {
     const ws = this.ws;
@@ -993,6 +1004,19 @@ export class IRCClient {
       case '433': // Nickname in use
       case '432': // Erroneous nickname
       case '437': // Nick/channel unavailable
+        if (
+          msg.command === '432'
+          && !this._registered
+          && /nickname is registered; authenticate/i.test(msg.params.at(-1) ?? '')
+        ) {
+          this.opts.onError?.('That nickname is registered. Sign in as its account before using it.');
+          try {
+            this.ws?.close(4003, 'Registered nickname requires authentication');
+          } catch {
+            // The authoritative server also closes; a raced socket is harmless.
+          }
+          return;
+        }
         if (!this._registered && this._nickRetries < 4) {
           this._nickRetries++;
           const newNick = this.opts.nick + '_';

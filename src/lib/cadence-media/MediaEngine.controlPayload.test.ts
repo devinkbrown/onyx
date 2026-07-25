@@ -44,6 +44,103 @@ function callbacks(overrides: Partial<CadenceMediaCallbacks> = {}): CadenceMedia
 }
 
 describe('CadenceMediaEngine control payload boundary', () => {
+  it('stopCamera mutes video without leaving the media room', () => {
+    const client = mediaClient();
+    const engine = new CadenceMediaEngine(callbacks(), { kind: 'video' });
+    engine.setClient(client);
+    const internals = engine as unknown as {
+      activeRoom: string | null;
+      localKind: string | null;
+      localStream: MediaStream | null;
+      stopCamera(): void;
+      stopVideoCapture(): void;
+    };
+    internals.activeRoom = '#root';
+    internals.localKind = 'video';
+    const stop = vi.fn();
+    internals.localStream = {
+      getVideoTracks: () => [{ stop, readyState: 'live' } as unknown as MediaStreamTrack],
+      getAudioTracks: () => [],
+      getTracks: () => [],
+    } as unknown as MediaStream;
+    const stopVideoCapture = vi.spyOn(internals, 'stopVideoCapture').mockImplementation(() => {});
+
+    internals.stopCamera();
+
+    expect(stopVideoCapture).toHaveBeenCalled();
+    expect(client.sendRaw).toHaveBeenCalledWith('MEDIA', 'MUTE', '#root', 'video');
+    expect(client.sendRaw).not.toHaveBeenCalledWith('MEDIA', 'LEAVE', '#root');
+    expect(internals.localKind).toBe('voice');
+  });
+
+  it('keeps peer stream routes when MACKEY is re-issued after peer JOIN', () => {
+    const client = mediaClient();
+    const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
+    engine.setClient(client);
+    const internals = engine as unknown as {
+      activeRoom: string | null;
+      wsMyNick: string;
+      streamRouter: {
+        setRoster(channel: string, nicks: readonly string[]): void;
+        addParticipant(nick: string): void;
+        resolve(id: number): { nick: string; kind: string } | null;
+      };
+      handleMediaServerMessage(msg: {
+        command: string;
+        params: string[];
+      }): void;
+    };
+    internals.activeRoom = '#root';
+    internals.wsMyNick = 'alice';
+    internals.streamRouter.setRoster('#root', ['alice']);
+    internals.streamRouter.addParticipant('bob');
+    const bobAudio = mediaStreamId('#root', 'bob', 'audio');
+    expect(internals.streamRouter.resolve(bobAudio)?.nick).toBe('bob');
+
+    internals.handleMediaServerMessage({
+      command: 'EVENT',
+      params: ['alice', 'MEDIA', 'MACKEY', '#root', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='],
+    });
+
+    // Peer must survive MACKEY re-issue (video JOIN re-sends MACKEY).
+    expect(internals.streamRouter.resolve(bobAudio)?.nick).toBe('bob');
+  });
+
+  it('maps server JOIN presence onto the voice peer path', () => {
+    const onPeerState = vi.fn();
+    const engine = new CadenceMediaEngine(callbacks({ onPeerState }), { kind: 'voice' });
+    const internals = engine as unknown as {
+      activeRoom: string | null;
+      callState: string;
+      streamRouter: { setRoster(c: string, n: readonly string[]): void; resolve(id: number): unknown };
+      handleMediaMessage(from: string, channel: string, subtype: string, payload: string): void;
+    };
+    internals.activeRoom = '#root';
+    internals.callState = 'in_call';
+    internals.streamRouter.setRoster('#root', ['alice']);
+
+    internals.handleMediaMessage('bob', '#root', 'JOIN', 'voice');
+
+    expect(onPeerState).toHaveBeenCalled();
+    expect(internals.streamRouter.resolve(mediaStreamId('#root', 'bob', 'audio'))).toBeTruthy();
+  });
+
+  it('installs a solo group key so encode is ready before peers arrive', async () => {
+    const onMediaE2eeState = vi.fn();
+    const client = mediaClient();
+    const engine = new CadenceMediaEngine(callbacks({ onMediaE2eeState }), { kind: 'voice' });
+    engine.setClient(client);
+    const internals = engine as unknown as {
+      activeRoom: string | null;
+      ensureLocalMediaGroupKey(): Promise<void>;
+      mooringGroupKey: MooringGroup | null;
+    };
+    internals.activeRoom = '#root';
+    await internals.ensureLocalMediaGroupKey();
+    expect(internals.mooringGroupKey).not.toBeNull();
+    expect(onMediaE2eeState).toHaveBeenCalledWith(true, false, expect.any(Number));
+  });
+
   it('fails closed instead of emitting plaintext media before a group key exists', async () => {
     const onMediaE2eeState = vi.fn();
     const client = mediaClient();

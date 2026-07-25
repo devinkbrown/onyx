@@ -7,6 +7,12 @@ type PopoverElement = HTMLDivElement & {
   hidePopover?: () => void;
 };
 
+/** Fixed viewport point used for context-menu style opens (right-click). */
+export type PopoverAnchorPoint = {
+  x: number;
+  y: number;
+};
+
 export type PopoverProps = ParentProps<{
   trigger: JSX.Element;
   id?: string;
@@ -17,6 +23,12 @@ export type PopoverProps = ParentProps<{
   panelLabel?: string;
   /** Disable the trigger and close an open panel when its owning surface is inert. */
   disabled?: boolean;
+  /**
+   * When set, the panel is positioned at this viewport point instead of the
+   * trigger rect. Used for right-click context menus so the menu appears under
+   * the cursor rather than the (often far-right) overflow trigger.
+   */
+  anchorPoint?: PopoverAnchorPoint | null;
 }>;
 
 let popoverId = 0;
@@ -46,7 +58,18 @@ function canRestoreFocus(element: HTMLElement): boolean {
 }
 
 export function Popover(props: PopoverProps) {
-  const [local, rest] = splitProps(props, ['trigger', 'id', 'open', 'defaultOpen', 'onOpenChange', 'placement', 'panelLabel', 'disabled', 'children']);
+  const [local, rest] = splitProps(props, [
+    'trigger',
+    'id',
+    'open',
+    'defaultOpen',
+    'onOpenChange',
+    'placement',
+    'panelLabel',
+    'disabled',
+    'anchorPoint',
+    'children',
+  ]);
   const [innerOpen, setInnerOpen] = createSignal(local.defaultOpen ?? false);
   const instanceId = ++popoverId;
   const id = () => local.id ?? `onyx-popover-${instanceId}`;
@@ -162,33 +185,48 @@ export function Popover(props: PopoverProps) {
     });
   });
 
-  // Position the panel relative to its trigger, clamped to the viewport. The
-  // panel is in the top layer (native popover="auto"), where CSS anchor
-  // positioning is unreliable and unsupported in Firefox/Safari — it was landing
-  // at left:0 then shifting half off-screen. Measure and place it ourselves;
-  // phones keep the CSS bottom-sheet (primitives.css), so we clear inline pos there.
+  // Position the panel relative to its trigger (or an explicit cursor anchor),
+  // clamped to the viewport. The panel is in the top layer (native
+  // popover="auto"), where CSS anchor positioning is unreliable and unsupported
+  // in Firefox/Safari — it was landing at left:0 then shifting half off-screen.
+  // Measure and place it ourselves; phones keep the CSS bottom-sheet
+  // (primitives.css), so we clear inline pos there.
   const positionPanel = (): void => {
     const panel = panelRef;
     const trigger = triggerRef;
-    if (!panel || !trigger || typeof window === 'undefined') return;
+    if (!panel || typeof window === 'undefined') return;
     const mobile = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 560px)').matches;
     if (mobile) {
       for (const p of ['position', 'left', 'top', 'transform']) panel.style.removeProperty(p);
       return;
     }
-    const t = trigger.getBoundingClientRect();
     const pw = panel.offsetWidth;
     const ph = panel.offsetHeight;
     const margin = 8;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    let left = t.left + t.width / 2 - pw / 2;
-    left = Math.max(margin, Math.min(left, vw - pw - margin));
-    const placeTop = (local.placement ?? 'bottom') === 'top';
-    let top = placeTop ? t.top - ph - 10 : t.bottom + 10;
-    if (placeTop && top < margin) top = t.bottom + 10; // no room above → flip down
-    if (!placeTop && top + ph > vh - margin) top = t.top - ph - 10; // flip up
-    top = Math.max(margin, Math.min(top, vh - ph - margin));
+    const anchor = local.anchorPoint;
+    let left: number;
+    let top: number;
+    if (anchor) {
+      // Context menu: open at the pointer, flip up/left when near edges.
+      left = anchor.x;
+      top = anchor.y;
+      if (left + pw > vw - margin) left = Math.max(margin, anchor.x - pw);
+      if (top + ph > vh - margin) top = Math.max(margin, anchor.y - ph);
+      left = Math.max(margin, Math.min(left, vw - pw - margin));
+      top = Math.max(margin, Math.min(top, vh - ph - margin));
+    } else {
+      if (!trigger) return;
+      const t = trigger.getBoundingClientRect();
+      left = t.left + t.width / 2 - pw / 2;
+      left = Math.max(margin, Math.min(left, vw - pw - margin));
+      const placeTop = (local.placement ?? 'bottom') === 'top';
+      top = placeTop ? t.top - ph - 10 : t.bottom + 10;
+      if (placeTop && top < margin) top = t.bottom + 10; // no room above → flip down
+      if (!placeTop && top + ph > vh - margin) top = t.top - ph - 10; // flip up
+      top = Math.max(margin, Math.min(top, vh - ph - margin));
+    }
     panel.style.position = 'fixed';
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
@@ -197,9 +235,13 @@ export function Popover(props: PopoverProps) {
 
   createEffect(() => {
     if (!isOpen() || typeof window === 'undefined') return;
+    // Re-run when the anchor point changes while open (e.g. successive
+    // right-clicks on different rows share a controlled open signal).
+    void local.anchorPoint?.x;
+    void local.anchorPoint?.y;
     const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0);
     // Deferred one-shot DOM measurement — deliberately untracked; the effect
-    // re-runs on isOpen() and the resize/scroll listeners cover the rest.
+    // re-runs on isOpen()/anchorPoint and the resize/scroll listeners cover the rest.
     // eslint-disable-next-line solid/reactivity
     raf(() => positionPanel());
     const reflow = () => positionPanel();

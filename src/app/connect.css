@@ -294,19 +294,47 @@
 }
 
 .conn-mode {
+  display: flex;
+  min-width: 0;
+  min-height: 62px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
   appearance: none;
   border: 1px solid transparent;
   border-radius: calc(var(--r-sm) - 1px);
-  padding: 9px 8px;
+  padding: 10px 12px;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
+  text-align: left;
   color: var(--paper-mute);
   background: transparent;
   cursor: pointer;
   transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
     border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.conn-mode-label {
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.conn-mode-short {
+  overflow: hidden;
+  width: 100%;
+  color: inherit;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
+  opacity: 0.72;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .conn-mode:hover:not([data-active='true']):not(:disabled) {
@@ -332,6 +360,124 @@
 .conn-mode:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ── Arrival brief — identity, destination, and continuity at a glance ── */
+.conn-arrival {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid color-mix(in oklab, var(--lapis) 38%, var(--seam-faint));
+  border-radius: var(--r-md);
+  background:
+    radial-gradient(100% 150% at 100% 0%,
+      color-mix(in oklab, var(--lapis-deep) 34%, transparent), transparent 60%),
+    color-mix(in oklab, var(--ink) 58%, var(--stone));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--lapis-bright) 10%, transparent);
+  animation: conn-rise var(--dur) var(--ease) both;
+}
+
+.conn-arrival::after {
+  content: '01';
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-family: var(--font-display);
+  font-size: 3.8rem;
+  line-height: 1;
+  color: color-mix(in oklab, var(--lapis-bright) 8%, transparent);
+  pointer-events: none;
+}
+
+.conn-arrival-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 46ch;
+}
+
+.conn-arrival-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+}
+
+.conn-arrival-title {
+  margin: 5px 0 0;
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 520;
+  line-height: 1.25;
+  color: var(--paper);
+}
+
+.conn-arrival-body {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--paper-dim);
+}
+
+.conn-arrival-switch {
+  appearance: none;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--lapis-bright) 38%, transparent);
+  background: transparent;
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.conn-arrival-switch:hover { color: var(--paper); }
+.conn-arrival-switch:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 4px; }
+
+.conn-arrival-map {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border-block: 1px solid var(--seam-faint);
+}
+
+.conn-arrival-map > div {
+  min-width: 0;
+  padding: 11px 10px;
+  border-right: 1px solid var(--seam-faint);
+}
+
+.conn-arrival-map > div:first-child { padding-left: 0; }
+.conn-arrival-map > div:last-child { padding-right: 0; border-right: 0; }
+
+.conn-arrival-map dt {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+}
+
+.conn-arrival-map dd {
+  overflow: hidden;
+  margin: 4px 0 0;
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--paper);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conn-arrival .conn-route {
+  padding: 0;
 }
 
 /* ── Remembered identity switcher ── */
@@ -1081,6 +1227,35 @@
   word-break: break-word;
 }
 
+.conn-auth-required {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 13px 14px;
+  border: 1px solid color-mix(in oklab, var(--gold) 44%, var(--seam-faint));
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--gold) 10%, var(--ink));
+}
+.conn-auth-required div { display: grid; gap: 3px; }
+.conn-auth-required strong { color: var(--paper); font-size: 0.82rem; }
+.conn-auth-required span { color: var(--paper-dim); font-size: 0.72rem; line-height: 1.4; }
+.conn-auth-required button {
+  flex: none;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in oklab, var(--gold) 52%, transparent);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--gold) 14%, transparent);
+  color: var(--gold-bright);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+.conn-auth-required button:hover { color: var(--paper); }
+.conn-auth-required button:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 2px; }
+
 /* ── Connect button area ── */
 .conn-actions {
   display: flex;
@@ -1314,6 +1489,35 @@
     letter-spacing: 0.08em;
   }
 
+  .conn-mode-short {
+    display: none;
+  }
+
+  .conn-arrival {
+    padding: 16px;
+  }
+
+  .conn-arrival-map {
+    grid-template-columns: 1fr;
+    border-block: 0;
+  }
+
+  .conn-arrival-map > div,
+  .conn-arrival-map > div:first-child,
+  .conn-arrival-map > div:last-child {
+    display: grid;
+    grid-template-columns: 90px minmax(0, 1fr);
+    gap: 10px;
+    align-items: baseline;
+    padding: 8px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--seam-faint);
+  }
+
+  .conn-arrival-map dd {
+    margin: 0;
+  }
+
   .conn-claim,
   .conn-invite,
   .conn-identities,
@@ -1360,6 +1564,8 @@
   .conn-toggle {
     align-items: flex-start;
   }
+
+  .conn-auth-required { align-items: stretch; flex-direction: column; }
 
   .conn-toggle-switch {
     margin-top: 2px;

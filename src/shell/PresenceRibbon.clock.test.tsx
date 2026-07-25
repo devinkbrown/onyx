@@ -67,8 +67,13 @@ describe('PresenceRibbon scheduled-event clock', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Scheduled room event' })).toHaveTextContent(
-      'Office hours · in 1 min',
+      'Event: Office hours · in 1 min',
     );
+    const countdowns = document.querySelectorAll('.shell-ribbon-event-countdown');
+    expect(countdowns).toHaveLength(2);
+    expect(countdowns[0]).toHaveTextContent('· in 1 min');
+    expect(countdowns[1]).toHaveTextContent('· in 1 min');
+    expect(document.querySelector('.shell-ribbon-event-text--compact')).toHaveAttribute('aria-hidden', 'true');
     const eventTimer = setIntervalSpy.mock.results[0]?.value;
     expect(setIntervalSpy).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(1);

@@ -11,6 +11,10 @@ const accessibilityCss = readFileSync(
 );
 const voiceStageDockRule = voiceCss.match(/\.voice-stage\s*\{[^}]+\}/u)?.[0];
 if (!voiceStageDockRule) throw new Error('voice-stage docking rule is missing');
+// Size modes are the dock contract (compact default; expanded optional).
+const voiceStageCompactRule = voiceCss.match(/\.voice-stage--size-compact\s*\{[^}]+\}/u)?.[0] ?? '';
+const voiceStageExpandedRule = voiceCss.match(/\.voice-stage--size-expanded\s*\{[^}]+\}/u)?.[0] ?? '';
+const voiceStageDockBundle = `${voiceStageDockRule}\n${voiceStageCompactRule}\n${voiceStageExpandedRule}`;
 
 test('reflows participant tiles and exposes their actions at 400% short zoom', async ({ page }) => {
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
@@ -320,7 +324,7 @@ test('docks the video tray without covering the chat feed', async ({ page }) => 
   await page.setContent(`
     <!doctype html>
     <main class="conversation">
-      <section class="voice-stage" aria-label="Voice call participants">
+      <section class="voice-stage voice-stage--video voice-stage--size-compact" aria-label="Voice call participants">
         <div class="voice-stage__grid" data-count="1">
           <article class="voice-tile">Video preview</article>
         </div>
@@ -355,7 +359,7 @@ test('docks the video tray without covering the chat feed', async ({ page }) => 
       .conversation { display: flex; flex-direction: column; height: 720px; overflow: hidden; }
       .message-feed { flex: 1; min-height: 0; overflow: auto; background: #08121d; }
       .composer { flex: none; height: 56px; }
-      ${voiceStageDockRule}
+      ${voiceStageDockBundle}
     `,
   });
 
@@ -375,7 +379,8 @@ test('docks the video tray without covering the chat feed', async ({ page }) => 
 
   expect(geometry.stageBottom).toBeLessThanOrEqual(geometry.feedTop);
   expect(geometry.feedBottom).toBeLessThanOrEqual(geometry.composerTop);
-  expect(geometry.stageHeight).toBeLessThanOrEqual(800 * 0.42);
+  // Compact default must stay a small tray, not a half-viewport video panel.
+  expect(geometry.stageHeight).toBeLessThanOrEqual(200);
   expect(geometry.feedHeight).toBeGreaterThan(260);
   await expect(page.getByRole('region', { name: 'Message history' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Message channel' })).toBeVisible();
@@ -386,7 +391,7 @@ test('keeps chat usable in a compact desktop conversation', async ({ page }) => 
   await page.setContent(`
     <!doctype html>
     <main class="conversation">
-      <section class="voice-stage" aria-label="Voice call participants">Starting video</section>
+      <section class="voice-stage voice-stage--audio voice-stage--size-compact" aria-label="Voice call participants">Starting voice</section>
       <section class="message-feed" aria-label="Message history">Visible chat</section>
       <form class="composer"><input aria-label="Message channel"></form>
     </main>
@@ -399,7 +404,7 @@ test('keeps chat usable in a compact desktop conversation', async ({ page }) => 
       .conversation { display: flex; flex-direction: column; height: 395px; overflow: hidden; }
       .message-feed { flex: 1; min-height: 0; overflow: auto; }
       .composer { flex: none; height: 56px; }
-      ${voiceStageDockRule}
+      ${voiceStageDockBundle}
     `,
   });
 

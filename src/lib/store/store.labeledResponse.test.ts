@@ -276,6 +276,39 @@ describe('labeled-response outbox flush', () => {
     expect(store.getState().toasts.some((t) => t.title === 'Message not delivered')).toBe(true);
   });
 
+  it('humanizes mesh TEMPORARILY_UNAVAILABLE FAIL after outbox flush and drops the row', async () => {
+    store.setState({ connectionStatus: 'disconnected', client: null });
+    store.getState().sendMessage('#room', 'queued mesh fail');
+    await until(async () => (await loadOutbox()).length === 1);
+    const [entry] = await loadOutbox();
+    const placeholderId = `outbox:${entry!.id}`;
+
+    const client = mockClient(['labeled-response', 'echo-message', 'batch']);
+    store.setState({
+      connectionStatus: 'connected',
+      client: client as never,
+      outboxDeliveryFailed: false,
+    });
+    store.getState().flushOutbox();
+    await until(() => client.send.mock.calls.length > 0);
+    await until(async () => (await loadOutbox()).length === 0);
+
+    const wire = String(client.send.mock.calls[0]?.[0] ?? '');
+    const label = labelFromWire(wire);
+    expect(messages()[0]?.id).toBe(placeholderId);
+    expect(messages()[0]?.pending).toBe(true);
+
+    feed(
+      `@label=${label} FAIL PRIVMSG TEMPORARILY_UNAVAILABLE :Mesh durable admit failed; message not sent — check mesh peers and retry`,
+    );
+
+    expect(messages()).toHaveLength(0);
+    const toast = store.getState().toasts.find((t) => t.title === 'Message not delivered');
+    expect(toast?.description).toMatch(/mesh peers|not sent/i);
+    // Wire-admitted FAIL is terminal for this row — not a durable outbox retry flag.
+    expect(store.getState().outboxDeliveryFailed).toBe(false);
+  });
+
   it('keeps durable outbox + pending UI when socket admission fails under labeled-response', async () => {
     store.setState({ connectionStatus: 'disconnected', client: null });
     store.getState().sendMessage('#room', 'stuck admission');
@@ -308,6 +341,40 @@ describe('labeled-response FAIL / batch / hostile', () => {
     feed(`@label=${label} FAIL PRIVMSG NEEDREGGEDNICK :You need to be logged in`);
     expect(messages()).toHaveLength(0);
     expect(store.getState().toasts.some((t) => t.title === 'Message not delivered')).toBe(true);
+  });
+
+  it('surfaces mesh durable-admit FAIL with operator-actionable toast copy', () => {
+    const client = clientOf();
+    store.getState().sendMessage('#room', 'mesh busy');
+    const wire = String(client.send.mock.calls[0]?.[0] ?? '');
+    const label = labelFromWire(wire);
+
+    feed(
+      `@label=${label} FAIL PRIVMSG TEMPORARILY_UNAVAILABLE :Mesh durable admit failed; message not sent — check mesh peers and retry`,
+    );
+    expect(messages()).toHaveLength(0);
+    const toast = store.getState().toasts.find((t) => t.title === 'Message not delivered');
+    expect(toast?.description).toMatch(/mesh peers|not sent/i);
+  });
+
+  it('toasts unlabeled messaging TEMPORARILY_UNAVAILABLE with humanized copy', () => {
+    feed(
+      'FAIL PRIVMSG TEMPORARILY_UNAVAILABLE :Mesh durable admit failed; message not sent — check mesh peers and retry',
+    );
+    const toast = store.getState().toasts.find((t) => t.title === 'Message not delivered');
+    expect(toast?.description).toMatch(/mesh peers|not sent/i);
+  });
+
+  it('falls back to clear copy when TEMPORARILY_UNAVAILABLE has no description', () => {
+    const client = clientOf();
+    store.getState().sendMessage('#room', 'empty fail desc');
+    const wire = String(client.send.mock.calls[0]?.[0] ?? '');
+    const label = labelFromWire(wire);
+
+    feed(`@label=${label} FAIL PRIVMSG TEMPORARILY_UNAVAILABLE`);
+    expect(messages()).toHaveLength(0);
+    const toast = store.getState().toasts.find((t) => t.title === 'Message not delivered');
+    expect(toast?.description).toMatch(/temporarily unavailable|not sent|retry/i);
   });
 
   it('resolves via a labeled-response batch that wraps the self-echo', () => {

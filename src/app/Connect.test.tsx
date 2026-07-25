@@ -110,7 +110,7 @@ function nickField(): HTMLElement {
 describe('Connect screen rendering', () => {
   it('renders the connect screen heading', () => {
     render(() => <Connect />);
-    expect(screen.getByRole('heading', { name: /connect/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /enter onyx/i })).toBeInTheDocument();
   });
 
   it('does not expose a server picker or any node hostnames', () => {
@@ -151,16 +151,15 @@ describe('Connect screen rendering', () => {
     expect(screen.getByRole('tab', { name: /register/i })).toBeInTheDocument();
   });
 
-  it('surfaces the account claim path and jumps to registration', () => {
+  it('explains what each arrival mode keeps and where it lands', () => {
     render(() => <Connect />);
-    const claim = screen.getByRole('region', { name: 'Claim path' });
-    expect(within(claim).getByText('Guest nick')).toBeInTheDocument();
-    expect(within(claim).getByText('Registered account')).toBeInTheDocument();
-    expect(within(claim).getByText('Recovery email')).toBeInTheDocument();
-    expect(within(claim).getByText('Device login')).toBeInTheDocument();
+    const summary = screen.getByRole('region', { name: /arrive without an account/i });
+    expect(within(summary).getByText('Guest identity')).toBeInTheDocument();
+    expect(within(summary).getByText('Home')).toBeInTheDocument();
 
-    fireEvent.click(within(claim).getByRole('button', { name: 'Register' }));
-    expect(screen.getByRole('tab', { name: /register/i })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('tab', { name: /register/i }));
+    expect(screen.getByRole('region', { name: /claim a name on onyx/i })).toBeInTheDocument();
+    expect(screen.getByText('Home after verification')).toBeInTheDocument();
   });
 
   it('defaults to Guest mode', () => {
@@ -181,6 +180,7 @@ describe('Connect screen rendering', () => {
   it('renders the stay signed in toggle in Guest mode', () => {
     render(() => <Connect />);
     expect(screen.getByRole('switch')).toBeInTheDocument();
+    expect(screen.getByText(/does not reserve your nick or create an account/i)).toBeInTheDocument();
   });
 
   it('renders the connect button', () => {
@@ -504,8 +504,8 @@ describe('Passkey sign-in', () => {
     const button = openPasskeySignIn();
 
     fireEvent.click(button);
-    const claim = screen.getByRole('region', { name: 'Claim path' });
-    fireEvent.click(within(claim).getByRole('button', { name: 'Register' }));
+    const arrival = screen.getByRole('region', { name: /resume your onyx identity/i });
+    fireEvent.click(within(arrival).getByRole('button', { name: /create an account instead/i }));
 
     expect(disconnectSpy).toHaveBeenCalledTimes(1);
     store.setState({ status: 'connected', connectionStatus: 'connected' });
@@ -1497,6 +1497,30 @@ describe('View gating on connectionStatus', () => {
     await waitFor(() =>
       expect(screen.getByTestId('conn-status')).toHaveTextContent(/password was not accepted/i)
     );
+    connectSpy.mockRestore();
+  });
+
+  it('routes a rejected registered guest nick into sign-in without changing the nick', async () => {
+    render(() => <Connect />);
+    fireEvent.input(nickField(), { target: { value: 'alice' } });
+
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ connectionStatus: 'connecting' });
+      setTimeout(() => {
+        getState().addNotification({
+          type: 'error',
+          text: 'That nickname is registered. Sign in as its account before using it.',
+        });
+        store.setState({ connectionStatus: 'disconnected' });
+      }, 0);
+    });
+    fireEvent.submit(document.querySelector('form')!);
+
+    const guard = await screen.findByTestId('conn-auth-required');
+    expect(screen.getByTestId('conn-status')).toHaveTextContent(/belongs to an account/i);
+    fireEvent.click(within(guard).getByRole('button', { name: /sign in as alice/i }));
+    expect(screen.getByRole('tab', { name: /sign in/i })).toHaveAttribute('aria-selected', 'true');
+    expect(nickField()).toHaveValue('alice');
     connectSpy.mockRestore();
   });
 });

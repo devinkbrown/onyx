@@ -199,11 +199,38 @@ export function mountMedia(): void {
       const safeNick = validMediaNick(nick) ? nick : '';
       const safeChannel = validMediaChannel(channel) ? channel : null;
       // Fresh call → re-arm R5 decode toasts for new peers/sessions.
-      if (state === 'idle') _decodeFailureAnnounced.clear();
+      if (state === 'idle') {
+        _decodeFailureAnnounced.clear();
+        // Full UI teardown. Engine setIdle used to only clear callState/channel,
+        // leaving callStartedAt/localStream half-set so the stage flickered or
+        // re-opened empty then vanished again.
+        getState().setVoiceCallState({
+          callState: 'idle',
+          callWith: '',
+          callChannel: null,
+          callStartedAt: null,
+          localStream: null,
+          cameraOn: false,
+          cameraStream: null,
+          screenshareActive: false,
+          screenshareStream: null,
+          peers: new Map(),
+          videoParticipants: new Map(),
+          pinnedParticipant: null,
+          handRaised: false,
+          raisedHands: new Set<string>(),
+          stageSize: 'compact',
+        });
+        return;
+      }
+      // Never wipe an established callChannel with null — setCallState('in_call',
+      // '', room) is fine, but a partial callback with an unvalidated channel
+      // must not make viewingCall() false and unmount the stage mid-call.
+      const prevChannel = getState().voice.callChannel;
       getState().setVoiceCallState({
         callState: state,
         callWith: safeNick,
-        callChannel: safeChannel,
+        callChannel: safeChannel ?? prevChannel,
       });
     },
 
