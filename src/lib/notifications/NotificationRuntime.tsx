@@ -20,6 +20,8 @@ import {
   ENCRYPTED_NOTIFICATION_BODY,
   notificationBodyFor,
 } from './notificationBody';
+import { matchesSmartMute } from './smartMute';
+import { loadSmartMute } from './smartMuteMemory';
 
 const DESKTOP_THROTTLE_MS = 6000;
 const SOUND_THROTTLE_MS = 1500;
@@ -86,6 +88,24 @@ function isNotificationDndActive(): boolean {
   if (state.dndEnabled) return true;
   if (state.dndUntil !== null && Date.now() < state.dndUntil) return true;
   return state.isDndActive();
+}
+
+/**
+ * Smart mute + ignore list for the notify decision. Fail open (not muted) when
+ * owner scope is missing so a logged-out tab does not invent mute rules.
+ */
+function isSmartMutedNote(note: StoreNotification, state: OnyxState): boolean {
+  const from = note.from ?? '';
+  if (from && state.isIgnored(from)) return true;
+  const owner = selectDeviceMemoryOwner(state);
+  if (!owner) return false;
+  const rules = loadSmartMute(owner);
+  const body = typeof note.text === 'string' ? note.text : '';
+  return matchesSmartMute(rules, {
+    text: body,
+    from,
+    kind: note.type,
+  });
 }
 
 function focusApp(): void {
@@ -243,6 +263,7 @@ export function NotificationRuntime(): null {
         kind: newest.type,
         isSelf: !!newest.from && newest.from.toLowerCase() === state.ourNick.toLowerCase(),
         muted: false,
+        smartMuted: isSmartMutedNote(newest, state),
         pushEnabled: state.pushNotificationsEnabled,
         soundEnabled: false,
         dnd: isNotificationDndActive(),
@@ -313,6 +334,7 @@ export function NotificationRuntime(): null {
         kind: note.type,
         isSelf: !!note.from && note.from.toLowerCase() === state.ourNick.toLowerCase(),
         muted: false,
+        smartMuted: isSmartMutedNote(note, state),
         pushEnabled: state.pushNotificationsEnabled,
         soundEnabled: state.soundEnabled,
         dnd: isNotificationDndActive(),

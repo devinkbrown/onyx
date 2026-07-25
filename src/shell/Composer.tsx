@@ -33,6 +33,7 @@ import {
   type SlashCommand,
 } from '@/lib/commands/registry';
 import { UploadError, uploadFile } from '@/lib/upload/upload';
+import { buildAttachmentMessage } from '@/lib/upload/attachmentMessage';
 import {
   SCHEDULE_PRESETS,
   isSchedulable,
@@ -714,7 +715,24 @@ export function Composer(props: ComposerProps): JSX.Element {
       ) return;
 
       const baseContent = expandSlashTextCommand(text().trim());
-      const content = [baseContent, ...urls].filter(Boolean).join('\n').trim();
+      // Prefer safe attachment lines (caption + [file: name] url) over bare URLs.
+      const attachmentLines: string[] = [];
+      for (let i = 0; i < urls.length; i += 1) {
+        const url = urls[i]!;
+        const item = attachments().find((a) => a.uploadedUrl === url) ?? attachments()[i];
+        const line = buildAttachmentMessage({
+          url,
+          name: item?.file.name,
+          caption: i === 0 ? baseContent || undefined : undefined,
+        });
+        if (line) attachmentLines.push(line);
+        else attachmentLines.push(url);
+      }
+      const content = (
+        attachmentLines.length > 0
+          ? attachmentLines.join('\n')
+          : baseContent
+      ).trim();
       if (!content) return;
 
       // Real IRC commands are intentionally never replayed from the offline

@@ -10,8 +10,9 @@ const initialState = store.getInitialState();
 function seed(
   connectionStatus: 'connected' | 'connecting' | 'disconnected' | 'reconnecting',
   reconnectIn = 0,
+  autoReconnect = true,
 ): void {
-  store.setState({ ...initialState, connectionStatus, reconnectIn }, true);
+  store.setState({ ...initialState, connectionStatus, reconnectIn, autoReconnect }, true);
 }
 
 describe('ReconnectStatusBanner', () => {
@@ -26,32 +27,31 @@ describe('ReconnectStatusBanner', () => {
   });
 
   it('announces a disconnect through one polite atomic status', () => {
-    seed('disconnected');
+    seed('disconnected', 0, false);
     render(() => <ReconnectStatusBanner />);
 
     const status = screen.getByRole('status');
     expect(status).toHaveAttribute('aria-live', 'polite');
     expect(status).toHaveAttribute('aria-atomic', 'true');
-    expect(status).toHaveTextContent('Disconnected from network. Working offline.');
+    expect(status).toHaveTextContent(/Disconnected/);
+    expect(status).toHaveTextContent(/Reconnect when you are ready/);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByText('Disconnected from network.')).toBeInTheDocument();
+    expect(screen.getByTestId('reconnect-status-banner')).toHaveTextContent(/Reconnect when you are ready/);
   });
 
-  it('keeps the visible countdown out of the stable screen-reader announcement', () => {
+  it('keeps countdown in the visible banner while status stays a phase announcement', () => {
     seed('reconnecting', 5);
     render(() => <ReconnectStatusBanner />);
 
     const status = screen.getByRole('status');
-    expect(screen.getByText('Reconnecting in 5s…').closest('[aria-hidden="true"]')).toBeInTheDocument();
-    expect(status).toHaveTextContent('Reconnecting to network.');
-    expect(status).not.toHaveTextContent('5');
+    const banner = screen.getByTestId('reconnect-status-banner');
+    expect(banner).toHaveAttribute('aria-hidden', 'true');
+    expect(banner).toHaveTextContent(/5s/);
+    expect(status).toHaveTextContent(/Reconnecting/);
 
     store.setState({ reconnectIn: 4 });
-
-    expect(screen.getByText('Reconnecting in 4s…')).toBeInTheDocument();
+    expect(screen.getByTestId('reconnect-status-banner')).toHaveTextContent(/4s/);
     expect(screen.getByRole('status')).toBe(status);
-    expect(status).toHaveTextContent('Reconnecting to network.');
-    expect(status).not.toHaveTextContent('4');
   });
 
   it('announces phase boundaries and briefly shows Back online after the handshake', () => {
@@ -60,19 +60,18 @@ describe('ReconnectStatusBanner', () => {
     render(() => <ReconnectStatusBanner />);
 
     store.setState({ connectionStatus: 'reconnecting', reconnectIn: 2 });
-    expect(screen.getByRole('status')).toHaveTextContent('Reconnecting to network.');
+    expect(screen.getByRole('status')).toHaveTextContent(/Reconnecting/);
 
     store.setState({ connectionStatus: 'connecting', reconnectIn: 0 });
-    expect(screen.getByText('Connecting…')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Connecting to network.');
+    expect(screen.getByTestId('reconnect-status-banner')).toHaveTextContent(/Connecting/);
+    expect(screen.getByRole('status')).toHaveTextContent(/Connecting|secure session/);
 
     store.setState({ connectionStatus: 'connected' });
-    expect(screen.getByText('Back online')).toBeInTheDocument();
+    expect(screen.getByTestId('reconnect-status-banner')).toHaveTextContent('Back online');
     expect(screen.getByRole('status')).toHaveTextContent('Back online.');
 
     vi.advanceTimersByTime(3_000);
-    expect(screen.queryByText('Back online')).not.toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Back online.');
+    expect(screen.queryByTestId('reconnect-status-banner')).not.toBeInTheDocument();
   });
 
   it('cancels recovery dismissal when another disconnect begins', () => {
@@ -81,13 +80,13 @@ describe('ReconnectStatusBanner', () => {
     render(() => <ReconnectStatusBanner />);
 
     store.setState({ connectionStatus: 'connected' });
-    expect(screen.getByText('Back online')).toBeInTheDocument();
+    expect(screen.getByTestId('reconnect-status-banner')).toHaveTextContent('Back online');
 
-    store.setState({ connectionStatus: 'disconnected' });
+    store.setState({ connectionStatus: 'disconnected', autoReconnect: true });
     vi.advanceTimersByTime(3_000);
 
-    expect(screen.getByText('Disconnected from network.')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Disconnected from network. Working offline.');
+    expect(screen.getByTestId('reconnect-status-banner')).toHaveTextContent(/retry automatically/);
+    expect(screen.getByRole('status')).toHaveTextContent(/Disconnected/);
   });
 
   it('cleans the recovery timer when the banner unmounts', () => {

@@ -56,6 +56,7 @@ import { OperEventConsole } from '@/shell/OperEventConsole';
 import { PortableIdentitySection } from '@/shell/PortableIdentitySection';
 import { CapabilityMatrixSection } from '@/shell/CapabilityMatrixSection';
 import { ChannelOrganizationSection } from '@/shell/ChannelOrganizationSection';
+import { SmartMuteSection } from '@/shell/SmartMuteSection';
 import { ModalShell } from '@/primitives/index';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
@@ -865,6 +866,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           <OperEventConsole />
           <CapabilityMatrixSection />
           <ChannelOrganizationSection owner={memoryOwner()} />
+          <SmartMuteSection owner={memoryOwner()} />
           <PortableIdentitySection
             owner={memoryOwner()}
             networkHint={networkName() || undefined}

@@ -61,6 +61,7 @@ import {
   type CallSecurityIcon,
 } from '@/lib/cadence-media/callSecurity';
 import { resolveCallPrivacy } from '@/lib/cadence-media/callPrivacy';
+import { sfuCascadeView } from '@/lib/media/sfuCascade';
 import {
   advanceConnectionQualityAction,
   connectionQualityActionCopy,
@@ -235,6 +236,19 @@ function CallPrivacySheet(props: {
                   {d.serverCanAccessMedia
                     ? 'Encrypted to this server — operators can access call media.'
                     : 'End-to-end — only people in this call can hear or see.'}
+                </dd>
+              </div>
+              <div class="voice-privacy__fact">
+                <dt>SFU topology</dt>
+                <dd data-testid="call-privacy-sfu-cascade">
+                  {sfuCascadeView({
+                    localSfu: true,
+                    remoteForwarders: 0,
+                    known: true,
+                  }).label}
+                  <span class="voice-privacy__hint">
+                    {' '}— {sfuCascadeView({ localSfu: true, remoteForwarders: 0, known: true }).detail}
+                  </span>
                 </dd>
               </div>
               <div class="voice-privacy__fact">

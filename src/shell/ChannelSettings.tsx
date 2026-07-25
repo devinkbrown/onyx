@@ -67,6 +67,11 @@ import {
 } from '@/lib/interop/bridgeStatus';
 import { Button, FormField, Sheet, toast } from '@/primitives/index';
 import { buildInviteLink } from '@/lib/invite/inviteLink';
+import {
+  encryptionPolicyBadge,
+  parseEncryptionPolicy,
+  withEncryptionPolicyParam,
+} from '@/lib/invite/encryptionPolicyBadge';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { BridgeStatusBadge } from './BridgeStatusBadge';
 import { RoomInsightsStrip } from './RoomInsightsStrip';
@@ -244,12 +249,20 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     ),
   );
 
+  const inviteE2eeBadge = createMemo(() =>
+    encryptionPolicyBadge(parseEncryptionPolicy(encryptionPolicy())),
+  );
+
+  const inviteShareUrl = createMemo(() =>
+    withEncryptionPolicyParam(inviteLink().shareUrl, inviteE2eeBadge().policy),
+  );
+
   const inviteShareData = createMemo<ShareData>(() => ({
     title: `${inviteLink().card.channel ?? networkName()} on ${networkName()}`,
     text: inviteLink().hasChannel
-      ? `Join ${inviteLink().card.channel} on ${networkName()}.`
+      ? `Join ${inviteLink().card.channel} on ${networkName()} (${inviteE2eeBadge().chip}).`
       : `Join ${networkName()} in Onyx.`,
-    url: inviteLink().shareUrl,
+    url: inviteShareUrl(),
   }));
   const canShareInvite = createMemo(() => {
     if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return false;
@@ -301,7 +314,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   async function copyInviteLink(): Promise<void> {
     if (copyBusy() || shareBusy()) return;
     const epoch = ++copyEpoch;
-    const url = inviteLink().shareUrl;
+    const url = inviteShareUrl();
     setCopyBusy(true);
     try {
       const copied = await writeClipboardText(url);
@@ -649,8 +662,20 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
           </form>
 
           <div class="shell-chset-readonly">
+            <p class="shell-chset-readonly-label">Encryption on invite</p>
+            <p
+              class="shell-chset-readonly-value"
+              data-testid="invite-e2ee-badge"
+              data-e2ee-policy={inviteE2eeBadge().policy}
+            >
+              {inviteE2eeBadge().chip}
+              <span class="shell-chset-hint"> — {inviteE2eeBadge().label}</span>
+            </p>
+          </div>
+
+          <div class="shell-chset-readonly">
             <p class="shell-chset-readonly-label">Shareable link</p>
-            <p class="shell-chset-readonly-value shell-chset-modes-mono">{inviteLink().shareUrl}</p>
+            <p class="shell-chset-readonly-value shell-chset-modes-mono">{inviteShareUrl()}</p>
           </div>
 
           <div class="shell-chset-inline-actions">
