@@ -31,6 +31,7 @@ import {
 import { useStore, getState, selectIsChannelOp } from '@/lib/store';
 import type { ChannelUser } from '@/lib/irc/types';
 import { createGroupReconciler, type ResolvedRole } from '@/lib/memberGroups';
+import { formatMentionInsert } from '@/lib/composer/composerInject';
 import { Avatar, Popover, Button, IconButton } from '@/primitives/index';
 
 // Role resolution, grouping, and identity-stable reconciliation live in
@@ -122,6 +123,20 @@ function MemberCard(props: MemberCardProps): JSX.Element {
       return;
     }
     getState().navigate({ kind: 'dm', nick: local.user.nick });
+  }
+
+  function handleMention(): void {
+    const insert = formatMentionInsert(local.user.nick);
+    if (!insert) return;
+    getState().injectComposerText(local.channel, insert, 'append');
+    getState().addToast({
+      variant: 'info',
+      title: `Mention ${local.user.nick}`,
+      description: 'Inserted into the composer for this channel.',
+    });
+    queueMicrotask(() => {
+      document.querySelector<HTMLElement>('[data-composer-input]')?.focus();
+    });
   }
 
   function handleWhois(event: MouseEvent): void {
@@ -219,6 +234,15 @@ function MemberCard(props: MemberCardProps): JSX.Element {
           aria-label={`Send DM to ${local.user.nick}`}
         >
           Message
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleMention}
+          data-testid="member-card-mention"
+          aria-label={`Mention ${local.user.nick} in the composer`}
+        >
+          Mention
         </Button>
         <Button
           variant="ghost"

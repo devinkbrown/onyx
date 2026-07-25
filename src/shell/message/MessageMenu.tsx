@@ -44,6 +44,7 @@ import {
 import { isValidTopicLabel } from '@/lib/topics/topics';
 import { openMessageSearchWithQuery } from '@/shell/search/useMessageSearch';
 import { hasEncryptedMessageBoundary } from '@/lib/e2ee/replyPrivacy';
+import { formatQuoteInsert } from '@/lib/composer/composerInject';
 import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
 import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
 import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, SearchIcon, TopicIcon, TranslateIcon, TrashIcon } from './icons';
@@ -70,6 +71,8 @@ export type MessageMenuCapabilities = {
   canDelete: boolean;
   /** Ignore this nick on this device (not self, not empty). */
   canIgnore: boolean;
+  /** Quote body into the composer (readable text present). */
+  canQuote: boolean;
 };
 
 export type CapabilityInput = {
@@ -120,6 +123,7 @@ export function messageMenuCapabilities(input: CapabilityInput): MessageMenuCapa
       && !hasEncryptedMessageBoundary(msg),
     canDelete: !gone && !msg.pending && isOwn && deleteSupported,
     canIgnore: !gone && !isOwn && typeof msg.from === 'string' && msg.from.trim().length > 0,
+    canQuote: hasText,
   };
 }
 
@@ -801,6 +805,33 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
               >
                 <CopyIcon class="msg-menu-item-icon" />
                 <span>Copy text</span>
+              </button>
+            </Show>
+            <Show when={caps().canQuote}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                data-testid="msg-menu-quote"
+                aria-label={`Quote ${messageActionTarget()} in composer`}
+                onClick={() => {
+                  const source = actionText();
+                  if (!source) return;
+                  const insert = formatQuoteInsert(local.msg.from, source);
+                  getState().injectComposerText(local.target, insert, 'prefix');
+                  getState().addToast({
+                    variant: 'info',
+                    title: 'Quoted into composer',
+                    description: `Prefixed a quote from ${local.msg.from}.`,
+                  });
+                  local.onMenuOpenChange?.(false);
+                  queueMicrotask(() => {
+                    document.querySelector<HTMLElement>('[data-composer-input]')?.focus();
+                  });
+                }}
+              >
+                <span class="msg-menu-item-icon" aria-hidden="true">❝</span>
+                <span>Quote in composer</span>
               </button>
             </Show>
             <Show when={caps().canCopyMoment}>

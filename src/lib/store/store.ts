@@ -92,6 +92,7 @@ import {
   sanitizePersistedReplyPreviewText,
 } from '@/lib/e2ee/replyPrivacy';
 import { activeReplyForTarget } from '@/lib/composer/messageContext';
+import { mergeComposerInsert } from '@/lib/composer/composerInject';
 import { removeMessageReactor, toggleMessageReactions } from '@/lib/reactions/toggleReaction';
 import { openDmTrusted, peerSafetyNumber, pinnedPeerKey, pinPeerKey, safetyNumber, sealDmTrustedToDevices } from '@/lib/e2ee/keyPinning';
 import {
@@ -1026,6 +1027,21 @@ export interface OnyxState {
   setComposerDraft(target: string, text: string): void;
   clearComposerDraft(target: string): void;
   setComposerEditingMessage(msg: ChatMessage | null): void;
+  /**
+   * One-shot composer inject (Quote / Mention). Composer applies when
+   * `seq` advances for the matching target, then clears.
+   */
+  composerInject: {
+    seq: number;
+    target: string;
+    text: string;
+    mode: 'append' | 'prefix' | 'replace';
+  } | null;
+  injectComposerText(
+    target: string,
+    text: string,
+    mode?: 'append' | 'prefix' | 'replace',
+  ): void;
 
   // ── Thread Panel ──────────────────────────────────────────────────────
   showThreadPanel: boolean;
@@ -5475,6 +5491,7 @@ export const store = createStore<OnyxState>()(
     // soon as registration establishes a server/account context.
     composerDrafts: {},
     editingMessage: null,
+    composerInject: null,
     editHistory: {},
     replyingTo: null,
     typingUsers: new Map(),
@@ -8046,6 +8063,27 @@ export const store = createStore<OnyxState>()(
 
     clearComposerDraft(target) {
       get().setComposerDraft(target, '');
+    },
+
+    injectComposerText(target, text, mode = 'append') {
+      const key = composerDraftKey(target);
+      if (!key || !text) return;
+      // Merge into the persisted draft immediately so the insert survives if the
+      // composer is on another target or not mounted yet.
+      const current = get().getComposerDraft(key);
+      const merged = mergeComposerInsert(current, text, mode);
+      get().setComposerDraft(key, merged.text);
+      const prev = get().composerInject;
+      const seq = (prev?.seq ?? 0) + 1;
+      set({
+        composerInject: {
+          seq,
+          target: key,
+          // Composer reloads the full draft (replace) so local textarea matches.
+          text: merged.text,
+          mode: 'replace',
+        },
+      });
     },
 
     setComposerEditingMessage(msg) {

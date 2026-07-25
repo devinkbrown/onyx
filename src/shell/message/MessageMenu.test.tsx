@@ -84,6 +84,7 @@ describe('messageMenuCapabilities', () => {
       canEdit: true,
       canDelete: true,
       canIgnore: false,
+      canQuote: true,
     });
   });
 
@@ -104,6 +105,7 @@ describe('messageMenuCapabilities', () => {
     expect(caps.canEdit).toBe(false);
     expect(caps.canDelete).toBe(false);
     expect(caps.canIgnore).toBe(true);
+    expect(caps.canQuote).toBe(true);
   });
 
   it('disables every live-message action once a message is deleted', () => {
@@ -1097,7 +1099,7 @@ describe('<MessageMenu>', () => {
     // Roving tabindex: only the focused item is in the Tab sequence.
     expect(firstItem).toHaveAttribute('tabindex', '0');
     expect(
-      screen.getByRole('menuitem', { name: 'Copy moment link for message from alice' }),
+      screen.getByRole('menuitem', { name: 'Quote message from alice in composer' }),
     ).toHaveAttribute('tabindex', '-1');
   });
 
@@ -1117,7 +1119,7 @@ describe('<MessageMenu>', () => {
 
     const menu = screen.getByRole('menu', { name: 'More actions for message from alice' });
     const first = screen.getByRole('menuitem', { name: 'Copy text from message from alice' });
-    const second = screen.getByRole('menuitem', { name: 'Copy moment link for message from alice' });
+    const second = screen.getByRole('menuitem', { name: 'Quote message from alice in composer' });
     const last = screen.getByRole('menuitem', { name: 'Delete message from alice for everyone' });
 
     await waitFor(() => expect(document.activeElement).toBe(first));

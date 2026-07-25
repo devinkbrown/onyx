@@ -74,6 +74,10 @@ already-merged main-tree wave. Server repo untouched (client-only integrate).
 | Message menu: toggle Unignore when already ignored | **SHIPPED** |
 | `/ignore` with no args lists current device ignore list | **SHIPPED** |
 | Channel settings: Leave channel (confirm + PART) | **SHIPPED** |
+| Sidebar filter for channels & DMs | **SHIPPED** |
+| Message menu: Quote in composer | **SHIPPED** |
+| Member card: Mention into composer | **SHIPPED** |
+| Composer inject path (store one-shot) | **SHIPPED** |
 
 ## See also
 

@@ -24,7 +24,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
-import { useStore, getState, selectDeviceMemoryOwner, selectOwnedScheduledMessageCount } from '@/lib/store';
+import { useStore, getState, setState, selectDeviceMemoryOwner, selectOwnedScheduledMessageCount } from '@/lib/store';
 import { searchEmojis } from '@/lib/emoji/emoji';
 import {
   completeSlashCommand,
@@ -33,6 +33,8 @@ import {
   type SlashCommand,
 } from '@/lib/commands/registry';
 import { cycleNickCompletion, nickTokenAt } from '@/lib/composer/nickComplete';
+import { mergeComposerInsert } from '@/lib/composer/composerInject';
+import { composerDraftKey } from '@/lib/composer/drafts';
 import { UploadError, uploadFile } from '@/lib/upload/upload';
 import { buildAttachmentMessage } from '@/lib/upload/attachmentMessage';
 import {
@@ -362,6 +364,7 @@ export function Composer(props: ComposerProps): JSX.Element {
   let loadedTarget: string | null = null;
   let loadedEditId: string | null = null;
   let focusedReplyId: string | null = null;
+  let appliedInjectSeq = 0;
   createEffect(() => {
     const t = target();
     const edit = activeEditing();
@@ -388,6 +391,25 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (t !== loadedTarget) {
       loadedTarget = t;
       setComposerText(t ? getState().getComposerDraft(t) : '', false);
+    }
+  });
+
+  // One-shot Quote / Mention inject from message menu or member card.
+  // Store already merged+persisted the draft; here we sync the live textarea.
+  const composerInject = useStore((s) => s.composerInject);
+  createEffect(() => {
+    const inj = composerInject();
+    if (!inj || inj.seq <= appliedInjectSeq) return;
+    const t = target();
+    if (!t || activeEditing()) return;
+    const key = composerDraftKey(t);
+    if (!key || key !== inj.target) return;
+    appliedInjectSeq = inj.seq;
+    const merged = mergeComposerInsert('', inj.text, 'replace');
+    setComposerText(merged.text, false); // already persisted by injectComposerText
+    focusTextarea(merged.caret);
+    if (getState().composerInject?.seq === inj.seq) {
+      setState({ composerInject: null });
     }
   });
 

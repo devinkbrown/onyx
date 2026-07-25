@@ -23,6 +23,7 @@ import {
 import { useStore, getState, selectDeviceMemoryOwner } from '@/lib/store';
 import type { Channel } from '@/lib/irc/types';
 import type { ActiveView, ChannelFolder, DMConversation } from '@/lib/store/store';
+import { filterSidebarNames, matchesSidebarQuery } from '@/lib/channel/sidebarFilter';
 import { NotificationControls } from './NotificationControls';
 
 export type ChannelSidebarProps = {
@@ -231,11 +232,16 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     return raw.startsWith('#') ? raw : `#${raw}`;
   });
 
+  // ── sidebar filter (channels + DMs) ──
+  const [listFilter, setListFilter] = createSignal('');
+  const filterActive = createMemo(() => listFilter().trim().length > 0);
+
   // ── sorted channel list (alpha base; stars + folders layer on top) ──
   const sortedChannels = createMemo(() => {
     const entries: Channel[] = [];
     channels().forEach((ch) => entries.push(ch));
-    return entries.sort((a, b) => a.name.localeCompare(b.name));
+    const sorted = entries.sort((a, b) => a.name.localeCompare(b.name));
+    return filterSidebarNames(sorted, listFilter(), (ch) => ch.name);
   });
 
   const channelByName = createMemo(() => {
@@ -310,7 +316,13 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   const sortedDms = createMemo(() => {
     const entries: DMConversation[] = [];
     dms().forEach((dm) => entries.push(dm));
-    return entries.sort((a, b) => a.nick.localeCompare(b.nick));
+    const sorted = entries.sort((a, b) => a.nick.localeCompare(b.nick));
+    return filterSidebarNames(sorted, listFilter(), (dm) => dm.nick);
+  });
+
+  const filterEmpty = createMemo(() => {
+    if (!filterActive()) return false;
+    return sortedChannels().length === 0 && sortedDms().length === 0;
   });
 
   // ── roving tab stop ──
@@ -503,6 +515,39 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         <NotificationControls />
       </div>
 
+      <div class="shell-sidebar-filter" role="search">
+        <label class="sr-only" for="sidebar-filter-input">Filter channels and DMs</label>
+        <input
+          id="sidebar-filter-input"
+          class="shell-sidebar-filter-input"
+          type="search"
+          data-testid="sidebar-filter"
+          placeholder="Filter channels & DMs"
+          autocomplete="off"
+          spellcheck={false}
+          value={listFilter()}
+          onInput={(e) => setListFilter(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' && listFilter()) {
+              e.preventDefault();
+              e.stopPropagation();
+              setListFilter('');
+            }
+          }}
+        />
+        <Show when={filterActive()}>
+          <button
+            type="button"
+            class="shell-sidebar-filter-clear"
+            data-testid="sidebar-filter-clear"
+            aria-label="Clear filter"
+            onClick={() => setListFilter('')}
+          >
+            Clear
+          </button>
+        </Show>
+      </div>
+
       {/* Scrollable list */}
       <div
         class="shell-sidebar-scroll"
@@ -510,25 +555,33 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         aria-label="Channels and direct messages"
         onKeyDown={handleListKeyDown}
       >
-        {/* Server / status entry — always present, read-only server buffer */}
-        <div class="shell-sidebar-section">
-          <ul class="shell-channel-list" role="list">
-            <li>
-              <button
-                type="button"
-                data-sidebar-item
-                tabindex={rovingKey() === 'status' ? 0 : -1}
-                class={`shell-channel-item${activeView().kind === 'status' ? ' shell-channel-item--active' : ''}`}
-                aria-current={activeView().kind === 'status' ? 'page' : undefined}
-                aria-label="Server status"
-                onClick={handleStatusClick}
-              >
-                <span class="shell-channel-sigil" aria-hidden="true">✦</span>
-                <span class="shell-channel-name">Status</span>
-              </button>
-            </li>
-          </ul>
-        </div>
+        {/* Server / status entry — always present unless filter hides non-matches */}
+        <Show when={!filterActive() || matchesSidebarQuery('status', listFilter())}>
+          <div class="shell-sidebar-section">
+            <ul class="shell-channel-list" role="list">
+              <li>
+                <button
+                  type="button"
+                  data-sidebar-item
+                  tabindex={rovingKey() === 'status' ? 0 : -1}
+                  class={`shell-channel-item${activeView().kind === 'status' ? ' shell-channel-item--active' : ''}`}
+                  aria-current={activeView().kind === 'status' ? 'page' : undefined}
+                  aria-label="Server status"
+                  onClick={handleStatusClick}
+                >
+                  <span class="shell-channel-sigil" aria-hidden="true">✦</span>
+                  <span class="shell-channel-name">Status</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+        </Show>
+
+        <Show when={filterEmpty()}>
+          <p class="shell-sidebar-filter-empty" data-testid="sidebar-filter-empty" role="status">
+            No channels or DMs match “{listFilter().trim()}”.
+          </p>
+        </Show>
 
         {/* Favorites — store starredChannels */}
         <Show when={organized().favorites.length > 0}>
