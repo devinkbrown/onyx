@@ -20,9 +20,9 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
-import { useStore, getState } from '@/lib/store';
+import { useStore, getState, selectDeviceMemoryOwner } from '@/lib/store';
 import type { Channel } from '@/lib/irc/types';
-import type { ActiveView, DMConversation } from '@/lib/store/store';
+import type { ActiveView, ChannelFolder, DMConversation } from '@/lib/store/store';
 import { NotificationControls } from './NotificationControls';
 
 export type ChannelSidebarProps = {
@@ -188,6 +188,12 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   // ── store selectors ──
   const channels = useStore((s) => s.channels);
   const channelLastActivity = useStore((s) => s.channelLastActivity);
+  const starredChannels = useStore((s) => s.starredChannels);
+  const channelFolders = useStore((s) => s.channelFolders);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
 
   // One shared minute-tick drives every activity stamp in the list.
   const [nowMs, setNowMs] = createSignal(Date.now());
@@ -225,12 +231,80 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     return raw.startsWith('#') ? raw : `#${raw}`;
   });
 
-  // ── sorted channel list ──
+  // ── sorted channel list (alpha base; stars + folders layer on top) ──
   const sortedChannels = createMemo(() => {
     const entries: Channel[] = [];
     channels().forEach((ch) => entries.push(ch));
     return entries.sort((a, b) => a.name.localeCompare(b.name));
   });
+
+  const channelByName = createMemo(() => {
+    const map = new Map<string, Channel>();
+    for (const ch of sortedChannels()) map.set(ch.name.toLowerCase(), ch);
+    return map;
+  });
+
+  /**
+   * Favorites (starredChannels) then non-default folders, then the default
+   * "TEXT CHANNELS" / uncategorized remainder — using store channelFolders.
+   */
+  const organized = createMemo(() => {
+    const byName = channelByName();
+    const stars = starredChannels();
+    const favorites: Channel[] = [];
+    for (const key of stars) {
+      const ch = byName.get(key.toLowerCase());
+      if (ch) favorites.push(ch);
+    }
+    favorites.sort((a, b) => a.name.localeCompare(b.name));
+
+    const claimed = new Set(favorites.map((ch) => ch.name.toLowerCase()));
+    const folders = channelFolders();
+    const folderGroups: { folder: ChannelFolder | null; channels: Channel[] }[] = [];
+
+    for (const folder of folders) {
+      // Skip the empty default bucket in the folder loop — it becomes the
+      // catch-all "channels" section below.
+      const isDefault = folder.id === 'default';
+      const list: Channel[] = [];
+      for (const name of folder.channels) {
+        const key = name.toLowerCase();
+        if (claimed.has(key)) continue;
+        const ch = byName.get(key);
+        if (!ch) continue;
+        claimed.add(key);
+        list.push(ch);
+      }
+      if (isDefault) continue;
+      folderGroups.push({ folder, channels: list });
+    }
+
+    const uncategorized: Channel[] = [];
+    for (const ch of sortedChannels()) {
+      if (!claimed.has(ch.name.toLowerCase())) uncategorized.push(ch);
+    }
+    folderGroups.push({ folder: null, channels: uncategorized });
+
+    return { favorites, folderGroups };
+  });
+
+  function handleToggleStar(ch: Channel, e: MouseEvent): void {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!memoryOwner()) return;
+    const key = ch.name.toLowerCase();
+    if (starredChannels().has(key) || starredChannels().has(ch.name)) {
+      getState().unstarChannel(ch.name);
+    } else {
+      getState().starChannel(ch.name);
+    }
+  }
+
+  function handleToggleFolder(id: string, e: MouseEvent): void {
+    e.preventDefault();
+    e.stopPropagation();
+    getState().toggleFolderCollapsed(id);
+  }
 
   // ── sorted DM list ──
   const sortedDms = createMemo(() => {
@@ -350,6 +424,68 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     local.onMobileClose?.();
   }
 
+  function renderChannelRow(ch: Channel): JSX.Element {
+    const active = createMemo(() => isChannelActive(activeView(), ch));
+    const hasUnread = createMemo(() => ch.unread > 0);
+    const hasHighlight = createMemo(() => ch.highlights > 0);
+    const starred = createMemo(() => {
+      const stars = starredChannels();
+      return stars.has(ch.name.toLowerCase()) || stars.has(ch.name);
+    });
+
+    return (
+      <li>
+        <div class="shell-channel-row">
+          <button
+            type="button"
+            data-sidebar-item
+            tabindex={rovingKey() === channelKey(ch) ? 0 : -1}
+            class={[
+              'shell-channel-item',
+              active() ? 'shell-channel-item--active' : '',
+              hasUnread() && !active() ? 'shell-channel-item--unread' : '',
+              hasHighlight() ? 'shell-channel-item--highlight' : '',
+            ].filter(Boolean).join(' ')}
+            aria-current={active() ? 'page' : undefined}
+            aria-label={`${ch.name}${unreadLabel(ch.unread, ch.highlights)}${starred() ? ', favorite' : ''}`}
+            onClick={() => handleChannelClick(ch)}
+          >
+            <span class="shell-channel-sigil" aria-hidden="true">#</span>
+            <span class="shell-channel-name">{ch.name.replace(/^#/, '')}</span>
+            <Show when={activityStamp(ch.name) && ch.unread === 0 && ch.highlights === 0}>
+              <span class="shell-channel-time" aria-hidden="true">
+                {activityStamp(ch.name)}
+              </span>
+            </Show>
+            <Show when={ch.highlights > 0}>
+              <span class="shell-channel-badge" aria-hidden="true">
+                {ch.highlights}
+              </span>
+            </Show>
+            <Show when={ch.unread > 0 && ch.highlights === 0}>
+              <span class="shell-channel-badge" aria-hidden="true">
+                {ch.unread > 99 ? '99+' : ch.unread}
+              </span>
+            </Show>
+          </button>
+          <Show when={!!memoryOwner()}>
+            <button
+              type="button"
+              class={`shell-channel-star${starred() ? ' shell-channel-star--on' : ''}`}
+              data-testid="sidebar-channel-star"
+              aria-label={starred() ? `Remove ${ch.name} from favorites` : `Add ${ch.name} to favorites`}
+              aria-pressed={starred()}
+              tabindex={-1}
+              onClick={(e) => handleToggleStar(ch, e)}
+            >
+              {starred() ? '★' : '☆'}
+            </button>
+          </Show>
+        </div>
+      </li>
+    );
+  }
+
   return (
     <aside class="shell-sidebar" aria-label="Channel navigation">
       {/* Header */}
@@ -394,71 +530,90 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
           </ul>
         </div>
 
-        {/* Channels section */}
-        <div class="shell-sidebar-section">
-          <p class="shell-sidebar-section-label" id="sidebar-channels-label">
-            channels
-          </p>
-          <ul
-            class="shell-channel-list"
-            role="list"
-            aria-labelledby="sidebar-channels-label"
-          >
-            <Show
-              when={sortedChannels().length > 0}
-              fallback={
-                <li style={{ padding: '4px 10px', color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
-                  No rooms yet
-                </li>
-              }
+        {/* Favorites — store starredChannels */}
+        <Show when={organized().favorites.length > 0}>
+          <div class="shell-sidebar-section" data-testid="sidebar-favorites">
+            <p class="shell-sidebar-section-label" id="sidebar-favorites-label">
+              favorites
+            </p>
+            <ul
+              class="shell-channel-list"
+              role="list"
+              aria-labelledby="sidebar-favorites-label"
             >
-              <For each={sortedChannels()}>
-                {(ch) => {
-                  const active = createMemo(() => isChannelActive(activeView(), ch));
-                  const hasUnread = createMemo(() => ch.unread > 0);
-                  const hasHighlight = createMemo(() => ch.highlights > 0);
-
-                  return (
-                    <li>
-                      <button
-                        type="button"
-                        data-sidebar-item
-                        tabindex={rovingKey() === channelKey(ch) ? 0 : -1}
-                        class={[
-                          'shell-channel-item',
-                          active() ? 'shell-channel-item--active' : '',
-                          hasUnread() && !active() ? 'shell-channel-item--unread' : '',
-                          hasHighlight() ? 'shell-channel-item--highlight' : '',
-                        ].filter(Boolean).join(' ')}
-                        aria-current={active() ? 'page' : undefined}
-                        aria-label={`${ch.name}${unreadLabel(ch.unread, ch.highlights)}`}
-                        onClick={() => handleChannelClick(ch)}
-                      >
-                        <span class="shell-channel-sigil" aria-hidden="true">#</span>
-                        <span class="shell-channel-name">{ch.name.replace(/^#/, '')}</span>
-                        <Show when={activityStamp(ch.name) && ch.unread === 0 && ch.highlights === 0}>
-                          <span class="shell-channel-time" aria-hidden="true">
-                            {activityStamp(ch.name)}
-                          </span>
-                        </Show>
-                        <Show when={ch.highlights > 0}>
-                          <span class="shell-channel-badge" aria-hidden="true">
-                            {ch.highlights}
-                          </span>
-                        </Show>
-                        <Show when={ch.unread > 0 && ch.highlights === 0}>
-                          <span class="shell-channel-badge" aria-hidden="true">
-                            {ch.unread > 99 ? '99+' : ch.unread}
-                          </span>
-                        </Show>
-                      </button>
-                    </li>
-                  );
-                }}
+              <For each={organized().favorites}>
+                {(ch) => renderChannelRow(ch)}
               </For>
-            </Show>
-          </ul>
-        </div>
+            </ul>
+          </div>
+        </Show>
+
+        {/* Channel folders + uncategorized (store channelFolders) */}
+        <For each={organized().folderGroups}>
+          {(group) => {
+            const isUncategorized = () => group.folder === null;
+            const collapsed = () => group.folder?.collapsed === true;
+            if (!isUncategorized() && group.channels.length === 0) return null;
+            if (!isUncategorized() && collapsed()) {
+              return (
+                <div class="shell-sidebar-section" data-testid="sidebar-folder">
+                  <button
+                    type="button"
+                    class="shell-sidebar-section-label shell-sidebar-folder-toggle"
+                    aria-expanded={false}
+                    data-testid="sidebar-folder-toggle"
+                    onClick={(e) => handleToggleFolder(group.folder!.id, e)}
+                  >
+                    {group.folder!.name} · collapsed
+                  </button>
+                </div>
+              );
+            }
+            return (
+              <div class="shell-sidebar-section" data-testid={isUncategorized() ? 'sidebar-channels' : 'sidebar-folder'}>
+                <Show
+                  when={isUncategorized()}
+                  fallback={
+                    <button
+                      type="button"
+                      class="shell-sidebar-section-label shell-sidebar-folder-toggle"
+                      aria-expanded={true}
+                      data-testid="sidebar-folder-toggle"
+                      onClick={(e) => handleToggleFolder(group.folder!.id, e)}
+                    >
+                      {group.folder!.name}
+                    </button>
+                  }
+                >
+                  <p class="shell-sidebar-section-label" id="sidebar-channels-label">
+                    channels
+                  </p>
+                </Show>
+                <ul
+                  class="shell-channel-list"
+                  role="list"
+                  aria-labelledby={isUncategorized() ? 'sidebar-channels-label' : undefined}
+                  aria-label={isUncategorized() ? undefined : group.folder!.name}
+                >
+                  <Show
+                    when={group.channels.length > 0}
+                    fallback={
+                      <Show when={isUncategorized() && sortedChannels().length === 0}>
+                        <li style={{ padding: '4px 10px', color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
+                          No rooms yet
+                        </li>
+                      </Show>
+                    }
+                  >
+                    <For each={group.channels}>
+                      {(ch) => renderChannelRow(ch)}
+                    </For>
+                  </Show>
+                </ul>
+              </div>
+            );
+          }}
+        </For>
 
         {/* DMs section */}
         <Show when={sortedDms().length > 0}>

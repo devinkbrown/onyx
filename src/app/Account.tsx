@@ -53,6 +53,9 @@ import { PasskeysSection } from '@/shell/PasskeysSection';
 import { SessionsDevicesSection } from '@/shell/SessionsDevicesSection';
 import { RecoveryCodesSection } from '@/shell/RecoveryCodesSection';
 import { OperEventConsole } from '@/shell/OperEventConsole';
+import { PortableIdentitySection } from '@/shell/PortableIdentitySection';
+import { CapabilityMatrixSection } from '@/shell/CapabilityMatrixSection';
+import { ChannelOrganizationSection } from '@/shell/ChannelOrganizationSection';
 import { ModalShell } from '@/primitives/index';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
@@ -182,6 +185,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
   );
   const info = useStore((s) => s.accountInfo);
+  const networkName = useStore((s) => s.networkName);
   const infoPending = useStore((s) => s.accountInfoPending);
   const actionError = useStore((s) => s.accountActionError);
   const serviceNotices = useStore((s) => s.serviceNotices);
@@ -859,6 +863,12 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           {/* Sessions & devices — current browser + Era 2 (B8) remote list skeleton */}
           <SessionsDevicesSection account={account()} />
           <OperEventConsole />
+          <CapabilityMatrixSection />
+          <ChannelOrganizationSection owner={memoryOwner()} />
+          <PortableIdentitySection
+            owner={memoryOwner()}
+            networkHint={networkName() || undefined}
+          />
 
           {/* Offline recovery codes — B8 remainder */}
           <RecoveryCodesSection account={account()} />
