@@ -74,7 +74,7 @@ import {
   type ScheduledMessage,
   type ScheduledMessageOwner,
 } from '@/lib/schedule/dispatch';
-import { deviceKeys, isEnvelope, isValidPeerPublicKey } from '@/lib/e2ee/dmCipher';
+import { deviceKeys, isEnvelope, isValidPeerPublicKey, normalizePeerDeviceKeys } from '@/lib/e2ee/dmCipher';
 import {
   hasEncryptedMessageBoundary,
   persistedReplyPreviewText,
@@ -82,7 +82,7 @@ import {
 } from '@/lib/e2ee/replyPrivacy';
 import { activeReplyForTarget } from '@/lib/composer/messageContext';
 import { removeMessageReactor, toggleMessageReactions } from '@/lib/reactions/toggleReaction';
-import { openDmTrusted, peerSafetyNumber, pinnedPeerKey, pinPeerKey, safetyNumber, sealDmTrusted } from '@/lib/e2ee/keyPinning';
+import { openDmTrusted, peerSafetyNumber, pinnedPeerKey, pinPeerKey, safetyNumber, sealDmTrustedToDevices } from '@/lib/e2ee/keyPinning';
 import {
   ENCRYPTION_POLICY_PROP,
   E2EE_CAP,
@@ -1990,6 +1990,12 @@ export interface OnyxState {
   userMetadata: Map<string, Record<string, string>>;
   /** nick.toLowerCase() → peer E2EE device public key (METADATA ocean.dm-key) */
   peerDmKeys: Map<string, string>;
+  /**
+   * Multi-device E2EE directory (Era 3 C2): nick → all known device public keys.
+   * `peerDmKeys` remains the primary/latest key for TOFU banners and single-key
+   * UI; send seals fan out to the full set when present.
+   */
+  peerDmDeviceKeys: Map<string, string[]>;
   /** Publish our device key + kick a NAMES-free key fetch for a DM peer */
   publishDeviceKey(): void;
   /** Decrypt an in-store encrypted DM in place (async; no-op if not ours) */
@@ -4112,6 +4118,7 @@ function _resetAccountPrivateMessageState(set: SetFn): void {
         error: null,
       },
       peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map(),
       peerKeyChanges: new Map(),
       peerSafetyNumbers: new Map(),
       pendingKeySafetyNumbers: new Map(),
@@ -5149,7 +5156,18 @@ function deliverChatMessage(
   const cp = client.isupport.CHANTYPES ?? '#&';
   const isDm = target.length > 0 && !cp.includes(target[0]!);
   const peerKey = get().peerDmKeys.get(target.toLowerCase());
-  if (isDm && peerKey && preferences().e2eeDms) {
+  const peerDeviceKeys = normalizePeerDeviceKeys([
+    ...(get().peerDmDeviceKeys.get(target.toLowerCase()) ?? []),
+    ...(peerKey ? [peerKey] : []),
+  ]);
+  // Designated E2EE DM: any directory entry (even a structurally invalid key)
+  // MUST enter the encrypted path and fail closed — never fall through to
+  // plaintext because normalizePeerDeviceKeys dropped a bad key.
+  const e2eeDesignated = isDm && preferences().e2eeDms && (
+    !!peerKey
+    || (get().peerDmDeviceKeys.get(target.toLowerCase())?.length ?? 0) > 0
+  );
+  if (e2eeDesignated) {
     const memoryContext = captureDeviceMemoryContext(get());
     if (!memoryContext) {
       get().addToast({
@@ -5163,9 +5181,24 @@ function deliverChatMessage(
       });
       return false;
     }
+    if (peerDeviceKeys.length === 0) {
+      // Directory present but no structurally valid device key — fail closed.
+      get().addToast({
+        variant: 'error',
+        title: 'Encryption unavailable',
+        description: `Your message to ${target} was NOT sent — no valid device key is published for this peer.`,
+      });
+      get().addNotification({
+        type: 'error',
+        text: `Encryption unavailable — message to ${target} was not sent (no valid device key).`,
+      });
+      return false;
+    }
     const encryptedKind: E2eeMessageKind | null = client.negotiatedCaps.has(E2EE_CAP) ? 'mls' : null;
     const encryptedOutboundTags = encryptedKind ? { ...outboundTags, ...e2eeMessageTag(encryptedKind) } : outboundTags;
-    return sealDmTrusted(target, peerKey, text, memoryContext.owner).then((outcome) => {
+    // Era 3 C2: fan-out seal to every published device key (single key still
+    // emits classic ONYXDM1). Fail closed on TOFU key-change or seal failure.
+    return sealDmTrustedToDevices(target, peerDeviceKeys, text, memoryContext.owner).then((outcome) => {
       if (
         generation !== _accountGeneration
         || client !== get().client
@@ -5173,7 +5206,7 @@ function deliverChatMessage(
       ) return false;
       if (outcome.status === 'key-changed') {
         // SECURITY — fail closed on a possible machine-in-the-middle.
-        void get()._flagPeerKeyChange(target, peerKey);
+        void get()._flagPeerKeyChange(target, peerKey ?? peerDeviceKeys[0]!);
         return false;
       }
       if (outcome.status !== 'sealed') {
@@ -5191,11 +5224,18 @@ function deliverChatMessage(
         return false;
       }
 
-      // Directory may have rotated while sealDmTrusted was in flight. Never
-      // admit ciphertext under a key the live METADATA directory no longer
-      // claims — re-check and surface the live key for the key-change warning.
+      // Directory may have rotated while seal was in flight. Never admit
+      // ciphertext under a device set the live directory no longer claims.
       const livePeerKey = get().peerDmKeys.get(target.toLowerCase());
-      if (livePeerKey !== peerKey) {
+      const liveDevices = normalizePeerDeviceKeys([
+        ...(get().peerDmDeviceKeys.get(target.toLowerCase()) ?? []),
+        ...(livePeerKey ? [livePeerKey] : []),
+      ]);
+      const sealedSet = new Set(peerDeviceKeys);
+      const liveMatches =
+        liveDevices.length === peerDeviceKeys.length
+        && liveDevices.every((key) => sealedSet.has(key));
+      if (!liveMatches) {
         if (livePeerKey) void get()._flagPeerKeyChange(target, livePeerKey);
         return false;
       }
@@ -14834,6 +14874,7 @@ export const store = createStore<OnyxState>()(
     // ── Onyx Server integration (serial integration pass) ──────────────────────────
     userMetadata: new Map(),
     peerDmKeys: new Map(),
+    peerDmDeviceKeys: new Map(),
     peerKeyChanges: new Map(),
     peerSafetyNumbers: new Map(),
     pendingKeySafetyNumbers: new Map(),
@@ -14904,12 +14945,34 @@ export const store = createStore<OnyxState>()(
       });
       // E2EE device key (METADATA ocean.dm-key): remember the peer's published
       // key so their DMs decrypt and ours to them encrypt. Any change re-derives.
-      if (safeKey.toLowerCase() === 'ocean.dm-key') {
+      // ocean.dm-keys (comma/space-separated) carries the multi-device directory.
+      const metaKey = safeKey.toLowerCase();
+      if (metaKey === 'ocean.dm-key' || metaKey === 'ocean.dm-keys') {
         set(s => {
           const peerDmKeys = new Map(s.peerDmKeys);
-          if (safeValue && isValidPeerPublicKey(safeValue)) peerDmKeys.set(nickKey, safeValue);
-          else peerDmKeys.delete(nickKey);
-          return { peerDmKeys };
+          const peerDmDeviceKeys = new Map(s.peerDmDeviceKeys);
+          if (metaKey === 'ocean.dm-key') {
+            if (safeValue && isValidPeerPublicKey(safeValue)) {
+              peerDmKeys.set(nickKey, safeValue);
+              const merged = normalizePeerDeviceKeys([
+                ...(peerDmDeviceKeys.get(nickKey) ?? []),
+                safeValue,
+              ]);
+              peerDmDeviceKeys.set(nickKey, merged);
+            } else {
+              peerDmKeys.delete(nickKey);
+            }
+          } else {
+            // Multi-device directory: split on commas/whitespace; keep primary.
+            const devices = normalizePeerDeviceKeys(safeValue.split(/[\s,]+/));
+            if (devices.length > 0) {
+              peerDmDeviceKeys.set(nickKey, devices);
+              if (!peerDmKeys.has(nickKey)) peerDmKeys.set(nickKey, devices[0]!);
+            } else {
+              peerDmDeviceKeys.delete(nickKey);
+            }
+          }
+          return { peerDmKeys, peerDmDeviceKeys };
         });
         // Decrypt any already-stored encrypted DMs from this peer now that the
         // key is known (covers key arriving after the message, e.g. WHOIS-late).

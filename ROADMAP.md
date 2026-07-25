@@ -28,6 +28,8 @@ Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
 | **Era 2 B4 / B5 / B7 / B11** | Room policy, push, history targets, Halloy matrix | ✅ **B4** ACCESS + encryption-policy + **history-policy** UI; ✅ **B5** recoverWebPush + SW E2EE body; ✅ **B7** TARGETS discovery; ✅ **B11** `docs/protocol/halloy-cap-matrix.md` |
 | **Era 2 B1 / B3 / B9 / B10 / B13** | Multi-device, pins, topics, insights, stages | ✅ **B1** revoke-others + session age; ✅ **B3** always-on pins chip; ✅ **B9** TopicFilterBar; ✅ **B10** RoomInsightsStrip; ✅ **B13** StagePanel |
 | **Era 3 C3** | Closed-tab mention + call push | ✅ SW maps `mention`/`call` payloads; server emits typed Web Push (deploy with daemon) |
+| **Era 3 C2** | Multi-device DM fan-out | ✅ `ONYXDMN1` + TOFU multi-pin + store directory (`docs/era3-40-game-changers.md`) |
+| **Era 3 wave** | 40 game-changer foundations | ✅ Ledger `docs/era3-40-game-changers.md` (C1/C4/C5/C7/C8/C10/C11 footholds) |
 | **Production daemon** | Dual-node Onyx Server only | ✅ `onyx-server.service` + `*/onyx-server-run/` (2026-07-25) |
 
 **Wiring audit notes (2026-07-21)** — evidence in

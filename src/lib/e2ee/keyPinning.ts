@@ -32,11 +32,42 @@
  * identity key".
  */
 
-import { deviceKeys, isEnvelope, isValidPeerPublicKey, openDm, sealDm } from './dmCipher';
+import {
+  deviceKeys,
+  isEnvelope,
+  isValidPeerPublicKey,
+  normalizePeerDeviceKeys,
+  openDm,
+  sealDmToDevices,
+} from './dmCipher';
 import {
   deviceMemoryOwnerKey,
   type DeviceMemoryOwner,
 } from '@/lib/deviceMemoryOwner';
+
+/** Multi-device pin blob — JSON so legacy single-key string pins stay readable. */
+const MULTI_PIN_PREFIX = '{"v":1,"k":';
+
+function encodeMultiPin(keys: readonly string[]): string {
+  const normalized = normalizePeerDeviceKeys(keys);
+  return JSON.stringify({ v: 1, k: normalized });
+}
+
+function parsePinnedKeys(raw: string | null): string[] | null {
+  if (raw === null) return null;
+  if (isValidPeerPublicKey(raw)) return [raw];
+  if (!raw.startsWith(MULTI_PIN_PREFIX) && !raw.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(raw) as { v?: unknown; k?: unknown };
+    if (parsed?.v !== 1 || !Array.isArray(parsed.k)) return null;
+    const keys = normalizePeerDeviceKeys(
+      parsed.k.filter((entry): entry is string => typeof entry === 'string'),
+    );
+    return keys.length > 0 ? keys : null;
+  } catch {
+    return null;
+  }
+}
 
 // ── pin store (sibling IndexedDB) ─────────────────────────────────────────────
 
@@ -213,7 +244,20 @@ export async function pinnedPeerKey(
   owner?: DeviceMemoryOwner,
 ): Promise<string | null> {
   const read = await readPin(account, owner);
-  return read.ok ? read.key : null;
+  if (!read.ok || read.key === null) return null;
+  const keys = parsePinnedKeys(read.key);
+  return keys?.[0] ?? null;
+}
+
+/** All pinned device keys for an account (single-key pins return a 1-length list). */
+export async function pinnedPeerKeys(
+  account: string,
+  owner?: DeviceMemoryOwner,
+): Promise<string[] | null> {
+  const read = await readPin(account, owner);
+  if (!read.ok) return null;
+  if (read.key === null) return [];
+  return parsePinnedKeys(read.key);
 }
 
 /**
@@ -229,6 +273,21 @@ export async function pinPeerKey(
 ): Promise<boolean> {
   if (!isValidPeerPublicKey(key)) return false;
   return writePin(account, key, owner);
+}
+
+/**
+ * Pin a multi-device key set (Era 3 C2). One key is stored as a legacy single
+ * string; two or more as a versioned JSON multi-pin blob.
+ */
+export async function pinPeerKeys(
+  account: string,
+  keys: readonly string[],
+  owner?: DeviceMemoryOwner,
+): Promise<boolean> {
+  const normalized = normalizePeerDeviceKeys(keys);
+  if (normalized.length === 0) return false;
+  if (normalized.length === 1) return writePin(account, normalized[0]!, owner);
+  return writePin(account, encodeMultiPin(normalized), owner);
 }
 
 /** Persist a bounded, pre-hashed trust binding for protocols that authenticate
@@ -274,7 +333,36 @@ export async function peerKeyStatus(
   const read = await readPin(account, owner);
   if (!read.ok) return 'unreadable';
   if (read.key === null) return 'first-use';
-  return read.key === presentedKey ? 'unchanged' : 'changed';
+  const pinned = parsePinnedKeys(read.key);
+  if (!pinned) {
+    // Corrupt multi-pin / non-key garbage — fail closed rather than re-TOFU.
+    return read.key === presentedKey ? 'unchanged' : 'changed';
+  }
+  return pinned.includes(presentedKey) ? 'unchanged' : 'changed';
+}
+
+/**
+ * Trust verdict for a whole device-key set. First-use when no pin exists;
+ * unchanged when every presented key is already pinned (extras already known
+ * are fine); changed when any presented key is new after a pin exists.
+ */
+export async function peerDeviceSetStatus(
+  account: string,
+  presentedKeys: readonly string[],
+  owner?: DeviceMemoryOwner,
+): Promise<PeerKeyVerdict> {
+  const keys = normalizePeerDeviceKeys(presentedKeys);
+  if (keys.length === 0) return 'unreadable';
+  const read = await readPin(account, owner);
+  if (!read.ok) return 'unreadable';
+  if (read.key === null) return 'first-use';
+  const pinned = parsePinnedKeys(read.key);
+  if (!pinned || pinned.length === 0) return 'changed';
+  const pinnedSet = new Set(pinned);
+  for (const key of keys) {
+    if (!pinnedSet.has(key)) return 'changed';
+  }
+  return 'unchanged';
 }
 
 // ── gated seal / open (the anti-MITM enforcement points) ──────────────────────
@@ -304,26 +392,45 @@ export async function sealDmTrusted(
   plaintext: string,
   owner?: DeviceMemoryOwner,
 ): Promise<SealTrustedOutcome> {
-  if (!isValidPeerPublicKey(presentedKey)) return { status: 'unavailable', envelope: null };
+  return sealDmTrustedToDevices(account, [presentedKey], plaintext, owner);
+}
+
+/**
+ * Trust-gated multi-device seal (Era 3 C2). Pins the full device set on first
+ * use; blocks when any presented key is not already trusted. Emits a single
+ * ONYXDM1 or ONYXDMN1 envelope — never plaintext fallback.
+ */
+export async function sealDmTrustedToDevices(
+  account: string,
+  presentedKeys: readonly string[],
+  plaintext: string,
+  owner?: DeviceMemoryOwner,
+): Promise<SealTrustedOutcome> {
+  const keys = normalizePeerDeviceKeys(presentedKeys);
+  if (keys.length === 0) return { status: 'unavailable', envelope: null };
   const recordKey = pinRecordKey(account, owner);
   if (!recordKey) return { status: 'unavailable', envelope: null };
 
   return withPinChain(recordKey, async () => {
-    const verdict = await peerKeyStatus(account, presentedKey, owner);
+    const verdict = await peerDeviceSetStatus(account, keys, owner);
     if (verdict === 'unreadable') return { status: 'unavailable', envelope: null };
     if (verdict === 'changed') {
       const pinnedKey = (await pinnedPeerKey(account, owner)) ?? '';
       return { status: 'key-changed', envelope: null, pinnedKey };
     }
     if (verdict === 'first-use') {
-      // TOFU: persist the pin BEFORE sealing. If we cannot persist it we cannot
-      // detect a future silent swap, so refuse rather than seal unverifiably.
-      if (!(await pinPeerKey(account, presentedKey, owner))) return { status: 'unavailable', envelope: null };
+      if (!(await pinPeerKeys(account, keys, owner))) {
+        return { status: 'unavailable', envelope: null };
+      }
     }
 
-    const envelope = await sealDm(presentedKey, plaintext);
+    const envelope = await sealDmToDevices(keys, plaintext);
     if (!envelope) return { status: 'unavailable', envelope: null };
-    return { status: 'sealed', envelope, keyStatus: verdict === 'first-use' ? 'first-use' : 'unchanged' };
+    return {
+      status: 'sealed',
+      envelope,
+      keyStatus: verdict === 'first-use' ? 'first-use' : 'unchanged',
+    };
   });
 }
 

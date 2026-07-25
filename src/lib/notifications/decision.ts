@@ -7,6 +7,8 @@ export interface NotifyDecisionInput {
   kind: NotifyKind;
   isSelf: boolean;
   muted?: boolean;
+  /** Smart keyword/nick mute (OR'd into the muted axis). */
+  smartMuted?: boolean;
   pushEnabled: boolean;
   soundEnabled: boolean;
   dnd: boolean;
@@ -60,10 +62,11 @@ export function shouldNotify(input: NotifyDecisionInput): NotifyDecision {
   const lastDesktop = input.lastDesktopAtMs ?? Number.NEGATIVE_INFINITY;
   const lastSound = input.lastSoundAtMs ?? Number.NEGATIVE_INFINITY;
 
+  const muted = input.muted === true || input.smartMuted === true;
   const baseBlock =
     !isAlertKind(input.kind) ? 'not-message-alert'
     : input.isSelf ? 'self'
-    : input.muted ? 'muted'
+    : muted ? 'muted'
     : !inactive ? 'focused'
     : input.dnd ? 'dnd'
     : null;

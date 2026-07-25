@@ -25,8 +25,20 @@ const DB_VERSION = 1;
 const STORE = 'device';
 const KEY_ID = 'dm-v1';
 
-/** On-wire E2EE DM envelope prefix. */
+/** On-wire E2EE DM envelope prefix (single peer device). */
 export const ENVELOPE_PREFIX = 'ONYXDM1 ';
+
+/**
+ * Multi-device fan-out envelope (Era 3 C2).
+ * Wire: `ONYXDMN1 ` ‖ b64url(u16be count ‖ for each: u16be len ‖ seal-body)
+ * where each seal-body is the same nonce12‖ct layout as a single ONYXDM1 body.
+ * Recipient opens by trying each seal under the sender's public key until one
+ * authenticates — only the seal for *this* device's private key will succeed.
+ */
+export const MULTI_ENVELOPE_PREFIX = 'ONYXDMN1 ';
+
+/** Hard cap on fan-out targets so a hostile directory cannot force unbounded work. */
+export const MAX_MULTI_DEVICE_SEALS = 16;
 
 /** Rendered in place of ciphertext we cannot open (wrong device, lost key). */
 export const LOCKED_PLACEHOLDER = '🔒 Encrypted message (sent to another device)';
@@ -306,17 +318,76 @@ export function _sharedKeyCacheSizeForTests(): number {
 // ── envelope ─────────────────────────────────────────────────────────────────
 
 export function isEnvelope(text: string): boolean {
-  return text.startsWith(ENVELOPE_PREFIX);
+  return text.startsWith(ENVELOPE_PREFIX) || text.startsWith(MULTI_ENVELOPE_PREFIX);
+}
+
+export function isMultiEnvelope(text: string): boolean {
+  return text.startsWith(MULTI_ENVELOPE_PREFIX);
 }
 
 /** Body offset after a recognized envelope prefix, or -1. */
 export function envelopeBodyOffset(text: string): number {
+  if (text.startsWith(MULTI_ENVELOPE_PREFIX)) return MULTI_ENVELOPE_PREFIX.length;
   if (text.startsWith(ENVELOPE_PREFIX)) return ENVELOPE_PREFIX.length;
   return -1;
 }
 
-/** Encrypt plaintext for the peer. Null when E2EE is unavailable. */
-export async function sealDm(peerPublicB64: string, plaintext: string): Promise<string | null> {
+/** Deduplicate + structurally validate peer device public keys for fan-out. */
+export function normalizePeerDeviceKeys(keys: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of keys) {
+    const key = raw.trim();
+    if (!key || seen.has(key) || !isValidPeerPublicKey(key)) continue;
+    seen.add(key);
+    out.push(key);
+    if (out.length >= MAX_MULTI_DEVICE_SEALS) break;
+  }
+  return out;
+}
+
+function encodeMultiSealBodies(bodies: readonly Uint8Array[]): Uint8Array | null {
+  if (bodies.length === 0 || bodies.length > MAX_MULTI_DEVICE_SEALS) return null;
+  let total = 2;
+  for (const body of bodies) {
+    if (body.length < MIN_BODY_BYTES || body.length > 0xffff) return null;
+    total += 2 + body.length;
+  }
+  const out = new Uint8Array(total);
+  const view = new DataView(out.buffer);
+  view.setUint16(0, bodies.length, false);
+  let offset = 2;
+  for (const body of bodies) {
+    view.setUint16(offset, body.length, false);
+    offset += 2;
+    out.set(body, offset);
+    offset += body.length;
+  }
+  return out;
+}
+
+function decodeMultiSealBodies(packed: Uint8Array): Uint8Array[] | null {
+  if (packed.length < 2) return null;
+  const view = new DataView(packed.buffer, packed.byteOffset, packed.byteLength);
+  const count = view.getUint16(0, false);
+  if (count === 0 || count > MAX_MULTI_DEVICE_SEALS) return null;
+  const bodies: Uint8Array[] = [];
+  let offset = 2;
+  for (let i = 0; i < count; i += 1) {
+    if (offset + 2 > packed.length) return null;
+    const len = view.getUint16(offset, false);
+    offset += 2;
+    if (len < MIN_BODY_BYTES || offset + len > packed.length) return null;
+    bodies.push(packed.slice(offset, offset + len));
+    offset += len;
+  }
+  // Reject trailing garbage so a smuggled payload cannot hide after valid seals.
+  if (offset !== packed.length) return null;
+  return bodies;
+}
+
+/** Encrypt one seal body (nonce‖ct) for a peer device. Null on failure. */
+async function sealBodyFor(peerPublicB64: string, plaintext: string): Promise<Uint8Array | null> {
   const key = await sharedKeyWith(peerPublicB64);
   if (!key) return null;
   try {
@@ -329,22 +400,19 @@ export async function sealDm(peerPublicB64: string, plaintext: string): Promise<
     const body = new Uint8Array(NONCE_BYTES + ct.byteLength);
     body.set(nonce, 0);
     body.set(new Uint8Array(ct), NONCE_BYTES);
-    return `${ENVELOPE_PREFIX}${toB64url(body)}`;
+    return body;
   } catch {
     return null;
   }
 }
 
-/** Decrypt an envelope from the peer. Null when it isn't ours to open. */
-export async function openDm(peerPublicB64: string, envelope: string): Promise<string | null> {
-  const prefixLen = envelopeBodyOffset(envelope);
-  if (prefixLen < 0) return null;
+async function openBodyFrom(
+  peerPublicB64: string,
+  body: Uint8Array,
+): Promise<string | null> {
+  if (body.length < MIN_BODY_BYTES) return null;
   const key = await sharedKeyWith(peerPublicB64);
   if (!key) return null;
-  const body = fromB64url(envelope.slice(prefixLen));
-  // A real body is nonce(12) ‖ ciphertext ‖ tag(16); anything below 28 bytes
-  // cannot even carry an empty-plaintext GCM tag, so reject it fast fail-closed.
-  if (!body || body.length < MIN_BODY_BYTES) return null;
   try {
     const pt = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: body.slice(0, NONCE_BYTES) },
@@ -353,6 +421,57 @@ export async function openDm(peerPublicB64: string, envelope: string): Promise<s
     );
     return new TextDecoder().decode(pt);
   } catch {
-    return null; // wrong device / rotated key — caller shows the placeholder
+    return null;
   }
+}
+
+/** Encrypt plaintext for the peer. Null when E2EE is unavailable. */
+export async function sealDm(peerPublicB64: string, plaintext: string): Promise<string | null> {
+  const body = await sealBodyFor(peerPublicB64, plaintext);
+  if (!body) return null;
+  return `${ENVELOPE_PREFIX}${toB64url(body)}`;
+}
+
+/**
+ * Seal plaintext to every published device key for a peer (C2 multi-device).
+ * One device → classic ONYXDM1 envelope (backward compatible).
+ * Two+ devices → ONYXDMN1 multi envelope. Fail closed if any seal fails.
+ */
+export async function sealDmToDevices(
+  peerPublicKeys: readonly string[],
+  plaintext: string,
+): Promise<string | null> {
+  const keys = normalizePeerDeviceKeys(peerPublicKeys);
+  if (keys.length === 0) return null;
+  if (keys.length === 1) return sealDm(keys[0]!, plaintext);
+
+  const bodies: Uint8Array[] = [];
+  for (const key of keys) {
+    const body = await sealBodyFor(key, plaintext);
+    if (!body) return null;
+    bodies.push(body);
+  }
+  const packed = encodeMultiSealBodies(bodies);
+  if (!packed) return null;
+  return `${MULTI_ENVELOPE_PREFIX}${toB64url(packed)}`;
+}
+
+/** Decrypt an envelope from the peer. Null when it isn't ours to open. */
+export async function openDm(peerPublicB64: string, envelope: string): Promise<string | null> {
+  if (isMultiEnvelope(envelope)) {
+    const packed = fromB64url(envelope.slice(MULTI_ENVELOPE_PREFIX.length));
+    if (!packed) return null;
+    const bodies = decodeMultiSealBodies(packed);
+    if (!bodies) return null;
+    for (const body of bodies) {
+      const pt = await openBodyFrom(peerPublicB64, body);
+      if (pt !== null) return pt;
+    }
+    return null;
+  }
+  const prefixLen = envelopeBodyOffset(envelope);
+  if (prefixLen < 0) return null;
+  const body = fromB64url(envelope.slice(prefixLen));
+  if (!body) return null;
+  return openBodyFrom(peerPublicB64, body);
 }

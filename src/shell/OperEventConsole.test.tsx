@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@solidjs/testing-library';
 import { store } from '@/lib/store';
 import { OperEventConsole } from './OperEventConsole';
@@ -35,5 +35,21 @@ describe('OperEventConsole', () => {
     expect(screen.getByTestId('oper-event-console')).toBeInTheDocument();
     expect(screen.getAllByTestId('oper-event-row').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/WEBPUSH/)).toBeInTheDocument();
+  });
+
+  it('offers EVENT REPLAY and sends when connected', () => {
+    const sendRaw = vi.fn();
+    store.setState({
+      isOper: true,
+      connectionStatus: 'connected',
+      client: { sendRaw } as never,
+      serviceNotices: [],
+    });
+    render(() => <OperEventConsole />);
+    const btn = screen.getByTestId('oper-event-replay');
+    expect(btn).not.toBeDisabled();
+    btn.click();
+    expect(sendRaw).toHaveBeenCalledWith('EVENT', 'REPLAY', '50');
+    expect(screen.getByTestId('oper-event-replay-status')).toHaveTextContent(/EVENT REPLAY 50/);
   });
 });
