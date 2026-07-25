@@ -73,6 +73,8 @@ export type MessageMenuCapabilities = {
   canIgnore: boolean;
   /** Quote body into the composer (readable text present). */
   canQuote: boolean;
+  /** Collapse/hide this nick's messages in the feed (not self). */
+  canCollapse: boolean;
 };
 
 export type CapabilityInput = {
@@ -124,6 +126,7 @@ export function messageMenuCapabilities(input: CapabilityInput): MessageMenuCapa
     canDelete: !gone && !msg.pending && isOwn && deleteSupported,
     canIgnore: !gone && !isOwn && typeof msg.from === 'string' && msg.from.trim().length > 0,
     canQuote: hasText,
+    canCollapse: !gone && !isOwn && typeof msg.from === 'string' && msg.from.trim().length > 0,
   };
 }
 
@@ -549,6 +552,10 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     const nick = typeof local.msg.from === 'string' ? local.msg.from.trim() : '';
     return nick.length > 0 && s.isIgnored(nick);
   });
+  const senderCollapsed = useStore((s) => {
+    const nick = typeof local.msg.from === 'string' ? local.msg.from.trim() : '';
+    return nick.length > 0 && s.collapsedNicks.has(nick.toLowerCase());
+  });
   function togglePin(): void {
     if (!canPin()) return;
     if (isPinned()) getState().unpinMessage(local.target, local.msg.id);
@@ -956,6 +963,40 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                   {senderIgnored()
                     ? `Unignore ${local.msg.from}`
                     : `Ignore ${local.msg.from}`}
+                </span>
+              </button>
+            </Show>
+            <Show when={caps().canCollapse}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                data-testid="msg-menu-collapse"
+                aria-label={
+                  senderCollapsed()
+                    ? `Show messages from ${local.msg.from}`
+                    : `Hide messages from ${local.msg.from} in this feed`
+                }
+                onClick={() => {
+                  const nick = local.msg.from.trim();
+                  if (!nick) return;
+                  getState().toggleNickCollapse(nick);
+                  const nowCollapsed = getState().collapsedNicks.has(nick.toLowerCase());
+                  getState().addToast({
+                    variant: 'info',
+                    title: nowCollapsed ? `Hiding ${nick}` : `Showing ${nick}`,
+                    description: nowCollapsed
+                      ? 'Their lines are hidden in this feed until you expand them. Device-only; not an ignore.'
+                      : 'Their messages are visible in the feed again.',
+                  });
+                  local.onMenuOpenChange?.(false);
+                }}
+              >
+                <span class="msg-menu-item-icon" aria-hidden="true">▾</span>
+                <span>
+                  {senderCollapsed()
+                    ? `Show ${local.msg.from}`
+                    : `Hide ${local.msg.from}`}
                 </span>
               </button>
             </Show>

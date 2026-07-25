@@ -82,6 +82,9 @@ already-merged main-tree wave. Server repo untouched (client-only integrate).
 | Member double-click → DM | **SHIPPED** |
 | Member card Copy nick | **SHIPPED** |
 | Composer nick completion popup list | **SHIPPED** |
+| Member list filter | **SHIPPED** |
+| Ribbon click-to-copy channel/DM name | **SHIPPED** |
+| Message menu Hide nick + feed collapse banner | **SHIPPED** |
 
 ## See also
 

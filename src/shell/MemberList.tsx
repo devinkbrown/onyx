@@ -22,6 +22,7 @@
 import {
   createEffect,
   createMemo,
+  createSignal,
   For,
   onCleanup,
   Show,
@@ -452,6 +453,7 @@ export type MemberListProps = {
 export function MemberList(props: MemberListProps): JSX.Element {
   const [local] = splitProps(props, ['hidden', 'modal', 'onClose', 'onOpenDm', 'onOpenWhois']);
   let memberListRef: HTMLElement | undefined;
+  const [memberFilter, setMemberFilter] = createSignal('');
 
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
@@ -499,8 +501,26 @@ export function MemberList(props: MemberListProps): JSX.Element {
     return reconciler.reconcile(ch.users, modeToPrefix());
   });
 
+  /** Filter roster groups by nick substring without mutating reconciler cache. */
+  const visibleGroups = createMemo(() => {
+    const q = memberFilter().trim().toLowerCase();
+    if (!q) return groups();
+    return groups()
+      .map((group) => ({
+        ...group,
+        members: group.members.filter(({ user }) =>
+          user.nick.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((group) => group.members.length > 0);
+  });
+
   const totalCount = createMemo(() => {
     return groups().reduce((sum, g) => sum + g.members.length, 0);
+  });
+
+  const visibleCount = createMemo(() => {
+    return visibleGroups().reduce((sum, g) => sum + g.members.length, 0);
   });
 
   const memberListLabel = createMemo(() => {
@@ -552,9 +572,13 @@ export function MemberList(props: MemberListProps): JSX.Element {
             </Show>
             <span
               class="shell-members-count"
-              aria-label={`${totalCount()} member${totalCount() === 1 ? '' : 's'}`}
+              aria-label={
+                memberFilter().trim()
+                  ? `${visibleCount()} of ${totalCount()} members shown`
+                  : `${totalCount()} member${totalCount() === 1 ? '' : 's'}`
+              }
             >
-              {totalCount()}
+              {memberFilter().trim() ? `${visibleCount()}/${totalCount()}` : totalCount()}
             </span>
           </span>
           <Show when={local.modal && !local.hidden && local.onClose}>
@@ -569,6 +593,30 @@ export function MemberList(props: MemberListProps): JSX.Element {
           </Show>
         </span>
       </div>
+
+      <Show when={!isLoadingRoster() && groups().length > 0}>
+        <div class="shell-members-filter" role="search">
+          <label class="sr-only" for="member-filter-input">Filter members</label>
+          <input
+            id="member-filter-input"
+            class="shell-members-filter-input"
+            type="search"
+            data-testid="member-filter"
+            placeholder="Filter members"
+            autocomplete="off"
+            spellcheck={false}
+            value={memberFilter()}
+            onInput={(e) => setMemberFilter(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && memberFilter()) {
+                e.preventDefault();
+                e.stopPropagation();
+                setMemberFilter('');
+              }
+            }}
+          />
+        </div>
+      </Show>
 
       <div class="shell-members-scroll" role="region" aria-label={rosterLabel()}>
         <Show
@@ -596,38 +644,47 @@ export function MemberList(props: MemberListProps): JSX.Element {
             </Show>
           }
         >
-          <For each={groups()}>
-            {(group) => {
-              const groupLabelId = `members-group-${group.key}`;
-              return (
-                <section aria-labelledby={groupLabelId}>
-                  <p
-                    class="shell-members-group-label"
-                    id={groupLabelId}
-                    role="heading"
-                    aria-level={3}
-                  >
-                    {group.label} — {group.members.length}
-                  </p>
-                  <ul class="shell-members-group-list" role="list" aria-labelledby={groupLabelId}>
-                    <For each={group.members}>
-                      {({ user, role }) => (
-                        <MemberRow
-                          user={user}
-                          role={role}
-                          channel={activeChannel()?.name ?? ''}
-                          hidden={local.hidden}
-                          onOpenDm={local.onOpenDm}
-                          onOpenWhois={local.onOpenWhois}
-                          getRoster={() => memberListRef}
-                        />
-                      )}
-                    </For>
-                  </ul>
-                </section>
-              );
-            }}
-          </For>
+          <Show
+            when={visibleGroups().length > 0}
+            fallback={
+              <p class="shell-members-filter-empty" data-testid="member-filter-empty" role="status">
+                No members match “{memberFilter().trim()}”.
+              </p>
+            }
+          >
+            <For each={visibleGroups()}>
+              {(group) => {
+                const groupLabelId = `members-group-${group.key}`;
+                return (
+                  <section aria-labelledby={groupLabelId}>
+                    <p
+                      class="shell-members-group-label"
+                      id={groupLabelId}
+                      role="heading"
+                      aria-level={3}
+                    >
+                      {group.label} — {group.members.length}
+                    </p>
+                    <ul class="shell-members-group-list" role="list" aria-labelledby={groupLabelId}>
+                      <For each={group.members}>
+                        {({ user, role }) => (
+                          <MemberRow
+                            user={user}
+                            role={role}
+                            channel={activeChannel()?.name ?? ''}
+                            hidden={local.hidden}
+                            onOpenDm={local.onOpenDm}
+                            onOpenWhois={local.onOpenWhois}
+                            getRoster={() => memberListRef}
+                          />
+                        )}
+                      </For>
+                    </ul>
+                  </section>
+                );
+              }}
+            </For>
+          </Show>
         </Show>
       </div>
     </aside>

@@ -85,6 +85,7 @@ describe('messageMenuCapabilities', () => {
       canDelete: true,
       canIgnore: false,
       canQuote: true,
+      canCollapse: false,
     });
   });
 
@@ -106,6 +107,7 @@ describe('messageMenuCapabilities', () => {
     expect(caps.canDelete).toBe(false);
     expect(caps.canIgnore).toBe(true);
     expect(caps.canQuote).toBe(true);
+    expect(caps.canCollapse).toBe(true);
   });
 
   it('disables every live-message action once a message is deleted', () => {

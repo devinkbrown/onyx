@@ -804,6 +804,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const activeChannelTopics = useStore((s) => s.activeChannelTopics);
   const firstUnreadId = useStore((s) => s.firstUnreadId);
   const ourNick = useStore((s) => s.ourNick);
+  const collapsedNicks = useStore((s) => s.collapsedNicks);
   const canEditMessages = useStore((s) => s.canEditMessages);
   const canRedactMessages = useStore((s) => s.canRedactMessages);
   const historyLoading = useStore((s) => s.historyLoading);
@@ -917,10 +918,25 @@ export function MessageView(props: MessageViewProps): JSX.Element {
 
   const messages = createMemo((): ChatMessage[] => {
     const topic = activeTopic();
-    if (topic === null) return allMessages();
-    const key = topic.toLowerCase();
-    return allMessages().filter((message) => (message.topic ?? '').toLowerCase() === key);
+    const collapsed = collapsedNicks();
+    let list = allMessages();
+    if (topic !== null) {
+      const key = topic.toLowerCase();
+      list = list.filter((message) => (message.topic ?? '').toLowerCase() === key);
+    }
+    // Device-local hide for noisy nicks (not ignore — notifications still fire).
+    if (collapsed.size > 0) {
+      list = list.filter((message) => {
+        const from = typeof message.from === 'string' ? message.from.toLowerCase() : '';
+        return !from || !collapsed.has(from);
+      });
+    }
+    return list;
   });
+
+  const collapsedNickList = createMemo(() =>
+    [...collapsedNicks()].sort((a, b) => a.localeCompare(b, 'en')),
+  );
 
   // One O(n) pass builds the set of parent ids that have at least one reply, so
   // each rendered row answers "has a thread?" in O(1) instead of re-scanning the
@@ -1651,6 +1667,34 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               }}
             </For>
           </section>
+        </Show>
+        <Show when={collapsedNickList().length > 0}>
+          <div
+            class="shell-collapse-banner"
+            role="status"
+            data-testid="collapse-banner"
+          >
+            <span>
+              Hiding messages from{' '}
+              {collapsedNickList().slice(0, 4).join(', ')}
+              {collapsedNickList().length > 4
+                ? ` +${collapsedNickList().length - 4}`
+                : ''}
+              .
+            </span>
+            <button
+              type="button"
+              class="shell-collapse-banner-btn"
+              data-testid="collapse-banner-show-all"
+              onClick={() => {
+                for (const nick of collapsedNickList()) {
+                  getState().expandNickMessages(nick);
+                }
+              }}
+            >
+              Show all
+            </button>
+          </div>
         </Show>
         <Show
           when={messages().length > 0}

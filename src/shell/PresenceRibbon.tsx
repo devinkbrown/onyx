@@ -20,6 +20,7 @@ import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPin
 import { openPreferences } from '@/lib/prefs/preferences';
 import { channelNotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { Popover } from '@/primitives/index';
 import { ChannelSettings } from './ChannelSettings';
 import { ChannelNotifyControl } from './ChannelNotifyControl';
@@ -422,13 +423,30 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           </span>
         }>
           {(name) => (
-            <span
-              class="shell-ribbon-channel"
+            <button
+              type="button"
+              class="shell-ribbon-channel shell-ribbon-channel-btn"
+              data-testid="ribbon-copy-name"
+              title="Click to copy name"
               aria-label={
-                activeView().kind === 'channel' ? `Channel: ${name()}`
-                : activeView().kind === 'dm' ? `Direct message: ${name()}`
-                : name()
+                activeView().kind === 'channel'
+                  ? `Channel ${name()}. Click to copy name.`
+                  : activeView().kind === 'dm'
+                    ? `Direct message ${name()}. Click to copy nick.`
+                    : `${name()}. Click to copy.`
               }
+              onClick={() => {
+                const label = name();
+                void writeClipboardText(label).then((ok) => {
+                  getState().addToast({
+                    variant: ok ? 'success' : 'warning',
+                    title: ok ? 'Copied' : 'Could not copy',
+                    description: ok
+                      ? `${label} is on the clipboard.`
+                      : 'Clipboard access was denied in this browser.',
+                  });
+                });
+              }}
             >
               <Show when={activeView().kind === 'channel'}>
                 <span class="shell-ribbon-sigil" aria-hidden="true">#</span>
@@ -442,7 +460,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               {activeView().kind === 'channel'
                 ? name().replace(/^#/, '')
                 : name()}
-            </span>
+            </button>
           )}
         </Show>
 
