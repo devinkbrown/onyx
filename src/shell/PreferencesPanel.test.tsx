@@ -1818,7 +1818,9 @@ describe('PreferencesPanel', () => {
     expect(review).not.toHaveTextContent('topic-cursor-preview-secret');
     expect(screen.getByRole('button', { name: 'Cancel import' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
-    expect(await screen.findByText(/Imported .*2 topic read cursors.*1 preference set/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Imported .*2 topic read cursors.*1 preference set/i),
+    ).toBeInTheDocument();
     expect(readTopicReadMarker('#root', 'roadmap')?.lastReadMessageId).toBe('m1');
     expect(readTopicReadMarker('#root', 'release train')?.lastReadMessageId).toBe('m2');
     selectPreferenceCategory('History & data');

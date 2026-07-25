@@ -1,6 +1,11 @@
 import '@testing-library/jest-dom';
-import { cleanup } from '@solidjs/testing-library';
+import { cleanup, configure } from '@solidjs/testing-library';
 import { afterEach } from 'vitest';
+
+// Full-suite + IDB/vault cases regularly exceed the default 1s wait under load
+// (PreferencesPanel toggle-erase / portable import flaked at ~1.3s). Keep
+// assertions async-safe without per-call timeout noise.
+configure({ asyncUtilTimeout: 10_000 });
 
 // Unmount Solid trees between tests.
 afterEach(() => cleanup());
