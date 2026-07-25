@@ -327,6 +327,48 @@ describe('PWA manifest', () => {
     expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('TSUMUGI1');
     expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('ciphertext');
 
+    // Era 3 C3: mention + call push types
+    pushWork = undefined;
+    showNotification.mockClear();
+    push!({
+      data: {
+        json: () => ({
+          type: 'mention',
+          from: 'Carol',
+          text: 'hey Alice look',
+          channel: '#root',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith(
+      'Carol mentioned you in #root',
+      expect.objectContaining({ body: 'hey Alice look' }),
+    );
+
+    pushWork = undefined;
+    showNotification.mockClear();
+    push!({
+      data: {
+        json: () => ({
+          type: 'call',
+          from: 'Dave',
+          text: 'Voice/video call started',
+          channel: '#voice',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith(
+      'Call in #voice',
+      expect.objectContaining({ body: 'Voice/video call started' }),
+    );
 
     const click = listeners.get('notificationclick');
     expect(click).toBeDefined();

@@ -46,7 +46,15 @@ export function SessionsDevicesSection(props: SessionsDevicesSectionProps): JSX.
   }
 
   function onRevokeOthers(): void {
-    for (const row of otherAttachedSessions(sessions())) {
+    const others = otherAttachedSessions(sessions());
+    if (others.length === 0) return;
+    const ok =
+      typeof window !== 'undefined' &&
+      window.confirm(
+        `Revoke ${others.length} other session${others.length === 1 ? '' : 's'}? Those devices will need to sign in again.`,
+      );
+    if (!ok) return;
+    for (const row of others) {
       getState().dropAccountSession(row.index);
     }
   }

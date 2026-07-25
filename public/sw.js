@@ -367,17 +367,32 @@ self.addEventListener('push', (event) => {
     data = { body: event.data?.text() ?? '' };
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) data = {};
-  // Onyx Server's webpushNotify sends {type:'dm', from, text} (RFC 8291-encrypted
-  // end to end to the browser); map it onto the generic {title, body, url} shape.
-  // The JSON is sealed to the push subscription — the *message* text may still
-  // be an E2EE envelope the SW cannot open; pushBodyFor redacts those.
-  const dmFrom = boundedPushString(data.from, PUSH_TITLE_MAX - 13);
-  if (data.type === 'dm' && dmFrom) {
+  // Onyx Server webpushNotifyKind seals JSON to the push subscription:
+  //   {type:'dm'|'mention'|'call', from, text, channel?}
+  // The *message* text may still be an E2EE envelope the SW cannot open;
+  // pushBodyFor redacts those so ciphertext never hits a lock screen.
+  const from = boundedPushString(data.from, PUSH_TITLE_MAX - 16);
+  const channel = boundedPushString(data.channel, 64);
+  if (data.type === 'dm' && from) {
     data = {
-      title: `Message from ${dmFrom}`,
+      title: `Message from ${from}`,
       body: pushBodyFor(data.text),
-      tag: `onyx-dm-${dmFrom}`,
+      tag: `onyx-dm-${from}`,
       url: APP_PATH,
+    };
+  } else if (data.type === 'mention' && from) {
+    data = {
+      title: channel ? `${from} mentioned you in ${channel}` : `${from} mentioned you`,
+      body: pushBodyFor(data.text),
+      tag: `onyx-mention-${channel || from}`,
+      url: channel ? `${APP_PATH}?join=${encodeURIComponent(channel)}` : APP_PATH,
+    };
+  } else if (data.type === 'call' && from) {
+    data = {
+      title: channel ? `Call in ${channel}` : 'Incoming call',
+      body: pushBodyFor(data.text) || `${from} started a call`,
+      tag: `onyx-call-${channel || from}`,
+      url: channel ? `${APP_PATH}?join=${encodeURIComponent(channel)}` : APP_PATH,
     };
   }
   const rawTag = boundedPushString(data.tag, PUSH_TAG_MAX);

@@ -85,5 +85,7 @@ Must pass on both public nodes without the Onyx web UI:
 
 | Date | Node | Operator | Result | Notes |
 |------|------|----------|--------|-------|
-| _pending_ | node A | | | |
-| _pending_ | node B | | | |
+| 2026-07-25 | eshmaki.me | fleet deploy | unit/version green | `onyx-server.service` `0.5.6+46a48ad`; Halloy CAP ticks still manual |
+| 2026-07-25 | ircx.us | fleet deploy | unit/version green | same binary; mesh `links_active=1` |
+| _pending_ | eshmaki.me | human | | Halloy: JOIN + CHATHISTORY LATEST |
+| _pending_ | ircx.us | human | | Halloy: react/reply TAGMSG |

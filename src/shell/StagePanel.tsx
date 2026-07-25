@@ -89,14 +89,19 @@ export function StagePanel(): JSX.Element {
         aria-label="Stage"
       >
         <div class="stage-panel__head">
-          <h2 class="stage-panel__title">Stage</h2>
-          <p class="stage-panel__hint">
+          <h2 class="stage-panel__title" id="stage-panel-title">
+            Stage
+          </h2>
+          <p class="stage-panel__hint" id="stage-panel-hint" role="status" aria-live="polite">
             <Show
               when={activeHere() || stagePropOn()}
               fallback="Start a stage to host speakers with a raised-hand queue."
             >
               {isSpeaker() ? 'You are a speaker.' : 'You are in the audience.'}
               {moderated() ? ' Room is moderated (+m).' : ''}
+              {raisedHands().length > 0
+                ? ` ${raisedHands().length} raised hand${raisedHands().length === 1 ? '' : 's'}.`
+                : ''}
             </Show>
           </p>
         </div>

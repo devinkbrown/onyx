@@ -52,6 +52,7 @@ import { deviceKeys, deviceRegistryId } from '@/lib/e2ee/dmCipher';
 import { PasskeysSection } from '@/shell/PasskeysSection';
 import { SessionsDevicesSection } from '@/shell/SessionsDevicesSection';
 import { RecoveryCodesSection } from '@/shell/RecoveryCodesSection';
+import { OperEventConsole } from '@/shell/OperEventConsole';
 import { ModalShell } from '@/primitives/index';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
@@ -857,6 +858,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
           {/* Sessions & devices — current browser + Era 2 (B8) remote list skeleton */}
           <SessionsDevicesSection account={account()} />
+          <OperEventConsole />
 
           {/* Offline recovery codes — B8 remainder */}
           <RecoveryCodesSection account={account()} />
@@ -864,7 +866,10 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           {/* Passkeys — WebAuthn passwordless login: register, list, rename, remove */}
           <PasskeysSection account={account()} owner={memoryOwner()} active={local.open} />
 
-          <Section title="Device encryption keys" hint="Publish this browser's E2EE public key and inspect the account transparency root.">
+          <Section
+            title="Device encryption keys"
+            hint="Multi-device DM E2EE (Era 3 C2): publish this browser's public key so other devices on your account can encrypt to you. List KEYTRANS entries from every device you use. Group E2EE is a later slice."
+          >
             <div class="acct-cert-actions">
               <Button type="button" variant="ghost" size="sm" disabled={e2eeDeviceBusy()} onClick={() => void publishThisDeviceKey()}>
                 {e2eeDeviceBusy() ? 'Publishing…' : 'Publish this device key'}

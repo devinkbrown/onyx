@@ -62,8 +62,16 @@ export function RoomInsightsStrip(): JSX.Element {
           <Show
             when={detail()}
             fallback={
-              <p class="room-insights__empty" role="status" data-testid="room-insights-loading">
-                {detail.loading ? 'Loading public room stats…' : 'No public stats for this room yet.'}
+              <p
+                class="room-insights__empty"
+                role="status"
+                data-testid={detail.loading ? 'room-insights-loading' : detail.error ? 'room-insights-error' : 'room-insights-empty'}
+              >
+                {detail.loading
+                  ? 'Loading public room stats…'
+                  : detail.error
+                    ? 'Could not load room stats. Try Full stats or check back later.'
+                    : 'No public stats for this room yet.'}
               </p>
             }
           >

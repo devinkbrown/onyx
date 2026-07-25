@@ -72,8 +72,9 @@ describe('SessionsDevicesSection', () => {
     expect(sendRaw).toHaveBeenCalledWith('SESSION', 'DROP', '#2');
   });
 
-  it('revokes every other attached session in one action', () => {
+  it('revokes every other attached session in one action after confirm', () => {
     const sendRaw = vi.fn();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     store.setState({ client: { sendRaw } as never }, false);
     render(() => <SessionsDevicesSection account="alice" />);
     store.setState({
@@ -86,8 +87,27 @@ describe('SessionsDevicesSection', () => {
     }, false);
 
     fireEvent.click(screen.getByTestId('sessions-revoke-others'));
+    expect(confirm).toHaveBeenCalled();
     expect(sendRaw).toHaveBeenCalledWith('SESSION', 'DROP', '#2');
     expect(sendRaw).toHaveBeenCalledWith('SESSION', 'DROP', '#3');
+    confirm.mockRestore();
+  });
+
+  it('does not revoke others when confirm is cancelled', () => {
+    const sendRaw = vi.fn();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    store.setState({ client: { sendRaw } as never }, false);
+    render(() => <SessionsDevicesSection account="alice" />);
+    store.setState({
+      accountSessions: [
+        { index: 1, current: true, signonMs: 1_710_000_000_000, state: 'attached' },
+        { index: 2, current: false, signonMs: 1_710_000_100_000, state: 'attached' },
+      ],
+      accountSessionsPending: false,
+    }, false);
+    fireEvent.click(screen.getByTestId('sessions-revoke-others'));
+    expect(sendRaw).not.toHaveBeenCalledWith('SESSION', 'DROP', '#2');
+    confirm.mockRestore();
   });
 
   it('points at Passkeys for device credentials', () => {

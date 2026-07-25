@@ -1511,14 +1511,15 @@ export function Connect(props: ConnectProps): JSX.Element {
                           type="text"
                           autocomplete="one-time-code"
                           spellcheck={false}
-                          placeholder="ABCDE-FGHIJ"
+                          placeholder="ABCDE-FGHJK"
                           value={recoveryCode()}
                           data-testid="conn-recovery-code"
                           onInput={(e) => setRecoveryCode(e.currentTarget.value)}
                         />
                       </label>
                       <p class="conn-mode-hint">
-                        Connects, then spends one offline recovery code for your account nick.
+                        Enter a single-use offline recovery code from Account → Recovery codes.
+                        Connects as your account nick, then spends the code (Crockford alphabet — no I/L/O/U).
                       </p>
                     </Show>
 
