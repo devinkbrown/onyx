@@ -22,7 +22,12 @@ export type RecoveryCodeLine = {
 };
 
 const STATUS_RE = /^RECOVERYCODES:\s*(\d+)\s+unused code/i;
-const CODE_LINE_RE = /^RECOVERYCODES:\s*(\d+)\.\s*([0-9A-HJ-NP-Z]{5}-[0-9A-HJ-NP-Z]{5})\s*$/i;
+// Crockford base32 body (matches server alphabet 0123456789ABCDEFGHJKMNPQRSTVWXYZ).
+const CODE_BODY = '[0-9A-HJKMNP-TV-Z]';
+const CODE_LINE_RE = new RegExp(
+  `^RECOVERYCODES:\\s*(\\d+)\\.\\s*(${CODE_BODY}{5}-${CODE_BODY}{5})\\s*$`,
+  'i',
+);
 const GENERATED_RE = /^RECOVERYCODES:\s*generated\s+(\d+)\s+single-use codes/i;
 const LOGIN_OK_RE = /^RECOVERYCODES:\s*login ok/i;
 const CLEARED_RE = /^RECOVERYCODES:\s*all recovery codes cleared/i;

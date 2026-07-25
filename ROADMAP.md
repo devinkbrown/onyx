@@ -24,7 +24,7 @@ Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
 | **7+** (later sections in this file) | Product entry, Atmosphere, Cadence media, etc. | 🟡 **Many slices shipped**; read per-item ✅ / ⏭️ below — do not treat headers alone as authoritative |
 | **Onyx Server CSB / MESSAGE_V2 / Helix** | Daemon | ✅ **P0s closed 2026-07-17** (see `onyx-server/CLAUDE_CSB_TAKEOVER_ROADMAP.md`); deploy is human-gated |
 | **Engine rename** | Daemon | ✅ **Source rebrand to Onyx Server 2026-07-19**; live `onyx-server.service` / `onyx-run` still production names until deploy |
-| **Era 2 B2 / B8 (client)** | Media polish + sessions | ✅ **B2 R1–R6 closed**; 🟡 **B8** list+`SESSION DROP` closed, recovery codes still open |
+| **Era 2 B2 / B8 (client)** | Media polish + sessions | ✅ **B2 R1–R6 closed**; ✅ **B8** list+`SESSION DROP` + recovery codes closed |
 
 **Wiring audit notes (2026-07-21)** — evidence in
 [`.ai/roadmap-source-ledger.md`](.ai/roadmap-source-ledger.md):
@@ -33,7 +33,9 @@ Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
   `VoiceBar`) and codec-failure toasts (`codecFailure` → `useCadenceMedia`
   `onError` / `onDecodeError`) are wired; not pure-module stubs.
 - **B8** — Account **Sessions & devices** lists attachments and revokes via
-  `SESSION DROP #<n>`; no recovery-code UX under `src/`.
+  `SESSION DROP #<n>`; **Recovery codes** UI + Connect LOGIN path wire
+  `RECOVERYCODES` STATUS/GENERATE/CLEAR/LOGIN (`recoveryCodes.ts`,
+  `RecoveryCodesSection`, store fold).
 - **Background consolidation** — all canvas presets on shared
   `composeSignature` pipeline (five signature families + scenes).
 - **Dense nicklist e2e** — real AppShell 48-member roster journey
@@ -561,8 +563,11 @@ client or public site needs to expose the result.
     **Sessions & devices** (`SessionsDevicesSection`) pulls authoritative
     `SESSION LIST` rows and offers `SESSION DROP #<n>` for non-current
     attachments only (`sessionList.ts` + store fold; never fabricates devices).
-    ⏭️ **CLIENT NEXT (B8 remainder)** — recovery codes (generate/view/consume)
-    remain open; no client implementation under `src/` yet.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-25 (Era 2 B8 recovery codes)** — Account
+    **Recovery codes** (`RecoveryCodesSection`) drives `RECOVERYCODES`
+    STATUS/GENERATE/CLEAR; Connect offers offline LOGIN (queued until 001);
+    pure Crockford parse helpers in `recoveryCodes.ts`; server stores digests
+    under account props `rcd\x00`.
 20. **Brand and glossary cleanup** *(main site + client)* — enforce one public
     glossary across home, about, status, roadmap, accessibility, app chrome,
     invite unfurls, and docs. Track the master-roadmap direction to make

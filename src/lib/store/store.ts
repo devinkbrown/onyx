@@ -33,6 +33,13 @@ import {
   parseSessionListLine,
   type AccountSessionRow,
 } from '@/lib/irc/sessionList';
+import {
+  isRecoveryCodesCleared,
+  isRecoveryCodesGenerated,
+  isRecoveryCodesLoginOk,
+  parseRecoveryCodeLine,
+  parseRecoveryCodesStatus,
+} from '@/lib/irc/recoveryCodes';
 import type { CadencePeerState, CadenceRoomStats, CallState } from '@/lib/cadence-media/types';
 import { getMountedCadenceMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
@@ -10452,34 +10459,33 @@ export const store = createStore<OnyxState>()(
 
             // ── RECOVERYCODES: offline recovery codes (B8) ───────────────
             if (text.startsWith('RECOVERYCODES:')) {
-              const body = text.slice('RECOVERYCODES:'.length).trim();
-              const statusMatch = body.match(/^(\d+)\s+unused code/i);
-              const codeLine = body.match(/^(\d+)\.\s*([0-9A-HJ-NP-Z]{5}-[0-9A-HJ-NP-Z]{5})\s*$/i);
+              const status = parseRecoveryCodesStatus(text);
+              const codeLine = parseRecoveryCodeLine(text);
               set(st => {
                 const recoveryCodes = { ...st.recoveryCodes, busy: false, error: null };
-                if (statusMatch) {
-                  recoveryCodes.remaining = Number.parseInt(statusMatch[1]!, 10);
+                if (status) {
+                  recoveryCodes.remaining = status.remaining;
                   recoveryCodes.info = null;
-                } else if (/^generated\s+\d+\s+single-use codes/i.test(body)) {
+                } else if (isRecoveryCodesGenerated(text)) {
                   recoveryCodes.freshCodes = [];
-                  recoveryCodes.info = body;
+                  recoveryCodes.info = text.slice('RECOVERYCODES:'.length).trim();
                 } else if (codeLine) {
-                  const dashed = codeLine[2]!.toUpperCase();
+                  const dashed = codeLine.code;
                   if (!recoveryCodes.freshCodes.includes(dashed)) {
                     recoveryCodes.freshCodes = [...recoveryCodes.freshCodes, dashed];
                   }
                   recoveryCodes.remaining = recoveryCodes.freshCodes.length;
-                } else if (/all recovery codes cleared/i.test(body)) {
+                } else if (isRecoveryCodesCleared(text)) {
                   recoveryCodes.remaining = 0;
                   recoveryCodes.freshCodes = [];
-                  recoveryCodes.info = body;
-                } else if (/login ok/i.test(body)) {
-                  recoveryCodes.info = body;
+                  recoveryCodes.info = text.slice('RECOVERYCODES:'.length).trim();
+                } else if (isRecoveryCodesLoginOk(text)) {
+                  recoveryCodes.info = text.slice('RECOVERYCODES:'.length).trim();
                   if (typeof recoveryCodes.remaining === 'number' && recoveryCodes.remaining > 0) {
                     recoveryCodes.remaining -= 1;
                   }
                 } else {
-                  recoveryCodes.info = body;
+                  recoveryCodes.info = text.slice('RECOVERYCODES:'.length).trim();
                 }
                 return { recoveryCodes };
               });

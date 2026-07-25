@@ -17,11 +17,13 @@ describe('recoveryCodes', () => {
     expect(parseRecoveryCodesStatus('nope')).toBeNull();
   });
 
-  it('parses dashed code lines', () => {
-    expect(parseRecoveryCodeLine('RECOVERYCODES: 3. ABCDE-FGHIJ')).toEqual({
+  it('parses dashed code lines (Crockford alphabet; no I/L/O/U)', () => {
+    expect(parseRecoveryCodeLine('RECOVERYCODES: 3. ABCDE-FGHJK')).toEqual({
       index: 3,
-      code: 'ABCDE-FGHIJ',
+      code: 'ABCDE-FGHJK',
     });
+    // Reject ambiguous I (server never emits it).
+    expect(parseRecoveryCodeLine('RECOVERYCODES: 3. ABCDE-FGHIJ')).toBeNull();
     expect(parseRecoveryCodeLine('RECOVERYCODES: generated 10')).toBeNull();
   });
 
@@ -32,7 +34,7 @@ describe('recoveryCodes', () => {
   });
 
   it('normalizes dashed input for LOGIN', () => {
-    expect(normalizeRecoveryCodeInput('abCde-fghij')).toBe('ABCDEFGHIJ');
-    expect(normalizeRecoveryCodeInput('  ABCDE FGH IJ ')).toBe('ABCDEFGHIJ');
+    expect(normalizeRecoveryCodeInput('abCde-fghjk')).toBe('ABCDEFGHJK');
+    expect(normalizeRecoveryCodeInput('  ABCDE FGH JK ')).toBe('ABCDEFGHJK');
   });
 });
