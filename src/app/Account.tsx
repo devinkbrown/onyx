@@ -517,15 +517,17 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
             </svg>
             <h3 class="acct-guest-title">You're browsing as a guest</h3>
             <p class="acct-guest-body">
-              Sign in or register from the Connect screen to claim a name, keep
-              your settings across the mesh, and protect your nick.
+              Claim an account to keep settings across the mesh, protect your nick,
+              enable multi-device sessions, recovery codes, and encrypted DMs that
+              follow you between browsers.
             </p>
             <ol class="acct-guest-steps" aria-label="Account claim steps">
-              <li>Register the name you are using.</li>
-              <li>Add recovery email during registration or later here.</li>
-              <li>Bind a passkey or certificate after sign-in.</li>
+              <li>Open Connect and register the name you are using.</li>
+              <li>Add a recovery email (and later, offline recovery codes).</li>
+              <li>Bind a passkey or client certificate after sign-in.</li>
+              <li>Publish your E2EE device key so multi-device DMs can fan out.</li>
             </ol>
-            <Button type="button" variant="primary" size="sm" onClick={returnToConnect}>
+            <Button type="button" variant="primary" size="sm" data-testid="guest-open-connect" onClick={returnToConnect}>
               Open Connect to claim
             </Button>
           </div>

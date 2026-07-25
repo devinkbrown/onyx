@@ -5185,6 +5185,25 @@ function deliverChatMessage(
   // optimistic echo; the offline caller also keeps its durable row untouched.
   const cp = client.isupport.CHANTYPES ?? '#&';
   const isDm = target.length > 0 && !cp.includes(target[0]!);
+
+  // Era 3 C1: rooms with encryption-policy=required must never accept plaintext
+  // until group envelope seal ships. Locked group ciphertext may still echo.
+  if (targetIsChannel && !isGroupEnvelope(text)) {
+    const policy = selectChannelEncryptionPolicy(target)(get());
+    if (policy === 'required') {
+      get().addToast({
+        variant: 'error',
+        title: 'Room requires encryption',
+        description: `Messages in ${target} cannot be sent as plaintext yet — group E2EE delivery is not ready on this client.`,
+      });
+      get().addNotification({
+        type: 'error',
+        text: `Encryption required — message to ${target} was not sent (group E2EE not available).`,
+      });
+      return false;
+    }
+  }
+
   const peerKey = get().peerDmKeys.get(target.toLowerCase());
   const peerDeviceKeys = normalizePeerDeviceKeys([
     ...(get().peerDmDeviceKeys.get(target.toLowerCase()) ?? []),
@@ -6481,11 +6500,13 @@ export const store = createStore<OnyxState>()(
       // restore chronology after merge (same contract as chathistory batches).
       const key = target.toLowerCase();
       let activatedView: ActiveView | null = null;
+      let paintedFresh = 0;
       set(s => {
         const merge = (existing: ChatMessage[]): ChatMessage[] => {
           const ids = new Set(existing.map(m => m.id));
           const fresh = localMsgs.filter(m => !ids.has(m.id));
           if (fresh.length === 0) return existing;
+          paintedFresh = fresh.length;
           return [...fresh, ...existing].sort(
             (a, b) => a.time.getTime() - b.time.getTime() || a.id.localeCompare(b.id),
           );
@@ -6534,6 +6555,14 @@ export const store = createStore<OnyxState>()(
       // an explicit ?join= request still wins in the JOIN handler.
       const restore = _currentSessionRestore(get);
       if (restore && activatedView) restore.preserveActiveView = activatedView;
+      // Honest cold-paint signal: device memory landed before/without network.
+      if (paintedFresh > 0 && options?.activate) {
+        get().addToast({
+          variant: 'info',
+          title: 'Device memory',
+          description: `Showing ${paintedFresh} saved message${paintedFresh === 1 ? '' : 's'} from this device while the network catches up.`,
+        });
+      }
       // E2EE: vaulted DMs are ciphertext at rest — decrypt the hydrated
       // envelopes once the buffer exists (peer key may already be known; if
       // not, the METADATA fetch on DM-open re-runs decryption).
@@ -7049,6 +7078,29 @@ export const store = createStore<OnyxState>()(
             return;
           }
           get().scheduleEvent(target, at, title);
+          return;
+        }
+        // Local client commands — never hit the wire as IRC verbs.
+        if (lc === 'clear') {
+          get().clearMessages(target);
+          get().addToast({
+            variant: 'info',
+            title: 'Scrollback cleared',
+            description: 'Local history for this view was cleared on this device only.',
+          });
+          return;
+        }
+        if (lc === 'search') {
+          const q = args.join(' ').trim();
+          // Dynamic import keeps store free of Solid search-module cycles.
+          void import('@/shell/search/useMessageSearch').then((mod) => {
+            if (q) mod.openMessageSearchWithQuery(q);
+            else mod.openMessageSearch();
+          });
+          return;
+        }
+        if (lc === 'history') {
+          get().openMessageSearch();
           return;
         }
         client.sendRaw(cmd!.toUpperCase(), ...args);
@@ -15097,10 +15149,18 @@ export const store = createStore<OnyxState>()(
       // Announce this device's E2EE public key so peers can encrypt to us.
       // METADATA is account/nick-scoped and server-persisted, so it survives
       // for the peer to fetch on WHOIS/next contact. Best-effort, pref-gated.
+      // Also publish ocean.dm-keys (C2 multi-device directory). Today this
+      // browser holds one identity key — the list is length 1 and grows when
+      // peers merge keys from E2EEKEY LIST / other devices' METADATA.
       if (!preferences().e2eeDms) return;
       void deviceKeys().then((keys) => {
         if (!keys) return;
-        get().client?.sendRaw('METADATA', '*', 'SET', 'ocean.dm-key', keys.publicB64);
+        const client = get().client;
+        if (!client) return;
+        client.sendRaw('METADATA', '*', 'SET', 'ocean.dm-key', keys.publicB64);
+        // Multi-device directory: at least this device; merge any already-known
+        // peer-self keys is N/A here — we only advertise our own public point.
+        client.sendRaw('METADATA', '*', 'SET', 'ocean.dm-keys', keys.publicB64);
       });
     },
 

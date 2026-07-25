@@ -72,8 +72,9 @@ describe('Account panel — guest state', () => {
       screen.getByRole('heading', { name: /browsing as a guest/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Account claim steps' })).toBeInTheDocument();
-    expect(screen.getByText('Register the name you are using.')).toBeInTheDocument();
-    expect(screen.getByText('Bind a passkey or certificate after sign-in.')).toBeInTheDocument();
+    expect(screen.getByText(/Open Connect and register/)).toBeInTheDocument();
+    expect(screen.getByText(/Bind a passkey or client certificate/)).toBeInTheDocument();
+    expect(screen.getByTestId('guest-open-connect')).toBeInTheDocument();
   });
 
   it('does not render management sections for a guest', () => {

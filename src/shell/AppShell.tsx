@@ -48,6 +48,7 @@ import { GuestClaimPrompt } from './GuestClaimPrompt';
 import { DmKeyChangeBanner } from './DmKeyChangeBanner';
 import { DmSafetySheet } from './DmSafetySheet';
 import { ReconnectStatusBanner } from './ReconnectStatusBanner';
+import { CapabilityMatrixSection } from './CapabilityMatrixSection';
 import { TimeScrubber } from './TimeScrubber';
 import { WatchTogetherActivity } from './WatchTogetherActivity';
 import { MessageView } from './MessageView';
@@ -898,7 +899,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
           </Show>
           }>
             {/* Read-only server/status buffer — no composer, no voice */}
-            <MessageView selfNick={displayNick()} />
+            <div class="shell-status-stack" data-testid="status-stack">
+              <CapabilityMatrixSection />
+              <MessageView selfNick={displayNick()} />
+            </div>
           </Show>
           {/* Search Center is global: on Home/status it searches every local
               vault target; server search appears only for a concrete room/DM. */}

@@ -15,7 +15,9 @@ import {
   type CalmPreset,
 } from '@/lib/notifications/calmMode';
 import { isQuietHoursActive } from '@/lib/notifications/quietHours';
+import { loadSmartMute } from '@/lib/notifications/smartMuteMemory';
 import { Popover } from '@/primitives/Popover';
+import { selectDeviceMemoryOwner } from '@/lib/store';
 import {
   disableWebPush,
   enableWebPush,
@@ -83,7 +85,21 @@ export function NotificationControls(): JSX.Element {
   const dndQuietStart = useStore((s) => s.dndQuietStart);
   const dndQuietEnd = useStore((s) => s.dndQuietEnd);
   const account = useStore(selectAccount);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const smartMuteSummary = (): string => {
+    const owner = memoryOwner();
+    if (!owner) return 'smart mute off';
+    const rules = loadSmartMute(owner);
+    if (rules.keywords.length === 0 && !rules.muteSystemNoise) return 'smart mute off';
+    const bits: string[] = [];
+    if (rules.keywords.length > 0) bits.push(`${rules.keywords.length} keyword mute${rules.keywords.length === 1 ? '' : 's'}`);
+    if (rules.muteSystemNoise) bits.push('system alerts muted');
+    return bits.join(', ');
+  };
   const webPushOwnerScope = useStore((s) => (
     s.server ? JSON.stringify([s.server.url, selectAccount(s)]) : null
   ));
@@ -317,7 +333,7 @@ export function NotificationControls(): JSX.Element {
     >
       <span id="notify-controls-title" class="sr-only">Notification controls</span>
       <span id="notify-controls-state" class="sr-only">
-        {desktopStateLabel(desktopActive(), permission())}; notification mode {CALM_PRESET_LABELS[calmPreset()]}; notification sound {soundEnabled() ? 'on' : 'off'}; do not disturb {dndActive() ? 'on' : 'off'}; {quietHoursSummary(dndQuietStart(), dndQuietEnd())}{quietHoursSilencing() ? ', currently active' : ''}.
+        {desktopStateLabel(desktopActive(), permission())}; notification mode {CALM_PRESET_LABELS[calmPreset()]}; notification sound {soundEnabled() ? 'on' : 'off'}; do not disturb {dndActive() ? 'on' : 'off'}; {quietHoursSummary(dndQuietStart(), dndQuietEnd())}{quietHoursSilencing() ? ', currently active' : ''}; {smartMuteSummary()}.
       </span>
       <button
         type="button"

@@ -40,6 +40,18 @@ already-merged main-tree wave. Server repo untouched (client-only integrate).
 - Focused Vitest on changed modules — see commit / report
 - `./deploy.sh` — SPA → `out/`
 
+## Follow-on wave (post-20x “more”)
+
+| Slice | Status |
+|-------|--------|
+| encryption-policy=required fail-closed channel send | **SHIPPED** |
+| `/clear` local scrollback + `/search` open Search Center | **SHIPPED** |
+| `publishDeviceKey` also sets `ocean.dm-keys` | **SHIPPED** |
+| Cold vault hydrate toast (device memory honesty) | **SHIPPED** |
+| Status buffer capability matrix strip | **SHIPPED** |
+| Guest upgrade CTA + E2EE step | **SHIPPED** |
+| Notify controls smart-mute summary | **SHIPPED** |
+
 ## See also
 
 - `docs/era3-40-game-changers.md` — full 40-item status table
