@@ -32,6 +32,7 @@ import {
   getSlashCommandSuggestions,
   type SlashCommand,
 } from '@/lib/commands/registry';
+import { cycleNickCompletion, nickTokenAt } from '@/lib/composer/nickComplete';
 import { UploadError, uploadFile } from '@/lib/upload/upload';
 import { buildAttachmentMessage } from '@/lib/upload/attachmentMessage';
 import {
@@ -260,6 +261,25 @@ export function Composer(props: ComposerProps): JSX.Element {
   const slashCommands = createMemo(() => getSlashCommandSuggestions(text(), 8));
   const slashVisible = createMemo(() => !slashDismissed() && slashCommands().length > 0);
 
+  // Nick Tab-complete candidates for the active room (channel roster or DM peer).
+  const nickCandidates = createMemo((): string[] => {
+    const t = target();
+    if (!t) return [];
+    const state = getState();
+    const view = state.activeView;
+    if (view.kind === 'dm') {
+      const peer = view.nick;
+      const self = state.ourNick;
+      return [peer, self].filter((n): n is string => typeof n === 'string' && n.length > 0);
+    }
+    const ch = state.channels.get(t.toLowerCase());
+    if (!ch) return [];
+    // Prefer display nick casing from ChannelUser; fall back to map key.
+    return Array.from(ch.users.values()).map((u) => u.nick || '').filter(Boolean);
+  });
+  let nickCycleIndex = -1;
+  let nickCycleQuery = '';
+
   const canSend = createMemo(() => {
     if (isSending()) return false;
     if (activeEditing()) return text().trim().length > 0 && attachments().length === 0;
@@ -479,6 +499,28 @@ export function Composer(props: ComposerProps): JSX.Element {
       if (e.key === 'Escape') {
         e.preventDefault();
         setSlashDismissed(true);
+        return;
+      }
+    }
+
+    // Tab completes a nick prefix (or @mention) when slash suggestions are idle.
+    if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
+      const el = e.currentTarget as HTMLTextAreaElement;
+      const caret = el.selectionStart ?? text().length;
+      const current = text();
+      // Reset cycle when the incomplete query changes.
+      const token = nickTokenAt(current, caret);
+      const q = token?.query ?? '';
+      if (q !== nickCycleQuery) {
+        nickCycleQuery = q;
+        nickCycleIndex = -1;
+      }
+      const result = cycleNickCompletion(current, caret, nickCandidates(), nickCycleIndex);
+      if (result) {
+        e.preventDefault();
+        nickCycleIndex = result.index;
+        setComposerText(result.text);
+        focusTextarea(result.caret);
         return;
       }
     }
@@ -1196,7 +1238,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         )}
       </Show>
       <p class="shell-composer-hint" aria-hidden="true">
-        Enter to send · Shift+Enter for newline · Paste or drop files to attach
+        Enter to send · Tab completes nick · Shift+Enter for newline · Paste or drop files to attach
       </p>
       </div>
     </section>

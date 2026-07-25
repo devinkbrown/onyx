@@ -66,6 +66,9 @@ already-merged main-tree wave. Server repo untouched (client-only integrate).
 | Shortcuts: mute channel, export transcript | **SHIPPED** |
 | Feed empty states (channel / DM / status) with slash hints | **SHIPPED** |
 | Ribbon DND chip when quiet hours / snooze / manual DND | **SHIPPED** |
+| Composer Tab nick / @-mention completion | **SHIPPED** |
+| Message menu: Ignore nick (device-local) | **SHIPPED** |
+| Document title attention `(N) Onyx` for mentions | **SHIPPED** |
 
 ## See also
 

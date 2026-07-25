@@ -83,10 +83,11 @@ describe('messageMenuCapabilities', () => {
       canStartTopic: true,
       canEdit: true,
       canDelete: true,
+      canIgnore: false,
     });
   });
 
-  it('disables edit and delete on someone else’s message but keeps reply/react/copy', () => {
+  it('disables edit and delete on someone else’s message but keeps reply/react/copy/ignore', () => {
     // Arrange
     const args = input({ selfNick: 'bob' });
 
@@ -102,6 +103,7 @@ describe('messageMenuCapabilities', () => {
     expect(caps.canStartTopic).toBe(true);
     expect(caps.canEdit).toBe(false);
     expect(caps.canDelete).toBe(false);
+    expect(caps.canIgnore).toBe(true);
   });
 
   it('disables every live-message action once a message is deleted', () => {

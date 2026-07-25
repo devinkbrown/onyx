@@ -68,6 +68,8 @@ export type MessageMenuCapabilities = {
   canEdit: boolean;
   /** Delete: own, non-deleted message (store supports redaction). */
   canDelete: boolean;
+  /** Ignore this nick on this device (not self, not empty). */
+  canIgnore: boolean;
 };
 
 export type CapabilityInput = {
@@ -117,6 +119,7 @@ export function messageMenuCapabilities(input: CapabilityInput): MessageMenuCapa
       && msg.type === 'msg'
       && !hasEncryptedMessageBoundary(msg),
     canDelete: !gone && !msg.pending && isOwn && deleteSupported,
+    canIgnore: !gone && !isOwn && typeof msg.from === 'string' && msg.from.trim().length > 0,
   };
 }
 
@@ -879,6 +882,29 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
               >
                 <PinIcon class="msg-menu-item-icon" />
                 <span>{isPinned() ? 'Unpin message' : 'Pin message'}</span>
+              </button>
+            </Show>
+            <Show when={caps().canIgnore}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                data-testid="msg-menu-ignore"
+                aria-label={`Ignore ${local.msg.from} on this device`}
+                onClick={() => {
+                  const nick = local.msg.from.trim();
+                  if (!nick) return;
+                  getState().ignoreUser(nick);
+                  getState().addToast({
+                    variant: 'info',
+                    title: `Ignoring ${nick}`,
+                    description: 'Their messages are hidden on this device. /unignore to reverse.',
+                  });
+                  local.onMenuOpenChange?.(false);
+                }}
+              >
+                <span class="msg-menu-item-icon" aria-hidden="true">⊘</span>
+                <span>Ignore {local.msg.from}</span>
               </button>
             </Show>
             <Show when={caps().canDelete}>
