@@ -140,6 +140,18 @@ export const SHORTCUTS: readonly Shortcut[] = [
     label: 'Star / unstar channel',
     group: 'Reading',
   },
+  {
+    id: 'mute.channel',
+    chord: { key: 'm', mod: true, shift: true },
+    label: 'Mute / unmute channel',
+    group: 'Reading',
+  },
+  {
+    id: 'export.transcript',
+    chord: { key: 'e', mod: true, alt: true },
+    label: 'Export local transcript',
+    group: 'Reading',
+  },
 ] as const;
 
 type ElementLikeTarget = EventTarget & {

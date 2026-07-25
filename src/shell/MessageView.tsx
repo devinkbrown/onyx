@@ -1658,9 +1658,32 @@ export function MessageView(props: MessageViewProps): JSX.Element {
             <Show
               when={isLoadingHistory()}
               fallback={
-                <div class="shell-feed-empty">
-                  <Show when={activeView().kind !== 'home'}>
-                    <span>Still waters here — say the first thing.</span>
+                <div
+                  class="shell-feed-empty"
+                  role="status"
+                  data-testid="feed-empty"
+                >
+                  <Show when={activeView().kind === 'channel'}>
+                    <p class="shell-feed-empty-title">Still waters here</p>
+                    <p class="shell-feed-empty-body">
+                      Say the first thing in {activeTarget()}, or try
+                      {' '}<kbd class="shell-feed-empty-kbd">/search</kbd>,
+                      {' '}<kbd class="shell-feed-empty-kbd">/share</kbd>,
+                      or <kbd class="shell-feed-empty-kbd">/export</kbd>.
+                    </p>
+                  </Show>
+                  <Show when={activeView().kind === 'dm'}>
+                    <p class="shell-feed-empty-title">A private conversation</p>
+                    <p class="shell-feed-empty-body">
+                      Messages with {activeTarget()} stay on this device until you send.
+                      Type below — or <kbd class="shell-feed-empty-kbd">/search</kbd> local history.
+                    </p>
+                  </Show>
+                  <Show when={activeView().kind === 'status'}>
+                    <p class="shell-feed-empty-title">Status log</p>
+                    <p class="shell-feed-empty-body">
+                      Server notices and connection detail will land here.
+                    </p>
                   </Show>
                 </div>
               }

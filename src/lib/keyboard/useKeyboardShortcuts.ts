@@ -200,6 +200,14 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
     description: 'Toggle do not disturb',
     group: 'View',
   }),
+  descriptorFromRegistry('mute.channel', {
+    description: 'Mute / unmute channel',
+    group: 'Chat',
+  }),
+  descriptorFromRegistry('export.transcript', {
+    description: 'Export local transcript',
+    group: 'Chat',
+  }),
   descriptorFromRegistry('composer.attach', {
     description: 'Attach a file',
     group: 'Chat',
@@ -449,6 +457,50 @@ function toggleDnd(): void {
   state.setDndEnabled(!state.dndEnabled);
 }
 
+function toggleActiveMute(): void {
+  const state = getState();
+  if (state.activeView.kind !== 'channel') return;
+  const channel = state.activeView.channel;
+  // muteChannel maps to notify level 'none'; unmute restores 'all'.
+  const level = state.channelNotify.get(channel.toLowerCase());
+  if (level === 'none') state.unmuteChannel(channel);
+  else state.muteChannel(channel);
+}
+
+function exportActiveTranscript(): void {
+  const state = getState();
+  const view = state.activeView;
+  const target = view.kind === 'channel'
+    ? view.channel
+    : view.kind === 'dm'
+      ? view.nick
+      : null;
+  if (!target) return;
+  const key = target.toLowerCase();
+  const messages = view.kind === 'channel'
+    ? (state.channels.get(key)?.messages ?? [])
+    : (state.dms.get(key)?.messages ?? []);
+  void import('@/lib/export/conversationExport').then(({
+    buildConversationExport,
+    downloadConversationExport,
+  }) => {
+    const doc = buildConversationExport({
+      target,
+      messages,
+      network: state.networkName,
+      ourNick: state.ourNick,
+    });
+    const ok = downloadConversationExport(doc, 'txt');
+    state.addToast({
+      variant: ok ? 'success' : 'warning',
+      title: ok ? 'Export started' : 'Export failed',
+      description: ok
+        ? `${doc.messageCount} local message${doc.messageCount === 1 ? '' : 's'} (this device only).`
+        : 'Could not build a downloadable transcript.',
+    });
+  });
+}
+
 function focusSidebar(): void {
   const active = document.querySelector<HTMLElement>(
     '[data-sidebar-item][aria-current="page"]',
@@ -547,6 +599,14 @@ const REGISTRY_HANDLERS: Readonly<Record<string, ShortcutHandler>> = {
   },
   'dnd.toggle': () => {
     toggleDnd();
+    return true;
+  },
+  'mute.channel': () => {
+    toggleActiveMute();
+    return true;
+  },
+  'export.transcript': () => {
+    exportActiveTranscript();
     return true;
   },
   'composer.attach': () => clickComposerControl('button[aria-label="Attach files"]'),

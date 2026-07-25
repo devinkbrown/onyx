@@ -807,7 +807,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('heading', { name: 'Conversation' })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Show 24-hour activity strip/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('switch', { name: /Show join voice\/video controls/i })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('switch', { name: /Show topic, forum, and follow controls/i })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('switch', { name: /Show topic, forum, and follow controls/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('switch', { name: /Show shared watch activity/i })).toHaveAttribute('aria-checked', 'true');
     const reactionDensity = screen.getByRole('radiogroup', { name: 'Reaction density' });
     expect(reactionDensity).toBeInTheDocument();

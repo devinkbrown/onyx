@@ -238,13 +238,22 @@ export function Composer(props: ComposerProps): JSX.Element {
     deliveryFailed: outboxDeliveryFailed(),
   }));
 
+  // Accessible name stays short and stable; the visible placeholder can carry
+  // light slash-command discoverability without polluting aria-label.
+  const accessibleName = createMemo(() => {
+    const t = target();
+    if (activeEditing()) return 'Edit message';
+    if (isOffline()) return t ? `Offline — queues for ${t}` : 'Reconnecting…';
+    if (!t) return 'Pick a room or a person to begin';
+    return `Message ${t}`;
+  });
+
   const placeholder = createMemo(() => {
     const t = target();
     if (activeEditing()) return 'Edit message';
     if (isOffline()) return t ? `Offline — queues for ${t}` : 'Reconnecting…';
     if (!t) return 'Pick a room or a person to begin';
-    // Light discoverability for platform slash commands without crowding the field.
-    return `Message ${t}  ·  /search  /clear  /read  /star`;
+    return `Message ${t}  ·  /search  /mute  /export  /help`;
   });
 
   const emojiMatches = createMemo(() => searchEmojis(emojiQuery(), 36));
@@ -1147,7 +1156,7 @@ export function Composer(props: ComposerProps): JSX.Element {
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          aria-label={placeholder()}
+          aria-label={accessibleName()}
           aria-disabled={!isEnabled()}
           aria-multiline="true"
           aria-controls={slashVisible() ? 'shell-command-menu' : undefined}

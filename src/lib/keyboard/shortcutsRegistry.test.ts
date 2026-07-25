@@ -83,6 +83,17 @@ describe('matchShortcut', () => {
     expect(modifiedMatch).toBeNull();
   });
 
+  it('matches mute channel and export transcript chords', () => {
+    expect(
+      matchShortcut({ key: 'm', ctrlKey: true, metaKey: false, shiftKey: true, altKey: false })?.id,
+    ).toBe('mute.channel');
+    expect(
+      matchShortcut({ key: 'e', ctrlKey: true, metaKey: false, shiftKey: false, altKey: true })?.id,
+    ).toBe('export.transcript');
+    expect(shortcutById('mute.channel')?.label).toMatch(/mute/i);
+    expect(shortcutById('export.transcript')?.label).toMatch(/export/i);
+  });
+
   it('matches the plain follow toggle shortcut', () => {
     const plainMatch = matchShortcut(makeEvent({ key: 'u' }));
     const modifiedMatch = matchShortcut(makeEvent({ key: 'u', ctrlKey: true }));

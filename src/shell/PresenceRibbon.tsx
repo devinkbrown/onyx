@@ -18,6 +18,7 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPins } from '@/lib/store';
 import { openPreferences } from '@/lib/prefs/preferences';
+import { channelNotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
 import { Popover } from '@/primitives/index';
 import { ChannelSettings } from './ChannelSettings';
@@ -132,7 +133,22 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const voiceChannelParticipants = useStore((s) => s.voiceChannelParticipants);
   const speakingNicks = useStore((s) => s.speakingNicks);
   const mutedNicks = useStore((s) => s.mutedNicks);
+  const channelNotify = useStore((s) => s.channelNotify);
   const [now, setNow] = createSignal(Date.now());
+  // Alerts are silenced by manual DND, a timed snooze, or the quiet-hours window.
+  const dndEnabled = useStore((s) => s.dndEnabled);
+  const dndUntil = useStore((s) => s.dndUntil);
+  const dndQuietStart = useStore((s) => s.dndQuietStart);
+  const dndQuietEnd = useStore((s) => s.dndQuietEnd);
+  const dndActive = createMemo(() => {
+    void dndQuietStart();
+    void dndQuietEnd();
+    void now();
+    if (dndEnabled()) return true;
+    const until = dndUntil();
+    if (until != null && until > now()) return true;
+    return getState().isDndActive();
+  });
 
   // ── derived ──
   const activeChannel = createMemo(() => {
@@ -558,6 +574,23 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 </svg>
               </button>
             </Show>
+            {/* DND / quiet-hours — only when active so calm default stays quiet. */}
+            <Show when={dndActive()}>
+              <button
+                type="button"
+                class="shell-ribbon-iconbtn shell-ribbon-dnd"
+                data-testid="ribbon-dnd-active"
+                aria-label="Do not disturb is on — open preferences to change"
+                title="Do not disturb is on"
+                onClick={() => openPreferences()}
+              >
+                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3a6.5 6.5 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                </svg>
+                <span class="shell-ribbon-action-label">DND</span>
+              </button>
+            </Show>
             {/* Member count is presence-as-place (stable roster trigger), not chrome. */}
             <Show when={memberCount() > 0}>
               <button
@@ -661,6 +694,80 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                         <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7.1 4l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1Z" />
                       </svg>
                       <span>Channel settings</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="shell-ribbon-more-item"
+                      role="menuitem"
+                      data-testid="ribbon-mute-channel"
+                      aria-label={
+                        channelNotifyMode(channelNotify(), settingsChannel() ?? '') === 'mute'
+                          ? `Unmute ${settingsChannel()}`
+                          : `Mute ${settingsChannel()}`
+                      }
+                      onClick={() => closeMoreThen(() => {
+                        const ch = settingsChannel();
+                        if (!ch) return;
+                        if (channelNotifyMode(getState().channelNotify, ch) === 'mute') {
+                          getState().unmuteChannel(ch);
+                        } else {
+                          getState().muteChannel(ch);
+                        }
+                      })}
+                      onKeyDown={onMoreMenuKeyDown}
+                    >
+                      <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+                        <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                        <path d="m22 9-6 6" />
+                        <path d="m16 9 6 6" />
+                      </svg>
+                      <span>
+                        {channelNotifyMode(channelNotify(), settingsChannel() ?? '') === 'mute'
+                          ? 'Unmute channel'
+                          : 'Mute channel'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      class="shell-ribbon-more-item"
+                      role="menuitem"
+                      data-testid="ribbon-export-transcript"
+                      aria-label={`Export local transcript for ${settingsChannel()}`}
+                      onClick={() => closeMoreThen(() => {
+                        const ch = settingsChannel();
+                        if (!ch) return;
+                        void import('@/lib/export/conversationExport').then(({
+                          buildConversationExport,
+                          downloadConversationExport,
+                        }) => {
+                          const state = getState();
+                          const key = ch.toLowerCase();
+                          const msgs = state.channels.get(key)?.messages ?? [];
+                          const doc = buildConversationExport({
+                            target: ch,
+                            messages: msgs,
+                            network: state.networkName,
+                            ourNick: state.ourNick,
+                          });
+                          downloadConversationExport(doc, 'txt');
+                          state.addToast({
+                            variant: 'success',
+                            title: 'Export started',
+                            description: `${doc.messageCount} local message${doc.messageCount === 1 ? '' : 's'} (this device only).`,
+                          });
+                        });
+                      })}
+                      onKeyDown={onMoreMenuKeyDown}
+                    >
+                      <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3v12" />
+                        <path d="m7 10 5 5 5-5" />
+                        <path d="M5 19h14" />
+                      </svg>
+                      <span>Export transcript</span>
                     </button>
                   </>
                 </Show>

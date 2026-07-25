@@ -51,6 +51,21 @@ already-merged main-tree wave. Server repo untouched (client-only integrate).
 | Status buffer capability matrix strip | **SHIPPED** |
 | Guest upgrade CTA + E2EE step | **SHIPPED** |
 | Notify controls smart-mute summary | **SHIPPED** |
+| Slash: ignore/read/star + mark-read ribbon + offline memo toast | **SHIPPED** |
+
+## 10× product surface wave (2026-07-25)
+
+| Slice | Status |
+|-------|--------|
+| Local slash: mute/unmute, autojoin, highlight, snooze/dnd, color, share, export, notify, help | **SHIPPED** |
+| `conversationExport` txt/json download (device-only honesty) | **SHIPPED** |
+| ChannelSettings Export transcript section | **SHIPPED** |
+| Ribbon More: mute channel + export transcript | **SHIPPED** |
+| Composer placeholder discoverability (`/mute /export /help`) | **SHIPPED** |
+| Composer accessible name clean of slash noise | **SHIPPED** |
+| Shortcuts: mute channel, export transcript | **SHIPPED** |
+| Feed empty states (channel / DM / status) with slash hints | **SHIPPED** |
+| Ribbon DND chip when quiet hours / snooze / manual DND | **SHIPPED** |
 
 ## See also
 

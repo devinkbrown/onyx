@@ -73,6 +73,10 @@ import {
   withEncryptionPolicyParam,
 } from '@/lib/invite/encryptionPolicyBadge';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
+import {
+  buildConversationExport,
+  downloadConversationExport,
+} from '@/lib/export/conversationExport';
 import { BridgeStatusBadge } from './BridgeStatusBadge';
 import { RoomInsightsStrip } from './RoomInsightsStrip';
 
@@ -333,6 +337,40 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
       });
     } finally {
       if (epoch === copyEpoch) setCopyBusy(false);
+    }
+  }
+
+  // ── Local transcript export (this device only; never server-complete) ────
+  const [exportStatus, setExportStatus] = createSignal('');
+  const messageCount = createMemo(() => channel()?.messages.length ?? 0);
+
+  function exportTranscript(format: 'txt' | 'json'): void {
+    const name = channel()?.name ?? local.channel;
+    const msgs = channel()?.messages ?? [];
+    const state = getState();
+    const doc = buildConversationExport({
+      target: name,
+      messages: msgs,
+      network: state.networkName,
+      ourNick: state.ourNick,
+    });
+    const ok = downloadConversationExport(doc, format);
+    if (ok) {
+      setExportStatus(
+        `Exported ${doc.messageCount} message${doc.messageCount === 1 ? '' : 's'} as ${format} (this device only).`,
+      );
+      toast({
+        title: 'Export started',
+        description: `${doc.messageCount} local message${doc.messageCount === 1 ? '' : 's'} (${format}).`,
+        intent: 'success',
+      });
+    } else {
+      setExportStatus('Export failed. Try again or use /export in the composer.');
+      toast({
+        title: 'Export failed',
+        description: 'Could not build a downloadable transcript.',
+        intent: 'warning',
+      });
     }
   }
 
@@ -715,6 +753,50 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             data-testid="chset-invite-status"
           >
             {copyStatus()}
+          </span>
+        </section>
+
+        {/* ── Export transcript (local device memory only) ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-export-heading">
+          <h3 id="chset-export-heading" class="shell-chset-heading">Export transcript</h3>
+          <p class="shell-chset-hint" id="chset-export-hint">
+            Downloads scrollback stored on this device only
+            {messageCount() > 0
+              ? ` (${messageCount()} message${messageCount() === 1 ? '' : 's'} in memory).`
+              : ' (no messages loaded here yet).'}
+            {' '}
+            Not a complete server history.
+          </p>
+          <div class="shell-chset-inline-actions">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              data-testid="chset-export-txt"
+              aria-describedby="chset-export-hint"
+              onClick={() => exportTranscript('txt')}
+            >
+              Download text
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              data-testid="chset-export-json"
+              aria-describedby="chset-export-hint"
+              onClick={() => exportTranscript('json')}
+            >
+              Download JSON
+            </Button>
+          </div>
+          <span
+            class="sr-only"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-testid="chset-export-status"
+          >
+            {exportStatus()}
           </span>
         </section>
 

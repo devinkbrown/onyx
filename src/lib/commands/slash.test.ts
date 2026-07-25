@@ -37,4 +37,14 @@ describe('slash command registry', () => {
     expect(completeSlashCommand('/shr', command!)).toBe(String.raw`¯\_(ツ)_/¯`);
     expect(expandSlashTextCommand('/tableflip')).toBe('(╯°□°）╯︵ ┻━┻');
   });
+
+  it('registers platform-local mute, export, notify, and help commands', () => {
+    expect(findSlashCommand('mute')?.usage).toContain('/mute');
+    expect(findSlashCommand('export')?.usage).toContain('/export');
+    expect(findSlashCommand('notify')?.usage).toContain('/notify');
+    expect(findSlashCommand('help')?.description.toLowerCase()).toContain('slash');
+    expect(findSlashCommand('colour')?.name).toBe('color');
+    expect(getSlashCommandSuggestions('/sno').map((c) => c.name)).toContain('snooze');
+    expect(getSlashCommandSuggestions('/exp').map((c) => c.name)).toEqual(['export']);
+  });
 });

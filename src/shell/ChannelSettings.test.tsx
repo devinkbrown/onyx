@@ -230,6 +230,16 @@ describe('ChannelSettings — Topic draft durability', () => {
   });
 });
 
+describe('ChannelSettings — Export transcript', () => {
+  it('exposes text and JSON download actions for local scrollback', () => {
+    seed();
+    renderPanel();
+    expect(screen.getByRole('heading', { name: 'Export transcript' })).toBeInTheDocument();
+    expect(screen.getByTestId('chset-export-txt')).toHaveAccessibleName(/download text/i);
+    expect(screen.getByTestId('chset-export-json')).toHaveAccessibleName(/download json/i);
+  });
+});
+
 describe('ChannelSettings — Share invite a11y', () => {
   it('names the invite preview and copy affordances for assistive tech', () => {
     seed();

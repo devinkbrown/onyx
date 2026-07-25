@@ -7158,6 +7158,270 @@ export const store = createStore<OnyxState>()(
           }
           return;
         }
+        if (lc === 'mute' || lc === 'unmute') {
+          const ch = targetIsChannel ? target : (args[0] ?? '').trim();
+          if (!ch || !(client.isupport.CHANTYPES ?? '#&').includes(ch[0]!)) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Mute a channel',
+              description: 'Use /mute in a channel, or /mute #room.',
+            });
+            return;
+          }
+          if (lc === 'mute') {
+            get().muteChannel(ch);
+            get().addToast({
+              variant: 'info',
+              title: `Muted ${ch}`,
+              description: 'Notifications for this room are off on this device.',
+            });
+          } else {
+            get().unmuteChannel(ch);
+            get().addToast({
+              variant: 'info',
+              title: `Unmuted ${ch}`,
+              description: 'Room notifications resume (mentions still follow channel notify mode).',
+            });
+          }
+          return;
+        }
+        if (lc === 'autojoin' || lc === 'unautojoin') {
+          const ch = targetIsChannel ? target : (args[0] ?? '').trim();
+          if (!ch || !(client.isupport.CHANTYPES ?? '#&').includes(ch[0]!)) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Auto-join',
+              description: 'Use /autojoin in a channel, or /autojoin #room.',
+            });
+            return;
+          }
+          if (lc === 'autojoin') {
+            get().addAutoJoin(ch);
+            get().addToast({
+              variant: 'info',
+              title: `Auto-join ${ch}`,
+              description: 'This room will be rejoined on this device after reconnect.',
+            });
+          } else {
+            get().removeAutoJoin(ch);
+            get().addToast({
+              variant: 'info',
+              title: `Removed auto-join for ${ch}`,
+              description: 'Reconnect will no longer force-join this room from this device.',
+            });
+          }
+          return;
+        }
+        if (lc === 'highlight' || lc === 'unhighlight') {
+          const word = args.join(' ').trim();
+          if (!word) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Highlight word',
+              description: `Use /${lc} <word or phrase>.`,
+            });
+            return;
+          }
+          if (lc === 'highlight') {
+            get().addHighlightWord(word);
+            get().addToast({
+              variant: 'info',
+              title: 'Highlight added',
+              description: `Messages containing “${word}” will highlight on this device.`,
+            });
+          } else {
+            get().removeHighlightWord(word);
+            get().addToast({
+              variant: 'info',
+              title: 'Highlight removed',
+              description: `“${word}” will no longer force a highlight.`,
+            });
+          }
+          return;
+        }
+        if (lc === 'snooze' || lc === 'dnd') {
+          // /snooze [minutes] — timed DND. /dnd on|off|minutes
+          const raw = (args[0] ?? '').trim().toLowerCase();
+          if (raw === 'off' || raw === '0' || raw === 'clear') {
+            get().setDndEnabled(false);
+            get().setDndUntil(null);
+            get().addToast({
+              variant: 'info',
+              title: 'Do not disturb off',
+              description: 'Desktop and sound alerts resume (quiet hours still apply).',
+            });
+            return;
+          }
+          if (raw === 'on' || raw === '') {
+            get().setDndEnabled(true);
+            get().setDndUntil(null);
+            get().addToast({
+              variant: 'info',
+              title: 'Do not disturb on',
+              description: 'Alerts are silenced until you turn DND off.',
+            });
+            return;
+          }
+          const mins = Number(raw);
+          if (!Number.isFinite(mins) || mins <= 0 || mins > 24 * 60) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Snooze',
+              description: 'Use /snooze <minutes> (1–1440), or /dnd on|off.',
+            });
+            return;
+          }
+          const until = Date.now() + Math.floor(mins) * 60_000;
+          get().setDndEnabled(false);
+          get().setDndUntil(until);
+          get().addToast({
+            variant: 'info',
+            title: `Snoozed ${Math.floor(mins)}m`,
+            description: 'Alerts pause until the timer ends.',
+          });
+          return;
+        }
+        if (lc === 'color' || lc === 'colour') {
+          if (!targetIsChannel) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Channel color',
+              description: 'Use /color #hex in a channel.',
+            });
+            return;
+          }
+          const color = (args[0] ?? '').trim();
+          if (!color || color === 'clear' || color === 'off' || color === 'reset') {
+            get().setChannelColor(target, '');
+            get().addToast({
+              variant: 'info',
+              title: 'Channel color cleared',
+              description: `${target} uses the default accent again.`,
+            });
+            return;
+          }
+          get().setChannelColor(target, color);
+          get().addToast({
+            variant: 'info',
+            title: 'Channel color set',
+            description: `${target} accent updated on this device.`,
+          });
+          return;
+        }
+        if (lc === 'share' || lc === 'invite') {
+          // /share — copy a deep link to the current room (or /invite <nick> stays wire).
+          if (lc === 'invite' && args[0]) {
+            // Real IRC INVITE needs a nick — fall through to wire.
+          } else if (targetIsChannel) {
+            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://eshmaki.me';
+            const url = `${origin}/app/?join=${encodeURIComponent(target)}`;
+            void import('@/lib/clipboard/writeClipboardText').then(async ({ writeClipboardText }) => {
+              const ok = await writeClipboardText(url);
+              get().addToast({
+                variant: ok ? 'success' : 'warning',
+                title: ok ? 'Room link copied' : 'Copy failed',
+                description: ok ? url : 'Could not write the invite link to the clipboard.',
+              });
+            });
+            return;
+          } else if (lc === 'share') {
+            get().addToast({
+              variant: 'warning',
+              title: 'Share a room',
+              description: 'Open a channel, then use /share to copy a deep link.',
+            });
+            return;
+          }
+        }
+        if (lc === 'export') {
+          // Local conversation export (this device scrollback only).
+          const formatArg = (args[0] ?? 'txt').trim().toLowerCase();
+          const format = formatArg === 'json' ? 'json' as const : 'txt' as const;
+          void import('@/lib/export/conversationExport').then(({ buildConversationExport, downloadConversationExport }) => {
+            const key = target.toLowerCase();
+            const ch = get().channels.get(key);
+            const dm = get().dms.get(key);
+            const msgs = ch?.messages ?? dm?.messages ?? [];
+            const doc = buildConversationExport({
+              target,
+              messages: msgs,
+              network: get().networkName,
+              ourNick: get().ourNick,
+            });
+            const ok = downloadConversationExport(doc, format);
+            get().addToast({
+              variant: ok ? 'success' : 'warning',
+              title: ok ? 'Export started' : 'Export failed',
+              description: ok
+                ? `${doc.messageCount} message${doc.messageCount === 1 ? '' : 's'} from this device (${format}).`
+                : 'Could not build a downloadable transcript.',
+            });
+          });
+          return;
+        }
+        if (lc === 'notify') {
+          // /notify all|mentions|mute — personal channel notify mode
+          if (!targetIsChannel) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Channel notifications',
+              description: 'Use /notify all|mentions|mute inside a channel.',
+            });
+            return;
+          }
+          const mode = (args[0] ?? '').trim().toLowerCase();
+          if (mode === 'all' || mode === 'mentions' || mode === 'mute' || mode === 'none') {
+            const mapped = mode === 'none' ? 'mute' : mode === 'mute' ? 'mute' : mode;
+            get().setChannelNotifyMode(target, mapped as 'all' | 'mentions' | 'mute');
+            get().addToast({
+              variant: 'info',
+              title: `Notify: ${mapped}`,
+              description: `Personal notification mode for ${target} on this device.`,
+            });
+            return;
+          }
+          get().addToast({
+            variant: 'warning',
+            title: 'Notify mode',
+            description: 'Use /notify all, /notify mentions, or /notify mute.',
+          });
+          return;
+        }
+        if (lc === 'help') {
+          // Local help — never send HELP as a raw IRC verb unless unknown.
+          void import('@/lib/commands/registry').then(({ findSlashCommand, SLASH_COMMANDS }) => {
+            const needle = (args[0] ?? '').trim().toLowerCase();
+            if (needle) {
+              const hit = findSlashCommand(needle);
+              if (!hit) {
+                get().addToast({
+                  variant: 'warning',
+                  title: 'Unknown command',
+                  description: `No slash command named “${needle}”. Try /help.`,
+                });
+                return;
+              }
+              get().addToast({
+                variant: 'info',
+                title: hit.usage,
+                description: hit.description,
+              });
+              return;
+            }
+            const localish = SLASH_COMMANDS
+              .filter((c) =>
+                ['clear', 'search', 'read', 'star', 'mute', 'autojoin', 'highlight', 'snooze', 'dnd', 'color', 'share', 'export', 'notify', 'help', 'ignore'].includes(c.name),
+              )
+              .map((c) => `/${c.name}`)
+              .join(' · ');
+            get().addToast({
+              variant: 'info',
+              title: 'Local slash commands',
+              description: localish || 'Type / in the composer for suggestions.',
+            });
+          });
+          return;
+        }
         client.sendRaw(cmd!.toUpperCase(), ...args);
         return;
       }
