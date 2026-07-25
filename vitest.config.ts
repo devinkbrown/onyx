@@ -30,6 +30,13 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/out/**', 'tests/e2e/**', '.wt/**'],
+    // Full-suite IDB/materialization cases (export bounds, vault prune) and Solid
+    // panel journeys exceed 5s under load; default 5s produced load flakes.
+    testTimeout: 60_000,
+    hookTimeout: 30_000,
+    // Cap concurrency so fake-indexeddb + jsdom suites do not thrash each other
+    // when the host is already running a heavy `zig build test`.
+    maxWorkers: 4,
     server: { deps: { inline: [/solid-js/, /@solidjs\/.*/] } },
     coverage: {
       provider: 'v8',

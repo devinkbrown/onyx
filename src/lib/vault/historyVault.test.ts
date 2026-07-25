@@ -700,7 +700,7 @@ describe('historyVault', () => {
       expect(exported[0]!.id).toBe('export-2');
       expect(exported.at(-1)!.id).toBe(`export-${total - 1}`);
       expect(exported.some((item) => item.id === 'export-0' || item.id === 'export-1')).toBe(false);
-    }, 30_000);
+    }, 90_000);
 
     it('imports a validated JSON round trip into the local vault', async () => {
       await saveMessages('#Alpha', [msg('a1', 1000, { target: '#Alpha' })]);
@@ -1160,7 +1160,7 @@ describe('historyVault', () => {
       expect(kept.length).toBe(VAULT_KEEP);
       expect(kept[0]!.id).toBe('p100');
       expect(kept[kept.length - 1]!.id).toBe('p499');
-    }, 30_000);
+    }, 90_000);
 
     it('prunes at VAULT_KEEP identically when a default-count policy is set', async () => {
       // A policy whose keep === VAULT_KEEP and no cutoff must equal the default.
@@ -1176,7 +1176,7 @@ describe('historyVault', () => {
       expect(kept.length).toBe(VAULT_KEEP);
       expect(kept[0]!.id).toBe('p100');
       expect(kept[kept.length - 1]!.id).toBe('p499');
-    }, 30_000);
+    }, 90_000);
 
     it('honors a per-channel keep override on the real prune path', async () => {
       // #small caps at 5; the default (VAULT_KEEP) applies to everyone else.

@@ -139,11 +139,14 @@ describe('Theme Studio accent EyeDropper', () => {
       state: 'cancelled',
       detail: 'Screen colour sampling cancelled. The accent seed was not changed.',
     });
-    expect(await screen.findByText('Screen colour sampling cancelled. The accent seed was not changed.'))
-      .toBeInTheDocument();
+    expect(await screen.findByText(
+      'Screen colour sampling cancelled. The accent seed was not changed.',
+      {},
+      { timeout: 10_000 },
+    )).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sample accent seed colour from the screen' }))
       .not.toBeDisabled();
-  });
+  }, 15_000);
 
   it('ignores a stale picker completion after the active theme changes', async () => {
     let resolvePick: (result: eyeDropper.EyeDropperSelectionResult) => void = () => {};

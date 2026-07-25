@@ -3248,9 +3248,13 @@ describe('PreferencesPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
     fireEvent.click(screen.getByRole('button', { name: 'Erase history' }));
 
-    expect(await screen.findByText('Could not clear all local history. Try again after freeing storage.')).toBeInTheDocument();
+    expect(await screen.findByText(
+      'Could not clear all local history. Try again after freeing storage.',
+      {},
+      { timeout: 10_000 },
+    )).toBeInTheDocument();
     expect(localStorage.getItem(TOPIC_READ_STORAGE_KEY)).not.toBeNull();
-  });
+  }, 15_000);
 
   it('resets background motion and announces every completion without moving focus', async () => {
     setSceneMotion('off');
