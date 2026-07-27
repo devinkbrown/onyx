@@ -30,7 +30,7 @@ import './shell.css';
 // the lazy VoiceStage chunk arrives — without this, the panel looks unstyled/missing.
 import './voice/voice.css';
 
-import { lazy, createEffect, createMemo, createSignal, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, Suspense, type JSX } from 'solid-js';
+import { lazy, createEffect, createMemo, createSignal, ErrorBoundary, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, Suspense, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { useThemeOptional } from '@/theme';
 import { Background } from '@/backgrounds/index';
@@ -84,16 +84,18 @@ const ReactionsOverlay = lazy(() =>
   import('./voice/overlays/ReactionsOverlay').then((m) => ({ default: m.ReactionsOverlay })),
 );
 import { MemberList } from './MemberList';
-import { AccountPanel } from '@/app/Account';
-import { AppearancePanel } from './AppearancePanel';
-import { PreferencesPanel } from './PreferencesPanel';
-import { PinnedMessages } from './PinnedMessages';
-import { ScheduledMessagesSheet } from './ScheduledMessagesSheet';
-import { JumpToDateSheet } from './JumpToDateSheet';
-import { applyPreferences, isPreferencesOpen, openPreferences, preferences } from '@/lib/prefs/preferences';
+// Panels are entered from explicit controls and should not inflate the initial
+// connected-shell bundle. Each preserves its existing Suspense boundary below.
+const AccountPanel = lazy(() => import('@/app/Account').then((m) => ({ default: m.AccountPanel })));
+const AppearancePanel = lazy(() => import('./AppearancePanel').then((m) => ({ default: m.AppearancePanel })));
+const PreferencesPanel = lazy(() => import('./PreferencesPanel').then((m) => ({ default: m.PreferencesPanel })));
+const PinnedMessages = lazy(() => import('./PinnedMessages').then((m) => ({ default: m.PinnedMessages })));
+const ScheduledMessagesSheet = lazy(() => import('./ScheduledMessagesSheet').then((m) => ({ default: m.ScheduledMessagesSheet })));
+const JumpToDateSheet = lazy(() => import('./JumpToDateSheet').then((m) => ({ default: m.JumpToDateSheet })));
+import { applyPreferences, closePreferences, isPreferencesOpen, openPreferences, preferences } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
-import { ShortcutsOverlay } from './ShortcutsOverlay';
+const ShortcutsOverlay = lazy(() => import('./ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })));
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { MessageSearch } from './search/MessageSearch';
 import { closeMessageSearch, openMessageSearch } from './search/useMessageSearch';
@@ -129,6 +131,34 @@ function focusableIn(root: HTMLElement | null | undefined): HTMLElement[] {
   if (!root) return [];
   return Array.from(root.querySelectorAll<HTMLElement>(MOBILE_DRAWER_FOCUSABLE))
     .filter((node) => !node.hasAttribute('disabled') && node.getAttribute('aria-hidden') !== 'true');
+}
+
+function LazySurface(props: {
+  label: string;
+  onClose: () => void;
+  children: JSX.Element;
+}): JSX.Element {
+  return (
+    <ErrorBoundary
+      fallback={() => (
+        <div class="shell-lazy-state" role="alert">
+          <span>{`Could not load ${props.label}.`}</span>
+          <button type="button" onClick={() => props.onClose()}>Close</button>
+          <button type="button" onClick={() => window.location.reload()}>Reload app</button>
+        </div>
+      )}
+    >
+      <Suspense
+        fallback={(
+          <div class="shell-lazy-state" role="status">
+            {`Loading ${props.label}…`}
+          </div>
+        )}
+      >
+        {props.children}
+      </Suspense>
+    </ErrorBoundary>
+  );
 }
 
 // ── Disconnected banner ──────────────────────────────────────────────────────
@@ -183,6 +213,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const mobileSidebarOpen = useStore((s) => s.mobileSidebarOpen);
   const ourNick = useStore((s) => s.ourNick);
   const showAccount = useStore((s) => s.showAccount);
+  const showAppearance = useStore((s) => s.showAppearance);
+  const showPinnedMessages = useStore((s) => s.showPinnedMessages);
+  const showScheduledMessages = useStore((s) => s.showScheduledMessages);
+  const showJumpToDate = useStore((s) => s.showJumpToDate);
   const showWhois = useStore((s) => s.showWhois);
   const showKeyboardShortcuts = useStore((s) => s.showKeyboardShortcuts);
   const reducedData = makeReducedDataSignal();
@@ -982,13 +1016,21 @@ export function AppShell(props: AppShellProps): JSX.Element {
       </nav>
 
       {/* Account management panel — portal modal, gated on store.showAccount */}
-      <AccountPanel
-        open={showAccount()}
-        onOpenChange={(open) => (open ? getState().openAccount() : getState().closeAccount())}
-      />
+      <Show when={showAccount()}>
+        <LazySurface label="account settings" onClose={() => getState().closeAccount()}>
+          <AccountPanel
+            open
+            onOpenChange={(open) => (open ? getState().openAccount() : getState().closeAccount())}
+          />
+        </LazySurface>
+      </Show>
 
       {/* Appearance panel — theme + background, gated on store.showAppearance */}
-      <AppearancePanel />
+      <Show when={showAppearance()}>
+        <LazySurface label="appearance settings" onClose={() => getState().closeAppearance()}>
+          <AppearancePanel />
+        </LazySurface>
+      </Show>
       <Show when={useStore((s) => s.showChannelBrowser)()}>
         <ChannelBrowser />
       </Show>
@@ -1001,16 +1043,32 @@ export function AppShell(props: AppShellProps): JSX.Element {
       </Show>
 
       {/* Preferences panel — display & behaviour, gated on isPreferencesOpen() */}
-      <PreferencesPanel />
+      <Show when={isPreferencesOpen()}>
+        <LazySurface label="preferences" onClose={closePreferences}>
+          <PreferencesPanel />
+        </LazySurface>
+      </Show>
 
       {/* Pinned messages drawer — gated on store.showPinnedMessages */}
-      <PinnedMessages />
+      <Show when={showPinnedMessages()}>
+        <LazySurface label="pinned messages" onClose={() => getState().closePinnedMessages()}>
+          <PinnedMessages />
+        </LazySurface>
+      </Show>
 
       {/* Scheduled "send later" queue — gated on store.showScheduledMessages */}
-      <ScheduledMessagesSheet />
+      <Show when={showScheduledMessages()}>
+        <LazySurface label="scheduled messages" onClose={() => getState().closeScheduledMessages()}>
+          <ScheduledMessagesSheet />
+        </LazySurface>
+      </Show>
 
       {/* Jump-to-date sheet — Era 1 A3 discoverable travelTo control */}
-      <JumpToDateSheet />
+      <Show when={showJumpToDate()}>
+        <LazySurface label="jump to date" onClose={() => getState().closeJumpToDate()}>
+          <JumpToDateSheet />
+        </LazySurface>
+      </Show>
 
       {/* Voice/video overlays — the whole cluster is lazy and only mounts once
           a call is signalled or the settings sheet opens; each still self-gates
@@ -1032,7 +1090,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
       </Show>
 
       {/* Keyboard shortcuts help overlay — opened with "?" or Home shortcuts action */}
-      <ShortcutsOverlay open={showKeyboardShortcuts()} onClose={() => getState().closeKeyboardShortcuts()} />
+      <Show when={showKeyboardShortcuts()}>
+        <LazySurface label="keyboard shortcuts" onClose={() => getState().closeKeyboardShortcuts()}>
+          <ShortcutsOverlay open onClose={() => getState().closeKeyboardShortcuts()} />
+        </LazySurface>
+      </Show>
     </>
   );
 }

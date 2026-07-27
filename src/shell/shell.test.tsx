@@ -1135,7 +1135,7 @@ describe('AppShell', () => {
       fireEvent.click(moreSurface.closest('button') ?? moreSurface);
     }
 
-    it('shows a "Guest" account chip that opens the account panel', () => {
+    it('shows a "Guest" account chip that opens the account panel', async () => {
       // Arrange — connected guest (no logged-in account).
       seedStore('#general');
 
@@ -1155,7 +1155,7 @@ describe('AppShell', () => {
       // Assert — store flag flips and the panel mounts (portaled to body, so
       // query the whole document via screen, not the render container).
       expect(store.getState().showAccount).toBe(true);
-      expect(screen.getByTestId('account-panel')).toBeInTheDocument();
+      expect(await screen.findByTestId('account-panel')).toBeInTheDocument();
     });
 
     it('shows the account name on the chip when signed in', () => {
@@ -1179,7 +1179,7 @@ describe('AppShell', () => {
       expect(chip.textContent).toContain('alice');
     });
 
-    it('opens preferences from the desktop ribbon', () => {
+    it('opens preferences from the desktop ribbon', async () => {
       // Arrange
       seedStore('#general');
 
@@ -1190,7 +1190,7 @@ describe('AppShell', () => {
 
       // Assert
       expect(isPreferencesOpen()).toBe(true);
-      expect(screen.getByTestId('preferences-panel')).toBeInTheDocument();
+      expect(await screen.findByTestId('preferences-panel')).toBeInTheDocument();
     });
 
     it('opens the channel video surface without opening voice settings', () => {

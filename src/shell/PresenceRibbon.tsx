@@ -723,15 +723,17 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                           ? `Unmute ${settingsChannel()}`
                           : `Mute ${settingsChannel()}`
                       }
-                      onClick={() => closeMoreThen(() => {
+                      onClick={() => {
                         const ch = settingsChannel();
-                        if (!ch) return;
-                        if (channelNotifyMode(getState().channelNotify, ch) === 'mute') {
-                          getState().unmuteChannel(ch);
-                        } else {
-                          getState().muteChannel(ch);
-                        }
-                      })}
+                        closeMoreThen(() => {
+                          if (!ch) return;
+                          if (channelNotifyMode(getState().channelNotify, ch) === 'mute') {
+                            getState().unmuteChannel(ch);
+                          } else {
+                            getState().muteChannel(ch);
+                          }
+                        });
+                      }}
                       onKeyDown={onMoreMenuKeyDown}
                     >
                       <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
@@ -753,30 +755,38 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       role="menuitem"
                       data-testid="ribbon-export-transcript"
                       aria-label={`Export local transcript for ${settingsChannel()}`}
-                      onClick={() => closeMoreThen(() => {
+                      onClick={() => {
                         const ch = settingsChannel();
-                        if (!ch) return;
-                        void import('@/lib/export/conversationExport').then(({
-                          buildConversationExport,
-                          downloadConversationExport,
-                        }) => {
-                          const state = getState();
-                          const key = ch.toLowerCase();
-                          const msgs = state.channels.get(key)?.messages ?? [];
-                          const doc = buildConversationExport({
-                            target: ch,
-                            messages: msgs,
-                            network: state.networkName,
-                            ourNick: state.ourNick,
-                          });
-                          downloadConversationExport(doc, 'txt');
-                          state.addToast({
-                            variant: 'success',
-                            title: 'Export started',
-                            description: `${doc.messageCount} local message${doc.messageCount === 1 ? '' : 's'} (this device only).`,
+                        closeMoreThen(() => {
+                          if (!ch) return;
+                          void import('@/lib/export/conversationExport').then(({
+                            buildConversationExport,
+                            downloadConversationExport,
+                          }) => {
+                            const state = getState();
+                            const key = ch.toLowerCase();
+                            const msgs = state.channels.get(key)?.messages ?? [];
+                            const doc = buildConversationExport({
+                              target: ch,
+                              messages: msgs,
+                              network: state.networkName,
+                              ourNick: state.ourNick,
+                            });
+                            downloadConversationExport(doc, 'txt');
+                            state.addToast({
+                              variant: 'success',
+                              title: 'Export started',
+                              description: `${doc.messageCount} local message${doc.messageCount === 1 ? '' : 's'} (this device only).`,
+                            });
+                          }).catch(() => {
+                            getState().addToast({
+                              variant: 'error',
+                              title: 'Export failed',
+                              description: 'The transcript exporter could not be loaded. Please try again.',
+                            });
                           });
                         });
-                      })}
+                      }}
                       onKeyDown={onMoreMenuKeyDown}
                     >
                       <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
