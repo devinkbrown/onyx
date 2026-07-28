@@ -3,15 +3,21 @@
  * groupEnvelope.ts — Era 3 C1 group-room E2EE foundation.
  *
  * Opaque on-wire envelope for channel messages once a room key exists.
- * This module deliberately does NOT implement TreeKEM/MLS key agreement yet —
+ * This module deliberately does NOT implement TreeKEM/MLS key agreement —
  * it only defines the wire shape, validation, and sealed-payload helpers so
  * send/receive paths can fail closed on unknown group ciphertext and so later
- * MLS work has a stable prefix boundary.
+ * MLS work has a stable prefix boundary. No RFC-9420 compliance claim.
  *
  * Wire: `ONYXROOM1 ` ‖ b64url(version u8 ‖ keyEpoch u32be ‖ nonce12 ‖ ct‖tag)
+ *
+ * AES-GCM binds additional authenticated data (AAD) to the normalized room
+ * name and key epoch so a ciphertext cannot be replayed into another room or
+ * epoch even when the raw AES key material is reused. Room identity is taken
+ * from channel context at seal/open time (not duplicated in the body).
  */
 
 import { fromB64url, toB64url } from './dmCipher';
+import { normalizeGroupRoom, validRoomEpoch } from './groupKeyring';
 
 export const GROUP_ENVELOPE_PREFIX = 'ONYXROOM1 ';
 export const GROUP_ENVELOPE_VERSION = 1;
@@ -23,6 +29,13 @@ const GCM_TAG_BYTES = 16;
 const HEADER_BYTES = 1 + 4; // version + epoch
 const MIN_BODY_BYTES = HEADER_BYTES + NONCE_BYTES + GCM_TAG_BYTES;
 
+/** Copy into a fresh ArrayBuffer so WebCrypto BufferSource typing is satisfied. */
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 export function isGroupEnvelope(text: string): boolean {
   return text.startsWith(GROUP_ENVELOPE_PREFIX);
 }
@@ -33,6 +46,19 @@ export type GroupEnvelopeParts = {
   nonce: Uint8Array;
   ciphertext: Uint8Array;
 };
+
+/**
+ * Canonical AAD for group AES-GCM: wire prefix label + normalized room + epoch.
+ * Both seal and open must use the same bytes; any room/epoch mismatch fails closed.
+ */
+export function buildGroupAad(room: string, keyEpoch: number): Uint8Array | null {
+  const normalized = normalizeGroupRoom(room);
+  if (!normalized || !validRoomEpoch(keyEpoch)) return null;
+  // Stable ASCII domain: "ONYXROOM1|<room>|<epoch>"
+  return new TextEncoder().encode(
+    `${GROUP_ENVELOPE_PREFIX.trim()}|${normalized}|${keyEpoch >>> 0}`,
+  );
+}
 
 /**
  * Parse a group envelope without decrypting. Fail closed on any structural
@@ -83,13 +109,18 @@ export function packGroupEnvelope(
 
 /**
  * Seal plaintext under a caller-supplied AES-GCM CryptoKey (room epoch key).
- * Returns null on any crypto or size failure — never leaks partial ciphertext.
+ * AAD binds `room` (normalized) + `keyEpoch` so the ciphertext is not portable
+ * across rooms or epochs. Returns null on any crypto or size failure — never
+ * leaks partial ciphertext.
  */
 export async function sealGroupMessage(
   roomKey: CryptoKey,
+  room: string,
   keyEpoch: number,
   plaintext: string,
 ): Promise<string | null> {
+  const aad = buildGroupAad(room, keyEpoch);
+  if (!aad) return null;
   const encoded = new TextEncoder().encode(plaintext);
   if (encoded.byteLength === 0 || encoded.byteLength > MAX_GROUP_PLAINTEXT_BYTES) {
     return null;
@@ -97,9 +128,13 @@ export async function sealGroupMessage(
   try {
     const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
     const ct = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv: nonce },
+      {
+        name: 'AES-GCM',
+        iv: toArrayBuffer(nonce),
+        additionalData: toArrayBuffer(aad),
+      },
       roomKey,
-      encoded,
+      toArrayBuffer(encoded),
     );
     return packGroupEnvelope(keyEpoch, nonce, new Uint8Array(ct));
   } catch {
@@ -107,27 +142,71 @@ export async function sealGroupMessage(
   }
 }
 
-/** Open a group envelope with the room epoch key. Null when not for this key. */
+/**
+ * Open a group envelope with the room epoch key in a known room context.
+ * Null when not for this key, room AAD, or optional expectedEpoch.
+ */
 export async function openGroupMessage(
   roomKey: CryptoKey,
+  room: string,
   envelope: string,
   expectedEpoch?: number,
 ): Promise<string | null> {
   const parts = parseGroupEnvelope(envelope);
   if (!parts) return null;
   if (expectedEpoch !== undefined && parts.keyEpoch !== expectedEpoch) return null;
+  const aad = buildGroupAad(room, parts.keyEpoch);
+  if (!aad) return null;
   try {
-    const iv = parts.nonce.slice();
-    const data = parts.ciphertext.slice();
     const pt = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
+      {
+        name: 'AES-GCM',
+        iv: toArrayBuffer(parts.nonce),
+        additionalData: toArrayBuffer(aad),
+      },
       roomKey,
-      data,
+      toArrayBuffer(parts.ciphertext),
     );
     return new TextDecoder().decode(pt);
   } catch {
     return null;
   }
+}
+
+/**
+ * Local seal via keyring active epoch: looks up the active key and binds AAD.
+ * Fail closed when the room has no active epoch or seal fails.
+ */
+export async function sealGroupMessageWithKeyring(
+  keyring: {
+    activeEpoch(room: string): number | null;
+    getActive(room: string): CryptoKey | null;
+  },
+  room: string,
+  plaintext: string,
+): Promise<string | null> {
+  const epoch = keyring.activeEpoch(room);
+  const key = keyring.getActive(room);
+  if (epoch === null || !key) return null;
+  return sealGroupMessage(key, room, epoch, plaintext);
+}
+
+/**
+ * Local open via keyring: uses the envelope's epoch key if retained for room.
+ * Fail closed when the epoch key is missing or AAD/key rejects.
+ */
+export async function openGroupMessageWithKeyring(
+  keyring: {
+    get(room: string, epoch: number): CryptoKey | null;
+  },
+  room: string,
+  envelope: string,
+): Promise<string | null> {
+  const parts = parseGroupEnvelope(envelope);
+  if (!parts) return null;
+  const key = keyring.get(room, parts.keyEpoch);
+  if (!key) return null;
+  return openGroupMessage(key, room, envelope, parts.keyEpoch);
 }
 
 /** Placeholder shown when a room ciphertext cannot be opened. */

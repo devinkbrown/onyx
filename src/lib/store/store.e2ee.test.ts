@@ -179,7 +179,8 @@ describe('E2EE DMs', () => {
       true,
       ['encrypt', 'decrypt'],
     );
-    const envelope = (await sealGroupMessage(roomKey, 2, 'secret room body mentioning me'))!;
+    // Deliberate room context for AAD-bound seal (matches seeded channel below).
+    const envelope = (await sealGroupMessage(roomKey, '#room', 2, 'secret room body mentioning me'))!;
     expect(envelope.startsWith(GROUP_ENVELOPE_PREFIX)).toBe(true);
 
     seedChannel('#room');
