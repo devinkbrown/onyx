@@ -13,13 +13,13 @@ const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 200)));
 
 // ── 1. Community site ──
-for (const [path, needle] of [['/', 'One serpent'], ['/guides/', 'Everything, written down'], ['/community/', 'napkin']]) {
+for (const [path, needle] of [['/', 'A room for your people.'], ['/guides/', 'Everything, written down'], ['/community/', 'napkin']]) {
   const res = await page.goto(`https://eshmaki.me${path}`, { waitUntil: 'domcontentloaded' });
   const body = await page.textContent('body');
   check(`site ${path}`, res.status() === 200 && body.includes(needle));
 }
 const stats = await page.goto('https://eshmaki.me/stats/', { waitUntil: 'networkidle' });
-check('stats SPA', stats.status() === 200 && (await page.textContent('body')).includes('IRCXNet'));
+check('stats SPA', stats.status() === 200 && (await page.textContent('body')).includes('The rooms'));
 const data = await (await page.request.get('https://eshmaki.me/stats/data/index.json')).json();
 check('live stats data', Array.isArray(data.channels));
 
@@ -33,15 +33,19 @@ await page.keyboard.press('Enter');
 await page.waitForTimeout(7000);
 check('guest connect → shell', await page.locator('[data-testid="app-shell"]').isVisible().catch(() => false));
 check('no autojoin → Home view', await page.locator('.home').isVisible().catch(() => false));
-check('ribbon guest chip', (await page.getByTestId('ribbon-account-chip').textContent()).includes('Guest'));
+await page.getByTestId('ribbon-more').click();
+check('ribbon guest action', (await page.getByTestId('ribbon-account-chip').textContent()).includes('Guest'));
+await page.keyboard.press('Escape');
 
 // ── 3. Panels ──
 await page.getByTestId('ribbon-bell').click();
 check('inbox opens', await page.getByTestId('notification-center').isVisible().catch(() => false));
 await page.keyboard.press('Escape');
 await page.keyboard.press('Control+k');
-await page.waitForTimeout(600);
-const spotlightOpen = await page.locator('[class*="spotlight"]').first().isVisible().catch(() => false);
+const spotlightOpen = await page.locator('.onyx-spotlight').waitFor({
+  state: 'attached',
+  timeout: 5000,
+}).then(() => true).catch(() => false);
 check('⌘K spotlight', spotlightOpen);
 if (spotlightOpen) {
   await page.keyboard.type('Browse channels');
@@ -51,7 +55,10 @@ if (spotlightOpen) {
   const rows = await page.locator('.chb-row').count();
   check('channel browser + LIST rows', rows >= 1, `${rows} rows`);
   await page.keyboard.press('Escape');
+} else {
+  await page.keyboard.press('Escape');
 }
+await page.getByTestId('ribbon-more').click();
 await page.getByTestId('ribbon-account-chip').click();
 await page.waitForTimeout(700);
 check('account panel (guest)', await page.getByTestId('account-guest').isVisible().catch(() => false));
