@@ -137,7 +137,7 @@ function BackgroundPlaceholder(props: {
       style={{
         position: 'fixed',
         inset: '0',
-        'z-index': '-1',
+        'z-index': '0',
         'pointer-events': 'none',
         background:
           'radial-gradient(120% 120% at 50% 0%, color-mix(in oklab, var(--lapis) 22%, var(--ink)) 0%, var(--ink) 60%)',
@@ -187,7 +187,7 @@ function CanvasBackground(props: {
         inset: '0',
         width: '100%',
         height: '100%',
-        'z-index': '-1',
+        'z-index': '0',
         'pointer-events': 'none',
         display: 'block',
       }}
@@ -210,7 +210,7 @@ function SceneBackground(props: { scene: SceneVariant; reducedMotion: boolean })
       style={{
         position: 'fixed',
         inset: '0',
-        'z-index': '-1',
+        'z-index': '0',
         'pointer-events': 'none',
         overflow: 'hidden',
       }}

@@ -45,7 +45,8 @@ not shipped until real content and gates exist):
 Do **not** invent `/enterprise`, `/gaming`, pricing, compliance badges,
 partner logos, or legal pages in marketing copy until those surfaces exist with
 evidence. `/download/` may only claim the currently published unsigned lanes
-(Windows zip, Linux tar.gz, and FreeBSD/OpenBSD install.sh hosts). Separate
+(Windows zip with offline WebView2 installer, plus Linux/FreeBSD/OpenBSD
+`install.sh` hosts). Separate
 macOS Intel and Apple Silicon packages may be described as coming soon, but the
 site must not expose DMG download controls until genuine Darwin-built artifacts
 are staged, and must never fabricate a macOS artifact on Linux.
@@ -141,7 +142,7 @@ Procurement materials and legal pages remain **gated**. Not a Home section inven
 | Open full product in the browser today | **Yes** |
 | Install-free first run | **Yes** |
 | Downloadable / signed multi-platform installers available now | **No** — signing/updater/notarization still pending (see roadmap Phase 6) |
-| Windows/Linux/macOS/FreeBSD/OpenBSD unsigned packages + checksums | **Yes** on `/download/` (zip/tar.gz/DMG; install.sh on BSD); Home stays platform-neutral |
+| Windows/Linux/macOS/FreeBSD/OpenBSD unsigned packages + checksums | **Yes** on `/download/` (Windows offline runtime included; install.sh on Linux/BSD; macOS still planned); Home stays platform-neutral |
 | macOS DMGs (unsigned/unnotarized Intel + Apple Silicon) | **Yes** when both Darwin-built artifacts are staged; never fabricated on Linux; signing/notarization pending |
 | Signed desktop installers / auto-updater | **No** — signing/updater pending |
 | “Desktop ships with the launch” as an unconditional promise | **No** — phrase only as gated future when ledger is green |

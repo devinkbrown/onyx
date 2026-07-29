@@ -46,8 +46,10 @@ export interface DownloadCard {
   archiveUrl: string;
   sha256Url: string;
   noticeUrl: string;
-  /** install.sh lanes only; null for Windows/Linux Native SDK packages. */
+  /** Package manager used by install.sh; null when the runtime installer is bundled. */
   hasInstallScript: boolean;
+  /** True only when the archive carries the runtime installer itself. */
+  runtimeIncluded: boolean;
 }
 
 /** Combined macOS coming-soon card (no archive URLs — no dead download controls). */
@@ -129,11 +131,12 @@ export const DOWNLOAD_CARDS: readonly DownloadCard[] = [
     arch: 'x86_64',
     title: 'Windows x86_64',
     summary:
-      'Native SDK directory package as an unsigned zip (bin/onyx.exe + WebView2Loader.dll + SPA). Not an MSI/EXE installer; Windows runtime not verified on this Linux release host.',
-    primaryPackages: ['WebView2 Evergreen Runtime'],
+      'Native SDK directory package with the full offline Microsoft WebView2 x64 installer included. Extract once and use Install-and-Run-Onyx.cmd; Windows GUI launch is not claimed from this Linux release host.',
+    primaryPackages: ['WebView2 Evergreen Runtime (offline x64 installer)'],
     packageManager: null,
     archiveExt: 'zip',
     hasInstallScript: false,
+    runtimeIncluded: true,
   }),
   card({
     lane: 'linux',
@@ -141,11 +144,12 @@ export const DOWNLOAD_CARDS: readonly DownloadCard[] = [
     arch: 'x86_64',
     title: 'Linux x86_64',
     summary:
-      'Native SDK system-WebView package as an unsigned tar.gz (bin/onyx + SPA). Needs system GTK 4 + WebKitGTK 6. Not AppImage/Flatpak/deb.',
+      'Native SDK system-WebView package with install.sh. It resolves GTK 4 + WebKitGTK 6 through apt, dnf, or pacman, then installs the client under your chosen prefix.',
     primaryPackages: ['gtk4', 'webkitgtk-6.0'],
-    packageManager: null,
+    packageManager: 'apt, dnf, or pacman',
     archiveExt: 'tar.gz',
-    hasInstallScript: false,
+    hasInstallScript: true,
+    runtimeIncluded: false,
   }),
   card({
     lane: 'freebsd',
@@ -158,6 +162,7 @@ export const DOWNLOAD_CARDS: readonly DownloadCard[] = [
     packageManager: 'pkg',
     archiveExt: 'tar.gz',
     hasInstallScript: true,
+    runtimeIncluded: false,
   }),
   card({
     lane: 'openbsd',
@@ -170,6 +175,7 @@ export const DOWNLOAD_CARDS: readonly DownloadCard[] = [
     packageManager: 'pkg_add',
     archiveExt: 'tar.gz',
     hasInstallScript: true,
+    runtimeIncluded: false,
   }),
 ] as const;
 
@@ -238,8 +244,8 @@ export function installSteps(lane: DownloadLane): string[] {
     return [
       `Expand-Archive ${c.archiveName} -DestinationPath .`,
       `cd ${root}`,
-      '.\\bin\\onyx.exe',
-      '# Requires WebView2 Evergreen Runtime on the Windows machine',
+      '.\\Install-and-Run-Onyx.cmd',
+      '# Full offline WebView2 x64 installer is included under runtime/',
       '# Runtime / GUI launch is NOT verified on the Linux release host',
     ];
   }
@@ -248,9 +254,10 @@ export function installSteps(lane: DownloadLane): string[] {
     return [
       `tar xzf ${c.archiveName}`,
       `cd ${root}`,
-      './bin/onyx',
-      '# System packages: gtk4 + webkitgtk-6.0 (WebKitGTK 6 / GTK 4)',
-      '# Not AppImage/Flatpak; unsigned directory package only',
+      './install.sh --help',
+      './install.sh                  # resolves runtime via apt/dnf/pacman',
+      './install.sh --prefix "$HOME/.local" --no-deps',
+      './install.sh --dry-run',
     ];
   }
 

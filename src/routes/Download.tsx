@@ -100,7 +100,11 @@ function LaneCard(props: {
       <ul class="dl-facts">
         <li>
           <strong>
-            {props.card.hasInstallScript ? 'Runtime (auto via install.sh)' : 'Runtime requirement'}
+            {props.card.runtimeIncluded
+              ? 'Runtime included'
+              : props.card.hasInstallScript
+                ? 'Runtime (auto via install.sh)'
+                : 'Runtime requirement'}
           </strong>
           {' '}
           {props.card.primaryPackages.join(' + ')}

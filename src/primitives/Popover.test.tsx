@@ -288,4 +288,47 @@ describe('Popover', () => {
     expect(dialog.style.top).toBe('8px');
     expect(dialog.style.transform).toBe('none');
   });
+
+  it('anchors mobile menus to the trigger instead of centering them as a sheet', async () => {
+    vi.stubGlobal('requestAnimationFrame', ((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    }) as typeof requestAnimationFrame);
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true }) as MediaQueryList));
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function rect(this: HTMLElement) {
+      return this.classList.contains('onyx-popover__trigger')
+        ? new DOMRect(330, 92, 44, 44)
+        : new DOMRect(0, 0, 0, 0);
+    });
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.classList.contains('onyx-popover__panel') ? 220 : 0;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.classList.contains('onyx-popover__panel') ? 180 : 0;
+      },
+    });
+
+    render(() => (
+      <Popover trigger="More" defaultOpen>
+        Room actions
+      </Popover>
+    ));
+    await Promise.resolve();
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.style.position).toBe('fixed');
+    expect(dialog.style.left).toBe('162px');
+    expect(dialog.style.top).toBe('146px');
+    expect(dialog.style.right).toBe('auto');
+    expect(dialog.style.bottom).toBe('auto');
+    expect(dialog.style.margin).toBe('0px');
+    expect(dialog.style.translate).toBe('none');
+  });
 });

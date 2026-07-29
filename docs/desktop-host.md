@@ -79,14 +79,19 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
 - **Windows x86_64 unsigned zip lane (v0.1.3):** `pnpm desktop:release:windows`
   (`tools/release-windows.mjs`) runs Native SDK `native package` via
   `zig build package -Dplatform=windows -Dtarget=x86_64-windows`, then
-  fail-closed layout validation + deterministic zip + SHA-256. **Not** an
-  MSI/EXE installer. **Windows runtime is not verified on a real Windows
-  machine** in this lane.
+  fail-closed layout validation + deterministic zip + SHA-256. The zip includes
+  the pinned full Microsoft WebView2 Evergreen Standalone Installer (x64),
+  its SHA-256, and `Install-and-Run-Onyx.cmd`; it does not need to fetch the
+  runtime from the network. **Not** an MSI/EXE installer. **Windows GUI runtime
+  is not verified on a real Windows machine** in this lane.
 - **Linux x86_64 unsigned tar.gz lane (v0.1.3):** `pnpm desktop:release:linux`
   (`tools/release-unix.mjs linux`) runs Native SDK package for system
   WebView (WebKitGTK 6 + GTK 4), fail-closed ELF x86_64 +
   `package-manifest.zon` (target/version/optimize) + SPA resources, then
-  one tar.gz + SHA-256 + embedded notice. **Not** AppImage/Flatpak/deb.
+  one tar.gz + SHA-256 + embedded notice. Its fail-closed `install.sh` resolves
+  distro-managed GTK4/WebKitGTK 6 packages through apt, dnf, or pacman and
+  supports `--prefix`, `--no-deps`, `--dry-run`, and `--help`. **Not**
+  AppImage/Flatpak/deb; the runtime libraries remain distro-managed.
 - **FreeBSD / OpenBSD native Zig host (v0.1.3):** `pnpm desktop:release:freebsd`
   / `pnpm desktop:release:openbsd` — cross-compile `desktop/bsd_host.zig` to
   `x86_64-freebsd` / `x86_64-openbsd`, stage `bin/onyx` + `resources/dist` +
@@ -156,9 +161,9 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
 | Zig **0.17.0-dev** pin `build -Dplatform=null` | **PASS** (compile + install of null backend) with pinned SDK patch |
 | Zig **0.17.0-dev** pin `build test -Dplatform=null` | **PASS** |
 | Zig **0.17.0-dev** pin `build -Dplatform=linux` | **Link unblocked** when WebKitGTK 6.0 is installed (`pkg-config webkitgtk-6.0`); still requires exact Zig pin from `.zigversion` |
-| Zig **0.17.0-dev** pin x86_64-windows cross-build | **PASS** artifact production (`onyx.exe` + `WebView2Loader.dll`) — **runtime not verified** here |
-| `pnpm desktop:release:windows` | **Tooling present** — `zig-out/release/windows-x86_64/onyx-0.1.3-windows-x86_64-ReleaseFast-unsigned.zip`; **unsigned**; Windows runtime **not** verified here |
-| `pnpm desktop:release:linux` | **Tooling present** — one tar.gz under `zig-out/release/linux-x86_64/` after ELF/manifest/resources validation; needs WebKitGTK 6 + Zig pin |
+| Zig **0.17.0-dev** pin x86_64-windows cross-build | **PASS** artifact production (`onyx.exe` + `WebView2Loader.dll`); offline runtime installer is hash-verified, GUI launch is **not verified** here |
+| `pnpm desktop:release:windows` | **Tooling present** — unsigned zip with pinned full offline WebView2 x64 installer + install-and-run command; Windows GUI runtime **not** verified here |
+| `pnpm desktop:release:linux` | **Tooling present** — one tar.gz with `install.sh` after ELF/manifest/resources validation; apt/dnf/pacman resolve distro-managed GTK4 + WebKitGTK 6 |
 | `pnpm desktop:release:freebsd` / `:openbsd` | **Tooling present** — Zig-native `bsd_host` x86_64 ELF + `resources/dist` tar.gz; runtime needs GTK/WebKitGTK on BSD; **GUI not claimed** from Linux cross-build |
 | `pnpm desktop:release:macos` | **Fail-closed on non-Darwin** — host arch → `macos-x86_64` or `macos-arm64`; GHA matrix `macos-15-intel` + `macos-15`; unsigned/unnotarized |
 | GUI launch on real FreeBSD/OpenBSD / signing / updater | **Not done / not verified** |
@@ -221,12 +226,18 @@ pnpm desktop:build:linux           # zig build -Dplatform=linux (diagnostic)
 pnpm desktop:test:linux            # zig build test -Dplatform=linux (diagnostic)
 pnpm desktop:build:windows         # cross-build x86_64-windows (artifact only)
 pnpm desktop:package:windows       # zig build package for windows (Native SDK dir under zig-out/package/)
+# Download the official full x64 standalone runtime installer to:
+#   zig-out/runtime-cache/MicrosoftEdgeWebView2RuntimeInstallerX64.exe
+# The release tool verifies its pinned SHA-256 and MZ/size gates before packaging.
+# ONYX_WEBVIEW2_RUNTIME_X64 may point to the same verified installer elsewhere.
 pnpm desktop:release:windows       # package + fail-closed validate + unsigned zip + SHA-256
 #   outputs: zig-out/release/windows-x86_64/onyx-0.1.3-windows-x86_64-ReleaseFast-unsigned.{zip,sha256,NOTICE.txt}
-#   Windows runtime NOT verified on real Windows.
+#   includes runtime/MicrosoftEdgeWebView2RuntimeInstallerX64.exe + pinned SHA-256
+#   includes Install-and-Run-Onyx.cmd; Windows GUI runtime NOT verified on real Windows.
 pnpm desktop:package:linux         # zig build package -Dplatform=linux (Native SDK dir)
 pnpm desktop:release:linux         # package + ELF/manifest/resources validate + tar.gz + SHA-256
 #   outputs: zig-out/release/linux-x86_64/onyx-0.1.3-linux-x86_64-ReleaseFast-unsigned.{tar.gz,sha256,NOTICE.txt}
+#   includes install.sh for apt/dnf/pacman runtime resolution; supports --prefix/--no-deps/--dry-run
 pnpm desktop:build:freebsd         # zig build bsd-host -Dbsd-os=freebsd → zig-out/bsd/freebsd-x86_64/onyx
 pnpm desktop:build:openbsd         # zig build bsd-host -Dbsd-os=openbsd → zig-out/bsd/openbsd-x86_64/onyx
 pnpm desktop:test:bsd              # zig build bsd-test (pure logic; host-native)

@@ -13,6 +13,7 @@ import { store } from '@/lib/store/store';
 import { encodeTheme } from '@/lib/theme/themeShare';
 import { THEME_IDS, type CustomTheme } from '@/theme';
 import { AppearancePanel } from './AppearancePanel';
+import { AUTO_BACKGROUND_ID } from './themeBackground';
 
 const initialState = store.getInitialState();
 
@@ -69,6 +70,20 @@ describe('AppearancePanel', () => {
 
     expect(store.getState().backgroundId).toBe('gold-veins');
     expect(goldVeins).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('can move from Auto to a pinned wallpaper and persists the choice', () => {
+    store.setState({ backgroundId: AUTO_BACKGROUND_ID });
+    store.getState().openAppearance();
+    render(() => <AppearancePanel />);
+
+    expect(screen.getByRole('radio', { name: /auto — theme-matched background/i }))
+      .toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: /starfield/i }));
+
+    expect(store.getState().backgroundId).toBe('starfield');
+    expect(localStorage.getItem('onyx:bg')).toBe('starfield');
+    expect(screen.getByRole('radio', { name: /starfield/i })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('imports a shared theme code from the appearance panel', () => {

@@ -33,7 +33,7 @@ Companions:
 | Zig desktop scaffold (manifest + structural check) | **PARTIAL / structural DONE** | `app.zon` `native validate` + `native check` PASS; host sources present |
 | Zig source compile of full Native SDK host (null backend) | **DONE** on Zig **0.17.0-dev** pin | `zig build -Dplatform=null` / `test` with pin `0.17.0-dev.1476+91a29d707`, patched `@native-sdk/cli@0.6.2`, isolated caches |
 | Native GUI link / run (Linux WebKitGTK 6) | **PENDING** | Missing `webkitgtk-6.0`; link fails after successful compile |
-| Downloadable installers | **PARTIAL** | FreeBSD/OpenBSD unsigned tar.gz + `install.sh` packaging lanes exist; not signed multi-platform |
+| Downloadable installers | **PARTIAL** | Windows bundles the offline WebView2 installer; Linux/FreeBSD/OpenBSD include `install.sh`; packages remain unsigned |
 | Code signing | **PENDING** | Not configured |
 | Auto-updater | **PENDING** | Capability `updater: false`; no pipeline |
 | Public desktop downloads | **PARTIAL** | `/download` six-lane surface (win/linux/macos-x86_64/macos-arm64/fbsd/obsd) + site-local `/downloads/v0.1.3/` staging; artifacts not committed; deploy stages only with explicit env; macOS via matching-arch Darwin/GHA matrix |
@@ -144,7 +144,7 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 | `zig build package` produces host-local artifact | **PARTIAL** — Linux/Windows/macOS lanes tooling; BSD uses `bsd-host` package stage |
 | Package target default = selected platform (not hardcoded macOS) | **DONE** (build graph) |
 | Package version = `app.zon` / 0.1.3 (not stale 0.1.0) | **DONE** (build graph) |
-| FreeBSD/OpenBSD one-install `install.sh` in release tarball | **DONE** (packaging tool + unit tests; GUI not claimed on Linux host) |
+| Linux/FreeBSD/OpenBSD one-install `install.sh` in release tarball | **DONE** (packaging tool + unit tests; BSD GUI not claimed on Linux host) |
 | Code signing (macOS / Windows / Linux policies) | **PENDING** |
 | Auto-updater channel | **PENDING** |
 | Public download pages + checksums | **PARTIAL** — `/download` + `/downloads/v0.1.3/` staging; fail-closed publish mode |

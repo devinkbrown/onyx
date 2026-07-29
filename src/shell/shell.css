@@ -1,13 +1,14 @@
 /* ── Onyx AppShell — quiet threshold × terminal ──────────────────────────────
    Layout: CSS grid — [ ServerRail | ChannelSidebar | ConversationColumn | MemberList ]
    PresenceRibbon spans the top of the conversation column.
-   Background canvas is fixed behind everything (z-index: -1).
+   Background canvas is fixed at page layer 0; shell chrome sits at layer 1.
    Matte surfaces, fine borders, quiet cyan signal — no decorative drift/glow.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ── Grid root ── */
 .shell {
   position: relative;
+  z-index: 1;
   isolation: isolate;
   /* Commercial product rail (was 224px power-user). Mobile drawer overrides
      width independently at the max-width:900px breakpoint. */
@@ -26,7 +27,7 @@
   overflow: hidden;
   font-family: var(--font-sans);
   color: var(--paper);
-  /* Quiet legibility wash — let the Background canvas (z-index -1) read through
+  /* Quiet legibility wash — let the Background canvas (page layer 0) read through
      without a top glow spectacle. Soft bottom fade only. */
   background:
     linear-gradient(

@@ -6,11 +6,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   RELEASE_PRODUCT_VERSION,
+  WEBVIEW2_RUNTIME,
   assertVersionAlignment,
   bufferLooksLikePe,
   createPackageZip,
   formatSha256SumFile,
   honestyNotice,
+  installAndRunCmd,
   packageDirName,
   parseAppZonVersion,
   parseBuildZigZonVersion,
@@ -22,6 +24,8 @@ import {
   runWindowsRelease,
   sha256Hex,
   validateWindowsPackageLayout,
+  validateWebView2RuntimeInstaller,
+  webView2RuntimeNotice,
   writeZipChecksum,
 } from './release-windows.mjs';
 
@@ -140,9 +144,32 @@ describe('release-windows checksum + honesty', () => {
     expect(formatSha256SumFile([{ path: 'a.zip', hash: 'dead' }])).toBe('dead  a.zip\n');
     const n = honestyNotice({ version: '0.1.3', host: 'linux/x64' });
     expect(n).toMatch(/NOT verified on a real Windows/i);
-    expect(n).toMatch(/macOS and Linux desktop builds are NOT released/i);
+    expect(n).toMatch(/offline Microsoft WebView2 Evergreen Standalone Installer/i);
+    expect(n).toMatch(/No network download is required/i);
     expect(n).toMatch(/UNSIGNED/i);
     expect(n).not.toMatch(/signed installer ready/i);
+    expect(installAndRunCmd()).toContain(WEBVIEW2_RUNTIME.filename);
+    expect(webView2RuntimeNotice()).toContain(WEBVIEW2_RUNTIME.downloadUrl);
+  });
+
+  it('validates the pinned offline runtime fail-closed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'onyx-runtime-'));
+    try {
+      const runtime = join(dir, WEBVIEW2_RUNTIME.filename);
+      const fixture = syntheticPe({ subsystem: 2 });
+      writeFileSync(runtime, fixture);
+      expect(validateWebView2RuntimeInstaller(runtime, {
+        expectedSha256: sha256Hex(fixture),
+        minimumBytes: 1,
+      })).toEqual({ ok: true, hash: sha256Hex(fixture), bytes: fixture.length });
+      expect(validateWebView2RuntimeInstaller(runtime, {
+        expectedSha256: '0'.repeat(64),
+        minimumBytes: 1,
+      }).ok).toBe(false);
+      expect(validateWebView2RuntimeInstaller(join(dir, 'missing.exe')).ok).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -163,8 +190,11 @@ describe('release-windows zip + pipeline (fixture)', () => {
       writeFileSync(join(dir, 'pkg/resources/dist/index.html'), '<!doctype html><title>t</title>\n');
 
       const zipPath = join(dir, 'out.zip');
+      const runtimePath = join(dir, 'runtime.exe');
+      writeFileSync(runtimePath, syntheticPe({ subsystem: 2 }));
       const z = createPackageZip(join(dir, 'pkg'), zipPath, {
         injectFiles: { 'UNSIGNED-WINDOWS.txt': honestyNotice() },
+        injectBinaryFiles: { 'runtime/runtime.exe': runtimePath },
       });
       expect(z.ok).toBe(true);
       const magic = readFileSync(zipPath).subarray(0, 2);
@@ -202,12 +232,18 @@ describe('release-windows zip + pipeline (fixture)', () => {
       );
       mkdirSync(join(pkg, 'resources/dist'), { recursive: true });
       writeFileSync(join(pkg, 'resources/dist/index.html'), '<html></html>\n');
+      const runtimePath = join(dir, WEBVIEW2_RUNTIME.filename);
+      const runtimeFixture = syntheticPe({ subsystem: 2 });
+      writeFileSync(runtimePath, runtimeFixture);
 
       const zigCalls = [];
       const result = await runWindowsRelease({
         repoRoot: dir,
         skipPackageBuild: true,
         packageDir: pkg,
+        runtimeInstallerPath: runtimePath,
+        runtimeInstallerSha256: sha256Hex(runtimeFixture),
+        runtimeInstallerMinimumBytes: 1,
         runZig: async (args) => {
           zigCalls.push(args);
           return 0;

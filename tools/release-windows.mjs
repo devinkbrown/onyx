@@ -7,12 +7,15 @@
  *  2. Run `zig build package` for x86_64-windows via tools/desktop-zig.mjs
  *     (Native SDK `native package` — directory artifact, not an installer)
  *  3. Validate package layout (onyx.exe PE + GUI subsystem, WebView2Loader.dll, SPA)
- *  4. Zip the package directory (reproducible file order) + SHA-256 sums
+ *  4. Verify + bundle the pinned full offline WebView2 x64 runtime installer
+ *  5. Zip the package directory (reproducible file order) + SHA-256 sums
  *
  * Honesty (printed and written into the zip):
  *  - Windows runtime is NOT verified on a real Windows machine in this lane.
  *  - macOS and Linux desktop are NOT released by this tool.
- *  - Artifact is UNSIGNED (no Authenticode, no installer, no updater).
+ *  - Artifact is UNSIGNED (no Authenticode, no Onyx installer, no updater).
+ *  - The included Microsoft runtime installer is verified but the app is not
+ *    launched on real Windows in this Linux cross-release lane.
  *
  * Does not download toolchains, commit, push, tag, deploy, or publish.
  */
@@ -44,6 +47,14 @@ export const RELEASE_OPTIMIZE = 'ReleaseFast';
 
 /** Package target name in Native SDK / zig-out/package path. */
 export const RELEASE_TARGET = 'windows';
+
+/** Official Microsoft WebView2 Evergreen Standalone Installer (x64) release input. */
+export const WEBVIEW2_RUNTIME = Object.freeze({
+  filename: 'MicrosoftEdgeWebView2RuntimeInstallerX64.exe',
+  downloadUrl: 'https://go.microsoft.com/fwlink/?linkid=2124701',
+  sha256: '04b9f08d839c8c06f34a85acea0d9f1568d3d8aa309a77619aaa46bb29ade0f8',
+  minimumBytes: 100 * 1024 * 1024,
+});
 
 /**
  * @param {string} text
@@ -149,6 +160,8 @@ export function honestyNotice(opts = {}) {
     '',
     'What this is:',
     '  - Native SDK directory package (bin/onyx.exe + WebView2Loader.dll + SPA resources)',
+    '  - Full offline Microsoft WebView2 Evergreen Standalone Installer (x64) included',
+    '    under runtime/; Install-and-Run-Onyx.cmd installs it silently, then starts Onyx.',
     '  - Zip archive only — NOT an MSI/EXE installer, NOT signed (no Authenticode),',
     '    NOT notarized, NO auto-updater, NO public download channel claim.',
     '',
@@ -158,8 +171,9 @@ export function honestyNotice(opts = {}) {
     '  - Cross-build host was: ' + host,
     '',
     'Requirements on a Windows machine (unverified here):',
-    '  - WebView2 Evergreen Runtime (system WebView engine)',
-    '  - x86_64 Windows; run bin/onyx.exe from the extracted tree',
+    '  - x86_64 Windows; extract the full tree and run Install-and-Run-Onyx.cmd',
+    '  - The included Microsoft runtime installer may require elevation.',
+    '  - No network download is required for the bundled runtime installer.',
     '',
     'Reproduce:',
     '  pnpm install',
@@ -167,6 +181,75 @@ export function honestyNotice(opts = {}) {
     '  # requires Zig pin from .zigversion (ONYX_ZIG or PATH); see docs/desktop-host.md',
     '',
   ].join('\n');
+}
+
+/**
+ * Validate the pinned Microsoft offline runtime before it can enter a release.
+ * @param {string} installerPath
+ * @param {{ expectedSha256?: string, minimumBytes?: number }} [opts]
+ * @returns {{ ok: true, hash: string, bytes: number } | { ok: false, errors: string[] }}
+ */
+export function validateWebView2RuntimeInstaller(installerPath, opts = {}) {
+  const expected = opts.expectedSha256 ?? WEBVIEW2_RUNTIME.sha256;
+  const minimumBytes = opts.minimumBytes ?? WEBVIEW2_RUNTIME.minimumBytes;
+  const errors = [];
+  if (!existsSync(installerPath)) {
+    return { ok: false, errors: [`WebView2 offline runtime installer missing: ${installerPath}`] };
+  }
+  let buf;
+  try {
+    buf = readFileSync(installerPath);
+  } catch (e) {
+    return {
+      ok: false,
+      errors: [`cannot read WebView2 runtime installer: ${e instanceof Error ? e.message : String(e)}`],
+    };
+  }
+  if (buf.length < minimumBytes) {
+    errors.push(`WebView2 runtime installer too small: ${buf.length} bytes (minimum ${minimumBytes})`);
+  }
+  if (buf[0] !== 0x4d || buf[1] !== 0x5a) {
+    errors.push('WebView2 runtime installer is not a Windows executable (MZ magic missing)');
+  }
+  const hash = sha256Hex(buf);
+  if (hash !== expected) {
+    errors.push(`WebView2 runtime installer SHA-256 mismatch: got ${hash}, expected ${expected}`);
+  }
+  if (errors.length) return { ok: false, errors };
+  return { ok: true, hash, bytes: buf.length };
+}
+
+export function installAndRunCmd() {
+  return [
+    '@echo off',
+    'setlocal',
+    'cd /d "%~dp0"',
+    `start "" /wait "runtime\\${WEBVIEW2_RUNTIME.filename}" /silent /install`,
+    'if errorlevel 1 (',
+    '  echo WebView2 Runtime installation failed with exit code %ERRORLEVEL%.',
+    '  echo You can retry by running the installer under the runtime folder as Administrator.',
+    '  pause',
+    '  exit /b %ERRORLEVEL%',
+    ')',
+    'start "" "bin\\onyx.exe"',
+    'exit /b 0',
+    '',
+  ].join('\r\n');
+}
+
+export function webView2RuntimeNotice(hash = WEBVIEW2_RUNTIME.sha256) {
+  return [
+    'Third-party runtime included with this Onyx package',
+    '',
+    'Component: Microsoft Edge WebView2 Evergreen Standalone Installer (x64)',
+    `File: runtime/${WEBVIEW2_RUNTIME.filename}`,
+    `Official source: ${WEBVIEW2_RUNTIME.downloadUrl}`,
+    `SHA-256: ${hash}`,
+    '',
+    'This Microsoft installer is not Onyx code. Microsoft license terms apply.',
+    'The Onyx package invokes it only through Install-and-Run-Onyx.cmd.',
+    '',
+  ].join('\r\n');
 }
 
 /**
@@ -336,7 +419,7 @@ export function formatSha256SumFile(entries) {
  * Fail-closed: non-zero throw / return.
  * @param {string} packageDir
  * @param {string} zipPath
- * @param {{ spawnSyncImpl?: typeof spawnSync, pythonBin?: string, injectFiles?: Record<string, string> }} [opts]
+ * @param {{ spawnSyncImpl?: typeof spawnSync, pythonBin?: string, injectFiles?: Record<string, string>, injectBinaryFiles?: Record<string, string> }} [opts]
  * @returns {{ ok: true, zipPath: string } | { ok: false, error: string }}
  */
 export function createPackageZip(packageDir, zipPath, opts = {}) {
@@ -346,6 +429,7 @@ export function createPackageZip(packageDir, zipPath, opts = {}) {
   // Prefer actual basename of packageDir when it matches expected pattern.
   const base = packageDir.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || rootName;
   const inject = opts.injectFiles ?? {};
+  const injectBinary = opts.injectBinaryFiles ?? {};
 
   mkdirSync(dirname(zipPath), { recursive: true });
 
@@ -355,6 +439,7 @@ package_dir = sys.argv[1]
 zip_path = sys.argv[2]
 root_name = sys.argv[3]
 inject = json.loads(sys.argv[4])
+inject_binary = json.loads(sys.argv[5])
 files = []
 for dirpath, dirnames, filenames in os.walk(package_dir):
     dirnames.sort()
@@ -378,12 +463,27 @@ with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
         info = zipfile.ZipInfo(root_name + '/' + arc_name, date_time=fixed)
         info.compress_type = zipfile.ZIP_DEFLATED
         zf.writestr(info, text.encode('utf-8'))
+    for arc_name, source_path in sorted(inject_binary.items()):
+        if not os.path.isfile(source_path):
+            raise FileNotFoundError(source_path)
+        info = zipfile.ZipInfo(root_name + '/' + arc_name, date_time=fixed)
+        info.compress_type = zipfile.ZIP_DEFLATED
+        with open(source_path, 'rb') as fh:
+            zf.writestr(info, fh.read())
 if not os.path.isfile(zip_path) or os.path.getsize(zip_path) < 64:
     sys.stderr.write('zip missing or too small\\n')
     sys.exit(2)
 `;
 
-  const result = run(python, ['-c', script, packageDir, zipPath, base, JSON.stringify(inject)], {
+  const result = run(python, [
+    '-c',
+    script,
+    packageDir,
+    zipPath,
+    base,
+    JSON.stringify(inject),
+    JSON.stringify(injectBinary),
+  ], {
     encoding: 'utf8',
     shell: false,
   });
@@ -438,6 +538,9 @@ export function loadAlignedVersion(repoRoot = REPO_ROOT) {
  *   runZig?: typeof runDesktopZig,
  *   createZip?: typeof createPackageZip,
  *   validate?: typeof validateWindowsPackageLayout,
+ *   runtimeInstallerPath?: string,
+ *   runtimeInstallerSha256?: string,
+ *   runtimeInstallerMinimumBytes?: number,
  *   stdout?: { write: (s: string) => void },
  *   stderr?: { write: (s: string) => void },
  * }} [opts]
@@ -487,13 +590,36 @@ export async function runWindowsRelease(opts = {}) {
     return { ok: false, code: 1, errors: layout.errors };
   }
 
+  const runtimeInstallerPath =
+    opts.runtimeInstallerPath ??
+    opts.env?.ONYX_WEBVIEW2_RUNTIME_X64 ??
+    process.env.ONYX_WEBVIEW2_RUNTIME_X64 ??
+    join(repoRoot, 'zig-out', 'runtime-cache', WEBVIEW2_RUNTIME.filename);
+  const runtime = validateWebView2RuntimeInstaller(runtimeInstallerPath, {
+    expectedSha256: opts.runtimeInstallerSha256,
+    minimumBytes: opts.runtimeInstallerMinimumBytes,
+  });
+  if (!runtime.ok) {
+    for (const e of runtime.errors) err.write(`release-windows: ${e}\n`);
+    return { ok: false, code: 1, errors: runtime.errors };
+  }
+
   mkdirSync(paths.releaseDir, { recursive: true });
   const notice = honestyNotice({ version, host: `${process.platform}/${process.arch}` });
   writeFileSync(paths.noticePath, notice, 'utf8');
 
   const createZip = opts.createZip ?? createPackageZip;
   const zipResult = createZip(packageDir, paths.zipPath, {
-    injectFiles: { 'UNSIGNED-WINDOWS.txt': notice },
+    injectFiles: {
+      'UNSIGNED-WINDOWS.txt': notice,
+      'Install-and-Run-Onyx.cmd': installAndRunCmd(),
+      'runtime/THIRD-PARTY-RUNTIME.txt': webView2RuntimeNotice(runtime.hash),
+      'runtime/WEBVIEW2-RUNTIME-SHA256.txt':
+        `${runtime.hash}  ${WEBVIEW2_RUNTIME.filename}\r\n`,
+    },
+    injectBinaryFiles: {
+      [`runtime/${WEBVIEW2_RUNTIME.filename}`]: runtimeInstallerPath,
+    },
   });
   if (!zipResult.ok) {
     err.write(`release-windows: ${zipResult.error}\n`);
@@ -519,7 +645,10 @@ export async function runWindowsRelease(opts = {}) {
   log.write(`release-windows: sha256  ${sum.hash}  ${paths.zipPath.split(/[/\\]/).pop()}\n`);
   log.write(`release-windows: notice  ${paths.noticePath}\n`);
   log.write(
-    'release-windows: UNSIGNED; Windows runtime NOT verified on real Windows; macOS/Linux NOT released.\n',
+    `release-windows: runtime ${runtime.bytes} bytes ${runtime.hash} ${WEBVIEW2_RUNTIME.filename}\n`,
+  );
+  log.write(
+    'release-windows: UNSIGNED; offline WebView2 x64 installer INCLUDED; Windows GUI launch NOT verified on real Windows.\n',
   );
 
   return { ok: true, paths, hash: sum.hash };

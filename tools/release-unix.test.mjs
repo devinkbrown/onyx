@@ -27,6 +27,7 @@ import {
   elfPtInterp,
   formatSha256SumFile,
   generateBsdInstallSh,
+  generateLinuxInstallSh,
   linuxHonestyNotice,
   loadAlignedVersion,
   mapNodeArchToMacosArch,
@@ -223,6 +224,7 @@ describe('release-unix linux layout validation', () => {
       mkdirSync(join(dir, 'resources/dist'), { recursive: true });
       writeFileSync(join(dir, 'bin/onyx'), syntheticElf64Aarch64());
       writeFileSync(join(dir, 'README.txt'), 'Linux native-sdk artifact directory.\n');
+      writeFileSync(join(dir, 'install.sh'), generateLinuxInstallSh());
       writeFileSync(join(dir, 'package-manifest.zon'), '.{}\n');
       writeFileSync(join(dir, 'resources/dist/index.html'), '<html></html>\n');
 
@@ -243,6 +245,38 @@ describe('release-unix linux layout validation', () => {
         ].join('\n'),
       );
       expect(validateLinuxPackageLayout(dir)).toEqual({ ok: true });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('installs the Linux package into a user prefix without dependency mutation', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'onyx-ux-install-'));
+    try {
+      mkdirSync(join(dir, 'pkg/bin'), { recursive: true });
+      mkdirSync(join(dir, 'pkg/resources/dist'), { recursive: true });
+      writeFileSync(join(dir, 'pkg/bin/onyx'), syntheticElf64X86_64());
+      writeFileSync(join(dir, 'pkg/resources/dist/index.html'), '<html></html>\n');
+      const installer = join(dir, 'pkg/install.sh');
+      writeFileSync(installer, generateLinuxInstallSh());
+      chmodSync(installer, 0o755);
+
+      const prefix = join(dir, 'prefix');
+      const result = spawnSync(installer, ['--prefix', prefix, '--no-deps'], {
+        encoding: 'utf8',
+        shell: false,
+      });
+      expect(result.status).toBe(0);
+      expect(readFileSync(join(prefix, 'bin/onyx'))).toEqual(syntheticElf64X86_64());
+      expect(readFileSync(join(prefix, 'resources/dist/index.html'), 'utf8'))
+        .toContain('<html>');
+
+      const relative = spawnSync(installer, ['--prefix', 'relative/path', '--no-deps'], {
+        encoding: 'utf8',
+        shell: false,
+      });
+      expect(relative.status).not.toBe(0);
+      expect(relative.stderr).toMatch(/absolute directory/i);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

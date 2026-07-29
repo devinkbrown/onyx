@@ -137,6 +137,8 @@ describe('Background lazy resource gating', () => {
       expect(container.querySelector('[data-background-id="starfield"]')).not.toBeNull();
       expect(container.querySelector('[data-background-id="deep-current"]')).toBeNull();
     });
+    expect((container.querySelector('[data-background-id="starfield"]') as HTMLElement).style.zIndex)
+      .toBe('0');
   });
 
   it('keeps the inert placeholder when a wallpaper chunk rejects (shell stays usable)', async () => {

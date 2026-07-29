@@ -417,18 +417,21 @@ export function linuxHonestyNotice(opts = {}) {
     'What this is:',
     '  - Native SDK system-WebView directory package (bin/onyx + SPA resources)',
     '  - Linked against system WebKitGTK 6 / GTK 4 (not Chromium/CEF)',
+    '  - Includes install.sh for one-step native runtime resolution and package install',
+    '    on apt, dnf, and pacman systems; it never curl-pipes or downloads Onyx code.',
     '  - Single tar.gz asset — NOT an AppImage/Flatpak/deb/rpm, NOT signed,',
     '    NO auto-updater, NO public download channel claim.',
     '',
     'What this is NOT / not claimed:',
-    '  - Not a portable static binary; needs WebKitGTK 6.0 + GTK 4 on the target.',
+    '  - Not a portable static binary; install.sh resolves WebKitGTK 6.0 + GTK 4.',
     '  - FreeBSD/OpenBSD use a separate Zig-native host lane (not this Linux artifact).',
     '  - macOS is released only on a real Mac (separate lane); not this artifact.',
     '  - Cross-build host was: ' + host,
     '',
     'Requirements on a Linux x86_64 machine:',
-    '  - webkitgtk-6.0 and gtk4 (pkg-config names)',
-    '  - extract and run bin/onyx from the package tree',
+    '  - apt: libgtk-4-1 + libwebkitgtk-6.0-4',
+    '  - dnf: gtk4 + webkitgtk6.0; pacman: gtk4 + webkitgtk-6.0',
+    '  - extract, run ./install.sh, then launch onyx from the selected prefix',
     '',
     'Reproduce:',
     '  pnpm install',
@@ -437,6 +440,121 @@ export function linuxHonestyNotice(opts = {}) {
     '  # requires Zig pin from .zigversion (ONYX_ZIG or PATH); see docs/desktop-host.md',
     '',
   ].join('\n');
+}
+
+export const LINUX_PRIMARY_RUNTIME_PACKAGES = Object.freeze({
+  apt: Object.freeze(['libgtk-4-1', 'libwebkitgtk-6.0-4']),
+  dnf: Object.freeze(['gtk4', 'webkitgtk6.0']),
+  pacman: Object.freeze(['gtk4', 'webkitgtk-6.0']),
+});
+
+/**
+ * Generate a fail-closed Linux installer. Dependencies remain distro-managed
+ * so WebKitGTK receives normal security updates instead of shipping stale DSOs.
+ * @param {{ version?: string }} [opts]
+ */
+export function generateLinuxInstallSh(opts = {}) {
+  const version = opts.version ?? RELEASE_PRODUCT_VERSION;
+  return [
+    '#!/bin/sh',
+    `# Onyx ${version} — Linux ${RELEASE_LINUX_ARCH} native host installer`,
+    '# Fail-closed. No remote shell pipes and no remote Onyx code download.',
+    'set -eu',
+    '',
+    'PREFIX="/usr/local"',
+    'INSTALL_DEPS=1',
+    'DRY_RUN=0',
+    '',
+    'usage() {',
+    '  cat <<EOF',
+    `Usage: ./install.sh [--prefix DIR] [--no-deps] [--dry-run]`,
+    '',
+    `Installs Onyx ${version} and resolves GTK4 + WebKitGTK 6 through apt, dnf, or pacman.`,
+    '  --prefix DIR  Install root (default: /usr/local)',
+    '  --no-deps     Skip system runtime installation',
+    '  --dry-run     Print actions without changing the system',
+    '  -h, --help    Show this help',
+    'EOF',
+    '}',
+    '',
+    'die() { printf "install.sh: %s\\n" "$*" >&2; exit 1; }',
+    'log() { printf "%s\\n" "$*"; }',
+    'run_cmd() {',
+    '  if [ "$DRY_RUN" -eq 1 ]; then log "[dry-run] $*"; else "$@"; fi',
+    '}',
+    'run_root() {',
+    '  if [ "$DRY_RUN" -eq 1 ]; then log "[dry-run root] $*"; return 0; fi',
+    '  if [ "$(id -u)" -eq 0 ]; then "$@";',
+    '  elif command -v sudo >/dev/null 2>&1; then sudo "$@";',
+    '  else die "runtime installation needs root or sudo; retry with --no-deps after installing dependencies"; fi',
+    '}',
+    '',
+    'while [ "$#" -gt 0 ]; do',
+    '  case "$1" in',
+    '    --prefix) [ "$#" -ge 2 ] || die "--prefix requires a directory"; PREFIX="$2"; shift 2 ;;',
+    '    --no-deps) INSTALL_DEPS=0; shift ;;',
+    '    --dry-run) DRY_RUN=1; shift ;;',
+    '    -h|--help) usage; exit 0 ;;',
+    '    *) die "unknown option: $1" ;;',
+    '  esac',
+    'done',
+    '',
+    'case "$PREFIX" in',
+    '  ""|/|.|..|*"/../"*|*"/./"*) die "unsafe --prefix: $PREFIX" ;;',
+    '  /*) ;;',
+    '  *) die "--prefix must be an absolute directory: $PREFIX" ;;',
+    'esac',
+    '[ "$(uname -s)" = "Linux" ] || die "this package requires Linux"',
+    'SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)',
+    '[ -f "$SCRIPT_DIR/bin/onyx" ] || die "missing package file bin/onyx"',
+    '[ -d "$SCRIPT_DIR/resources/dist" ] || die "missing package directory resources/dist"',
+    '',
+    'if [ "$INSTALL_DEPS" -eq 1 ]; then',
+    '  if command -v apt-get >/dev/null 2>&1; then',
+    '    run_root apt-get update',
+    `    run_root apt-get install -y ${LINUX_PRIMARY_RUNTIME_PACKAGES.apt.join(' ')}`,
+    '  elif command -v dnf >/dev/null 2>&1; then',
+    `    run_root dnf install -y ${LINUX_PRIMARY_RUNTIME_PACKAGES.dnf.join(' ')}`,
+    '  elif command -v pacman >/dev/null 2>&1; then',
+    `    run_root pacman -S --needed --noconfirm ${LINUX_PRIMARY_RUNTIME_PACKAGES.pacman.join(' ')}`,
+    '  else',
+    '    die "supported package manager not found (apt-get, dnf, pacman); install GTK4 + WebKitGTK 6 and retry with --no-deps"',
+    '  fi',
+    'fi',
+    '',
+    'DEST_BIN="$PREFIX/bin"',
+    '# Preserve the Native SDK package topology: bin/ and resources/ are siblings.',
+    'DEST_RES="$PREFIX/resources"',
+    'run_cmd mkdir -p "$DEST_BIN" "$DEST_RES"',
+    'run_cmd cp "$SCRIPT_DIR/bin/onyx" "$DEST_BIN/onyx"',
+    'run_cmd chmod 755 "$DEST_BIN/onyx"',
+    'if [ "$DRY_RUN" -eq 1 ]; then',
+    '  log "[dry-run] replace $DEST_RES/dist from package resources/dist"',
+    'else',
+    '  rm -rf "$DEST_RES/dist"',
+    '  cp -R "$SCRIPT_DIR/resources/dist" "$DEST_RES/dist"',
+    'fi',
+    'log "installed: $DEST_BIN/onyx"',
+    'log "runtime: distro-managed GTK4 + WebKitGTK 6"',
+    '',
+  ].join('\n');
+}
+
+export function validateLinuxInstallShContent(text) {
+  const errors = [];
+  for (const token of [
+    'apt-get install -y libgtk-4-1 libwebkitgtk-6.0-4',
+    'dnf install -y gtk4 webkitgtk6.0',
+    'pacman -S --needed --noconfirm gtk4 webkitgtk-6.0',
+    '--no-deps',
+    '--dry-run',
+  ]) {
+    if (!text.includes(token)) errors.push(`install.sh missing contract token: ${token}`);
+  }
+  if (/curl\s|wget\s|\|\s*(sh|bash)/.test(text)) {
+    errors.push('install.sh must not download or pipe remote code');
+  }
+  return errors.length ? { ok: false, errors } : { ok: true };
 }
 
 /**
@@ -758,12 +876,22 @@ export function validateLinuxPackageLayout(packageDir, opts = {}) {
 
   const required = [
     'bin/onyx',
+    'install.sh',
     'README.txt',
     'package-manifest.zon',
     'resources/dist/index.html',
   ];
   for (const rel of required) {
     if (!exists(join(root, rel))) errors.push(`missing required package path: ${rel}`);
+  }
+
+  if (exists(join(root, 'install.sh'))) {
+    try {
+      const installer = validateLinuxInstallShContent(read(join(root, 'install.sh')).toString('utf8'));
+      if (!installer.ok) errors.push(...installer.errors);
+    } catch (e) {
+      errors.push(`cannot read install.sh: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   if (exists(join(root, 'bin/onyx'))) {
@@ -1421,6 +1549,14 @@ export async function runLinuxRelease(opts = {}) {
   }
 
   const packageDir = opts.packageDir ?? paths.packageDir;
+  const installPath = join(packageDir, 'install.sh');
+  if (!existsSync(packageDir)) {
+    const msg = `package directory missing: ${packageDir}`;
+    err.write(`release-unix: ${msg}\n`);
+    return { ok: false, code: 1, errors: [msg] };
+  }
+  writeFileSync(installPath, generateLinuxInstallSh({ version }), 'utf8');
+  chmodSync(installPath, 0o755);
   const validate = opts.validate ?? validateLinuxPackageLayout;
   const layout = validate(packageDir, { version });
   if (!layout.ok) {
@@ -1453,7 +1589,7 @@ export async function runLinuxRelease(opts = {}) {
   log.write(`release-unix linux: sha256  ${sum.hash}  ${paths.archivePath.split(/[/\\]/).pop()}\n`);
   log.write(`release-unix linux: notice  ${paths.noticePath}\n`);
   log.write(
-    'release-unix linux: UNSIGNED Native SDK system-WebView; needs WebKitGTK 6 + GTK 4. FreeBSD/OpenBSD use a separate Zig-native host lane (desktop:release:freebsd|openbsd), not this Linux artifact.\n',
+    'release-unix linux: UNSIGNED Native SDK system-WebView; install.sh resolves WebKitGTK 6 + GTK 4 through apt/dnf/pacman.\n',
   );
 
   return { ok: true, paths, hash: sum.hash, lane: 'linux' };

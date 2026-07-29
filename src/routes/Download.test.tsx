@@ -50,8 +50,10 @@ describe('downloadMeta', () => {
     expect(fb.primaryPackages).toEqual(['gtk4', 'webkit2-gtk_60']);
     expect(ob.primaryPackages).toEqual(['gtk+4', 'webkitgtk60']);
     expect(installSteps('freebsd').some((s) => s.includes('install.sh'))).toBe(true);
-    expect(installSteps('windows').some((s) => s.includes('onyx.exe'))).toBe(true);
-    expect(installSteps('linux').some((s) => s.includes('bin/onyx'))).toBe(true);
+    expect(win.runtimeIncluded).toBe(true);
+    expect(lin.hasInstallScript).toBe(true);
+    expect(installSteps('windows').some((s) => s.includes('Install-and-Run-Onyx.cmd'))).toBe(true);
+    expect(installSteps('linux').some((s) => s.includes('install.sh'))).toBe(true);
 
     // macOS: combined coming-soon, planned asset names documented, no install steps
     expect(MACOS_COMING_SOON.id).toBe('macos');
@@ -145,6 +147,8 @@ describe('Download page', () => {
     expect(getByTestId('dl-card-freebsd').textContent).toMatch(/gtk4/);
     expect(getByTestId('dl-card-openbsd').textContent).toMatch(/webkitgtk60/);
     expect(getByTestId('dl-card-windows').textContent).toMatch(/WebView2/i);
+    expect(getByTestId('dl-card-windows').textContent).toMatch(/Runtime included/i);
+    expect(getByTestId('dl-card-linux').textContent).toMatch(/auto via install\.sh/i);
 
     // No per-arch macOS download cards or dead DMG links
     expect(queryByTestId('dl-card-macos-x86_64')).not.toBeInTheDocument();
@@ -229,14 +233,16 @@ describe('Download page', () => {
     expect(install).toMatch(/--dry-run/);
   });
 
-  it('documents Windows zip extract path without install.sh', () => {
+  it('documents the Windows offline runtime install-and-run path', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: false, status: 404, text: async () => '', json: async () => null })),
     );
     const { getByTestId } = render(() => <Download />);
     const steps = getByTestId('dl-install-windows').textContent ?? '';
-    expect(steps).toMatch(/Expand-Archive|onyx\.exe/i);
+    expect(steps).toMatch(/Expand-Archive/i);
+    expect(steps).toMatch(/Install-and-Run-Onyx\.cmd/i);
+    expect(steps).toMatch(/offline WebView2/i);
     expect(steps).not.toMatch(/install\.sh/);
   });
 
