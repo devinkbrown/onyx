@@ -1,4 +1,4 @@
-/* ── /download BSD release surface ─────────────────────────────────────────── */
+/* ── /download release surface ─────────────────────────────────────────────── */
 .dl-page .dl-section-title {
   margin: 0 0 16px;
   font-family: var(--font-display);
@@ -33,6 +33,78 @@
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 18px;
+}
+
+/* Combined macOS coming-soon: same card shell, quiet status — no fake download chrome */
+.dl-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.dl-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in oklab, var(--lapis) 42%, var(--seam-faint));
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dl-card--soon {
+  grid-column: 1 / -1;
+  border-color: color-mix(in oklab, var(--lapis) 22%, var(--seam-faint));
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--lapis) 8%, transparent), transparent 48%),
+    color-mix(in oklab, var(--stone-2) 42%, var(--ink));
+}
+
+.dl-soon-arches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--seam-faint);
+}
+
+.dl-soon-arch {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 55%, transparent);
+}
+
+.dl-soon-arch strong {
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.dl-soon-arch span {
+  color: var(--paper-mute);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .dl-soon-arches {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dl-checksum {

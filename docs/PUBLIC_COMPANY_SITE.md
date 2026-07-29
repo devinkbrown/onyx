@@ -38,16 +38,17 @@ not shipped until real content and gates exist):
 | **Organizations** | Org / team proof path (not “enterprise SSO pack”) | **Gated** — audience entry on Home only |
 | **Trust** | Protection honesty, public status, ownership | **PARTIAL** — Home proof strip + `/status/`; full Trust page gated |
 | **Technology / Onyx Server** | Protocol, engine, self-host posture | **PARTIAL** — Home technical proof + `/about/`, `/roadmap/` |
-| **Download** `/download/` | Browser/PWA first; unsigned Win/Linux/macOS/FreeBSD/OpenBSD | **PARTIAL** — operator zip/tar.gz/DMG + checksums; not signed; macOS Darwin-built only |
+| **Download** `/download/` | Browser/PWA first; unsigned Win/Linux/FreeBSD/OpenBSD; macOS planned | **PARTIAL** — four operator zip/tar.gz packages + checksums; not signed; macOS coming soon |
 | **Status** `/status/` | Live public mesh/status honesty | **Ships** (existing) |
 | **About / contact / legal** | Short about; contact; privacy/terms | **PARTIAL** — `/about/` exists; contact/legal copy **gated** (no fake legal) |
 
 Do **not** invent `/enterprise`, `/gaming`, pricing, compliance badges,
 partner logos, or legal pages in marketing copy until those surfaces exist with
-evidence. `/download/` may only claim the verified unsigned lanes (Windows zip,
-Linux tar.gz, separate macOS Intel and Apple Silicon unsigned DMGs from genuine Darwin, FreeBSD/OpenBSD
-install.sh hosts) and must never fabricate a macOS artifact on Linux
-on the Linux release host.
+evidence. `/download/` may only claim the currently published unsigned lanes
+(Windows zip, Linux tar.gz, and FreeBSD/OpenBSD install.sh hosts). Separate
+macOS Intel and Apple Silicon packages may be described as coming soon, but the
+site must not expose DMG download controls until genuine Darwin-built artifacts
+are staged, and must never fabricate a macOS artifact on Linux.
 
 Existing supporting routes that remain valid links: `/stats/`, `/roadmap/`,
 `/invite/`, `/app/`, `/download/`.

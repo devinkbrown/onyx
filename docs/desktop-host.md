@@ -71,9 +71,11 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   `zig build` (auto platform). Explicit `desktop:*:linux` and
   `desktop:*:null` diagnostics exist separately.
 - Honest status: **signed multi-platform installers, updater, and notarization
-  are not done.** Public unsigned packages: Windows zip, Linux tar.gz,
-  separate macOS Intel and Apple Silicon DMGs (Darwin-built only), FreeBSD/OpenBSD one-install tarballs
-  (`install.sh`) via site-local `/download/` staging.
+  are not done.** Public unsigned packages currently available: Windows zip,
+  Linux tar.gz, and FreeBSD/OpenBSD one-install tarballs (`install.sh`) via
+  site-local `/download/` staging. Separate macOS Intel and Apple Silicon DMGs
+  remain planned and are shown as coming soon until real Darwin-built artifacts
+  are staged.
 - **Windows x86_64 unsigned zip lane (v0.1.3):** `pnpm desktop:release:windows`
   (`tools/release-windows.mjs`) runs Native SDK `native package` via
   `zig build package -Dplatform=windows -Dtarget=x86_64-windows`, then

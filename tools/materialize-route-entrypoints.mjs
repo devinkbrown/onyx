@@ -50,7 +50,7 @@ export const ROUTE_ENTRYPOINTS = [
     route: 'download',
     title: 'Download Onyx — unsigned native packages',
     description:
-      'Download unsigned Onyx v0.1.3 Windows zip, Linux/FreeBSD/OpenBSD tar.gz, and separate macOS Intel + Apple Silicon DMG packages with SHA-256 sidecars. Not signed or notarized. Browser and PWA remain the primary paths.',
+      'Download unsigned Onyx v0.1.3 Windows zip and Linux/FreeBSD/OpenBSD tar.gz packages with SHA-256 sidecars. macOS Intel and Apple Silicon native packages are coming soon. Not signed or notarized. Browser and PWA remain the primary paths.',
   },
   {
     route: 'accessibility',

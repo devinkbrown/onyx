@@ -9,9 +9,9 @@ import {
   DOWNLOAD_CARDS,
   DOWNLOAD_CATALOG_URL,
   DOWNLOAD_PRODUCT_VERSION,
+  MACOS_COMING_SOON,
   checksumFromCatalog,
   installSteps,
-  isMacosDownloadLane,
   parseSha256SumText,
   type DownloadCard,
   type DownloadCatalog,
@@ -41,13 +41,11 @@ async function loadSha256(url: string): Promise<string | null> {
 
 function archiveButtonLabel(ext: DownloadCard['archiveExt']): string {
   if (ext === 'zip') return 'Download zip';
-  if (ext === 'dmg') return 'Download DMG';
   return 'Download tar.gz';
 }
 
 function signingLabel(ext: DownloadCard['archiveExt']): string {
   if (ext === 'zip') return 'none — unsigned zip';
-  if (ext === 'dmg') return 'none — unsigned, unnotarized DMG';
   return 'none — unsigned tarball';
 }
 
@@ -112,9 +110,6 @@ function LaneCard(props: {
           {' '}
           <Show when={props.card.lane === 'windows'}>
             package root bin/onyx.exe + WebView2Loader.dll + resources
-          </Show>
-          <Show when={isMacosDownloadLane(props.card.lane)}>
-            .app bundle (Contents/MacOS/onyx + system WKWebView) inside unsigned DMG
           </Show>
           <Show when={props.card.lane === 'linux'}>
             package root bin/onyx + resources/dist
@@ -190,22 +185,8 @@ function LaneCard(props: {
               This package is
               {' '}
               <strong>unsigned</strong>
-              <Show when={isMacosDownloadLane(props.card.lane)}>
-                {' '}
-                and
-                {' '}
-                <strong>unnotarized</strong>
-              </Show>
-              . Extract or mount and run from the package tree. Onyx does not claim
+              . Extract and run from the package tree. Onyx does not claim
               codesign, notarization, virus-free status, or GUI launch verification for this lane.
-              <Show when={props.card.lane === 'macos-x86_64'}>
-                {' '}
-                The DMG is built only on a genuine Darwin Intel runner (x86_64).
-              </Show>
-              <Show when={props.card.lane === 'macos-arm64'}>
-                {' '}
-                The DMG is built only on a genuine Darwin Apple Silicon runner (arm64).
-              </Show>
             </p>
           )}
         >
@@ -234,13 +215,76 @@ function LaneCard(props: {
 }
 
 /**
- * Public /download — unsigned Windows/Linux/macOS/FreeBSD/OpenBSD native packages.
- * macOS DMGs are Darwin-built only (Intel + Apple Silicon). Browser remains primary.
+ * Combined macOS Intel + Apple Silicon card: polished coming-soon, no dead downloads.
+ * Uniform mineral controls — primary path is browser / PWA.
+ */
+function MacosComingSoonCard(): JSX.Element {
+  const mac = MACOS_COMING_SOON;
+  return (
+    <article
+      class="dl-card data-card dl-card--soon"
+      data-testid="dl-card-macos"
+      data-state="coming-soon"
+    >
+      <div class="dl-card-head">
+        <span class="label">{mac.osLabel}</span>
+        <span class="dl-status" data-testid="dl-macos-status">{mac.statusLabel}</span>
+      </div>
+      <h2>{mac.title}</h2>
+      <p>{mac.summary}</p>
+      <ul class="dl-facts">
+        <li>
+          <strong>Runtime (planned)</strong>
+          {' '}
+          {mac.runtime}
+        </li>
+        <li>
+          <strong>Package (planned)</strong>
+          {' '}
+          {mac.plannedPackage}
+        </li>
+        <li>
+          <strong>Status</strong>
+          {' '}
+          No public DMG, SHA-256 sidecar, or honesty notice is linked until genuine Darwin builds ship.
+        </li>
+      </ul>
+      <div class="dl-soon-arches" data-testid="dl-macos-arches" aria-label="Planned macOS architectures">
+        <For each={[...mac.arches]}>
+          {(arch) => (
+            <div class="dl-soon-arch" data-testid={`dl-macos-arch-${arch.arch}`}>
+              <strong>{arch.label}</strong>
+              <span>{arch.note}</span>
+            </div>
+          )}
+        </For>
+      </div>
+      <div class="dl-actions">
+        <a
+          class="r-btn primary"
+          data-testid="dl-macos-open-app"
+          href="/app/"
+        >
+          Open Onyx in browser
+        </a>
+      </div>
+      <p class="dl-note" data-testid="dl-macos-honesty">
+        {mac.honesty}
+        {' '}
+        Supporting browsers can install Onyx as a PWA from the app shell — same rooms, messages, and calls without a native package.
+      </p>
+    </article>
+  );
+}
+
+/**
+ * Public /download — unsigned Windows/Linux/FreeBSD/OpenBSD native packages.
+ * macOS Intel + Apple Silicon: combined coming-soon (no fake DMG controls). Browser remains primary.
  */
 export default function Download(): JSX.Element {
   setPageMeta(
     'Download Onyx — unsigned native packages',
-    'Download unsigned Onyx v0.1.3 Windows zip, Linux/FreeBSD/OpenBSD tar.gz, and macOS Intel + Apple Silicon DMG packages with SHA-256 sidecars. Not signed or notarized. Browser and PWA remain the primary paths.',
+    'Download unsigned Onyx v0.1.3 Windows zip and Linux/FreeBSD/OpenBSD tar.gz packages with SHA-256 sidecars. macOS Intel and Apple Silicon native packages are coming soon. Not signed or notarized. Browser and PWA remain the primary paths.',
     '/download/',
   );
 
@@ -267,20 +311,26 @@ export default function Download(): JSX.Element {
 
       <section class="r-wrap data-hero" aria-labelledby="download-heading">
         <p class="r-kicker">v{DOWNLOAD_PRODUCT_VERSION} · unsigned native packages</p>
-        <h1 id="download-heading">Windows, Linux, macOS, FreeBSD &amp; OpenBSD</h1>
+        <h1 id="download-heading">Windows, Linux, FreeBSD &amp; OpenBSD</h1>
         <p class="sub">
-          Operator packages: Windows zip, Linux tar.gz, separate macOS Intel (x86_64) and
-          Apple Silicon (arm64) DMGs (system WKWebView; unsigned/unnotarized; each built on
-          genuine matching-arch Darwin), and FreeBSD/OpenBSD native hosts with
+          Operator packages now: Windows zip, Linux tar.gz, and FreeBSD/OpenBSD hosts with
           {' '}
           <code>install.sh</code>
-          . Every artifact is
+          . Every published artifact is
           {' '}
           <strong>unsigned</strong>
           , carries a SHA-256 sidecar and honesty notice, and is site-local under
           {' '}
           <code>/downloads/v{DOWNLOAD_PRODUCT_VERSION}/</code>
           .
+          {' '}
+          <strong>macOS</strong>
+          {' '}
+          Intel and Apple Silicon native packages are
+          {' '}
+          <strong>coming soon</strong>
+          {' '}
+          (built on real Macs only — never fabricated here). Until then, use the browser or PWA.
         </p>
       </section>
 
@@ -291,16 +341,16 @@ export default function Download(): JSX.Element {
             <li>
               <strong>Is:</strong>
               {' '}
-              unsigned zip/tar.gz/DMG packages with SHA-256 sidecars and honesty notices
-              (Windows Native SDK zip; Linux Native SDK tar.gz; macOS Intel + Apple Silicon
-              WKWebView DMGs; FreeBSD/OpenBSD Zig-native hosts with install.sh).
+              unsigned zip/tar.gz packages with SHA-256 sidecars and honesty notices
+              (Windows Native SDK zip; Linux Native SDK tar.gz; FreeBSD/OpenBSD Zig-native hosts
+              with install.sh).
             </li>
             <li>
               <strong>Is not:</strong>
               {' '}
               codesigned, notarized, virus-scanned, store-packaged, auto-updating, or a signed
-              multi-platform installer suite. Not a universal macOS binary — pick Intel or
-              Apple Silicon.
+              multi-platform installer suite. macOS DMGs are not published yet — no fake download
+              buttons.
             </li>
             <li>
               <strong>Runtime / GUI launch</strong>
@@ -311,9 +361,9 @@ export default function Download(): JSX.Element {
             <li>
               <strong>macOS:</strong>
               {' '}
-              separate unsigned/unnotarized DMGs with system WKWebView for Intel x86_64 and
-              Apple Silicon arm64, each produced only on a genuine matching-arch Darwin runner
-              (GitHub-hosted macos-15-intel / macos-15 or a real Mac). Never fabricated on Linux.
+              Intel x86_64 and Apple Silicon arm64 native WKWebView packages are planned as separate
+              arch lanes, produced only on genuine matching-arch Darwin. Until they ship, there is
+              no DMG, sidecar, or install path on this page.
             </li>
             <li>
               <strong>Browser first:</strong>
@@ -322,7 +372,7 @@ export default function Download(): JSX.Element {
               {' '}
               <a href="/app/">Open Onyx</a>
               {' '}
-              in a browser or install the PWA.
+              in a browser or install the PWA — including on Mac today.
             </li>
           </ul>
         </div>
@@ -332,6 +382,7 @@ export default function Download(): JSX.Element {
         <For each={[...DOWNLOAD_CARDS]}>
           {(card) => <LaneCard card={card} catalog={catalog()} />}
         </For>
+        <MacosComingSoonCard />
       </section>
 
       <section class="r-wrap r-section">
@@ -340,9 +391,8 @@ export default function Download(): JSX.Element {
           <pre class="dl-pre">{`# after download (example: FreeBSD)
 sha256 -c onyx-${DOWNLOAD_PRODUCT_VERSION}-freebsd-x86_64-ReleaseFast-unsigned.sha256
 # Linux: sha256sum -c …
-# macOS Intel: shasum -a 256 -c onyx-${DOWNLOAD_PRODUCT_VERSION}-macos-x86_64-ReleaseFast-unsigned.sha256
-# macOS Apple Silicon: shasum -a 256 -c onyx-${DOWNLOAD_PRODUCT_VERSION}-macos-arm64-ReleaseFast-unsigned.sha256
-# Windows (PowerShell): Get-FileHash .\\onyx-…-unsigned.zip -Algorithm SHA256`}</pre>
+# Windows (PowerShell): Get-FileHash .\\onyx-…-unsigned.zip -Algorithm SHA256
+# macOS native packages: not published yet — no .sha256 sidecar to check`}</pre>
           <p class="dl-note">
             Compare the hash on this page (when staged) with the
             {' '}
