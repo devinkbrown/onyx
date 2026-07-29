@@ -13,6 +13,8 @@ export default tseslint.config(
       '.claude/**',
       'scratchpad/**',
       'out/**',
+      'zig-out/**',
+      '.zig-cache/**',
       'coverage/**',
       'dist/**',
       'test-results/**',

@@ -1,6 +1,6 @@
 {
   "name": "onyx",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -28,7 +28,13 @@
     "desktop:test:linux": "node tools/desktop-zig.mjs build test -Dplatform=linux",
     "desktop:build:windows": "node tools/desktop-zig.mjs build -Dplatform=windows -Dtarget=x86_64-windows",
     "desktop:package:windows": "node tools/desktop-zig.mjs build package -Dplatform=windows -Dtarget=x86_64-windows",
-    "desktop:release:windows": "node tools/release-windows.mjs"
+    "desktop:release:windows": "node tools/release-windows.mjs",
+    "desktop:package:linux": "node tools/desktop-zig.mjs build package -Dplatform=linux",
+    "desktop:release:linux": "node tools/release-unix.mjs linux",
+    "desktop:release:freebsd": "node tools/release-unix.mjs freebsd",
+    "desktop:release:openbsd": "node tools/release-unix.mjs openbsd",
+    "desktop:package:macos": "node tools/desktop-zig.mjs build package -Dplatform=macos",
+    "desktop:release:macos": "node tools/release-unix.mjs macos"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.2.9",

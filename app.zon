@@ -2,7 +2,7 @@
     .id = "me.eshmaki.onyx",
     .name = "onyx",
     .display_name = "Onyx",
-    .version = "0.1.1",
+    .version = "0.1.2",
     .icons = .{"assets/icon.png"},
     // Native SDK 0.6.2 system-WebView hosts: macOS (WKWebView), Linux (WebKitGTK 6),
     // Windows (WebView2). Do not claim Chromium/CEF parity; this scaffold uses system.

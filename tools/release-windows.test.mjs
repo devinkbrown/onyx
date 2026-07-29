@@ -44,26 +44,26 @@ function syntheticPe({ subsystem }) {
 
 describe('release-windows version alignment', () => {
   it('parses versions from package.json / app.zon / build.zig.zon forms', () => {
-    expect(parsePackageJsonVersion('{"version":"0.1.1"}')).toBe('0.1.1');
-    expect(parseAppZonVersion('.version = "0.1.1",\n')).toBe('0.1.1');
-    expect(parseBuildZigZonVersion('.version = "0.1.1",')).toBe('0.1.1');
+    expect(parsePackageJsonVersion('{"version":"0.1.2"}')).toBe('0.1.2');
+    expect(parseAppZonVersion('.version = "0.1.2",\n')).toBe('0.1.2');
+    expect(parseBuildZigZonVersion('.version = "0.1.2",')).toBe('0.1.2');
     expect(parsePackageJsonVersion('not-json')).toBeNull();
     expect(parseAppZonVersion('nope')).toBeNull();
   });
 
-  it('accepts aligned 0.1.1 and rejects drift', () => {
+  it('accepts aligned 0.1.2 and rejects drift', () => {
     const good = assertVersionAlignment({
-      packageJson: '{"version":"0.1.1"}',
-      appZon: '.version = "0.1.1"',
-      buildZigZon: '.version = "0.1.1"',
+      packageJson: '{"version":"0.1.2"}',
+      appZon: '.version = "0.1.2"',
+      buildZigZon: '.version = "0.1.2"',
     });
-    expect(good).toEqual({ ok: true, version: '0.1.1' });
-    expect(RELEASE_PRODUCT_VERSION).toBe('0.1.1');
+    expect(good).toEqual({ ok: true, version: '0.1.2' });
+    expect(RELEASE_PRODUCT_VERSION).toBe('0.1.2');
 
     const bad = assertVersionAlignment({
       packageJson: '{"version":"0.1.0"}',
-      appZon: '.version = "0.1.1"',
-      buildZigZon: '.version = "0.1.1"',
+      appZon: '.version = "0.1.2"',
+      buildZigZon: '.version = "0.1.2"',
     });
     expect(bad.ok).toBe(false);
     if (!bad.ok) expect(bad.errors.join(' ')).toMatch(/package\.json/);
@@ -72,11 +72,11 @@ describe('release-windows version alignment', () => {
 
 describe('release-windows naming', () => {
   it('matches build.zig package dir and release zip basenames', () => {
-    expect(packageDirName()).toBe('onyx-0.1.1-windows-ReleaseFast');
-    expect(releaseZipBaseName()).toBe('onyx-0.1.1-windows-x86_64-ReleaseFast-unsigned');
-    const paths = resolveReleasePaths('/repo', '0.1.1');
-    expect(paths.packageDir).toBe('/repo/zig-out/package/onyx-0.1.1-windows-ReleaseFast');
-    expect(paths.zipPath).toMatch(/onyx-0\.1\.1-windows-x86_64-ReleaseFast-unsigned\.zip$/);
+    expect(packageDirName()).toBe('onyx-0.1.2-windows-ReleaseFast');
+    expect(releaseZipBaseName()).toBe('onyx-0.1.2-windows-x86_64-ReleaseFast-unsigned');
+    const paths = resolveReleasePaths('/repo', '0.1.2');
+    expect(paths.packageDir).toBe('/repo/zig-out/package/onyx-0.1.2-windows-ReleaseFast');
+    expect(paths.zipPath).toMatch(/onyx-0\.1\.2-windows-x86_64-ReleaseFast-unsigned\.zip$/);
   });
 });
 
@@ -119,7 +119,7 @@ describe('release-windows layout validation', () => {
         [
           '.{',
           '  .target = "windows",',
-          '  .version = "0.1.1",',
+          '  .version = "0.1.2",',
           '  .optimize = "ReleaseFast",',
           '  .signing = "none",',
           '  .subsystem = "gui",',
@@ -138,7 +138,7 @@ describe('release-windows checksum + honesty', () => {
   it('formats sha256sum lines and honesty claims', () => {
     expect(sha256Hex('abc')).toMatch(/^[0-9a-f]{64}$/);
     expect(formatSha256SumFile([{ path: 'a.zip', hash: 'dead' }])).toBe('dead  a.zip\n');
-    const n = honestyNotice({ version: '0.1.1', host: 'linux/x64' });
+    const n = honestyNotice({ version: '0.1.2', host: 'linux/x64' });
     expect(n).toMatch(/NOT verified on a real Windows/i);
     expect(n).toMatch(/macOS and Linux desktop builds are NOT released/i);
     expect(n).toMatch(/UNSIGNED/i);
@@ -157,7 +157,7 @@ describe('release-windows zip + pipeline (fixture)', () => {
       writeFileSync(join(dir, 'pkg/README.txt'), 'Windows native-sdk artifact directory.\n');
       writeFileSync(
         join(dir, 'pkg/package-manifest.zon'),
-        '.{ .target = "windows", .version = "0.1.1", .optimize = "ReleaseFast", .signing = "none", .subsystem = "gui" }\n',
+        '.{ .target = "windows", .version = "0.1.2", .optimize = "ReleaseFast", .signing = "none", .subsystem = "gui" }\n',
       );
       mkdirSync(join(dir, 'pkg/resources/dist'), { recursive: true });
       writeFileSync(join(dir, 'pkg/resources/dist/index.html'), '<!doctype html><title>t</title>\n');
@@ -185,12 +185,12 @@ describe('release-windows zip + pipeline (fixture)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'onyx-run-'));
     try {
       // Minimal repo-shaped tree for version + dist preflight
-      writeFileSync(join(dir, 'package.json'), JSON.stringify({ version: '0.1.1' }));
-      writeFileSync(join(dir, 'app.zon'), '.{ .version = "0.1.1" }\n');
-      writeFileSync(join(dir, 'build.zig.zon'), '.{ .version = "0.1.1" }\n');
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ version: '0.1.2' }));
+      writeFileSync(join(dir, 'app.zon'), '.{ .version = "0.1.2" }\n');
+      writeFileSync(join(dir, 'build.zig.zon'), '.{ .version = "0.1.2" }\n');
       mkdirSync(join(dir, 'dist'), { recursive: true });
 
-      const pkg = join(dir, 'zig-out/package/onyx-0.1.1-windows-ReleaseFast');
+      const pkg = join(dir, 'zig-out/package/onyx-0.1.2-windows-ReleaseFast');
       mkdirSync(join(pkg, 'bin'), { recursive: true });
       mkdirSync(join(pkg, 'resources'), { recursive: true });
       writeFileSync(join(pkg, 'bin/onyx.exe'), syntheticPe({ subsystem: 2 }));
@@ -198,7 +198,7 @@ describe('release-windows zip + pipeline (fixture)', () => {
       writeFileSync(join(pkg, 'README.txt'), 'x\n');
       writeFileSync(
         join(pkg, 'package-manifest.zon'),
-        '.{ .target = "windows", .version = "0.1.1", .optimize = "ReleaseFast", .signing = "none", .subsystem = "gui" }\n',
+        '.{ .target = "windows", .version = "0.1.2", .optimize = "ReleaseFast", .signing = "none", .subsystem = "gui" }\n',
       );
       mkdirSync(join(pkg, 'resources/dist'), { recursive: true });
       writeFileSync(join(pkg, 'resources/dist/index.html'), '<html></html>\n');
@@ -230,9 +230,9 @@ describe('release-windows zip + pipeline (fixture)', () => {
   it('runWindowsRelease fails closed when zig package exits non-zero', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'onyx-fail-'));
     try {
-      writeFileSync(join(dir, 'package.json'), JSON.stringify({ version: '0.1.1' }));
-      writeFileSync(join(dir, 'app.zon'), '.{ .version = "0.1.1" }\n');
-      writeFileSync(join(dir, 'build.zig.zon'), '.{ .version = "0.1.1" }\n');
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ version: '0.1.2' }));
+      writeFileSync(join(dir, 'app.zon'), '.{ .version = "0.1.2" }\n');
+      writeFileSync(join(dir, 'build.zig.zon'), '.{ .version = "0.1.2" }\n');
       const chunks = [];
       const result = await runWindowsRelease({
         repoRoot: dir,

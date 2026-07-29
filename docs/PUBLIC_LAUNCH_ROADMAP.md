@@ -101,7 +101,7 @@ Companions:
 | `native validate` / `native check` | **DONE** (structural gates) |
 | Zig compile of SDK host sources (`-Dplatform=null`) | **DONE** on Zig **0.17.0-dev** pin + patched SDK 0.6.2 |
 | Native GUI link + run | **PENDING** (WebKitGTK 6 missing on Linux verify host) |
-| Package output version/target defaults | **DONE** in graph: version from `app.zon` (0.1.1), target from selected platform; `null` not packageable |
+| Package output version/target defaults | **DONE** in graph: version from `app.zon` (0.1.2), target from selected platform; `null` not packageable |
 | Toolchain pin | **DONE** — Zig **0.17.0-dev.1476+91a29d707** / Native SDK **0.6.2** via pnpm `patchedDependencies` |
 
 ---
@@ -143,7 +143,7 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 |------|--------|
 | `zig build package` produces host-local artifact | **PENDING** (needs green GUI link first) |
 | Package target default = selected platform (not hardcoded macOS) | **DONE** (build graph) |
-| Package version = `app.zon` / 0.1.1 (not stale 0.1.0) | **DONE** (build graph) |
+| Package version = `app.zon` / 0.1.2 (not stale 0.1.0) | **DONE** (build graph) |
 | Code signing (macOS / Windows / Linux policies) | **PENDING** |
 | Auto-updater channel | **PENDING** |
 | Public download pages + checksums | **PENDING** |
@@ -195,6 +195,6 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 1. Keep Landing/tests aligned with `PUBLIC_COMPANY_SITE.md` when copy changes.
 2. Continue commercial total UI redesign **after** nav/calls foundation: Home surface → conversation → composer → profile/You settings (still without touching protocol/store/media/E2EE kernel).
 3. Install WebKitGTK 6 for Linux GUI link; re-run `zig build -Dplatform=linux` with the Zig 0.17 pin until green.
-4. Prove `zig build package` on a packageable platform with versioned output under `zig-out/package/onyx-0.1.1-…`.
+4. Prove `zig build package` on a packageable platform with versioned output under `zig-out/package/onyx-0.1.2-…`.
 5. Only then design signing + updater + download pages; flip claim ledger rows with evidence.
 6. Add gated company-site routes only with real content (Phase 7) — never empty legal or fake download.

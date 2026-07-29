@@ -79,8 +79,8 @@ pub fn build(b: *std.Build) void {
     // -Dplatform=null is never a package default; only an explicit -Dpackage-target may
     // still package while the host graph uses the null backend for diagnostics.
     const package_target: ?PackageTarget = package_target_override orelse defaultPackageTarget(selected_platform);
-    // Prefer app.zon .version (currently 0.1.1); fall back to product version string.
-    const package_version = packageVersionFromAppZon(@embedFile("app.zon")) orelse "0.1.1";
+    // Prefer app.zon .version (currently 0.1.2); fall back to product version string.
+    const package_version = packageVersionFromAppZon(@embedFile("app.zon")) orelse "0.1.2";
     const app_config = appManifestBuildConfig(b);
     const web_engine = web_engine_override orelse app_config.web_engine;
     const cef_dir = cef_dir_override orelse defaultCefDir(selected_platform, app_config.cef_dir);
@@ -194,11 +194,22 @@ pub fn build(b: *std.Build) void {
         break :pkg built;
     };
 
-    const package_step = b.step("package", "Create a local package artifact");
+    // Package targets are ONLY macos|linux|windows (Native SDK backends).
+    // FreeBSD/OpenBSD have no Native SDK host — release tools ship portable
+    // web/PWA tar.gz via tools/release-unix.mjs (not this zig package step).
+    // macOS packaging requires a Darwin host + Apple SDK; do not invent .app
+    // on Linux. Public release lanes: tools/release-windows.mjs + release-unix.mjs.
+    const package_step = b.step("package", "Create a local package artifact (macos|linux|windows only; no BSD native)");
     if (package_target) |pkg_target| {
         // Invoke the checkout's patched @native-sdk/cli via node + explicit
         // bin path so `zig build package` never depends on a foreign
         // PATH-resolved `native` binary from another install.
+        // Output layout (v0.1.2):
+        //   zig-out/package/onyx-<version>-linux-ReleaseFast/
+        //   zig-out/package/onyx-<version>-windows-ReleaseFast/
+        //   zig-out/package/onyx-<version>-macos-ReleaseFast.app/
+        // Release archives (one downloadable asset per platform) are produced
+        // by tools/release-*.mjs, not here.
         const package = b.addSystemCommand(&.{
             "node",
             b.fmt("{s}/bin/native.js", .{native_sdk_path}),
@@ -241,7 +252,7 @@ pub fn build(b: *std.Build) void {
         const reject = b.addSystemCommand(&.{
             "sh",
             "-c",
-            "echo 'zig build package rejects -Dplatform=null; pass -Dpackage-target=macos|linux|windows or a packageable -Dplatform' >&2; exit 1",
+            "echo 'zig build package rejects -Dplatform=null; pass -Dpackage-target=macos|linux|windows or a packageable -Dplatform. FreeBSD/OpenBSD are not Native SDK package targets — use pnpm desktop:release:freebsd|openbsd for portable web/PWA bundles (tools/release-unix.mjs).' >&2; exit 1",
         });
         package_step.dependOn(&reject.step);
     }
@@ -665,11 +676,11 @@ comptime {
     const sample =
         \\.{
         \\    .name = "onyx",
-        \\    .version = "0.1.1",
+        \\    .version = "0.1.2",
         \\}
     ;
     const parsed = packageVersionFromAppZon(sample) orelse @compileError("packageVersionFromAppZon failed to parse sample");
-    if (!std.mem.eql(u8, parsed, "0.1.1")) @compileError("packageVersionFromAppZon expected 0.1.1");
+    if (!std.mem.eql(u8, parsed, "0.1.2")) @compileError("packageVersionFromAppZon expected 0.1.2");
     if (packageVersionFromAppZon("no version field") != null) @compileError("packageVersionFromAppZon should miss without marker");
     if (defaultPackageTarget(.linux) != .linux) @compileError("defaultPackageTarget(linux)");
     if (defaultPackageTarget(.macos) != .macos) @compileError("defaultPackageTarget(macos)");

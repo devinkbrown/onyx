@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * Onyx client v0.1.1 — unsigned Windows x86_64 zip release (Native SDK package).
+ * Onyx client v0.1.2 — unsigned Windows x86_64 zip release (Native SDK package).
  *
  * Pipeline (fail-closed):
  *  1. Align versions: package.json + app.zon + build.zig.zon
@@ -34,7 +34,7 @@ import { runDesktopZig } from './desktop-zig.mjs';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Product version for this release lane (must match manifests). */
-export const RELEASE_PRODUCT_VERSION = '0.1.1';
+export const RELEASE_PRODUCT_VERSION = '0.1.2';
 
 /** Windows release arch claim (cross-build target). */
 export const RELEASE_ARCH = 'x86_64';
