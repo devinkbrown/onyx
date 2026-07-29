@@ -1,11 +1,11 @@
 /**
- * account.css — Onyx account panel (deep-water dark-luxury).
+ * account.css — Onyx account panel (quiet threshold).
  *
  * Rendered inside the shared ModalShell (`.onyx-modal__*`), so this sheet only
  * styles the panel's interior: the identity card, the section rhythm, the
- * protection switches, the certificate list, and the danger zone. Every value
- * is a design token (see styles/tokens.css); nothing is hardcoded. All motion
- * is disabled under prefers-reduced-motion at the foot of the file.
+ * protection switches, the certificate list, and the danger zone. Matte mineral
+ * surfaces, fine borders, Instrument Sans hierarchy, quiet cyan marks — no
+ * decorative glow. Tokens only; motion freezes under prefers-reduced-motion.
  */
 
 .acct {
@@ -25,22 +25,22 @@
   padding: var(--space-7) var(--space-5);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
-  background:
-    radial-gradient(120% 90% at 50% 0%, color-mix(in oklab, var(--lapis-deep) 14%, transparent), transparent 70%),
-    color-mix(in oklab, var(--stone) 40%, transparent);
+  background: color-mix(in oklab, var(--stone) 36%, transparent);
 }
 
 .acct-guest-glyph {
   font-size: 2.4rem;
   line-height: 1;
-  color: var(--lapis-bright);
-  filter: drop-shadow(0 0 12px color-mix(in oklab, var(--lapis) 50%, transparent));
+  color: var(--lapis);
+  filter: none;
 }
 
 .acct-guest-title {
   margin: 0;
-  font-family: var(--font-serif);
-  font-size: 1.18rem;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.12rem;
+  letter-spacing: -0.01em;
   color: var(--paper);
 }
 
@@ -81,8 +81,8 @@
   width: 0.48rem;
   height: 0.48rem;
   border-radius: var(--r-pill);
-  background: var(--lapis-bright);
-  box-shadow: 0 0 8px color-mix(in oklab, var(--lapis-bright) 58%, transparent);
+  background: var(--lapis);
+  box-shadow: none;
 }
 
 /* ── Identity card ───────────────────────────────────────────────────────── */
@@ -92,11 +92,10 @@
   align-items: flex-start;
   gap: var(--space-4);
   padding: var(--space-4);
-  border: 1px solid var(--seam);
+  border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 60%, transparent), color-mix(in oklab, var(--stone) 70%, transparent));
-  box-shadow: inset 0 1px 0 0 color-mix(in oklab, var(--paper) 6%, transparent);
+  background: color-mix(in oklab, var(--stone) 42%, transparent);
+  box-shadow: inset 0 1px 0 0 color-mix(in oklab, var(--paper) 4%, transparent);
 }
 
 .acct-identity-avatar {
@@ -106,12 +105,13 @@
   display: grid;
   place-items: center;
   border-radius: var(--r-md);
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
+  font-weight: 650;
   font-size: 1.05rem;
-  letter-spacing: 0.04em;
-  color: var(--ink);
-  background: linear-gradient(135deg, var(--lapis-bright), var(--lapis-deep));
-  box-shadow: 0 0 18px -6px color-mix(in oklab, var(--lapis) 80%, transparent);
+  letter-spacing: 0.02em;
+  color: var(--on-accent, var(--ink));
+  background: var(--lapis);
+  box-shadow: none;
 }
 
 .acct-identity-meta {
@@ -130,9 +130,11 @@
 }
 
 .acct-identity-name {
-  font-family: var(--font-serif);
-  font-size: 1.32rem;
-  line-height: 1.1;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.2rem;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
   color: var(--paper);
   word-break: break-word;
 }
@@ -166,7 +168,7 @@
   margin: 0;
   font-family: var(--font-mono);
   font-size: 0.74rem;
-  color: var(--lapis-bright);
+  color: var(--paper-dim);
   word-break: break-all;
 }
 
@@ -339,9 +341,9 @@
 }
 
 .acct-switch input:checked + .acct-switch-track {
-  background: color-mix(in oklab, var(--lapis-deep) 70%, var(--stone));
+  background: color-mix(in oklab, var(--lapis) 55%, var(--stone));
   border-color: var(--lapis);
-  box-shadow: 0 0 16px -4px color-mix(in oklab, var(--lapis) 80%, transparent);
+  box-shadow: none;
 }
 
 .acct-switch input:focus-visible + .acct-switch-track {
@@ -363,8 +365,8 @@
 
 .acct-switch input:checked ~ .acct-switch-thumb {
   transform: translateX(20px);
-  background: var(--lapis-bright);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--lapis-bright) 80%, transparent);
+  background: var(--paper);
+  box-shadow: none;
 }
 
 /* ── Certificates ────────────────────────────────────────────────────────── */
@@ -432,7 +434,7 @@
   color: var(--paper-dim);
 }
 .acct-totp-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--paper-mute); flex: none; }
-.acct-totp-status[data-status='active'] .acct-totp-dot { background: var(--lapis); box-shadow: 0 0 8px color-mix(in oklab, var(--lapis) 55%, transparent); }
+.acct-totp-status[data-status='active'] .acct-totp-dot { background: var(--lapis); box-shadow: none; }
 .acct-totp-status[data-status='pending'] .acct-totp-dot { background: var(--gold); }
 .acct-totp-enroll {
   width: 100%;

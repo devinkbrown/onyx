@@ -1,7 +1,8 @@
-/* ── Onyx AppShell — Bioluminescence × Terminal ──────────────────────────────
+/* ── Onyx AppShell — quiet threshold × terminal ──────────────────────────────
    Layout: CSS grid — [ ServerRail | ChannelSidebar | ConversationColumn | MemberList ]
    PresenceRibbon spans the top of the conversation column.
    Background canvas is fixed behind everything (z-index: -1).
+   Matte surfaces, fine borders, quiet cyan signal — no decorative drift/glow.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ── Grid root ── */
@@ -25,23 +26,15 @@
   overflow: hidden;
   font-family: var(--font-sans);
   color: var(--paper);
-  /* Light legibility wash ONLY — let the real animated Background canvas (z-index
-     -1) read through just like it does in the Theme Factory. A faint top glow and
-     a soft bottom fade keep the header and composer legible without a heavy ink
-     veil burying the scene. (The old ::before/::after faux current + biolume
-     layers were removed: they competed with and dimmed the real, theme-matched
-     canvas, and their CSS animation ignored prefers-reduced-motion.) */
+  /* Quiet legibility wash — let the Background canvas (z-index -1) read through
+     without a top glow spectacle. Soft bottom fade only. */
   background:
-    radial-gradient(
-      ellipse at 50% 0%,
-      color-mix(in oklab, var(--lapis-deep) 14%, transparent) 0%,
-      transparent 42%
-    ),
     linear-gradient(
       180deg,
-      transparent 0%,
-      transparent 62%,
-      color-mix(in oklab, var(--ink) 22%, transparent) 100%
+      color-mix(in oklab, var(--ink) 18%, transparent) 0%,
+      transparent 28%,
+      transparent 70%,
+      color-mix(in oklab, var(--ink) 28%, transparent) 100%
     );
 }
 
@@ -50,30 +43,14 @@
   z-index: 1;
 }
 
-@keyframes shell-current-drift {
-  from { transform: translate3d(-2.5%, -1%, 0); }
-  to { transform: translate3d(2.5%, 1%, 0); }
-}
-
-@keyframes shell-biolume-drift {
-  from {
-    transform: translate3d(0, 0, 0);
-    opacity: 0.34;
-  }
-  to {
-    transform: translate3d(0, -1.8%, 0);
-    opacity: 0.54;
-  }
-}
-
 .shell button:focus-visible,
 .shell [role='button']:focus-visible,
 .shell input:focus-visible,
 .shell textarea:focus-visible,
 .shell-mobile-nav-btn:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: 2px solid var(--lapis);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--lapis) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--lapis) 22%, transparent);
 }
 
 .sr-only {
@@ -172,28 +149,21 @@
 .shell-rail-entry:hover {
   color: var(--lapis-bright);
   border-color: var(--seam);
-  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
-  box-shadow: inset 0 0 18px color-mix(in oklab, var(--lapis) 14%, transparent);
+  background: color-mix(in oklab, var(--stone-2) 70%, transparent);
 }
 
 /* The Appearance link is an <a>, which the global .shell focus rule (button /
    [role=button] / input / textarea) does not cover — give it a focus ring. */
 .shell-rail-entry:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: 2px solid var(--lapis);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--lapis) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--lapis) 22%, transparent);
 }
 
 .shell-rail-entry--active {
   color: var(--lapis-bright);
-  border-color: var(--seam);
-  background:
-    radial-gradient(
-      circle at 50% 20%,
-      color-mix(in oklab, var(--lapis-bright) 18%, transparent) 0%,
-      transparent 58%
-    ),
-    color-mix(in oklab, var(--stone-2) 56%, transparent);
+  border-color: color-mix(in oklab, var(--lapis) 34%, var(--seam-faint));
+  background: color-mix(in oklab, var(--stone-2) 72%, transparent);
 }
 
 .shell-rail-entry--active::before {
@@ -203,8 +173,9 @@
   top: 20%;
   bottom: 20%;
   width: 2px;
-  background: var(--lapis-bright);
-  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+  background: var(--lapis);
+  /* Matte marker — no glow halo */
+  box-shadow: none;
 }
 
 /* Forced colors: the active server entry must stay visible. In Windows High
@@ -338,25 +309,9 @@
 /* Product-frame primary nav (Home / Rooms / Messages / Calls / You) */
 .shell-primary-nav {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   padding: 10px 8px;
   border-bottom: 1px solid var(--seam-faint);
-}
-
-@keyframes shell-tide-glow {
-  0%,
-  100% {
-    opacity: 0.72;
-    box-shadow:
-      0 0 8px color-mix(in oklab, var(--lapis-bright) 48%, transparent),
-      0 0 18px color-mix(in oklab, var(--lapis) 28%, transparent);
-  }
-  50% {
-    opacity: 1;
-    box-shadow:
-      0 0 12px color-mix(in oklab, var(--lapis-bright) 72%, transparent),
-      0 0 26px color-mix(in oklab, var(--lapis) 40%, transparent);
-  }
 }
 
 .shell-primary-nav-btn {
@@ -366,13 +321,14 @@
   align-items: center;
   gap: 10px;
   /* WCAG 2.5.5 / commercial touch target floor */
-  min-height: 44px;
+  min-height: var(--target-min, 44px);
   padding: 10px 12px 10px 14px;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   background: transparent;
   color: var(--paper-dim);
-  font: 600 0.88rem/1.1 var(--font-sans);
+  font: 600 var(--text-md, 0.9375rem)/1.15 var(--font-sans);
+  letter-spacing: 0.01em;
   text-align: left;
   cursor: pointer;
   transition:
@@ -381,25 +337,17 @@
     background var(--dur) var(--ease);
 }
 
-/* Illuminated tide-line / current marker on the active primary destination. */
+/* Quiet signal bar on the active primary destination — matte, no animated glow. */
 .shell-primary-nav-btn--active::before {
   content: '';
   position: absolute;
   left: 3px;
-  top: 8px;
-  bottom: 8px;
-  width: 3px;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
   border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--lapis-bright) 88%, white) 0%,
-    var(--lapis-bright) 42%,
-    var(--lapis) 100%
-  );
-  box-shadow:
-    0 0 10px color-mix(in oklab, var(--lapis-bright) 58%, transparent),
-    0 0 20px color-mix(in oklab, var(--lapis) 32%, transparent);
-  animation: shell-tide-glow 2.8s ease-in-out infinite;
+  background: var(--lapis);
+  box-shadow: none;
   pointer-events: none;
 }
 
@@ -408,56 +356,51 @@
   place-items: center;
   width: 24px;
   height: 24px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   color: var(--paper-mute);
-  font: 700 0.78rem/1 var(--font-mono);
-  background: color-mix(in oklab, var(--stone-2) 30%, transparent);
+  font: 700 var(--text-xs, 0.6875rem)/1 var(--font-mono);
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 44%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
 }
 
 .shell-primary-nav-btn:hover {
   color: var(--paper);
-  background: color-mix(in oklab, var(--stone-2) 36%, transparent);
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 48%, transparent);
+  border-color: color-mix(in oklab, var(--line) 70%, transparent);
+}
+
+.shell-primary-nav-btn:active {
+  box-shadow: var(--elev-press, inset 0 1px 0 color-mix(in oklab, var(--ink) 18%, transparent));
 }
 
 .shell-primary-nav-btn:focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 2px;
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
 }
 
 .shell-primary-nav-btn--active {
   color: var(--paper);
-  border-color: color-mix(in oklab, var(--lapis) 28%, var(--seam-faint));
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--lapis-deep) 22%, transparent) 0%,
-      color-mix(in oklab, var(--lapis-deep) 10%, transparent) 48%,
-      transparent 100%
-    );
+  border-color: color-mix(in oklab, var(--lapis) 26%, var(--seam-faint));
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 62%, transparent);
 }
 
 .shell-primary-nav-btn--active span {
-  color: var(--ink);
-  background: var(--lapis-bright);
-  box-shadow: 0 0 14px -4px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .shell-primary-nav-btn--active::before {
-    animation: none;
-    opacity: 1;
-    box-shadow:
-      0 0 8px color-mix(in oklab, var(--lapis-bright) 42%, transparent),
-      0 0 14px color-mix(in oklab, var(--lapis) 22%, transparent);
-  }
+  color: var(--on-accent, var(--ink));
+  background: var(--lapis);
+  border-color: color-mix(in oklab, var(--lapis) 70%, var(--stone-line));
+  box-shadow: none;
 }
 
 .shell-sidebar-empty {
-  margin: 0;
-  padding: 6px 10px 14px;
+  margin: 8px;
+  padding: 12px 12px 14px;
   color: var(--paper-mute);
-  font-size: 0.82rem;
-  line-height: 1.45;
+  font-size: var(--text-sm, 0.8125rem);
+  line-height: var(--leading-body, 1.55);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 40%, transparent);
+  border-left: 2px solid color-mix(in oklab, var(--lapis) 40%, var(--stone-line));
 }
 
 .shell-sidebar-filter {
@@ -1502,8 +1445,8 @@
   gap: var(--space-3);
   padding: 0 clamp(12px, 1.8vw, 20px);
   /* Commercial header budget — primary Call/People/More targets ≥40px desktop. */
-  height: 56px;
-  background: color-mix(in oklab, var(--ink) 88%, var(--stone));
+  height: 52px;
+  background: color-mix(in oklab, var(--surface-void, var(--ink)) 88%, var(--surface-face, var(--stone)));
   border-bottom: 1px solid var(--seam);
   overflow: hidden;
 }
@@ -1571,8 +1514,8 @@
 
 .shell-ribbon-channel {
   font-family: var(--font-sans);
-  font-size: 1rem;
-  font-weight: 750;
+  font-size: var(--text-md, 0.9375rem);
+  font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
   color: var(--paper);
@@ -1580,7 +1523,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   flex: none;
-  max-width: 22ch;
+  max-width: 24ch;
 }
 
 .shell[data-room-identity] .shell-ribbon-channel {
@@ -5776,8 +5719,8 @@
   }
   .shell {
     /* Keep the rail compact at ordinary sizes, but let enlarged text grow its
-       content box instead of clipping icons and labels into a fixed 58px row. */
-    --mnav-h: max(58px, 2.25rem);
+       content box instead of clipping icons and labels into a fixed row. */
+    --mnav-h: max(56px, 2.25rem);
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
     /* Sit above the fixed bottom tab bar; clear the notch up top. */
@@ -5792,7 +5735,15 @@
 
   .shell-rail { display: none; }
 
-  /* Channel drawer — slides in from the left, stops above the tab bar */
+  /* The fixed product rail already owns Home / Rooms / Messages / Calls / You
+     on phones. Repeating that navigation inside the Rooms drawer wastes most
+     of a short viewport and creates two competing focus paths. */
+  .shell-sidebar .shell-primary-nav {
+    display: none;
+  }
+
+  /* Channel drawer — slides in from the left, stops above the tab bar.
+     Soft right edge radius + mineral field make the sheet feel intentional. */
   .shell-sidebar {
     position: fixed;
     top: 0;
@@ -5803,13 +5754,17 @@
     );
     left: 0;
     z-index: 90;
-    width: min(300px, 86vw);
+    width: min(300px, 88vw);
+    max-width: 320px;
     padding-top: env(safe-area-inset-top, 0px);
     padding-left: env(safe-area-inset-left, 0px);
     transform: translateX(-100%);
     transition: transform var(--dur) var(--ease);
     grid-column: unset;
-    box-shadow: 24px 0 60px -30px color-mix(in oklab, var(--ink) 92%, transparent);
+    border-right: 1px solid var(--seam);
+    border-radius: 0 var(--r-lg) var(--r-lg) 0;
+    background: color-mix(in oklab, var(--ink) 96%, var(--stone));
+    box-shadow: 18px 0 48px -28px color-mix(in oklab, var(--ink) 88%, transparent);
   }
   /* The open class lives on the wrapper; flip the fixed child's transform.
      (A transform on the wrapper itself would make the fixed child a containing
@@ -5821,7 +5776,7 @@
     position: fixed;
     inset: 0;
     z-index: 89;
-    background: color-mix(in oklab, var(--ink) 64%, transparent);
+    background: color-mix(in oklab, var(--ink) 58%, transparent);
     backdrop-filter: blur(2px);
   }
 
@@ -5836,13 +5791,17 @@
     );
     right: 0;
     z-index: 90;
-    width: min(290px, 84vw);
+    width: min(290px, 86vw);
+    max-width: 320px;
     padding-top: env(safe-area-inset-top, 0px);
     padding-right: env(safe-area-inset-right, 0px);
     transform: translateX(100%);
     transition: transform var(--dur) var(--ease);
     grid-column: unset;
-    box-shadow: -24px 0 60px -30px color-mix(in oklab, var(--ink) 92%, transparent);
+    border-left: 1px solid var(--seam);
+    border-radius: var(--r-lg) 0 0 var(--r-lg);
+    background: color-mix(in oklab, var(--ink) 96%, var(--stone));
+    box-shadow: -18px 0 48px -28px color-mix(in oklab, var(--ink) 88%, transparent);
   }
   /* Override desktop display:none so the drawer can animate off-screen instead */
   .shell-members--hidden {
@@ -5855,44 +5814,52 @@
   .shell-conversation {
     grid-column: 1;
     min-width: 0;
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in oklab, var(--ink) 68%, transparent) 0%,
-        color-mix(in oklab, var(--ink) 78%, transparent) 100%
-      );
+    /* Preserve the selected Onyx backdrop instead of burying it under a nearly
+       opaque black sheet. The wash protects text while letting mineral color
+       and motion remain part of the product identity. */
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--ink) 70%, transparent),
+      color-mix(in oklab, var(--ink) 82%, transparent)
+    );
   }
 
   .shell-conversation::before {
     top: 42px;
-    opacity: 0.45;
+    opacity: 0.28;
   }
 
+  /* Ribbon lives inside the shell, which already applies safe-area-inset-top.
+     Do not double-pad; keep a compact identity rail with 44px primary controls. */
   .shell-ribbon {
-    height: 56px;
-    min-height: 56px;
+    height: 52px;
+    min-height: 52px;
     padding: 0 10px;
-    padding-top: env(safe-area-inset-top, 0px);
-    background:
-      linear-gradient(180deg, color-mix(in oklab, var(--ink) 86%, var(--stone)), color-mix(in oklab, var(--ink) 94%, var(--stone)));
+    background: color-mix(in oklab, var(--ink) 94%, var(--stone));
+    border-bottom: 1px solid var(--seam-faint);
+    box-shadow: none;
   }
 
   .shell-ribbon-inner {
-    gap: 8px;
+    gap: 6px;
+    min-height: 52px;
   }
 
   .shell-ribbon-identity {
     gap: 6px;
+    min-width: 0;
   }
 
   .shell-ribbon-channel {
     max-width: min(42vw, 15ch);
     font-size: 1.02rem;
     letter-spacing: 0;
+    font-weight: 650;
   }
 
   .shell-ribbon-right {
     gap: 2px;
+    min-width: 0;
   }
 
   .shell-ribbon-group {
@@ -5900,9 +5867,9 @@
   }
 
   /* Commercial mobile: place chips stay primary; legacy strip chrome lives in More.
-     Connection stays present (compact); do not display:none .shell-ribbon-conn.
-     Secondary facepile is desktop-only — never crowds Call/People/More/conn.
-     Hide Facepile root (.shell-facepile); !important beats its inline display. */
+     Connection stays present (compact visual, full 44px hit); do not display:none
+     .shell-ribbon-conn. Secondary facepile is desktop-only — never crowds Call /
+     People / More / conn. Hide Facepile root (.shell-facepile). */
   .shell-ribbon-account,
   .shell-ribbon-appearance,
   .shell-ribbon-preferences,
@@ -5918,14 +5885,21 @@
   }
   .shell-ribbon-conn {
     display: inline-flex;
-    padding: 4px;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
     gap: 0;
-    min-width: 18px;
-    min-height: 18px;
   }
 
   /* Primary targets Call / People / More ≥44×44 on phone. */
-  .shell-ribbon-iconbtn {
+  .shell-ribbon-iconbtn,
+  .shell-ribbon-more-trigger,
+  .shell-ribbon-group .onyx-popover__trigger {
     min-width: 44px;
     min-height: 44px;
     width: 44px;
@@ -5950,12 +5924,18 @@
 
   .shell-ribbon-voice-chip {
     max-width: 8.75rem;
-    height: 32px;
+    height: 36px;
+    min-height: 36px;
     padding-inline: 8px;
   }
 
   .shell-ribbon-voice-text {
     max-width: 7.2rem;
+  }
+
+  .shell-ribbon-event-chip {
+    height: 36px;
+    min-height: 36px;
   }
 
   .time-scrubber {
@@ -6053,11 +6033,12 @@
     padding: 0 6px;
   }
 
-  /* Composer: 16px kills iOS zoom-on-focus; larger send target; drop the hint */
+  /* Composer: 16px kills iOS zoom-on-focus; 44px primary tools; drop the hint */
   .shell-composer {
-    padding: 7px 9px 8px;
-    background:
-      linear-gradient(180deg, color-mix(in oklab, var(--ink) 70%, transparent), color-mix(in oklab, var(--ink) 94%, var(--stone)));
+    padding: 8px 10px;
+    background: color-mix(in oklab, var(--ink) 94%, var(--stone));
+    border-top: 1px solid var(--seam-faint);
+    /* Stay clear of the virtual keyboard via shell height + keyboard inset. */
   }
   .shell-composer-measure {
     max-width: none;
@@ -6065,24 +6046,28 @@
   .shell-composer-context,
   .shell-composer-topic {
     max-width: 100%;
-    min-height: 32px;
+    min-height: 40px;
     margin-bottom: 6px;
-    padding-block: 5px;
+    padding-block: 6px;
   }
   .shell-composer-inner {
     gap: 4px;
-    border-radius: 16px;
-    padding: 2px;
+    border-radius: var(--r-md);
+    padding: 3px;
+    border: 1px solid var(--seam);
+    background: color-mix(in oklab, var(--stone-2) 42%, transparent);
   }
   .shell-composer-textarea {
     font-size: 16px;
-    min-height: 38px;
-    max-height: min(26svh, 132px);
-    padding: 8px 7px 8px 9px;
+    min-height: 44px;
+    max-height: min(28svh, 148px);
+    padding: 10px 8px 10px 10px;
     padding-inline: 10px;
-    line-height: 1.35;
+    line-height: 1.4;
+    /* Comfortable reading density for long drafts on phone. */
+    letter-spacing: 0;
   }
-  /* Phone/tablet (incl. 390×844): primary Attach/Emoji/More/Send ≥44×44.
+  /* Phone/tablet (incl. 320–430 widths): Attach/Emoji/More/Send ≥44×44.
      Four 44px targets + small gaps still fit a ~374px inner row with a usable textarea. */
   .shell-composer-tool {
     width: 44px;
@@ -6090,18 +6075,22 @@
     min-width: 44px;
     min-height: 44px;
     margin-bottom: 0;
-    border-radius: 13px;
+    border-radius: var(--r-sm);
   }
   .shell-composer-send {
     width: 44px;
     height: 44px;
     min-width: 44px;
     min-height: 44px;
-    margin: 0 2px 1px 0;
-    border-radius: 14px;
+    margin: 0 2px 0 0;
+    border-radius: var(--r-sm);
   }
   .shell-composer-tools {
     width: min(300px, calc(100vw - 16px));
+  }
+  .shell-composer-tools-item,
+  .shell-composer-tools-action {
+    min-height: 44px;
   }
   .shell-composer-hint { display: none; }
   .shell-command-menu,
@@ -6111,9 +6100,9 @@
     overflow-y: auto;
   }
 
-  /* Bottom tab bar — fixed, safe-area aware, real touch targets */
+  /* Bottom tab bar — fixed, safe-area aware, real thumb targets */
   .shell-mobile-nav {
-    --mnav-h: max(58px, 2.25rem);
+    --mnav-h: max(56px, 2.25rem);
 
     display: flex;
     align-items: stretch;
@@ -6133,18 +6122,16 @@
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scrollbar-width: thin;
-    background:
-      linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 42%, transparent), transparent 42%),
-      color-mix(in oklab, var(--ink) 94%, var(--stone));
+    /* Matte product rail — no gradient wash / glow stack. */
+    background: color-mix(in oklab, var(--surface-void, var(--ink)) 96%, var(--surface-face, var(--stone)));
     border-top: 1px solid var(--seam);
-    box-shadow:
-      0 -22px 54px -34px color-mix(in oklab, var(--ink) 92%, transparent),
-      inset 0 1px 0 color-mix(in oklab, var(--paper) 7%, transparent);
-    -webkit-backdrop-filter: blur(18px) saturate(1.2);
-    backdrop-filter: blur(18px) saturate(1.2);
+    box-shadow: 0 -8px 24px -20px color-mix(in oklab, var(--ink) 70%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   .shell-mobile-nav-btn {
+    --mobile-accent: var(--lapis);
     /* Equal fifths at ordinary text sizes; intrinsic min-content width wins at
        high zoom, turning the containing nav into a single-axis rail. */
     flex: 1 0 20%;
@@ -6152,68 +6139,71 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    min-height: 50px;
-    padding: 4px 3px 6px;
+    gap: 4px;
+    min-width: var(--target-min, 44px);
+    min-height: var(--target-min, 44px);
+    height: 100%;
+    padding: 6px 3px 8px;
     color: var(--paper-mute);
-    font-family: var(--font-mono);
-    font-size: 0.52rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs, 0.625rem);
+    font-weight: 650;
+    letter-spacing: 0.03em;
+    text-transform: none;
     background: transparent;
     border: none;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition: color var(--dur) var(--ease);
+    transition: color var(--dur) var(--ease), background var(--dur-micro) var(--ease);
   }
+
+  .shell-mobile-nav-btn:nth-child(2) { --mobile-accent: var(--lapis-bright); }
+  .shell-mobile-nav-btn:nth-child(3) { --mobile-accent: var(--ok); }
+  .shell-mobile-nav-btn:nth-child(4) { --mobile-accent: var(--shu); }
+  .shell-mobile-nav-btn:nth-child(5) { --mobile-accent: var(--gold); }
+
   .shell-mobile-nav-btn b {
-    width: 1.36rem;
-    height: 1.26rem;
+    width: 1.55rem;
+    height: 1.4rem;
     display: grid;
     place-items: center;
-    border-radius: var(--r-pill);
-    font-size: 0.96rem;
+    border-radius: var(--r-sm);
+    font-size: 1rem;
     line-height: 1;
     font-weight: 400;
-    background: color-mix(in oklab, var(--stone-2) 28%, transparent);
+    background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 36%, transparent);
   }
-  .shell-mobile-nav-btn:active { color: var(--lapis-bright); }
+  .shell-mobile-nav-btn:active {
+    color: var(--lapis-bright);
+    background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 28%, transparent);
+  }
   .shell-mobile-nav-btn:hover,
-  .shell-mobile-nav-btn--active { color: var(--lapis-bright); }
+  .shell-mobile-nav-btn--active { color: var(--mobile-accent); }
   .shell-mobile-nav-btn--active b {
-    color: var(--ink);
-    background: linear-gradient(180deg, var(--lapis-bright), var(--lapis));
-    box-shadow: 0 0 18px -8px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+    color: var(--on-accent, var(--ink));
+    background: var(--mobile-accent);
+    box-shadow: none;
+    border: 1px solid color-mix(in oklab, var(--mobile-accent) 60%, var(--stone-line));
   }
-  /* Tide-line current marker on the active mobile primary destination. */
+  .shell-mobile-nav-btn:focus-visible {
+    outline: var(--focus-ring, 2px solid var(--lapis));
+    outline-offset: -2px;
+  }
+  /* Quiet signal bar on the active mobile primary destination — no animated glow. */
   .shell-mobile-nav-btn {
     position: relative;
   }
   .shell-mobile-nav-btn--active::after {
     content: '';
     position: absolute;
-    left: 22%;
-    right: 22%;
-    top: 3px;
-    height: 3px;
-    border-radius: 999px;
-    background: linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--lapis-bright) 70%, white),
-      var(--lapis-bright),
-      var(--lapis)
-    );
-    box-shadow:
-      0 0 10px color-mix(in oklab, var(--lapis-bright) 58%, transparent),
-      0 0 18px color-mix(in oklab, var(--lapis) 30%, transparent);
-    animation: shell-tide-glow 2.8s ease-in-out infinite;
+    left: 30%;
+    right: 30%;
+    top: 2px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--mobile-accent);
+    box-shadow: none;
     pointer-events: none;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .shell-mobile-nav-btn--active::after {
-      animation: none;
-      opacity: 1;
-    }
   }
 
   .shell-topic-filter {
@@ -6341,8 +6331,8 @@
   }
 
   .shell-msg-text {
-    font-size: 0.92rem;
-    line-height: 1.46;
+    font-size: 0.95rem;
+    line-height: 1.5;
   }
 
   .shell-msg-actions {
@@ -6350,12 +6340,18 @@
     margin-top: 3px;
   }
 
+  .shell-msg-action {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
   .shell-reactions {
     margin-top: 4px;
   }
 
   .shell-reaction {
-    padding: 2px 7px 2px 5px;
+    min-height: 32px;
+    padding: 4px 8px 4px 6px;
   }
 
   .shell-day-divider {
@@ -6367,6 +6363,19 @@
     padding-inline: 9px;
     font-size: 0.56rem;
   }
+
+  /* Sidebar filter / search rows remain thumb-reachable inside the drawer. */
+  .shell-sidebar-filter,
+  .shell-sidebar-search,
+  .shell-sidebar input[type='search'],
+  .shell-sidebar input[type='text'] {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .shell-channel-item {
+    min-height: 44px;
+  }
 }
 
 @media (min-width: 901px) {
@@ -6375,13 +6384,13 @@
   .shell-members-backdrop { display: none; }
 }
 
-/* Phone-specific tightening */
+/* Phone-specific tightening (320 / 360 / 390 / 430 CSS widths) */
 @media (max-width: 480px) {
   .shell,
   .shell-mobile-nav {
     --mnav-h: max(56px, 2.25rem);
   }
-  .shell-ribbon { gap: 6px; padding: 0 8px; }
+  .shell-ribbon { gap: 4px; padding: 0 8px; }
   .shell-ribbon-channel { font-size: 0.98rem; max-width: min(48vw, 13ch); }
   .shell-ribbon-topic { display: none; }
   /* Keep the identity (channel NAME) — hiding the whole block left a dead
@@ -6397,8 +6406,11 @@
   .shell-ribbon-voice-text {
     max-width: 5.6rem;
   }
+  .shell-ribbon-event-chip {
+    max-width: 6.5rem;
+  }
   .shell-composer { padding: 6px 8px 7px; }
-  .shell-composer-inner { gap: 4px; }
+  .shell-composer-inner { gap: 3px; }
   .shell-command-item { grid-template-columns: 1fr; gap: 2px; }
   .shell-emoji-grid { grid-template-columns: repeat(7, minmax(28px, 1fr)); }
   .shell-attachment { grid-template-columns: 34px minmax(0, 1fr) 24px; max-width: 100%; }
@@ -6413,10 +6425,149 @@
   }
 }
 
+/* Narrowest phones (~320 CSS px): keep five destinations + usable composer. */
+@media (max-width: 360px) {
+  .shell-ribbon-channel {
+    max-width: min(40vw, 11ch);
+    font-size: 0.94rem;
+  }
+  .shell-ribbon-voice-chip,
+  .shell-ribbon-event-chip {
+    max-width: 5.5rem;
+  }
+  .shell-composer-inner {
+    gap: 2px;
+  }
+  .shell-composer-textarea {
+    padding-inline: 8px;
+  }
+  .shell-mobile-nav-btn {
+    font-size: 0.56rem;
+    letter-spacing: 0.04em;
+    padding-inline: 1px;
+  }
+}
+
+/* Landscape phones / short wide viewports: reclaim vertical room for transcript
+   + composer while keeping 44px targets and safe-area bottom nav. */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 480px) {
+  .shell,
+  .shell-mobile-nav {
+    --mnav-h: 48px;
+  }
+
+  .shell-ribbon {
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .shell-ribbon-inner {
+    min-height: 44px;
+  }
+
+  .shell-mobile-nav-btn {
+    flex-direction: row;
+    gap: 6px;
+    padding: 4px 8px;
+    font-size: 0.62rem;
+  }
+
+  .shell-mobile-nav-btn b {
+    width: 1.25rem;
+    height: 1.25rem;
+    font-size: 0.9rem;
+  }
+
+  .shell-mobile-nav-btn--active::after {
+    display: none;
+  }
+
+  .shell-composer {
+    padding: 4px 8px 5px;
+  }
+
+  .shell-composer-textarea {
+    min-height: 40px;
+    max-height: min(22svh, 96px);
+    padding-block: 8px;
+  }
+
+  .shell-msg-group {
+    padding-block: 4px 2px;
+  }
+
+  .shell-feed {
+    padding-top: 2px;
+  }
+}
+
+/* Forced colors: mobile chrome must remain operable without seam washes. */
+@media (max-width: 900px) and (forced-colors: active) {
+  .shell-mobile-nav,
+  .shell-ribbon,
+  .shell-composer,
+  .shell-sidebar,
+  .shell-members {
+    background: Canvas;
+    border-color: CanvasText;
+    color: CanvasText;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .shell-mobile-nav-btn,
+  .shell-ribbon-iconbtn,
+  .shell-composer-tool,
+  .shell-composer-send {
+    border: 1px solid ButtonText;
+    color: ButtonText;
+    background: ButtonFace;
+    forced-color-adjust: none;
+  }
+
+  .shell-mobile-nav-btn--active,
+  .shell-mobile-nav-btn--active b,
+  .shell-composer-send {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+
+  .shell-mobile-nav-btn--active::after {
+    background: Highlight;
+  }
+
+  .shell-sidebar-backdrop,
+  .shell-members-backdrop {
+    background: Canvas;
+    opacity: 0.72;
+    backdrop-filter: none;
+  }
+}
+
+/* Drawer motion freezes under reduced-motion (keep instant open/close). */
+@media (max-width: 900px) and (prefers-reduced-motion: reduce) {
+  .shell-sidebar,
+  .shell-members {
+    transition: none;
+  }
+
+  .shell-sidebar-backdrop,
+  .shell-members-backdrop {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .shell-mobile-nav-btn {
+    transition: none;
+  }
+}
+
 /* A 400% zoomed phone can expose less than 30rem of CSS height. Keep visible
    labels enlarged, but put their decorative glyphs beside them so the bottom
    rail does not consume the member/channel drawer's entire working area. */
-@media (max-width: 900px) and (max-height: 30rem) {
+@media (max-width: 42rem) and (max-height: 30rem) {
   .shell,
   .shell-mobile-nav {
     --mnav-h: 56px;
@@ -6459,6 +6610,7 @@
   }
 
   .shell-ribbon-iconbtn {
+    display: inline-flex;
     width: 44px;
     min-width: 44px;
     height: 44px;
@@ -6553,10 +6705,14 @@
   }
 
   .shell-mobile-nav-btn {
+    flex: 0 0 auto;
     flex-direction: row;
     justify-content: flex-start;
     gap: 4px;
+    min-width: 92px;
     padding: 4px 10px;
+    font-size: 16px;
+    line-height: 1.2;
   }
 
   .shell-mobile-nav-btn b {
@@ -6567,6 +6723,9 @@
   }
 
   .shell-members-head {
+    flex: none;
+    min-height: 60px;
+    max-height: 60px;
     flex-wrap: nowrap;
     justify-content: flex-start;
     gap: 8px;
@@ -6578,6 +6737,19 @@
     overscroll-behavior-x: contain;
     scroll-padding-inline: 12px;
     scrollbar-width: thin;
+  }
+
+  .shell-members-filter {
+    flex: none;
+    min-height: 60px;
+    padding: 8px;
+  }
+
+  .shell-members-filter-input {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 16px;
   }
 
   .shell-sidebar-head button {
@@ -6593,6 +6765,13 @@
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scrollbar-width: thin;
+  }
+
+  .shell-sidebar .shell-notify-quiet-popover .onyx-popover__trigger {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
   }
 
   .shell-sidebar-network {
@@ -6630,6 +6809,35 @@
      navigation remains scannable and its count badges do not overflow. */
   .shell-sidebar-scroll {
     padding-bottom: 4px;
+  }
+
+  .shell-sidebar-filter {
+    flex: none;
+    min-height: 60px;
+    padding: 8px;
+  }
+
+  .shell-sidebar-filter-input,
+  .shell-sidebar-filter-unread,
+  .shell-sidebar-filter-clear {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 8px;
+    font-size: 14px;
+  }
+
+  .shell-join-form {
+    flex: none;
+    min-height: 52px;
+    margin: 4px 8px;
+  }
+
+  .shell-join-input,
+  .shell-join-btn {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 8px;
+    font-size: 16px;
   }
 
   .shell-sidebar-section {

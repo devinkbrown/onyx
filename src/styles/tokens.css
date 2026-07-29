@@ -1,16 +1,15 @@
 /* ─────────────────────────────────────────────────────────────
-   Onyx — design tokens.  Flagship theme: "ocean" (deep-water dark luxury).
+   Onyx — design tokens.  Flagship theme: "ocean" (quiet threshold).
 
-   Identity = Onyx × Bioluminescence × Champagne:
-   · deep water    — abyssal trench → mid-depth strata → near-surface crests,
-                     a true vertical depth gradient with real layering
-   · azure current — electric sky-blue, the living primary; bioluminescent
-                     crest highlights that glow on the dark water
-   · champagne     — warm gold treasure inlay, the second accent (sparingly)
-   · sea-foam text — aqua-tinted ivory over deep water, calm and legible
-   Soft, fluid radii and unhurried motion — elegant, not brutalist.
+   Identity = mineral night × quiet cyan signal:
+   · void / face / edge — #05070A #0C1016 #1A222C (matte strata, no neon depth)
+   · paper / mute       — #E6E8EC #8B939E (calm reading contrast)
+   · signal             — #5BA3C9 (quiet cyan; no electric glow spectacle)
+   Type: Instrument Sans body, restrained Fraunces for lede/soul, JetBrains Mono
+   for status — no Anton marketing display on the default cut.
+   Surfaces are matte and finely bordered; motion stays unhurried.
 
-   The :root declaration is the canonical default (deep-water flagship).
+   The :root declaration is the canonical default (quiet-threshold flagship).
    All themes in src/theme/themes.ts override these values via ThemeProvider,
    which writes CSS-custom-property overrides onto document.documentElement and
    sets the data-theme attribute.  [data-theme='onyx'] restores the older Onyx
@@ -21,25 +20,23 @@
 [data-theme='ocean'] {
   color-scheme: dark;
 
-  /* Ground — abyssal trench → mid depth → near-surface crests.
-     OKLCH engine ramp (seed: primary 232°, depth .8, vibrancy .85) — even
-     perceptual lightness steps, azure-tinted all the way down. */
-  --ink: #000306;        /* the trench, beneath everything */
-  --ink-2: #00050a;
-  --stone: #000e17;      /* deep water body */
-  --stone-2: #051821;    /* mid depth, raised surface */
-  --stone-3: #10232c;    /* upper layer, near the light */
-  --stone-line: #0f2d3b; /* current banding line */
+  /* Ground — mineral night void → face → edge (quiet-threshold six-hue core). */
+  --ink: #05070a;        /* void */
+  --ink-2: #080b10;
+  --stone: #0c1016;      /* face */
+  --stone-2: #121820;    /* raised matte surface */
+  --stone-3: #1a222c;    /* edge plane */
+  --stone-line: #222c38; /* fine border line (one step above edge) */
 
-  /* Azure — electric sky-blue current + bioluminescent crest (primary) */
-  --lapis: #00ace9;
-  --lapis-bright: #87d6ff;
-  --lapis-deep: #00668c;
+  /* Quiet cyan signal (primary) — restrained, not electric. */
+  --lapis: #5ba3c9;
+  --lapis-bright: #8bc4d9;
+  --lapis-deep: #2e5f7a;
 
-  /* Glacier — icy pale azure, the second accent (was champagne gold) */
-  --gold: #6bc8d5;
-  --gold-bright: #a2edf7;
-  --gold-deep: #35818b;
+  /* Mineral second accent — cool steel, never neon glacier. */
+  --gold: #7a9aab;
+  --gold-bright: #a8c0cc;
+  --gold-deep: #4a6570;
 
   /* Coral — the single hot accent (danger / badges, sparingly) */
   --shu: #ff6f61;
@@ -49,32 +46,32 @@
      Use these for text sitting on --lapis / --lapis-bright / --gold-bright
      CTAs and on --shu / --danger badges instead of hand-picking a hex per
      component, so the ink tracks the theme's accent.
-     Ocean (canonical) contrast: --on-accent 7.27 : 1 vs --lapis,
-     11.79 : 1 vs --lapis-bright, 14.40 : 1 vs --gold-bright (AAA);
-     --on-danger 7.06 : 1 vs --shu (AAA). */
-  --on-accent: #04121e;
+     Ocean (canonical) contrast: --on-accent ~6.9 : 1 vs --lapis,
+     ~10 : 1 vs --lapis-bright; --on-danger 7.06 : 1 vs --shu (AAA). */
+  --on-accent: #061018;
   --on-danger: #1c0906;
 
-  /* Text — sea-foam ivory over deep water */
-  --paper: #d1e1e9;
-  --paper-dim: #8c9ba3;
-  --paper-mute: #536771; /* deep-tide graphite, least important */
+  /* Text — cool paper over mineral night */
+  --paper: #e6e8ec;
+  --paper-dim: #8b939e;
+  --paper-mute: #5c6570; /* least important metadata */
 
   /* Functional status (kept in-palette where possible) */
   --ok: #5bc78e;
-  --warn: #e6d08c; /* warnings stay WARM — decoupled from the (now glacier) second accent */
+  --warn: #e6d08c; /* warnings stay WARM — decoupled from the mineral second accent */
   --danger: var(--shu);
 
-  /* Seams (bioluminescent current lines) + bands (pale tide) */
-  --seam: color-mix(in oklab, var(--lapis) 42%, transparent);
-  --seam-faint: color-mix(in oklab, var(--lapis) 16%, transparent);
-  --line: color-mix(in oklab, var(--paper) 14%, transparent);
-  --line-faint: color-mix(in oklab, var(--paper) 7%, transparent);
+  /* Seams + bands — fine borders, not glowing current lines */
+  --seam: color-mix(in oklab, var(--lapis) 28%, transparent);
+  --seam-faint: color-mix(in oklab, var(--lapis) 12%, transparent);
+  --line: color-mix(in oklab, var(--paper) 12%, transparent);
+  --line-faint: color-mix(in oklab, var(--paper) 6%, transparent);
 
-  /* Radius — fluid and elegant for the deep-water cut. */
+  /* Radius — slightly tighter for matte professional surfaces. */
   --r-0: 0px;
-  --r-sm: 5px;
-  --r-md: 11px;
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px; /* cards / drawers that need a step above controls */
   --r-pill: 999px;
 
   /* ── Spacing scale ──────────────────────────────────────────────────────────
@@ -100,6 +97,44 @@
   --pad-panel: var(--space-4);    /* inner padding of a dialog/panel body */
   --pad-panel-lg: var(--space-5); /* roomier panel padding on wide surfaces */
 
+  /* Touch / keyboard interaction floor (WCAG 2.5.5 target size). */
+  --target-min: 44px;
+  --focus-ring: 2px solid var(--lapis);
+  --focus-offset: 3px;
+
+  /* ── Type scale (commercial reading ladder) ─────────────────────────────────
+     Shared landing → connect → shell so titles, ledes, meta, and UI chrome
+     stay one voice. Prefer these over ad-hoc rem sizes on product surfaces. */
+  --text-2xs: 0.625rem;  /* 10px — dense mono marks */
+  --text-xs: 0.6875rem;  /* 11px — kickers, section labels */
+  --text-sm: 0.8125rem;  /* 13px — secondary UI */
+  --text-md: 0.9375rem;  /* 15px — body / control */
+  --text-lg: 1.0625rem;  /* 17px — lede / intro */
+  --text-xl: 1.25rem;    /* 20px — section titles */
+  --text-2xl: 1.5rem;    /* 24px — page titles (mobile floor) */
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-body: 1.55;
+  --tracking-kicker: 0.12em;
+  --tracking-title: -0.02em;
+
+  /* ── Surface + elevation hierarchy (matte mineral, not glass stack) ───────
+     Face sits on void; raised cards lift one step; float is for sheets/drawers.
+     Shadows stay cool and short — no neon bloom, no pure black slabs. */
+  --surface-void: var(--ink);
+  --surface-face: var(--stone);
+  --surface-raised: var(--stone-2);
+  --surface-edge: var(--stone-3);
+  --elev-0: none;
+  --elev-1: 0 1px 0 color-mix(in oklab, var(--paper) 5%, transparent) inset;
+  --elev-2:
+    0 14px 36px -28px color-mix(in oklab, var(--ink) 88%, transparent),
+    0 1px 0 color-mix(in oklab, var(--paper) 5%, transparent) inset;
+  --elev-3:
+    0 28px 56px -32px color-mix(in oklab, var(--ink) 90%, transparent),
+    0 1px 0 color-mix(in oklab, var(--paper) 6%, transparent) inset;
+  --elev-press: inset 0 1px 0 color-mix(in oklab, var(--ink) 18%, transparent);
+
   /* Motion — chat-productive duration ladder (Era 1 A6).
      Micro/fast stay fixed for direct-manipulation feedback; --dur-base is the
      default control settle. Themes may still override --dur for personality
@@ -115,10 +150,12 @@
      narrower columns simply fill their width. */
   --shell-measure: 1180px;
 
-  /* Type — mono-led labels + display + humanist sans + serif soul. */
+  /* Type — Instrument Sans body, restrained display (no Anton on default),
+     mono status, Fraunces soul. Non-default themes may still set Anton. */
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo,
     Consolas, monospace;
-  --font-display: 'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  --font-display: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
   --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system,
     'Segoe UI', Roboto, sans-serif;
   --font-serif: 'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
@@ -162,6 +199,7 @@
   --r-0: 0px;
   --r-sm: 2px;
   --r-md: 4px;
+  --r-lg: 8px;
   --r-pill: 999px;
 }
 

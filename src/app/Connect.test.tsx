@@ -226,7 +226,7 @@ describe('Mode switching', () => {
 
   it('changes the submit label per mode', () => {
     render(() => <Connect />);
-    expect(screen.getByTestId('conn-submit')).toHaveTextContent(/dive in/i);
+    expect(screen.getByTestId('conn-submit')).toHaveTextContent(/continue/i);
     clickMode(/sign in/i);
     expect(screen.getByTestId('conn-submit')).toHaveTextContent(/sign in/i);
     clickMode(/register/i);

@@ -1,0 +1,127 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Manual macOS unsigned DMG release for Onyx v0.1.3 — genuine Intel + Apple Silicon.
+# Matrix: official GitHub-hosted macos-15-intel (x86_64) and macos-15 (arm64).
+# Never fabricates a DMG on Linux. Invokes tools/release-unix.mjs macos lane only;
+# arch is host-derived from process.arch (no arch override).
+#
+# Does not publish to the website, commit binaries, or run automatically.
+name: macOS release (unsigned DMG)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Exact pin from .zigversion — do not substitute another 0.17.0-dev snapshot.
+  ZIG_VERSION: '0.17.0-dev.1476+91a29d707'
+
+jobs:
+  macos-release:
+    name: Build unsigned macOS DMG (${{ matrix.macos_arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            macos_arch: x86_64
+            zig_tarball_arch: x86_64
+            expected_uname: x86_64
+            expected_node_arch: x64
+          - runner: macos-15
+            macos_arch: arm64
+            zig_tarball_arch: aarch64
+            expected_uname: arm64
+            expected_node_arch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Verify host architecture (uname + node)
+        run: |
+          set -euo pipefail
+          UNAME_M="$(uname -m)"
+          NODE_ARCH="$(node -p 'process.arch')"
+          echo "runner=${{ matrix.runner }}"
+          echo "uname -m=${UNAME_M}"
+          echo "process.arch=${NODE_ARCH}"
+          test "${UNAME_M}" = "${{ matrix.expected_uname }}"
+          test "${NODE_ARCH}" = "${{ matrix.expected_node_arch }}"
+
+      - name: Install exact Zig from ziglang.org (${{ matrix.zig_tarball_arch }}-macos)
+        run: |
+          set -euo pipefail
+          ZIG_TARBALL="zig-${{ matrix.zig_tarball_arch }}-macos-${ZIG_VERSION}.tar.xz"
+          ZIG_URL="https://ziglang.org/builds/${ZIG_TARBALL}"
+          echo "Downloading ${ZIG_URL}"
+          curl -fsSL "${ZIG_URL}" -o /tmp/zig.tar.xz
+          mkdir -p "${HOME}/zig-sdk"
+          tar -xJf /tmp/zig.tar.xz -C "${HOME}/zig-sdk"
+          ZIG_DIR="${HOME}/zig-sdk/zig-${{ matrix.zig_tarball_arch }}-macos-${ZIG_VERSION}"
+          test -x "${ZIG_DIR}/zig"
+          echo "${ZIG_DIR}" >> "${GITHUB_PATH}"
+          echo "ONYX_ZIG=${ZIG_DIR}/zig" >> "${GITHUB_ENV}"
+          "${ZIG_DIR}/zig" version
+
+      - name: Verify Zig version matches .zigversion pin
+        run: |
+          set -euo pipefail
+          EXPECTED="$(tr -d '[:space:]' < .zigversion)"
+          ACTUAL="$(zig version | tr -d '[:space:]')"
+          echo "expected=${EXPECTED}"
+          echo "actual=${ACTUAL}"
+          test "${ACTUAL}" = "${EXPECTED}"
+          test "${ACTUAL}" = "${ZIG_VERSION}"
+
+      - name: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Focused mac release tests
+        run: |
+          pnpm exec vitest run \
+            tools/release-unix.test.mjs \
+            tools/desktop-zig.test.mjs
+
+      - name: Build SPA (package resources)
+        run: pnpm build
+
+      - name: Produce macOS unsigned DMG (genuine Darwin host arch only)
+        run: pnpm desktop:release:macos
+
+      - name: Assert arch-distinct release artifacts exist
+        run: |
+          set -euo pipefail
+          ARCH="${{ matrix.macos_arch }}"
+          BASE="zig-out/release/macos-${ARCH}/onyx-0.1.3-macos-${ARCH}-ReleaseFast-unsigned"
+          test -f "${BASE}.dmg"
+          test -f "${BASE}.sha256"
+          test -f "${BASE}.NOTICE.txt"
+          ls -la "zig-out/release/macos-${ARCH}/"
+          cat "${BASE}.sha256"
+          # Filename in sha256 sidecar must match public asset name
+          grep -F "onyx-0.1.3-macos-${ARCH}-ReleaseFast-unsigned.dmg" "${BASE}.sha256"
+
+      - name: Upload macOS DMG + sha256 + NOTICE (${{ matrix.macos_arch }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: onyx-0.1.3-macos-${{ matrix.macos_arch }}-ReleaseFast-unsigned
+          path: |
+            zig-out/release/macos-${{ matrix.macos_arch }}/onyx-0.1.3-macos-${{ matrix.macos_arch }}-ReleaseFast-unsigned.dmg
+            zig-out/release/macos-${{ matrix.macos_arch }}/onyx-0.1.3-macos-${{ matrix.macos_arch }}-ReleaseFast-unsigned.sha256
+            zig-out/release/macos-${{ matrix.macos_arch }}/onyx-0.1.3-macos-${{ matrix.macos_arch }}-ReleaseFast-unsigned.NOTICE.txt
+          if-no-files-found: error
+          retention-days: 30

@@ -1,4 +1,4 @@
-/* HomeView — commercial public home (Deep Current reading flow) */
+/* HomeView — connected client home (quiet-threshold reading flow) */
 .home {
   height: 100%;
   min-height: 0;
@@ -17,30 +17,25 @@
 }
 
 .home-masthead { margin-bottom: clamp(28px, 4vh, 40px); }
-.home-kicker {
-  margin: 0 0 12px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  color: var(--lapis-bright);
-}
 .home-title {
-  margin: 0 0 12px;
-  font-family: var(--font-display); /* Anton — editorial display only */
-  font-size: clamp(2rem, 1.35rem + 2.6vw, 3.15rem);
-  letter-spacing: 0.01em;
-  line-height: 1.05;
+  margin: 0 0 10px;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  font-size: clamp(1.7rem, 1.25rem + 2vw, 2.55rem);
+  letter-spacing: var(--tracking-title, -0.02em);
+  line-height: var(--leading-tight, 1.15);
   color: var(--paper);
-  font-weight: 400;
+  font-weight: 600;
+  /* Quiet threshold: no Anton marketing display */
+  font-stretch: normal;
 }
 .home-sub {
   margin: 0;
-  max-width: 42ch;
-  color: var(--paper-dim);
-  font-size: 1.02rem;
-  line-height: 1.55;
-  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  max-width: 40ch;
+  color: color-mix(in oklab, var(--paper) 86%, var(--paper-dim));
+  font-size: var(--text-lg, 1.0625rem);
+  line-height: var(--leading-body, 1.55);
+  font-family: var(--font-serif, "Fraunces", Georgia, serif);
+  font-weight: 400;
 }
 .home-sub b {
   color: var(--paper);
@@ -51,6 +46,35 @@
   border: 1px solid var(--line);
   border-radius: 5px;
   background: var(--stone);
+}
+.home-shortcut-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 12px 0 0;
+  color: var(--paper-mute);
+  font-size: var(--text-sm, 0.8125rem);
+  line-height: var(--leading-snug, 1.35);
+}
+.home-shortcut-note > span {
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs, 0.625rem);
+  font-weight: 700;
+  letter-spacing: var(--tracking-kicker, 0.12em);
+  text-transform: uppercase;
+}
+.home-shortcut-note b {
+  min-width: 1.5rem;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--stone-2) 60%, transparent);
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  text-align: center;
 }
 .home-welcome-actions {
   display: flex;
@@ -91,18 +115,9 @@
   bottom: 0.35rem;
   width: 2px;
   border-radius: 2px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--lapis-bright) 88%, transparent),
-    color-mix(in oklab, var(--lapis) 42%, transparent) 55%,
-    color-mix(in oklab, var(--lapis) 12%, transparent)
-  );
-  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 28%, transparent);
-}
-@media (prefers-reduced-motion: reduce) {
-  .home-current-rail--active::before {
-    box-shadow: none;
-  }
+  /* Quiet cyan signal bar — matte, no glow halo */
+  background: color-mix(in oklab, var(--lapis) 72%, var(--stone-line));
+  box-shadow: none;
 }
 
 /* ── Device outbox journal ──────────────────────────────────────────────── */
@@ -286,25 +301,35 @@
 }
 .home-event {
   width: 100%;
-  min-height: 72px;
+  min-height: 68px;
   display: grid;
   grid-template-columns: minmax(112px, 0.34fr) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 12px 14px;
   text-align: left;
-  border: 1px solid color-mix(in oklab, var(--lapis) 28%, var(--line));
-  border-left: 2px solid var(--lapis-bright);
+  border: 1px solid color-mix(in oklab, var(--lapis) 24%, var(--line));
+  border-left: 2px solid var(--lapis);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--lapis) 10%, var(--stone));
+  background: color-mix(in oklab, var(--lapis) 8%, var(--surface-raised, var(--stone-2)));
   color: var(--paper);
   cursor: pointer;
+  box-shadow: var(--elev-1, none);
   transition: border-color var(--dur, 200ms) var(--ease),
-    background var(--dur, 200ms) var(--ease);
+    background var(--dur, 200ms) var(--ease),
+    box-shadow var(--dur, 200ms) var(--ease);
 }
 .home-event:hover {
-  border-color: color-mix(in oklab, var(--lapis-bright) 55%, var(--line));
-  background: color-mix(in oklab, var(--lapis) 15%, var(--stone));
+  border-color: color-mix(in oklab, var(--lapis-bright) 48%, var(--line));
+  background: color-mix(in oklab, var(--lapis) 12%, var(--surface-raised, var(--stone-2)));
+  box-shadow: var(--elev-2, none);
+}
+.home-event:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
+.home-event:active {
+  box-shadow: var(--elev-press, inset 0 1px 0 color-mix(in oklab, var(--ink) 18%, transparent));
 }
 .home-event.is-live {
   border-color: color-mix(in oklab, var(--gold-bright) 55%, var(--line));
@@ -393,22 +418,37 @@
 }
 .home-cta {
   font: inherit;
-  font-weight: 600;
+  font-weight: 650;
   font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
   color: var(--on-accent);
-  background: linear-gradient(180deg, var(--lapis-bright), var(--lapis));
-  border: 0;
-  border-radius: 999px;
-  min-height: 44px;
-  padding: 10px 22px;
+  background: var(--lapis);
+  border: 1px solid color-mix(in oklab, var(--lapis) 75%, var(--stone-line));
+  border-radius: var(--r-md, 8px);
+  min-height: var(--target-min, 44px);
+  min-width: var(--target-min, 44px);
+  padding: 10px 20px;
   cursor: pointer;
-  transition: transform var(--dur, 200ms) var(--ease), filter var(--dur, 200ms) var(--ease);
+  letter-spacing: 0.01em;
+  text-transform: none;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--paper) 8%, transparent) inset;
+  transition:
+    border-color var(--dur, 200ms) var(--ease),
+    background var(--dur, 200ms) var(--ease),
+    box-shadow var(--dur-micro, 100ms) var(--ease),
+    transform var(--dur-micro, 100ms) var(--ease);
 }
-.home-cta:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.home-cta:hover {
+  background: color-mix(in oklab, var(--lapis) 88%, white);
+  border-color: color-mix(in oklab, var(--lapis) 90%, white);
+}
+.home-cta:active {
+  transform: translateY(1px);
+  box-shadow: var(--elev-press, inset 0 1px 0 color-mix(in oklab, var(--ink) 18%, transparent));
+}
 .home-cta:focus-visible,
 .home-action:focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 3px;
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
 }
 .home-action {
   font: inherit;
@@ -416,13 +456,22 @@
   color: var(--paper-dim);
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  min-height: 44px;
-  padding: 10px 18px;
+  /* Squared secondary actions — fewer pills than the previous cut */
+  border-radius: var(--r-md);
+  min-height: var(--target-min, 44px);
+  padding: 10px 16px;
   cursor: pointer;
-  transition: color var(--dur, 200ms) var(--ease), border-color var(--dur, 200ms) var(--ease);
+  transition: color var(--dur, 200ms) var(--ease), border-color var(--dur, 200ms) var(--ease),
+    background var(--dur, 200ms) var(--ease);
 }
-.home-action:hover { color: var(--paper); border-color: var(--stone-line); }
+.home-action:hover {
+  color: var(--paper);
+  border-color: var(--stone-line);
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 40%, transparent);
+}
+.home-action:active {
+  box-shadow: var(--elev-press, inset 0 1px 0 color-mix(in oklab, var(--ink) 18%, transparent));
+}
 .home-action--primary {
   border-color: color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
   color: var(--paper);
@@ -489,23 +538,80 @@
   text-transform: uppercase;
   color: var(--paper-mute);
 }
+.home-first-room {
+  position: relative;
+  margin-top: 18px;
+  padding: 18px 20px 20px 24px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg, 12px);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--stone-2) 76%, transparent),
+      color-mix(in oklab, var(--stone) 52%, transparent)
+    );
+  box-shadow: var(--elev-1, none);
+}
+.home-first-room::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    var(--lapis) 0 30%,
+    var(--ok) 30% 54%,
+    var(--shu) 54% 76%,
+    var(--gold) 76% 100%
+  );
+}
+.home-first-room__eyebrow {
+  margin: 0 0 8px;
+  color: var(--lapis-bright);
+  font: 700 var(--text-xs, 0.6875rem)/1 var(--font-mono);
+  letter-spacing: var(--tracking-kicker, 0.12em);
+  text-transform: uppercase;
+}
+.home-first-room__title {
+  margin: 0;
+  color: var(--paper);
+  font-size: var(--text-xl, 1.25rem);
+  font-weight: 650;
+  letter-spacing: var(--tracking-title, -0.02em);
+  line-height: var(--leading-tight, 1.15);
+}
+.home-first-room__copy {
+  max-width: 48ch;
+  margin: 8px 0 0;
+  color: var(--paper-dim);
+  font-size: var(--text-md, 0.9375rem);
+  line-height: var(--leading-body, 1.55);
+}
 .home-empty {
   margin: 8px 0 28px;
-  padding: 8px 0 4px;
-  max-width: 40ch;
+  padding: var(--pad-panel, 1rem) var(--pad-panel-lg, 1.25rem);
+  max-width: 42ch;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 48%, transparent);
+  box-shadow: var(--elev-1, none);
+  border-left: 2px solid color-mix(in oklab, var(--lapis) 55%, var(--stone-line));
 }
 .home-empty-title {
   margin: 0 0 8px;
-  font-family: var(--font-display);
-  font-size: clamp(1.35rem, 1.1rem + 1vw, 1.75rem);
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  font-size: clamp(1.15rem, 1rem + 0.7vw, 1.4rem);
+  font-weight: 600;
   color: var(--paper);
-  letter-spacing: 0.01em;
+  letter-spacing: var(--tracking-title, -0.02em);
+  line-height: var(--leading-snug, 1.35);
 }
 .home-empty-copy {
   margin: 0;
   color: var(--paper-dim);
-  font-size: 0.95rem;
-  line-height: 1.5;
+  font-size: var(--text-md, 0.9375rem);
+  line-height: var(--leading-body, 1.55);
 }
 
 /* More activity — technical demotion */
@@ -557,6 +663,7 @@
     transition: none;
   }
   .home-cta:hover,
+  .home-cta:active,
   .home-card:hover,
   .home-memory-card:hover {
     transform: none;
@@ -991,10 +1098,10 @@
 /* Directory */
 .home-section-label {
   display: block;
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.22em;
+  font-size: var(--text-xs, 0.6875rem);
+  letter-spacing: var(--tracking-kicker, 0.12em);
   text-transform: uppercase;
   color: var(--paper-mute);
 }
@@ -1008,15 +1115,21 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: color-mix(in oklab, var(--stone) 85%, transparent);
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 72%, var(--surface-face, var(--stone)));
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: 14px 16px;
-  transition: border-color var(--dur, 200ms) var(--ease), transform var(--dur, 200ms) var(--ease);
+  box-shadow: var(--elev-1, none);
+  transition: border-color var(--dur, 200ms) var(--ease), transform var(--dur, 200ms) var(--ease),
+    box-shadow var(--dur, 200ms) var(--ease);
 }
 .home-card:hover {
-  border-color: color-mix(in oklab, var(--lapis) 45%, var(--line));
-  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--lapis) 42%, var(--line));
+  transform: translateY(-1px);
+  box-shadow: var(--elev-2, none);
+}
+.home-card:focus-within {
+  border-color: color-mix(in oklab, var(--lapis) 48%, var(--line));
 }
 .home-card-head {
   display: flex;
@@ -1102,7 +1215,13 @@
 
 @media (max-width: 700px) {
   .home-pulse { grid-template-columns: 1fr 1fr; }
-  .home-inner { padding-top: 20px; }
+  .home-inner {
+    padding:
+      20px
+      max(16px, env(safe-area-inset-right, 0px))
+      calc(var(--mnav-h, 56px) + env(safe-area-inset-bottom, 0px) + 20px)
+      max(16px, env(safe-area-inset-left, 0px));
+  }
   .home-memory-grid { grid-template-columns: 1fr; }
   .home-boosts-list { grid-template-columns: 1fr; }
   .home-quiet-item { grid-template-columns: 1fr; }
@@ -1166,6 +1285,133 @@
     max-width: 100%;
     white-space: normal;
   }
+
+  /* Phone Home hierarchy: continue / search / browse first, ambient later. */
+  .home-masthead {
+    margin-bottom: 18px;
+  }
+  .home-title {
+    font-size: clamp(1.55rem, 1.15rem + 3.2vw, 2.05rem);
+    margin-bottom: 8px;
+  }
+  .home-sub {
+    max-width: none;
+    font-size: 0.98rem;
+    line-height: 1.48;
+  }
+  .home-welcome-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .home-cta,
+  .home-action {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+    border-radius: var(--r-md);
+  }
+  .home-action--quiet {
+    min-height: 44px;
+  }
+  .home-current-rail {
+    gap: 20px;
+    margin: 4px 0 24px;
+  }
+  .home-current-rail--active {
+    padding-left: 12px;
+  }
+  .home-continue,
+  .home-resume {
+    margin-top: 0;
+  }
+  .home-resume-item,
+  .home-catchup-item {
+    min-height: 48px;
+    padding: 12px 14px;
+  }
+  .home-explore-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+  .home-explore-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .home-explore-actions .home-action,
+  .home-explore-actions .home-cta {
+    width: 100%;
+    background: color-mix(in oklab, var(--stone-2) 52%, transparent);
+  }
+
+  .home-explore-actions .home-action:first-child {
+    border-color: color-mix(in oklab, var(--lapis) 46%, var(--line));
+    color: var(--lapis-bright);
+  }
+
+  .home-explore-actions .home-action:nth-child(2) {
+    border-color: color-mix(in oklab, var(--gold) 40%, var(--line));
+    color: color-mix(in oklab, var(--gold) 78%, var(--paper));
+  }
+  .home-section-label {
+    letter-spacing: 0.14em;
+  }
+}
+
+/* Compact phones 320–390: tighter type, full-width resume rows. */
+@media (max-width: 390px) {
+  .home-inner {
+    padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px));
+  }
+  .home-title {
+    font-size: 1.5rem;
+  }
+  .home-sub {
+    font-size: 0.94rem;
+  }
+  .home-resume-meta,
+  .home-catchup-meta {
+    gap: 6px;
+  }
+  .home-pulse {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 340px) {
+  .home-explore-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Landscape phone Home: denser masthead so continue stays above the fold. */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 480px) {
+  .home-inner {
+    padding-top: 12px;
+    padding-bottom: calc(var(--mnav-h, 48px) + env(safe-area-inset-bottom, 0px) + 12px);
+  }
+  .home-masthead {
+    margin-bottom: 10px;
+  }
+  .home-title {
+    font-size: 1.35rem;
+    margin-bottom: 4px;
+  }
+  .home-sub {
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
+  .home-welcome-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 10px;
+  }
+  .home-current-rail {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
 }
 
 /* The connected shell stacks transient banners above Home. At 400% zoom Home
@@ -1188,12 +1434,6 @@
 
   .home-masthead {
     margin-bottom: 12px;
-  }
-
-  .home-kicker {
-    margin-bottom: 4px;
-    font-size: 11px;
-    letter-spacing: 0.12em;
   }
 
   .home-title {
@@ -1223,6 +1463,24 @@
 @media (prefers-reduced-motion: reduce) {
   .home-card, .home-cta, .home-card-join, .home-event, .home-memory-card, .home-quiet-item, .home-boost-card__open, .home-rhythm-item { transition: none; }
   .home-memory-card:hover { transform: none; }
+}
+
+@media (max-width: 700px) and (forced-colors: active) {
+  .home-cta,
+  .home-action,
+  .home-resume-item,
+  .home-catchup-item,
+  .home-memory-card {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .home-cta {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
 }
 
 /* ── Catch up — "what did I miss" across joined rooms + DMs ───────────────────
@@ -1306,17 +1564,9 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-3) var(--space-2);
   border-radius: var(--r-md);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--gold) 12%, transparent),
-      transparent 72%
-    ),
-    color-mix(in oklab, var(--stone) 55%, transparent);
-  border: 1px solid color-mix(in oklab, var(--gold) 32%, var(--line));
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--gold) 14%, transparent),
-    0 1px 0 color-mix(in oklab, var(--ink) 22%, transparent);
+  background: color-mix(in oklab, var(--gold) 8%, var(--stone));
+  border: 1px solid color-mix(in oklab, var(--gold) 28%, var(--line));
+  box-shadow: none;
 }
 .home-catchup-tier--attention .home-catchup-tier-label {
   font-size: 0.78rem;
@@ -1329,8 +1579,8 @@
   padding: var(--space-3) var(--space-4);
   border-left-width: 3px;
   border-left-color: var(--gold-bright);
-  background: color-mix(in oklab, var(--gold) 8%, var(--stone));
-  box-shadow: 0 1px 0 color-mix(in oklab, var(--gold) 12%, transparent);
+  background: color-mix(in oklab, var(--gold) 6%, var(--stone));
+  box-shadow: none;
 }
 .home-catchup-tier--attention .home-catchup-item:hover {
   border-color: color-mix(in oklab, var(--gold-bright) 42%, var(--line));

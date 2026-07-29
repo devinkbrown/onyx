@@ -245,7 +245,6 @@ export function HomeView(): JSX.Element {
   const composerDrafts = useStore((s) => s.composerDrafts);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const outboxDeliveryFailed = useStore((s) => s.outboxDeliveryFailed);
-  const networkName = useStore((s) => s.networkName);
   const ourNick = useStore((s) => s.ourNick);
   const serverUrl = useStore((s) => s.server?.url.trim() ?? '');
   const accountIdentity = useStore((s) =>
@@ -863,6 +862,13 @@ export function HomeView(): JSX.Element {
       && coldRememberedRooms().length === 0
       && awayDigest().followed.length === 0,
   );
+  const showFirstRoomPrompt = createMemo(
+    () =>
+      connectionStatus() === 'connected'
+      && !hasRooms()
+      && directory().length === 0
+      && recentRooms().length === 0,
+  );
   const moreActivityHasContent = createMemo(() =>
     !!stats.latest
     || (connectionStatus() === 'connected' && roomRhythm().length > 0)
@@ -884,13 +890,16 @@ export function HomeView(): JSX.Element {
       <div class="home-inner">
         {/* 1 — Calm personal welcome + Search / Browse */}
         <header class="home-masthead">
-          <p class="home-kicker">{networkName() || 'Onyx'}</p>
           <h2 class="home-title">
             {welcomeName() ? `Welcome, ${welcomeName()}.` : 'Welcome.'}
           </h2>
           <p class="home-sub">
-            What needs you, and where to continue. Search messages or browse rooms —
-            press <b>/</b> for the palette, <b>?</b> for shortcuts.
+            Your rooms, messages, and calls come together here. Browse a room or
+            search your history to get started.
+          </p>
+          <p class="home-shortcut-note">
+            <span>Power tip</span>
+            Press <b>/</b> for the palette or <b>?</b> for shortcuts.
           </p>
           <div class="home-welcome-actions" role="group" aria-label="Primary home actions">
             <button
@@ -1360,6 +1369,17 @@ export function HomeView(): JSX.Element {
                   )}
                 </For>
               </div>
+            </div>
+          </Show>
+
+          <Show when={showFirstRoomPrompt()}>
+            <div class="home-first-room" role="note" aria-label="Start with a room">
+              <p class="home-first-room__eyebrow">Your space is ready</p>
+              <p class="home-first-room__title">Start with a room.</p>
+              <p class="home-first-room__copy">
+                Rooms hold your conversation, files, and calls in one place.
+                Browse what is open now, or join one by name.
+              </p>
             </div>
           </Show>
         </section>

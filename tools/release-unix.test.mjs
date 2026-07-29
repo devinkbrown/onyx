@@ -9,9 +9,11 @@ import {
   BSD_PT_INTERP,
   RELEASE_BSD_ARCH,
   RELEASE_LINUX_ARCH,
+  RELEASE_MACOS_ARCHS,
   RELEASE_PRODUCT_VERSION,
   assertLinuxHost,
   assertMacosHost,
+  assertMacosHostAndArch,
   assertVersionAlignment,
   BSD_PRIMARY_RUNTIME_PACKAGES,
   bsdHonestyNotice,
@@ -27,6 +29,7 @@ import {
   generateBsdInstallSh,
   linuxHonestyNotice,
   loadAlignedVersion,
+  mapNodeArchToMacosArch,
   macosHonestyNotice,
   packageDirName,
   parseAppZonVersion,
@@ -99,12 +102,16 @@ function writeAlignedRepo(dir) {
 }
 
 describe('release-unix version + naming', () => {
-  it('parses versions and names one native asset per platform lane', () => {
+  it('parses versions and names arch-distinct macOS assets', () => {
     expect(parsePackageJsonVersion('{"version":"0.1.3"}')).toBe('0.1.3');
     expect(parseAppZonVersion('.version = "0.1.3"')).toBe('0.1.3');
     expect(RELEASE_PRODUCT_VERSION).toBe('0.1.3');
     expect(RELEASE_LINUX_ARCH).toBe('x86_64');
     expect(RELEASE_BSD_ARCH).toBe('x86_64');
+    expect(RELEASE_MACOS_ARCHS).toEqual(['x86_64', 'arm64']);
+    expect(mapNodeArchToMacosArch('x64')).toBe('x86_64');
+    expect(mapNodeArchToMacosArch('arm64')).toBe('arm64');
+    expect(mapNodeArchToMacosArch('ia32')).toBeNull();
 
     expect(packageDirName('linux')).toBe('onyx-0.1.3-linux-ReleaseFast');
     expect(packageDirName('macos')).toBe('onyx-0.1.3-macos-ReleaseFast.app');
@@ -119,7 +126,13 @@ describe('release-unix version + naming', () => {
     expect(releaseAssetBaseName('openbsd')).toBe(
       'onyx-0.1.3-openbsd-x86_64-ReleaseFast-unsigned',
     );
-    expect(releaseAssetBaseName('macos')).toBe('onyx-0.1.3-macos-ReleaseFast-unsigned');
+    expect(releaseAssetBaseName('macos', '0.1.3', 'ReleaseFast', 'x86_64')).toBe(
+      'onyx-0.1.3-macos-x86_64-ReleaseFast-unsigned',
+    );
+    expect(releaseAssetBaseName('macos', '0.1.3', 'ReleaseFast', 'arm64')).toBe(
+      'onyx-0.1.3-macos-arm64-ReleaseFast-unsigned',
+    );
+    expect(() => releaseAssetBaseName('macos')).toThrow(/arch must be x86_64\|arm64/);
     // No portable-web asset names.
     expect(releaseAssetBaseName('freebsd')).not.toMatch(/portable-web/);
     expect(releaseAssetBaseName('openbsd')).not.toMatch(/portable/);
@@ -136,8 +149,14 @@ describe('release-unix version + naming', () => {
     expect(fbsd.hostBinPath).toBe('/repo/zig-out/bsd/freebsd-x86_64/onyx');
     expect(fbsd.archivePath).not.toMatch(/portable-web/);
 
-    const mac = resolveReleasePaths('macos', '/repo', '0.1.3');
-    expect(mac.archivePath).toMatch(/macos\/onyx-0\.1\.3-macos-ReleaseFast-unsigned\.dmg$/);
+    const macIntel = resolveReleasePaths('macos', '/repo', '0.1.3', 'x86_64');
+    expect(macIntel.archivePath).toMatch(
+      /macos-x86_64\/onyx-0\.1\.3-macos-x86_64-ReleaseFast-unsigned\.dmg$/,
+    );
+    const macArm = resolveReleasePaths('macos', '/repo', '0.1.3', 'arm64');
+    expect(macArm.archivePath).toMatch(
+      /macos-arm64\/onyx-0\.1\.3-macos-arm64-ReleaseFast-unsigned\.dmg$/,
+    );
   });
 
   it('rejects version drift', () => {
@@ -175,7 +194,7 @@ describe('release-unix ELF probes', () => {
 });
 
 describe('release-unix host gates', () => {
-  it('allows linux package only on linux; macos only on darwin', () => {
+  it('allows linux package only on linux; macos only on darwin with host arch', () => {
     expect(assertLinuxHost('linux').ok).toBe(true);
     expect(assertLinuxHost('darwin').ok).toBe(false);
     expect(assertMacosHost('darwin').ok).toBe(true);
@@ -185,6 +204,12 @@ describe('release-unix host gates', () => {
       expect(refused.error).toMatch(/refuse to build or fabricate/i);
       expect(refused.error).toMatch(/real Mac/i);
     }
+    expect(assertMacosHostAndArch('darwin', 'x64')).toEqual({ ok: true, arch: 'x86_64' });
+    expect(assertMacosHostAndArch('darwin', 'arm64')).toEqual({ ok: true, arch: 'arm64' });
+    const badArch = assertMacosHostAndArch('darwin', 'ia32');
+    expect(badArch.ok).toBe(false);
+    if (!badArch.ok) expect(badArch.error).toMatch(/unsupported process\.arch/i);
+    expect(assertMacosHostAndArch('linux', 'arm64').ok).toBe(false);
   });
 });
 
@@ -409,9 +434,12 @@ describe('release-unix honesty + checksum helpers', () => {
     const l = linuxHonestyNotice({ version: '0.1.3', host: 'linux/x64' });
     expect(l).toMatch(/WebKitGTK 6/i);
     expect(l).toMatch(/NOT an AppImage/i);
-    const m = macosHonestyNotice({ host: 'darwin/arm64' });
+    const m = macosHonestyNotice({ host: 'darwin/arm64', arch: 'arm64' });
+    expect(m).toMatch(/macOS arm64/i);
+    expect(m).toMatch(/Apple Silicon/i);
     expect(m).toMatch(/NOT notarized/i);
     expect(m).toMatch(/NOT fabricated on Linux/i);
+    expect(macosHonestyNotice({ arch: 'x86_64' })).toMatch(/Intel x86_64/i);
     const b = bsdHonestyNotice('freebsd', { host: 'linux/x64' });
     expect(b).toMatch(/Zig-native/i);
     expect(b).toMatch(/does NOT claim GUI launch/i);
@@ -588,40 +616,71 @@ describe('release-unix tar.gz + pipelines (fixture)', () => {
     }
   });
 
-  it('runMacosRelease packages fixture on darwin with injected createDmg', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'onyx-ux-macok-'));
+  it('runMacosRelease packages arch-distinct fixtures for x64 and arm64 hosts', async () => {
+    for (const { nodeArch, macosArch } of [
+      { nodeArch: 'x64', macosArch: 'x86_64' },
+      { nodeArch: 'arm64', macosArch: 'arm64' },
+    ]) {
+      const dir = mkdtempSync(join(tmpdir(), `onyx-ux-macok-${macosArch}-`));
+      try {
+        writeAlignedRepo(dir);
+        const pkg = join(dir, 'zig-out/package/onyx-0.1.3-macos-ReleaseFast.app');
+        mkdirSync(join(pkg, 'Contents/MacOS'), { recursive: true });
+        mkdirSync(join(pkg, 'Contents/Resources/dist'), { recursive: true });
+        writeFileSync(join(pkg, 'Contents/MacOS/onyx'), 'fake-macho\n');
+        writeFileSync(join(pkg, 'Contents/Info.plist'), '<plist></plist>\n');
+        writeFileSync(
+          join(pkg, 'Contents/Resources/package-manifest.zon'),
+          '.{ .target = "macos", .version = "0.1.3", .optimize = "ReleaseFast", .signing = "none" }\n',
+        );
+        writeFileSync(join(pkg, 'Contents/Resources/dist/index.html'), '<html></html>\n');
+
+        expect(validateMacosPackageLayout(pkg)).toEqual({ ok: true });
+
+        const result = await runMacosRelease({
+          repoRoot: dir,
+          skipPackageBuild: true,
+          packageDir: pkg,
+          platform: 'darwin',
+          nodeArch,
+          createDmg: (appDir, dmgPath) => {
+            writeFileSync(dmgPath, Buffer.alloc(128, 0));
+            return { ok: true, dmgPath };
+          },
+          stdout: { write: () => {} },
+          stderr: { write: () => {} },
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.arch).toBe(macosArch);
+          expect(result.hash).toMatch(/^[0-9a-f]{64}$/);
+          expect(result.paths.archivePath).toMatch(
+            new RegExp(`macos-${macosArch}/onyx-0\\.1\\.3-macos-${macosArch}-ReleaseFast-unsigned\\.dmg$`),
+          );
+          expect(readFileSync(result.paths.noticePath, 'utf8')).toMatch(new RegExp(macosArch));
+        }
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it('runMacosRelease rejects unsupported process.arch', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'onyx-ux-mac-badarch-'));
     try {
       writeAlignedRepo(dir);
-      const pkg = join(dir, 'zig-out/package/onyx-0.1.3-macos-ReleaseFast.app');
-      mkdirSync(join(pkg, 'Contents/MacOS'), { recursive: true });
-      mkdirSync(join(pkg, 'Contents/Resources/dist'), { recursive: true });
-      writeFileSync(join(pkg, 'Contents/MacOS/onyx'), 'fake-macho\n');
-      writeFileSync(join(pkg, 'Contents/Info.plist'), '<plist></plist>\n');
-      writeFileSync(
-        join(pkg, 'Contents/Resources/package-manifest.zon'),
-        '.{ .target = "macos", .version = "0.1.3", .optimize = "ReleaseFast", .signing = "none" }\n',
-      );
-      writeFileSync(join(pkg, 'Contents/Resources/dist/index.html'), '<html></html>\n');
-
-      expect(validateMacosPackageLayout(pkg)).toEqual({ ok: true });
-
       const result = await runMacosRelease({
         repoRoot: dir,
-        skipPackageBuild: true,
-        packageDir: pkg,
         platform: 'darwin',
-        createDmg: (appDir, dmgPath) => {
-          writeFileSync(dmgPath, Buffer.alloc(128, 0));
-          return { ok: true, dmgPath };
+        nodeArch: 'ia32',
+        createDmg: () => {
+          throw new Error('must not create DMG for unsupported arch');
         },
         stdout: { write: () => {} },
         stderr: { write: () => {} },
       });
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.hash).toMatch(/^[0-9a-f]{64}$/);
-        expect(result.paths.archivePath).toMatch(/\.dmg$/);
-      }
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.errors.join(' ')).toMatch(/unsupported process\.arch/i);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -666,6 +725,16 @@ describe('release-unix tar.gz + pipelines (fixture)', () => {
         stderr: { write: () => {} },
       });
       expect(macOnLinux.ok).toBe(false);
+
+      const archOverride = await runUnixReleaseCli(['macos', '--arch=arm64'], {
+        repoRoot: dir,
+        platform: 'darwin',
+        nodeArch: 'x64',
+        stdout: { write: () => {} },
+        stderr: { write: () => {} },
+      });
+      expect(archOverride.ok).toBe(false);
+      if (!archOverride.ok) expect(archOverride.errors.join(' ')).toMatch(/refuse --arch/i);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

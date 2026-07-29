@@ -48,9 +48,9 @@ export const ROUTE_ENTRYPOINTS = [
   },
   {
     route: 'download',
-    title: 'Download Onyx — FreeBSD & OpenBSD native hosts',
+    title: 'Download Onyx — unsigned native packages',
     description:
-      'Download unsigned Onyx v0.1.3 FreeBSD and OpenBSD native host tarballs with install.sh. Not signed. Browser and PWA remain the primary paths.',
+      'Download unsigned Onyx v0.1.3 Windows zip, Linux/FreeBSD/OpenBSD tar.gz, and separate macOS Intel + Apple Silicon DMG packages with SHA-256 sidecars. Not signed or notarized. Browser and PWA remain the primary paths.',
   },
   {
     route: 'accessibility',

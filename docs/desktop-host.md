@@ -71,8 +71,9 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   `zig build` (auto platform). Explicit `desktop:*:linux` and
   `desktop:*:null` diagnostics exist separately.
 - Honest status: **signed multi-platform installers, updater, and notarization
-  are not done.** FreeBSD/OpenBSD have an unsigned one-install tarball lane
-  (`install.sh` + site-local `/download/` staging).
+  are not done.** Public unsigned packages: Windows zip, Linux tar.gz,
+  separate macOS Intel and Apple Silicon DMGs (Darwin-built only), FreeBSD/OpenBSD one-install tarballs
+  (`install.sh`) via site-local `/download/` staging.
 - **Windows x86_64 unsigned zip lane (v0.1.3):** `pnpm desktop:release:windows`
   (`tools/release-windows.mjs`) runs Native SDK `native package` via
   `zig build package -Dplatform=windows -Dtarget=x86_64-windows`, then
@@ -103,22 +104,39 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   **Not** Native SDK; **not** portable-web/PWA; **not** codesigned. Cross-build
   on Linux validates ELF/package layout only — **does not claim GUI launch**
   on real FreeBSD/OpenBSD from this host. Public surface: `/download/` + optional
-  `pnpm desktop:stage-bsd-downloads` → `dist/downloads/v0.1.3/` (deploy only
-  when `ONYX_STAGE_BSD_DOWNLOADS=1`; publish fail-closed with
-  `ONYX_PUBLISH_BSD_DOWNLOADS=1`).
-- **macOS unsigned DMG lane (v0.1.3):** `pnpm desktop:release:macos` runs
+  `pnpm desktop:stage-release-downloads` → `dist/downloads/v0.1.3/` (deploy only
+  when `ONYX_STAGE_RELEASE_DOWNLOADS=1`; publish fail-closed with
+  `ONYX_PUBLISH_RELEASE_DOWNLOADS=1` requiring all six public lanes
+  windows+linux+macos-x86_64+macos-arm64+freebsd+openbsd).
+  Legacy aliases: `desktop:stage-bsd-downloads` / `ONYX_*_BSD_DOWNLOADS`.
+- **macOS unsigned DMG lanes (v0.1.3):** `pnpm desktop:release:macos` runs
   **only on Darwin** and **fails closed** on Linux/other hosts (never
-  fabricates a `.app`/DMG without a real Mac + Apple tools). Produces
-  Native SDK WKWebView `.app` + unsigned DMG when green.
+  fabricates a `.app`/DMG without a real Mac + Apple tools). Architecture is
+  **host-derived** from `process.arch` (`x64`→`x86_64`, `arm64`→`arm64`); no
+  CLI arch override that can lie about the host. Produces Native SDK WKWebView
+  `.app` + unsigned DMG when green:
+  - Intel: `onyx-0.1.3-macos-x86_64-ReleaseFast-unsigned.dmg` under
+    `zig-out/release/macos-x86_64/`
+  - Apple Silicon: `onyx-0.1.3-macos-arm64-ReleaseFast-unsigned.dmg` under
+    `zig-out/release/macos-arm64/`
+  GitHub Actions `workflow_dispatch` matrix
+  `.github/workflows/macos-release.yml` on official `macos-15-intel` (x86_64)
+  and `macos-15` (arm64) with matching Zig tarballs (exact pin from
+  `.zigversion`). Staging copies pre-built DMGs into
+  `dist/downloads/v0.1.3/` — it never builds macOS on Linux.
 
 ## What is not done
 
 - Code signing (Authenticode / Apple codesign), notarization, auto-updater,
-  public download deployment, store installers (AppImage/Flatpak/MSI/etc.).
+  store installers (AppImage/Flatpak/MSI/etc.). Site-local unsigned six-lane
+  staging exists; live publish needs built v0.1.3 artifacts under
+  `zig-out/release/` for all of windows+linux+macos-x86_64+macos-arm64+freebsd+openbsd
+  (macOS from matching-arch Darwin / GHA matrix only).
 - Verified Windows GUI launch on real Windows hardware/VMs.
 - Verified macOS GUI launch / Gatekeeper path on real Apple hardware
-  (**blocker:** this release machine is Linux — macOS package/DMG must be
-  produced on a Mac; see table below).
+  (**blocker for local Linux host:** package/DMG must be produced on Darwin —
+  use `macos-release.yml` matrix (`macos-15-intel` + `macos-15`) or a real Mac;
+  still unsigned/unnotarized).
 - Verified FreeBSD/OpenBSD GUI launch on real BSD hardware/VMs (cross-build
   on Linux only proves ELF OS/machine + package layout).
 - Extra native permissions (filesystem, notifications bridge, etc.).
@@ -140,9 +158,9 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
 | `pnpm desktop:release:windows` | **Tooling present** — `zig-out/release/windows-x86_64/onyx-0.1.3-windows-x86_64-ReleaseFast-unsigned.zip`; **unsigned**; Windows runtime **not** verified here |
 | `pnpm desktop:release:linux` | **Tooling present** — one tar.gz under `zig-out/release/linux-x86_64/` after ELF/manifest/resources validation; needs WebKitGTK 6 + Zig pin |
 | `pnpm desktop:release:freebsd` / `:openbsd` | **Tooling present** — Zig-native `bsd_host` x86_64 ELF + `resources/dist` tar.gz; runtime needs GTK/WebKitGTK on BSD; **GUI not claimed** from Linux cross-build |
-| `pnpm desktop:release:macos` | **Fail-closed on non-Darwin** — must run on a real Mac; remaining **macOS blocker** for this Linux release host |
+| `pnpm desktop:release:macos` | **Fail-closed on non-Darwin** — host arch → `macos-x86_64` or `macos-arm64`; GHA matrix `macos-15-intel` + `macos-15`; unsigned/unnotarized |
 | GUI launch on real FreeBSD/OpenBSD / signing / updater | **Not done / not verified** |
-| Public `/download` + BSD install.sh packaging tests | **Tooling present** (site-local staging; binaries not in git) |
+| Public `/download` six-lane staging (win/linux/macos×2/bsd) | **Tooling present** (`stage-release-downloads`; binaries not in git; publish requires all six) |
 
 ### Linux GUI link dependency
 
@@ -216,7 +234,16 @@ pnpm desktop:release:openbsd       # same for OpenBSD
 #   GUI launch NOT claimed when packaging from Linux; run bin/onyx on real BSD with a matching GTK+WebKit pair.
 pnpm desktop:package:macos         # zig build package -Dplatform=macos (Darwin only)
 pnpm desktop:release:macos         # .app + unsigned DMG — FAILS CLOSED on non-Darwin (no fake macOS assets)
-#   outputs (on Mac only): zig-out/release/macos/onyx-0.1.3-macos-ReleaseFast-unsigned.{dmg,sha256,NOTICE.txt}
+#   arch from process.arch (x64→x86_64, arm64→arm64); no --arch override
+#   outputs (on matching Mac / GHA matrix only):
+#     zig-out/release/macos-x86_64/onyx-0.1.3-macos-x86_64-ReleaseFast-unsigned.{dmg,sha256,NOTICE.txt}
+#     zig-out/release/macos-arm64/onyx-0.1.3-macos-arm64-ReleaseFast-unsigned.{dmg,sha256,NOTICE.txt}
+#   workflow: .github/workflows/macos-release.yml (workflow_dispatch; matrix intel+arm64)
+#   staging may copy those DMGs on Linux; it never builds/fabricates them.
+pnpm desktop:stage-release-downloads         # optional: copy unsigned win/linux/macos×2/bsd → dist/downloads/v0.1.3/
+pnpm desktop:stage-release-downloads:publish # same with --require (all six public lanes must exist)
+#   deploy only when ONYX_STAGE_RELEASE_DOWNLOADS=1; publish fail-closed ONYX_PUBLISH_RELEASE_DOWNLOADS=1
+#   legacy aliases: desktop:stage-bsd-downloads* / ONYX_*_BSD_DOWNLOADS
 # Package other hosts (diagnostic):
 # zig build package                # target defaults to host platform; version from app.zon
 # zig build package -Dpackage-target=linux

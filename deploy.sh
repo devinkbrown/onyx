@@ -35,11 +35,17 @@
 #                   no live backup/rsync/ACL.
 #   ONYX_WEB_USER   Account granted execute on the live parent (default: http)
 #   ONYX_LANDING    Override path to the legacy landing tree (default: /home/kain/landing)
-#   ONYX_STAGE_BSD_DOWNLOADS  If 1, copy FreeBSD/OpenBSD release tarballs into
-#                   dist/downloads/v0.1.3/ via tools/stage-bsd-downloads.mjs.
+#   ONYX_STAGE_RELEASE_DOWNLOADS  If 1, copy unsigned public release archives
+#                   (Windows zip + Linux/FreeBSD/OpenBSD tar.gz + macOS Intel/ARM DMGs)
+#                   into dist/downloads/v0.1.3/ via tools/stage-release-downloads.mjs.
 #                   Normal deploy leaves this unset (no binary staging).
-#   ONYX_PUBLISH_BSD_DOWNLOADS  If 1 (with stage), fail closed when either BSD
-#                   lane artifact is missing under zig-out/release/.
+#                   macOS DMGs must already exist under zig-out/release/macos-x86_64/
+#                   and macos-arm64/ (Darwin-built); staging never fabricates them.
+#                   Legacy alias: ONYX_STAGE_BSD_DOWNLOADS=1
+#   ONYX_PUBLISH_RELEASE_DOWNLOADS  If 1 (with stage), fail closed when any of
+#                   windows|linux|macos-x86_64|macos-arm64|freebsd|openbsd is missing
+#                   under zig-out/release/. macOS still must be Darwin-produced first.
+#                   Legacy alias: ONYX_PUBLISH_BSD_DOWNLOADS=1
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -509,7 +515,7 @@ prove_snapshot_restored() {
 verify_live_out() {
   local live_out="$1"
   local version="$2"
-  local title_needle="${3:-Onyx — talk, stream, and stay with your people}"
+  local title_needle="${3:-Onyx — a room for your people}"
 
   if [[ ! -f "${live_out}/index.html" ]]; then
     echo "FAIL: live index.html missing after sync" >&2
@@ -676,7 +682,7 @@ deploy_main() {
   test -f dist/sw.js      || { echo "FAIL: dist/sw.js missing"; exit 1; }
 
   # Guard: Vite root must still be the Solid Landing after build.
-  grep -q "Onyx — talk, stream, and stay with your people" dist/index.html \
+  grep -q "Onyx — a room for your people" dist/index.html \
     || { echo "FAIL: dist/index.html missing authoritative public title — refusing deploy"; exit 1; }
 
   # SPA route entrypoints. solid-router is client-routed but the build emits only
@@ -689,18 +695,24 @@ deploy_main() {
   test -f dist/download/index.html \
     || { echo "FAIL: dist/download/index.html missing after materialise"; exit 1; }
 
-  # Optional: stage site-local FreeBSD/OpenBSD release artifacts (never the default).
+  # Optional: stage site-local public release artifacts (never the default).
+  # Six public lanes: windows + linux + macos-x86_64 + macos-arm64 + freebsd + openbsd.
+  # macOS DMGs must be Darwin-built first (never fabricated here); stage only copies.
   # Binaries are not committed; operators must produce them via desktop:release:*.
-  if [[ "${ONYX_STAGE_BSD_DOWNLOADS:-0}" == "1" || "${ONYX_PUBLISH_BSD_DOWNLOADS:-0}" == "1" ]]; then
-    echo "==> staging BSD download artifacts into dist/downloads/ (explicit env)"
+  if [[ "${ONYX_STAGE_RELEASE_DOWNLOADS:-0}" == "1" \
+     || "${ONYX_PUBLISH_RELEASE_DOWNLOADS:-0}" == "1" \
+     || "${ONYX_STAGE_BSD_DOWNLOADS:-0}" == "1" \
+     || "${ONYX_PUBLISH_BSD_DOWNLOADS:-0}" == "1" ]]; then
+    echo "==> staging public release download artifacts into dist/downloads/ (explicit env)"
     stage_args=()
-    if [[ "${ONYX_PUBLISH_BSD_DOWNLOADS:-0}" == "1" ]]; then
+    if [[ "${ONYX_PUBLISH_RELEASE_DOWNLOADS:-0}" == "1" \
+       || "${ONYX_PUBLISH_BSD_DOWNLOADS:-0}" == "1" ]]; then
       stage_args+=(--require)
     fi
-    node tools/stage-bsd-downloads.mjs "${stage_args[@]}" \
-      || { echo "FAIL: stage-bsd-downloads failed (publish mode fails closed when artifacts missing)"; exit 1; }
+    node tools/stage-release-downloads.mjs "${stage_args[@]}" \
+      || { echo "FAIL: stage-release-downloads failed (publish mode fails closed when any of windows|linux|macos-x86_64|macos-arm64|freebsd|openbsd is missing)"; exit 1; }
   else
-    echo "==> skipping BSD download artifact staging (set ONYX_STAGE_BSD_DOWNLOADS=1 to enable)"
+    echo "==> skipping release download artifact staging (set ONYX_STAGE_RELEASE_DOWNLOADS=1 to enable)"
   fi
 
   echo "==> stamping service-worker cache: onyx-shell-${version}"

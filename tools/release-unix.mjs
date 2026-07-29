@@ -2,17 +2,20 @@
 /**
  * Onyx client v0.1.3 — Unix release packaging (Linux + native BSD + macOS).
  *
- * Lanes (one downloadable asset per platform):
+ * Lanes (one downloadable asset per platform / arch):
  *  1. linux   — Native SDK system-WebView directory package → tar.gz (x86_64 ELF)
  *  2. freebsd — Zig-native desktop host (desktop/bsd_host.zig) x86_64-freebsd → tar.gz
  *  3. openbsd — Zig-native desktop host (desktop/bsd_host.zig) x86_64-openbsd → tar.gz
- *  4. macos   — Native SDK .app + DMG; runs ONLY on Darwin (fail-closed elsewhere)
+ *  4. macos   — Native SDK .app + DMG; runs ONLY on Darwin (fail-closed elsewhere).
+ *               Architecture is host-derived from process.arch (x64→x86_64, arm64→arm64);
+ *               produces arch-distinct filenames under zig-out/release/macos-{x86_64,arm64}/.
  *
  * Honesty:
  *  - FreeBSD/OpenBSD are real Zig-native GTK/WebKitGTK hosts (dlopen at runtime).
  *  - Cross-build on Linux produces correct ELF + package layout; it does NOT
  *    claim GUI launch was verified on FreeBSD/OpenBSD from this host.
  *  - macOS is never fabricated on Linux; requires a real Mac + Apple tooling.
+ *  - macOS arch cannot be overridden to lie about the host in production CLI.
  *  - Artifacts are UNSIGNED (no codesign/notarize/AppImage/Flatpak store claims).
  *  - No portable-web / PWA lane names for BSD.
  *
@@ -49,6 +52,12 @@ export const RELEASE_LINUX_ARCH = 'x86_64';
 
 /** BSD native host arch (cross-compiled x86_64). */
 export const RELEASE_BSD_ARCH = 'x86_64';
+
+/**
+ * Supported macOS public release arches (genuine host builds only).
+ * @type {readonly ['x86_64', 'arm64']}
+ */
+export const RELEASE_MACOS_ARCHS = /** @type {const} */ (['x86_64', 'arm64']);
 
 /** ELF e_machine for EM_X86_64. */
 export const ELF_EM_X86_64 = 62;
@@ -130,6 +139,29 @@ export function loadAlignedVersion(repoRoot = REPO_ROOT) {
 }
 
 /**
+ * Map Node process.arch → macOS public release arch token.
+ * @param {string} [nodeArch] process.arch (x64 | arm64 | …)
+ * @returns {'x86_64' | 'arm64' | null}
+ */
+export function mapNodeArchToMacosArch(nodeArch = process.arch) {
+  if (nodeArch === 'x64') return 'x86_64';
+  if (nodeArch === 'arm64') return 'arm64';
+  return null;
+}
+
+/**
+ * Normalize a macOS arch token (public lane or Node arch).
+ * @param {string | undefined | null} arch
+ * @returns {'x86_64' | 'arm64' | null}
+ */
+export function normalizeMacosArch(arch) {
+  if (arch === 'x86_64' || arch === 'arm64') return arch;
+  if (arch === 'x64') return 'x86_64';
+  if (arch === 'aarch64') return 'arm64';
+  return null;
+}
+
+/**
  * Directory name produced by build.zig package step / Native SDK artifactName / BSD stage.
  * @param {'linux' | 'macos' | 'freebsd' | 'openbsd'} target
  * @param {string} [version]
@@ -146,17 +178,30 @@ export function packageDirName(target, version = RELEASE_PRODUCT_VERSION, optimi
 
 /**
  * Single downloadable asset basename (no extension) per platform lane.
+ * macOS requires an arch token (x86_64 | arm64) — never omits arch in public names.
  * @param {'linux' | 'macos' | 'freebsd' | 'openbsd'} lane
  * @param {string} [version]
  * @param {string} [optimize]
+ * @param {'x86_64' | 'arm64' | string} [arch] required for macos
  * @returns {string}
  */
-export function releaseAssetBaseName(lane, version = RELEASE_PRODUCT_VERSION, optimize = RELEASE_OPTIMIZE) {
+export function releaseAssetBaseName(
+  lane,
+  version = RELEASE_PRODUCT_VERSION,
+  optimize = RELEASE_OPTIMIZE,
+  arch,
+) {
   if (lane === 'linux') {
     return `onyx-${version}-linux-${RELEASE_LINUX_ARCH}-${optimize}-unsigned`;
   }
   if (lane === 'macos') {
-    return `onyx-${version}-macos-${optimize}-unsigned`;
+    const macArch = normalizeMacosArch(arch);
+    if (!macArch) {
+      throw new Error(
+        `releaseAssetBaseName(macos): arch must be x86_64|arm64 (got ${JSON.stringify(arch)})`,
+      );
+    }
+    return `onyx-${version}-macos-${macArch}-${optimize}-unsigned`;
   }
   // Native BSD Zig host (x86_64 FreeBSD / OpenBSD).
   return `onyx-${version}-${lane}-${RELEASE_BSD_ARCH}-${optimize}-unsigned`;
@@ -166,10 +211,16 @@ export function releaseAssetBaseName(lane, version = RELEASE_PRODUCT_VERSION, op
  * @param {'linux' | 'macos' | 'freebsd' | 'openbsd'} lane
  * @param {string} [repoRoot]
  * @param {string} [version]
+ * @param {'x86_64' | 'arm64' | string} [arch] required for macos (public dir + filename)
  */
-export function resolveReleasePaths(lane, repoRoot = REPO_ROOT, version = RELEASE_PRODUCT_VERSION) {
-  const assetBase = releaseAssetBaseName(lane, version);
+export function resolveReleasePaths(
+  lane,
+  repoRoot = REPO_ROOT,
+  version = RELEASE_PRODUCT_VERSION,
+  arch,
+) {
   if (lane === 'linux') {
+    const assetBase = releaseAssetBaseName(lane, version);
     const dirName = packageDirName('linux', version);
     const packageDir = join(repoRoot, 'zig-out', 'package', dirName);
     const releaseDir = join(repoRoot, 'zig-out', 'release', 'linux-x86_64');
@@ -183,9 +234,16 @@ export function resolveReleasePaths(lane, repoRoot = REPO_ROOT, version = RELEAS
     };
   }
   if (lane === 'macos') {
+    const macArch = normalizeMacosArch(arch) ?? mapNodeArchToMacosArch(process.arch);
+    if (!macArch) {
+      throw new Error(
+        `resolveReleasePaths(macos): arch must be x86_64|arm64 (got ${JSON.stringify(arch)}; process.arch=${process.arch})`,
+      );
+    }
+    const assetBase = releaseAssetBaseName('macos', version, RELEASE_OPTIMIZE, macArch);
     const dirName = packageDirName('macos', version);
     const packageDir = join(repoRoot, 'zig-out', 'package', dirName);
-    const releaseDir = join(repoRoot, 'zig-out', 'release', 'macos');
+    const releaseDir = join(repoRoot, 'zig-out', 'release', `macos-${macArch}`);
     return {
       packageDir,
       releaseDir,
@@ -193,9 +251,11 @@ export function resolveReleasePaths(lane, repoRoot = REPO_ROOT, version = RELEAS
       sumsPath: join(releaseDir, `${assetBase}.sha256`),
       noticePath: join(releaseDir, `${assetBase}.NOTICE.txt`),
       assetBase,
+      arch: macArch,
     };
   }
   // freebsd / openbsd native host package
+  const assetBase = releaseAssetBaseName(lane, version);
   const dirName = packageDirName(lane, version);
   const packageDir = join(repoRoot, 'zig-out', 'package', dirName);
   const releaseDir = join(repoRoot, 'zig-out', 'release', `${lane}-${RELEASE_BSD_ARCH}`);
@@ -642,30 +702,38 @@ export function bsdHonestyNotice(os, opts = {}) {
 
 /**
  * Honesty notice for macOS (only produced on Darwin).
- * @param {{ version?: string, host?: string }} [opts]
+ * @param {{ version?: string, host?: string, arch?: 'x86_64' | 'arm64' | string }} [opts]
  * @returns {string}
  */
 export function macosHonestyNotice(opts = {}) {
   const version = opts.version ?? RELEASE_PRODUCT_VERSION;
   const host = opts.host ?? `${process.platform}/${process.arch}`;
+  const arch =
+    normalizeMacosArch(opts.arch) ?? mapNodeArchToMacosArch(process.arch) ?? 'unknown';
+  const archLabel =
+    arch === 'arm64' ? 'Apple Silicon arm64' : arch === 'x86_64' ? 'Intel x86_64' : arch;
   return [
-    `Onyx desktop ${version} — macOS UNSIGNED Native SDK package (DMG)`,
+    `Onyx desktop ${version} — macOS ${arch} UNSIGNED Native SDK package (DMG)`,
     '',
     'What this is:',
-    '  - Native SDK system-WebView .app (WKWebView) packaged as an unsigned DMG',
-    '  - Built only on a real Darwin host with Apple SDK tools (xcrun/hdiutil)',
+    `  - Native SDK system-WebView .app (WKWebView) packaged as an unsigned DMG (${archLabel})`,
+    '  - Built only on a real Darwin host with matching CPU arch + Apple SDK tools (xcrun/hdiutil)',
+    '  - Architecture is host-derived (process.arch); not a cross-arch fabricatable claim',
     '',
     'What this is NOT:',
     '  - NOT notarized, NOT codesigned for Gatekeeper distribution',
     '  - NOT fabricated on Linux/CI without a Mac — that path is fail-closed',
+    '  - NOT a universal binary; use the matching x86_64 or arm64 download for this CPU',
     '  - NO auto-updater, NO public download channel claim',
     '',
     'Built on host: ' + host,
+    'Release arch:  ' + arch,
     '',
-    'Reproduce (on macOS only):',
+    'Reproduce (on matching macOS only):',
     '  pnpm install && pnpm build',
     '  pnpm desktop:release:macos',
     '  # requires Zig pin from .zigversion; see docs/desktop-host.md',
+    '  # Intel: GHA macos-15-intel → macos-x86_64; Apple Silicon: GHA macos-15 → macos-arm64',
     '',
   ].join('\n');
 }
@@ -1188,6 +1256,29 @@ export function assertMacosHost(platform = process.platform) {
 }
 
 /**
+ * Fail-closed Darwin + arch gate for macOS release.
+ * Production derives arch from real process.arch; tests may inject platform/nodeArch.
+ * @param {string} [platform]
+ * @param {string} [nodeArch] process.arch (x64 | arm64)
+ * @returns {{ ok: true, arch: 'x86_64' | 'arm64' } | { ok: false, error: string }}
+ */
+export function assertMacosHostAndArch(platform = process.platform, nodeArch = process.arch) {
+  const host = assertMacosHost(platform);
+  if (!host.ok) return host;
+  const arch = mapNodeArchToMacosArch(nodeArch);
+  if (!arch) {
+    return {
+      ok: false,
+      error:
+        'release-unix macos: unsupported process.arch ' +
+        JSON.stringify(nodeArch) +
+        ' (need x64→x86_64 or arm64→arm64). Refusing to invent or cross-label arch.',
+    };
+  }
+  return { ok: true, arch };
+}
+
+/**
  * Fail-closed Linux host gate for native package (build.zig requires linux target).
  * @param {string} [platform]
  * @returns {{ ok: true } | { ok: false, error: string }}
@@ -1552,21 +1643,27 @@ export function createMacosDmg(appDir, dmgPath, volumeName, opts = {}) {
  *   createDmg?: typeof createMacosDmg,
  *   validate?: typeof validateMacosPackageLayout,
  *   platform?: string,
+ *   nodeArch?: string,
  *   stdout?: { write: (s: string) => void },
  *   stderr?: { write: (s: string) => void },
  * }} [opts]
+ *
+ * Production CLI must not pass nodeArch — host arch is always process.arch.
+ * Tests may inject platform + nodeArch (x64|arm64) without inventing a false arch.
  */
 export async function runMacosRelease(opts = {}) {
   const repoRoot = opts.repoRoot ?? REPO_ROOT;
   const log = opts.stdout ?? process.stdout;
   const err = opts.stderr ?? process.stderr;
   const platform = opts.platform ?? process.platform;
+  const nodeArch = opts.nodeArch ?? process.arch;
 
-  const hostGate = assertMacosHost(platform);
+  const hostGate = assertMacosHostAndArch(platform, nodeArch);
   if (!hostGate.ok) {
     err.write(`release-unix: ${hostGate.error}\n`);
     return { ok: false, code: 1, errors: [hostGate.error] };
   }
+  const macosArch = hostGate.arch;
 
   const aligned = loadAlignedVersion(repoRoot);
   if (!aligned.ok) {
@@ -1574,7 +1671,7 @@ export async function runMacosRelease(opts = {}) {
     return { ok: false, code: 1, errors: aligned.errors };
   }
   const version = aligned.version;
-  const paths = resolveReleasePaths('macos', repoRoot, version);
+  const paths = resolveReleasePaths('macos', repoRoot, version, macosArch);
 
   if (!opts.skipPackageBuild) {
     const env = { ...(opts.env ?? process.env) };
@@ -1583,7 +1680,7 @@ export async function runMacosRelease(opts = {}) {
     env.NATIVE_SDK_PATH = env.NATIVE_SDK_PATH || join(repoRoot, 'node_modules', '@native-sdk', 'cli');
 
     log.write(
-      'release-unix macos: zig build package -Dplatform=macos (Native SDK WKWebView .app)\n',
+      `release-unix macos: zig build package -Dplatform=macos (Native SDK WKWebView .app, host ${macosArch})\n`,
     );
     const runZig = opts.runZig ?? runDesktopZig;
     const code = await runZig(['build', 'package', '-Dplatform=macos'], { env });
@@ -1603,7 +1700,11 @@ export async function runMacosRelease(opts = {}) {
   }
 
   mkdirSync(paths.releaseDir, { recursive: true });
-  const notice = macosHonestyNotice({ version, host: `${platform}/${process.arch}` });
+  const notice = macosHonestyNotice({
+    version,
+    host: `${platform}/${nodeArch}`,
+    arch: macosArch,
+  });
   writeFileSync(paths.noticePath, notice, 'utf8');
   // Embed notice beside the .app for operators who skip the DMG.
   try {
@@ -1613,7 +1714,7 @@ export async function runMacosRelease(opts = {}) {
   }
 
   const createDmg = opts.createDmg ?? createMacosDmg;
-  const dmg = createDmg(packageDir, paths.archivePath, `Onyx ${version}`);
+  const dmg = createDmg(packageDir, paths.archivePath, `Onyx ${version} ${macosArch}`);
   if (!dmg.ok) {
     err.write(`release-unix: ${dmg.error}\n`);
     return { ok: false, code: 1, errors: [dmg.error] };
@@ -1625,22 +1726,27 @@ export async function runMacosRelease(opts = {}) {
     return { ok: false, code: 1, errors: [sum.error] };
   }
 
-  log.write(`release-unix macos: package ${packageDir}\n`);
-  log.write(`release-unix macos: dmg     ${paths.archivePath}\n`);
-  log.write(`release-unix macos: sha256  ${sum.hash}  ${paths.archivePath.split(/[/\\]/).pop()}\n`);
+  log.write(`release-unix macos (${macosArch}): package ${packageDir}\n`);
+  log.write(`release-unix macos (${macosArch}): dmg     ${paths.archivePath}\n`);
   log.write(
-    'release-unix macos: UNSIGNED; not notarized; built only on Darwin with Apple tools.\n',
+    `release-unix macos (${macosArch}): sha256  ${sum.hash}  ${paths.archivePath.split(/[/\\]/).pop()}\n`,
+  );
+  log.write(
+    `release-unix macos (${macosArch}): UNSIGNED; not notarized; built only on matching Darwin host.\n`,
   );
 
-  return { ok: true, paths, hash: sum.hash, lane: 'macos' };
+  return { ok: true, paths, hash: sum.hash, lane: 'macos', arch: macosArch };
 }
 
 /**
  * CLI dispatcher.
+ * Production always derives macOS arch from real process.arch (no --arch override).
+ * Tests may inject platform/nodeArch via opts only.
  * @param {string[]} argv
  * @param {{
  *   repoRoot?: string,
  *   platform?: string,
+ *   nodeArch?: string,
  *   runLinux?: typeof runLinuxRelease,
  *   runBsd?: typeof runBsdRelease,
  *   runPortable?: typeof runBsdRelease,
@@ -1657,6 +1763,16 @@ export async function runUnixReleaseCli(argv, opts = {}) {
   const skipHostBuild = args.includes('--skip-host-build') || skipPackageBuild;
   const packageDirArg = args.find((a) => a.startsWith('--package-dir='));
   const packageDir = packageDirArg ? packageDirArg.slice('--package-dir='.length) : undefined;
+  // Reject production-style arch overrides that could lie about the host.
+  const archOverride = args.find(
+    (a) => a.startsWith('--arch=') || a === '--arch' || a.startsWith('--macos-arch='),
+  );
+  if (archOverride) {
+    const msg =
+      'release-unix: refuse --arch / --macos-arch override; macOS arch is derived from real process.arch (x64→x86_64, arm64→arm64)';
+    err.write(`${msg}\n`);
+    return { ok: false, code: 2, errors: [msg] };
+  }
   const common = {
     repoRoot: opts.repoRoot,
     platform: opts.platform,
@@ -1679,7 +1795,11 @@ export async function runUnixReleaseCli(argv, opts = {}) {
   }
   if (lane === 'macos') {
     const run = opts.runMacos ?? runMacosRelease;
-    return run(common);
+    // Do not invent arch from CLI; only optional test inject via opts.nodeArch.
+    return run({
+      ...common,
+      nodeArch: opts.nodeArch,
+    });
   }
 
   const msg =
@@ -1687,7 +1807,7 @@ export async function runUnixReleaseCli(argv, opts = {}) {
     '  linux   — Native SDK system-WebView x86_64 tar.gz (Linux host)\n' +
     '  freebsd — Zig-native x86_64-freebsd host tar.gz (GTK/WebKitGTK dlopen)\n' +
     '  openbsd — Zig-native x86_64-openbsd host tar.gz (GTK/WebKitGTK dlopen)\n' +
-    '  macos   — Native SDK .app + DMG (Darwin only; fail-closed elsewhere)';
+    '  macos   — Native SDK .app + DMG (Darwin only; arch from process.arch → x86_64|arm64)';
   err.write(`release-unix: ${msg}\n`);
   return { ok: false, code: 2, errors: [msg] };
 }

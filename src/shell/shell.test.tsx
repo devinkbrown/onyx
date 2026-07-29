@@ -1092,6 +1092,22 @@ describe('AppShell', () => {
   });
 
   describe('presence ribbon', () => {
+    it('does not repeat the Onyx network label on Home', () => {
+      store.setState({
+        ...initialState,
+        activeView: { kind: 'home' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        networkName: 'Onyx',
+      }, true);
+
+      const { getByRole } = render(() => <AppShell />);
+
+      const ribbon = getByRole('banner', { name: 'Channel information' });
+      expect(ribbon.textContent).toContain('Home');
+      expect(ribbon.textContent).not.toContain('Onyx');
+    });
+
     it('shows the channel name and topic in the ribbon', () => {
       // Arrange
       seedStore('#general');

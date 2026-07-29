@@ -6,15 +6,16 @@ import { Mascot } from '@/components/brand/Mascot';
 import { PublicFooter } from './PublicFooter';
 import { setPageMeta } from './pageMeta';
 import {
-  BSD_DOWNLOAD_CARDS,
+  DOWNLOAD_CARDS,
   DOWNLOAD_CATALOG_URL,
   DOWNLOAD_PRODUCT_VERSION,
   checksumFromCatalog,
   installSteps,
+  isMacosDownloadLane,
   parseSha256SumText,
-  type BsdDownloadCard,
-  type BsdDownloadLane,
+  type DownloadCard,
   type DownloadCatalog,
+  type DownloadLane,
 } from './downloadMeta';
 
 async function loadCatalog(): Promise<DownloadCatalog | null> {
@@ -36,6 +37,18 @@ async function loadSha256(url: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+function archiveButtonLabel(ext: DownloadCard['archiveExt']): string {
+  if (ext === 'zip') return 'Download zip';
+  if (ext === 'dmg') return 'Download DMG';
+  return 'Download tar.gz';
+}
+
+function signingLabel(ext: DownloadCard['archiveExt']): string {
+  if (ext === 'zip') return 'none — unsigned zip';
+  if (ext === 'dmg') return 'none — unsigned, unnotarized DMG';
+  return 'none — unsigned tarball';
 }
 
 function CopyButton(props: { label: string; value: string; testId: string }): JSX.Element {
@@ -70,7 +83,7 @@ function CopyButton(props: { label: string; value: string; testId: string }): JS
 }
 
 function LaneCard(props: {
-  card: BsdDownloadCard;
+  card: DownloadCard;
   catalog: DownloadCatalog | null | undefined;
 }): JSX.Element {
   const [shaFromFile] = createResource(
@@ -88,19 +101,32 @@ function LaneCard(props: {
       <p>{props.card.summary}</p>
       <ul class="dl-facts">
         <li>
-          <strong>Runtime (auto via install.sh)</strong>
+          <strong>
+            {props.card.hasInstallScript ? 'Runtime (auto via install.sh)' : 'Runtime requirement'}
+          </strong>
           {' '}
           {props.card.primaryPackages.join(' + ')}
         </li>
         <li>
           <strong>Layout</strong>
           {' '}
-          PREFIX/bin/onyx + PREFIX/resources (default PREFIX=/usr/local)
+          <Show when={props.card.lane === 'windows'}>
+            package root bin/onyx.exe + WebView2Loader.dll + resources
+          </Show>
+          <Show when={isMacosDownloadLane(props.card.lane)}>
+            .app bundle (Contents/MacOS/onyx + system WKWebView) inside unsigned DMG
+          </Show>
+          <Show when={props.card.lane === 'linux'}>
+            package root bin/onyx + resources/dist
+          </Show>
+          <Show when={props.card.hasInstallScript}>
+            PREFIX/bin/onyx + PREFIX/resources (default PREFIX=/usr/local)
+          </Show>
         </li>
         <li>
           <strong>Signing</strong>
           {' '}
-          none — unsigned tarball
+          {signingLabel(props.card.archiveExt)}
         </li>
       </ul>
       <div class="dl-actions">
@@ -110,7 +136,7 @@ function LaneCard(props: {
           href={props.card.archiveUrl}
           download={props.card.archiveName}
         >
-          Download tar.gz
+          {archiveButtonLabel(props.card.archiveExt)}
         </a>
         <a class="r-btn ghost" href={props.card.noticeUrl}>
           Honesty notice
@@ -146,44 +172,75 @@ function LaneCard(props: {
         </Show>
       </div>
       <div class="dl-install">
-        <h3>Install on {props.card.osLabel}</h3>
+        <h3>
+          {props.card.hasInstallScript
+            ? `Install on ${props.card.osLabel}`
+            : `Use on ${props.card.osLabel}`}
+        </h3>
         <pre class="dl-pre" data-testid={`dl-install-${props.card.lane}`}>{steps()}</pre>
         <CopyButton
-          label="Copy install steps"
+          label={props.card.hasInstallScript ? 'Copy install steps' : 'Copy steps'}
           value={steps()}
           testId={`dl-copy-install-${props.card.lane}`}
         />
-        <p class="dl-note">
-          Root and network are required only when
-          {' '}
-          <code>install.sh</code>
-          {' '}
-          auto-installs system packages via
-          {' '}
-          {props.card.packageManager}
-          . Use
-          {' '}
-          <code>--prefix</code>
-          {' '}
-          and
-          {' '}
-          <code>--no-deps</code>
-          {' '}
-          for a non-root tree. The script never curl-pipes remote code.
-        </p>
+        <Show
+          when={props.card.hasInstallScript}
+          fallback={(
+            <p class="dl-note">
+              This package is
+              {' '}
+              <strong>unsigned</strong>
+              <Show when={isMacosDownloadLane(props.card.lane)}>
+                {' '}
+                and
+                {' '}
+                <strong>unnotarized</strong>
+              </Show>
+              . Extract or mount and run from the package tree. Onyx does not claim
+              codesign, notarization, virus-free status, or GUI launch verification for this lane.
+              <Show when={props.card.lane === 'macos-x86_64'}>
+                {' '}
+                The DMG is built only on a genuine Darwin Intel runner (x86_64).
+              </Show>
+              <Show when={props.card.lane === 'macos-arm64'}>
+                {' '}
+                The DMG is built only on a genuine Darwin Apple Silicon runner (arm64).
+              </Show>
+            </p>
+          )}
+        >
+          <p class="dl-note">
+            Root and network are required only when
+            {' '}
+            <code>install.sh</code>
+            {' '}
+            auto-installs system packages via
+            {' '}
+            {props.card.packageManager}
+            . Use
+            {' '}
+            <code>--prefix</code>
+            {' '}
+            and
+            {' '}
+            <code>--no-deps</code>
+            {' '}
+            for a non-root tree. The script never curl-pipes remote code.
+          </p>
+        </Show>
       </div>
     </article>
   );
 }
 
 /**
- * Public /download — FreeBSD/OpenBSD unsigned native host tarballs only.
- * Browser remains the primary product path; this page is honest about limits.
+ * Public /download — unsigned Windows/Linux/macOS/FreeBSD/OpenBSD native packages.
+ * macOS DMGs are Darwin-built only (Intel + Apple Silicon). Browser remains primary.
  */
 export default function Download(): JSX.Element {
   setPageMeta(
-    'Download Onyx — FreeBSD & OpenBSD native hosts',
-    'Download unsigned Onyx v0.1.3 FreeBSD and OpenBSD native host tarballs with install.sh. Not signed. GUI not claimed from the Linux build host. Browser and PWA remain the primary paths.',
+    'Download Onyx — unsigned native packages',
+    'Download unsigned Onyx v0.1.3 Windows zip, Linux/FreeBSD/OpenBSD tar.gz, and macOS Intel + Apple Silicon DMG packages with SHA-256 sidecars. Not signed or notarized. Browser and PWA remain the primary paths.',
     '/download/',
   );
 
@@ -209,22 +266,18 @@ export default function Download(): JSX.Element {
       </header>
 
       <section class="r-wrap data-hero" aria-labelledby="download-heading">
-        <p class="r-kicker">v{DOWNLOAD_PRODUCT_VERSION} · unsigned native BSD</p>
-        <h1 id="download-heading">FreeBSD &amp; OpenBSD hosts</h1>
+        <p class="r-kicker">v{DOWNLOAD_PRODUCT_VERSION} · unsigned native packages</p>
+        <h1 id="download-heading">Windows, Linux, macOS, FreeBSD &amp; OpenBSD</h1>
         <p class="sub">
-          One-install native packages for operators on FreeBSD and OpenBSD x86_64.
-          Each tarball includes
-          {' '}
-          <code>bin/onyx</code>
-          ,
-          {' '}
-          <code>resources/dist</code>
-          , and an idempotent
+          Operator packages: Windows zip, Linux tar.gz, separate macOS Intel (x86_64) and
+          Apple Silicon (arm64) DMGs (system WKWebView; unsigned/unnotarized; each built on
+          genuine matching-arch Darwin), and FreeBSD/OpenBSD native hosts with
           {' '}
           <code>install.sh</code>
+          . Every artifact is
           {' '}
-          that can install the primary GTK4 + WebKitGTK runtime through the OS package manager.
-          Artifacts are site-local under
+          <strong>unsigned</strong>
+          , carries a SHA-256 sidecar and honesty notice, and is site-local under
           {' '}
           <code>/downloads/v{DOWNLOAD_PRODUCT_VERSION}/</code>
           .
@@ -238,17 +291,29 @@ export default function Download(): JSX.Element {
             <li>
               <strong>Is:</strong>
               {' '}
-              Zig-native desktop host (not Native SDK), unsigned tar.gz, SHA-256 sidecar, honesty notice.
+              unsigned zip/tar.gz/DMG packages with SHA-256 sidecars and honesty notices
+              (Windows Native SDK zip; Linux Native SDK tar.gz; macOS Intel + Apple Silicon
+              WKWebView DMGs; FreeBSD/OpenBSD Zig-native hosts with install.sh).
             </li>
             <li>
               <strong>Is not:</strong>
               {' '}
-              codesigned, notarized, virus-scanned, store-packaged, or auto-updating.
+              codesigned, notarized, virus-scanned, store-packaged, auto-updating, or a signed
+              multi-platform installer suite. Not a universal macOS binary — pick Intel or
+              Apple Silicon.
             </li>
             <li>
-              <strong>GUI launch</strong>
+              <strong>Runtime / GUI launch</strong>
               {' '}
-              is not claimed from the Linux release host — only ELF/package layout is validated there.
+              is not claimed from the Linux release host — package layout and checksums only.
+              Windows runtime is not verified on real Windows here.
+            </li>
+            <li>
+              <strong>macOS:</strong>
+              {' '}
+              separate unsigned/unnotarized DMGs with system WKWebView for Intel x86_64 and
+              Apple Silicon arm64, each produced only on a genuine matching-arch Darwin runner
+              (GitHub-hosted macos-15-intel / macos-15 or a real Mac). Never fabricated on Linux.
             </li>
             <li>
               <strong>Browser first:</strong>
@@ -257,14 +322,14 @@ export default function Download(): JSX.Element {
               {' '}
               <a href="/app/">Open Onyx</a>
               {' '}
-              in a browser or install the PWA. Windows, macOS, and Linux native installers are separate lanes and not offered here as signed downloads.
+              in a browser or install the PWA.
             </li>
           </ul>
         </div>
       </section>
 
-      <section class="r-wrap r-section dl-grid" aria-label="BSD download cards">
-        <For each={[...BSD_DOWNLOAD_CARDS]}>
+      <section class="r-wrap r-section dl-grid" aria-label="Native download cards">
+        <For each={[...DOWNLOAD_CARDS]}>
           {(card) => <LaneCard card={card} catalog={catalog()} />}
         </For>
       </section>
@@ -272,15 +337,19 @@ export default function Download(): JSX.Element {
       <section class="r-wrap r-section">
         <div class="dl-verify data-card">
           <h2>Verify a download</h2>
-          <pre class="dl-pre">{`# after download
+          <pre class="dl-pre">{`# after download (example: FreeBSD)
 sha256 -c onyx-${DOWNLOAD_PRODUCT_VERSION}-freebsd-x86_64-ReleaseFast-unsigned.sha256
-# or: sha256sum -c …`}</pre>
+# Linux: sha256sum -c …
+# macOS Intel: shasum -a 256 -c onyx-${DOWNLOAD_PRODUCT_VERSION}-macos-x86_64-ReleaseFast-unsigned.sha256
+# macOS Apple Silicon: shasum -a 256 -c onyx-${DOWNLOAD_PRODUCT_VERSION}-macos-arm64-ReleaseFast-unsigned.sha256
+# Windows (PowerShell): Get-FileHash .\\onyx-…-unsigned.zip -Algorithm SHA256`}</pre>
           <p class="dl-note">
             Compare the hash on this page (when staged) with the
             {' '}
             <code>.sha256</code>
             {' '}
-            file next to the tarball. Onyx does not claim third-party virus-free status or code signing for these artifacts.
+            file next to the archive. Onyx does not claim third-party virus-free status or code
+            signing for these artifacts.
           </p>
         </div>
       </section>
@@ -290,4 +359,4 @@ sha256 -c onyx-${DOWNLOAD_PRODUCT_VERSION}-freebsd-x86_64-ReleaseFast-unsigned.s
   );
 }
 
-export type { BsdDownloadLane };
+export type { DownloadLane };

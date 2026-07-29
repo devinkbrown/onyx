@@ -1756,6 +1756,6 @@ function submitLabel(mode: Mode, phase: 'idle' | 'connecting' | 'error'): string
   switch (mode) {
     case 'signin':   return 'Sign in';
     case 'register': return 'Create account';
-    default:         return 'Dive in';
+    default:         return 'Continue';
   }
 }

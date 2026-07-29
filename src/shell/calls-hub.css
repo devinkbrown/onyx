@@ -1,27 +1,31 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
-/* Calls hub — public product-frame surface (truthful, no auto-join). */
+/* Calls hub — quiet-threshold product frame (truthful idle, no auto-join). */
 
 .shell-calls-hub {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: clamp(28px, 6vw, 84px);
+  padding: clamp(24px, 5.5vw, 72px);
   color: var(--paper);
-  background:
-    radial-gradient(circle at 82% 18%, color-mix(in oklab, var(--lapis) 17%, transparent), transparent 32%),
-    linear-gradient(150deg, color-mix(in oklab, var(--ink) 78%, transparent), color-mix(in oklab, var(--stone) 46%, transparent));
+  /* Matte mineral field — no radial glow wash */
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--surface-face, var(--stone)) 55%, var(--surface-void, var(--ink))) 0%,
+    var(--surface-void, var(--ink)) 100%
+  );
 }
 
 .shell-calls-kicker {
   width: fit-content;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   padding: 6px 10px;
-  border: 1px solid color-mix(in oklab, var(--lapis) 44%, var(--seam-faint));
-  border-radius: var(--r-pill);
-  color: var(--lapis-bright);
-  font: 700 0.68rem/1 var(--font-mono);
-  letter-spacing: 0.14em;
+  border: 1px solid color-mix(in oklab, var(--lapis) 28%, var(--line));
+  border-radius: var(--r-sm);
+  color: var(--paper-dim);
+  font: 600 var(--text-xs, 0.6875rem)/1 var(--font-mono);
+  letter-spacing: var(--tracking-kicker, 0.12em);
   text-transform: uppercase;
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 40%, transparent);
 }
 
 .shell-calls-status {
@@ -30,9 +34,9 @@
   gap: 8px;
   margin: 0 0 18px;
   padding: 6px 12px 6px 10px;
-  border: 1px solid color-mix(in oklab, var(--seam-faint) 80%, transparent);
-  border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--stone-2) 28%, transparent);
+  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--stone-2) 40%, transparent);
   color: var(--paper-dim);
   font: 600 0.78rem/1.2 var(--font-mono);
   letter-spacing: 0.04em;
@@ -46,26 +50,28 @@
   flex: none;
 }
 
+/* Truthful idle: mute pip, no glow */
 .shell-calls-status-pip[data-state='idle'] {
   background: var(--paper-mute);
+  box-shadow: none;
 }
 
 .shell-calls-status-pip[data-state='ringing_in'],
 .shell-calls-status-pip[data-state='ringing_out'] {
-  background: var(--lapis-bright);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
+  background: var(--lapis);
+  box-shadow: none;
   animation: shell-calls-ring-pulse 1.4s ease-in-out infinite;
 }
 
 .shell-calls-status-pip[data-state='provisional'] {
-  background: var(--lapis);
-  box-shadow: 0 0 8px color-mix(in oklab, var(--lapis) 50%, transparent);
+  background: var(--lapis-bright);
+  box-shadow: none;
   animation: shell-calls-ring-pulse 1.8s ease-in-out infinite;
 }
 
 .shell-calls-status-pip[data-state='established'] {
   background: var(--ok);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--ok) 55%, transparent);
+  box-shadow: none;
 }
 
 .shell-calls-status-where {
@@ -87,39 +93,53 @@
 }
 
 .shell-calls-hub h1 {
-  max-width: 760px;
+  max-width: 720px;
   margin: 0;
   color: var(--paper);
-  font: 400 clamp(2.2rem, 5vw, 4.8rem)/0.98 var(--font-display);
-  letter-spacing: -0.035em;
+  font: 600 clamp(1.7rem, 3.2vw, 2.55rem)/var(--leading-tight, 1.15) var(--font-sans);
+  letter-spacing: var(--tracking-title, -0.02em);
 }
 
 .shell-calls-intro {
-  max-width: 650px;
-  margin: 24px 0 0;
-  color: var(--paper-dim);
-  font: 400 clamp(1rem, 1.7vw, 1.25rem)/1.58 var(--font-sans);
+  max-width: 52ch;
+  margin: 18px 0 0;
+  color: color-mix(in oklab, var(--paper) 86%, var(--paper-dim));
+  font: 400 clamp(1rem, 1.3vw, 1.1rem)/var(--leading-body, 1.55) var(--font-serif, var(--font-sans));
 }
 
 .shell-calls-primary {
-  min-height: 44px;
-  margin-top: 28px;
+  min-height: var(--target-min, 44px);
+  min-width: var(--target-min, 44px);
+  margin-top: 24px;
   padding: 11px 18px;
-  border: 1px solid color-mix(in oklab, var(--lapis-bright) 55%, transparent);
-  border-radius: var(--r-pill);
-  background: var(--lapis-bright);
-  color: var(--ink);
-  font: 700 0.86rem/1 var(--font-sans);
+  border: 1px solid color-mix(in oklab, var(--lapis) 75%, var(--stone-line));
+  border-radius: var(--r-md);
+  background: var(--lapis);
+  color: var(--on-accent, var(--ink));
+  font: 650 var(--text-md, 0.9375rem)/1 var(--font-sans);
+  letter-spacing: 0.01em;
   cursor: pointer;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--paper) 8%, transparent) inset;
+  transition:
+    background var(--dur-fast, 160ms) var(--ease),
+    border-color var(--dur-fast, 160ms) var(--ease),
+    box-shadow var(--dur-micro, 100ms) var(--ease),
+    transform var(--dur-micro, 100ms) var(--ease);
 }
 
 .shell-calls-primary:hover {
-  background: var(--paper);
+  background: color-mix(in oklab, var(--lapis) 88%, white);
+  border-color: color-mix(in oklab, var(--lapis) 90%, white);
+}
+
+.shell-calls-primary:active {
+  transform: translateY(1px);
+  box-shadow: var(--elev-press, inset 0 1px 0 color-mix(in oklab, var(--ink) 18%, transparent));
 }
 
 .shell-calls-primary:focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 3px;
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
 }
 
 .shell-calls-proof {
@@ -127,43 +147,153 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   max-width: 880px;
-  margin-top: clamp(48px, 8vw, 96px);
+  margin-top: clamp(40px, 7vw, 80px);
 }
 
 .shell-calls-proof article {
   min-width: 0;
-  padding: 20px;
-  border: 1px solid var(--seam-faint);
+  padding: 18px;
+  border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--stone-2) 38%, transparent);
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 55%, transparent);
+  box-shadow: var(--elev-1, none);
 }
 
 .shell-calls-proof article > span {
-  color: var(--lapis-bright);
-  font: 700 0.62rem/1 var(--font-mono);
-  letter-spacing: 0.12em;
+  color: var(--paper-dim);
+  font: 600 var(--text-2xs, 0.625rem)/1 var(--font-mono);
+  letter-spacing: var(--tracking-kicker, 0.12em);
+  text-transform: uppercase;
 }
 
 .shell-calls-proof h2 {
-  margin: 18px 0 8px;
+  margin: 14px 0 6px;
   color: var(--paper);
-  font: 600 1rem/1.2 var(--font-sans);
+  font: 600 var(--text-md, 0.9375rem)/var(--leading-snug, 1.35) var(--font-sans);
 }
 
 .shell-calls-proof p {
   margin: 0;
   color: var(--paper-mute);
-  font: 400 0.86rem/1.48 var(--font-sans);
+  font: 400 var(--text-sm, 0.8125rem)/1.48 var(--font-sans);
 }
 
 @media (max-width: 680px) {
   .shell-calls-hub {
-    padding: 28px 18px calc(var(--mnav-h, 58px) + env(safe-area-inset-bottom, 0px) + 24px);
+    /* Controlled voice color: enough depth to distinguish Calls without
+       implying that a call is active. */
+    padding:
+      max(22px, calc(env(safe-area-inset-top, 0px) + 12px))
+      max(16px, env(safe-area-inset-right, 0px))
+      calc(var(--mnav-h, 56px) + env(safe-area-inset-bottom, 0px) + 28px)
+      max(16px, env(safe-area-inset-left, 0px));
+    background: linear-gradient(
+      160deg,
+      color-mix(in oklab, var(--lapis-deep) 18%, var(--ink)) 0%,
+      color-mix(in oklab, var(--stone) 42%, var(--ink)) 38%,
+      var(--ink) 100%
+    );
+  }
+
+  .shell-calls-hub h1 {
+    font-size: clamp(1.55rem, 1.15rem + 3vw, 2.1rem);
+    line-height: 1.15;
+    max-width: 22ch;
+  }
+
+  .shell-calls-intro {
+    margin-top: 14px;
+    font-size: 1rem;
+    line-height: 1.5;
+    max-width: none;
+  }
+
+  .shell-calls-status {
+    min-height: 40px;
+    margin-bottom: 14px;
+    padding: 8px 12px 8px 10px;
+  }
+
+  .shell-calls-primary {
+    width: 100%;
+    min-height: 48px;
+    margin-top: 22px;
+    justify-content: center;
   }
 
   .shell-calls-proof {
     grid-template-columns: 1fr;
-    margin-top: 40px;
+    gap: 10px;
+    margin-top: 32px;
+  }
+
+  .shell-calls-proof article {
+    padding: 16px;
+    border-left: 2px solid color-mix(in oklab, var(--lapis) 72%, var(--line));
+  }
+
+  .shell-calls-proof article:nth-child(2) {
+    border-left-color: color-mix(in oklab, var(--ok) 68%, var(--line));
+  }
+
+  .shell-calls-proof article:nth-child(3) {
+    border-left-color: color-mix(in oklab, var(--gold) 68%, var(--line));
+  }
+
+  .shell-calls-proof article:nth-child(1) > span { color: var(--lapis-bright); }
+  .shell-calls-proof article:nth-child(2) > span { color: var(--ok); }
+  .shell-calls-proof article:nth-child(3) > span { color: var(--gold); }
+
+  .shell-calls-proof h2 {
+    margin-top: 12px;
+    font-size: 0.98rem;
+  }
+}
+
+/* Narrow phones: single column already; keep type from overflowing 320px. */
+@media (max-width: 360px) {
+  .shell-calls-hub {
+    padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px));
+  }
+
+  .shell-calls-hub h1 {
+    font-size: 1.45rem;
+  }
+
+  .shell-calls-kicker {
+    letter-spacing: 0.1em;
+  }
+}
+
+/* Short / landscape phone: discovery stays scannable above the tab bar. */
+@media (max-width: 900px) and (max-height: 30rem) {
+  .shell-calls-hub {
+    padding-top: max(12px, env(safe-area-inset-top, 0px));
+    padding-bottom: calc(var(--mnav-h, 48px) + env(safe-area-inset-bottom, 0px) + 16px);
+  }
+
+  .shell-calls-hub h1 {
+    font-size: 1.35rem;
+  }
+
+  .shell-calls-intro {
+    margin-top: 8px;
+    font-size: 0.92rem;
+    line-height: 1.4;
+  }
+
+  .shell-calls-proof {
+    margin-top: 20px;
+    gap: 8px;
+  }
+
+  .shell-calls-proof article {
+    padding: 12px 14px;
+  }
+
+  .shell-calls-primary {
+    margin-top: 14px;
+    min-height: 44px;
   }
 }
 
@@ -172,11 +302,45 @@
     transition: none;
   }
 
+  .shell-calls-primary:active {
+    transform: none;
+  }
+
   .shell-calls-status-pip[data-state='ringing_in'],
   .shell-calls-status-pip[data-state='ringing_out'],
   .shell-calls-status-pip[data-state='provisional'] {
     animation: none;
     opacity: 1;
     transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .shell-calls-primary {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+
+  .shell-calls-proof article,
+  .shell-calls-status,
+  .shell-calls-kicker {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .shell-calls-status-pip[data-state='idle'] {
+    background: GrayText;
+  }
+
+  .shell-calls-status-pip[data-state='established'] {
+    background: Highlight;
+  }
+
+  .shell-calls-status-pip[data-state='ringing_in'],
+  .shell-calls-status-pip[data-state='ringing_out'],
+  .shell-calls-status-pip[data-state='provisional'] {
+    background: Highlight;
   }
 }

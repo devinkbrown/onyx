@@ -487,9 +487,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
       {/* ── LEFT: conversation identity (what you're looking at) ── */}
       <div class="shell-ribbon-identity">
         <Show when={channelName()} fallback={
-          <span class="shell-ribbon-channel" aria-label="No active channel">
-            Onyx
-          </span>
+          <span class="sr-only">Home</span>
         }>
           {(name) => (
             <button

@@ -36,7 +36,7 @@ Companions:
 | Downloadable installers | **PARTIAL** | FreeBSD/OpenBSD unsigned tar.gz + `install.sh` packaging lanes exist; not signed multi-platform |
 | Code signing | **PENDING** | Not configured |
 | Auto-updater | **PENDING** | Capability `updater: false`; no pipeline |
-| Public desktop downloads | **PARTIAL** | `/download` FreeBSD/OpenBSD surface + site-local `/downloads/v0.1.3/` staging tool; artifacts not committed; deploy stages only with explicit env |
+| Public desktop downloads | **PARTIAL** | `/download` six-lane surface (win/linux/macos-x86_64/macos-arm64/fbsd/obsd) + site-local `/downloads/v0.1.3/` staging; artifacts not committed; deploy stages only with explicit env; macOS via matching-arch Darwin/GHA matrix |
 | Desktop deploy to production hosts | **PENDING** | Only web `deploy.sh` → `out/` for the SPA site |
 | Dedicated Product / Communities / Organizations / Trust routes | **PENDING** | Contracted in `PUBLIC_COMPANY_SITE.md`; Home has pillars + audience entries only |
 | Contact / legal pages | **PENDING** | Gated — no fake legal copy |
@@ -55,7 +55,7 @@ Companions:
 | Landing route + hero / CTA / structure | **DONE** |
 | Home pillars Rooms / Messages / Calls / Continuity | **DONE** (Continuity replaces premature desktop product card) |
 | Audience proof paths on Home (incl. Gaming & Organizations) | **DONE** (entries only; dedicated routes gated) |
-| Desktop-download CTAs claiming shippable installers | **PARTIAL** — Home may link `/download/` for unsigned FreeBSD/OpenBSD only; no signed multi-platform ship claim |
+| Desktop-download CTAs claiming shippable installers | **PARTIAL** — Home may link `/download/` for unsigned native packages; no signed multi-platform ship claim |
 | About / product explanation pages | **PARTIAL** — `/about/` exists; Product/Communities/Organizations/Trust pages gated |
 | Contact / legal | **PENDING** — do not invent copy |
 
@@ -148,7 +148,7 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 | Code signing (macOS / Windows / Linux policies) | **PENDING** |
 | Auto-updater channel | **PENDING** |
 | Public download pages + checksums | **PARTIAL** — `/download` + `/downloads/v0.1.3/` staging; fail-closed publish mode |
-| Production desktop deploy | **PENDING** (web deploy may stage BSD artifacts only via `ONYX_STAGE_BSD_DOWNLOADS=1`) |
+| Production desktop deploy | **PENDING** (web deploy may stage public lanes via `ONYX_STAGE_RELEASE_DOWNLOADS=1`) |
 | Release checklist / human gate | **PENDING** |
 
 ---
@@ -164,7 +164,7 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 | Organizations proof page (same client; no SSO theatre) | **PENDING** |
 | Trust page (protection honesty + status + ownership) | **PENDING** |
 | Technology / Onyx Server page | **PENDING** (About/roadmap partial today) |
-| Download page (browser/PWA now; FreeBSD/OpenBSD unsigned hosts) | **PARTIAL** — `/download/` ships BSD-only truthful surface; signed multi-platform still pending |
+| Download page (browser/PWA now; six unsigned native lanes) | **PARTIAL** — `/download/` ships win/linux/macos Intel+Apple Silicon/fbsd/obsd truthful surface; signed multi-platform still pending |
 | Short contact + real legal | **PENDING** |
 
 ---
@@ -198,6 +198,6 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 2. Continue commercial total UI redesign **after** nav/calls foundation: Home surface → conversation → composer → profile/You settings (still without touching protocol/store/media/E2EE kernel).
 3. Install WebKitGTK 6 for Linux GUI link; re-run `zig build -Dplatform=linux` with the Zig 0.17 pin until green.
 4. Prove `zig build package` on a packageable platform with versioned output under `zig-out/package/onyx-0.1.3-…`.
-5. Keep `/download/` claim level exact: unsigned FreeBSD/OpenBSD + install.sh only; stage artifacts with `pnpm desktop:stage-bsd-downloads:publish` when publishing.
-6. Design signing + updater for multi-platform only with evidence; never claim virus-free/codesign for BSD tarballs.
+5. Keep `/download/` claim level exact: unsigned Windows zip + Linux/FreeBSD/OpenBSD tar.gz + macOS Intel and Apple Silicon DMGs (matching-arch Darwin-built only, never fabricated on Linux); stage with `pnpm desktop:stage-release-downloads:publish` when publishing (requires all six lanes).
+6. Design signing + updater for multi-platform only with evidence; never claim virus-free/codesign for unsigned packages.
 7. Add remaining company-site routes only with real content (Phase 7) — never empty legal.

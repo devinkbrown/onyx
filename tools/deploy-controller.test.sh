@@ -264,7 +264,7 @@ assert_eq "backup hardlink snapshot exists" "old-content" \
 
 mkdir -p "${TMP}/verify/app"
 cat >"${TMP}/verify/index.html" <<'HTML'
-<title>Onyx — talk, stream, and stay with your people</title>
+<title>Onyx — a room for your people</title>
 HTML
 echo "app" >"${TMP}/verify/app/index.html"
 echo "const CACHE_NAME = 'onyx-shell-vtest';" >"${TMP}/verify/sw.js"
@@ -331,7 +331,7 @@ echo "-- forced verify fail path (ONYX_DEPLOY_FORCE_VERIFY_FAIL)"
 # Staged tree that WOULD pass verify if not forced
 mkdir -p "${TMP}/staged-good/app" "${TMP}/live3/out/app"
 cat >"${TMP}/staged-good/index.html" <<'HTML'
-<title>Onyx — talk, stream, and stay with your people</title>
+<title>Onyx — a room for your people</title>
 HTML
 echo "app-new" >"${TMP}/staged-good/app/index.html"
 echo "const CACHE_NAME = 'onyx-shell-forcev';" >"${TMP}/staged-good/sw.js"
@@ -372,7 +372,7 @@ echo "old-compat-app" >"${TMP}/live-compat/out/app/index.html"
 echo "const CACHE_NAME = 'onyx-shell-oldcompat';" >"${TMP}/live-compat/out/sw.js"
 
 cat >"${TMP}/staged-compat/index.html" <<'HTML'
-<title>Onyx — talk, stream, and stay with your people</title>
+<title>Onyx — a room for your people</title>
 HTML
 echo "app-compat-new" >"${TMP}/staged-compat/app/index.html"
 echo "const CACHE_NAME = 'onyx-shell-compat-v';" >"${TMP}/staged-compat/sw.js"
@@ -413,7 +413,7 @@ echo "const CACHE_NAME = 'onyx-shell-preroll';" >"${TMP}/live-roll-assets/out/sw
 echo "pre-roll-stale" >"${TMP}/live-roll-assets/out/will-change.html"
 
 cat >"${TMP}/staged-roll-assets/index.html" <<'HTML'
-<title>Onyx — talk, stream, and stay with your people</title>
+<title>Onyx — a room for your people</title>
 HTML
 echo "post-roll-app" >"${TMP}/staged-roll-assets/app/index.html"
 echo "const CACHE_NAME = 'onyx-shell-postroll';" >"${TMP}/staged-roll-assets/sw.js"

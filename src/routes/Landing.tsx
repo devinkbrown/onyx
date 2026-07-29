@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
+import './home.css';
 import { createMemo, createResource, createSignal, onCleanup, Show } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { fetchStatsIndex } from '@/lib/stats/networkIndex';
@@ -10,20 +11,18 @@ import {
   publicMeshFeedState,
 } from '@/lib/stats/status';
 import { setPageMeta } from './pageMeta';
-import { PublicFooter } from './PublicFooter';
 
 /**
- * Onyx public homepage — Deep Current living-room / studio front door.
+ * Onyx public homepage — mineral-night front door with a live-room aperture.
  * Contract: docs/PUBLIC_COMPANY_SITE.md
- * Proof order: browser entry → Rooms/Messages/Calls/Continuity → live
- * telemetry → audience paths → Trust/Technology evidence.
- * Open Onyx is the only primary CTA. FreeBSD/OpenBSD unsigned hosts are a
- * secondary operator path at /download/ — not a signed multi-platform ship claim.
+ * Proof order: browser entry → aperture preview → compact telemetry →
+ * capability current → operator shelf. One primary Open Onyx CTA.
+ * Native artifacts remain a secondary, platform-neutral link at /download/.
  */
 export default function Landing() {
   setPageMeta(
-    'Onyx — talk, stream, and stay with your people',
-    'Onyx is a public communication service for communities, creators, gaming crews, organizations, and power users. Open in the browser now; install as a PWA from a supporting browser. FreeBSD and OpenBSD operators can fetch unsigned native hosts with install.sh from /download/. Signed multi-platform installers remain pending. Powered by Onyx Server.',
+    'Onyx — a room for your people',
+    'Open Onyx in your browser for rooms, messages, calls, and continuity on your device. Use the same client across desktop and mobile, or choose a native download.',
     '/',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
@@ -35,6 +34,7 @@ export default function Landing() {
     void refetchStatus();
   }, 30_000);
   onCleanup(() => clearInterval(refreshTimer));
+
   const busiest = createMemo(() =>
     [...(stats.latest?.channels ?? [])].sort((a, b) => b.messages - a.messages)[0] ?? null,
   );
@@ -51,40 +51,19 @@ export default function Landing() {
   });
 
   return (
-    <main class="r r-landing">
-      {/* ── mineral atmosphere: depth · glass tide · soft signal ── */}
-      <div class="r-ground" aria-hidden="true" />
-      <div class="r-flecks" aria-hidden="true" />
-      <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
-        <path class="flow" d="M-40 120 C 280 60, 420 280, 720 220 S 1180 120, 1500 240" />
-        <path class="flow" d="M-40 540 C 320 640, 560 420, 860 520 S 1240 660, 1520 560" />
-        <path d="M-40 760 C 360 700, 700 860, 1040 760 S 1320 700, 1520 800" />
-        <circle class="node" cx="720" cy="220" r="3" />
-        <circle class="node" cx="860" cy="520" r="3" />
-        <circle class="node" cx="1040" cy="760" r="2.5" />
-      </svg>
-      <div class="r-grain" aria-hidden="true" />
+    <main class="r r-landing home">
+      {/* Thin mineral atmosphere — motion stacks gated in home.css reduced-motion */}
+      <div class="r-ground home-ground" aria-hidden="true" />
+      <div class="r-grain home-grain" aria-hidden="true" />
 
-      {/* ── top bar ── */}
-      <header class="r-status" role="banner">
+      <header class="r-status home-header" role="banner">
         <a class="brand" href="/" aria-label="Onyx home">
-          {/* Decorative mark: parent link owns the concise accessible name so
-              embedded mascot <style> CSS never pollutes the role name. */}
           <span class="brand-mark" aria-hidden="true">
             <Mascot variant="mark" />
           </span>
           <span class="brand-wordmark" aria-hidden="true">ONYX</span>
         </a>
         <nav aria-label="Primary">
-          <a class="hideable" href="#product">Product</a>
-          <a class="hideable" href="#live">Live</a>
-          <a class="hideable" href="#audience">Audiences</a>
-          <a class="hideable" href="#start">Start</a>
-          <a class="hideable" href="/stats/">Stats</a>
-          <a class="hideable" href="/status/">Status</a>
-          <a class="hideable" href="/roadmap/">Roadmap</a>
-          <a class="hideable" href="/about/">About</a>
-          <a class="hideable" href="/invite/?join=%23root">Invite</a>
           <span class="live hideable" data-feed-state={feedState()}>
             <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
           </span>
@@ -92,343 +71,222 @@ export default function Landing() {
         </nav>
       </header>
 
-      {/* ── 1. immediate browser entry ── */}
-      <section class="r-wrap r-hero" aria-labelledby="hero-heading">
-        <div class="r-hero-grid">
-          <div class="r-hero-copy">
-            <p class="r-kicker">public communication · powered by Onyx Server</p>
-            <h1 id="hero-heading">
-              Your rooms.
-              <br />
-              <span class="gold">Your people.</span>
-              <br />
-              Right here.
-            </h1>
-            <p class="serif-sub">
-              Onyx is a public place to talk, gather, and stream together —
-              one product for communities, gaming crews, creators, organizations,
-              friends, and power users.
+      <section class="r-wrap home-hero" aria-labelledby="hero-heading">
+        <div class="home-hero-grid">
+          <div class="home-hero-copy">
+            <p class="home-kicker">Public communication · powered by Onyx Server</p>
+            <h1 id="hero-heading" class="home-h1">A room for your people.</h1>
+            <p class="home-lede">
+              Talk, call, and keep continuity on your device — open in the browser now.
             </p>
-            <p class="sub">
-              Open text rooms and private messages, hop into voice and video,
-              share a screen for a stage or a stream, keep continuity on your device,
-              carry a name that stays yours, and see the protection state of every call —
-              never guessed, never overstated.
-            </p>
-            <div class="r-cta">
-              <a class="r-btn primary" href="/app/">Open Onyx &rarr;</a>
-              <a class="r-btn ghost" href="#product">See what you get</a>
-              <a class="r-btn ghost" href="/download/">BSD downloads</a>
+            <div class="home-cta-row">
+              <a class="r-btn primary home-cta-primary" href="/app/">Open Onyx</a>
+              <a class="home-secondary-link" href="/download/">
+                Desktop downloads
+              </a>
             </div>
-            <p class="r-desktop-note">
-              <strong>Browser now.</strong> The full client opens in your browser —
-              no install required. On a supporting browser you can also install Onyx as a
-              PWA. FreeBSD and OpenBSD operators can download
-              {' '}
-              <a href="/download/">unsigned v0.1.3 native host tarballs</a>
-              {' '}
-              with
-              {' '}
-              <code>install.sh</code>
-              {' '}
-              (GTK4 + WebKitGTK runtime; site-local checksums; not signed; GUI not claimed from the Linux build host).
-              Signed Windows/macOS/Linux installers, notarization, and auto-update remain pending.
+            <p class="home-desktop-note">
+              No install is required to begin. Use the same client on desktop or mobile;
+              supporting browsers can also install Onyx as a PWA.
             </p>
-            <div class="r-ticker" aria-label="Product highlights">
-              <span><b>rooms</b> · spaces that stay open</span>
-              <span><b>messages</b> · DMs without a second app</span>
-              <span><b>calls</b> · voice · video · screen</span>
-              <span><b>continuity</b> · resume · local history</span>
-            </div>
           </div>
 
-          {/* Signature: honest product tableau — labeled preview, not live content */}
-          <aside class="r-tableau" aria-labelledby="tableau-label">
-            <p class="r-tableau-label" id="tableau-label">
-              <span class="r-tableau-badge">Product preview</span>
-              Not live content — a picture of the room you open.
+          <aside
+            class="home-aperture"
+            data-home-aperture
+            aria-labelledby="aperture-label"
+          >
+            <p class="home-aperture-label" id="aperture-label">
+              <span class="home-aperture-badge">Preview</span>
+              Not live content — a quiet picture of the room you open.
             </p>
-            <div class="r-tableau-shell" role="img" aria-label="Preview of an Onyx room with chat, a stream stage, and visible connection and protection receipts">
-              <div class="r-tableau-chrome">
-                <span class="r-tableau-dots" aria-hidden="true"><i /><i /><i /></span>
-                <span class="r-tableau-title">#creator-night · studio floor</span>
-                <span class="r-tableau-chip r-tableau-chip--link">Connected</span>
+            <div
+              class="home-aperture-shell"
+              role="img"
+              aria-label="Preview of an Onyx room with a call stage, chat, local continuity, and protection state — not live content"
+            >
+              <div class="home-aperture-chrome">
+                <span class="home-aperture-dots" aria-hidden="true"><i /><i /><i /></span>
+                <span class="home-aperture-title">#root · living room</span>
+                <span class="home-aperture-chip">Preview</span>
               </div>
-              <div class="r-tableau-body">
-                <div class="r-tableau-stage">
-                  <div class="r-tableau-stage-glow" aria-hidden="true" />
-                  <div class="r-tableau-stage-meta">
-                    <span class="r-tableau-live">Stage</span>
-                    <span>Screen share · preview</span>
+
+              <div class="home-aperture-body">
+                {/* Miniature room rail — product silhouette, not a live list */}
+                <div class="home-aperture-rail" aria-hidden="true">
+                  <span class="home-aperture-rail-k">Rooms</span>
+                  <span class="home-aperture-rail-item is-active">
+                    <i class="mark mark-msg" />#root
+                  </span>
+                  <span class="home-aperture-rail-item">
+                    <i class="mark mark-call" />#stage
+                  </span>
+                  <span class="home-aperture-rail-item mute">
+                    <i class="mark mark-cont" />#ops
+                  </span>
+                </div>
+
+                <div class="home-aperture-main">
+                  <div class="home-aperture-stage">
+                    <div class="home-aperture-stage-meta">
+                      <span class="mark mark-call" aria-hidden="true" />
+                      <span>Call · share</span>
+                    </div>
+                    <div class="home-aperture-tiles" aria-hidden="true">
+                      <span class="home-aperture-tile is-you">you</span>
+                      <span class="home-aperture-tile">mira</span>
+                      <span class="home-aperture-tile is-idle">+</span>
+                    </div>
+                    <p class="home-aperture-stage-title">Voice when you need it</p>
+                    <p class="home-aperture-stage-sub">Camera optional · share when ready</p>
+                    <span class="home-aperture-protect">
+                      <span class="mark mark-protect" aria-hidden="true" />
+                      Protection shown, not assumed
+                    </span>
                   </div>
-                  <p class="r-tableau-stage-title">Tonight&apos;s stream board</p>
-                  <p class="r-tableau-stage-sub">Voice on · camera optional · share when you are ready</p>
-                  <div class="r-tableau-receipts">
-                    <span class="r-receipt r-receipt--ok">Connection · live</span>
-                    <span class="r-receipt r-receipt--cyan">Media · protected in transit</span>
-                    <span class="r-receipt r-receipt--coral">Protection state · shown, not assumed</span>
+
+                  <div class="home-aperture-chat">
+                    <div class="home-aperture-line">
+                      <span class="who">mira</span>
+                      <span class="msg">Room is open — drop a message when you land.</span>
+                    </div>
+                    <div class="home-aperture-line">
+                      <span class="who mute">you</span>
+                      <span class="msg">History stays on this device.</span>
+                    </div>
+                    <div class="home-aperture-continuity" aria-hidden="true">
+                      <span class="mark mark-cont" />
+                      <span>Local continuity · resume when you return</span>
+                    </div>
+                    <div class="home-aperture-composer" aria-hidden="true">
+                      <span>Message #root</span>
+                      <span class="send">Send</span>
+                    </div>
                   </div>
                 </div>
-                <div class="r-tableau-chat">
-                  <div class="r-tableau-line">
-                    <span class="who coral">mira</span>
-                    <span class="msg">Dropping into voice — screen is up when you are.</span>
-                  </div>
-                  <div class="r-tableau-line">
-                    <span class="who cyan">devon</span>
-                    <span class="msg">History is local on my machine; session picks up where I left off.</span>
-                  </div>
-                  <div class="r-tableau-line">
-                    <span class="who pearl">you</span>
-                    <span class="msg">Open Onyx, say hi, join the stage.</span>
-                  </div>
-                  <div class="r-tableau-composer" aria-hidden="true">
-                    <span>Message #creator-night</span>
-                    <span class="send">Send</span>
-                  </div>
-                </div>
               </div>
-            </div>
-            <div class="r-tableau-mascot" aria-hidden="true">
-              <Mascot variant="mark" />
+
+              {/* Category-spectrum current under the miniature */}
+              <div class="home-aperture-spectrum" aria-hidden="true">
+                <span class="home-spectrum-seg is-msg">message</span>
+                <span class="home-spectrum-seg is-call">call</span>
+                <span class="home-spectrum-seg is-cont">continuity</span>
+                <span class="home-spectrum-seg is-protect">protection</span>
+              </div>
             </div>
           </aside>
         </div>
       </section>
 
-      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
-
-      {/* ── 2. real product pillars: Rooms / Messages / Calls / Continuity ── */}
-      <section id="product" class="r-wrap r-section r-product" aria-labelledby="product-heading">
-        <span class="r-eyebrow">what you open</span>
-        <h2 class="r-title" id="product-heading">Rooms. Messages.<br />Calls. Continuity.</h2>
-        <p class="r-lede">
-          Four pillars, one client. Everything below is language for people, not protocol names.
-          The same surface serves a quiet friend chat, a gaming crew, a community stage, or a working group.
-        </p>
-        <div class="r-board">
-          <article class="r-card">
-            <span class="k">rooms</span>
-            <h3>Text rooms that stay open</h3>
-            <p>Shared spaces for communities and crews. Topics, presence, and conversation that wait for you between visits.</p>
-          </article>
-          <article class="r-card">
-            <span class="k">messages</span>
-            <h3>Direct messages</h3>
-            <p>Side conversations without a second app. Same account, same people, quieter corner.</p>
-          </article>
-          <article class="r-card">
-            <span class="k">calls</span>
-            <h3>Voice, video, and screen</h3>
-            <p>Talk face to face when typing is not enough — hangouts, co-working, after-stream debriefs, or a shared stage.</p>
-          </article>
-          <article class="r-card">
-            <span class="k">continuity</span>
-            <h3>Continuity on your device</h3>
-            <p>
-              Session resume when you reconnect, local history in a device-side vault,
-              and on-device import so conversation memory stays with you — not rented as a cloud feed.
-            </p>
-          </article>
-          <article class="r-card">
-            <span class="k">identity</span>
-            <h3>A name that travels</h3>
-            <p>Register once and carry the same identity across doors. Portable by design — not locked to one browser tab.</p>
-          </article>
-          <article class="r-card">
-            <span class="k">protection</span>
-            <h3>Visible protection state</h3>
-            <p>Calls show how media is protected. Onyx never paints a lock that overstates what is actually on the path.</p>
-          </article>
-        </div>
-      </section>
-
-      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
-
-      {/* ── 3. live telemetry ── */}
-      <section id="live" class="r-wrap r-section r-live" aria-labelledby="live-heading">
-        <div class="r-live-head">
-          <div>
-            <span class="r-eyebrow">live network</span>
-            <h2 class="r-title" id="live-heading">Public telemetry,<br />not a marketing number</h2>
-          </div>
-          <a class="r-live-link" href="/status/">Open status</a>
-        </div>
-        <p class="r-lede">
-          Real public feeds power this page. When a feed is still loading, stale, or incomplete,
-          Onyx says so — no invented online counts, no fake “everyone is here” banners.
-        </p>
-        <div class="r-live-grid" aria-label="Live network summary">
-          <article class="r-live-tile">
+      <section
+        class="r-wrap home-telemetry"
+        aria-label="Public network telemetry"
+      >
+        <div class="home-telemetry-strip" data-feed-state={feedState()}>
+          <span class="home-telemetry-item">
             <span class="k">network</span>
             <strong data-state={meshState()}>{meshState()}</strong>
-            <p>
-              <Show when={status.latest} fallback="waiting for the public status feed">
-                {(s) => !s().peers_complete
-                  ? 'peer feed incomplete'
-                  : s().mesh.partitioned
-                  ? `${s().mesh.components} visible network components`
-                  : `${s().peers.filter((p) => p.up).length}/${s().peers.length} peer links up`}
-              </Show>
-            </p>
-          </article>
-          <article class="r-live-tile">
+          </span>
+          <span class="home-telemetry-sep" aria-hidden="true">·</span>
+          <span class="home-telemetry-item">
             <span class="k">people</span>
             <strong>
               <Show when={stats.latest} fallback="--">
                 {(data) => data().users_online.toLocaleString('en-US')}
               </Show>
             </strong>
-            <p>online from the public stats feed</p>
-          </article>
-          <article class="r-live-tile">
+            <span class="hint">
+              <Show when={stats.latest} fallback="waiting for stats">
+                online
+              </Show>
+            </span>
+          </span>
+          <span class="home-telemetry-sep" aria-hidden="true">·</span>
+          <span class="home-telemetry-item">
             <span class="k">rooms</span>
             <strong>
               <Show when={stats.latest} fallback="--">
                 {(data) => data().channels.length.toLocaleString('en-US')}
               </Show>
             </strong>
-            <p>{stats.latest?.channels_complete ? 'tracked in the public index' : 'partial public index'}</p>
-          </article>
-          <article class="r-live-tile">
-            <span class="k">busiest</span>
+            <span class="hint">
+              {stats.latest
+                ? (stats.latest.channels_complete ? 'tracked' : 'partial')
+                : 'waiting'}
+            </span>
+          </span>
+          <span class="home-telemetry-sep" aria-hidden="true">·</span>
+          <span class="home-telemetry-item">
+            <span class="k">busy</span>
             <strong>
-              <Show when={busiest()} fallback="#root">
+              <Show when={busiest()} fallback="--">
                 {(room) => room().channel}
               </Show>
             </strong>
-            <p>
-              <Show when={status.latest} fallback="updated by the stats cadence">
-                {(s) => `${s().node || s().network || 'node'} up ${formatDuration(s().uptime_seconds)}`}
+            <span class="hint">
+              <Show when={status.latest} fallback="no status yet">
+                {(s) => `up ${formatDuration(s().uptime_seconds)}`}
               </Show>
-            </p>
-          </article>
-        </div>
-        <div class="r-cta">
-          <a class="r-btn ghost" href="/stats/">Open channel stats &rarr;</a>
+            </span>
+          </span>
+          <a class="home-telemetry-link" href="/status/">Status</a>
         </div>
       </section>
 
-      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
+      <section class="r-wrap home-capability" aria-labelledby="capability-heading">
+        <h2 id="capability-heading" class="home-visually-hidden">What you get</h2>
+        <ul class="home-current" data-home-current>
+          <li class="home-current-beat is-msg">
+            <span class="mark mark-msg" aria-hidden="true" />
+            <span>Text rooms and direct messages</span>
+          </li>
+          <li class="home-current-beat is-call">
+            <span class="mark mark-call" aria-hidden="true" />
+            <span>Voice and video when you need them</span>
+          </li>
+          <li class="home-current-beat is-cont">
+            <span class="mark mark-cont" aria-hidden="true" />
+            <span>Session resume and local history that stay with you</span>
+          </li>
+          <li class="home-current-beat is-protect">
+            <span class="mark mark-protect" aria-hidden="true" />
+            <span>Calls show how media is protected — never guessed.</span>
+          </li>
+        </ul>
+      </section>
 
-      {/* ── 4. audience proof paths (same client, no sector skins) ── */}
-      <section id="audience" class="r-wrap r-section r-audience" aria-labelledby="audience-heading">
-        <span class="r-eyebrow">who it is for</span>
-        <h2 class="r-title" id="audience-heading">One product.<br />Many proof paths.</h2>
-        <p class="r-lede">
-          Same Deep Current client for everyone — no gaming skin, no enterprise skin.
-          Each path leads with the proofs that audience actually needs.
+      <nav
+        id="operators"
+        class="r-wrap home-shelf"
+        data-home-shelf
+        aria-label="Operators and power users"
+      >
+        <p class="home-shelf-label">Operators and power users</p>
+        <ul class="home-shelf-list">
+          <li><a href="/status/">Status</a></li>
+          <li><a href="/stats/">Stats</a></li>
+          <li><a href="/roadmap/">Roadmap</a></li>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/download/">Download</a></li>
+          <li><a href="/invite/?join=%23root">Invite</a></li>
+        </ul>
+      </nav>
+
+      <footer class="r-wrap home-footer">
+        <div class="home-footer-brand">
+          <span aria-hidden="true"><Mascot variant="mark" /></span>
+          <span>Onyx</span>
+        </div>
+        <p class="home-footer-lede">
+          Open rooms, local continuity, and security state that says what is true.
         </p>
-        <div class="r-stats">
-          <div class="r-stat">
-            <span class="n">General public</span>
-            <span class="l">Open in the browser, join a room, say hello — no install wall.</span>
-          </div>
-          <div class="r-stat">
-            <span class="n">Gaming &amp; creators</span>
-            <span class="l">Persistent rooms, live calls, voice and video, screen stages, receipts you can see.</span>
-          </div>
-          <div class="r-stat">
-            <span class="n">Communities</span>
-            <span class="l">Rooms that stay open for the people who keep showing up — invites included.</span>
-          </div>
-          <div class="r-stat">
-            <span class="n">Organizations</span>
-            <span class="l">The same rooms, messages, and calls for working groups — honest state, no pretend admin suite.</span>
-          </div>
-          <div class="r-stat">
-            <span class="n">Developers</span>
-            <span class="l">Open wire under the glass — IRCv3 and IRCX over WebSocket, powered by Onyx Server.</span>
-          </div>
-          <div class="r-stat">
-            <span class="n">Press &amp; procurement</span>
-            <span class="l">Live status, a claim ledger on the roadmap, and protection language that refuses to invent compliance.</span>
-          </div>
-          <div class="r-stat">
-            <span class="n">Power users</span>
-            <span class="l">Continuity, local history, on-device import, and a name you control — not a black box.</span>
-          </div>
-        </div>
-      </section>
-
-      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
-
-      {/* ── start ── */}
-      <section id="start" class="r-wrap r-section r-join" aria-labelledby="start-heading">
-        <span class="r-eyebrow">start here</span>
-        <h2 class="r-title" id="start-heading">Open Onyx.<br />Say hello.</h2>
-        <div class="grid2">
-          <ol class="r-steps">
-            <li>
-              <span class="idx">01</span>
-              <div><b>Open Onyx in the browser.</b> No install required to begin.</div>
-            </li>
-            <li>
-              <span class="idx">02</span>
-              <div><b>Pick a name.</b> Drop in as a guest or register so the identity stays yours.</div>
-            </li>
-            <li>
-              <span class="idx">03</span>
-              <div><b>Join a room or a call.</b> Text, DM, voice, video, or screen share — with protection state visible.</div>
-            </li>
-          </ol>
-          <div class="term" aria-hidden="true">
-            <div class="bar">
-              <span class="lights"><i /><i /><i /></span>
-              <span>onyx — first open</span>
-            </div>
-            <div class="body">
-              <div><span class="o">welcome —</span> <span class="c">finding a quiet door …</span></div>
-              <div><span class="o">you joined</span> <span class="h">#root</span></div>
-              <div><span class="o">&lt;you&gt;</span> <span class="c">hello from the living room</span></div>
-              <div><span class="o">receipt</span> <span class="p">connection live · protection shown</span> <span class="cursor">0</span></div>
-            </div>
-          </div>
-        </div>
-        <div class="r-cta">
-          <a class="r-btn primary" href="/app/">Open Onyx &rarr;</a>
-          <a class="r-btn ghost" href="/invite/?join=%23root">Invite someone</a>
-          <a class="r-btn ghost" href="/about/">How it works</a>
-        </div>
-      </section>
-
-      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
-
-      {/* ── 5. Trust / Technology evidence (protocol language allowed here) ── */}
-      <section id="proof" class="r-wrap r-section r-built" aria-labelledby="proof-heading">
-        <span class="r-eyebrow">trust &amp; technology</span>
-        <h2 class="r-title" id="proof-heading">Quietly serious<br />under the glass</h2>
-        <p class="r-lede">
-          You do not need this section to use Onyx. It is here so claims stay accountable.
-          Powered by Onyx Server — the engine behind the public service.
-          Dedicated Trust, Technology, and legal pages stay gated until they carry real content. FreeBSD/OpenBSD unsigned hosts live at /download/.
-        </p>
-        <div class="r-strip">
-          <div class="r-spec">
-            <span class="t">open wire</span>
-            <p>IRCv3 + IRCX over WebSocket. Onyx is one client door; other clients can speak the same network language.</p>
-          </div>
-          <div class="r-spec">
-            <span class="t">honest media state</span>
-            <p>Voice, video, and screen share show hop protection vs stronger media encryption when it applies. No decorative padlock for weaker paths.</p>
-          </div>
-          <div class="r-spec">
-            <span class="t">local-first memory</span>
-            <p>Device-side history vault with bounded retention — conversation memory is not rented back to you as a cloud feed.</p>
-          </div>
-          <div class="r-spec">
-            <span class="t">self-selecting nodes</span>
-            <p>The client prefers a responsive public node; when one is quiet, another can take the load without you hand-picking a server.</p>
-          </div>
-        </div>
-        <div class="r-cta">
-          <a class="r-btn ghost" href="/status/">Public status &rarr;</a>
-          <a class="r-btn ghost" href="/roadmap/">Read the roadmap &rarr;</a>
-          <a class="r-btn ghost" href="/about/">Full technical about &rarr;</a>
-        </div>
-      </section>
-
-      <PublicFooter />
+        <nav aria-label="Standards and product information">
+          <a href="/accessibility/">Accessibility</a>
+          <a href="/glossary/">Glossary</a>
+          <a href="/about/">About</a>
+        </nav>
+        <small class="home-footer-credit">Powered by Onyx Server · 2026</small>
+      </footer>
     </main>
   );
 }

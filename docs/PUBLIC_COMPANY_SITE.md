@@ -2,7 +2,7 @@
 
 **Status:** living contract for public marketing truth.
 **Companion claim ledger:** [`PUBLIC_LAUNCH_ROADMAP.md`](./PUBLIC_LAUNCH_ROADMAP.md).
-**Homepage implementation:** `src/routes/Landing.tsx` (+ `landing.css`, `Landing.test.tsx`).
+**Homepage implementation:** `src/routes/Landing.tsx` (+ shared `landing.css`, Home-only `home.css`, `Landing.test.tsx`).
 
 This document freezes the **accepted Grok/Codex positioning decisions** so Landing,
 future Product/Communities/Organizations/Trust/Technology pages, and release copy
@@ -38,13 +38,16 @@ not shipped until real content and gates exist):
 | **Organizations** | Org / team proof path (not “enterprise SSO pack”) | **Gated** — audience entry on Home only |
 | **Trust** | Protection honesty, public status, ownership | **PARTIAL** — Home proof strip + `/status/`; full Trust page gated |
 | **Technology / Onyx Server** | Protocol, engine, self-host posture | **PARTIAL** — Home technical proof + `/about/`, `/roadmap/` |
-| **Download** `/download/` | Browser/PWA first; FreeBSD/OpenBSD unsigned hosts only | **PARTIAL** — BSD operator tarballs + checksums; not signed multi-platform |
+| **Download** `/download/` | Browser/PWA first; unsigned Win/Linux/macOS/FreeBSD/OpenBSD | **PARTIAL** — operator zip/tar.gz/DMG + checksums; not signed; macOS Darwin-built only |
 | **Status** `/status/` | Live public mesh/status honesty | **Ships** (existing) |
 | **About / contact / legal** | Short about; contact; privacy/terms | **PARTIAL** — `/about/` exists; contact/legal copy **gated** (no fake legal) |
 
 Do **not** invent `/enterprise`, `/gaming`, pricing, compliance badges,
 partner logos, or legal pages in marketing copy until those surfaces exist with
-evidence. `/download/` may only claim the verified FreeBSD/OpenBSD unsigned lane.
+evidence. `/download/` may only claim the verified unsigned lanes (Windows zip,
+Linux tar.gz, separate macOS Intel and Apple Silicon unsigned DMGs from genuine Darwin, FreeBSD/OpenBSD
+install.sh hosts) and must never fabricate a macOS artifact on Linux
+on the Linux release host.
 
 Existing supporting routes that remain valid links: `/stats/`, `/roadmap/`,
 `/invite/`, `/app/`, `/download/`.
@@ -69,29 +72,45 @@ Every audience uses the **same** product. Paths differ only in **which proofs le
 
 ## Home proof order (required)
 
-Home sections must teach in this order of **argument**, even if visual layout
-adjusts for rhythm:
+Home is a **quiet threshold**, not an infomercial. Sections on `/` teach in this
+order of **argument** (layout may tighten for rhythm, but not reorder the story):
 
-1. **Immediate browser entry** — Open Onyx primary; no install required to begin.
-2. **Real product pillars** — Rooms, Messages, Calls, Continuity (only claims grounded in client behavior).
-3. **Live telemetry** — public stats/status feeds; fail-honest when stale/incomplete.
-4. **Audience paths** — general + gaming/creators + communities + organizations + power users (+ developers / press pointers without fake pages).
-5. **Trust / Technology evidence** — protection shown-not-assumed; Onyx Server / open wire / local-first memory.
+1. **Immediate browser entry** — one primary **Open Onyx** → `/app/`; optional
+   platform-neutral secondary text link to `/download/`. Exact platform
+   availability, signing state, and package requirements belong on Download.
+2. **Live-room aperture** — one honest **static** product preview, labeled
+   preview / not live content (not a laptop mockup; not live nicknames or metrics).
+3. **Compact live telemetry** — one strip from public stats/status feeds;
+   fail-honest when loading, stale, incomplete, or time-skewed (no invented counts).
+4. **One plain-language capability passage** — rooms, messages, calls/voice-video,
+   continuity (resume + local history), protection shown-not-assumed — **prose only**,
+   not a multi-card feature board.
+5. **Operator / power-user link shelf** — text links to Status, Stats, Roadmap,
+   About, Download, Invite (and existing footer). No second primary CTA.
 
-### Product pillars (Home language)
+**Removed from Home (do not reintroduce):** audience taxonomy grids, six-card
+product boards, numbered how-to steps, faux terminals, protocol essays
+(IRCv3 / IRCX / WebSocket marketing on body copy), repeated Open Onyx loops,
+gold/Anton display shout, multi-primary hero CTAs.
+
+Audience paths, pillar depth, and Trust/Technology essays remain valid **product
+truth** for secondary routes and future gated pages — they are **not** required
+sections on `/`.
+
+### Product pillars (language allowed on Home as prose)
 
 | Pillar | Public language | Grounding (conservative) |
 |--------|-----------------|---------------------------|
 | **Rooms** | Text rooms that stay open | Channels, presence, topics |
 | **Messages** | Direct messages | Same account, side conversations |
-| **Calls** | Voice, video, screen for hangouts and stages | Cadence media; join is explicit; protection state visible |
-| **Continuity** | Session resume, local history, on-device import/export | `SESSION RESUME`, device vault, vault import/export — **not** cloud landlord history |
+| **Calls** | Voice, video, screen when you need them | Cadence media; join is explicit; protection state visible |
+| **Continuity** | Session resume, local history on device | `SESSION RESUME`, device vault, vault import/export — **not** cloud landlord history |
 
-Supporting proof (not a fifth pillar competing with Continuity): portable identity,
+Supporting proof (may appear as one ordinary sentence, not a fifth pillar card):
 visible protection state. **Desktop installers are not a product pillar** until
 Phase 6 packaging gates are green.
 
-### Gaming proof order (when Gaming is the lens)
+### Gaming proof order (secondary surfaces / when Gaming is the lens)
 
 1. Persistent rooms
 2. Live calls
@@ -100,9 +119,9 @@ Phase 6 packaging gates are green.
 5. Visible connection and protection receipts
 6. Continuity back into the same rooms
 
-No competitor-replacement framing.
+No competitor-replacement framing. Not a Home section inventory.
 
-### Organizations proof order (when Organizations is the lens)
+### Organizations proof order (secondary surfaces / when Organizations is the lens)
 
 1. Same client as public (no special “enterprise skin”)
 2. Rooms + messages + calls for working groups
@@ -110,7 +129,7 @@ No competitor-replacement framing.
 4. Honest protection / status language
 5. Technology / Onyx Server for technical evaluators
 
-Procurement materials and legal pages remain **gated**.
+Procurement materials and legal pages remain **gated**. Not a Home section inventory.
 
 ---
 
@@ -121,12 +140,15 @@ Procurement materials and legal pages remain **gated**.
 | Open full product in the browser today | **Yes** |
 | Install-free first run | **Yes** |
 | Downloadable / signed multi-platform installers available now | **No** — signing/updater/notarization still pending (see roadmap Phase 6) |
-| FreeBSD/OpenBSD unsigned native hosts + install.sh | **Yes** on `/download/` and as a secondary Home link — never claim codesign, virus-free, or GUI-verified-from-Linux |
+| Windows/Linux/macOS/FreeBSD/OpenBSD unsigned packages + checksums | **Yes** on `/download/` (zip/tar.gz/DMG; install.sh on BSD); Home stays platform-neutral |
+| macOS DMGs (unsigned/unnotarized Intel + Apple Silicon) | **Yes** when both Darwin-built artifacts are staged; never fabricated on Linux; signing/notarization pending |
+| Signed desktop installers / auto-updater | **No** — signing/updater pending |
 | “Desktop ships with the launch” as an unconditional promise | **No** — phrase only as gated future when ledger is green |
 | Desktop host scaffold / null compile exists | **Internal / roadmap only** for multi-platform ship claims |
 
-Home may say: **Browser now.** FreeBSD/OpenBSD operators may use `/download/` for
-unsigned native hosts. Prefer silence over aspirational signed multi-platform CTAs.
+Home may say: **Browser now across desktop and mobile**, with a neutral link to
+`/download/`. Exact native platform support stays on Download. Prefer silence
+over aspirational signed multi-platform CTAs.
 
 ---
 
@@ -161,4 +183,8 @@ Before flipping any public claim on Home or future marketing routes:
 3. `PUBLIC_LAUNCH_ROADMAP.md` claim ledger updated if the claim is launch-critical.
 4. No new route without real content (no empty shells for legal/download/enterprise).
 
-**This pass (homepage truth repair):** contract document + Landing pillars/audiences/desktop honesty + tests + roadmap alignment. No new routes. No stage/commit/push/deploy implied by this file alone.
+**This pass (quiet-threshold Home):** contract Home proof order + Landing section
+inventory (hero, aperture, telemetry strip, capability prose, operator shelf) +
+`home.css` mineral-night scope + tests. Shared `landing.css` remains for About /
+Download / footer primitives. No new routes. No stage/commit/push/deploy implied
+by this file alone.

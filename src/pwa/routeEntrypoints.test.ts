@@ -42,8 +42,9 @@ const expected = {
     description: 'Open an Onyx invite to join a room as a guest or with your account, carrying its topic, moment, and reading context.',
   },
   download: {
-    title: 'Download Onyx — FreeBSD & OpenBSD native hosts',
-    description: 'Download unsigned Onyx v0.1.3 FreeBSD and OpenBSD native host tarballs with install.sh. Not signed. Browser and PWA remain the primary paths.',
+    title: 'Download Onyx — unsigned native packages',
+    description:
+      'Download unsigned Onyx v0.1.3 Windows zip, Linux/FreeBSD/OpenBSD tar.gz, and separate macOS Intel + Apple Silicon DMG packages with SHA-256 sidecars. Not signed or notarized. Browser and PWA remain the primary paths.',
   },
   accessibility: {
     title: 'Onyx accessibility — access is a requirement',

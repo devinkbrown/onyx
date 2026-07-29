@@ -94,9 +94,11 @@ test('contains enlarged mobile navigation in a safe-area-aware horizontal rail',
     expect(button.scrollHeight).toBeLessThanOrEqual(button.clientHeight);
   }
 
-  const disconnect = page.getByRole('button', { name: 'Disconnect from network' });
-  await disconnect.focus();
-  await expect(disconnect).toBeFocused();
+  // Disconnect intentionally lives in the server rail / account surface, not
+  // the five-destination mobile product nav. Exercise the actual last tab.
+  const lastDestination = page.getByRole('button', { name: 'Open You' });
+  await lastDestination.focus();
+  await expect(lastDestination).toBeFocused();
   const focusedGeometry = await nav.evaluate((element) => {
     const last = element.querySelector<HTMLButtonElement>('button:last-child')!;
     const navRect = element.getBoundingClientRect();

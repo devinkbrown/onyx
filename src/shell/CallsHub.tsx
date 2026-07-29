@@ -172,17 +172,17 @@ export function CallsHub(props: CallsHubProps): JSX.Element {
 
       <div class="shell-calls-proof" aria-label="Call capabilities">
         <article>
-          <span aria-hidden="true">01</span>
+          <span aria-hidden="true">Media</span>
           <h2>Voice and video</h2>
           <p>Join from the room ribbon when your people are ready.</p>
         </article>
         <article>
-          <span aria-hidden="true">02</span>
+          <span aria-hidden="true">Access</span>
           <h2>Live captions</h2>
           <p>Keep the conversation easier to follow in the moment.</p>
         </article>
         <article>
-          <span aria-hidden="true">03</span>
+          <span aria-hidden="true">Status</span>
           <h2>Honest state</h2>
           <p>Onyx shows connection and protection status instead of hiding uncertainty.</p>
         </article>

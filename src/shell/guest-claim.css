@@ -1,4 +1,4 @@
-/* GuestClaimPrompt — compact keep-nick chip + sheet body (dark-luxury). */
+/* GuestClaimPrompt — compact quiet-threshold keep-nick chip + sheet body. */
 
 /* ── Compact chip (never expands into composer column) ───────────────────── */
 
@@ -10,11 +10,9 @@
   justify-content: space-between;
   margin: var(--space-2) var(--space-3) 0;
   padding: 6px 10px;
-  border: 1px solid var(--stone-line);
-  border-radius: var(--r-pill);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--gold-deep) 6%, transparent), transparent),
-    var(--stone);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 62%, var(--stone));
   max-width: min(100%, 36rem);
   flex: none;
 }
@@ -29,7 +27,7 @@
 }
 
 .guest-claim-chip__nick {
-  color: var(--gold-bright);
+  color: var(--lapis);
   font-weight: 700;
 }
 

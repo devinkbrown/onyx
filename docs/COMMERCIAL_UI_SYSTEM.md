@@ -25,9 +25,9 @@ Not: a terminal for operators. Not: a clone of any big chat brand. Not: a featur
 
 **Design signature to keep (identity, not chrome density)**
 
-- Deep Current / ocean OKLCH tokens (`src/styles/tokens.css`)
-- Anton display + Instrument Sans + JetBrains Mono + Fraunces
-- Biolume seams, translucent shell over live canvas
+- Quiet-threshold ocean tokens (`src/styles/tokens.css`) — mineral night + quiet cyan signal
+- Instrument Sans + restrained Fraunces + JetBrains Mono (default cut; no Anton marketing)
+- Matte surfaces, fine borders, quiet cyan signal — no neon/glow spectacle
 - Room-identity accents when present
 - Truthful call and protection state
 - Local-first vault language (“on this device”)
@@ -279,7 +279,7 @@ disconnecting, without blocking the composer, and without false product claims.
 **Copy:** Prefer rooms, messages, on this device, first unread, pick up where you left off.
 **Avoid on primary surface:** device memory, last-read boundary, chanstats heatlines, reviewed spans, Join #root.
 
-**Visual:** Spacious reading flow (Instrument Sans body, Anton display titles, mono for status/time). One sparse cyan current line on Needs you → Continue. Glow only on active/unread/live. Desktop ~1440 and mobile ~390; ≥44px touch; visible focus; `prefers-reduced-motion`.
+**Visual:** Spacious reading flow (Instrument Sans body/titles, restrained Fraunces lede, mono for status/time). One sparse cyan signal line on Needs you → Continue. Matte cards with fine borders; no animated active-nav glow. Desktop ~1440 and mobile ~390; ≥44px touch; visible focus; `prefers-reduced-motion`.
 
 **Strata markers retained:** `data-home-stratum` attention | followed | quiet | resume | memory; plus `data-home-band` needs-you | continue | live-now | explore | caught-up | more-activity.
 

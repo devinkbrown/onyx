@@ -43,7 +43,7 @@ describe('PWA manifest', () => {
 
     expect(publicMetadata).not.toMatch(/IRCXNet/i);
     expect(manifest.description).toContain('Onyx mesh');
-    expect(entryDocument).toContain('<title>Onyx — talk, stream, and stay with your people</title>');
+    expect(entryDocument).toContain('<title>Onyx — a room for your people</title>');
   });
 
   it('states public-service entry truth and rejects premature desktop ship wording', () => {
@@ -55,18 +55,13 @@ describe('PWA manifest', () => {
     const twitterDescription = document.querySelector('meta[name="twitter:description"]')?.getAttribute('content') ?? '';
     const entryMetadata = [title, description, ogDescription, twitterDescription].join('\n');
 
-    expect(title).toBe('Onyx — talk, stream, and stay with your people');
-    expect(description).toMatch(/public communication service/i);
-    expect(description).toMatch(/Open in the browser now/i);
-    expect(description).toMatch(/install as a PWA from a supporting browser/i);
-    expect(description).toMatch(/FreeBSD and OpenBSD operators|unsigned native hosts/i);
-    expect(description).toMatch(/Signed multi-platform installers remain pending/i);
-    expect(ogDescription).toMatch(/Open Onyx in the browser now/i);
-    expect(ogDescription).toMatch(/install as a PWA from a supporting browser/i);
-    expect(ogDescription).toMatch(/\/download\/|unsigned native hosts/i);
-    expect(twitterDescription).toMatch(/Browser now/i);
-    expect(twitterDescription).toMatch(/installable PWA from supporting browsers/i);
-    expect(twitterDescription).toMatch(/\/download\/|unsigned hosts/i);
+    expect(title).toBe('Onyx — a room for your people');
+    expect(description).toMatch(/Open Onyx in your browser/i);
+    expect(description).toMatch(/rooms, messages, calls/i);
+    expect(description).toMatch(/desktop and mobile/i);
+    expect(description).toMatch(/native download/i);
+    expect(ogDescription).toBe(description);
+    expect(twitterDescription).toBe(description);
 
     // Premature native-ship promises must stay out of entry/share metadata.
     // Keep patterns specific so form-factor labels like "desktop connect screen"

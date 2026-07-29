@@ -99,24 +99,32 @@
 
 .dl-copy {
   appearance: none;
+  min-height: var(--target-min, 44px);
   border: 1px solid var(--seam-faint);
-  border-radius: 999px;
-  padding: 6px 12px;
-  background: color-mix(in oklab, var(--stone-2) 40%, transparent);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  background: color-mix(in oklab, var(--stone-2) 48%, transparent);
   color: var(--paper);
   font: inherit;
   font-size: 0.82rem;
   cursor: pointer;
+  transition:
+    border-color var(--dur-fast, 160ms) var(--ease),
+    background var(--dur-fast, 160ms) var(--ease),
+    color var(--dur-fast, 160ms) var(--ease);
 }
 
 .dl-copy:hover,
 .dl-copy:focus-visible {
-  border-color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone-2) 62%, transparent);
   outline: none;
 }
 
 .dl-copy[data-state='copied'] {
-  color: var(--lapis-bright);
+  color: var(--on-accent);
+  background: var(--lapis);
+  border-color: color-mix(in oklab, var(--lapis) 75%, var(--stone-3));
 }
 
 .dl-note {
@@ -193,16 +201,17 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--lapis-bright);
-  box-shadow: 0 0 16px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+  /* Quiet signal dot — matte ring, not electric bloom. Semantic colors preserved. */
+  background: var(--lapis);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--lapis) 40%, transparent);
 }
 
 .stats-ledger-mark[data-state='stale'],
 .stats-ledger-mark[data-state='future'],
 .stats-ledger-mark[data-state='unknown'],
 .stats-ledger-mark[data-state='partial'] {
-  background: var(--shu-bright);
-  box-shadow: 0 0 16px color-mix(in oklab, var(--shu-bright) 60%, transparent);
+  background: var(--warn);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--warn) 45%, transparent);
 }
 
 .stats-refresh {
@@ -224,8 +233,9 @@
 
 .stats-primary-metric {
   background:
-    linear-gradient(135deg, color-mix(in oklab, var(--lapis-deep) 44%, transparent), color-mix(in oklab, var(--stone-2) 54%, transparent)),
-    color-mix(in oklab, var(--stone) 36%, var(--ink));
+    linear-gradient(180deg, color-mix(in oklab, var(--lapis) 10%, transparent), transparent 58%),
+    color-mix(in oklab, var(--stone-2) 48%, var(--ink));
+  border-color: color-mix(in oklab, var(--lapis) 28%, var(--seam-faint));
 }
 
 .data-summary {
@@ -349,8 +359,8 @@
   min-width: 0;
   height: max(4px, calc(var(--h) * 1%));
   border-radius: var(--r-sm) var(--r-sm) 0 0;
-  background: linear-gradient(180deg, var(--lapis-bright), var(--lapis-deep));
-  box-shadow: 0 0 18px color-mix(in oklab, var(--lapis) 28%, transparent);
+  background: color-mix(in oklab, var(--lapis) 82%, var(--lapis-deep));
+  box-shadow: none;
 }
 
 .stats-chart-caption {
@@ -488,6 +498,7 @@
 
 .data-action {
   appearance: none;
+  min-height: var(--target-min, 44px);
   background: transparent;
   cursor: pointer;
   font-family: var(--font-mono);
@@ -509,15 +520,15 @@
 }
 
 .data-action--inspect[aria-pressed='true'] {
-  color: var(--ink);
-  border-color: var(--lapis-bright);
-  background: var(--lapis-bright);
+  color: var(--on-accent);
+  border-color: color-mix(in oklab, var(--lapis) 75%, var(--stone-3));
+  background: var(--lapis);
 }
 
 .data-action:hover,
 .data-action:focus-visible {
-  color: var(--lapis-bright);
-  border-color: var(--lapis);
+  color: var(--paper);
+  border-color: var(--seam);
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
 }
 
@@ -586,7 +597,7 @@
   display: block;
   height: max(3px, calc(var(--h) * 1%));
   border-radius: var(--r-sm) var(--r-sm) 0 0;
-  background: color-mix(in oklab, var(--lapis-bright) 78%, var(--lapis-deep));
+  background: color-mix(in oklab, var(--lapis) 72%, var(--stone-3));
 }
 
 .channel-spark-empty {
@@ -641,7 +652,7 @@
 
 .stats-room-search input {
   width: 100%;
-  min-height: 42px;
+  min-height: var(--target-min, 44px);
   padding: 9px 12px;
   border: 1px solid var(--seam);
   border-radius: var(--r-md);
@@ -652,9 +663,9 @@
 
 .stats-room-search input::placeholder { color: var(--paper-mute); }
 .stats-room-search input:focus-visible {
-  border-color: var(--lapis-bright);
-  outline: 2px solid color-mix(in oklab, var(--lapis-bright) 54%, transparent);
-  outline-offset: 2px;
+  border-color: var(--lapis);
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
 }
 
 .stats-control-group {
@@ -664,29 +675,35 @@
 }
 
 .stats-control-group button {
+  min-height: var(--target-min, 44px);
   border: 1px solid transparent;
   border-radius: var(--r-pill);
-  padding: 7px 10px;
+  padding: 7px 12px;
   color: var(--paper-mute);
   background: transparent;
   font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.05em;
   cursor: pointer;
+  transition:
+    border-color var(--dur-fast, 160ms) var(--ease),
+    color var(--dur-fast, 160ms) var(--ease),
+    background var(--dur-fast, 160ms) var(--ease);
 }
 
 .stats-control-group button:hover,
 .stats-control-group button:focus-visible {
   border-color: var(--seam);
   color: var(--paper);
+  background: color-mix(in oklab, var(--stone-2) 40%, transparent);
   outline: none;
 }
 
 .stats-control-group button.is-active {
   border-color: color-mix(in oklab, var(--lapis) 58%, var(--seam));
-  color: var(--lapis-bright);
-  background: color-mix(in oklab, var(--lapis-deep) 22%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 12%, transparent);
+  color: var(--on-accent);
+  background: var(--lapis);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--paper) 10%, transparent) inset;
 }
 
 .stats-result-count {
@@ -802,8 +819,8 @@
   display: block;
   height: max(3px, calc(var(--h) * 1%));
   border-radius: 3px 3px 0 0;
-  background: linear-gradient(180deg, var(--lapis-bright), color-mix(in oklab, var(--lapis-deep) 82%, var(--ink)));
-  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis) 24%, transparent);
+  background: color-mix(in oklab, var(--lapis) 78%, var(--stone-3));
+  box-shadow: none;
 }
 .stats-hour-axis {
   display: flex;
@@ -941,12 +958,16 @@
   height: 8px;
   border-radius: var(--r-pill);
   background: currentColor;
-  box-shadow: 0 0 12px currentColor;
+  /* Matte status pip — semantic color via currentColor, no neon bloom. */
+  box-shadow: 0 0 0 1px color-mix(in oklab, currentColor 40%, transparent);
 }
 
-.status-pill[data-state='degraded'],
+.status-pill[data-state='degraded'] {
+  color: var(--warn);
+}
+
 .status-pill[data-state='down'] {
-  color: var(--shu-bright);
+  color: var(--danger);
 }
 
 .peer-table {
@@ -1018,18 +1039,19 @@
   height: 18px;
   margin: 20px auto 0;
   border-radius: var(--r-pill);
+  /* Status semantic fill preserved; matte ring instead of neon glow. */
   background: var(--ok);
-  box-shadow: 0 0 18px color-mix(in oklab, var(--ok) 60%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ok) 45%, transparent);
 }
 
 .roadmap-phase[data-state='active'] .roadmap-phase__rail span {
-  background: var(--lapis-bright);
-  box-shadow: 0 0 22px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
+  background: var(--lapis);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--lapis) 50%, transparent);
 }
 
 .roadmap-phase[data-state='planned'] .roadmap-phase__rail span {
   background: var(--paper-mute);
-  box-shadow: 0 0 16px color-mix(in oklab, var(--paper-mute) 45%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--paper-mute) 40%, transparent);
 }
 
 .roadmap-phase__body {
