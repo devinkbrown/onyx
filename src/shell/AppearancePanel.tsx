@@ -86,7 +86,7 @@ export function AppearancePanel(): JSX.Element {
                 Share / import
               </button>
             </div>
-            <div class="ap-panel-themes" role="radiogroup" aria-label="Theme">
+            <div class="ap-panel-themes" role="radiogroup" aria-label="Theme" style={{ 'touch-action': 'manipulation' }}>
               <For each={themeEntries()}>
                 {(entry) => {
                   const active = () => theme.themeId() === entry.id;
@@ -99,6 +99,7 @@ export function AppearancePanel(): JSX.Element {
                       aria-checked={active()}
                       aria-label={`${entry.label} theme`}
                       title={entry.title}
+                      style={{ 'min-height': '44px', 'touch-action': 'manipulation' }}
                       onClick={() => theme.setTheme(entry.id)}
                     >
                       <span class="ap-theme-swatch" aria-hidden="true">
@@ -115,7 +116,7 @@ export function AppearancePanel(): JSX.Element {
           {/* ── Background ── */}
           <section class="ap-panel-group">
             <h3 class="ap-panel-label">Background</h3>
-            <div class="ap-panel-bgs" role="radiogroup" aria-label="Background">
+            <div class="ap-panel-bgs" role="radiogroup" aria-label="Background" style={{ 'touch-action': 'manipulation' }}>
               <button
                 type="button"
                 class="ap-bg-chip"
@@ -123,6 +124,7 @@ export function AppearancePanel(): JSX.Element {
                 role="radio"
                 aria-checked={backgroundId() === AUTO_BACKGROUND_ID}
                 aria-label="Auto — theme-matched background"
+                style={{ 'min-height': '44px', 'touch-action': 'manipulation' }}
                 onClick={() => getState().setBackground(AUTO_BACKGROUND_ID)}
               >
                 <span class="ap-bg-name">Auto</span>
@@ -138,6 +140,7 @@ export function AppearancePanel(): JSX.Element {
                       classList={{ 'ap-bg-chip--on': active() }}
                       role="radio"
                       aria-checked={active()}
+                      style={{ 'min-height': '44px', 'touch-action': 'manipulation' }}
                       onClick={() => getState().setBackground(opt.id)}
                     >
                       <span class="ap-bg-name">{opt.label}</span>

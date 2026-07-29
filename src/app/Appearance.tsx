@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show } from 'solid-js';
 import { Background, backgroundOptions, type BackgroundId } from '@/backgrounds';
 import { useTheme, THEMES, THEME_IDS, type ThemeId } from '@/theme';
 // Import ThemeStudio from its module directly, NOT via the '@/theme' barrel.
@@ -19,11 +19,58 @@ type BgChip = { id: string; label: string; kind: string };
  * background chunk it crosses. Focus and activation bypass this delay. */
 export const POINTER_PREVIEW_DELAY_MS = 160;
 
+/** True for primary touch contacts — never used for delayed hover-preview. */
+export function isTouchPointerEvent(event: { pointerType?: string }): boolean {
+  return event.pointerType === 'touch';
+}
+
+/**
+ * Devices without real hover must not arm the delayed pointer-preview path.
+ * Touch/pen still activate via click; keyboard still previews on focus.
+ * JSDOM/default matchMedia returns matches:false → preview stays enabled for
+ * the existing mouse pointer-sweep unit tests.
+ */
+export function prefersNoHoverPreview(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  try {
+    return window.matchMedia('(hover: none)').matches;
+  } catch {
+    return false;
+  }
+}
+
+function allowsPointerHoverPreview(event: { pointerType?: string }): boolean {
+  if (isTouchPointerEvent(event)) return false;
+  if (prefersNoHoverPreview()) return false;
+  return true;
+}
+
 /** Palette dots for a built-in theme, read straight from its token map. */
 function themeSwatch(id: string): string[] {
   const t = THEMES[id as ThemeId]?.tokens;
   if (!t) return ['var(--lapis)', 'var(--gold)', 'var(--shu)'];
   return [t['--lapis'] ?? '#7f7f7f', t['--gold'] ?? '#7f7f7f', t['--shu'] ?? '#7f7f7f'];
+}
+
+/** Inert fixed layer used when the live Background tree throws — keeps the
+ * Appearance chrome (bar + chips) mounted so a bad wallpaper never blanks UI. */
+function BackgroundFallback() {
+  return (
+    <div
+      aria-hidden="true"
+      data-background-canvas="true"
+      data-background-fallback="true"
+      data-testid="background-fallback"
+      style={{
+        position: 'fixed',
+        inset: '0',
+        'z-index': '-1',
+        'pointer-events': 'none',
+        background:
+          'radial-gradient(120% 120% at 50% 0%, color-mix(in oklab, var(--lapis) 22%, var(--ink)) 0%, var(--ink) 60%)',
+      }}
+    />
+  );
 }
 
 /** /appearance — the customization surface: live theme + background gallery over
@@ -34,10 +81,15 @@ export default function Appearance() {
   const chooseBg = (id: string) => getState().setBackground(id);
 
   // Pointer hover waits for intent before changing the lazy Background source;
-  // keyboard focus and explicit activation stay immediate.
+  // keyboard focus and explicit activation stay immediate. Touch / (hover:none)
+  // never arm the delayed path — they commit only via click/activation so a
+  // finger sweep cannot thrash wallpaper chunks or leave a sticky preview.
   const [hoverBg, setHoverBg] = createSignal<string | null>(null);
   let pointerPreviewTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingPointerBg: string | null = null;
+  // Touch focus-before-click: suppress focus-preview so leave/cancel cannot
+  // desync hover state before activation commits the real selection.
+  let suppressFocusPreview = false;
 
   const cancelPointerPreview = (id?: string): void => {
     if (pointerPreviewTimer === undefined) return;
@@ -68,7 +120,10 @@ export default function Appearance() {
   };
 
   const selectBackground = (id: string): void => {
+    suppressFocusPreview = false;
     cancelPointerPreview();
+    // Active selection truth is the store; clear any transient preview first so
+    // aria-pressed / .on never compete with a leftover hoverBg after activation.
     setHoverBg(null);
     chooseBg(id);
   };
@@ -78,6 +133,16 @@ export default function Appearance() {
   const previewBgId = createMemo(
     () => resolveBackgroundId(hoverBg() ?? backgroundId(), theme.themeId()) as BackgroundId,
   );
+  let failedWallpaperId: BackgroundId | undefined;
+  let resetWallpaperBoundary: (() => void) | undefined;
+  createEffect(() => {
+    const current = previewBgId();
+    if (failedWallpaperId !== undefined && current !== failedWallpaperId) {
+      failedWallpaperId = undefined;
+      resetWallpaperBoundary?.();
+      resetWallpaperBoundary = undefined;
+    }
+  });
 
   const themeChips = createMemo<ThemeChip[]>(() => [
     ...THEME_IDS.map((id) => ({ id, label: THEMES[id].label, custom: false, swatch: themeSwatch(id) })),
@@ -92,15 +157,47 @@ export default function Appearance() {
   const ambientBgs = backgroundOptions.filter((o) => o.kind !== 'scene') as BgChip[];
   const sceneBgs = backgroundOptions.filter((o) => o.kind === 'scene') as BgChip[];
 
+  const onBgPointerEnter = (id: string, event: { pointerType?: string }): void => {
+    if (!allowsPointerHoverPreview(event)) return;
+    schedulePointerPreview(id);
+  };
+
+  const onBgPointerLeave = (id: string, event: { pointerType?: string }): void => {
+    if (!allowsPointerHoverPreview(event)) return;
+    restoreSelectedBackground(id);
+  };
+
+  const onBgPointerDown = (event: { pointerType?: string }): void => {
+    // Touch focuses the button before click; skip focus-preview for that gesture.
+    suppressFocusPreview = isTouchPointerEvent(event);
+  };
+
+  const onBgFocus = (id: string): void => {
+    if (suppressFocusPreview) {
+      // Consume the flag for this focus cycle; click still commits.
+      suppressFocusPreview = false;
+      return;
+    }
+    previewImmediately(id);
+  };
+
+  const onBgPointerCancel = (id: string): void => {
+    suppressFocusPreview = false;
+    restoreSelectedBackground(id);
+  };
+
   const bgChip = (opt: BgChip) => (
     <button
       type="button"
       class="ap-chip"
       classList={{ on: backgroundId() === opt.id, previewing: hoverBg() === opt.id }}
       aria-pressed={backgroundId() === opt.id}
-      onPointerEnter={() => schedulePointerPreview(opt.id)}
-      onPointerLeave={() => restoreSelectedBackground(opt.id)}
-      onFocus={() => previewImmediately(opt.id)}
+      onPointerDown={onBgPointerDown}
+      onPointerUp={() => { suppressFocusPreview = false; }}
+      onPointerEnter={(event) => onBgPointerEnter(opt.id, event)}
+      onPointerLeave={(event) => onBgPointerLeave(opt.id, event)}
+      onPointerCancel={() => onBgPointerCancel(opt.id)}
+      onFocus={() => onBgFocus(opt.id)}
       onBlur={() => restoreSelectedBackground(opt.id)}
       onClick={() => selectBackground(opt.id)}
     >
@@ -111,7 +208,15 @@ export default function Appearance() {
 
   return (
     <main class="ap">
-      <Background id={previewBgId()} />
+      <ErrorBoundary
+        fallback={(_error, reset) => {
+          failedWallpaperId = previewBgId();
+          resetWallpaperBoundary = reset;
+          return <BackgroundFallback />;
+        }}
+      >
+        <Background id={previewBgId()} />
+      </ErrorBoundary>
 
       <header class="ap-bar">
         <a class="ap-back" href="/app/">← back to app</a>
@@ -154,16 +259,20 @@ export default function Appearance() {
 
         <div class="ap-group">
           <span class="ap-glabel">Background</span>
-          <p class="ap-ghint">Hover or focus to preview live · click to keep</p>
+          <p class="ap-ghint ap-ghint--fine">Hover or focus to preview live · click to keep</p>
+          <p class="ap-ghint ap-ghint--coarse">Tap a background to apply it</p>
           <div class="ap-chips">
             <button
               type="button"
               class="ap-chip ap-chip--auto"
               classList={{ on: backgroundId() === AUTO_BACKGROUND_ID }}
               aria-pressed={backgroundId() === AUTO_BACKGROUND_ID}
-              onPointerEnter={() => schedulePointerPreview(AUTO_BACKGROUND_ID)}
-              onPointerLeave={() => restoreSelectedBackground(AUTO_BACKGROUND_ID)}
-              onFocus={() => previewImmediately(AUTO_BACKGROUND_ID)}
+              onPointerDown={onBgPointerDown}
+              onPointerUp={() => { suppressFocusPreview = false; }}
+              onPointerEnter={(event) => onBgPointerEnter(AUTO_BACKGROUND_ID, event)}
+              onPointerLeave={(event) => onBgPointerLeave(AUTO_BACKGROUND_ID, event)}
+              onPointerCancel={() => onBgPointerCancel(AUTO_BACKGROUND_ID)}
+              onFocus={() => onBgFocus(AUTO_BACKGROUND_ID)}
               onBlur={() => restoreSelectedBackground(AUTO_BACKGROUND_ID)}
               onClick={() => selectBackground(AUTO_BACKGROUND_ID)}
             >

@@ -1,6 +1,7 @@
 /* /appearance — customization surface (sits over the live Background canvas). */
 .ap {
   position: relative;
+  isolation: isolate;
   min-height: 100svh;
   font-family: var(--font-sans);
   color: var(--text, var(--paper));
@@ -27,7 +28,11 @@
 .ap-bar a:hover { color: var(--paper); }
 .ap-bar .ap-tag { color: var(--gold-bright); }
 
+/* Chrome must paint above the fixed Background (z-index: -1). Explicit
+   stacking keeps a wallpaper swap from ever covering the picker UI. */
 .ap-wrap {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 1040px;
   margin: 0 auto;
@@ -155,10 +160,28 @@
   font-size: 12px;
   color: var(--paper-mute);
 }
+/* Coarse / no-hover devices commit on tap only — hide hover-centric copy. */
+.ap-ghint--coarse { display: none; }
 .ap-lede-hint { color: var(--lapis-bright); }
 .ap-lede-hint b { font-family: var(--font-mono); font-weight: 600; }
 
 .ap-studio { margin-top: clamp(34px, 5vw, 64px); }
+
+/* Touch / coarse primary pointers: 44px targets, no hover-lift that steals taps,
+   no sticky :hover transform after a finger leaves the chip. */
+@media (hover: none), (pointer: coarse) {
+  .ap-ghint--fine { display: none; }
+  .ap-ghint--coarse { display: block; }
+
+  .ap-chip {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .ap-chip:hover {
+    transform: none;
+  }
+}
 
 /* The display headline and serif introduction are intentionally expansive at
    normal sizes, but must not become the route's horizontal canvas at 400%.

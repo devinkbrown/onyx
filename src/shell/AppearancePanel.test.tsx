@@ -56,6 +56,21 @@ describe('AppearancePanel', () => {
     expect(store.getState().backgroundId).not.toBe(before === 'aurora' ? 'x' : before);
   });
 
+  it('exposes 44px touch targets and commits background on touch-driven click', () => {
+    store.getState().openAppearance();
+    render(() => <AppearancePanel />);
+
+    const goldVeins = screen.getByRole('radio', { name: /gold veins/i });
+    expect(goldVeins.style.minHeight).toBe('44px');
+    expect(goldVeins.style.touchAction).toBe('manipulation');
+
+    fireEvent.pointerDown(goldVeins, { pointerType: 'touch' });
+    fireEvent.click(goldVeins);
+
+    expect(store.getState().backgroundId).toBe('gold-veins');
+    expect(goldVeins).toHaveAttribute('aria-checked', 'true');
+  });
+
   it('imports a shared theme code from the appearance panel', () => {
     const imported: CustomTheme = {
       id: 'custom:shared',
