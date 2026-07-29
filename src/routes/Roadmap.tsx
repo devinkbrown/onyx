@@ -27,7 +27,7 @@ export function RoadmapBridge() {
             Product status now lives on one canonical public page, checked against
             shipped source and acceptance evidence.
           </p>
-          <a class="landing-primary" href={CANONICAL_ROADMAP_PATH}>
+          <a class="r-btn primary" href={CANONICAL_ROADMAP_PATH}>
             Open roadmap
           </a>
         </div>
