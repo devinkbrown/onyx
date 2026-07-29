@@ -1,6 +1,6 @@
 {
   "name": "onyx",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -31,6 +31,9 @@
     "desktop:release:windows": "node tools/release-windows.mjs",
     "desktop:package:linux": "node tools/desktop-zig.mjs build package -Dplatform=linux",
     "desktop:release:linux": "node tools/release-unix.mjs linux",
+    "desktop:build:freebsd": "node tools/desktop-zig.mjs build bsd-host -Dbsd-os=freebsd",
+    "desktop:build:openbsd": "node tools/desktop-zig.mjs build bsd-host -Dbsd-os=openbsd",
+    "desktop:test:bsd": "node tools/desktop-zig.mjs build bsd-test",
     "desktop:release:freebsd": "node tools/release-unix.mjs freebsd",
     "desktop:release:openbsd": "node tools/release-unix.mjs openbsd",
     "desktop:package:macos": "node tools/desktop-zig.mjs build package -Dplatform=macos",

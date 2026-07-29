@@ -1,22 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * Onyx client v0.1.2 — Unix release packaging (Linux native + BSD portable + macOS).
+ * Onyx client v0.1.3 — Unix release packaging (Linux + native BSD + macOS).
  *
  * Lanes (one downloadable asset per platform):
  *  1. linux   — Native SDK system-WebView directory package → tar.gz (x86_64 ELF)
- *  2. freebsd — architecture-neutral portable web/PWA tar.gz (NOT a native host)
- *  3. openbsd — architecture-neutral portable web/PWA tar.gz (NOT a native host)
+ *  2. freebsd — Zig-native desktop host (desktop/bsd_host.zig) x86_64-freebsd → tar.gz
+ *  3. openbsd — Zig-native desktop host (desktop/bsd_host.zig) x86_64-openbsd → tar.gz
  *  4. macos   — Native SDK .app + DMG; runs ONLY on Darwin (fail-closed elsewhere)
  *
  * Honesty:
- *  - Native SDK has no FreeBSD/OpenBSD backend — BSD assets are SPA+localhost only.
+ *  - FreeBSD/OpenBSD are real Zig-native GTK/WebKitGTK hosts (dlopen at runtime).
+ *  - Cross-build on Linux produces correct ELF + package layout; it does NOT
+ *    claim GUI launch was verified on FreeBSD/OpenBSD from this host.
  *  - macOS is never fabricated on Linux; requires a real Mac + Apple tooling.
  *  - Artifacts are UNSIGNED (no codesign/notarize/AppImage/Flatpak store claims).
+ *  - No portable-web / PWA lane names for BSD.
  *
  * Does not download toolchains, commit, push, tag, deploy, or publish.
  */
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -35,7 +39,7 @@ import { runDesktopZig } from './desktop-zig.mjs';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Product version for this release lane (must match manifests). */
-export const RELEASE_PRODUCT_VERSION = '0.1.2';
+export const RELEASE_PRODUCT_VERSION = '0.1.3';
 
 /** Package optimize name Native SDK / build.zig use in artifact paths. */
 export const RELEASE_OPTIMIZE = 'ReleaseFast';
@@ -43,11 +47,23 @@ export const RELEASE_OPTIMIZE = 'ReleaseFast';
 /** Linux release arch claim (host native package). */
 export const RELEASE_LINUX_ARCH = 'x86_64';
 
+/** BSD native host arch (cross-compiled x86_64). */
+export const RELEASE_BSD_ARCH = 'x86_64';
+
 /** ELF e_machine for EM_X86_64. */
 export const ELF_EM_X86_64 = 62;
 
-/** Portable OS labels (web/PWA only — not native desktop hosts). */
-export const PORTABLE_OS = /** @type {const} */ (['freebsd', 'openbsd']);
+/** PT_INTERP program header type. */
+export const ELF_PT_INTERP = 3;
+
+/** Native BSD lanes (Zig host, not Native SDK). */
+export const BSD_OS = /** @type {const} */ (['freebsd', 'openbsd']);
+
+/** Expected dynamic linker path in PT_INTERP for each BSD OS. */
+export const BSD_PT_INTERP = /** @type {const} */ ({
+  freebsd: '/libexec/ld-elf.so.1',
+  openbsd: '/usr/libexec/ld.so',
+});
 
 /**
  * @param {string} text
@@ -114,14 +130,17 @@ export function loadAlignedVersion(repoRoot = REPO_ROOT) {
 }
 
 /**
- * Directory name produced by build.zig package step / Native SDK artifactName.
- * @param {'linux' | 'macos'} target
+ * Directory name produced by build.zig package step / Native SDK artifactName / BSD stage.
+ * @param {'linux' | 'macos' | 'freebsd' | 'openbsd'} target
  * @param {string} [version]
  * @param {string} [optimize]
  * @returns {string}
  */
 export function packageDirName(target, version = RELEASE_PRODUCT_VERSION, optimize = RELEASE_OPTIMIZE) {
   if (target === 'macos') return `onyx-${version}-macos-${optimize}.app`;
+  if (target === 'freebsd' || target === 'openbsd') {
+    return `onyx-${version}-${target}-${RELEASE_BSD_ARCH}-${optimize}`;
+  }
   return `onyx-${version}-${target}-${optimize}`;
 }
 
@@ -139,8 +158,8 @@ export function releaseAssetBaseName(lane, version = RELEASE_PRODUCT_VERSION, op
   if (lane === 'macos') {
     return `onyx-${version}-macos-${optimize}-unsigned`;
   }
-  // Architecture-neutral portable web/PWA (not native desktop).
-  return `onyx-${version}-${lane}-portable-web-unsigned`;
+  // Native BSD Zig host (x86_64 FreeBSD / OpenBSD).
+  return `onyx-${version}-${lane}-${RELEASE_BSD_ARCH}-${optimize}-unsigned`;
 }
 
 /**
@@ -176,17 +195,20 @@ export function resolveReleasePaths(lane, repoRoot = REPO_ROOT, version = RELEAS
       assetBase,
     };
   }
-  // freebsd / openbsd portable
-  const releaseDir = join(repoRoot, 'zig-out', 'release', `${lane}-portable-web`);
-  const stagingDir = join(releaseDir, 'staging', assetBase);
+  // freebsd / openbsd native host package
+  const dirName = packageDirName(lane, version);
+  const packageDir = join(repoRoot, 'zig-out', 'package', dirName);
+  const releaseDir = join(repoRoot, 'zig-out', 'release', `${lane}-${RELEASE_BSD_ARCH}`);
+  const hostBinDir = join(repoRoot, 'zig-out', 'bsd', `${lane}-x86_64`);
   return {
-    packageDir: stagingDir,
+    packageDir,
     releaseDir,
     archivePath: join(releaseDir, `${assetBase}.tar.gz`),
     sumsPath: join(releaseDir, `${assetBase}.sha256`),
     noticePath: join(releaseDir, `${assetBase}.NOTICE.txt`),
     assetBase,
-    stagingDir,
+    hostBinDir,
+    hostBinPath: join(hostBinDir, 'onyx'),
   };
 }
 
@@ -260,6 +282,68 @@ export function elfMachineVerdict(buf) {
 }
 
 /**
+ * Read PT_INTERP dynamic linker path from an ELF64 image.
+ * Zig sets EI_OSABI=SYSV for FreeBSD/OpenBSD; PT_INTERP distinguishes them.
+ * @param {Buffer} buf
+ * @returns {string | null}
+ */
+export function elfPtInterp(buf) {
+  if (!bufferLooksLikeElf(buf) || buf.length < 64) return null;
+  const ei_class = buf[4];
+  const ei_data = buf[5];
+  if (ei_class !== 2) return null; // ELF64 only
+  const le = ei_data === 1;
+  const readU16 = (off) => (le ? buf.readUInt16LE(off) : buf.readUInt16BE(off));
+  const readU32 = (off) => (le ? buf.readUInt32LE(off) : buf.readUInt32BE(off));
+  const readU64 = (off) => {
+    // Node Buffer may lack readBigUInt64 on very old runtimes; use two u32 LE/BE.
+    if (typeof buf.readBigUInt64LE === 'function') {
+      return Number(le ? buf.readBigUInt64LE(off) : buf.readBigUInt64BE(off));
+    }
+    const lo = le ? buf.readUInt32LE(off) : buf.readUInt32BE(off + 4);
+    const hi = le ? buf.readUInt32LE(off + 4) : buf.readUInt32BE(off);
+    return hi * 0x100000000 + lo;
+  };
+  const e_phoff = readU64(32);
+  const e_phentsize = readU16(54);
+  const e_phnum = readU16(56);
+  if (!e_phoff || !e_phentsize || !e_phnum) return null;
+  for (let i = 0; i < e_phnum; i += 1) {
+    const off = e_phoff + i * e_phentsize;
+    if (off + e_phentsize > buf.length) break;
+    const p_type = readU32(off);
+    if (p_type !== ELF_PT_INTERP) continue;
+    // ELF64 Phdr: p_offset at +8, p_filesz at +32
+    const p_offset = readU64(off + 8);
+    const p_filesz = readU64(off + 32);
+    if (p_offset + p_filesz > buf.length || p_filesz === 0) return null;
+    const slice = buf.subarray(p_offset, p_offset + p_filesz);
+    const z = slice.indexOf(0);
+    return slice.subarray(0, z === -1 ? slice.length : z).toString('utf8');
+  }
+  return null;
+}
+
+/**
+ * Classify ELF OS using PT_INTERP (and optional FreeBSD/OpenBSD note strings).
+ * @param {Buffer} buf
+ * @returns {'freebsd' | 'openbsd' | 'linux' | 'other' | 'unknown'}
+ */
+export function elfOsAbiVerdict(buf) {
+  if (!bufferLooksLikeElf(buf)) return 'unknown';
+  const interp = elfPtInterp(buf);
+  if (interp === BSD_PT_INTERP.freebsd) return 'freebsd';
+  if (interp === BSD_PT_INTERP.openbsd) return 'openbsd';
+  if (interp && /ld-linux|ld-musl|\/lib64\/ld-/.test(interp)) return 'linux';
+  // Secondary string markers from Zig's OS notes
+  const text = buf.subarray(0, Math.min(buf.length, 512 * 1024)).toString('binary');
+  if (text.includes('FreeBSD') && !text.includes('OpenBSD')) return 'freebsd';
+  if (text.includes('OpenBSD') && !text.includes('FreeBSD')) return 'openbsd';
+  if (interp) return 'other';
+  return 'unknown';
+}
+
+/**
  * Honesty notice for Linux native package.
  * @param {{ version?: string, host?: string }} [opts]
  * @returns {string}
@@ -278,7 +362,7 @@ export function linuxHonestyNotice(opts = {}) {
     '',
     'What this is NOT / not claimed:',
     '  - Not a portable static binary; needs WebKitGTK 6.0 + GTK 4 on the target.',
-    '  - FreeBSD/OpenBSD are NOT native desktop hosts (Native SDK has no BSD backend).',
+    '  - FreeBSD/OpenBSD use a separate Zig-native host lane (not this Linux artifact).',
     '  - macOS is released only on a real Mac (separate lane); not this artifact.',
     '  - Cross-build host was: ' + host,
     '',
@@ -296,38 +380,45 @@ export function linuxHonestyNotice(opts = {}) {
 }
 
 /**
- * Honesty notice for architecture-neutral portable web/PWA (BSD lanes).
+ * Honesty notice for native FreeBSD/OpenBSD Zig desktop host packages.
  * @param {'freebsd' | 'openbsd'} os
  * @param {{ version?: string, host?: string }} [opts]
  * @returns {string}
  */
-export function portableWebHonestyNotice(os, opts = {}) {
+export function bsdHonestyNotice(os, opts = {}) {
   const version = opts.version ?? RELEASE_PRODUCT_VERSION;
   const host = opts.host ?? `${process.platform}/${process.arch}`;
   const osLabel = os === 'freebsd' ? 'FreeBSD' : 'OpenBSD';
+  const triple = os === 'freebsd' ? 'x86_64-freebsd' : 'x86_64-openbsd';
+  const pkgHint =
+    os === 'freebsd'
+      ? 'pkg install gtk4 webkit2-gtk_60 glib  (or gtk3 webkit2-gtk_41) — matching pair only'
+      : 'pkg_add gtk+4 webkitgtk60 glib2  (or gtk+3 webkitgtk4) — matching pair only';
   return [
-    `Onyx ${version} — ${osLabel} PORTABLE WEB / PWA bundle (architecture-neutral)`,
+    `Onyx desktop ${version} — ${osLabel} ${RELEASE_BSD_ARCH} UNSIGNED native host package`,
     '',
     'What this is:',
-    '  - The same SolidJS/Vite SPA (`dist/`) plus a safe 127.0.0.1-only launcher.',
-    '  - Architecture-neutral: no ELF/PE/Mach-O desktop binary for ' + osLabel + '.',
-    '  - Intended for browser/PWA use on ' + osLabel + ' (or any OS that can run the SPA).',
+    `  - Zig-native desktop host (desktop/bsd_host.zig) for ${triple}`,
+    '  - Dynamically loads GTK + WebKitGTK at runtime (clear error if missing)',
+    '  - Embeds the SolidJS SPA under resources/dist (same pnpm build dist/)',
+    '  - Single tar.gz — NOT signed, NO auto-updater, NO store installer claim',
     '',
-    'What this is NOT:',
-    '  - NOT a native desktop host. Native SDK has NO FreeBSD/OpenBSD backend.',
-    '  - NOT Zig-linked WebKitGTK/WKWebView packaging for BSD.',
-    '  - NOT signed, NOT an installer, NO auto-updater.',
+    'What this is NOT / not claimed:',
+    '  - NOT a portable-web / PWA / localhost-only bundle',
+    '  - NOT the Native SDK linux/macos/windows backend',
+    '  - Cross-packaging on Linux validates ELF OS/machine + package layout only;',
+    `    it does NOT claim GUI launch was executed on real ${osLabel} from this host`,
+    '  - Built/packaged on host: ' + host,
     '',
-    'How to use:',
-    '  1. Extract the tar.gz',
-    '  2. Run ./launch-localhost.sh  (binds 127.0.0.1 only; opens no 0.0.0.0 socket)',
-    '  3. Open the printed URL in a modern browser',
-    '',
-    'Packaged on host: ' + host,
+    `Requirements on ${osLabel} ${RELEASE_BSD_ARCH}:`,
+    `  - ${pkgHint}`,
+    '  - extract and run bin/onyx from the package tree (needs a graphical session)',
     '',
     'Reproduce:',
-    '  pnpm install && pnpm build',
+    '  pnpm install',
+    '  pnpm build',
     `  pnpm desktop:release:${os}`,
+    '  # requires Zig pin from .zigversion (ONYX_ZIG or PATH); see docs/desktop-host.md',
     '',
   ].join('\n');
 }
@@ -360,51 +451,6 @@ export function macosHonestyNotice(opts = {}) {
     '  # requires Zig pin from .zigversion; see docs/desktop-host.md',
     '',
   ].join('\n');
-}
-
-/**
- * Safe localhost launcher for portable web bundles (127.0.0.1 only).
- * @param {{ osLabel?: string }} [opts]
- * @returns {string}
- */
-export function portableLocalhostLauncherScript(opts = {}) {
-  const osLabel = opts.osLabel ?? 'portable';
-  return `#!/usr/bin/env sh
-# Onyx portable web/PWA launcher — ${osLabel}
-# Binds 127.0.0.1 ONLY (never 0.0.0.0). Not a native desktop host.
-# Native SDK has no FreeBSD/OpenBSD backend; this serves the SPA for a browser.
-set -eu
-ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-DIST="$ROOT/dist"
-PORT=\${ONYX_PORTABLE_PORT:-8765}
-if [ ! -f "$DIST/index.html" ]; then
-  echo "error: missing dist/index.html under $ROOT" >&2
-  exit 1
-fi
-# Prefer python3 (common on FreeBSD/OpenBSD ports); fall back to python.
-if command -v python3 >/dev/null 2>&1; then
-  PY=python3
-elif command -v python >/dev/null 2>&1; then
-  PY=python
-else
-  echo "error: python3 (or python) required to serve the portable SPA on 127.0.0.1" >&2
-  exit 1
-fi
-echo "Onyx portable web (${osLabel}): http://127.0.0.1:\${PORT}/"
-echo "Serving $DIST on 127.0.0.1 only (Ctrl-C to stop)."
-cd "$DIST"
-exec "$PY" -c "
-import sys
-try:
-    from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-except ImportError:
-    from http.server import HTTPServer as ThreadingHTTPServer, SimpleHTTPRequestHandler
-host, port = '127.0.0.1', int(sys.argv[1])
-httpd = ThreadingHTTPServer((host, port), SimpleHTTPRequestHandler)
-print('listening on http://%s:%d/' % (host, port), flush=True)
-httpd.serve_forever()
-" "$PORT"
-`;
 }
 
 /**
@@ -488,69 +534,192 @@ export function validateLinuxPackageLayout(packageDir, opts = {}) {
 }
 
 /**
- * Validate portable web staging layout.
- * @param {string} stagingDir
+ * Validate native FreeBSD/OpenBSD desktop package layout (fail-closed).
+ * Checks ELF machine, OS via PT_INTERP, SPA resources, and launch contract files.
+ * @param {string} packageDir
  * @param {'freebsd' | 'openbsd'} os
- * @param {{ exists?: (p: string) => boolean, readFile?: (p: string) => Buffer | string }} [opts]
+ * @param {{ readFile?: (p: string) => Buffer, exists?: (p: string) => boolean, version?: string, optimize?: string }} [opts]
  * @returns {{ ok: true } | { ok: false, errors: string[] }}
  */
-export function validatePortableWebLayout(stagingDir, os, opts = {}) {
-  const exists = opts.exists ?? ((p) => existsSync(p));
+export function validateBsdPackageLayout(packageDir, os, opts = {}) {
   const read = opts.readFile ?? ((p) => readFileSync(p));
+  const exists = opts.exists ?? ((p) => existsSync(p));
+  const version = opts.version ?? RELEASE_PRODUCT_VERSION;
+  const optimize = opts.optimize ?? RELEASE_OPTIMIZE;
   const errors = [];
-  const root = resolve(stagingDir);
-  if (!exists(root)) return { ok: false, errors: [`staging directory missing: ${root}`] };
+  const root = resolve(packageDir);
+
+  if (os !== 'freebsd' && os !== 'openbsd') {
+    return { ok: false, errors: [`validateBsdPackageLayout: os must be freebsd|openbsd, got ${os}`] };
+  }
+
+  if (!exists(root)) {
+    return { ok: false, errors: [`package directory missing: ${root}`] };
+  }
+
+  // Fail closed: portable-web layout markers must not appear in native packages.
+  for (const banned of [
+    'PORTABLE-WEB-NOT-NATIVE.txt',
+    'launch-localhost.sh',
+    'dist/index.html', // SPA must live under resources/dist for the native host contract
+  ]) {
+    if (exists(join(root, banned))) {
+      errors.push(`native BSD package must not include portable-web path: ${banned}`);
+    }
+  }
 
   const required = [
-    'dist/index.html',
-    'launch-localhost.sh',
+    'bin/onyx',
     'README.txt',
-    'PORTABLE-WEB-NOT-NATIVE.txt',
+    'package-manifest.zon',
+    'resources/dist/index.html',
   ];
   for (const rel of required) {
-    if (!exists(join(root, rel))) errors.push(`missing required portable path: ${rel}`);
+    if (!exists(join(root, rel))) errors.push(`missing required package path: ${rel}`);
   }
 
-  // Fail closed: must not ship a native desktop binary pretending to be BSD-native.
-  for (const banned of ['bin/onyx', 'bin/onyx.exe', 'Contents/MacOS/onyx']) {
-    if (exists(join(root, banned))) {
-      errors.push(`portable web bundle must not include native binary path: ${banned}`);
+  if (exists(join(root, 'bin/onyx'))) {
+    let exeBuf;
+    try {
+      exeBuf = read(join(root, 'bin/onyx'));
+    } catch (e) {
+      errors.push(`cannot read bin/onyx: ${e instanceof Error ? e.message : String(e)}`);
+      exeBuf = null;
+    }
+    if (exeBuf) {
+      if (!bufferLooksLikeElf(exeBuf)) {
+        errors.push('bin/onyx is not an ELF image (magic check failed)');
+      } else {
+        const klass = elfClassVerdict(exeBuf);
+        if (klass !== 64) {
+          errors.push(`bin/onyx ELF class is ${klass}, expected 64`);
+        }
+        const machine = elfMachineVerdict(exeBuf);
+        if (machine !== RELEASE_BSD_ARCH) {
+          errors.push(`bin/onyx machine is ${machine}, expected ${RELEASE_BSD_ARCH}`);
+        }
+        const elfOs = elfOsAbiVerdict(exeBuf);
+        if (elfOs !== os) {
+          errors.push(
+            `bin/onyx ELF OS ABI/identity is ${elfOs}, expected ${os} (PT_INTERP ${BSD_PT_INTERP[os]})`,
+          );
+        }
+        const interp = elfPtInterp(exeBuf);
+        if (interp && interp !== BSD_PT_INTERP[os]) {
+          errors.push(`bin/onyx PT_INTERP is ${interp}, expected ${BSD_PT_INTERP[os]}`);
+        }
+      }
     }
   }
 
-  if (exists(join(root, 'PORTABLE-WEB-NOT-NATIVE.txt'))) {
+  const manifestPath = join(root, 'package-manifest.zon');
+  if (exists(manifestPath)) {
     try {
-      const text = String(read(join(root, 'PORTABLE-WEB-NOT-NATIVE.txt')));
-      if (!/NOT a native desktop host/i.test(text)) {
-        errors.push('PORTABLE-WEB-NOT-NATIVE.txt must state this is not a native desktop host');
+      const manifest = read(manifestPath).toString('utf8');
+      for (const [field, expected] of [
+        ['target', os],
+        ['version', version],
+        ['optimize', optimize],
+        ['arch', RELEASE_BSD_ARCH],
+      ]) {
+        const pattern = new RegExp(
+          `\\.${field}\\s*=\\s*"${String(expected).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`,
+        );
+        if (!pattern.test(manifest)) {
+          errors.push(`package-manifest.zon does not declare ${field}=${expected}`);
+        }
       }
-      if (!new RegExp(os, 'i').test(text) && !/FreeBSD|OpenBSD|portable/i.test(text)) {
-        errors.push('PORTABLE-WEB-NOT-NATIVE.txt should identify the portable OS lane');
-      }
-      if (!/no FreeBSD\/OpenBSD backend|no BSD backend/i.test(text)) {
-        errors.push('PORTABLE-WEB-NOT-NATIVE.txt must mention Native SDK has no BSD backend');
+      if (!/\.host\s*=\s*"bsd_host"/.test(manifest) && !/\.host\s*=\s*"zig-bsd"/.test(manifest)) {
+        errors.push('package-manifest.zon must declare host="bsd_host" (or zig-bsd)');
       }
     } catch (e) {
-      errors.push(`cannot read PORTABLE-WEB-NOT-NATIVE.txt: ${e instanceof Error ? e.message : String(e)}`);
+      errors.push(
+        `cannot read package-manifest.zon: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   }
 
-  if (exists(join(root, 'launch-localhost.sh'))) {
+  if (exists(join(root, 'README.txt'))) {
     try {
-      const script = String(read(join(root, 'launch-localhost.sh')));
-      if (!/127\.0\.0\.1/.test(script)) {
-        errors.push('launch-localhost.sh must bind 127.0.0.1 only');
+      const text = String(read(join(root, 'README.txt')));
+      // Reject affirmative portable-web claims; allow explicit "NOT portable-web" honesty.
+      if (
+        /architecture-neutral portable/i.test(text) ||
+        /\bPORTABLE WEB\b/i.test(text) ||
+        (/portable-web|portable web\/pwa/i.test(text) &&
+          !/NOT a portable-web|not a portable-web|NOT portable-web/i.test(text))
+      ) {
+        errors.push('README.txt must not claim portable-web packaging for native BSD host');
       }
-      if (/0\.0\.0\.0/.test(script) && !/never 0\.0\.0\.0/.test(script)) {
-        errors.push('launch-localhost.sh must not listen on 0.0.0.0');
+      if (!new RegExp(os === 'freebsd' ? 'FreeBSD' : 'OpenBSD', 'i').test(text)) {
+        errors.push('README.txt should identify the BSD OS lane');
+      }
+      if (!/WebKitGTK|webkit|GTK/i.test(text)) {
+        errors.push('README.txt must mention GTK/WebKitGTK runtime dependencies');
+      }
+      if (!/does NOT claim GUI launch|does not claim GUI launch|not claim GUI/i.test(text)) {
+        errors.push('README.txt must not fabricate GUI launch claims for cross-build hosts');
       }
     } catch (e) {
-      errors.push(`cannot read launch-localhost.sh: ${e instanceof Error ? e.message : String(e)}`);
+      errors.push(`cannot read README.txt: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
   if (errors.length) return { ok: false, errors };
   return { ok: true };
+}
+
+/**
+ * Package-manifest.zon body for native BSD hosts.
+ * @param {'freebsd' | 'openbsd'} os
+ * @param {{ version?: string, optimize?: string }} [opts]
+ */
+export function bsdPackageManifest(os, opts = {}) {
+  const version = opts.version ?? RELEASE_PRODUCT_VERSION;
+  const optimize = opts.optimize ?? RELEASE_OPTIMIZE;
+  return [
+    '.{',
+    `  .target = "${os}",`,
+    `  .arch = "${RELEASE_BSD_ARCH}",`,
+    `  .version = "${version}",`,
+    `  .optimize = "${optimize}",`,
+    '  .host = "bsd_host",',
+    '  .signing = "none",',
+    '  .webview = "webkitgtk-dlopen",',
+    '}',
+    '',
+  ].join('\n');
+}
+
+/**
+ * Launch-contract helper text for operators (not a portable-web launcher).
+ * @param {'freebsd' | 'openbsd'} os
+ */
+export function bsdLaunchContractText(os) {
+  const osLabel = os === 'freebsd' ? 'FreeBSD' : 'OpenBSD';
+  // Fixed product loopback port — must match desktop/bsd_host.zig product_loopback_port.
+  const loopbackOrigin = 'http://127.0.0.1:42691';
+  const loopbackEntry = `${loopbackOrigin}/app`;
+  return [
+    `Onyx native ${osLabel} launch contract`,
+    '',
+    'Executable: bin/onyx',
+    'SPA root:   resources/dist/index.html',
+    'Web engine: system WebKitGTK (dlopen) + GTK',
+    `SPA origin: ${loopbackOrigin}  (fixed product port; never ephemeral)`,
+    `Web entry:  ${loopbackEntry}`,
+    '',
+    'Fail-closed:',
+    '  - Missing GTK/WebKit shared libraries → clear stderr + non-zero exit',
+    '  - Missing resources/dist → clear stderr + non-zero exit',
+    '  - Port 42691 already in use / second instance → clear stderr + non-zero exit',
+    '  - No alternate port (localStorage/IndexedDB/session-resume origin must stay stable)',
+    '  - No portable-web / localhost-PWA fallback',
+    '',
+    `Run on ${osLabel} ${RELEASE_BSD_ARCH} with a graphical session:`,
+    '  ./bin/onyx',
+    '',
+  ].join('\n');
 }
 
 /**
@@ -737,36 +906,58 @@ export function requireBuiltDist(repoRoot = REPO_ROOT) {
   if (!existsSync(index)) {
     return {
       ok: false,
-      error: `missing ${index}; run \`pnpm build\` before packaging portable/native SPA assets`,
+      error: `missing ${index}; run \`pnpm build\` before packaging native SPA assets`,
     };
   }
   return { ok: true, distDir };
 }
 
 /**
- * Stage portable web tree for FreeBSD or OpenBSD.
+ * Stage native FreeBSD/OpenBSD package: bin/onyx + resources/dist + manifest.
  * @param {'freebsd' | 'openbsd'} os
- * @param {string} stagingDir
+ * @param {string} packageDir
+ * @param {string} hostBinPath path to cross-built onyx ELF
  * @param {string} distDir
- * @param {{ version?: string, host?: string }} [opts]
+ * @param {{ version?: string, host?: string, optimize?: string }} [opts]
+ * @returns {{ ok: true } | { ok: false, error: string }}
  */
-export function stagePortableWebBundle(os, stagingDir, distDir, opts = {}) {
+export function stageBsdPackage(os, packageDir, hostBinPath, distDir, opts = {}) {
   const version = opts.version ?? RELEASE_PRODUCT_VERSION;
   const host = opts.host ?? `${process.platform}/${process.arch}`;
-  const osLabel = os === 'freebsd' ? 'FreeBSD' : 'OpenBSD';
+  const optimize = opts.optimize ?? RELEASE_OPTIMIZE;
 
-  rmSync(stagingDir, { recursive: true, force: true });
-  mkdirSync(join(stagingDir, 'dist'), { recursive: true });
-  cpSync(distDir, join(stagingDir, 'dist'), { recursive: true });
+  if (os !== 'freebsd' && os !== 'openbsd') {
+    return { ok: false, error: `stageBsdPackage: os must be freebsd|openbsd, got ${os}` };
+  }
+  if (!existsSync(hostBinPath)) {
+    return { ok: false, error: `missing BSD host binary: ${hostBinPath} (run zig build bsd-host -Dbsd-os=${os})` };
+  }
+  if (!existsSync(join(distDir, 'index.html'))) {
+    return { ok: false, error: `missing ${join(distDir, 'index.html')}; run pnpm build first` };
+  }
 
-  const notice = portableWebHonestyNotice(os, { version, host });
-  writeFileSync(join(stagingDir, 'README.txt'), notice, 'utf8');
-  writeFileSync(join(stagingDir, 'PORTABLE-WEB-NOT-NATIVE.txt'), notice, 'utf8');
+  rmSync(packageDir, { recursive: true, force: true });
+  mkdirSync(join(packageDir, 'bin'), { recursive: true });
+  mkdirSync(join(packageDir, 'resources', 'dist'), { recursive: true });
+
+  cpSync(hostBinPath, join(packageDir, 'bin', 'onyx'));
+  try {
+    chmodSync(join(packageDir, 'bin', 'onyx'), 0o755);
+  } catch {
+    // non-fatal on exotic hosts
+  }
+  cpSync(distDir, join(packageDir, 'resources', 'dist'), { recursive: true });
+
+  const notice = bsdHonestyNotice(os, { version, host });
+  writeFileSync(join(packageDir, 'README.txt'), notice, 'utf8');
+  writeFileSync(join(packageDir, 'LAUNCH.txt'), bsdLaunchContractText(os), 'utf8');
   writeFileSync(
-    join(stagingDir, 'launch-localhost.sh'),
-    portableLocalhostLauncherScript({ osLabel }),
-    { mode: 0o755, encoding: 'utf8' },
+    join(packageDir, 'package-manifest.zon'),
+    bsdPackageManifest(os, { version, optimize }),
+    'utf8',
   );
+  writeFileSync(join(packageDir, `UNSIGNED-${os.toUpperCase()}.txt`), notice, 'utf8');
+  return { ok: true };
 }
 
 /**
@@ -860,31 +1051,39 @@ export async function runLinuxRelease(opts = {}) {
   log.write(`release-unix linux: sha256  ${sum.hash}  ${paths.archivePath.split(/[/\\]/).pop()}\n`);
   log.write(`release-unix linux: notice  ${paths.noticePath}\n`);
   log.write(
-    'release-unix linux: UNSIGNED Native SDK system-WebView; needs WebKitGTK 6 + GTK 4; BSD not native.\n',
+    'release-unix linux: UNSIGNED Native SDK system-WebView; needs WebKitGTK 6 + GTK 4. FreeBSD/OpenBSD use a separate Zig-native host lane (desktop:release:freebsd|openbsd), not this Linux artifact.\n',
   );
 
   return { ok: true, paths, hash: sum.hash, lane: 'linux' };
 }
 
 /**
+ * Cross-build + package native FreeBSD/OpenBSD desktop host.
+ * May run on Linux: produces correct ELF + layout; does not claim GUI launch.
  * @param {'freebsd' | 'openbsd'} os
  * @param {{
  *   repoRoot?: string,
  *   distDir?: string,
+ *   skipHostBuild?: boolean,
+ *   packageDir?: string,
+ *   hostBinPath?: string,
  *   createTar?: typeof createPackageTarGz,
+ *   validate?: typeof validateBsdPackageLayout,
+ *   runZig?: typeof runDesktopZig,
  *   platform?: string,
+ *   env?: NodeJS.ProcessEnv,
  *   stdout?: { write: (s: string) => void },
  *   stderr?: { write: (s: string) => void },
  * }} [opts]
  */
-export async function runPortableWebRelease(os, opts = {}) {
+export async function runBsdRelease(os, opts = {}) {
   const repoRoot = opts.repoRoot ?? REPO_ROOT;
   const log = opts.stdout ?? process.stdout;
   const err = opts.stderr ?? process.stderr;
   const platform = opts.platform ?? process.platform;
 
   if (os !== 'freebsd' && os !== 'openbsd') {
-    const msg = `portable web lane must be freebsd|openbsd, got ${os}`;
+    const msg = `BSD native lane must be freebsd|openbsd, got ${os}`;
     err.write(`release-unix: ${msg}\n`);
     return { ok: false, code: 1, errors: [msg] };
   }
@@ -897,6 +1096,22 @@ export async function runPortableWebRelease(os, opts = {}) {
   const version = aligned.version;
   const paths = resolveReleasePaths(os, repoRoot, version);
 
+  if (!opts.skipHostBuild) {
+    const env = { ...(opts.env ?? process.env) };
+    const bin = join(repoRoot, 'node_modules', '.bin');
+    env.PATH = `${bin}${env.PATH ? `:${env.PATH}` : ''}`;
+    log.write(
+      `release-unix ${os}: zig build bsd-host -Dbsd-os=${os} (Zig-native GTK/WebKitGTK host, ${paths.hostBinDir ?? 'zig-out/bsd'})\n`,
+    );
+    const runZig = opts.runZig ?? runDesktopZig;
+    const code = await runZig(['build', 'bsd-host', `-Dbsd-os=${os}`], { env });
+    if (code !== 0) {
+      const msg = `zig build bsd-host (-Dbsd-os=${os}) failed with exit ${code}`;
+      err.write(`release-unix: ${msg}\n`);
+      return { ok: false, code: code === 0 ? 1 : code, errors: [msg] };
+    }
+  }
+
   const dist = opts.distDir
     ? existsSync(join(opts.distDir, 'index.html'))
       ? { ok: true, distDir: opts.distDir }
@@ -907,27 +1122,36 @@ export async function runPortableWebRelease(os, opts = {}) {
     return { ok: false, code: 1, errors: [dist.error] };
   }
 
-  mkdirSync(paths.releaseDir, { recursive: true });
-  stagePortableWebBundle(os, paths.stagingDir ?? paths.packageDir, dist.distDir, {
+  const hostBinPath = opts.hostBinPath ?? paths.hostBinPath;
+  const packageDir = opts.packageDir ?? paths.packageDir;
+  const staged = stageBsdPackage(os, packageDir, hostBinPath, dist.distDir, {
     version,
     host: `${platform}/${process.arch}`,
   });
+  if (!staged.ok) {
+    err.write(`release-unix: ${staged.error}\n`);
+    return { ok: false, code: 1, errors: [staged.error] };
+  }
 
-  const layout = validatePortableWebLayout(paths.stagingDir ?? paths.packageDir, os);
+  const validate = opts.validate ?? validateBsdPackageLayout;
+  const layout = validate(packageDir, os, { version });
   if (!layout.ok) {
     for (const e of layout.errors) err.write(`release-unix: ${e}\n`);
     return { ok: false, code: 1, errors: layout.errors };
   }
 
-  const notice = portableWebHonestyNotice(os, {
+  mkdirSync(paths.releaseDir, { recursive: true });
+  const notice = bsdHonestyNotice(os, {
     version,
     host: `${platform}/${process.arch}`,
   });
   writeFileSync(paths.noticePath, notice, 'utf8');
 
   const createTar = opts.createTar ?? createPackageTarGz;
-  const rootName = paths.assetBase;
-  const tarResult = createTar(paths.stagingDir ?? paths.packageDir, paths.archivePath, rootName);
+  const rootName = packageDirName(os, version);
+  const tarResult = createTar(packageDir, paths.archivePath, rootName, {
+    injectFiles: { [`UNSIGNED-${os.toUpperCase()}.txt`]: notice },
+  });
   if (!tarResult.ok) {
     err.write(`release-unix: ${tarResult.error}\n`);
     return { ok: false, code: 1, errors: [tarResult.error] };
@@ -939,14 +1163,20 @@ export async function runPortableWebRelease(os, opts = {}) {
     return { ok: false, code: 1, errors: [sum.error] };
   }
 
-  log.write(`release-unix ${os}: portable staging ${paths.stagingDir ?? paths.packageDir}\n`);
+  log.write(`release-unix ${os}: package ${packageDir}\n`);
   log.write(`release-unix ${os}: tar.gz  ${paths.archivePath}\n`);
   log.write(`release-unix ${os}: sha256  ${sum.hash}  ${paths.archivePath.split(/[/\\]/).pop()}\n`);
+  log.write(`release-unix ${os}: notice  ${paths.noticePath}\n`);
   log.write(
-    `release-unix ${os}: architecture-neutral portable WEB/PWA — NOT a native ${os} desktop host (Native SDK has no BSD backend).\n`,
+    `release-unix ${os}: UNSIGNED Zig-native host; needs GTK+WebKitGTK on ${os}; ELF validated — GUI not claimed on ${platform}.\n`,
   );
 
   return { ok: true, paths, hash: sum.hash, lane: os };
+}
+
+/** @deprecated Use runBsdRelease — portable-web BSD lane removed. */
+export async function runPortableWebRelease(os, opts = {}) {
+  return runBsdRelease(os, opts);
 }
 
 /**
@@ -1101,7 +1331,8 @@ export async function runMacosRelease(opts = {}) {
  *   repoRoot?: string,
  *   platform?: string,
  *   runLinux?: typeof runLinuxRelease,
- *   runPortable?: typeof runPortableWebRelease,
+ *   runBsd?: typeof runBsdRelease,
+ *   runPortable?: typeof runBsdRelease,
  *   runMacos?: typeof runMacosRelease,
  *   stdout?: { write: (s: string) => void },
  *   stderr?: { write: (s: string) => void },
@@ -1112,6 +1343,7 @@ export async function runUnixReleaseCli(argv, opts = {}) {
   const args = argv.filter((a) => a !== '--');
   const lane = (args.find((a) => !a.startsWith('--')) ?? '').toLowerCase();
   const skipPackageBuild = args.includes('--skip-package-build');
+  const skipHostBuild = args.includes('--skip-host-build') || skipPackageBuild;
   const packageDirArg = args.find((a) => a.startsWith('--package-dir='));
   const packageDir = packageDirArg ? packageDirArg.slice('--package-dir='.length) : undefined;
   const common = {
@@ -1128,8 +1360,11 @@ export async function runUnixReleaseCli(argv, opts = {}) {
     return run(common);
   }
   if (lane === 'freebsd' || lane === 'openbsd') {
-    const run = opts.runPortable ?? runPortableWebRelease;
-    return run(lane, common);
+    const run = opts.runBsd ?? opts.runPortable ?? runBsdRelease;
+    return run(lane, {
+      ...common,
+      skipHostBuild,
+    });
   }
   if (lane === 'macos') {
     const run = opts.runMacos ?? runMacosRelease;
@@ -1137,10 +1372,10 @@ export async function runUnixReleaseCli(argv, opts = {}) {
   }
 
   const msg =
-    'usage: node tools/release-unix.mjs <linux|freebsd|openbsd|macos> [--skip-package-build] [--package-dir=PATH]\n' +
+    'usage: node tools/release-unix.mjs <linux|freebsd|openbsd|macos> [--skip-package-build] [--skip-host-build] [--package-dir=PATH]\n' +
     '  linux   — Native SDK system-WebView x86_64 tar.gz (Linux host)\n' +
-    '  freebsd — portable web/PWA tar.gz (NOT native; Native SDK has no BSD backend)\n' +
-    '  openbsd — portable web/PWA tar.gz (NOT native; Native SDK has no BSD backend)\n' +
+    '  freebsd — Zig-native x86_64-freebsd host tar.gz (GTK/WebKitGTK dlopen)\n' +
+    '  openbsd — Zig-native x86_64-openbsd host tar.gz (GTK/WebKitGTK dlopen)\n' +
     '  macos   — Native SDK .app + DMG (Darwin only; fail-closed elsewhere)';
   err.write(`release-unix: ${msg}\n`);
   return { ok: false, code: 2, errors: [msg] };

@@ -16,9 +16,10 @@ Public-launch tracking: **[`PUBLIC_LAUNCH_ROADMAP.md`](./PUBLIC_LAUNCH_ROADMAP.m
 
 | Piece | Path |
 |-------|------|
-| Manifest | `app.zon` (`.version` currently `0.1.2`) |
-| Host entry | `desktop/main.zig` |
+| Manifest | `app.zon` (`.version` currently `0.1.3`) |
+| Host entry | `desktop/main.zig` (Native SDK: macOS/Linux/Windows) |
 | Host runner | `desktop/runner.zig` (from `@native-sdk/cli` vite scaffold) |
+| BSD host | `desktop/bsd_host.zig` (Zig-native FreeBSD/OpenBSD; GTK/WebKitGTK dlopen) |
 | Build graph | `build.zig` / `build.zig.zon` (CLI `--full` Vite scaffold, adapted) |
 | Frontend | existing repo root (not a forked `frontend/`) |
 | Surface detect | `src/lib/platform.ts` (`browser` \| `pwa` \| `zig-desktop`) |
@@ -47,11 +48,11 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   explicit `-Dpackage-target=…` fails with a clear error; other steps may still
   configure for diagnostics.
 - **Output path** uses the **app.zon version** (parsed from `.version = "…"`,
-  fallback `0.1.2`), not a stale `0.1.0`:
+  fallback `0.1.3`), not a stale `0.1.0`:
 
   `zig-out/package/onyx-<version>-<target>-<optimize>[.app]`
 
-  Example: `zig-out/package/onyx-0.1.2-linux-ReleaseFast`
+  Example: `zig-out/package/onyx-0.1.3-linux-ReleaseFast`
 
 ## What is achieved
 
@@ -71,22 +72,35 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   `desktop:*:null` diagnostics exist separately.
 - Honest status: **installers, signing, updater, public downloads, and
   desktop deploy are not done.**
-- **Windows x86_64 unsigned zip lane (v0.1.2):** `pnpm desktop:release:windows`
+- **Windows x86_64 unsigned zip lane (v0.1.3):** `pnpm desktop:release:windows`
   (`tools/release-windows.mjs`) runs Native SDK `native package` via
   `zig build package -Dplatform=windows -Dtarget=x86_64-windows`, then
   fail-closed layout validation + deterministic zip + SHA-256. **Not** an
   MSI/EXE installer. **Windows runtime is not verified on a real Windows
   machine** in this lane.
-- **Linux x86_64 unsigned tar.gz lane (v0.1.2):** `pnpm desktop:release:linux`
+- **Linux x86_64 unsigned tar.gz lane (v0.1.3):** `pnpm desktop:release:linux`
   (`tools/release-unix.mjs linux`) runs Native SDK package for system
   WebView (WebKitGTK 6 + GTK 4), fail-closed ELF x86_64 +
   `package-manifest.zon` (target/version/optimize) + SPA resources, then
   one tar.gz + SHA-256 + embedded notice. **Not** AppImage/Flatpak/deb.
-- **FreeBSD / OpenBSD portable web/PWA (v0.1.2):** `pnpm desktop:release:freebsd`
-  / `pnpm desktop:release:openbsd` — architecture-neutral tar.gz of the
-  built `dist/` SPA plus a **127.0.0.1-only** launcher. **Not** native
-  desktop hosts: **Native SDK has no BSD backend.**
-- **macOS unsigned DMG lane (v0.1.2):** `pnpm desktop:release:macos` runs
+- **FreeBSD / OpenBSD native Zig host (v0.1.3):** `pnpm desktop:release:freebsd`
+  / `pnpm desktop:release:openbsd` — cross-compile `desktop/bsd_host.zig` to
+  `x86_64-freebsd` / `x86_64-openbsd`, stage `bin/onyx` + `resources/dist`,
+  validate ELF machine + PT_INTERP OS identity + launch contract, then one
+  unsigned tar.gz + SHA-256. Runtime **dlopen**s a matching toolkit pair only
+  (GTK4+webkitgtk-6.0 or GTK3+webkit2gtk-4.x; never mixed), runs
+  **GtkApplication** + `g_application_run`, and serves SPA assets from a
+  **loopback-only** fixed-port HTTP server at `http://127.0.0.1:42691/app`
+  (not `file://`, never ephemeral). Port **42691** is product-stable for
+  localStorage/IndexedDB/session-resume origin; bind failure is fail-closed
+  single-instance (no alternate port). Package install pairs:
+  FreeBSD `gtk4`+`webkit2-gtk_60` or `gtk3`+`webkit2-gtk_41`; OpenBSD
+  `gtk+4`+`webkitgtk60` or `gtk+3`+`webkitgtk4`. Clear fail-closed errors if
+  libs/dist missing. **Not** Native SDK; **not** portable-web/PWA. Cross-build
+  on Linux validates ELF/package layout only — **does not claim GUI launch**
+  on real FreeBSD/OpenBSD from this host. `zig build bsd-host` depends on
+  `frontend-build` so release stages a fresh `dist/`.
+- **macOS unsigned DMG lane (v0.1.3):** `pnpm desktop:release:macos` runs
   **only on Darwin** and **fails closed** on Linux/other hosts (never
   fabricates a `.app`/DMG without a real Mac + Apple tools). Produces
   Native SDK WKWebView `.app` + unsigned DMG when green.
@@ -99,8 +113,8 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
 - Verified macOS GUI launch / Gatekeeper path on real Apple hardware
   (**blocker:** this release machine is Linux — macOS package/DMG must be
   produced on a Mac; see table below).
-- Native FreeBSD/OpenBSD desktop hosts (impossible with current Native SDK
-  platforms: macos/linux/windows only).
+- Verified FreeBSD/OpenBSD GUI launch on real BSD hardware/VMs (cross-build
+  on Linux only proves ELF OS/machine + package layout).
 - Extra native permissions (filesystem, notifications bridge, etc.).
 - Chromium/CEF path (`-Dweb-engine=chromium`) — **out of scope** for this
   scaffold; build graph still panics chromium unless macOS when forced.
@@ -112,16 +126,16 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
 | `app.zon` validates (`native validate`) | **PASS** after corrections |
 | `native check` structural | **PASS** (web layer included via `.frontend`) |
 | TS surface tests + typecheck + web `pnpm build` | **PASS** when gates are run green |
-| Package target/version graph defaults | **Configured** in `build.zig` (no macOS hardcode; version from `app.zon` / `0.1.2`) |
+| Package target/version graph defaults | **Configured** in `build.zig` (no macOS hardcode; version from `app.zon` / `0.1.3`) |
 | Zig **0.17.0-dev** pin `build -Dplatform=null` | **PASS** (compile + install of null backend) with pinned SDK patch |
 | Zig **0.17.0-dev** pin `build test -Dplatform=null` | **PASS** |
 | Zig **0.17.0-dev** pin `build -Dplatform=linux` | **Link unblocked** when WebKitGTK 6.0 is installed (`pkg-config webkitgtk-6.0`); still requires exact Zig pin from `.zigversion` |
 | Zig **0.17.0-dev** pin x86_64-windows cross-build | **PASS** artifact production (`onyx.exe` + `WebView2Loader.dll`) — **runtime not verified** here |
-| `pnpm desktop:release:windows` | **Tooling present** — `zig-out/release/windows-x86_64/onyx-0.1.2-windows-x86_64-ReleaseFast-unsigned.zip`; **unsigned**; Windows runtime **not** verified here |
+| `pnpm desktop:release:windows` | **Tooling present** — `zig-out/release/windows-x86_64/onyx-0.1.3-windows-x86_64-ReleaseFast-unsigned.zip`; **unsigned**; Windows runtime **not** verified here |
 | `pnpm desktop:release:linux` | **Tooling present** — one tar.gz under `zig-out/release/linux-x86_64/` after ELF/manifest/resources validation; needs WebKitGTK 6 + Zig pin |
-| `pnpm desktop:release:freebsd` / `:openbsd` | **Tooling present** — portable web/PWA tar.gz only (SPA + localhost launcher); **not** native BSD hosts |
+| `pnpm desktop:release:freebsd` / `:openbsd` | **Tooling present** — Zig-native `bsd_host` x86_64 ELF + `resources/dist` tar.gz; runtime needs GTK/WebKitGTK on BSD; **GUI not claimed** from Linux cross-build |
 | `pnpm desktop:release:macos` | **Fail-closed on non-Darwin** — must run on a real Mac; remaining **macOS blocker** for this Linux release host |
-| GUI launch / signing / updater / public downloads / deploy | **Not done / not verified** |
+| GUI launch / signing / updater / public downloads / deploy | **Not done / not verified** (incl. real FreeBSD/OpenBSD display) |
 
 ### Linux GUI link dependency
 
@@ -181,17 +195,21 @@ pnpm desktop:test:linux            # zig build test -Dplatform=linux (diagnostic
 pnpm desktop:build:windows         # cross-build x86_64-windows (artifact only)
 pnpm desktop:package:windows       # zig build package for windows (Native SDK dir under zig-out/package/)
 pnpm desktop:release:windows       # package + fail-closed validate + unsigned zip + SHA-256
-#   outputs: zig-out/release/windows-x86_64/onyx-0.1.2-windows-x86_64-ReleaseFast-unsigned.{zip,sha256,NOTICE.txt}
+#   outputs: zig-out/release/windows-x86_64/onyx-0.1.3-windows-x86_64-ReleaseFast-unsigned.{zip,sha256,NOTICE.txt}
 #   Windows runtime NOT verified on real Windows.
 pnpm desktop:package:linux         # zig build package -Dplatform=linux (Native SDK dir)
 pnpm desktop:release:linux         # package + ELF/manifest/resources validate + tar.gz + SHA-256
-#   outputs: zig-out/release/linux-x86_64/onyx-0.1.2-linux-x86_64-ReleaseFast-unsigned.{tar.gz,sha256,NOTICE.txt}
-pnpm desktop:release:freebsd       # portable web/PWA tar.gz (NOT native; no BSD Native SDK backend)
-pnpm desktop:release:openbsd       # portable web/PWA tar.gz (NOT native; no BSD Native SDK backend)
-#   outputs: zig-out/release/{freebsd,openbsd}-portable-web/onyx-0.1.2-*-portable-web-unsigned.tar.gz
+#   outputs: zig-out/release/linux-x86_64/onyx-0.1.3-linux-x86_64-ReleaseFast-unsigned.{tar.gz,sha256,NOTICE.txt}
+pnpm desktop:build:freebsd         # zig build bsd-host -Dbsd-os=freebsd → zig-out/bsd/freebsd-x86_64/onyx
+pnpm desktop:build:openbsd         # zig build bsd-host -Dbsd-os=openbsd → zig-out/bsd/openbsd-x86_64/onyx
+pnpm desktop:test:bsd              # zig build bsd-test (pure logic; host-native)
+pnpm desktop:release:freebsd       # cross-build + stage bin/onyx + resources/dist + tar.gz + SHA-256
+pnpm desktop:release:openbsd       # same for OpenBSD
+#   outputs: zig-out/release/{freebsd,openbsd}-x86_64/onyx-0.1.3-*-x86_64-ReleaseFast-unsigned.{tar.gz,sha256,NOTICE.txt}
+#   GUI launch NOT claimed when packaging from Linux; run bin/onyx on real BSD with a matching GTK+WebKit pair.
 pnpm desktop:package:macos         # zig build package -Dplatform=macos (Darwin only)
 pnpm desktop:release:macos         # .app + unsigned DMG — FAILS CLOSED on non-Darwin (no fake macOS assets)
-#   outputs (on Mac only): zig-out/release/macos/onyx-0.1.2-macos-ReleaseFast-unsigned.{dmg,sha256,NOTICE.txt}
+#   outputs (on Mac only): zig-out/release/macos/onyx-0.1.3-macos-ReleaseFast-unsigned.{dmg,sha256,NOTICE.txt}
 # Package other hosts (diagnostic):
 # zig build package                # target defaults to host platform; version from app.zon
 # zig build package -Dpackage-target=linux

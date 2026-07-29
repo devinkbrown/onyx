@@ -1,7 +1,7 @@
 .{
     .name = .onyx,
     .fingerprint = 0xa06be5d2f99e29b9,
-    .version = "0.1.2",
+    .version = "0.1.3",
     .minimum_zig_version = "0.17.0-dev.1476+91a29d707",
     .dependencies = .{},
     .paths = .{

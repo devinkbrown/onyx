@@ -32,6 +32,12 @@ const PackageTarget = enum {
     linux,
 };
 
+/// Native BSD desktop host OS (separate from Native SDK PlatformOption).
+const BsdOsOption = enum {
+    freebsd,
+    openbsd,
+};
+
 const default_native_sdk_path = "node_modules/@native-sdk/cli";
 const app_exe_name = "onyx";
 
@@ -79,8 +85,8 @@ pub fn build(b: *std.Build) void {
     // -Dplatform=null is never a package default; only an explicit -Dpackage-target may
     // still package while the host graph uses the null backend for diagnostics.
     const package_target: ?PackageTarget = package_target_override orelse defaultPackageTarget(selected_platform);
-    // Prefer app.zon .version (currently 0.1.2); fall back to product version string.
-    const package_version = packageVersionFromAppZon(@embedFile("app.zon")) orelse "0.1.2";
+    // Prefer app.zon .version (currently 0.1.3); fall back to product version string.
+    const package_version = packageVersionFromAppZon(@embedFile("app.zon")) orelse "0.1.3";
     const app_config = appManifestBuildConfig(b);
     const web_engine = web_engine_override orelse app_config.web_engine;
     const cef_dir = cef_dir_override orelse defaultCefDir(selected_platform, app_config.cef_dir);
@@ -194,17 +200,17 @@ pub fn build(b: *std.Build) void {
         break :pkg built;
     };
 
-    // Package targets are ONLY macos|linux|windows (Native SDK backends).
-    // FreeBSD/OpenBSD have no Native SDK host — release tools ship portable
-    // web/PWA tar.gz via tools/release-unix.mjs (not this zig package step).
+    // Package targets for the Native SDK path are ONLY macos|linux|windows.
+    // FreeBSD/OpenBSD use the separate Zig-native host (`desktop/bsd_host.zig`)
+    // via `zig build bsd-host -Dbsd-os=…` / `pnpm desktop:release:freebsd|openbsd`.
     // macOS packaging requires a Darwin host + Apple SDK; do not invent .app
     // on Linux. Public release lanes: tools/release-windows.mjs + release-unix.mjs.
-    const package_step = b.step("package", "Create a local package artifact (macos|linux|windows only; no BSD native)");
+    const package_step = b.step("package", "Create a local package artifact (macos|linux|windows Native SDK; BSD uses bsd-host)");
     if (package_target) |pkg_target| {
         // Invoke the checkout's patched @native-sdk/cli via node + explicit
         // bin path so `zig build package` never depends on a foreign
         // PATH-resolved `native` binary from another install.
-        // Output layout (v0.1.2):
+        // Output layout (v0.1.3):
         //   zig-out/package/onyx-<version>-linux-ReleaseFast/
         //   zig-out/package/onyx-<version>-windows-ReleaseFast/
         //   zig-out/package/onyx-<version>-macos-ReleaseFast.app/
@@ -252,7 +258,7 @@ pub fn build(b: *std.Build) void {
         const reject = b.addSystemCommand(&.{
             "sh",
             "-c",
-            "echo 'zig build package rejects -Dplatform=null; pass -Dpackage-target=macos|linux|windows or a packageable -Dplatform. FreeBSD/OpenBSD are not Native SDK package targets — use pnpm desktop:release:freebsd|openbsd for portable web/PWA bundles (tools/release-unix.mjs).' >&2; exit 1",
+            "echo 'zig build package rejects -Dplatform=null; pass -Dpackage-target=macos|linux|windows or a packageable -Dplatform. FreeBSD/OpenBSD native hosts use: zig build bsd-host -Dbsd-os=freebsd|openbsd (or pnpm desktop:release:freebsd|openbsd).' >&2; exit 1",
         });
         package_step.dependOn(&reject.step);
     }
@@ -260,6 +266,62 @@ pub fn build(b: *std.Build) void {
     const tests = b.addTest(.{ .root_module = app_mod });
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&b.addRunArtifact(tests).step);
+
+    // ── Zig-native FreeBSD / OpenBSD desktop host (not Native SDK) ─────────
+    // Cross-compiled x86_64-freebsd / x86_64-openbsd; GTK/WebKitGTK via dlopen.
+    // Does not claim GUI execution on the Linux build host.
+    const bsd_os = b.option(BsdOsOption, "bsd-os", "Native BSD desktop host OS: freebsd or openbsd (x86_64)");
+    const bsd_host_step = b.step("bsd-host", "Build Zig-native FreeBSD/OpenBSD desktop host (requires -Dbsd-os=freebsd|openbsd)");
+    const bsd_test_step = b.step("bsd-test", "Run desktop/bsd_host.zig pure unit tests (host-native)");
+
+    const bsd_test_mod = localModule(b, target, optimize, "desktop/bsd_host.zig");
+    const bsd_tests = b.addTest(.{ .root_module = bsd_test_mod });
+    const run_bsd_tests = b.addRunArtifact(bsd_tests);
+    bsd_test_step.dependOn(&run_bsd_tests.step);
+    // Also fold into default `zig build test` so bsd_host stays green.
+    test_step.dependOn(&run_bsd_tests.step);
+
+    if (bsd_os) |os| {
+        const bsd_query = std.Target.Query{
+            .cpu_arch = .x86_64,
+            .os_tag = switch (os) {
+                .freebsd => .freebsd,
+                .openbsd => .openbsd,
+            },
+        };
+        const bsd_target = b.resolveTargetQuery(bsd_query);
+        // Release-shaped by default (package_optimize); honor explicit -Doptimize.
+        const bsd_optimize = package_optimize;
+        const bsd_mod = b.createModule(.{
+            .root_source_file = b.path("desktop/bsd_host.zig"),
+            .target = bsd_target,
+            .optimize = bsd_optimize,
+        });
+        const bsd_exe = b.addExecutable(.{
+            .name = app_exe_name,
+            .root_module = bsd_mod,
+            .use_llvm = true,
+        });
+        // Install under zig-out/bsd/<os>-x86_64/onyx so release-unix can stage packages.
+        const bsd_install = b.addInstallArtifact(bsd_exe, .{
+            .dest_dir = .{
+                .override = .{
+                    .custom = b.fmt("bsd/{s}-x86_64", .{@tagName(os)}),
+                },
+            },
+        });
+        // Release/package stages resources/dist from dist/; rebuild SPA first so
+        // bsd-host never ships a stale frontend tree.
+        bsd_host_step.dependOn(&frontend_build.step);
+        bsd_host_step.dependOn(&bsd_install.step);
+    } else {
+        const bsd_reject = b.addSystemCommand(&.{
+            "sh",
+            "-c",
+            "echo 'zig build bsd-host requires -Dbsd-os=freebsd or -Dbsd-os=openbsd (x86_64 cross target).' >&2; exit 1",
+        });
+        bsd_host_step.dependOn(&bsd_reject.step);
+    }
 }
 
 // Zig 0.16.0's self-hosted x86_64 backend miscompiles the SysV C
@@ -676,11 +738,11 @@ comptime {
     const sample =
         \\.{
         \\    .name = "onyx",
-        \\    .version = "0.1.2",
+        \\    .version = "0.1.3",
         \\}
     ;
     const parsed = packageVersionFromAppZon(sample) orelse @compileError("packageVersionFromAppZon failed to parse sample");
-    if (!std.mem.eql(u8, parsed, "0.1.2")) @compileError("packageVersionFromAppZon expected 0.1.2");
+    if (!std.mem.eql(u8, parsed, "0.1.3")) @compileError("packageVersionFromAppZon expected 0.1.3");
     if (packageVersionFromAppZon("no version field") != null) @compileError("packageVersionFromAppZon should miss without marker");
     if (defaultPackageTarget(.linux) != .linux) @compileError("defaultPackageTarget(linux)");
     if (defaultPackageTarget(.macos) != .macos) @compileError("defaultPackageTarget(macos)");
