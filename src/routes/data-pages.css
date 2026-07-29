@@ -1,3 +1,137 @@
+/* ── /download BSD release surface ─────────────────────────────────────────── */
+.dl-page .dl-section-title {
+  margin: 0 0 16px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.6rem, 1rem + 2vw, 2.4rem);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--paper);
+}
+
+.dl-honesty ul,
+.dl-facts {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--paper-dim);
+  line-height: 1.55;
+}
+
+.dl-honesty li + li,
+.dl-facts li + li {
+  margin-top: 0.55rem;
+}
+
+.dl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: clamp(16px, 2vw, 28px);
+}
+
+.dl-card .dl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.dl-checksum {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--seam-faint);
+}
+
+.dl-checksum-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+  margin-bottom: 8px;
+}
+
+.dl-checksum-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.dl-hash {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--lapis-bright);
+}
+
+.dl-checksum-missing {
+  margin: 0;
+  color: var(--paper-mute);
+  font-size: 0.92rem;
+}
+
+.dl-install {
+  margin-top: 20px;
+}
+
+.dl-install h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: var(--paper);
+}
+
+.dl-pre {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 72%, transparent);
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.dl-copy {
+  appearance: none;
+  border: 1px solid var(--seam-faint);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: color-mix(in oklab, var(--stone-2) 40%, transparent);
+  color: var(--paper);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.dl-copy:hover,
+.dl-copy:focus-visible {
+  border-color: var(--lapis-bright);
+  outline: none;
+}
+
+.dl-copy[data-state='copied'] {
+  color: var(--lapis-bright);
+}
+
+.dl-note {
+  margin: 12px 0 0;
+  color: var(--paper-mute);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.dl-note code,
+.dl-honesty code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+
 .data-page .r-status nav a[aria-current='page'] {
   color: var(--paper);
 }

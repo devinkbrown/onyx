@@ -17,12 +17,13 @@ import { PublicFooter } from './PublicFooter';
  * Contract: docs/PUBLIC_COMPANY_SITE.md
  * Proof order: browser entry → Rooms/Messages/Calls/Continuity → live
  * telemetry → audience paths → Trust/Technology evidence.
- * Open Onyx is the only primary CTA. Desktop downloads stay gated.
+ * Open Onyx is the only primary CTA. FreeBSD/OpenBSD unsigned hosts are a
+ * secondary operator path at /download/ — not a signed multi-platform ship claim.
  */
 export default function Landing() {
   setPageMeta(
     'Onyx — talk, stream, and stay with your people',
-    'Onyx is a public communication service for communities, creators, gaming crews, organizations, and power users. Open in the browser now; install as a PWA from a supporting browser. Native desktop downloads stay gated. Powered by Onyx Server.',
+    'Onyx is a public communication service for communities, creators, gaming crews, organizations, and power users. Open in the browser now; install as a PWA from a supporting browser. FreeBSD and OpenBSD operators can fetch unsigned native hosts with install.sh from /download/. Signed multi-platform installers remain pending. Powered by Onyx Server.',
     '/',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
@@ -117,12 +118,21 @@ export default function Landing() {
             <div class="r-cta">
               <a class="r-btn primary" href="/app/">Open Onyx &rarr;</a>
               <a class="r-btn ghost" href="#product">See what you get</a>
+              <a class="r-btn ghost" href="/download/">BSD downloads</a>
             </div>
             <p class="r-desktop-note">
               <strong>Browser now.</strong> The full client opens in your browser —
               no install required. On a supporting browser you can also install Onyx as a
-              PWA. Native desktop downloads remain gated until installers, signing,
-              updater, checksums, and release gates are green.
+              PWA. FreeBSD and OpenBSD operators can download
+              {' '}
+              <a href="/download/">unsigned v0.1.3 native host tarballs</a>
+              {' '}
+              with
+              {' '}
+              <code>install.sh</code>
+              {' '}
+              (GTK4 + WebKitGTK runtime; site-local checksums; not signed; GUI not claimed from the Linux build host).
+              Signed Windows/macOS/Linux installers, notarization, and auto-update remain pending.
             </p>
             <div class="r-ticker" aria-label="Product highlights">
               <span><b>rooms</b> · spaces that stay open</span>
@@ -391,7 +401,7 @@ export default function Landing() {
         <p class="r-lede">
           You do not need this section to use Onyx. It is here so claims stay accountable.
           Powered by Onyx Server — the engine behind the public service.
-          Dedicated Trust, Technology, Download, and legal pages stay gated until they carry real content.
+          Dedicated Trust, Technology, and legal pages stay gated until they carry real content. FreeBSD/OpenBSD unsigned hosts live at /download/.
         </p>
         <div class="r-strip">
           <div class="r-spec">

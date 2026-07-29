@@ -35,6 +35,11 @@
 #                   no live backup/rsync/ACL.
 #   ONYX_WEB_USER   Account granted execute on the live parent (default: http)
 #   ONYX_LANDING    Override path to the legacy landing tree (default: /home/kain/landing)
+#   ONYX_STAGE_BSD_DOWNLOADS  If 1, copy FreeBSD/OpenBSD release tarballs into
+#                   dist/downloads/v0.1.3/ via tools/stage-bsd-downloads.mjs.
+#                   Normal deploy leaves this unset (no binary staging).
+#   ONYX_PUBLISH_BSD_DOWNLOADS  If 1 (with stage), fail closed when either BSD
+#                   lane artifact is missing under zig-out/release/.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -68,6 +73,7 @@ SPA_OWNED_BLOCKLIST=(
   app
   appearance
   invite
+  download
   stats
   status
   roadmap
@@ -75,6 +81,7 @@ SPA_OWNED_BLOCKLIST=(
   glossary
   integrations
   agents
+  downloads
   assets
   manifest.json
   sw.js
@@ -679,6 +686,22 @@ deploy_main() {
 
   test -f dist/app/index.html \
     || { echo "FAIL: dist/app/index.html missing after materialise"; exit 1; }
+  test -f dist/download/index.html \
+    || { echo "FAIL: dist/download/index.html missing after materialise"; exit 1; }
+
+  # Optional: stage site-local FreeBSD/OpenBSD release artifacts (never the default).
+  # Binaries are not committed; operators must produce them via desktop:release:*.
+  if [[ "${ONYX_STAGE_BSD_DOWNLOADS:-0}" == "1" || "${ONYX_PUBLISH_BSD_DOWNLOADS:-0}" == "1" ]]; then
+    echo "==> staging BSD download artifacts into dist/downloads/ (explicit env)"
+    stage_args=()
+    if [[ "${ONYX_PUBLISH_BSD_DOWNLOADS:-0}" == "1" ]]; then
+      stage_args+=(--require)
+    fi
+    node tools/stage-bsd-downloads.mjs "${stage_args[@]}" \
+      || { echo "FAIL: stage-bsd-downloads failed (publish mode fails closed when artifacts missing)"; exit 1; }
+  else
+    echo "==> skipping BSD download artifact staging (set ONYX_STAGE_BSD_DOWNLOADS=1 to enable)"
+  fi
 
   echo "==> stamping service-worker cache: onyx-shell-${version}"
   sed -i "s/onyx-shell-__BUILD_VERSION__/onyx-shell-${version}/" dist/sw.js

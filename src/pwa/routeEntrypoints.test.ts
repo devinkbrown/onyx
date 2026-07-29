@@ -41,6 +41,10 @@ const expected = {
     title: 'Join Onyx — open a room invite',
     description: 'Open an Onyx invite to join a room as a guest or with your account, carrying its topic, moment, and reading context.',
   },
+  download: {
+    title: 'Download Onyx — FreeBSD & OpenBSD native hosts',
+    description: 'Download unsigned Onyx v0.1.3 FreeBSD and OpenBSD native host tarballs with install.sh. Not signed. Browser and PWA remain the primary paths.',
+  },
   accessibility: {
     title: 'Onyx accessibility — access is a requirement',
     description: 'Read the public Onyx accessibility contract for keyboard use, focus recovery, motion, contrast, and status announcements.',

@@ -380,6 +380,212 @@ export function linuxHonestyNotice(opts = {}) {
 }
 
 /**
+ * Primary runtime packages install.sh installs automatically (GTK4 + WebKitGTK 6).
+ * Secondary GTK3 pairs remain runtime-compatible in the host but are not auto-installed.
+ * @type {Readonly<{ freebsd: readonly string[], openbsd: readonly string[] }>}
+ */
+export const BSD_PRIMARY_RUNTIME_PACKAGES = Object.freeze({
+  freebsd: Object.freeze(['gtk4', 'webkit2-gtk_60']),
+  openbsd: Object.freeze(['gtk+4', 'webkitgtk60']),
+});
+
+/**
+ * Generate a fail-closed, idempotent install.sh for a native BSD package root.
+ * Never curl-pipes or downloads code; only native package managers for deps.
+ * @param {'freebsd' | 'openbsd'} os
+ * @param {{ version?: string }} [opts]
+ * @returns {string}
+ */
+export function generateBsdInstallSh(os, opts = {}) {
+  if (os !== 'freebsd' && os !== 'openbsd') {
+    throw new Error(`generateBsdInstallSh: os must be freebsd|openbsd, got ${os}`);
+  }
+  const version = opts.version ?? RELEASE_PRODUCT_VERSION;
+  const osLabel = os === 'freebsd' ? 'FreeBSD' : 'OpenBSD';
+  const uname = os === 'freebsd' ? 'FreeBSD' : 'OpenBSD';
+  const pkgs = BSD_PRIMARY_RUNTIME_PACKAGES[os];
+  const pkgList = pkgs.join(' ');
+  const depInstall =
+    os === 'freebsd'
+      ? [
+          '  if command -v pkg >/dev/null 2>&1; then',
+          `    run_cmd pkg install -y ${pkgList}`,
+          '  else',
+          '    die "pkg(8) not found; install FreeBSD pkg and retry, or install deps manually"',
+          '  fi',
+        ].join('\n')
+      : [
+          '  if command -v pkg_add >/dev/null 2>&1; then',
+          `    run_cmd pkg_add ${pkgList}`,
+          '  else',
+          '    die "pkg_add not found; install OpenBSD packages tools and retry, or install deps manually"',
+          '  fi',
+        ].join('\n');
+
+  return [
+    '#!/bin/sh',
+    `# Onyx ${version} — ${osLabel} ${RELEASE_BSD_ARCH} native host installer`,
+    '# Fail-closed. Idempotent. No remote-shell pipe install, no remote code download.',
+    '# Root/network is required ONLY when automatic system dependency install runs.',
+    'set -eu',
+    '',
+    `EXPECTED_OS="${uname}"`,
+    `PRODUCT_VERSION="${version}"`,
+    `DEFAULT_PREFIX="/usr/local"`,
+    `RUNTIME_PACKAGES="${pkgList}"`,
+    'PREFIX="$DEFAULT_PREFIX"',
+    'DRY_RUN=0',
+    'INSTALL_DEPS=1',
+    '',
+    'usage() {',
+    '  cat <<EOF',
+    `Usage: ./install.sh [options]`,
+    '',
+    `Install Onyx ${version} native ${osLabel} host (bin/ + resources/) into PREFIX.`,
+    '',
+    'Options:',
+    '  --prefix DIR   Install root (default: /usr/local). Safe for non-root test trees.',
+    '  --no-deps      Skip automatic system package install of GTK4+WebKitGTK runtime.',
+    '  --dry-run      Print actions without changing the system or PREFIX.',
+    '  -h, --help     Show this help and exit.',
+    '',
+    'Behavior:',
+    `  - Detects exact OS via uname -s (must be ${uname}).`,
+    `  - Optionally installs primary runtime packages: ${pkgList}`,
+    '  - Copies bin/onyx and resources/ under PREFIX (layout: PREFIX/bin, PREFIX/resources).',
+    '  - Idempotent: re-running overwrites the same paths safely.',
+    '',
+    'Privilege / network:',
+    '  - Root (or sufficient privileges) and network are needed ONLY for automatic',
+    '    system dependency install via the native package manager.',
+    '  - With --prefix under a user-writable directory and --no-deps, no root is required.',
+    '',
+    'This script never downloads Onyx code from the network and never pipes a remote shell.',
+    'Artifact is UNSIGNED (no codesign/notarize claim).',
+    'EOF',
+    '}',
+    '',
+    'die() {',
+    '  printf \'error: %s\\n\' "$*" >&2',
+    '  exit 1',
+    '}',
+    '',
+    'log() {',
+    '  printf \'%s\\n\' "$*"',
+    '}',
+    '',
+    'run_cmd() {',
+    '  if [ "$DRY_RUN" -eq 1 ]; then',
+    '    printf \'[dry-run]\'',
+    '    printf \' %s\' "$@"',
+    '    printf \'\\n\'',
+    '    return 0',
+    '  fi',
+    '  "$@"',
+    '}',
+    '',
+    'while [ "$#" -gt 0 ]; do',
+    '  case "$1" in',
+    '    --prefix)',
+    '      [ "$#" -ge 2 ] || die "--prefix requires a directory argument"',
+    '      PREFIX="$2"',
+    '      shift 2',
+    '      ;;',
+    '    --prefix=*)',
+    '      PREFIX="${1#--prefix=}"',
+    '      shift',
+    '      ;;',
+    '    --no-deps)',
+    '      INSTALL_DEPS=0',
+    '      shift',
+    '      ;;',
+    '    --dry-run)',
+    '      DRY_RUN=1',
+    '      shift',
+    '      ;;',
+    '    -h|--help)',
+    '      usage',
+    '      exit 0',
+    '      ;;',
+    '    --)',
+    '      shift',
+    '      break',
+    '      ;;',
+    '    -*)',
+    '      die "unknown option: $1 (try --help)"',
+    '      ;;',
+    '    *)',
+    '      die "unexpected argument: $1 (try --help)"',
+    '      ;;',
+    '  esac',
+    'done',
+    '',
+    '[ "$#" -eq 0 ] || die "unexpected arguments: $* (try --help)"',
+    '',
+    'SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)',
+    'SRC_BIN="$SCRIPT_DIR/bin/onyx"',
+    'SRC_RES="$SCRIPT_DIR/resources"',
+    '',
+    'case "$PREFIX" in',
+    '  "" ) die "--prefix must not be empty" ;;',
+    '  "/" ) die "--prefix must not be the filesystem root" ;;',
+    '  /* ) ;;',
+    '  * ) die "--prefix must be an absolute path (got: $PREFIX)" ;;',
+    'esac',
+    'case "/$PREFIX/" in',
+    '  */../*|*/./* ) die "--prefix must not contain dot path segments (got: $PREFIX)" ;;',
+    'esac',
+    '',
+    'OS_NAME=$(uname -s 2>/dev/null || true)',
+    '[ "$OS_NAME" = "$EXPECTED_OS" ] || die "this installer is for $EXPECTED_OS only (uname -s reported: ${OS_NAME:-unknown})"',
+    '',
+    'ARCH_NAME=$(uname -m 2>/dev/null || true)',
+    'case "$ARCH_NAME" in',
+    '  amd64|x86_64) ;;',
+    '  *) die "this package is for x86_64/amd64 only (uname -m reported: ${ARCH_NAME:-unknown})" ;;',
+    'esac',
+    '',
+    '[ -f "$SRC_BIN" ] || die "missing package binary: $SRC_BIN (extract the full tarball first)"',
+    '[ -f "$SRC_RES/dist/index.html" ] || die "missing SPA resources: $SRC_RES/dist/index.html"',
+    '',
+    'if [ "$INSTALL_DEPS" -eq 1 ]; then',
+    '  log "installing primary runtime packages (may need root + network): $RUNTIME_PACKAGES"',
+    depInstall,
+    'else',
+    '  log "skipping system dependency install (--no-deps); ensure $RUNTIME_PACKAGES are present"',
+    'fi',
+    '',
+    'DEST_BIN_DIR="$PREFIX/bin"',
+    'DEST_RES_DIR="$PREFIX/resources"',
+    '',
+    'log "installing Onyx $PRODUCT_VERSION -> $PREFIX"',
+    'run_cmd mkdir -p "$DEST_BIN_DIR"',
+    'run_cmd mkdir -p "$DEST_RES_DIR"',
+    'run_cmd cp -f "$SRC_BIN" "$DEST_BIN_DIR/onyx"',
+    'if [ "$DRY_RUN" -eq 0 ]; then',
+    '  chmod 755 "$DEST_BIN_DIR/onyx" || die "chmod failed on $DEST_BIN_DIR/onyx"',
+    'else',
+    '  log "[dry-run] chmod 755 $DEST_BIN_DIR/onyx"',
+    'fi',
+    '',
+    '# Idempotent resources tree: remove previous tree then copy fresh.',
+    'if [ "$DRY_RUN" -eq 1 ]; then',
+    '  log "[dry-run] rm -rf $DEST_RES_DIR/dist"',
+    '  log "[dry-run] cp -R $SRC_RES/dist $DEST_RES_DIR/dist"',
+    'else',
+    '  rm -rf "$DEST_RES_DIR/dist"',
+    '  cp -R "$SRC_RES/dist" "$DEST_RES_DIR/dist" || die "failed to copy resources/dist"',
+    'fi',
+    '',
+    'log "installed: $DEST_BIN_DIR/onyx"',
+    'log "installed: $DEST_RES_DIR/dist (SPA assets)"',
+    'log "launch (graphical session): $DEST_BIN_DIR/onyx"',
+    'log "note: package is UNSIGNED; install.sh never claims codesign, notarization, or virus-free status"',
+    '',
+  ].join('\n');
+}
+
+/**
  * Honesty notice for native FreeBSD/OpenBSD Zig desktop host packages.
  * @param {'freebsd' | 'openbsd'} os
  * @param {{ version?: string, host?: string }} [opts]
@@ -390,10 +596,11 @@ export function bsdHonestyNotice(os, opts = {}) {
   const host = opts.host ?? `${process.platform}/${process.arch}`;
   const osLabel = os === 'freebsd' ? 'FreeBSD' : 'OpenBSD';
   const triple = os === 'freebsd' ? 'x86_64-freebsd' : 'x86_64-openbsd';
+  const primary = BSD_PRIMARY_RUNTIME_PACKAGES[os].join(' ');
   const pkgHint =
     os === 'freebsd'
-      ? 'pkg install gtk4 webkit2-gtk_60 glib  (or gtk3 webkit2-gtk_41) — matching pair only'
-      : 'pkg_add gtk+4 webkitgtk60 glib2  (or gtk+3 webkitgtk4) — matching pair only';
+      ? `install.sh → pkg install ${primary}  (host also accepts gtk3+webkit2-gtk_41 pair at runtime)`
+      : `install.sh → pkg_add ${primary}  (host also accepts gtk+3+webkitgtk4 pair at runtime)`;
   return [
     `Onyx desktop ${version} — ${osLabel} ${RELEASE_BSD_ARCH} UNSIGNED native host package`,
     '',
@@ -401,20 +608,30 @@ export function bsdHonestyNotice(os, opts = {}) {
     `  - Zig-native desktop host (desktop/bsd_host.zig) for ${triple}`,
     '  - Dynamically loads GTK + WebKitGTK at runtime (clear error if missing)',
     '  - Embeds the SolidJS SPA under resources/dist (same pnpm build dist/)',
+    '  - One-install surface: ./install.sh (idempotent, fail-closed, no curl|sh)',
     '  - Single tar.gz — NOT signed, NO auto-updater, NO store installer claim',
     '',
     'What this is NOT / not claimed:',
     '  - NOT a portable-web / PWA / localhost-only bundle',
     '  - NOT the Native SDK linux/macos/windows backend',
+    '  - NOT codesigned / notarized / virus-scanned / store-ready',
     '  - Cross-packaging on Linux validates ELF OS/machine + package layout only;',
     `    it does NOT claim GUI launch was executed on real ${osLabel} from this host`,
     '  - Built/packaged on host: ' + host,
     '',
     `Requirements on ${osLabel} ${RELEASE_BSD_ARCH}:`,
     `  - ${pkgHint}`,
-    '  - extract and run bin/onyx from the package tree (needs a graphical session)',
+    '  - root/network only when install.sh auto-installs system packages',
+    '  - graphical session to launch bin/onyx (or PREFIX/bin/onyx after install)',
     '',
-    'Reproduce:',
+    'Install (on the target OS):',
+    '  tar xzf onyx-…-unsigned.tar.gz',
+    '  cd onyx-…',
+    '  ./install.sh                  # default PREFIX=/usr/local',
+    '  ./install.sh --prefix "$HOME/onyx-prefix" --no-deps   # non-root test tree',
+    '  ./install.sh --dry-run',
+    '',
+    'Reproduce packaging:',
     '  pnpm install',
     '  pnpm build',
     `  pnpm desktop:release:${os}`,
@@ -570,6 +787,7 @@ export function validateBsdPackageLayout(packageDir, os, opts = {}) {
 
   const required = [
     'bin/onyx',
+    'install.sh',
     'README.txt',
     'package-manifest.zon',
     'resources/dist/index.html',
@@ -609,6 +827,18 @@ export function validateBsdPackageLayout(packageDir, os, opts = {}) {
           errors.push(`bin/onyx PT_INTERP is ${interp}, expected ${BSD_PT_INTERP[os]}`);
         }
       }
+    }
+  }
+
+  if (exists(join(root, 'install.sh'))) {
+    try {
+      const installer = String(read(join(root, 'install.sh')));
+      const installCheck = validateBsdInstallShContent(installer, os, { version });
+      if (!installCheck.ok) {
+        for (const e of installCheck.errors) errors.push(`install.sh: ${e}`);
+      }
+    } catch (e) {
+      errors.push(`cannot read install.sh: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -660,11 +890,88 @@ export function validateBsdPackageLayout(packageDir, os, opts = {}) {
       if (!/does NOT claim GUI launch|does not claim GUI launch|not claim GUI/i.test(text)) {
         errors.push('README.txt must not fabricate GUI launch claims for cross-build hosts');
       }
+      if (!/install\.sh/i.test(text)) {
+        errors.push('README.txt must document install.sh one-install path');
+      }
     } catch (e) {
       errors.push(`cannot read README.txt: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
+  if (errors.length) return { ok: false, errors };
+  return { ok: true };
+}
+
+/**
+ * Fail-closed content checks for generated BSD install.sh (unit-testable).
+ * @param {string} text
+ * @param {'freebsd' | 'openbsd'} os
+ * @param {{ version?: string }} [opts]
+ * @returns {{ ok: true } | { ok: false, errors: string[] }}
+ */
+export function validateBsdInstallShContent(text, os, opts = {}) {
+  const version = opts.version ?? RELEASE_PRODUCT_VERSION;
+  const errors = [];
+  const body = String(text ?? '');
+  if (!body.startsWith('#!/bin/sh')) errors.push('must start with #!/bin/sh');
+  if (!/set -eu/.test(body)) errors.push('must enable set -eu');
+  if (!/--help/.test(body) || !/--dry-run/.test(body) || !/--prefix/.test(body)) {
+    errors.push('must support --help, --dry-run, and --prefix');
+  }
+  if (!/DEFAULT_PREFIX="\/usr\/local"/.test(body)) {
+    errors.push('default prefix must be /usr/local');
+  }
+  if (!/--prefix must not be the filesystem root/.test(body)) {
+    errors.push('must reject filesystem-root prefix');
+  }
+  if (!/--prefix must not contain dot path segments/.test(body)) {
+    errors.push('must reject dot path segments in prefix');
+  }
+  const expectedOs = os === 'freebsd' ? 'FreeBSD' : 'OpenBSD';
+  if (!body.includes(`EXPECTED_OS="${expectedOs}"`)) {
+    errors.push(`must pin EXPECTED_OS to ${expectedOs}`);
+  }
+  if (!body.includes(`PRODUCT_VERSION="${version}"`)) {
+    errors.push(`must pin PRODUCT_VERSION to ${version}`);
+  }
+  for (const pkg of BSD_PRIMARY_RUNTIME_PACKAGES[os]) {
+    if (!body.includes(pkg)) errors.push(`must install primary package ${pkg}`);
+  }
+  // Fail closed: no secondary GTK3 auto-install as primary path confusion.
+  if (os === 'freebsd' && /pkg install[^\n]*webkit2-gtk_41/.test(body)) {
+    errors.push('must not auto-install secondary webkit2-gtk_41 as primary path');
+  }
+  if (os === 'openbsd' && /pkg_add[^\n]*webkitgtk4\b/.test(body) && !/webkitgtk60/.test(body)) {
+    errors.push('must auto-install webkitgtk60 primary, not only webkitgtk4');
+  }
+  // Reject actual remote-fetch invocations (command position), not prose about avoiding them.
+  if (
+    /(^|[;&|`\n\r\t])\s*curl(\s|$)/m.test(body) ||
+    /(^|[;&|`\n\r\t])\s*wget(\s|$)/m.test(body)
+  ) {
+    errors.push('must never download remote code (no curl/wget invocation)');
+  }
+  if (/(^|[;&|`\n\r\t])\s*curl\s+[^|\n]*\|/m.test(body) || /(^|[;&|`\n\r\t])\s*wget\s+[^|\n]*\|/m.test(body)) {
+    errors.push('must never curl|pipe or wget|pipe');
+  }
+  if (!/Root \(or sufficient privileges\) and network are needed ONLY/i.test(body)) {
+    errors.push('must state root/network only for automatic system dependency install');
+  }
+  if (!/UNSIGNED/i.test(body)) {
+    errors.push('must state artifact is UNSIGNED');
+  }
+  if (os === 'freebsd' && !/pkg install -y/.test(body)) {
+    errors.push('FreeBSD installer must use pkg install -y');
+  }
+  if (os === 'openbsd' && !/\bpkg_add\b/.test(body)) {
+    errors.push('OpenBSD installer must use pkg_add');
+  }
+  if (!body.includes('DEST_BIN_DIR="$PREFIX/bin"') || !body.includes('DEST_RES_DIR="$PREFIX/resources"')) {
+    errors.push('must install bin/ and resources/ under PREFIX');
+  }
+  if (!/cp -f "\$SRC_BIN" "\$DEST_BIN_DIR\/onyx"/.test(body)) {
+    errors.push('must copy package bin/onyx into PREFIX/bin/onyx');
+  }
   if (errors.length) return { ok: false, errors };
   return { ok: true };
 }
@@ -957,6 +1264,10 @@ export function stageBsdPackage(os, packageDir, hostBinPath, distDir, opts = {})
     'utf8',
   );
   writeFileSync(join(packageDir, `UNSIGNED-${os.toUpperCase()}.txt`), notice, 'utf8');
+  const installSh = generateBsdInstallSh(os, { version });
+  const installPath = join(packageDir, 'install.sh');
+  writeFileSync(installPath, installSh, 'utf8');
+  chmodSync(installPath, 0o755);
   return { ok: true };
 }
 

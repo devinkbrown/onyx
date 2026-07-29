@@ -37,7 +37,9 @@
     "desktop:release:freebsd": "node tools/release-unix.mjs freebsd",
     "desktop:release:openbsd": "node tools/release-unix.mjs openbsd",
     "desktop:package:macos": "node tools/desktop-zig.mjs build package -Dplatform=macos",
-    "desktop:release:macos": "node tools/release-unix.mjs macos"
+    "desktop:release:macos": "node tools/release-unix.mjs macos",
+    "desktop:stage-bsd-downloads": "node tools/stage-bsd-downloads.mjs",
+    "desktop:stage-bsd-downloads:publish": "node tools/stage-bsd-downloads.mjs --require"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.2.9",

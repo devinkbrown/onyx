@@ -24,21 +24,28 @@ describe('Landing', () => {
     expect(enter.length).toBeGreaterThan(0);
   });
 
-  it('teaches browser-first entry, conservative PWA install, and gates native desktop downloads', () => {
-    const { getAllByText, queryByText, container } = render(() => <Landing />);
+  it('teaches browser-first entry, conservative PWA install, and honest BSD operator downloads', () => {
+    const { getAllByText, queryByText, container, getAllByRole } = render(() => <Landing />);
     expect(getAllByText(/Browser now/i).length).toBeGreaterThan(0);
     expect(getByTextMatching(container, /no install required/i)).toBeTruthy();
     expect(getByTextMatching(container, /install Onyx as a\s*PWA/i)).toBeTruthy();
     expect(getByTextMatching(container, /supporting browser/i)).toBeTruthy();
-    expect(getByTextMatching(container, /Native desktop downloads remain gated/i)).toBeTruthy();
-    expect(getByTextMatching(container, /installers,\s*signing,\s*updater,\s*checksums,\s*and release gates/i)).toBeTruthy();
-    expect(getByTextMatching(container, /release gates are green/i)).toBeTruthy();
+    expect(getByTextMatching(container, /unsigned v0\.1\.3 native host tarballs/i)).toBeTruthy();
+    expect(getByTextMatching(container, /install\.sh/i)).toBeTruthy();
+    expect(getByTextMatching(container, /not signed/i)).toBeTruthy();
+    expect(getByTextMatching(container, /Signed Windows\/macOS\/Linux installers/i)).toBeTruthy();
+    const downloadLinks = getAllByRole('link').filter((a) => {
+      const href = a.getAttribute('href') ?? '';
+      return href === '/download' || href === '/download/' || href.startsWith('/download');
+    });
+    expect(downloadLinks.length).toBeGreaterThan(0);
     // Premature ship claims must stay off Home.
     expect(queryByText(/downloadable desktop apps are part of the Onyx 1\.0 launch/i)).not.toBeInTheDocument();
     expect(queryByText(/Desktop apps ship with the launch/i)).not.toBeInTheDocument();
     expect(queryByText(/Desktop with the launch/i)).not.toBeInTheDocument();
     expect(queryByText(/desktop apps are part of the launch/i)).not.toBeInTheDocument();
     expect(queryByText(/desktop apps with the launch/i)).not.toBeInTheDocument();
+    expect(queryByText(/signed installer available/i)).not.toBeInTheDocument();
   });
 
   it('presents Rooms, Messages, Calls, and Continuity as product pillars', () => {
@@ -94,6 +101,7 @@ describe('Landing', () => {
     expect(queryByText(/download now/i)).not.toBeInTheDocument();
     expect(queryByText(/get the desktop app/i)).not.toBeInTheDocument();
     expect(queryByText(/signed installer available/i)).not.toBeInTheDocument();
+    expect(queryByText(/virus-free/i)).not.toBeInTheDocument();
   });
 
   it('labels the product tableau as a preview, not live content', () => {
@@ -153,7 +161,7 @@ describe('Landing', () => {
     expect(container.querySelector('.r-status .enter')).toBeTruthy();
   });
 
-  it('keeps public routes for app, status, stats, about, roadmap, and invite', () => {
+  it('keeps public routes for app, status, stats, about, roadmap, invite, and download', () => {
     const { getAllByRole } = render(() => <Landing />);
     const hrefs = getAllByRole('link').map((a) => a.getAttribute('href'));
     expect(hrefs).toContain('/app/');
@@ -162,8 +170,8 @@ describe('Landing', () => {
     expect(hrefs).toContain('/roadmap/');
     expect(hrefs).toContain('/about/');
     expect(hrefs.some((h) => h?.startsWith('/invite/'))).toBe(true);
-    // Gated surfaces must not appear as real routes yet.
-    expect(hrefs.some((h) => h === '/download' || h === '/download/' || h?.startsWith('/download'))).toBe(false);
+    expect(hrefs.some((h) => h === '/download' || h === '/download/' || h?.startsWith('/download'))).toBe(true);
+    // Still-gated surfaces must not appear as real routes yet.
     expect(hrefs.some((h) => h?.includes('/enterprise'))).toBe(false);
     expect(hrefs.some((h) => h?.includes('/legal'))).toBe(false);
   });
@@ -185,17 +193,20 @@ describe('Landing', () => {
     expect(description).toMatch(/public communication service/i);
     expect(description).toMatch(/Open in the browser now/i);
     expect(description).toMatch(/install as a PWA from a supporting browser/i);
-    expect(description).toMatch(/Native desktop downloads stay gated/i);
+    expect(description).toMatch(/FreeBSD and OpenBSD operators/i);
+    expect(description).toMatch(/\/download\//i);
+    expect(description).toMatch(/Signed multi-platform installers remain pending/i);
     expect(ogDescription).toMatch(/public communication service|Open in the browser now/i);
     expect(twitterDescription).toMatch(/public communication service|Open in the browser now/i);
 
-    // Client-side head must not reintroduce premature desktop ship promises.
+    // Client-side head must not reintroduce premature multi-platform ship promises.
     expect(headCopy).not.toMatch(/desktop apps are part of the launch/i);
     expect(headCopy).not.toMatch(/desktop apps with the launch/i);
     expect(headCopy).not.toMatch(/Desktop apps ship with the launch/i);
     expect(headCopy).not.toMatch(/Desktop with the launch/i);
     expect(headCopy).not.toMatch(/signed installer available/i);
     expect(headCopy).not.toMatch(/get the desktop app/i);
+    expect(headCopy).not.toMatch(/virus-free/i);
   });
 
   it('renders the brand mascot accessibly', () => {

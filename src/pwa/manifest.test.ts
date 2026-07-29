@@ -59,13 +59,14 @@ describe('PWA manifest', () => {
     expect(description).toMatch(/public communication service/i);
     expect(description).toMatch(/Open in the browser now/i);
     expect(description).toMatch(/install as a PWA from a supporting browser/i);
-    expect(description).toMatch(/Native desktop downloads stay gated/i);
+    expect(description).toMatch(/FreeBSD and OpenBSD operators|unsigned native hosts/i);
+    expect(description).toMatch(/Signed multi-platform installers remain pending/i);
     expect(ogDescription).toMatch(/Open Onyx in the browser now/i);
     expect(ogDescription).toMatch(/install as a PWA from a supporting browser/i);
-    expect(ogDescription).toMatch(/Native desktop downloads stay gated/i);
+    expect(ogDescription).toMatch(/\/download\/|unsigned native hosts/i);
     expect(twitterDescription).toMatch(/Browser now/i);
     expect(twitterDescription).toMatch(/installable PWA from supporting browsers/i);
-    expect(twitterDescription).toMatch(/Native desktop downloads stay gated/i);
+    expect(twitterDescription).toMatch(/\/download\/|unsigned hosts/i);
 
     // Premature native-ship promises must stay out of entry/share metadata.
     // Keep patterns specific so form-factor labels like "desktop connect screen"
@@ -226,6 +227,8 @@ describe('PWA manifest', () => {
       'appearance',
       'assets',
       'codecs',
+      'download',
+      'downloads',
       'favicon.ico',
       'favicon.svg',
       'glossary',

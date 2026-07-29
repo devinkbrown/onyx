@@ -70,8 +70,9 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
 - Package scripts: `desktop:build` / `test` / `dev` use **host-native**
   `zig build` (auto platform). Explicit `desktop:*:linux` and
   `desktop:*:null` diagnostics exist separately.
-- Honest status: **installers, signing, updater, public downloads, and
-  desktop deploy are not done.**
+- Honest status: **signed multi-platform installers, updater, and notarization
+  are not done.** FreeBSD/OpenBSD have an unsigned one-install tarball lane
+  (`install.sh` + site-local `/download/` staging).
 - **Windows x86_64 unsigned zip lane (v0.1.3):** `pnpm desktop:release:windows`
   (`tools/release-windows.mjs`) runs Native SDK `native package` via
   `zig build package -Dplatform=windows -Dtarget=x86_64-windows`, then
@@ -85,21 +86,26 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   one tar.gz + SHA-256 + embedded notice. **Not** AppImage/Flatpak/deb.
 - **FreeBSD / OpenBSD native Zig host (v0.1.3):** `pnpm desktop:release:freebsd`
   / `pnpm desktop:release:openbsd` — cross-compile `desktop/bsd_host.zig` to
-  `x86_64-freebsd` / `x86_64-openbsd`, stage `bin/onyx` + `resources/dist`,
-  validate ELF machine + PT_INTERP OS identity + launch contract, then one
-  unsigned tar.gz + SHA-256. Runtime **dlopen**s a matching toolkit pair only
-  (GTK4+webkitgtk-6.0 or GTK3+webkit2gtk-4.x; never mixed), runs
-  **GtkApplication** + `g_application_run`, and serves SPA assets from a
-  **loopback-only** fixed-port HTTP server at `http://127.0.0.1:42691/app`
-  (not `file://`, never ephemeral). Port **42691** is product-stable for
-  localStorage/IndexedDB/session-resume origin; bind failure is fail-closed
-  single-instance (no alternate port). Package install pairs:
-  FreeBSD `gtk4`+`webkit2-gtk_60` or `gtk3`+`webkit2-gtk_41`; OpenBSD
-  `gtk+4`+`webkitgtk60` or `gtk+3`+`webkitgtk4`. Clear fail-closed errors if
-  libs/dist missing. **Not** Native SDK; **not** portable-web/PWA. Cross-build
+  `x86_64-freebsd` / `x86_64-openbsd`, stage `bin/onyx` + `resources/dist` +
+  idempotent `install.sh`, validate ELF machine + PT_INTERP OS identity +
+  launch contract + installer content, then one unsigned tar.gz + SHA-256.
+  Runtime **dlopen**s a matching toolkit pair only (GTK4+webkitgtk-6.0 or
+  GTK3+webkit2gtk-4.x; never mixed), runs **GtkApplication** +
+  `g_application_run`, and serves SPA assets from a **loopback-only** fixed-port
+  HTTP server at `http://127.0.0.1:42691/app` (not `file://`, never ephemeral).
+  Port **42691** is product-stable for localStorage/IndexedDB/session-resume
+  origin; bind failure is fail-closed single-instance (no alternate port).
+  **`install.sh` auto-installs only the primary GTK4 pair:** FreeBSD
+  `gtk4`+`webkit2-gtk_60`; OpenBSD `gtk+4`+`webkitgtk60`. Default
+  `PREFIX=/usr/local`; supports `--prefix`, `--no-deps`, `--dry-run`, `--help`;
+  never curl-pipes; root/network only for automatic system package install.
+  Host still accepts secondary GTK3 pairs at runtime if already present.
+  **Not** Native SDK; **not** portable-web/PWA; **not** codesigned. Cross-build
   on Linux validates ELF/package layout only — **does not claim GUI launch**
-  on real FreeBSD/OpenBSD from this host. `zig build bsd-host` depends on
-  `frontend-build` so release stages a fresh `dist/`.
+  on real FreeBSD/OpenBSD from this host. Public surface: `/download/` + optional
+  `pnpm desktop:stage-bsd-downloads` → `dist/downloads/v0.1.3/` (deploy only
+  when `ONYX_STAGE_BSD_DOWNLOADS=1`; publish fail-closed with
+  `ONYX_PUBLISH_BSD_DOWNLOADS=1`).
 - **macOS unsigned DMG lane (v0.1.3):** `pnpm desktop:release:macos` runs
   **only on Darwin** and **fails closed** on Linux/other hosts (never
   fabricates a `.app`/DMG without a real Mac + Apple tools). Produces
@@ -135,7 +141,8 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
 | `pnpm desktop:release:linux` | **Tooling present** — one tar.gz under `zig-out/release/linux-x86_64/` after ELF/manifest/resources validation; needs WebKitGTK 6 + Zig pin |
 | `pnpm desktop:release:freebsd` / `:openbsd` | **Tooling present** — Zig-native `bsd_host` x86_64 ELF + `resources/dist` tar.gz; runtime needs GTK/WebKitGTK on BSD; **GUI not claimed** from Linux cross-build |
 | `pnpm desktop:release:macos` | **Fail-closed on non-Darwin** — must run on a real Mac; remaining **macOS blocker** for this Linux release host |
-| GUI launch / signing / updater / public downloads / deploy | **Not done / not verified** (incl. real FreeBSD/OpenBSD display) |
+| GUI launch on real FreeBSD/OpenBSD / signing / updater | **Not done / not verified** |
+| Public `/download` + BSD install.sh packaging tests | **Tooling present** (site-local staging; binaries not in git) |
 
 ### Linux GUI link dependency
 

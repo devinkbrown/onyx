@@ -38,16 +38,16 @@ not shipped until real content and gates exist):
 | **Organizations** | Org / team proof path (not “enterprise SSO pack”) | **Gated** — audience entry on Home only |
 | **Trust** | Protection honesty, public status, ownership | **PARTIAL** — Home proof strip + `/status/`; full Trust page gated |
 | **Technology / Onyx Server** | Protocol, engine, self-host posture | **PARTIAL** — Home technical proof + `/about/`, `/roadmap/` |
-| **Download** | Browser now; desktop installers only when green | **Gated** — no download page; no installer CTAs |
+| **Download** `/download/` | Browser/PWA first; FreeBSD/OpenBSD unsigned hosts only | **PARTIAL** — BSD operator tarballs + checksums; not signed multi-platform |
 | **Status** `/status/` | Live public mesh/status honesty | **Ships** (existing) |
 | **About / contact / legal** | Short about; contact; privacy/terms | **PARTIAL** — `/about/` exists; contact/legal copy **gated** (no fake legal) |
 
-Do **not** invent `/download`, `/enterprise`, `/gaming`, pricing, compliance badges,
+Do **not** invent `/enterprise`, `/gaming`, pricing, compliance badges,
 partner logos, or legal pages in marketing copy until those surfaces exist with
-evidence.
+evidence. `/download/` may only claim the verified FreeBSD/OpenBSD unsigned lane.
 
 Existing supporting routes that remain valid links: `/stats/`, `/roadmap/`,
-`/invite/`, `/app/`.
+`/invite/`, `/app/`, `/download/`.
 
 ---
 
@@ -62,7 +62,7 @@ Every audience uses the **same** product. Paths differ only in **which proofs le
 | **Communities** | Rooms that stay open, presence, invites, stages | Moderation suite / policy admin product that is not shipped |
 | **Organizations** | Same rooms + DMs + calls + continuity; ownership/honest state | SSO, SCIM, admin policy console, SLA, SOC2 until true |
 | **Developers** | Open wire (IRCv3/IRCX over WS), Onyx Server engine, honest media state | Fake SDKs, invented APIs, “enterprise API platform” |
-| **Press / procurement** | Status telemetry, roadmap claim ledger, visible protection language, no invented compliance | Fake logos, benchmarks, pricing tables, unsigned installers |
+| **Press / procurement** | Status telemetry, roadmap claim ledger, visible protection language, no invented compliance | Fake logos, benchmarks, pricing tables, signed-installer claims without evidence |
 | **Power users** | Continuity (session resume, local history, on-device import/export), identity you carry, fail-honest state | Overstated E2EE / group crypto beyond what UI shows |
 
 ---
@@ -120,12 +120,13 @@ Procurement materials and legal pages remain **gated**.
 |-------|----------|
 | Open full product in the browser today | **Yes** |
 | Install-free first run | **Yes** |
-| Downloadable / signed desktop installers available now | **No** until installers, signing, updater, checksums, and release gates are green (see roadmap Phase 6) |
+| Downloadable / signed multi-platform installers available now | **No** — signing/updater/notarization still pending (see roadmap Phase 6) |
+| FreeBSD/OpenBSD unsigned native hosts + install.sh | **Yes** on `/download/` and as a secondary Home link — never claim codesign, virus-free, or GUI-verified-from-Linux |
 | “Desktop ships with the launch” as an unconditional promise | **No** — phrase only as gated future when ledger is green |
-| Desktop host scaffold / null compile exists | **Internal / roadmap only** — not Home download CTA |
+| Desktop host scaffold / null compile exists | **Internal / roadmap only** for multi-platform ship claims |
 
-Home may say: **Browser now.** Desktop downloads open only after release gates
-are green. Prefer silence over aspirational download buttons.
+Home may say: **Browser now.** FreeBSD/OpenBSD operators may use `/download/` for
+unsigned native hosts. Prefer silence over aspirational signed multi-platform CTAs.
 
 ---
 

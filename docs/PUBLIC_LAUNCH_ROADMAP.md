@@ -33,10 +33,10 @@ Companions:
 | Zig desktop scaffold (manifest + structural check) | **PARTIAL / structural DONE** | `app.zon` `native validate` + `native check` PASS; host sources present |
 | Zig source compile of full Native SDK host (null backend) | **DONE** on Zig **0.17.0-dev** pin | `zig build -Dplatform=null` / `test` with pin `0.17.0-dev.1476+91a29d707`, patched `@native-sdk/cli@0.6.2`, isolated caches |
 | Native GUI link / run (Linux WebKitGTK 6) | **PENDING** | Missing `webkitgtk-6.0`; link fails after successful compile |
-| Downloadable installers | **PENDING** | No package artifacts shipped |
+| Downloadable installers | **PARTIAL** | FreeBSD/OpenBSD unsigned tar.gz + `install.sh` packaging lanes exist; not signed multi-platform |
 | Code signing | **PENDING** | Not configured |
 | Auto-updater | **PENDING** | Capability `updater: false`; no pipeline |
-| Public desktop downloads | **PENDING** | No CDN/release artifacts; no `/download` route |
+| Public desktop downloads | **PARTIAL** | `/download` FreeBSD/OpenBSD surface + site-local `/downloads/v0.1.3/` staging tool; artifacts not committed; deploy stages only with explicit env |
 | Desktop deploy to production hosts | **PENDING** | Only web `deploy.sh` → `out/` for the SPA site |
 | Dedicated Product / Communities / Organizations / Trust routes | **PENDING** | Contracted in `PUBLIC_COMPANY_SITE.md`; Home has pillars + audience entries only |
 | Contact / legal pages | **PENDING** | Gated — no fake legal copy |
@@ -55,7 +55,7 @@ Companions:
 | Landing route + hero / CTA / structure | **DONE** |
 | Home pillars Rooms / Messages / Calls / Continuity | **DONE** (Continuity replaces premature desktop product card) |
 | Audience proof paths on Home (incl. Gaming & Organizations) | **DONE** (entries only; dedicated routes gated) |
-| Desktop-download CTAs claiming shippable installers | **PENDING** (must stay off until packaging green) |
+| Desktop-download CTAs claiming shippable installers | **PARTIAL** — Home may link `/download/` for unsigned FreeBSD/OpenBSD only; no signed multi-platform ship claim |
 | About / product explanation pages | **PARTIAL** — `/about/` exists; Product/Communities/Organizations/Trust pages gated |
 | Contact / legal | **PENDING** — do not invent copy |
 
@@ -137,17 +137,18 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 
 ## Phase 6 — Packaging, signing, updater, downloads, deploy, release
 
-**Goal:** Ship signed desktop artifacts with an updater and public download path. **None of this is green today.** Do not add Home download CTAs or a public Download route until every row below is green with evidence.
+**Goal:** Ship signed desktop artifacts with an updater and public download path. **Signing / updater / multi-platform green is still pending.** FreeBSD/OpenBSD have a narrower verified lane (unsigned tarball + install.sh + optional site staging).
 
 | Gate | Status |
 |------|--------|
-| `zig build package` produces host-local artifact | **PENDING** (needs green GUI link first) |
+| `zig build package` produces host-local artifact | **PARTIAL** — Linux/Windows/macOS lanes tooling; BSD uses `bsd-host` package stage |
 | Package target default = selected platform (not hardcoded macOS) | **DONE** (build graph) |
 | Package version = `app.zon` / 0.1.3 (not stale 0.1.0) | **DONE** (build graph) |
+| FreeBSD/OpenBSD one-install `install.sh` in release tarball | **DONE** (packaging tool + unit tests; GUI not claimed on Linux host) |
 | Code signing (macOS / Windows / Linux policies) | **PENDING** |
 | Auto-updater channel | **PENDING** |
-| Public download pages + checksums | **PENDING** |
-| Production desktop deploy | **PENDING** |
+| Public download pages + checksums | **PARTIAL** — `/download` + `/downloads/v0.1.3/` staging; fail-closed publish mode |
+| Production desktop deploy | **PENDING** (web deploy may stage BSD artifacts only via `ONYX_STAGE_BSD_DOWNLOADS=1`) |
 | Release checklist / human gate | **PENDING** |
 
 ---
@@ -163,7 +164,7 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 | Organizations proof page (same client; no SSO theatre) | **PENDING** |
 | Trust page (protection honesty + status + ownership) | **PENDING** |
 | Technology / Onyx Server page | **PENDING** (About/roadmap partial today) |
-| Download page (browser/PWA now; desktop only when Phase 6 green) | **PENDING** |
+| Download page (browser/PWA now; FreeBSD/OpenBSD unsigned hosts) | **PARTIAL** — `/download/` ships BSD-only truthful surface; signed multi-platform still pending |
 | Short contact + real legal | **PENDING** |
 
 ---
@@ -184,9 +185,10 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 
 - Full commercial shell redesign (Home surface, conversation chrome, composer, profile/settings presentation).
 - Native GUI link/run (Linux needs `webkitgtk-6.0`).
-- Installers, signing, updater, public downloads, desktop deployment.
-- Dedicated Product/Communities/Organizations/Trust/Download/legal routes.
-- Installer/signing/updater/public desktop deploy (still out of scope until packaging green).
+- Signed installers, notarization, auto-updater, multi-platform public download ship.
+- Verified FreeBSD/OpenBSD GUI launch on real BSD hardware (cross-build proves ELF/layout only).
+- Dedicated Product/Communities/Organizations/Trust/legal routes.
+- Production publish of BSD tarballs into live `out/` (opt-in staging only; human gate).
 
 ---
 
@@ -196,5 +198,6 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 2. Continue commercial total UI redesign **after** nav/calls foundation: Home surface → conversation → composer → profile/You settings (still without touching protocol/store/media/E2EE kernel).
 3. Install WebKitGTK 6 for Linux GUI link; re-run `zig build -Dplatform=linux` with the Zig 0.17 pin until green.
 4. Prove `zig build package` on a packageable platform with versioned output under `zig-out/package/onyx-0.1.3-…`.
-5. Only then design signing + updater + download pages; flip claim ledger rows with evidence.
-6. Add gated company-site routes only with real content (Phase 7) — never empty legal or fake download.
+5. Keep `/download/` claim level exact: unsigned FreeBSD/OpenBSD + install.sh only; stage artifacts with `pnpm desktop:stage-bsd-downloads:publish` when publishing.
+6. Design signing + updater for multi-platform only with evidence; never claim virus-free/codesign for BSD tarballs.
+7. Add remaining company-site routes only with real content (Phase 7) — never empty legal.
