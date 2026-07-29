@@ -48,17 +48,48 @@ export function Background(props: BackgroundProps) {
   // An undefined resource source is Solid's explicit "do not fetch" state.
   // Keep Off outside the lazy-loader entirely; restoring Animated/Still changes
   // this source back to an id and loads the selected renderer normally.
+  //
+  // Source is the concrete render id only — Auto is resolved by the host
+  // (AppShell / Appearance) before it reaches here — so Auto → explicit
+  // transitions always change the resource key when the user pins a different
+  // scene and re-fetch the new chunk without eager-loading the catalogue.
   const activeId = createMemo(() => sceneDisabled() || reducedData()
     ? undefined
     : selectBackgroundId(props.id, effectiveReducedMotion()));
-  const [variant] = createResource(activeId, loadBackgroundVariant);
+  // Wrap the loader so a rejected dynamic import (stale/missing/network chunk)
+  // never enters createResource's error state: reading an errored resource
+  // throws and can blank the connected shell / appearance chrome, leaving only
+  // wallpaper. Fail closed to "no variant" instead.
+  const [variant] = createResource(activeId, async (id) => {
+    try {
+      return await loadBackgroundVariant(id);
+    } catch {
+      return undefined;
+    }
+  });
+
+  // Never read variant() while pending/errored in a way that throws; track
+  // state explicitly so the inert placeholder stays up and the shell remains.
+  const resolvedVariant = createMemo(() => {
+    const state = variant.state;
+    if (state === 'pending' || state === 'refreshing' || state === 'unresolved' || state === 'errored') {
+      return undefined;
+    }
+    return variant();
+  });
+  const loadFailed = createMemo(() => variant.state === 'errored' || (
+    // Ready-but-empty after a caught import failure for a known active id.
+    variant.state === 'ready'
+    && activeId() != null
+    && resolvedVariant() === undefined
+  ));
 
   const scene = createMemo(() => {
-    const active = variant();
+    const active = resolvedVariant();
     return active && isSceneVariant(active) ? active : undefined;
   });
   const canvasVariant = createMemo(() => {
-    const active = variant();
+    const active = resolvedVariant();
     return active && !isSceneVariant(active) ? active : undefined;
   });
 
@@ -66,10 +97,11 @@ export function Background(props: BackgroundProps) {
     <Show when={!sceneDisabled()} fallback={null}>
       <Show when={!reducedData()} fallback={<BackgroundPlaceholder reducedData={true} />}>
         <Show
-          when={variant()}
+          when={resolvedVariant()}
           // First paint isn't blocked on the variant chunk: show a frozen themed
-          // frame (matching the reduced-motion still) until it resolves.
-          fallback={<BackgroundPlaceholder reducedData={false} />}
+          // frame (matching the reduced-motion still) until it resolves — and
+          // after a stale-chunk miss so the shell/interface stays usable.
+          fallback={<BackgroundPlaceholder reducedData={false} loadFailed={loadFailed} />}
         >
           <Show
             when={scene()}
@@ -85,10 +117,15 @@ export function Background(props: BackgroundProps) {
 
 /**
  * Static themed frame shown for the one tick between mount and the active
- * variant's chunk resolving. Matches the app's base surface so there's no flash
- * and no layout work — a fixed, non-interactive, painter-only layer.
+ * variant's chunk resolving, and after a failed/stale chunk load. Matches the
+ * app's base surface so there's no flash and no layout work — a fixed,
+ * non-interactive, painter-only layer that never competes with the shell.
  */
-function BackgroundPlaceholder(props: { reducedData: boolean }) {
+function BackgroundPlaceholder(props: {
+  reducedData: boolean;
+  /** Accessor so the fail flag stays reactive while Show holds the fallback. */
+  loadFailed?: () => boolean;
+}) {
   return (
     <div
       aria-hidden="true"
@@ -96,6 +133,7 @@ function BackgroundPlaceholder(props: { reducedData: boolean }) {
       data-background-placeholder="true"
       data-background-kind="solid"
       data-background-reduced-data={props.reducedData ? 'true' : undefined}
+      data-background-load-failed={props.loadFailed?.() ? 'true' : undefined}
       style={{
         position: 'fixed',
         inset: '0',

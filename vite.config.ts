@@ -48,6 +48,8 @@ export default defineConfig({
       },
     },
   },
-  server: { port: 3000, host: true },
+  // Desktop host (Native SDK) allowlists http://127.0.0.1:3000 — bind all
+  // interfaces in browser dev, but prefer 127.0.0.1 when spawned by `native dev`.
+  server: { port: 3000, strictPort: true, host: true },
   preview: { port: 4173, host: true },
 });

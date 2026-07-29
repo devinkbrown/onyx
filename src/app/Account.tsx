@@ -17,8 +17,9 @@
  *   • Danger zone   — DROP (guarded behind a typed confirmation).
  *
  * Guests (no account) see a gentle "you're browsing as a guest" state that
- * points back at Connect — this panel never logs anyone in (that's Connect's
- * job); it manages an *existing* session.
+ * opens the shared in-session claim Sheet (REGISTER → IDENTIFY on the live
+ * socket) — never disconnecting back to Connect. This panel manages an
+ * *existing* session for signed-in users; Connect remains the front door.
  *
  * The global store is the single source of truth. Actions dispatch raw Onyx Server
  * commands; the store folds the replies (FAIL/WARN/NOTE/NOTICE/numerics) into
@@ -62,6 +63,7 @@ import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
+import { openGuestClaimSheet } from '@/shell/guestClaimState';
 
 export interface AccountPanelProps {
   open: boolean;
@@ -494,9 +496,13 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     local.onOpenChange(false);
   }
 
-  function returnToConnect(): void {
-    getState().disconnect();
+  function openClaimWithoutDisconnect(): void {
+    // Close Account (ModalShell focus trap) first, then open the shared claim
+    // Sheet on a microtask so the two traps never stack.
     local.onOpenChange(false);
+    queueMicrotask(() => {
+      openGuestClaimSheet();
+    });
   }
 
   return (
@@ -517,18 +523,24 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
             </svg>
             <h3 class="acct-guest-title">You're browsing as a guest</h3>
             <p class="acct-guest-body">
-              Claim an account to keep settings across the mesh, protect your nick,
-              enable multi-device sessions, recovery codes, and encrypted DMs that
-              follow you between browsers.
+              Register the nick you are using on this connection to protect it with a
+              password. You stay connected. Passkeys, recovery codes, certificates,
+              and multi-device encryption tools are available after the account exists.
             </p>
             <ol class="acct-guest-steps" aria-label="Account claim steps">
-              <li>Open Connect and register the name you are using.</li>
-              <li>Add a recovery email (and later, offline recovery codes).</li>
-              <li>Bind a passkey or client certificate after sign-in.</li>
-              <li>Publish your E2EE device key so multi-device DMs can fan out.</li>
+              <li>Keep the nick you are using — register it without reconnecting.</li>
+              <li>Add an optional recovery email if the server asks for verification.</li>
+              <li>After sign-in, bind a passkey or client certificate from this panel.</li>
+              <li>After sign-in, publish an E2EE device key if you use more than one browser.</li>
             </ol>
-            <Button type="button" variant="primary" size="sm" data-testid="guest-open-connect" onClick={returnToConnect}>
-              Open Connect to claim
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              data-testid="guest-open-claim"
+              onClick={openClaimWithoutDisconnect}
+            >
+              Keep this nick
             </Button>
           </div>
         </Show>

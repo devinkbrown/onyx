@@ -82,25 +82,32 @@ describe('buildAwayDigest — tier decision table', () => {
     expect(d.followed).toHaveLength(0);
   });
 
-  it('excludes a muted channel from attention even when mentioned', () => {
+  it('routes a muted mentioned channel to attention (Needs you)', () => {
     const d = digest(
       [chan({ name: '#spam', highlights: 5 })],
       'regular',
       levels([['#spam', 'none']]),
     );
-    expect(d.attention).toHaveLength(0);
+    expect(d.attention.map((i) => i.name)).toEqual(['#spam']);
     expect(d.followed).toHaveLength(0);
-    expect(d.quiet.map((i) => i.name)).toEqual(['#spam']);
+    expect(d.quiet).toHaveLength(0);
   });
 
-  it('excludes a muted followed channel from the followed tier', () => {
+  it('keeps muted ambient and muted followed-no-highlight in the quiet tail', () => {
     const d = digest(
-      [chan({ name: '#loud', followed: true })],
+      [
+        chan({ name: '#ambient', highlights: 0, followed: false }),
+        chan({ name: '#loud', followed: true, highlights: 0 }),
+      ],
       'regular',
-      levels([['#loud', 'none']]),
+      levels([
+        ['#ambient', 'none'],
+        ['#loud', 'none'],
+      ]),
     );
+    expect(d.attention).toHaveLength(0);
     expect(d.followed).toHaveLength(0);
-    expect(d.quiet.map((i) => i.name)).toEqual(['#loud']);
+    expect(d.quiet.map((i) => i.name).sort()).toEqual(['#ambient', '#loud']);
   });
 
   it('never mutes a DM via the channelNotify map', () => {

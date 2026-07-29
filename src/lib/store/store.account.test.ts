@@ -514,6 +514,100 @@ describe('account replies — state from the message handler', () => {
     });
   });
 
+  it('correlated 464 after IDENTIFY sets accountActionError without clearing notifications', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer(null) });
+    store.getState().identify('alice', 'wrong-password');
+
+    feed(':eshmaki.me 464 alice :Password incorrect');
+
+    expect(store.getState().accountActionError).toMatchObject({
+      command: 'IDENTIFY',
+      code: '464',
+      description: 'Password incorrect',
+    });
+    const notes = store.getState().notifications;
+    expect(notes[notes.length - 1]).toMatchObject({
+      type: 'error',
+      text: 'Password incorrect',
+    });
+    expect(store.getState().serviceNotices.at(-1)).toMatchObject({
+      source: 'Account',
+      text: 'Password incorrect',
+    });
+  });
+
+  it('does not attribute a 464 without a current IDENTIFY reply context', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer(null) });
+
+    feed(':eshmaki.me 464 guest :Password incorrect');
+
+    expect(store.getState().accountActionError).toBeNull();
+    expect(store.getState().notifications.at(-1)).toMatchObject({
+      type: 'error',
+      text: 'Password incorrect',
+    });
+    expect(store.getState().serviceNotices.at(-1)).toMatchObject({
+      source: 'Account',
+      text: 'Password incorrect',
+    });
+  });
+
+  it('does not attribute a 464 after the client transport changes', () => {
+    const clientA = makeClient();
+    const clientB = makeClient();
+    store.setState({ client: clientA as never, server: seedServer(null) });
+    store.getState().identify('alice', 'wrong-password');
+    store.setState({ client: clientB as never });
+
+    feed(':eshmaki.me 464 alice :Password incorrect');
+
+    expect(store.getState().accountActionError).toBeNull();
+    expect(store.getState().notifications.at(-1)).toMatchObject({
+      type: 'error',
+      text: 'Password incorrect',
+    });
+  });
+
+  it('clears IDENTIFY reply context after accepted 900 so a later 464 is not attributed', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer(null) });
+    store.getState().identify('alice', 'alice-password');
+
+    feed(':eshmaki.me 900 alice alice!u@h alice :You are now logged in as alice');
+    expect(store.getState().server?.account).toBe('alice');
+    expect(store.getState().accountActionError).toBeNull();
+
+    feed(':eshmaki.me 464 alice :Password incorrect');
+
+    expect(store.getState().accountActionError).toBeNull();
+    expect(store.getState().notifications.at(-1)).toMatchObject({
+      type: 'error',
+      text: 'Password incorrect',
+    });
+  });
+
+  it('clears IDENTIFY reply context after correlated 464 so a second 464 is not re-attributed', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer(null) });
+    store.getState().identify('alice', 'wrong-password');
+    feed(':eshmaki.me 464 alice :Password incorrect');
+    expect(store.getState().accountActionError).toMatchObject({
+      command: 'IDENTIFY',
+      code: '464',
+    });
+
+    store.setState({ accountActionError: null });
+    feed(':eshmaki.me 464 alice :Password incorrect again');
+
+    expect(store.getState().accountActionError).toBeNull();
+    expect(store.getState().notifications.at(-1)).toMatchObject({
+      type: 'error',
+      text: 'Password incorrect again',
+    });
+  });
+
   it('FAIL E2EEKEY surfaces accountActionError', () => {
     const client = makeClient();
     store.setState({ client: client as never, server: seedServer('alice') });

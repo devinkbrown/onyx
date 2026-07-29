@@ -87,14 +87,15 @@ there's nothing waiting. (`src/shell/HomeView.tsx:490`)
 - **Followed** — channels you follow that have unread messages but no mention.
   Summarised on their own, never bumped up into *Needs you*.
   (`src/lib/notifications/awayDigest.ts:69`, `src/shell/HomeView.tsx:521`)
-- **Quiet activity** — the collapsed tail: everything else with unread, plus any
-  **muted** channels (a muted channel is never "needs you"). It's folded into an
-  expandable *Quiet activity (N)* section and capped so it never floods the card.
-  (`src/lib/notifications/awayDigest.ts:64`, `src/lib/notifications/awayDigest.ts:136`,
+- **Quiet activity** — the collapsed tail: everything else with unread, plus
+  **muted** ambient traffic (no mention/highlight). Direct mentions from a muted
+  room still stay in *Needs you*; only ambient muted unread is quiet. Folded into
+  an expandable *Quiet activity (N)* section and capped so it never floods the card.
+  (`src/lib/notifications/awayDigest.ts:66`, `src/lib/notifications/awayDigest.ts:139`,
   `src/shell/HomeView.tsx:529`)
 
-Muting a channel always drops it to **Quiet activity**, regardless of whether
-you follow it. (`src/lib/notifications/awayDigest.ts:64`)
+Muting a channel quiets only ambient unread (including followed-no-ping);
+muted-room highlights still route to **Needs you**. (`src/lib/notifications/awayDigest.ts:66`)
 
 ### How your calm preset changes it
 

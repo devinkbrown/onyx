@@ -9603,6 +9603,11 @@ export const store = createStore<OnyxState>()(
               if (!_replyTransportIsCurrent(_accountInfoReplyContext, get)) return;
               _accountInfoReplyContext = null;
             }
+            if (standard.command === 'IDENTIFY') {
+              // Terminal IDENTIFY reply — drop context so a later unrelated 464
+              // cannot be misattributed to this attempt.
+              _identifyReplyContext = null;
+            }
             if (standard.command === 'SESSION') {
               set({
                 accountSessionsPending: false,
@@ -13252,6 +13257,9 @@ export const store = createStore<OnyxState>()(
             // Capture before server object exists (900 arrives during CAP/SASL, before 001)
             _saslAccount = account900;
             _addSessionRestoreIdentity(get, account900);
+            // Accepted IDENTIFY / SASL login — drop any pending identify reply
+            // context so a later unrelated 464 cannot be attributed to it.
+            _identifyReplyContext = null;
             // Clear any in-flight passkey ceremony — a passkey AUTH-FINISH that
             // verifies lands here as RPL_LOGGEDIN.
             set(s => {
@@ -13514,8 +13522,23 @@ export const store = createStore<OnyxState>()(
 
         case '464': { // ERR_PASSWDMISMATCH — wrong password (GHOST/IDENTIFY/etc.)
           const text464 = params[params.length - 1] || 'Invalid account or password';
+          // Always surface the ordinary notification / service notice.
           get().addNotification({ type: 'error', text: text464 });
           get().addServiceNotice('Account', text464);
+          // When this 464 is the reply to a live in-session IDENTIFY, fold it
+          // into accountActionError so GuestClaimPrompt can leave "identifying"
+          // without disconnecting. Correlate only with the current context;
+          // clear it so a later unrelated 464 cannot be misattributed.
+          if (_replyTransportIsCurrent(_identifyReplyContext, get)) {
+            _identifyReplyContext = null;
+            set({
+              accountActionError: {
+                command: 'IDENTIFY',
+                code: '464',
+                description: text464,
+              },
+            });
+          }
           break;
         }
 

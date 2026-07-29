@@ -1619,13 +1619,164 @@ describe('AppShell', () => {
       expect(screen.getByRole('button', { name: 'Open Home' })).toHaveAttribute('aria-current', 'page');
     });
 
+    it('exposes exact product-frame mobile labels without Leave', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+
+      const mobileNav = document.querySelector('.shell-mobile-nav');
+      expect(mobileNav).not.toBeNull();
+      const labels = Array.from(mobileNav!.querySelectorAll('button')).map((btn) =>
+        (btn.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      );
+      expect(labels).toEqual(['⌂Home', '#Rooms', '@Messages', '◉Calls', '◇You']);
+      expect(screen.queryByRole('button', { name: 'Disconnect from network' })).toBeNull();
+      expect(screen.queryByLabelText(/leave/i)).toBeNull();
+    });
+
+    it('opens Rooms collection in the mobile drawer', () => {
+      stubMobileViewport();
+      seedStore('#general');
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open Rooms' }));
+
+      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
+      expect(within(drawer).getByRole('region', { name: 'Rooms' })).toBeInTheDocument();
+      expect(within(drawer).getByRole('searchbox', { name: 'Filter rooms' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open Rooms' })).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('opens Messages collection in the mobile drawer', () => {
+      stubMobileViewport();
+      seedStore('#general');
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open Messages' }));
+
+      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
+      expect(within(drawer).getByRole('region', { name: 'Direct messages' })).toBeInTheDocument();
+      expect(within(drawer).getByRole('searchbox', { name: 'Filter direct messages' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('opens a truthful calls hub without starting a call', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open Calls' }));
+
+      expect(screen.getByRole('heading', { name: 'Talk where the conversation already lives.' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Choose a room' })).toBeInTheDocument();
+      expect(store.getState().voice.callState).toBe('idle');
+      expect(store.getState().voice.callStartedAt).toBeNull();
+      expect(screen.getByRole('button', { name: 'Open Calls' })).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('opening Calls never mutates voice store across live lifecycle states', () => {
+      seedStore('#general');
+      const startedAt = 1_700_000_000_000;
+      const snapshots = [
+        {
+          voice: {
+            ...initialState.voice,
+            callState: 'ringing_in' as const,
+            callWith: 'alice',
+            callChannel: null,
+            callStartedAt: null,
+          },
+          heading: 'Incoming call',
+        },
+        {
+          voice: {
+            ...initialState.voice,
+            callState: 'ringing_out' as const,
+            callWith: 'bob',
+            callChannel: null,
+            callStartedAt: null,
+          },
+          heading: 'Calling…',
+        },
+        {
+          voice: {
+            ...initialState.voice,
+            callState: 'in_call' as const,
+            callChannel: '#general',
+            callWith: '',
+            callStartedAt: null,
+          },
+          heading: 'Connecting to the call…',
+        },
+        {
+          voice: {
+            ...initialState.voice,
+            callState: 'in_call' as const,
+            callChannel: '#general',
+            callWith: '',
+            callStartedAt: startedAt,
+          },
+          heading: 'Your call is still here.',
+        },
+      ];
+
+      for (const row of snapshots) {
+        store.setState({ voice: { ...row.voice } });
+        const before = {
+          callState: store.getState().voice.callState,
+          callChannel: store.getState().voice.callChannel,
+          callWith: store.getState().voice.callWith,
+          callStartedAt: store.getState().voice.callStartedAt,
+        };
+
+        const view = render(() => <AppShell />);
+        fireEvent.click(screen.getByRole('button', { name: 'Open Calls' }));
+
+        // Scope to the product Calls hub — ring overlays may reuse similar titles.
+        const hub = document.querySelector('.shell-calls-hub');
+        expect(hub).not.toBeNull();
+        expect(within(hub as HTMLElement).getByRole('heading', { name: row.heading })).toBeInTheDocument();
+        expect(store.getState().voice.callState).toBe(before.callState);
+        expect(store.getState().voice.callChannel).toBe(before.callChannel);
+        expect(store.getState().voice.callWith).toBe(before.callWith);
+        expect(store.getState().voice.callStartedAt).toBe(before.callStartedAt);
+        // Hub itself never offers accept/join/start; overlays may still own those.
+        expect(within(hub as HTMLElement).queryByRole('button', { name: /accept|join call|start call/i })).toBeNull();
+
+        view.unmount();
+      }
+    });
+
+    it('exits the calls hub via Home without joining a call', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open Calls' }));
+      expect(screen.getByRole('heading', { name: 'Talk where the conversation already lives.' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open Home' }));
+      expect(store.getState().activeView).toEqual({ kind: 'home' });
+      expect(store.getState().voice.callState).toBe('idle');
+      expect(screen.queryByRole('heading', { name: 'Talk where the conversation already lives.' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Open Home' })).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('opens account management from You', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open You' }));
+
+      expect(store.getState().showAccount).toBe(true);
+      expect(screen.getByRole('button', { name: 'Open You' })).toHaveAttribute('aria-current', 'page');
+    });
+
     it('moves focus into the mobile channel drawer and restores it on Escape', async () => {
       stubMobileViewport();
       seedStore('#general');
 
       const { container } = render(() => <AppShell />);
 
-      const roomsButton = screen.getByRole('button', { name: 'Toggle channel list' });
+      const roomsButton = screen.getByRole('button', { name: 'Open Rooms' });
       const conversation = container.querySelector<HTMLElement>('.shell-conversation');
       const mobileNav = container.querySelector<HTMLElement>('.shell-mobile-nav');
       expect(conversation).not.toHaveAttribute('inert');
@@ -1656,7 +1807,7 @@ describe('AppShell', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Toggle channel list' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open Rooms' }));
       const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
       await waitFor(() => expect(drawer.contains(document.activeElement)).toBe(true));
 
@@ -1680,7 +1831,7 @@ describe('AppShell', () => {
 
       const { container } = render(() => <AppShell />);
 
-      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       const sidebar = container.querySelector<HTMLElement>('.shell-sidebar-slot');
       const conversation = container.querySelector<HTMLElement>('.shell-conversation');
@@ -1729,7 +1880,7 @@ describe('AppShell', () => {
       seedStore('#general');
 
       const { container } = render(() => <AppShell />);
-      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       membersButton.focus();
       fireEvent.click(membersButton);
 
@@ -1745,7 +1896,6 @@ describe('AppShell', () => {
       await waitFor(() => {
         expect(screen.queryByRole('dialog', { name: 'Member details for alice' })).not.toBeInTheDocument();
         expect(memberList).toHaveAttribute('aria-hidden', 'false');
-        expect(membersButton).toHaveAttribute('aria-expanded', 'true');
         expect(aliceTrigger).toHaveFocus();
       });
 
@@ -1753,7 +1903,6 @@ describe('AppShell', () => {
 
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
-        expect(membersButton).toHaveAttribute('aria-expanded', 'false');
         expect(membersButton).toHaveFocus();
       });
     });
@@ -1763,7 +1912,7 @@ describe('AppShell', () => {
       seedStore('#general');
 
       const { container } = render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Toggle member list' }));
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
 
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
@@ -1796,7 +1945,7 @@ describe('AppShell', () => {
       const { container } = render(() => <AppShell />);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
-      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       membersButton.focus();
       fireEvent.click(membersButton);
       await waitFor(() => expect(memberList).toHaveAttribute('aria-label', 'Member list for #general'));
@@ -1807,7 +1956,6 @@ describe('AppShell', () => {
         expect(memberList).toHaveAttribute('aria-label', 'Member list for #other');
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
         expect(memberList).toHaveAttribute('inert');
-        expect(membersButton).toHaveAttribute('aria-expanded', 'false');
         expect(membersButton).toHaveFocus();
       });
 
@@ -1816,28 +1964,25 @@ describe('AppShell', () => {
       store.setState({ activeView: { kind: 'home' } });
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
-        expect(screen.queryByRole('button', { name: 'Toggle member list' })).toBeNull();
+        expect(screen.queryByRole('button', { name: /members — toggle member list/i })).toBeNull();
       });
 
       store.setState({ activeView: { kind: 'channel', channel: '#general' } });
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-label', 'Member list for #general');
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
-        expect(screen.getByRole('button', { name: 'Toggle member list' })).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.getByRole('button', { name: /members — toggle member list/i })).toBeInTheDocument();
       });
     });
 
-    it('focuses and names the empty mobile member drawer until Escape restores its trigger', async () => {
+    it('opens the mobile member drawer from the ribbon and restores its trigger on Escape', async () => {
+      // Product-frame mobile nav no longer owns Members; the presence ribbon is
+      // the stable trigger. Empty-roster ribbon chrome remains a later slice.
       stubMobileViewport();
       seedStore('#general');
-      const channels = new Map(store.getState().channels);
-      const channel = channels.get('#general');
-      expect(channel).toBeDefined();
-      channels.set('#general', { ...channel!, users: new Map() });
-      store.setState({ channels });
 
       render(() => <AppShell />);
-      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       membersButton.focus();
       fireEvent.click(membersButton);
 
@@ -1845,9 +1990,6 @@ describe('AppShell', () => {
       expect(drawer).toHaveAttribute('aria-modal', 'true');
       const closeButton = within(drawer).getByRole('button', { name: 'Close member list' });
       await waitFor(() => expect(closeButton).toHaveFocus());
-
-      fireEvent.keyDown(document, { key: 'Tab' });
-      expect(closeButton).toHaveFocus();
 
       fireEvent.keyDown(document, { key: 'Escape' });
       await waitFor(() => {
@@ -1915,7 +2057,7 @@ describe('AppShell', () => {
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
       if (mobile) {
-        fireEvent.click(screen.getByRole('button', { name: 'Toggle member list' }));
+        fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
         await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
       }
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
@@ -1976,7 +2118,7 @@ describe('AppShell', () => {
 
       fireEvent.keyDown(document, { key: 'Escape' });
 
-      const mobileMembersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const mobileMembersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
         expect(memberList).toHaveAttribute('inert');
@@ -2014,7 +2156,7 @@ describe('AppShell', () => {
       });
 
       fireEvent.keyDown(document, { key: 'Escape' });
-      const mobileMembersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const mobileMembersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
         expect(memberList).toHaveAttribute('inert');
@@ -2039,7 +2181,7 @@ describe('AppShell', () => {
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
       if (mobile) {
-        fireEvent.click(screen.getByRole('button', { name: 'Toggle member list' }));
+        fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
         await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
       }
 
@@ -2066,7 +2208,7 @@ describe('AppShell', () => {
       });
 
       const { container } = render(() => <AppShell />);
-      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       membersButton.focus();
       fireEvent.click(membersButton);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
@@ -2107,7 +2249,7 @@ describe('AppShell', () => {
       expect(container.querySelector('[data-testid="app-shell"]')).toHaveClass('shell--members-hidden');
       expect(container.querySelector('aside.shell-members')).toHaveAttribute('inert');
       expect(screen.queryByRole('region', { name: /Channel members/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Toggle member list' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /members — toggle member list/i })).not.toBeInTheDocument();
     });
 
     it('summarizes unread home recaps and hands them to Spotlight', async () => {
@@ -2252,7 +2394,7 @@ describe('AppShell', () => {
 
       render(() => <AppShell />);
 
-      const localMemory = await screen.findByText(/Local-memory mode:.*1 queued send/);
+      const localMemory = await screen.findByText(/On this device:.*1 queued send/);
       expect(localMemory).toHaveTextContent('1 room draft');
       expect(localMemory).toHaveTextContent('1 topic draft');
       const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
@@ -2350,7 +2492,7 @@ describe('AppShell', () => {
 
       const boosts = screen.getByLabelText('Quiet boosts');
       const boostCards = screen.getByRole('list', { name: 'Quiet boost cards' });
-      expect(within(boosts).getByText('non-notifying reactions')).toBeInTheDocument();
+      expect(within(boosts).getByText('reactions')).toBeInTheDocument();
       expect(within(boostCards).getAllByRole('listitem')).toHaveLength(1);
       expect(within(boosts).getByText('#general')).toBeInTheDocument();
       expect(boosts).toHaveTextContent('Quietly boosted note');

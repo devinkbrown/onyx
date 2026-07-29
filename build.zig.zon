@@ -1,0 +1,17 @@
+.{
+    .name = .onyx,
+    .fingerprint = 0xa06be5d2f99e29b9,
+    .version = "0.1.1",
+    .minimum_zig_version = "0.17.0-dev.1476+91a29d707",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "desktop",
+        "assets",
+        "dist",
+        "app.zon",
+        "package.json",
+        "docs/desktop-host.md",
+    },
+}

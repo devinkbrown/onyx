@@ -96,7 +96,7 @@ describe('HomeView — cold return catch-up from device memory', () => {
 
     const catchUp = screen.getByLabelText('Catch up on what you missed');
     expect(catchUp).toHaveAttribute('data-catchup-source', 'memory');
-    expect(within(catchUp).getByText('device memory')).toBeInTheDocument();
+    expect(within(catchUp).getByText('saved on this device')).toBeInTheDocument();
     expect(within(catchUp).getByText(/5 unread/)).toBeInTheDocument();
     expect(within(catchUp).getByText((content, el) =>
       el?.classList.contains('home-catchup-summary') === true

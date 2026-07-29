@@ -269,9 +269,32 @@ state). Almost every module has a co-located `*.test.ts`.
 - `pnpm build` — Vite build to **`dist/`** (`vite.config.ts:13`), *not* `out/`.
   Manual chunks split `solid`, `media`, and the store `runtime`
   (`vite.config.ts:18`).
-- `./deploy.sh` — the only writer of `out/`. It builds to `dist/`, uses
-  `tools/materialize-route-entrypoints.mjs` for route-specific `index.html`
-  documents and metadata, stamps the service-worker cache name, overlays the community site from
-  `/home/kain/landing`, then `rsync --delete dist/ → out/`. nginx serves `out/`
-  at eshmaki.me. See [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for the safety
-  rationale.
+- `./deploy.sh` — the only writer of the **live** `out` tree. Live path is
+  **`ONYX_LIVE_OUT`** (when set: must already be absolute, basename `out`, not a
+  symlink; default `$checkout/out`). Production on this host is
+  `/home/kain/onyx/out` (nginx root); worktree-local `out/` is not production
+  unless explicitly targeted.
+  - Vite/Solid Landing is authoritative for `/` and SPA routes.
+  - Materialises route-specific `index.html` via
+    `tools/materialize-route-entrypoints.mjs`, stamps
+    `onyx-shell-<version>[-dirty]` into `dist/sw.js`.
+  - Stages **allowlisted** legacy support only from `/home/kain/landing`
+    (`guides`, `community`, `install`, `self-host`, `why`, `memory`, `onyxOS`,
+    `fonts`) — never root documents or SPA-owned paths; SPA fingerprints are
+    taken before staging and verified after.
+  - `DEPLOY_DRY_RUN` must be exactly `0` or `1`; `1` builds/stages/asserts
+    without live backup, ACL, or rsync.
+  - Real sync: hard-link snapshot under sibling `.onyx-deploy-backups/` **before**
+    ACL or content mutation, then **two-phase** rsync for active-client
+    compatibility: (1) root `rsync --archive --checksum --delete
+    --exclude=/assets/` (never `--delete-excluded`); (2) `mkdir` live `assets/`
+    and `rsync --archive --checksum` **without** `--delete` so prior immutable
+    hashed chunks remain for open tabs. Post-sync: every current staged file
+    must match live byte-for-byte (deterministic checksums); extra legacy files
+    under live `assets/` are allowed; index/`app`/`sw.js` version checks still
+    apply. Safe asset GC/retention is future, separately designed policy —
+    deploy does not scan backups or auto-prune hashed assets. On rsync/verify
+    failure: automatic snapshot restore with proven rollback evidence
+    (`RECOVERY_EVIDENCE`), else fail closed.
+  See [`../CONTRIBUTING.md`](../CONTRIBUTING.md) and [`../README.md`](../README.md)
+  for the safety rationale.

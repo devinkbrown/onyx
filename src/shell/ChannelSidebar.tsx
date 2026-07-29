@@ -32,6 +32,15 @@ import { NotificationControls } from './NotificationControls';
 export type ChannelSidebarProps = {
   /** Called when mobile close is triggered */
   onMobileClose?: () => void;
+  /** Which conversation collection is visible below the primary navigation. */
+  mode?: 'rooms' | 'messages';
+  /** Primary product navigation callbacks are owned by AppShell. */
+  onModeChange?: (mode: 'rooms' | 'messages') => void;
+  onOpenHome?: () => void;
+  onOpenCalls?: () => void;
+  onOpenYou?: () => void;
+  onConversationOpen?: () => void;
+  activeSection?: 'home' | 'rooms' | 'messages' | 'calls' | 'you';
 };
 
 type NavigationViewTransition = {
@@ -118,7 +127,16 @@ function moveSidebarFocus(
 }
 
 export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
-  const [local] = splitProps(props, ['onMobileClose']);
+  const [local] = splitProps(props, [
+    'onMobileClose',
+    'mode',
+    'onModeChange',
+    'onOpenHome',
+    'onOpenCalls',
+    'onOpenYou',
+    'onConversationOpen',
+    'activeSection',
+  ]);
   let navigationEpoch = 0;
   let activeNavigationTransition: NavigationViewTransition | null = null;
 
@@ -226,6 +244,10 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
   const displayNetworkName = createMemo(() => publicNetworkName(networkName()));
+  // mode undefined (standalone/tests) keeps both collections visible.
+  const sidebarMode = createMemo(() => local.mode ?? 'rooms');
+  const showRooms = createMemo(() => local.mode === undefined || sidebarMode() === 'rooms');
+  const showMessages = createMemo(() => local.mode === undefined || sidebarMode() === 'messages');
 
   // ── join input ──
   const [joinInput, setJoinInput] = createSignal('');
@@ -330,7 +352,9 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
 
   const filterEmpty = createMemo(() => {
     if (!filterActive()) return false;
-    return sortedChannels().length === 0 && sortedDms().length === 0;
+    const hasRooms = showRooms() && sortedChannels().length > 0;
+    const hasMessages = showMessages() && sortedDms().length > 0;
+    return !hasRooms && !hasMessages;
   });
 
   // ── roving tab stop ──
@@ -340,26 +364,26 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   // only via the arrow keys, keeping the list a single Tab landing point.
   const rovingKey = createMemo((): string | null => {
     const view = activeView();
-    if (view.kind === 'status') return 'status';
-    if (view.kind === 'channel') {
+    if (showRooms() && view.kind === 'status') return 'status';
+    if (showRooms() && view.kind === 'channel') {
       const match = sortedChannels().find(
         (ch) => ch.name.toLowerCase() === view.channel.toLowerCase(),
       );
       if (match) return `ch:${match.name.toLowerCase()}`;
     }
-    if (view.kind === 'dm') {
+    if (showMessages() && view.kind === 'dm') {
       const match = sortedDms().find(
         (dm) => dm.nick.toLowerCase() === view.nick.toLowerCase(),
       );
       if (match) return `dm:${match.nick.toLowerCase()}`;
     }
-    const firstChannel = sortedChannels()[0];
+    const firstChannel = showRooms() ? sortedChannels()[0] : undefined;
     if (firstChannel) return `ch:${firstChannel.name.toLowerCase()}`;
-    const firstDm = sortedDms()[0];
+    const firstDm = showMessages() ? sortedDms()[0] : undefined;
     if (firstDm) return `dm:${firstDm.nick.toLowerCase()}`;
-    // The Status entry always exists, so it owns the single tab stop when there
-    // are no channels or DMs yet (keeps the list keyboard-reachable).
-    return 'status';
+    // Status is the room-list fallback. Message mode can legitimately have no
+    // conversations yet, in which case the filter remains the next tab stop.
+    return showRooms() ? 'status' : null;
   });
 
   function channelKey(ch: Channel): string {
@@ -422,24 +446,28 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     setJoinInput('');
     // Navigate to the new channel
     const view: ActiveView = { kind: 'channel', channel: target.toLowerCase() };
+    local.onConversationOpen?.();
     runConversationNavigation(() => getState().navigate(view), view);
     local.onMobileClose?.();
   }
 
   function handleChannelClick(ch: Channel): void {
     const view: ActiveView = { kind: 'channel', channel: ch.name.toLowerCase() };
+    local.onConversationOpen?.();
     runConversationNavigation(() => getState().navigate(view), view);
     local.onMobileClose?.();
   }
 
   function handleDmClick(dm: DMConversation): void {
     const view: ActiveView = { kind: 'dm', nick: dm.nick };
+    local.onConversationOpen?.();
     runConversationNavigation(() => getState().navigate(view), view);
     local.onMobileClose?.();
   }
 
   function handleStatusClick(): void {
     const view: ActiveView = { kind: 'status' };
+    local.onConversationOpen?.();
     runConversationNavigation(() => getState().navigate(view), view);
     local.onMobileClose?.();
   }
@@ -523,14 +551,59 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         <NotificationControls />
       </div>
 
+      <nav class="shell-primary-nav" aria-label="Primary">
+        <button
+          type="button"
+          class={`shell-primary-nav-btn${local.activeSection === 'home' ? ' shell-primary-nav-btn--active' : ''}`}
+          aria-current={local.activeSection === 'home' ? 'page' : undefined}
+          onClick={() => local.onOpenHome?.()}
+        >
+          <span aria-hidden="true">⌂</span>Home
+        </button>
+        <button
+          type="button"
+          class={`shell-primary-nav-btn${local.activeSection === 'rooms' ? ' shell-primary-nav-btn--active' : ''}`}
+          aria-current={local.activeSection === 'rooms' ? 'page' : undefined}
+          onClick={() => local.onModeChange?.('rooms')}
+        >
+          <span aria-hidden="true">#</span>Rooms
+        </button>
+        <button
+          type="button"
+          class={`shell-primary-nav-btn${local.activeSection === 'messages' ? ' shell-primary-nav-btn--active' : ''}`}
+          aria-current={local.activeSection === 'messages' ? 'page' : undefined}
+          onClick={() => local.onModeChange?.('messages')}
+        >
+          <span aria-hidden="true">@</span>Messages
+        </button>
+        <button
+          type="button"
+          class={`shell-primary-nav-btn${local.activeSection === 'calls' ? ' shell-primary-nav-btn--active' : ''}`}
+          aria-current={local.activeSection === 'calls' ? 'page' : undefined}
+          onClick={() => local.onOpenCalls?.()}
+        >
+          <span aria-hidden="true">◉</span>Calls
+        </button>
+        <button
+          type="button"
+          class={`shell-primary-nav-btn${local.activeSection === 'you' ? ' shell-primary-nav-btn--active' : ''}`}
+          aria-current={local.activeSection === 'you' ? 'page' : undefined}
+          onClick={() => local.onOpenYou?.()}
+        >
+          <span aria-hidden="true">◇</span>You
+        </button>
+      </nav>
+
       <div class="shell-sidebar-filter" role="search">
-        <label class="sr-only" for="sidebar-filter-input">Filter channels and DMs</label>
+        <label class="sr-only" for="sidebar-filter-input">
+          {sidebarMode() === 'messages' ? 'Filter direct messages' : 'Filter rooms'}
+        </label>
         <input
           id="sidebar-filter-input"
           class="shell-sidebar-filter-input"
           type="search"
           data-testid="sidebar-filter"
-          placeholder="Filter channels & DMs"
+          placeholder={sidebarMode() === 'messages' ? 'Filter messages' : 'Filter rooms'}
           autocomplete="off"
           spellcheck={false}
           value={listFilter()}
@@ -574,9 +647,10 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
       <div
         class="shell-sidebar-scroll"
         role="region"
-        aria-label="Channels and direct messages"
+        aria-label={sidebarMode() === 'messages' ? 'Direct messages' : 'Rooms'}
         onKeyDown={handleListKeyDown}
       >
+        <Show when={showRooms()}>
         {/* Server / status entry — always present unless filter hides non-matches */}
         <Show when={!filterActive() || matchesSidebarQuery('status', listFilter())}>
           <div class="shell-sidebar-section">
@@ -691,101 +765,109 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             );
           }}
         </For>
+        </Show>
 
         {/* DMs section */}
-        <Show when={sortedDms().length > 0}>
+        <Show when={showMessages()}>
           <div class="shell-sidebar-section">
             <p class="shell-sidebar-section-label" id="sidebar-dms-label">
               direct messages
             </p>
-            <ul
-              class="shell-dm-list"
-              role="list"
-              aria-labelledby="sidebar-dms-label"
+            <Show
+              when={sortedDms().length > 0}
+              fallback={<p class="shell-sidebar-empty">No direct messages yet.</p>}
             >
-              <For each={sortedDms()}>
-                {(dm) => {
-                  const active = createMemo(() => isDmActive(activeView(), dm));
-                  const hasUnread = createMemo(() => dm.unread > 0);
-                  const hasHighlight = createMemo(() => dm.highlights > 0);
-                  // Offline-memo aggregate (wire MEMO). Cleared by navigate →
-                  // clearOfflineMemo when the DM is opened.
-                  const offlineCount = createMemo(
-                    () => offlineMemo().get(dm.nick.toLowerCase())?.count ?? 0,
-                  );
+              <ul
+                class="shell-dm-list"
+                role="list"
+                aria-labelledby="sidebar-dms-label"
+              >
+                <For each={sortedDms()}>
+                  {(dm) => {
+                    const active = createMemo(() => isDmActive(activeView(), dm));
+                    const hasUnread = createMemo(() => dm.unread > 0);
+                    const hasHighlight = createMemo(() => dm.highlights > 0);
+                    // Offline-memo aggregate (wire MEMO). Cleared by navigate →
+                    // clearOfflineMemo when the DM is opened.
+                    const offlineCount = createMemo(
+                      () => offlineMemo().get(dm.nick.toLowerCase())?.count ?? 0,
+                    );
 
-                  return (
-                    <li>
-                      <button
-                        type="button"
-                        data-sidebar-item
-                        tabindex={rovingKey() === dmKey(dm) ? 0 : -1}
-                        class={[
-                          'shell-channel-item',
-                          active() ? 'shell-channel-item--active' : '',
-                          hasUnread() && !active() ? 'shell-channel-item--unread' : '',
-                          hasHighlight() ? 'shell-channel-item--highlight' : '',
-                        ].filter(Boolean).join(' ')}
-                        aria-current={active() ? 'page' : undefined}
-                        aria-label={`DM with ${dm.nick}${unreadLabel(dm.unread, dm.highlights)}${offlineMemoLabel(offlineCount())}`}
-                        onClick={() => handleDmClick(dm)}
-                      >
-                        <span class="shell-channel-sigil" aria-hidden="true">@</span>
-                        <span class="shell-channel-name">{dm.nick}</span>
-                        <Show when={offlineCount() > 0}>
-                          <span class="shell-channel-offline" aria-hidden="true">
-                            {offlineMemoStamp(offlineCount())}
-                          </span>
-                        </Show>
-                        <Show when={dm.highlights > 0}>
-                          <span class="shell-channel-badge" aria-hidden="true">
-                            {dm.highlights}
-                          </span>
-                        </Show>
-                        <Show when={dm.unread > 0 && dm.highlights === 0}>
-                          <span class="shell-channel-badge" aria-hidden="true">
-                            {dm.unread > 99 ? '99+' : dm.unread}
-                          </span>
-                        </Show>
-                      </button>
-                    </li>
-                  );
-                }}
-              </For>
-            </ul>
+                    return (
+                      <li>
+                        <button
+                          type="button"
+                          data-sidebar-item
+                          tabindex={rovingKey() === dmKey(dm) ? 0 : -1}
+                          class={[
+                            'shell-channel-item',
+                            active() ? 'shell-channel-item--active' : '',
+                            hasUnread() && !active() ? 'shell-channel-item--unread' : '',
+                            hasHighlight() ? 'shell-channel-item--highlight' : '',
+                          ].filter(Boolean).join(' ')}
+                          aria-current={active() ? 'page' : undefined}
+                          aria-label={`DM with ${dm.nick}${unreadLabel(dm.unread, dm.highlights)}${offlineMemoLabel(offlineCount())}`}
+                          onClick={() => handleDmClick(dm)}
+                        >
+                          <span class="shell-channel-sigil" aria-hidden="true">@</span>
+                          <span class="shell-channel-name">{dm.nick}</span>
+                          <Show when={offlineCount() > 0}>
+                            <span class="shell-channel-offline" aria-hidden="true">
+                              {offlineMemoStamp(offlineCount())}
+                            </span>
+                          </Show>
+                          <Show when={dm.highlights > 0}>
+                            <span class="shell-channel-badge" aria-hidden="true">
+                              {dm.highlights}
+                            </span>
+                          </Show>
+                          <Show when={dm.unread > 0 && dm.highlights === 0}>
+                            <span class="shell-channel-badge" aria-hidden="true">
+                              {dm.unread > 99 ? '99+' : dm.unread}
+                            </span>
+                          </Show>
+                        </button>
+                      </li>
+                    );
+                  }}
+                </For>
+              </ul>
+            </Show>
           </div>
         </Show>
       </div>
 
       {/* Join channel form */}
-      <form
-        class="shell-join-form"
-        onSubmit={handleJoin}
-        aria-label="Join a channel"
-      >
-        <label for="shell-join-input" class="sr-only">
-          Channel name
-        </label>
-        <input
-          id="shell-join-input"
-          class="shell-join-input"
-          type="text"
-          placeholder="join #channel"
-          autocomplete="off"
-          spellcheck={false}
-          value={joinInput()}
-          onInput={(e) => setJoinInput(e.currentTarget.value)}
-          aria-label="Channel name to join"
-        />
-        <button
-          type="submit"
-          class="shell-join-btn"
-          disabled={!joinInput().trim()}
-          aria-label={joinTarget() ? `Join ${joinTarget()}` : 'Join channel'}
+      <Show when={showRooms()}>
+        <form
+          class="shell-join-form"
+          onSubmit={handleJoin}
+          aria-label="Join a channel"
         >
-          <span aria-hidden="true">+</span>
-        </button>
-      </form>
+          <label for="shell-join-input" class="sr-only">
+            Channel name
+          </label>
+          <input
+            id="shell-join-input"
+            class="shell-join-input"
+            type="text"
+            placeholder="join #channel"
+            autocomplete="off"
+            spellcheck={false}
+            value={joinInput()}
+            onInput={(e) => setJoinInput(e.currentTarget.value)}
+            aria-label="Channel name to join"
+          />
+          <button
+            type="submit"
+            class="shell-join-btn"
+            disabled={!joinInput().trim()}
+            aria-label={joinTarget() ? `Join ${joinTarget()}` : 'Join channel'}
+          >
+            <span aria-hidden="true">+</span>
+          </button>
+        </form>
+      </Show>
     </aside>
   );
 }

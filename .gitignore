@@ -56,3 +56,8 @@ playwright-report/
 # Claude Code personal (uncommitted) settings
 .claude/settings.local.json
 .eslintcache
+
+# Zig / Native SDK desktop host
+/zig-out/
+/.zig-cache/
+/native-sdk-package/

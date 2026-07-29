@@ -1,22 +1,30 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * PresenceRibbon.overflow.test.tsx — A8 place-strip compression + B3 pins bar.
+ * PresenceRibbon.overflow.test.tsx — commercial room-header slice.
  *
- * Secondary chrome lives behind a single More disclosure while primary place
- * signals (event, voice, jump-to-date, join, pins count) stay one click away.
+ * 4-zone place header: Call · People · More; pins + Jump to date in More;
+ * People visible at 0 with truthful aria-pressed; conn always present;
+ * call lifecycle truth table; More section headings + valid menus.
  */
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openPreferences } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
+import type { CallState } from '@/lib/cadence-media/types';
 import { PresenceRibbon } from './PresenceRibbon';
 
 vi.mock('@/lib/prefs/preferences', () => ({ openPreferences: vi.fn() }));
 vi.mock('./NotificationCenter', () => ({ NotificationCenter: () => null }));
 vi.mock('./PresenceHeatline', () => ({ PresenceHeatline: () => null }));
-vi.mock('./Facepile', () => ({ Facepile: () => null }));
+// Stub preserves Facepile's real root class so hide-CSS coupling is testable.
+vi.mock('./Facepile', () => ({
+  Facepile: () => <div class="shell-facepile" data-testid="facepile-stub" />,
+}));
 
 const initialState = store.getInitialState();
 
@@ -24,8 +32,8 @@ function makeUser(nick: string): ChannelUser {
   return { nick, modes: new Set() };
 }
 
-function seedChannel(name = '#general'): void {
-  const users = new Map<string, ChannelUser>([
+function seedChannel(name = '#general', users?: Map<string, ChannelUser>): void {
+  const roster = users ?? new Map<string, ChannelUser>([
     ['alice', makeUser('alice')],
     ['bob', makeUser('bob')],
   ]);
@@ -35,7 +43,7 @@ function seedChannel(name = '#general'): void {
     topicSetBy: 'server',
     topicSetAt: null,
     modes: '',
-    users,
+    users: roster,
     unread: 0,
     highlights: 0,
     createdAt: null,
@@ -60,7 +68,22 @@ function openMore(): void {
   fireEvent.click(moreTrigger());
 }
 
-describe('PresenceRibbon place-strip compression (A8)', () => {
+function setRoomVoice(
+  channel: string,
+  callState: CallState,
+  callStartedAt: number | null,
+): void {
+  store.setState({
+    voice: {
+      ...store.getState().voice,
+      callState,
+      callChannel: channel,
+      callStartedAt,
+    },
+  });
+}
+
+describe('PresenceRibbon commercial room header', () => {
   beforeEach(() => {
     store.setState(initialState, true);
     vi.mocked(openPreferences).mockReset();
@@ -72,22 +95,68 @@ describe('PresenceRibbon place-strip compression (A8)', () => {
     vi.restoreAllMocks();
   });
 
-  it('exposes a More disclosure and keeps jump-to-date on the primary strip', () => {
+  it('exposes More and People on the primary strip; demotes pins and Jump to date into More', () => {
     seedChannel();
     render(() => <PresenceRibbon />);
 
     expect(screen.getByTestId('ribbon-more')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument();
-    expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
-    // Presence count stays on the strip; secondary chrome waits for More.
     expect(screen.getByTestId('ribbon-members')).toBeInTheDocument();
+    // Jump to date is not a primary header control.
+    expect(screen.queryByTestId('ribbon-jump-to-date')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-preferences')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-settings-gear')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-account-chip')).not.toBeInTheDocument();
-    // B3 always-on pins chip: present in a channel even with zero pins (no count badge).
-    const pins = screen.getByTestId('ribbon-pins');
-    expect(pins).toBeInTheDocument();
-    expect(pins).toHaveAttribute('aria-label', 'Pinned messages');
+    // Pins leave the primary strip in the commercial header.
+    expect(screen.queryByTestId('ribbon-pins')).not.toBeInTheDocument();
+
+    openMore();
+    expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
+  });
+
+  it('shows People at zero members with accessible count and aria-pressed false', () => {
+    seedChannel('#empty', new Map());
+    render(() => <PresenceRibbon />);
+
+    const people = screen.getByTestId('ribbon-members');
+    expect(people).toBeInTheDocument();
+    expect(people).toHaveAttribute('aria-label', '0 members — toggle member list');
+    // Empty roster cannot open a member surface.
+    expect(people).toHaveAttribute('aria-pressed', 'false');
+    expect(people.querySelector('.shell-ribbon-count')).toHaveTextContent('0');
+  });
+
+  it('uses membersOpen for People aria-pressed (AppShell membersVisible wiring)', () => {
+    seedChannel();
+    const { unmount } = render(() => <PresenceRibbon membersOpen={false} />);
+    expect(screen.getByTestId('ribbon-members')).toHaveAttribute('aria-pressed', 'false');
+    unmount();
+
+    render(() => <PresenceRibbon membersOpen={true} />);
+    expect(screen.getByTestId('ribbon-members')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('forces membersPressed false when memberCount is zero even if membersOpen=true', () => {
+    seedChannel('#empty', new Map());
+    render(() => <PresenceRibbon membersOpen={true} />);
+
+    const people = screen.getByTestId('ribbon-members');
+    expect(people).toHaveAttribute('aria-label', '0 members — toggle member list');
+    expect(people).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('keeps connection status present with a11y text (narrow-safe structure)', () => {
+    seedChannel();
+    render(() => <PresenceRibbon />);
+
+    const conn = screen.getByTestId('ribbon-conn');
+    expect(conn).toBeInTheDocument();
+    expect(conn).toHaveAttribute('aria-live', 'polite');
+    expect(conn).toHaveAttribute('data-state', 'connected');
+    expect(conn.querySelector('.shell-ribbon-conn-dot')).toBeTruthy();
+    expect(conn.textContent).toMatch(/Connection:\s*connected/i);
+    // Must not carry a display-none utility class; compact is CSS-only.
+    expect(conn).not.toHaveClass('hidden');
   });
 
   it('keeps event and voice chips on the primary strip when present', () => {
@@ -104,10 +173,62 @@ describe('PresenceRibbon place-strip compression (A8)', () => {
     expect(screen.getByRole('button', { name: 'Join call' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Join voice' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Join video' })).not.toBeInTheDocument();
-    expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
+    // Jump to date is in More, not primary.
+    expect(screen.queryByTestId('ribbon-jump-to-date')).not.toBeInTheDocument();
   });
 
-  it('surfaces pins on the primary strip and secondary actions only after More', () => {
+  it('presents ringing / provisional / established call lifecycle without join accept', () => {
+    seedChannel();
+
+    // ringing_in — sparse Incoming; no Join call
+    setRoomVoice('#general', 'ringing_in', null);
+    const view = render(() => <PresenceRibbon showJoinVoice onJoinVoice={() => {}} />);
+    let status = screen.getByTestId('ribbon-call-status');
+    expect(status).toHaveAttribute('data-presentation', 'ringing_in');
+    expect(status).toHaveTextContent('Incoming');
+    expect(screen.queryByRole('button', { name: 'Join call' })).not.toBeInTheDocument();
+    expect(status.className).not.toMatch(/--active/);
+
+    // ringing_out
+    setRoomVoice('#general', 'ringing_out', null);
+    status = screen.getByTestId('ribbon-call-status');
+    expect(status).toHaveAttribute('data-presentation', 'ringing_out');
+    expect(status).toHaveTextContent('Calling');
+    expect(screen.queryByRole('button', { name: 'Join call' })).not.toBeInTheDocument();
+
+    // provisional in_call — Connecting…, not established paint
+    setRoomVoice('#general', 'in_call', null);
+    status = screen.getByTestId('ribbon-call-status');
+    expect(status).toHaveAttribute('data-presentation', 'provisional');
+    expect(status).toHaveTextContent('Connecting…');
+    expect(status.className).not.toMatch(/voice-chip--active/);
+    expect(screen.queryByRole('button', { name: 'Join call' })).not.toBeInTheDocument();
+
+    // established — In call with active mark when no occupancy chip
+    setRoomVoice('#general', 'in_call', 1_700_000_000_000);
+    status = screen.getByTestId('ribbon-call-status');
+    expect(status).toHaveAttribute('data-presentation', 'established');
+    expect(status).toHaveTextContent('In call');
+    expect(status.className).toMatch(/voice-chip--active/);
+    expect(screen.queryByRole('button', { name: 'Join call' })).not.toBeInTheDocument();
+
+    // idle restore — Join call returns
+    setRoomVoice('#general', 'idle', null);
+    store.setState({
+      voice: {
+        ...store.getState().voice,
+        callState: 'idle',
+        callChannel: null,
+        callStartedAt: null,
+      },
+    });
+    expect(screen.getByRole('button', { name: 'Join call' })).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-call-status')).not.toBeInTheDocument();
+
+    view.unmount();
+  });
+
+  it('surfaces pins + Jump to date inside grouped More (This room) with valid menus', () => {
     seedChannel();
     store.setState({
       channelProps: new Map([['#general', { PINS: 'msg-1,msg-2' }]]),
@@ -115,27 +236,65 @@ describe('PresenceRibbon place-strip compression (A8)', () => {
     const openPins = vi.spyOn(store.getState(), 'openPinnedMessages');
     render(() => <PresenceRibbon />);
 
-    // B3 pins bar: one-click chip on Place cluster, not buried in More.
-    const pins = screen.getByTestId('ribbon-pins');
-    expect(pins).toBeInTheDocument();
-    expect(pins).toHaveAttribute('aria-label', '2 pinned messages');
-    fireEvent.click(pins);
-    expect(openPins).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('ribbon-pins')).not.toBeInTheDocument();
 
     openMore();
     expect(screen.getByRole('dialog', { name: 'More channel and workspace actions' })).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-more-menu')).toBeInTheDocument();
-    // Pins are not duplicated inside More.
-    expect(screen.getAllByTestId('ribbon-pins')).toHaveLength(1);
+
+    // Visible section headings (not aria-hidden) name real semantic groups
+    expect(screen.getByText('Alerts')).toBeInTheDocument();
+    expect(screen.getByText('This room')).toBeInTheDocument();
+    expect(screen.getByText('Workspace')).toBeInTheDocument();
+    expect(screen.queryByText('Channel')).not.toBeInTheDocument();
+    expect(screen.getByText('Alerts')).not.toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('This room')).not.toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Workspace')).not.toHaveAttribute('aria-hidden', 'true');
+
+    // Labelled section wrappers are role=group (labels name the groups)
+    const alertsGroup = screen.getByRole('group', { name: 'Alerts' });
+    const roomGroup = screen.getByRole('group', { name: 'This room' });
+    const workspaceGroup = screen.getByRole('group', { name: 'Workspace' });
+    expect(alertsGroup).toHaveClass('shell-ribbon-more-section');
+    expect(roomGroup).toHaveClass('shell-ribbon-more-section');
+    expect(workspaceGroup).toHaveClass('shell-ribbon-more-section');
+
+    // Menus only contain menuitem children (headings/groups live outside role=menu)
+    const menus = screen.getAllByRole('menu');
+    expect(menus.length).toBeGreaterThanOrEqual(2);
+    for (const menu of menus) {
+      const kids = Array.from(menu.children);
+      for (const kid of kids) {
+        expect(kid.getAttribute('role')).toBe('menuitem');
+      }
+    }
+
     expect(screen.getByTestId('ribbon-preferences')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-settings-gear')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-account-chip')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-appearance')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-more-channel')).toBeInTheDocument();
+    expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: /Notifications for/ })).toBeInTheDocument();
-    // Hierarchy kickers (visual only) — Channel tools then Workspace chrome.
-    expect(screen.getByText('Channel')).toBeInTheDocument();
-    expect(screen.getByText('Workspace')).toBeInTheDocument();
+
+    // Menu order: This room items before Workspace items (single roving set under panel)
+    const panel = screen.getByTestId('ribbon-more-menu');
+    const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
+    const labels = items.map((el) => el.textContent ?? '');
+    const settingsIdx = labels.findIndex((t) => t.includes('Channel settings'));
+    const pinsIdx = labels.findIndex((t) => t.includes('Pinned messages'));
+    const jumpIdx = labels.findIndex((t) => t.includes('Jump to date'));
+    const appearanceIdx = labels.findIndex((t) => t.includes('Appearance'));
+    expect(settingsIdx).toBeGreaterThanOrEqual(0);
+    expect(pinsIdx).toBeGreaterThan(settingsIdx);
+    expect(jumpIdx).toBeGreaterThan(pinsIdx);
+    expect(appearanceIdx).toBeGreaterThan(jumpIdx);
+
+    const pins = screen.getByTestId('ribbon-pins');
+    expect(pins).toBeInTheDocument();
+    expect(pins).toHaveAttribute('aria-label', '2 pinned messages');
+    fireEvent.click(pins);
+    expect(openPins).toHaveBeenCalledTimes(1);
   });
 
   it('opens account from the More menu and preserves accessible names', () => {
@@ -183,17 +342,24 @@ describe('PresenceRibbon place-strip compression (A8)', () => {
     });
   });
 
-  it('still wires jump-to-date to openJumpToDate on the primary strip', () => {
+  it('wires Jump to date from More (This room) with one-click openJumpToDate', async () => {
     seedChannel();
     const openSpy = vi.spyOn(store.getState(), 'openJumpToDate');
     render(() => <PresenceRibbon />);
 
-    fireEvent.click(screen.getByTestId('ribbon-jump-to-date'));
+    expect(screen.queryByTestId('ribbon-jump-to-date')).not.toBeInTheDocument();
+    openMore();
+    const jump = screen.getByTestId('ribbon-jump-to-date');
+    expect(jump).toHaveAttribute('role', 'menuitem');
+    fireEvent.click(jump);
     expect(openSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.queryByTestId('ribbon-more-menu')).not.toBeInTheDocument();
+    });
     openSpy.mockRestore();
   });
 
-  it('shows jump-to-date and More for DMs without channel-only secondary items', () => {
+  it('shows Jump to date under Conversation for DMs without channel-only items', () => {
     store.setState({
       ...initialState,
       connectionStatus: 'connected',
@@ -201,13 +367,40 @@ describe('PresenceRibbon place-strip compression (A8)', () => {
     });
     render(() => <PresenceRibbon />);
 
-    expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-jump-to-date')).not.toBeInTheDocument();
     expect(screen.getByTestId('ribbon-more')).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-members')).not.toBeInTheDocument();
     openMore();
+    expect(screen.getByText('Conversation')).toBeInTheDocument();
+    expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-preferences')).toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-settings-gear')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-more-channel')).not.toBeInTheDocument();
-    expect(screen.queryByText('Channel')).not.toBeInTheDocument();
+    expect(screen.queryByText('This room')).not.toBeInTheDocument();
     expect(screen.getByText('Workspace')).toBeInTheDocument();
+  });
+
+  it('renders Facepile root class that responsive CSS actually hides', () => {
+    seedChannel();
+    const { container } = render(() => <PresenceRibbon />);
+
+    // Structural: Facepile root is `.shell-facepile` (not a phantom ribbon class alone).
+    const face = container.querySelector('.shell-facepile');
+    expect(face).toBeTruthy();
+    expect(face).toHaveClass('shell-facepile');
+    // Host wrapper may exist for layout, but hide CSS must target the real root class.
+    expect(container.querySelector('.shell-ribbon-facepile')).toBeTruthy();
+
+    // Stylesheet assertion: would have failed when hide only targeted `.shell-ribbon-facepile`.
+    const cssPath = join(dirname(fileURLToPath(import.meta.url)), 'shell.css');
+    const css = readFileSync(cssPath, 'utf8');
+    const hideForFacepile = [
+      ...css.matchAll(/\.shell-facepile\s*\{[^}]*display:\s*none[^}]*\}/g),
+    ];
+    expect(hideForFacepile.length).toBeGreaterThanOrEqual(2);
+    // Ensure no hide-only phantom: every responsive hide of facepile must name the real class.
+    expect(css).not.toMatch(
+      /\/\*[^*]*facepile[^*]*\*\/\s*\.shell-ribbon-facepile\s*\{\s*display:\s*none/i,
+    );
   });
 });

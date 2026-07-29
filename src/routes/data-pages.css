@@ -568,6 +568,11 @@
 .stats-inspector {
   border-top: 1px solid var(--seam-faint);
   border-bottom: 1px solid var(--seam-faint);
+  outline: none;
+}
+.stats-inspector:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--lapis-bright) 70%, white);
+  outline-offset: 6px;
 }
 
 .stats-inspector-head {

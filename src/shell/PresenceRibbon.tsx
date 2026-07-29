@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * PresenceRibbon.tsx — top ribbon of the conversation column.
+ * PresenceRibbon.tsx — commercial room header (conversation column).
  *
- * Place strip (A8) hierarchy:
- *   LEFT  — conversation identity (name · topic · heatline · facepile)
- *   RIGHT — place signals first (event · voice · hop-in · member count),
- *           then time (jump-to-date), reach (inbox), connection.
- * Secondary chrome (pins, notify, settings, appearance, prefs, account)
- * collapses into one "More" disclosure so the ribbon reads as
- * presence-as-place, not a control dump. Member count stays primary —
- * it is the roster trigger, not chrome.
+ * Four-zone place header (docs/COMMERCIAL_UI_SYSTEM.md):
+ *   Z1 Identity — name · topic · secondary heatline/facepile (facepile desktop-only)
+ *   Z2 Place    — event · voice occupancy · Call lifecycle control
+ *   Z3 People   — roster toggle + count (always on channel, incl. 0)
+ *   Z4 Edge     — Inbox (temp primary) · More · connection (conn never display:none)
+ *
+ * More is grouped (Alerts · This room|Conversation · Workspace), not a junk drawer.
+ * Jump-to-date lives in More (This room / Conversation). Call presentation reuses
+ * pure classifyCallsHubPresentation — no auto-join, no accept/decline in the ribbon.
+ * People aria-pressed uses membersOpen (AppShell membersVisible). Persistence deferred.
  *
  * SOLID IDIOMS: never destructure props; splitProps; createMemo; For/Show;
  * store reads via useStore; snapshots via getState() in handlers.
@@ -29,12 +31,19 @@ import { PresenceHeatline } from './PresenceHeatline';
 import { Facepile } from './Facepile';
 import { facepileInputsFromUsers } from './facepile';
 import { AiPolicyBadge } from './AiPolicyBadge';
+import { classifyCallsHubPresentation, type CallsHubPresentation } from './CallsHub';
 import type { AiPolicy } from '@/lib/irc/aiPolicyProp';
 import type { Channel } from '@/lib/irc/types';
 
 export type PresenceRibbonProps = {
   selfNick?: string;
   onToggleMembers?: () => void;
+  /**
+   * True when the member surface is actually open for this room — desktop
+   * column or mobile drawer. AppShell should pass `membersVisible()`.
+   * Must be false with zero roster (no member surface can open).
+   */
+  membersOpen?: boolean;
   showJoinVoice?: boolean;
   onJoinVoice?: (withVideo: boolean) => void;
 };
@@ -117,11 +126,19 @@ export function buildVoiceRoomStatus(input: VoiceRoomStatusInput): VoiceRoomStat
 }
 
 export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
-  const [local] = splitProps(props, ['selfNick', 'onToggleMembers', 'showJoinVoice', 'onJoinVoice']);
+  const [local] = splitProps(props, [
+    'selfNick',
+    'onToggleMembers',
+    'membersOpen',
+    'showJoinVoice',
+    'onJoinVoice',
+  ]);
 
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const channels = useStore((s) => s.channels);
+  // Fallback only when AppShell does not pass membersOpen (unit hosts).
+  const showMemberList = useStore((s) => s.showMemberList);
   // selectChannelEvent parses the prop into a fresh object each call; without a
   // value-equality fn this signal (and its four countdown memos) would re-fire on
   // every unrelated store mutation whenever the active channel has an event set.
@@ -158,6 +175,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     return channels().get(view.channel) ?? null;
   });
 
+  const channelHasUnread = createMemo(
+    () => (activeChannel()?.unread ?? 0) > 0 || (activeChannel()?.highlights ?? 0) > 0,
+  );
+
   // The channel object gets a fresh identity on every message (the store spreads
   // {...c, messages:[...]} on append), but its `users` map identity is preserved
   // across message-only updates. Roster-shaped derivations key on these two memos
@@ -192,6 +213,17 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const memberCount = createMemo(() => {
     const ch = activeChannel();
     return ch ? ch.users.size : 0;
+  });
+
+  /**
+   * People `aria-pressed` tracks the *actual* open surface (desktop column or
+   * mobile drawer). AppShell passes `membersVisible()` via membersOpen.
+   * Invariant: empty roster can never show pressed, even if membersOpen is true.
+   */
+  const membersPressed = createMemo(() => {
+    if (memberCount() === 0) return false;
+    if (local.membersOpen !== undefined) return !!local.membersOpen;
+    return !!showMemberList();
   });
 
   // Facepile roster — adapts the channel's user map into the pure facepile inputs.
@@ -236,12 +268,45 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
   const voiceCount = createMemo(() => voiceParticipants().length);
 
+  /**
+   * True while this room's media session is `in_call` (provisional or established).
+   * Drives local device health on the occupancy chip and "current call" aria —
+   * not the established paint mark (see establishedRoomCall).
+   */
   const currentVoiceCall = createMemo(() => {
     const channel = settingsChannel();
+    const v = voice();
     return !!channel
-      && voice().callChannel?.toLowerCase() === channel.toLowerCase()
-      && voice().callState === 'in_call';
+      && v.callChannel?.toLowerCase() === channel.toLowerCase()
+      && v.callState === 'in_call';
   });
+
+  /** Established only (callStartedAt set) — occupancy chip active mark / In call seal. */
+  const establishedRoomCall = createMemo(() => {
+    const channel = settingsChannel();
+    const v = voice();
+    return !!channel
+      && v.callChannel?.toLowerCase() === channel.toLowerCase()
+      && classifyCallsHubPresentation(v.callState, v.callStartedAt) === 'established';
+  });
+
+  /**
+   * Call lifecycle for this room only. Ringing/provisional/established elsewhere
+   * must not paint fake local established state on the ribbon.
+   */
+  const roomCallPresentation = createMemo((): CallsHubPresentation => {
+    const channel = settingsChannel();
+    const v = voice();
+    const presentation = classifyCallsHubPresentation(v.callState, v.callStartedAt);
+    if (presentation === 'idle') return 'idle';
+    if (!channel) return 'idle';
+    if (v.callChannel?.toLowerCase() === channel.toLowerCase()) return presentation;
+    return 'idle';
+  });
+
+  const showCallJoin = createMemo(
+    () => !!local.showJoinVoice && !!local.onJoinVoice && roomCallPresentation() === 'idle',
+  );
 
   const voiceRoomStatus = createMemo(() => buildVoiceRoomStatus({
     participants: voiceParticipants(),
@@ -355,6 +420,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
   function moreMenuItems(): HTMLButtonElement[] {
     if (!moreMenuRef) return [];
+    // Multiple section menus share one roving set across the More panel.
     return Array.from(moreMenuRef.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
   }
 
@@ -390,23 +456,26 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     }
   }
 
-  const jumpDateButton = (ariaLabel: string): JSX.Element => (
+  /** Jump to date lives in More (This room / Conversation), one click → sheet. */
+  const jumpDateMenuItem = (ariaLabel: string): JSX.Element => (
     <button
       type="button"
-      class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-jump-date"
+      class="shell-ribbon-more-item"
+      role="menuitem"
       aria-label={ariaLabel}
       aria-haspopup="dialog"
       title="Jump to date"
-      onClick={() => getState().openJumpToDate()}
       data-testid="ribbon-jump-to-date"
+      onClick={() => closeMoreThen(() => getState().openJumpToDate())}
+      onKeyDown={onMoreMenuKeyDown}
     >
-      <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+      <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="5" width="18" height="16" rx="2" />
         <path d="M8 3v4M16 3v4M3 11h18" />
         <path d="M12 15v2.5M12 15l2 1.2" />
       </svg>
-      <span class="shell-ribbon-action-label">Date</span>
+      <span>Jump to date</span>
     </button>
   );
 
@@ -481,15 +550,17 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           <PresenceHeatline channel={() => (activeView().kind === 'channel' ? channelName() : null)} />
         </Show>
 
-        {/* Presence-as-place: who's in the room right now (channels only). */}
+        {/* Presence-as-place secondary: desktop facepile only (CSS hides on narrow). */}
         <Show when={activeView().kind === 'channel'}>
-          <Facepile members={facepileMembers} />
+          <div class="shell-ribbon-facepile">
+            <Facepile members={facepileMembers} />
+          </div>
         </Show>
       </div>
 
-      {/* ── RIGHT: place signals first; secondary chrome in More ── */}
+      {/* ── RIGHT: Z2 Place · Z3 People · Z4 Edge (commercial sparse chrome) ── */}
       <div class="shell-ribbon-right">
-        {/* Place cluster: event horizon + soft voice corner (channels only). */}
+        {/* Z2 Place — event · voice occupancy · Call lifecycle (channels only). */}
         <Show when={activeView().kind === 'channel'}>
           <div class="shell-ribbon-group" role="group" aria-label="Place">
             <Show when={ribbonEvent()}>
@@ -512,12 +583,11 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 </span>
               </button>
             </Show>
-            <AiPolicyBadge policy={aiPolicy()} channel={settingsChannel() ?? channelName() ?? 'channel'} />
             <Show when={voiceCount() > 0}>
               <button
                 type="button"
                 class="shell-ribbon-voice-chip"
-                classList={{ 'shell-ribbon-voice-chip--active': currentVoiceCall() }}
+                classList={{ 'shell-ribbon-voice-chip--active': establishedRoomCall() }}
                 aria-label={voiceChipAria()}
                 title={[voiceParticipants().join(', '), voiceRoomStatus().label].filter(Boolean).join(' · ')}
                 onClick={handleVoiceChipClick}
@@ -526,9 +596,50 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 <span class="shell-ribbon-voice-text">{voiceChipLabel()}</span>
               </button>
             </Show>
-            {/* One entry for the shared call stage — voice + camera are toggles
-                on the in-call bar, not separate ribbon actions. */}
-            <Show when={local.showJoinVoice && local.onJoinVoice}>
+            {/* Ringing / provisional — sparse status only; overlays own accept. */}
+            <Show when={roomCallPresentation() === 'ringing_in'}>
+              <span
+                class="shell-ribbon-call-status"
+                data-testid="ribbon-call-status"
+                data-presentation="ringing_in"
+                aria-live="polite"
+              >
+                Incoming
+              </span>
+            </Show>
+            <Show when={roomCallPresentation() === 'ringing_out'}>
+              <span
+                class="shell-ribbon-call-status"
+                data-testid="ribbon-call-status"
+                data-presentation="ringing_out"
+                aria-live="polite"
+              >
+                Calling
+              </span>
+            </Show>
+            <Show when={roomCallPresentation() === 'provisional'}>
+              <span
+                class="shell-ribbon-call-status shell-ribbon-call-status--provisional"
+                data-testid="ribbon-call-status"
+                data-presentation="provisional"
+                aria-live="polite"
+              >
+                Connecting…
+              </span>
+            </Show>
+            <Show when={roomCallPresentation() === 'established' && voiceCount() === 0}>
+              <span
+                class="shell-ribbon-voice-chip shell-ribbon-voice-chip--active shell-ribbon-call-status"
+                data-testid="ribbon-call-status"
+                data-presentation="established"
+                aria-live="polite"
+              >
+                <span class="shell-ribbon-voice-mark" aria-hidden="true" />
+                <span class="shell-ribbon-voice-text">In call</span>
+              </span>
+            </Show>
+            {/* Idle join — one Call control; camera lives on the in-call bar. */}
+            <Show when={showCallJoin()}>
               <button
                 type="button"
                 class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-call"
@@ -547,105 +658,37 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 <span class="shell-ribbon-action-label">Call</span>
               </button>
             </Show>
-            {/* Pins chip — always one click away in a channel (B3 polish). Count
-                badges only when pins exist so empty rooms stay quiet. */}
-            <Show when={activeView().kind === 'channel'}>
-              <button
-                type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-pins"
-                aria-label={
-                  pinCount() > 0
-                    ? `${pinCount()} pinned message${pinCount() === 1 ? '' : 's'}`
-                    : 'Pinned messages'
-                }
-                title={pinCount() > 0 ? `${pinCount()} pinned` : 'Pinned messages'}
-                data-testid="ribbon-pins"
-                onClick={() => getState().openPinnedMessages()}
-              >
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
-                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" />
-                  <path d="M12 14v6" />
-                </svg>
-                <Show when={pinCount() > 0}>
-                  <span class="shell-ribbon-count">{pinCount()}</span>
-                </Show>
-              </button>
-            </Show>
-            {/* Mark read — only when this channel has unread (badge hygiene). */}
-            <Show when={(activeChannel()?.unread ?? 0) > 0 || (activeChannel()?.highlights ?? 0) > 0}>
-              <button
-                type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-mark-read"
-                data-testid="ribbon-mark-read"
-                aria-label={`Mark ${activeChannel()?.name ?? 'channel'} as read`}
-                title="Mark as read"
-                onClick={() => {
-                  const ch = activeChannel();
-                  if (!ch) return;
-                  getState().markRead(ch.name);
-                }}
-              >
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
-                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              </button>
-            </Show>
-            {/* DND / quiet-hours — only when active so calm default stays quiet. */}
-            <Show when={dndActive()}>
-              <button
-                type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-dnd"
-                data-testid="ribbon-dnd-active"
-                aria-label="Do not disturb is on — open preferences to change"
-                title="Do not disturb is on"
-                onClick={() => openPreferences()}
-              >
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
-                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 3a6.5 6.5 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-                </svg>
-                <span class="shell-ribbon-action-label">DND</span>
-              </button>
-            </Show>
-            {/* Member count is presence-as-place (stable roster trigger), not chrome. */}
-            <Show when={memberCount() > 0}>
-              <button
-                type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-members"
-                aria-label={`${memberCount()} members — toggle member list`}
-                data-testid="ribbon-members"
-                onClick={handleMembersClick}
-              >
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
-                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19" />
-                  <circle cx="10" cy="8" r="3" />
-                  <path d="M20 19v-1.4a3.4 3.4 0 0 0-2.6-3.3M15.5 5.2a3 3 0 0 1 0 5.6" />
-                </svg>
-                <span class="shell-ribbon-count">{memberCount()}</span>
-              </button>
-            </Show>
+          </div>
+
+          {/* Z3 People — always on channel, including zero members. */}
+          <div class="shell-ribbon-group" role="group" aria-label="People">
+            <button
+              type="button"
+              class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-members"
+              aria-label={`${memberCount()} members — toggle member list`}
+              aria-pressed={membersPressed()}
+              data-testid="ribbon-members"
+              onClick={handleMembersClick}
+            >
+              <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19" />
+                <circle cx="10" cy="8" r="3" />
+                <path d="M20 19v-1.4a3.4 3.4 0 0 0-2.6-3.3M15.5 5.2a3 3 0 0 1 0 5.6" />
+              </svg>
+              <span class="shell-ribbon-count">{memberCount()}</span>
+              <span class="shell-ribbon-action-label">People</span>
+            </button>
           </div>
           <span class="shell-ribbon-divider" aria-hidden="true" />
         </Show>
 
-        {/* Time instrument — jump-to-date stays one click away (channel + DM). */}
-        <Show when={activeView().kind === 'channel'}>
-          <div class="shell-ribbon-group" role="group" aria-label="Time">
-            {jumpDateButton(`Jump to date in ${settingsChannel()}`)}
-          </div>
-          <span class="shell-ribbon-divider" aria-hidden="true" />
-        </Show>
-        <Show when={activeView().kind === 'dm'}>
-          <div class="shell-ribbon-group" role="group" aria-label="Conversation">
-            {jumpDateButton(`Jump to date in DM with ${channelName()}`)}
-          </div>
-          <span class="shell-ribbon-divider" aria-hidden="true" />
-        </Show>
+        {/* Z4 Edge — Inbox · More · connection (Date lives in More). */}
+        <div class="shell-ribbon-group" role="group" aria-label="Inbox">
+          <NotificationCenter />
+        </div>
+        <span class="shell-ribbon-divider" aria-hidden="true" />
 
-        {/* Secondary chrome — one disclosure instead of a control dump. */}
         <div class="shell-ribbon-group" role="group" aria-label="More">
           <Popover
             open={moreOpen()}
@@ -654,7 +697,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
             panelLabel="More channel and workspace actions"
             trigger={
               <span
-                class="shell-ribbon-iconbtn shell-ribbon-more-trigger"
+                class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-more-trigger"
                 data-testid="ribbon-more"
               >
                 <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
@@ -664,38 +707,60 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                   <circle cx="19" cy="12" r="1.6" />
                 </svg>
                 <span class="sr-only">More actions</span>
+                <span class="shell-ribbon-action-label" aria-hidden="true">More</span>
               </span>
             }
           >
-            <div class="shell-ribbon-more">
-              {/* Notify is a radiogroup — keep it outside role=menu (ARIA menu may only host menuitems). */}
+            {/*
+              Section headings are normal text outside role=menu, associated via
+              aria-labelledby. Each menu only contains menuitem children (valid ARIA).
+              Roving focus walks every menuitem under the panel root.
+            */}
+            <div
+              class="shell-ribbon-more"
+              data-testid="ribbon-more-menu"
+              ref={(element) => {
+                moreMenuRef = element;
+                queueMicrotask(() => focusMoreMenuItem(0));
+              }}
+            >
+              {/* Notify is a radiogroup — keep it outside role=menu. */}
               <Show when={activeView().kind === 'channel' && settingsChannel()}>
                 {(name) => (
-                  <div class="shell-ribbon-more-section" data-testid="ribbon-more-channel">
-                    <p class="shell-ribbon-more-label">Alerts</p>
+                  <div
+                    class="shell-ribbon-more-section"
+                    role="group"
+                    data-testid="ribbon-more-channel"
+                    aria-labelledby="ribbon-more-alerts-label"
+                  >
+                    <p id="ribbon-more-alerts-label" class="shell-ribbon-more-label">
+                      Alerts
+                    </p>
                     <ChannelNotifyControl channel={name()} class="shell-ribbon-more-notify" />
+                    <Show when={aiPolicy() !== 'open'}>
+                      <div class="shell-ribbon-more-ai" data-testid="ribbon-more-ai-policy">
+                        <AiPolicyBadge policy={aiPolicy()} channel={name()} />
+                      </div>
+                    </Show>
                   </div>
                 )}
               </Show>
 
-              {/* Single menu: Channel tools first, then Workspace chrome — one roving focus set. */}
-              <div
-                ref={(element) => {
-                  moreMenuRef = element;
-                  queueMicrotask(() => focusMoreMenuItem(0));
-                }}
-                class="shell-ribbon-more-list"
-                role="menu"
-                aria-label="More actions"
-                data-testid="ribbon-more-menu"
-              >
-                <Show when={activeView().kind === 'channel' && settingsChannel()}>
-                  <>
-                    <p class="shell-ribbon-more-label shell-ribbon-more-label--in-menu" aria-hidden="true">
-                      Channel
-                    </p>
-                    {/* Pins live on the Place cluster (one-click ribbon chip) when
-                        the channel has any — no second entry in More. */}
+              {/* This room — channel tools + Jump to date */}
+              <Show when={activeView().kind === 'channel' && settingsChannel()}>
+                <div
+                  class="shell-ribbon-more-section"
+                  role="group"
+                  aria-labelledby="ribbon-more-room-label"
+                >
+                  <p id="ribbon-more-room-label" class="shell-ribbon-more-label">
+                    This room
+                  </p>
+                  <div
+                    class="shell-ribbon-more-list"
+                    role="menu"
+                    aria-labelledby="ribbon-more-room-label"
+                  >
                     <button
                       type="button"
                       class="shell-ribbon-more-item"
@@ -797,83 +862,182 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       </svg>
                       <span>Export transcript</span>
                     </button>
-                  </>
-                </Show>
+                    <button
+                      type="button"
+                      class="shell-ribbon-more-item"
+                      role="menuitem"
+                      aria-label={
+                        pinCount() > 0
+                          ? `${pinCount()} pinned message${pinCount() === 1 ? '' : 's'}`
+                          : 'Pinned messages'
+                      }
+                      data-testid="ribbon-pins"
+                      onClick={() => closeMoreThen(() => getState().openPinnedMessages())}
+                      onKeyDown={onMoreMenuKeyDown}
+                    >
+                      <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" />
+                        <path d="M12 14v6" />
+                      </svg>
+                      <span>Pinned messages</span>
+                      <Show when={pinCount() > 0}>
+                        <span class="shell-ribbon-more-meta">{pinCount()}</span>
+                      </Show>
+                    </button>
+                    {jumpDateMenuItem(`Jump to date in ${settingsChannel()}`)}
+                    <Show when={channelHasUnread()}>
+                      <button
+                        type="button"
+                        class="shell-ribbon-more-item"
+                        role="menuitem"
+                        data-testid="ribbon-mark-read"
+                        aria-label={`Mark ${activeChannel()?.name ?? 'channel'} as read`}
+                        onClick={() => {
+                          const ch = activeChannel();
+                          closeMoreThen(() => {
+                            if (!ch) return;
+                            getState().markRead(ch.name);
+                          });
+                        }}
+                        onKeyDown={onMoreMenuKeyDown}
+                      >
+                        <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                        <span>Mark as read</span>
+                      </button>
+                    </Show>
+                    <Show when={dndActive()}>
+                      <button
+                        type="button"
+                        class="shell-ribbon-more-item"
+                        role="menuitem"
+                        data-testid="ribbon-dnd-active"
+                        aria-label="Do not disturb is on — open preferences to change"
+                        onClick={() => closeMoreThen(() => openPreferences())}
+                        onKeyDown={onMoreMenuKeyDown}
+                      >
+                        <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 3a6.5 6.5 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                        </svg>
+                        <span>Do not disturb is on</span>
+                      </button>
+                    </Show>
+                  </div>
+                </div>
+              </Show>
 
-                <p class="shell-ribbon-more-label shell-ribbon-more-label--in-menu" aria-hidden="true">
+              {/* Conversation — DM Jump to date */}
+              <Show when={activeView().kind === 'dm' && channelName()}>
+                {(nick) => (
+                  <div
+                    class="shell-ribbon-more-section"
+                    role="group"
+                    aria-labelledby="ribbon-more-conv-label"
+                  >
+                    <p id="ribbon-more-conv-label" class="shell-ribbon-more-label">
+                      Conversation
+                    </p>
+                    <div
+                      class="shell-ribbon-more-list"
+                      role="menu"
+                      aria-labelledby="ribbon-more-conv-label"
+                    >
+                      {jumpDateMenuItem(`Jump to date in DM with ${nick()}`)}
+                    </div>
+                  </div>
+                )}
+              </Show>
+
+              {/* Workspace — appearance / prefs / account */}
+              <div
+                class="shell-ribbon-more-section"
+                role="group"
+                aria-labelledby="ribbon-more-workspace-label"
+              >
+                <p id="ribbon-more-workspace-label" class="shell-ribbon-more-label">
                   Workspace
                 </p>
-                <button
-                  type="button"
-                  class="shell-ribbon-more-item"
-                  role="menuitem"
-                  aria-label="Appearance — theme and background"
-                  aria-haspopup="dialog"
-                  data-testid="ribbon-appearance"
-                  onClick={() => closeMoreThen(() => getState().openAppearance())}
-                  onKeyDown={onMoreMenuKeyDown}
+                <div
+                  class="shell-ribbon-more-list"
+                  role="menu"
+                  aria-labelledby="ribbon-more-workspace-label"
                 >
-                  <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
-                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-3.9-4-7.4-9-7.4Z" />
-                    <circle cx="7.5" cy="11.5" r="1.1" fill="currentColor" stroke="none" />
-                    <circle cx="11" cy="7.5" r="1.1" fill="currentColor" stroke="none" />
-                    <circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
-                  </svg>
-                  <span>Appearance</span>
-                </button>
+                  <button
+                    type="button"
+                    class="shell-ribbon-more-item"
+                    role="menuitem"
+                    aria-label="Appearance — theme and background"
+                    aria-haspopup="dialog"
+                    data-testid="ribbon-appearance"
+                    onClick={() => closeMoreThen(() => getState().openAppearance())}
+                    onKeyDown={onMoreMenuKeyDown}
+                  >
+                    <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-3.9-4-7.4-9-7.4Z" />
+                      <circle cx="7.5" cy="11.5" r="1.1" fill="currentColor" stroke="none" />
+                      <circle cx="11" cy="7.5" r="1.1" fill="currentColor" stroke="none" />
+                      <circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
+                    </svg>
+                    <span>Appearance</span>
+                  </button>
 
-                <button
-                  type="button"
-                  class="shell-ribbon-more-item"
-                  role="menuitem"
-                  aria-label="Open preferences"
-                  aria-haspopup="dialog"
-                  data-testid="ribbon-preferences"
-                  onClick={() => closeMoreThen(() => openPreferences())}
-                  onKeyDown={onMoreMenuKeyDown}
-                >
-                  <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
-                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 21v-7" />
-                    <path d="M4 10V3" />
-                    <path d="M12 21v-9" />
-                    <path d="M12 8V3" />
-                    <path d="M20 21v-5" />
-                    <path d="M20 12V3" />
-                    <path d="M2 14h4" />
-                    <path d="M10 8h4" />
-                    <path d="M18 16h4" />
-                  </svg>
-                  <span>Preferences</span>
-                </button>
+                  <button
+                    type="button"
+                    class="shell-ribbon-more-item"
+                    role="menuitem"
+                    aria-label="Open preferences"
+                    aria-haspopup="dialog"
+                    data-testid="ribbon-preferences"
+                    onClick={() => closeMoreThen(() => openPreferences())}
+                    onKeyDown={onMoreMenuKeyDown}
+                  >
+                    <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 21v-7" />
+                      <path d="M4 10V3" />
+                      <path d="M12 21v-9" />
+                      <path d="M12 8V3" />
+                      <path d="M20 21v-5" />
+                      <path d="M20 12V3" />
+                      <path d="M2 14h4" />
+                      <path d="M10 8h4" />
+                      <path d="M18 16h4" />
+                    </svg>
+                    <span>Preferences</span>
+                  </button>
 
-                <button
-                  type="button"
-                  class="shell-ribbon-more-item shell-ribbon-more-item--account"
-                  role="menuitem"
-                  data-guest={account() ? 'false' : 'true'}
-                  aria-label={
-                    account()
-                      ? `Account: ${account()} — open account panel`
-                      : 'Guest — open account panel'
-                  }
-                  aria-haspopup="dialog"
-                  data-testid="ribbon-account-chip"
-                  onClick={() => closeMoreThen(() => getState().openAccount())}
-                  onKeyDown={onMoreMenuKeyDown}
-                >
-                  <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
-                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="8" r="3.5" />
-                    <path d="M5 19.5c1.6-3 4-4.5 7-4.5s5.4 1.5 7 4.5" />
-                  </svg>
-                  <span class="shell-ribbon-account-text">
-                    <Show when={account()} fallback={<span class="shell-ribbon-account-name">Guest</span>}>
-                      {(acct) => <span class="shell-ribbon-account-name">{acct()}</span>}
-                    </Show>
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    class="shell-ribbon-more-item shell-ribbon-more-item--account"
+                    role="menuitem"
+                    data-guest={account() ? 'false' : 'true'}
+                    aria-label={
+                      account()
+                        ? `Account: ${account()} — open account panel`
+                        : 'Guest — open account panel'
+                    }
+                    aria-haspopup="dialog"
+                    data-testid="ribbon-account-chip"
+                    onClick={() => closeMoreThen(() => getState().openAccount())}
+                    onKeyDown={onMoreMenuKeyDown}
+                  >
+                    <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="8" r="3.5" />
+                      <path d="M5 19.5c1.6-3 4-4.5 7-4.5s5.4 1.5 7 4.5" />
+                    </svg>
+                    <span class="shell-ribbon-account-text">
+                      <Show when={account()} fallback={<span class="shell-ribbon-account-name">Guest</span>}>
+                        {(acct) => <span class="shell-ribbon-account-name">{acct()}</span>}
+                      </Show>
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           </Popover>
@@ -881,21 +1045,16 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
         <span class="shell-ribbon-divider" aria-hidden="true" />
 
-        {/* Reach instrument stays one click away — not buried in More. */}
-        <div class="shell-ribbon-group" role="group" aria-label="Inbox">
-          <NotificationCenter />
-        </div>
-
-        <span class="shell-ribbon-divider" aria-hidden="true" />
-
-        {/* Connection status: a labelled chip, not a stray dot. */}
+        {/* Connection — may compact at narrow widths; never display:none. */}
         <span
           class="shell-ribbon-conn"
+          data-testid="ribbon-conn"
           data-state={connectionStatus()}
           title={`Connection: ${connLabel()}`}
           aria-live="polite"
           aria-atomic="true"
         >
+          <span class="shell-ribbon-conn-dot" aria-hidden="true" />
           <span class="shell-ribbon-conn-label" aria-hidden="true">{connLabel()}</span>
           <span class="sr-only">Connection: {connLabel()}</span>
         </span>

@@ -36,6 +36,7 @@ import {
   createSignal,
   createMemo,
   createEffect,
+  ErrorBoundary,
   For,
   lazy,
   onCleanup,
@@ -44,6 +45,7 @@ import {
   Suspense,
   type JSX,
 } from 'solid-js';
+import { lazyRouteFallback } from '@/app/StaleChunkRecovery';
 import { useStore, getState } from '@/lib/store';
 import { parseAtParam, parseJoinParam, parseReaderParam, parseTopicParam } from '@/lib/deeplink';
 import { buildInviteCard, inviteTitle, inviteDescription } from '@/lib/invite/inviteCard';
@@ -1717,22 +1719,26 @@ export function Connect(props: ConnectProps): JSX.Element {
         </div>
       }
     >
-      {/* Connected shell — reads everything from the store */}
-      <Suspense
-        fallback={
-          <div class="conn" data-testid="shell-loading">
-            <Atmosphere />
-            <div class="conn-stage">
-              <Spinner label="Opening Onyx" />
+      {/* Connected shell — reads everything from the store.
+          ErrorBoundary: a stale post-deploy AppShell chunk 404 must not leave
+          wallpaper-only blank output; offer reload / home, never auto-loop. */}
+      <ErrorBoundary fallback={lazyRouteFallback}>
+        <Suspense
+          fallback={
+            <div class="conn" data-testid="shell-loading">
+              <Atmosphere />
+              <div class="conn-stage">
+                <Spinner label="Opening Onyx" />
+              </div>
             </div>
-          </div>
-        }
-      >
-        <AppShell
-          onDisconnect={handleDisconnect}
-          selfNick={ourNick()}
-        />
-      </Suspense>
+          }
+        >
+          <AppShell
+            onDisconnect={handleDisconnect}
+            selfNick={ourNick()}
+          />
+        </Suspense>
+      </ErrorBoundary>
     </Show>
   );
 }

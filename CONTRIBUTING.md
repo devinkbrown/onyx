@@ -75,27 +75,66 @@ TypeScript is **strict**, and `noUncheckedIndexedAccess` is on
   `ocean.accent`, `ocean.links`, `ocean.watch`) are **wire format** —
   server-persisted and shared with other clients. Never rename them.
 
-## Deploy safety — the `dist/` vs `out/` invariant
+## Deploy safety — the `dist/` vs live-`out` invariant
 
-**Only `deploy.sh` writes `out/`.** nginx serves `/home/kain/onyx/out` directly
-at eshmaki.me, so `out/` *is* production. To keep a plain build, a test run, or a
-Playwright web server from ever wiping or half-replacing the live site, Vite
-builds to `dist/` (`vite.config.ts`), and `deploy.sh` is the single path that
-syncs `dist/ → out/`.
+**Only `deploy.sh` writes the live `out` tree.** nginx serves
+`/home/kain/onyx/out` at eshmaki.me. A worktree checkout (for example
+`/home/kain/onyx-public-launch`) is **not** that tree: set
+`ONYX_LIVE_OUT=/home/kain/onyx/out` for a production release. When supplied,
+`ONYX_LIVE_OUT` must already be an absolute path whose basename is `out` (raw
+relative paths are rejected; the target must not itself be a symlink). The
+default is the checkout-local `$checkout/out`.
 
-`./deploy.sh`:
+Vite builds to `dist/` (`vite.config.ts`) so a plain build, test run, or
+Playwright web server can never wipe or half-replace production. **`deploy.sh`
+is the only writer of the live out.**
 
-1. `pnpm build` → `dist/` (aborts if `dist/index.html` or `dist/sw.js` is missing).
-2. Materialises SPA route entrypoints with route-correct canonical, Open Graph,
+The **Vite/Solid Landing** is authoritative for the public root and all SPA
+routes. `/home/kain/landing` is **legacy support only**: deploy builds it and
+stages **allowlisted** non-conflicting paths (`guides`, `community`, `install`,
+`self-host`, `why`, `memory`, `onyxOS`, `fonts`). It never overlays root
+documents (`index.html`, `robots.txt`, `sitemap.xml`, favicons) or SPA-owned
+routes/assets/service worker. SPA-owned content is fingerprinted before staging
+and re-verified afterward.
+
+`./deploy.sh` (or `DEPLOY_DRY_RUN=1 …` for build/stage/assert only — no live
+mutation; `DEPLOY_DRY_RUN` must be exactly `0` or `1`):
+
+1. Resolves and validates `ONYX_LIVE_OUT` (absolute, basename `out`, not `/`,
+   not the checkout root, not `dist`, not a symlink).
+2. `pnpm build` → `dist/` (aborts if `dist/index.html` or `dist/sw.js` is missing).
+3. Materialises SPA route entrypoints with route-correct canonical, Open Graph,
    title, and description metadata so hard loads do not 404 and pre-hydration
    crawlers see the right page. **Keep `ROUTE_ENTRYPOINTS` in
    `tools/materialize-route-entrypoints.mjs` in sync with the `<Route>` table in
    `src/index.tsx`.**
-3. Stamps the service-worker cache name (`onyx-shell-<version>`) into `dist/sw.js`.
-4. Overlays the community site from `/home/kain/landing`.
-5. `rsync -a --delete dist/ out/`.
+4. Stamps the service-worker cache name (`onyx-shell-<version>[-dirty]`) into
+   `dist/sw.js`.
+5. Stages allowlisted legacy support from `/home/kain/landing` into `dist/`,
+   then asserts SPA-owned fingerprints are unchanged.
+6. Unless `DEPLOY_DRY_RUN=1`: hard-link snapshot of any existing live out under a
+   sibling `.onyx-deploy-backups/` **before** ACL or content mutation, then
+   two-phase live sync for **active-client compatibility**:
+   - root: `rsync --archive --checksum --delete --exclude=/assets/ dist/ →
+     $ONYX_LIVE_OUT` (never `--delete-excluded`)
+   - assets: create live `assets/` and `rsync --archive --checksum` **without**
+     `--delete` so prior immutable hashed assets stay available to clients
+     still on the previous shell
+   - verify every current staged file exists byte-identically in live
+     (deterministic checksums), allowing extra legacy files only under live
+     `assets/`; also check index title/metadata, `app/index.html`, `sw.js`, and
+     the version stamp
+   - automatic hashed-asset GC/retention is **not** implemented here — that is
+     future, separately designed policy (no backup scanning or pruning in
+     deploy)
+   - on rsync or post-sync verification failure the controller restores the
+     snapshot, proves restoration, emits `RECOVERY_EVIDENCE`, and exits nonzero
+     (fail closed if rollback cannot be proven).
 
-Never point a build, test, or script at `out/` yourself.
+Controller unit tests: `bash tools/deploy-controller.test.sh` (never mutates
+`/home/kain/onyx/out`).
+
+Never point a build, test, or script at the live `out/` yourself.
 
 ## Branch conventions
 

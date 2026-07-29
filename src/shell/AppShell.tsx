@@ -39,6 +39,7 @@ import { NotificationRuntime } from '@/lib/notifications';
 import { TopicReadRuntime } from '@/lib/topics/TopicReadRuntime';
 import { ServerRail } from './ServerRail';
 import { ChannelSidebar } from './ChannelSidebar';
+import { CallsHub } from './CallsHub';
 import { HomeView } from './HomeView';
 const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
 const WhoisSheet = lazy(() => import('./WhoisSheet').then((m) => ({ default: m.WhoisSheet })));
@@ -92,7 +93,7 @@ const PreferencesPanel = lazy(() => import('./PreferencesPanel').then((m) => ({ 
 const PinnedMessages = lazy(() => import('./PinnedMessages').then((m) => ({ default: m.PinnedMessages })));
 const ScheduledMessagesSheet = lazy(() => import('./ScheduledMessagesSheet').then((m) => ({ default: m.ScheduledMessagesSheet })));
 const JumpToDateSheet = lazy(() => import('./JumpToDateSheet').then((m) => ({ default: m.JumpToDateSheet })));
-import { applyPreferences, closePreferences, isPreferencesOpen, openPreferences, preferences } from '@/lib/prefs/preferences';
+import { applyPreferences, closePreferences, isPreferencesOpen, preferences } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
 const ShortcutsOverlay = lazy(() => import('./ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })));
@@ -220,6 +221,13 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const showWhois = useStore((s) => s.showWhois);
   const showKeyboardShortcuts = useStore((s) => s.showKeyboardShortcuts);
   const reducedData = makeReducedDataSignal();
+  // Product-frame navigation is shell-local — never widen store ActiveView.
+  // 'calls' is a discovery hub only; Join call still starts the real surface.
+  const [primarySurface, setPrimarySurface] = createSignal<'conversation' | 'calls'>('conversation');
+  const [browseActive, setBrowseActive] = createSignal(false);
+  const [sidebarMode, setSidebarMode] = createSignal<'rooms' | 'messages'>(
+    activeView().kind === 'dm' ? 'messages' : 'rooms',
+  );
 
   // ── Global keyboard shortcuts (nav, member list, composer, help) ──
   // Spotlight is mounted once at the app root. This hook adds connected-app
@@ -561,7 +569,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
   let mobileMembersTarget: string | null = null;
   let sidebarDrawerRef: HTMLDivElement | undefined;
   let mobileRoomsButtonRef: HTMLButtonElement | undefined;
-  let mobileMembersButtonRef: HTMLButtonElement | undefined;
   let mobileDrawerRestoreTarget: HTMLElement | null = null;
 
   function rememberMobileDrawerTrigger(): void {
@@ -677,7 +684,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
       // persistent roster from becoming inert for one reactive turn, which
       // would light-dismiss an open member card and strand focus on <body>.
       if (preserveMemberContext) {
-        mobileDrawerRestoreTarget ||= mobileMembersButtonRef ?? null;
+        // Product-frame mobile nav no longer owns Members; restore to the
+        // presence-ribbon members control (stable roster trigger).
+        mobileDrawerRestoreTarget ||= document.querySelector<HTMLElement>('[data-testid="ribbon-members"]');
         setMobileMembersOpen(true);
       }
       setIsMobile(e.matches);
@@ -739,7 +748,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
       }
 
       rememberMobileDrawerTrigger();
-      mobileDrawerRestoreTarget ||= mobileMembersButtonRef ?? null;
+      mobileDrawerRestoreTarget ||= document.querySelector<HTMLElement>('[data-testid="ribbon-members"]');
       getState().closeMobileSidebar();
       setMobileMembersOpen(true);
       queueMicrotask(() => focusFirstInMobileDrawer(membersDrawerElement()));
@@ -779,7 +788,50 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   function openHome(): void {
     closeActiveMobileDrawer(false);
+    setPrimarySurface('conversation');
+    setBrowseActive(false);
     getState().navigate({ kind: 'home' });
+  }
+
+  function selectSidebarMode(mode: 'rooms' | 'messages'): void {
+    setPrimarySurface('conversation');
+    setBrowseActive(true);
+    setSidebarMode(mode);
+  }
+
+  function openMobileCollection(mode: 'rooms' | 'messages'): void {
+    selectSidebarMode(mode);
+    if (mobileSidebarOpen()) {
+      focusFirstInMobileDrawer(sidebarDrawerRef);
+      return;
+    }
+    openMobileSidebar();
+  }
+
+  /** Opens the Calls hub only — never joins or starts a call. */
+  function openCalls(): void {
+    closeActiveMobileDrawer(false);
+    setBrowseActive(false);
+    setPrimarySurface('calls');
+  }
+
+  function openYou(): void {
+    closeActiveMobileDrawer(false);
+    getState().openAccount();
+  }
+
+  function openRoomsFromCalls(): void {
+    if (isMobile()) {
+      openMobileCollection('rooms');
+      return;
+    }
+    selectSidebarMode('rooms');
+  }
+
+  function returnToCall(channel: string): void {
+    setPrimarySurface('conversation');
+    setBrowseActive(false);
+    getState().navigate({ kind: 'channel', channel });
   }
 
   function openMemberDm(nick: string): void {
@@ -810,6 +862,15 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const membersVisible = createMemo(() =>
     hasMemberRoster() && (isMobile() ? mobileMembersOpen() : showMemberList()),
   );
+
+  const activeSection = createMemo<'home' | 'rooms' | 'messages' | 'calls' | 'you'>(() => {
+    if (showAccount()) return 'you';
+    if (primarySurface() === 'calls') return 'calls';
+    if (browseActive()) return sidebarMode();
+    if (activeView().kind === 'home') return 'home';
+    if (activeView().kind === 'dm') return 'messages';
+    return sidebarMode();
+  });
 
   function handleDisconnect(): void {
     local.onDisconnect?.();
@@ -860,7 +921,19 @@ export function AppShell(props: AppShellProps): JSX.Element {
           aria-label={isMobile() && mobileSidebarOpen() ? 'Channel drawer' : undefined}
           tabindex={isMobile() && mobileSidebarOpen() ? -1 : undefined}
         >
-          <ChannelSidebar onMobileClose={closeMobileSidebar} />
+          <ChannelSidebar
+            mode={sidebarMode()}
+            activeSection={activeSection()}
+            onModeChange={selectSidebarMode}
+            onOpenHome={openHome}
+            onOpenCalls={openCalls}
+            onOpenYou={openYou}
+            onConversationOpen={() => {
+              setPrimarySurface('conversation');
+              setBrowseActive(false);
+            }}
+            onMobileClose={closeMobileSidebar}
+          />
         </div>
 
         {/* ── Conversation Column ── */}
@@ -874,75 +947,90 @@ export function AppShell(props: AppShellProps): JSX.Element {
           <PresenceRibbon
             selfNick={displayNick()}
             onToggleMembers={handleToggleMembers}
+            membersOpen={membersVisible()}
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
           />
-          {/* Discord Stages-class strip (B13) — self-gates per active channel. */}
-          <StagePanel />
-          {/* Call stage docks immediately under the ribbon so guest-claim /
-              time-scrubber / watch-together cannot sit on top of the video. */}
-          {/* Keep the stage mounted for the whole in-call surface. Gating on
-              callStartedAt unmounted it every provisional re-join and made the
-              panel look like it "kept closing". VoiceStage shows starting UI
-              until streams land. */}
-          <Show when={viewingCall()}>
-            <Suspense
-              fallback={
-                <div
-                  class="voice-stage voice-stage--audio voice-stage--size-compact"
-                  aria-label="Voice call participants"
-                  role="region"
-                  data-testid="voice-stage-loading"
-                >
-                  <p role="status">Starting call…</p>
-                </div>
-              }
-            >
-              <VoiceStage />
-            </Suspense>
-          </Show>
-          {/* Always-available DM trust receipt. It self-gates outside DMs and
-              expands in flow so verification never covers the transcript. */}
-          <DmSafetySheet />
-          {/* Guest → claim-your-nick affordance (self-gates on guest state) */}
-          <GuestClaimPrompt />
-          {/* E2EE key-change warning (self-gates on the active DM having a pending change) */}
-          <DmKeyChangeBanner />
-          {/* While a call is up, hide the history scrubber + watch launcher —
-              they steal the column above the stage and look like they cover video. */}
-          <Show when={preferences().timeScrubber && !inCall()}>
-            <TimeScrubber />
-          </Show>
-          <Show when={preferences().watchTogether && !inCall()}>
-            <WatchTogetherActivity />
-          </Show>
-
-          {/* Content: read-only status buffer, conversation, or home */}
-          <Show when={activeView().kind === 'status'} fallback={
           <Show
-            when={hasConversation()}
-            fallback={<HomeView />}
+            when={primarySurface() === 'calls'}
+            fallback={(
+              <>
+                {/* Discord Stages-class strip (B13) — self-gates per active channel. */}
+                <StagePanel />
+                {/* Keep the stage mounted for the whole in-call surface. Gating on
+                    callStartedAt unmounted it every provisional re-join and made the
+                    panel look like it "kept closing". VoiceStage shows starting UI
+                    until streams land. */}
+                <Show when={viewingCall()}>
+                  <Suspense
+                    fallback={
+                      <div
+                        class="voice-stage voice-stage--audio voice-stage--size-compact"
+                        aria-label="Voice call participants"
+                        role="region"
+                        data-testid="voice-stage-loading"
+                      >
+                        <p role="status">Starting call…</p>
+                      </div>
+                    }
+                  >
+                    <VoiceStage />
+                  </Suspense>
+                </Show>
+                {/* Always-available DM trust receipt. It self-gates outside DMs and
+                    expands in flow so verification never covers the transcript. */}
+                <DmSafetySheet />
+                {/* Guest → claim-your-nick affordance (self-gates on guest state) */}
+                <GuestClaimPrompt />
+                {/* E2EE key-change warning (self-gates on the active DM having a pending change) */}
+                <DmKeyChangeBanner />
+                {/* While a call is up, hide the history scrubber + watch launcher —
+                    they steal the column above the stage and look like they cover video. */}
+                <Show when={preferences().timeScrubber && !inCall()}>
+                  <TimeScrubber />
+                </Show>
+                <Show when={preferences().watchTogether && !inCall()}>
+                  <WatchTogetherActivity />
+                </Show>
+
+                {/* Content: read-only status buffer, conversation, or home */}
+                <Show when={activeView().kind === 'status'} fallback={
+                <Show
+                  when={hasConversation()}
+                  fallback={<HomeView />}
+                >
+                  <MessageView selfNick={displayNick()} />
+                  {/* Persistent call controls while in a call */}
+                  <Show when={inCall()}>
+                    <Suspense fallback={null}>
+                      <VoiceBar />
+                    </Suspense>
+                  </Show>
+                  <TypingIndicator />
+                  <Composer />
+                </Show>
+                }>
+                  {/* Read-only server/status buffer — no composer, no voice */}
+                  <div class="shell-status-stack" data-testid="status-stack">
+                    <CapabilityMatrixSection />
+                    <MessageView selfNick={displayNick()} />
+                  </div>
+                </Show>
+                {/* Search Center is global: on Home/status it searches every local
+                    vault target; server search appears only for a concrete room/DM. */}
+                <MessageSearch />
+              </>
+            )}
           >
-            <MessageView selfNick={displayNick()} />
-            {/* Persistent call controls while in a call */}
-            <Show when={inCall()}>
-              <Suspense fallback={null}>
-                <VoiceBar />
-              </Suspense>
-            </Show>
-            <TypingIndicator />
-            <Composer />
+            <CallsHub
+              callState={voice().callState}
+              callChannel={voice().callChannel}
+              callWith={voice().callWith}
+              callStartedAt={voice().callStartedAt}
+              onOpenRooms={openRoomsFromCalls}
+              onReturnToCall={returnToCall}
+            />
           </Show>
-          }>
-            {/* Read-only server/status buffer — no composer, no voice */}
-            <div class="shell-status-stack" data-testid="status-stack">
-              <CapabilityMatrixSection />
-              <MessageView selfNick={displayNick()} />
-            </div>
-          </Show>
-          {/* Search Center is global: on Home/status it searches every local
-              vault target; server search appears only for a concrete room/DM. */}
-          <MessageSearch />
         </div>
 
         {/* ── Member List (right drawer on mobile) ── */}
@@ -962,56 +1050,58 @@ export function AppShell(props: AppShellProps): JSX.Element {
         />
       </div>
 
-      {/* Mobile bottom tab bar */}
+      {/* Mobile bottom tab bar — product frame: Home / Rooms / Messages / Calls / You.
+          No Leave here; disconnect remains on ServerRail / account. Members stay
+          on the presence ribbon (not a bottom-tab). */}
       <nav class="shell-mobile-nav" aria-label="Mobile navigation">
         <button
           type="button"
-          class={`shell-mobile-nav-btn${activeView().kind === 'home' ? ' shell-mobile-nav-btn--active' : ''}`}
+          class={`shell-mobile-nav-btn${activeSection() === 'home' ? ' shell-mobile-nav-btn--active' : ''}`}
           aria-label="Open Home"
-          aria-current={activeView().kind === 'home' ? 'page' : undefined}
+          aria-current={activeSection() === 'home' ? 'page' : undefined}
           onClick={openHome}
         >
-          <b aria-hidden="true">⌂</b>home
+          <b aria-hidden="true">⌂</b>Home
         </button>
         <button
           ref={mobileRoomsButtonRef}
           type="button"
-          class={`shell-mobile-nav-btn${mobileSidebarOpen() ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Toggle channel list"
-          aria-expanded={mobileSidebarOpen()}
-          onClick={() => (mobileSidebarOpen() ? closeMobileSidebar() : openMobileSidebar())}
+          class={`shell-mobile-nav-btn${activeSection() === 'rooms' ? ' shell-mobile-nav-btn--active' : ''}`}
+          aria-label="Open Rooms"
+          aria-current={activeSection() === 'rooms' ? 'page' : undefined}
+          aria-expanded={mobileSidebarOpen() && sidebarMode() === 'rooms'}
+          onClick={() => openMobileCollection('rooms')}
         >
-          <b aria-hidden="true">≡</b>rooms
+          <b aria-hidden="true">#</b>Rooms
         </button>
-        <Show when={hasMemberRoster()}>
-          <button
-            ref={mobileMembersButtonRef}
-            type="button"
-            class={`shell-mobile-nav-btn${mobileMembersOpen() ? ' shell-mobile-nav-btn--active' : ''}`}
-            aria-label="Toggle member list"
-            aria-expanded={mobileMembersOpen()}
-            onClick={handleToggleMembers}
-          >
-            <b aria-hidden="true">◇</b>members
-          </button>
-        </Show>
         <button
           type="button"
-          class={`shell-mobile-nav-btn${isPreferencesOpen() ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open preferences"
+          class={`shell-mobile-nav-btn${activeSection() === 'messages' ? ' shell-mobile-nav-btn--active' : ''}`}
+          aria-label="Open Messages"
+          aria-current={activeSection() === 'messages' ? 'page' : undefined}
+          aria-expanded={mobileSidebarOpen() && sidebarMode() === 'messages'}
+          onClick={() => openMobileCollection('messages')}
+        >
+          <b aria-hidden="true">@</b>Messages
+        </button>
+        <button
+          type="button"
+          class={`shell-mobile-nav-btn${activeSection() === 'calls' ? ' shell-mobile-nav-btn--active' : ''}`}
+          aria-label="Open Calls"
+          aria-current={activeSection() === 'calls' ? 'page' : undefined}
+          onClick={openCalls}
+        >
+          <b aria-hidden="true">◉</b>Calls
+        </button>
+        <button
+          type="button"
+          class={`shell-mobile-nav-btn${activeSection() === 'you' ? ' shell-mobile-nav-btn--active' : ''}`}
+          aria-label="Open You"
+          aria-current={activeSection() === 'you' ? 'page' : undefined}
           aria-haspopup="dialog"
-          onClick={() => openPreferences()}
+          onClick={openYou}
         >
-          <b aria-hidden="true">⚙</b>prefs
-        </button>
-        <button
-          type="button"
-          class="shell-mobile-nav-btn"
-          aria-label="Disconnect from network"
-          onClick={handleDisconnect}
-          style={{ color: 'var(--shu)' }}
-        >
-          <b aria-hidden="true">✕</b>leave
+          <b aria-hidden="true">◇</b>You
         </button>
       </nav>
 

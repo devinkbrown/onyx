@@ -446,4 +446,67 @@ describe('ChannelSidebar accessibility', () => {
     callbacks[2]?.();
     expect(navigateSpy).toHaveBeenLastCalledWith({ kind: 'dm', nick: 'dave' });
   });
+
+  it('exposes product-frame primary navigation without starting a call', () => {
+    seed();
+    const onOpenHome = vi.fn();
+    const onModeChange = vi.fn();
+    const onOpenCalls = vi.fn();
+    const onOpenYou = vi.fn();
+
+    const { getByRole } = render(() => (
+      <ChannelSidebar
+        mode="rooms"
+        activeSection="rooms"
+        onOpenHome={onOpenHome}
+        onModeChange={onModeChange}
+        onOpenCalls={onOpenCalls}
+        onOpenYou={onOpenYou}
+      />
+    ));
+
+    const primary = getByRole('navigation', { name: 'Primary' });
+    expect(primary).toBeInTheDocument();
+    fireEvent.click(getByRole('button', { name: /Home/ }));
+    fireEvent.click(getByRole('button', { name: /Messages/ }));
+    fireEvent.click(getByRole('button', { name: /Calls/ }));
+    fireEvent.click(getByRole('button', { name: /You/ }));
+
+    expect(onOpenHome).toHaveBeenCalledTimes(1);
+    expect(onModeChange).toHaveBeenCalledWith('messages');
+    expect(onOpenCalls).toHaveBeenCalledTimes(1);
+    expect(onOpenYou).toHaveBeenCalledTimes(1);
+    // Opening Calls is a parent surface action — sidebar never joins voice.
+    expect(store.getState().voice?.callState ?? 'idle').toBe('idle');
+  });
+
+  it('scopes rooms vs messages collections from mode', () => {
+    seed();
+
+    const rooms = render(() => (
+      <ChannelSidebar mode="rooms" activeSection="rooms" />
+    ));
+    expect(rooms.getByRole('region', { name: 'Rooms' })).toBeInTheDocument();
+    expect(rooms.getByRole('button', { name: /#bravo/ })).toBeInTheDocument();
+    expect(rooms.queryByRole('button', { name: /DM with dave/ })).toBeNull();
+    rooms.unmount();
+
+    const messages = render(() => (
+      <ChannelSidebar mode="messages" activeSection="messages" />
+    ));
+    expect(messages.getByRole('region', { name: 'Direct messages' })).toBeInTheDocument();
+    expect(messages.getByRole('button', { name: /DM with dave/ })).toBeInTheDocument();
+    expect(messages.queryByRole('button', { name: /#bravo/ })).toBeNull();
+  });
+
+  it('notifies parent when a conversation opens so Calls hub can exit', () => {
+    seed();
+    const onConversationOpen = vi.fn();
+    const { getByRole } = render(() => (
+      <ChannelSidebar mode="rooms" onConversationOpen={onConversationOpen} />
+    ));
+
+    fireEvent.click(getByRole('button', { name: '#alpha' }));
+    expect(onConversationOpen).toHaveBeenCalledTimes(1);
+  });
 });

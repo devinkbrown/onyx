@@ -20,6 +20,10 @@ import { AccountPanel } from './Account';
 import { store, getState, MAX_PERSONA_HOST_LENGTH, type Server } from '@/lib/store';
 import * as dmCipher from '@/lib/e2ee/dmCipher';
 import * as clipboard from '@/lib/clipboard/writeClipboardText';
+import {
+  isGuestClaimSheetOpen,
+  resetGuestClaimSheetState,
+} from '@/shell/guestClaimState';
 
 const initialState = store.getInitialState();
 
@@ -54,6 +58,7 @@ function renderPanel(opts?: { account?: string | null }) {
 
 beforeEach(() => {
   store.setState(initialState, true);
+  resetGuestClaimSheetState();
 });
 
 afterEach(() => {
@@ -62,6 +67,7 @@ afterEach(() => {
   // vi.spyOn on a state action would leak into the next test.
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  resetGuestClaimSheetState();
 });
 
 describe('Account panel — guest state', () => {
@@ -72,9 +78,9 @@ describe('Account panel — guest state', () => {
       screen.getByRole('heading', { name: /browsing as a guest/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Account claim steps' })).toBeInTheDocument();
-    expect(screen.getByText(/Open Connect and register/)).toBeInTheDocument();
-    expect(screen.getByText(/Bind a passkey or client certificate/)).toBeInTheDocument();
-    expect(screen.getByTestId('guest-open-connect')).toBeInTheDocument();
+    expect(screen.getByText(/Keep the nick you are using/)).toBeInTheDocument();
+    expect(screen.getByText(/After sign-in, bind a passkey/)).toBeInTheDocument();
+    expect(screen.getByTestId('guest-open-claim')).toBeInTheDocument();
   });
 
   it('does not render management sections for a guest', () => {
@@ -88,19 +94,29 @@ describe('Account panel — guest state', () => {
     expect(client.sendRaw).not.toHaveBeenCalledWith('ACCOUNTINFO');
   });
 
-  it('lets a guest return to Connect to claim the account', () => {
+  it('closes Account first then opens the claim sheet without disconnecting', async () => {
     const disconnectSpy = vi.spyOn(getState(), 'disconnect').mockImplementation(() => {});
-    const closeSpy = vi.fn();
+    let sheetOpenWhileClosing = true;
+    const closeSpy = vi.fn((open: boolean) => {
+      if (open === false) {
+        sheetOpenWhileClosing = isGuestClaimSheetOpen();
+      }
+    });
     store.setState({
       client: makeClient() as never,
       server: seedServer(null),
     });
     render(() => <AccountPanel open={true} onOpenChange={closeSpy} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Connect to claim' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Keep this nick' }));
 
-    expect(disconnectSpy).toHaveBeenCalled();
+    expect(disconnectSpy).not.toHaveBeenCalled();
     expect(closeSpy).toHaveBeenCalledWith(false);
+    // Modal must close before the shared Sheet opens (no stacked focus traps).
+    expect(sheetOpenWhileClosing).toBe(false);
+    await waitFor(() => {
+      expect(isGuestClaimSheetOpen()).toBe(true);
+    });
   });
 });
 

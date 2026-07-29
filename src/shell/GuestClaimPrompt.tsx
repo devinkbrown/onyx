@@ -1,22 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * GuestClaimPrompt.tsx — in-session "claim your nick" affordance.
+ * GuestClaimPrompt.tsx — in-session "keep this nick" affordance.
  *
- * A guest (server.account === null) who is already chatting gets a low-friction,
- * dismissible entry point to CLAIM (register) their CURRENT nick — turning the
- * anonymous session into a real account WITHOUT reconnecting. It reuses the
- * existing store registerAccount()/verifyAccount() actions and the real REGISTER
- * command; nothing here re-opens the Connect screen or drops the socket.
+ * Guests (server.account === null) already chatting get a compact, dismissible
+ * chip that never expands into the composer column. Claiming opens a real Sheet
+ * (focus trap + Escape) and runs REGISTER → (optional VERIFY) → IDENTIFY on the
+ * live socket — no disconnect, no Connect re-entry.
+ *
+ * Store actions reused: registerAccount / verifyAccount / identify, plus
+ * registerPending / registerError / verifyRequired / accountActionError / account.
+ * Sheet open is a small module signal (guestClaimState) so Account can open the
+ * same surface without store changes.
  *
  * SOLID IDIOMS:
- *   - Component body runs ONCE. Reactivity lives in the memos + <Show>.
- *   - No props to destructure; store reactive reads go through useStore, the
- *     imperative claim dispatches through getState() in the submit handler.
- *   - The dismissed flag persists under an onyx: localStorage key so it does not
- *     nag across sessions; the reactive gate hides the prompt the instant the
- *     server confirms the account (isGuest flips false).
+ *   - Component body runs once; reactivity in memos, effects, and <Show>.
+ *   - No props. Store reads via useStore; submit dispatches via getState().
  */
-import { createEffect, createMemo, createSignal, Show, type JSX } from 'solid-js';
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  Show,
+  type JSX,
+} from 'solid-js';
 import { useStore, getState, selectAccount } from '@/lib/store';
 import {
   deviceMemoryOwnerKey,
@@ -26,11 +33,23 @@ import {
 } from '@/lib/deviceMemoryOwner';
 import { Button } from '@/primitives/Button';
 import { FormField } from '@/primitives/FormField';
+import { Sheet } from '@/primitives/Sheet';
 import { Spinner } from '@/primitives/Spinner';
+import {
+  closeGuestClaimSheet,
+  isGuestClaimSheetOpen,
+  openGuestClaimSheet,
+  setGuestClaimSheetOpenState,
+} from './guestClaimState';
 import './guest-claim.css';
 
-/** localStorage flag: the user dismissed the claim prompt (onyx: namespace). */
+/** localStorage flag base: durable chip dismissal (onyx: + per-owner suffix). */
 export const GUEST_CLAIM_DISMISS_KEY = 'onyx:guest-claim-dismissed';
+
+/** Minimum password length (matches Connect / Account). */
+export const GUEST_CLAIM_MIN_PASSWORD = 8;
+
+type ClaimPhase = 'idle' | 'registering' | 'verifying' | 'identifying';
 
 function guestClaimDismissKey(owner: DeviceMemoryOwner | null): string | null {
   return owner ? deviceMemoryStorageKey(GUEST_CLAIM_DISMISS_KEY, owner) : null;
@@ -52,14 +71,12 @@ function persistDismissed(owner: DeviceMemoryOwner | null): void {
     const key = guestClaimDismissKey(owner);
     if (key) localStorage.setItem(key, '1');
   } catch {
-    /* storage unavailable (private mode / quota) — degrade to session-only. */
+    /* storage unavailable — session-only dismiss. */
   }
 }
 
 export function GuestClaimPrompt(): JSX.Element {
-  let expandButton: HTMLButtonElement | undefined;
-  let claimForm: HTMLFormElement | undefined;
-  let verifyForm: HTMLFormElement | undefined;
+  let chipKeepButton: HTMLButtonElement | undefined;
 
   // ── reactive store reads ──
   const account = useStore(selectAccount);
@@ -68,6 +85,7 @@ export function GuestClaimPrompt(): JSX.Element {
   const registerPending = useStore((s) => s.registerPending);
   const registerError = useStore((s) => s.registerError);
   const verifyRequired = useStore((s) => s.verifyRequired);
+  const actionError = useStore((s) => s.accountActionError);
 
   // ── local UI state ──
   const initialState = getState();
@@ -78,13 +96,23 @@ export function GuestClaimPrompt(): JSX.Element {
         identity: initialState.ourNick,
       });
   const [dismissed, setDismissed] = createSignal(readDismissed(initialOwner));
-  const [expanded, setExpanded] = createSignal(false);
-  // null = follow the live nick; a string = the user edited the field.
-  const [nickDraft, setNickDraft] = createSignal<string | null>(null);
   const [email, setEmail] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [localError, setLocalError] = createSignal<string | undefined>(undefined);
   const [verifyCode, setVerifyCode] = createSignal('');
+  const [phase, setPhase] = createSignal<ClaimPhase>('idle');
+  /** True only after we issued REGISTER or VERIFY and before that round-trip settles. */
+  const [requestInFlight, setRequestInFlight] = createSignal(false);
+  /** Password captured at submit for the post-register IDENTIFY (never re-read live). */
+  const [claimPassword, setClaimPassword] = createSignal('');
+  const [claimNick, setClaimNick] = createSignal('');
+  /** Guards against double IDENTIFY for one successful REGISTER/VERIFY. */
+  const [identifyIssued, setIdentifyIssued] = createSignal(false);
+
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
 
   const isGuest = createMemo(() => !account());
   const guestOwner = createMemo<DeviceMemoryOwner | null>(() => (
@@ -92,23 +120,42 @@ export function GuestClaimPrompt(): JSX.Element {
       ? normalizeDeviceMemoryOwner({ serverUrl: serverUrl(), identity: ourNick() })
       : null
   ));
-  const nickValue = createMemo(() => nickDraft() ?? ourNick());
-  const show = createMemo(() => isGuest() && !dismissed() && ourNick().trim() !== '');
-  // Prefer a local validation message; otherwise surface the server's verdict.
-  const errorText = createMemo(() => localError() ?? registerError() ?? undefined);
+  const liveNick = createMemo(() => ourNick().trim());
+  const showChip = createMemo(
+    () => isGuest() && !dismissed() && liveNick() !== '',
+  );
+  const sheetOpen = createMemo(
+    () => isGuest() && liveNick() !== '' && isGuestClaimSheetOpen(),
+  );
+  const busy = createMemo(
+    () => registerPending() || requestInFlight() || phase() === 'identifying',
+  );
+  const identifyErrorText = createMemo(() => {
+    const err = actionError();
+    if (!err || err.command !== 'IDENTIFY') return undefined;
+    return err.description || err.code;
+  });
+  const errorText = createMemo(
+    () => localError() ?? registerError() ?? identifyErrorText() ?? undefined,
+  );
 
   function resetClaimDrafts(): void {
-    setExpanded(false);
-    setNickDraft(null);
     setEmail('');
     setPassword('');
     setLocalError(undefined);
     setVerifyCode('');
+    setPhase('idle');
+    setRequestInFlight(false);
+    setClaimPassword('');
+    setClaimNick('');
+    setIdentifyIssued(false);
   }
 
-  // This component stays mounted through login, logout, guest NICK changes,
-  // and endpoint switches. Rehydrate the exact guest dismissal and erase all
-  // transient claim credentials whenever that owner boundary changes.
+  function closeSheet(): void {
+    setGuestClaimSheetOpenState(false);
+  }
+
+  // Rehydrate dismissal + wipe credentials when guest owner boundary changes.
   let activeOwnerKey = initialOwner ? deviceMemoryOwnerKey(initialOwner) : null;
   createEffect(() => {
     const owner = guestOwner();
@@ -117,119 +164,255 @@ export function GuestClaimPrompt(): JSX.Element {
     activeOwnerKey = nextOwnerKey;
     setDismissed(readDismissed(owner));
     resetClaimDrafts();
+    if (!isGuest()) closeGuestClaimSheet();
   });
 
+  // Hide + close when signed in (900 sets server.account).
   createEffect(() => {
-    if (!expanded()) return;
-    const form = verifyRequired() ? verifyForm : claimForm;
+    if (!isGuest()) {
+      closeGuestClaimSheet();
+      resetClaimDrafts();
+    }
+  });
+
+  // registering → verifying when the server requires email verification.
+  createEffect(() => {
+    if (phase() === 'registering' && verifyRequired()) {
+      setRequestInFlight(false);
+      setPhase('verifying');
+      setIdentifyIssued(false);
+    }
+  });
+
+  // REGISTER / VERIFY settle on registerPending falling edge. Only then may we
+  // IDENTIFY — never on submit, never twice for the same success path.
+  createEffect(() => {
+    const currentPhase = phase();
+    const inFlight = requestInFlight();
+    const pending = registerPending();
+    if (
+      (currentPhase !== 'registering' && currentPhase !== 'verifying')
+      || !inFlight
+      || pending
+    ) {
+      return;
+    }
+
+    // Untracked sample after the store batch settles (same pattern as Connect).
+    // eslint-disable-next-line solid/reactivity
     queueMicrotask(() => {
-      if (!form?.isConnected) return;
-      form?.querySelector<HTMLElement>('input, button, [tabindex]:not([tabindex="-1"])')?.focus();
+      if (disposed || !requestInFlight()) return;
+      // Live re-check: pending may still be true if the effect scheduled before
+      // the zustand→Solid subscriber update for registerPending landed.
+      if (getState().registerPending) return;
+      if (getState().server?.account) {
+        setRequestInFlight(false);
+        setPhase('idle');
+        closeGuestClaimSheet();
+        return;
+      }
+      if (getState().registerError) {
+        setRequestInFlight(false);
+        return;
+      }
+      if (phase() === 'registering' && getState().verifyRequired) {
+        // verifying transition effect owns this.
+        return;
+      }
+      if (phase() === 'verifying' && getState().verifyRequired) {
+        // VERIFY not yet successful.
+        setRequestInFlight(false);
+        return;
+      }
+      // Success path: REGISTER SUCCESS or VERIFY SUCCESS → IDENTIFY once.
+      if (identifyIssued()) {
+        setRequestInFlight(false);
+        return;
+      }
+      const nick = claimNick() || liveNick();
+      const pass = claimPassword();
+      if (!nick || !pass) {
+        setRequestInFlight(false);
+        setLocalError('Missing credentials for sign-in after registration.');
+        setPhase('idle');
+        return;
+      }
+      setRequestInFlight(false);
+      setIdentifyIssued(true);
+      setPhase('identifying');
+      getState().identify(nick, pass);
     });
   });
 
-  function collapse(): void {
-    setExpanded(false);
-    queueMicrotask(() => expandButton?.focus());
-  }
+  // IDENTIFY completion: 900 flips account; FAIL IDENTIFY fills accountActionError.
+  createEffect(() => {
+    if (phase() !== 'identifying') return;
+    if (account()) {
+      setPhase('idle');
+      closeGuestClaimSheet();
+      return;
+    }
+    if (identifyErrorText()) {
+      setPhase('idle');
+      setIdentifyIssued(false);
+    }
+  });
 
-  function dismiss(): void {
+  function dismissChip(): void {
     persistDismissed(guestOwner());
     setDismissed(true);
   }
 
+  function openSheetFromChip(): void {
+    setLocalError(undefined);
+    openGuestClaimSheet();
+  }
+
   function submitClaim(event: Event): void {
     event.preventDefault();
-    const nick = nickValue().trim();
+    if (busy()) return;
+    const nick = liveNick();
     const pass = password();
     if (!nick) {
-      setLocalError('Enter the nick you want to claim.');
+      setLocalError('You need a nick on this connection before claiming.');
       return;
     }
     if (!pass) {
       setLocalError('Choose a password to protect the account.');
       return;
     }
+    if (pass.length < GUEST_CLAIM_MIN_PASSWORD) {
+      setLocalError(`Use at least ${GUEST_CLAIM_MIN_PASSWORD} characters.`);
+      return;
+    }
     setLocalError(undefined);
+    setClaimNick(nick);
+    setClaimPassword(pass);
+    setIdentifyIssued(false);
     const mail = email().trim();
+    // Issue REGISTER first so registerPending is true before requestInFlight
+    // arms the settle effect (avoids a Solid/zustand batch race that would
+    // IDENTIFY before the round-trip starts).
     getState().registerAccount(nick, mail || undefined, pass);
+    // Store no-ops when the live client is gone (disconnect race). Do not arm
+    // the settle path or IDENTIFY — stay on this room and ask for reconnect.
+    if (!getState().registerPending) {
+      setLocalError('Reconnect required — the connection was lost before registration could start.');
+      return;
+    }
+    setPhase('registering');
+    setRequestInFlight(true);
   }
 
   function submitVerify(event: Event): void {
     event.preventDefault();
+    if (busy()) return;
     const code = verifyCode().trim();
+    const nick = claimNick() || liveNick();
     if (!code) {
       setLocalError('Enter the verification code from your email.');
       return;
     }
+    if (!nick) {
+      setLocalError('Missing nick for verification.');
+      return;
+    }
     setLocalError(undefined);
-    getState().verifyAccount(nickValue().trim(), code);
+    setIdentifyIssued(false);
+    getState().verifyAccount(nick, code);
+    // Same client-gone no-op as REGISTER: no phase arm, no IDENTIFY.
+    if (!getState().registerPending) {
+      setLocalError('Reconnect required — the connection was lost before verification could start.');
+      return;
+    }
+    setPhase('verifying');
+    setRequestInFlight(true);
   }
 
   return (
-    <Show when={show()}>
-      <section class="guest-claim" role="region" aria-label="Guest account" data-testid="guest-claim">
-        <div class="guest-claim__head">
-          <div class="guest-claim__lede">
-            <span class="guest-claim__eyebrow" aria-hidden="true">guest</span>
-            <p class="guest-claim__title">
-              Claim <b class="guest-claim__nick">{nickValue()}</b> before someone else does
-            </p>
-            <p class="guest-claim__sub">
-              Register your current name to keep it, carry your settings across the mesh, and
-              protect your nick — no reconnect needed.
-            </p>
-          </div>
-          <div class="guest-claim__head-actions">
-            <Show when={!expanded()}>
-              <Button
-                ref={expandButton}
-                type="button"
-                variant="primary"
-                size="sm"
-                onClick={() => setExpanded(true)}
-              >
-                Claim your nick
-              </Button>
-            </Show>
+    <>
+      <Show when={showChip()}>
+        <div
+          class="guest-claim-chip"
+          role="region"
+          aria-label="Keep this nick"
+          data-testid="guest-claim"
+        >
+          <p class="guest-claim-chip__text">
+            Keep <b class="guest-claim-chip__nick">{liveNick()}</b>?
+          </p>
+          <div class="guest-claim-chip__actions">
+            <Button
+              ref={chipKeepButton}
+              type="button"
+              variant="primary"
+              size="sm"
+              data-testid="guest-claim-open"
+              onClick={openSheetFromChip}
+            >
+              Keep this nick
+            </Button>
             <button
               type="button"
-              class="guest-claim__dismiss"
-              aria-label="Dismiss claim prompt"
-              onClick={dismiss}
+              class="guest-claim-chip__dismiss"
+              aria-label="Dismiss keep-nick prompt"
+              data-testid="guest-claim-dismiss"
+              onClick={dismissChip}
             >
               <span aria-hidden="true">✕</span>
             </button>
           </div>
         </div>
+      </Show>
 
-        <Show when={expanded()}>
+      <Sheet
+        open={sheetOpen()}
+        onOpenChange={(open) => {
+          // Wire REGISTER/VERIFY/IDENTIFY cannot be canceled — refuse backdrop,
+          // Escape, and close-button dismiss while any claim request is busy.
+          // Idle Escape still reaches here with busy() false and restores focus.
+          if (!open && busy()) return;
+          setGuestClaimSheetOpenState(open);
+          if (!open) {
+            // Closing the sheet aborts local phase UI; in-flight wire replies still
+            // settle into the store and will no longer drive this UI until reopened.
+            if (phase() !== 'identifying' && !registerPending()) {
+              setPhase('idle');
+              setRequestInFlight(false);
+            }
+          }
+        }}
+        title="Keep this nick"
+        description="Register the name you are using on this connection. You stay connected — passkeys and multi-device tools are available after the account exists."
+        closeLabel="Close claim panel"
+        returnFocus={chipKeepButton}
+      >
+        <div class="guest-claim-sheet" data-testid="guest-claim-sheet">
           <Show
-            when={verifyRequired()}
+            when={phase() === 'verifying' || verifyRequired()}
             fallback={
               <form
-                ref={claimForm}
-                class="guest-claim__form"
-                aria-label="Claim your nick"
+                class="guest-claim-sheet__form"
+                aria-label="Keep this nick"
                 onSubmit={submitClaim}
                 noValidate
+                data-testid="guest-claim-form"
               >
                 <FormField
                   id="guest-claim-nick"
-                  label="Nick to claim"
+                  label="Nick"
+                  description="Your current nick on this connection (not editable here)."
                   autocomplete="username"
-                  value={nickValue()}
-                  onInput={(e) => {
-                    setNickDraft(e.currentTarget.value);
-                    setLocalError(undefined);
-                  }}
+                  value={liveNick()}
+                  readOnly
+                  data-testid="guest-claim-nick"
                 />
                 <FormField
                   id="guest-claim-password"
                   label="Password"
                   type="password"
                   autocomplete="new-password"
-                  placeholder="choose a password"
+                  placeholder={`at least ${GUEST_CLAIM_MIN_PASSWORD} characters`}
                   value={password()}
                   onInput={(e) => {
                     setPassword(e.currentTarget.value);
@@ -242,6 +425,7 @@ export function GuestClaimPrompt(): JSX.Element {
                   type="email"
                   autocomplete="email"
                   placeholder="you@example.com"
+                  description="Optional. Used if the server requires verification or later recovery."
                   value={email()}
                   onInput={(e) => {
                     setEmail(e.currentTarget.value);
@@ -251,19 +435,32 @@ export function GuestClaimPrompt(): JSX.Element {
 
                 <Show when={errorText()}>
                   {(err) => (
-                    <p class="guest-claim__error" role="alert">
+                    <p class="guest-claim-sheet__error" role="alert">
                       <span aria-hidden="true">⚠</span> {err()}
                     </p>
                   )}
                 </Show>
 
-                <div class="guest-claim__form-actions">
-                  <Button type="submit" variant="primary" size="sm" disabled={registerPending()}>
-                    <Show when={registerPending()} fallback="Create account">
-                      <Spinner size="sm" label="Registering" />
+                <div class="guest-claim-sheet__actions">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={busy()}
+                    data-testid="guest-claim-submit"
+                  >
+                    <Show when={busy()} fallback="Create account">
+                      <Spinner size="sm" label={phase() === 'identifying' ? 'Signing in' : 'Registering'} />
                     </Show>
                   </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={collapse}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => closeSheet()}
+                    disabled={busy()}
+                    data-testid="guest-claim-not-now"
+                  >
                     Not now
                   </Button>
                 </div>
@@ -271,15 +468,15 @@ export function GuestClaimPrompt(): JSX.Element {
             }
           >
             <form
-              ref={verifyForm}
-              class="guest-claim__form"
+              class="guest-claim-sheet__form"
               aria-label="Verify your nick"
               onSubmit={submitVerify}
               noValidate
+              data-testid="guest-claim-verify-form"
             >
-              <p class="guest-claim__sub">
-                Almost there — enter the verification code we emailed you to finish claiming{' '}
-                <b class="guest-claim__nick">{nickValue()}</b>.
+              <p class="guest-claim-sheet__lede">
+                Enter the verification code sent for{' '}
+                <b class="guest-claim-chip__nick">{claimNick() || liveNick()}</b>.
               </p>
               <FormField
                 id="guest-claim-verify"
@@ -294,23 +491,29 @@ export function GuestClaimPrompt(): JSX.Element {
               />
               <Show when={errorText()}>
                 {(err) => (
-                  <p class="guest-claim__error" role="alert">
+                  <p class="guest-claim-sheet__error" role="alert">
                     <span aria-hidden="true">⚠</span> {err()}
                   </p>
                 )}
               </Show>
-              <div class="guest-claim__form-actions">
-                <Button type="submit" variant="primary" size="sm" disabled={registerPending()}>
-                  <Show when={registerPending()} fallback="Verify">
-                    <Spinner size="sm" label="Verifying" />
+              <div class="guest-claim-sheet__actions">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={busy()}
+                  data-testid="guest-claim-verify-submit"
+                >
+                  <Show when={busy()} fallback="Verify">
+                    <Spinner size="sm" label={phase() === 'identifying' ? 'Signing in' : 'Verifying'} />
                   </Show>
                 </Button>
               </div>
             </form>
           </Show>
-        </Show>
-      </section>
-    </Show>
+        </div>
+      </Sheet>
+    </>
   );
 }
 

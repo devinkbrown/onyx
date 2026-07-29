@@ -1,0 +1,1766 @@
+diff --git a/src/automation/layout_fingerprint.zig b/src/automation/layout_fingerprint.zig
+index 39e6f99af788f6dedfef42b26a4291bf2595ed4c..efe854d7ce4fe9db72d5f00d9cf56f4360010de4 100644
+--- a/src/automation/layout_fingerprint.zig
++++ b/src/automation/layout_fingerprint.zig
+@@ -52,15 +52,15 @@ pub fn describe(comptime T: type) []const u8 {
+             .void => return "void",
+             .@"enum" => |info| {
+                 var out: []const u8 = "enum(" ++ @typeName(info.tag_type) ++ "){";
+-                for (info.fields) |field| {
+-                    out = out ++ field.name ++ "=" ++ std.fmt.comptimePrint("{d}", .{field.value}) ++ ",";
++                for (info.field_names, info.field_values) |name, value| {
++                    out = out ++ name ++ "=" ++ std.fmt.comptimePrint("{d}", .{value}) ++ ",";
+                 }
+                 return out ++ "}";
+             },
+             .@"struct" => |info| {
+                 var out: []const u8 = "struct{";
+-                for (info.fields) |field| {
+-                    out = out ++ field.name ++ ":" ++ describe(field.type) ++ ",";
++                for (info.field_names, info.field_types) |name, field_type| {
++                    out = out ++ name ++ ":" ++ describe(field_type) ++ ",";
+                 }
+                 return out ++ "}";
+             },
+@@ -74,8 +74,8 @@ pub fn describe(comptime T: type) []const u8 {
+                     "union(" ++ describe(tag) ++ "){"
+                 else
+                     "union{";
+-                for (info.fields) |field| {
+-                    out = out ++ field.name ++ ":" ++ describe(field.type) ++ ",";
++                for (info.field_names, info.field_types) |name, field_type| {
++                    out = out ++ name ++ ":" ++ describe(field_type) ++ ",";
+                 }
+                 return out ++ "}";
+             },
+diff --git a/src/automation/protocol.zig b/src/automation/protocol.zig
+index 3c16a288628760585c2c7d743dc72654c4b73f3b..f438f942bf63edb2af22856d22e2444338aeec4d 100644
+--- a/src/automation/protocol.zig
++++ b/src/automation/protocol.zig
+@@ -349,5 +349,5 @@ test "screenshot file names stay inside the automation directory" {
+     try std.testing.expectEqualStrings("screenshot-..-evil.png", try screenshotFileName("../evil", &buffer));
+     try std.testing.expectEqualStrings("screenshot-a-b.png", try screenshotFileName("a/b", &buffer));
+     try std.testing.expectError(error.InvalidCommand, screenshotFileName("", &buffer));
+-    try std.testing.expectError(error.CommandTooLarge, screenshotFileName("x" ** 65, &buffer));
++    try std.testing.expectError(error.CommandTooLarge, screenshotFileName(@as([65]u8, @splat('x')), &buffer));
+ }
+diff --git a/src/automation/server.zig b/src/automation/server.zig
+index 90aff7768c0ba212c48f4f89749041a0742503ed..29b1b4a74cd1be7a20d4396e32723690655e76d4 100644
+--- a/src/automation/server.zig
++++ b/src/automation/server.zig
+@@ -431,7 +431,7 @@ test "server acks undispatchable command entries instead of stranding the queue"
+
+     // Same for a line larger than the caller's buffer.
+     var oversized_buffer: [64]u8 = undefined;
+-    const oversized = "widget-key canvas " ++ "x" ** 256 ++ "\n";
++    const oversized = "widget-key canvas " ++ @as([256]u8, @splat('x')) ++ "\n";
+     try writeQueueEntry(std.testing.io, server, 3, oversized);
+     try std.testing.expectError(error.CommandTooLarge, server.takeCommand(&oversized_buffer));
+     try std.testing.expect(!queueEntryExists(std.testing.io, server, 3));
+diff --git a/src/embed/host.zig b/src/embed/host.zig
+index ad0a5897be887bbc09f5c3a1dd1630696394032c..c43d1d8d50b68379482ed2cf01fdf79296ba066c 100644
+--- a/src/embed/host.zig
++++ b/src/embed/host.zig
+@@ -710,7 +710,7 @@ pub const MobileHostApp = struct {
+     /// path as `native_sdk_app_render_pixels`.
+     presented: MobilePresentedCanvas = .{},
+     present_pixels_chain: ?MobilePresentPixelsFn = null,
+-    last_command_name: [max_mobile_command_name_bytes + 1]u8 = [_]u8{0} ** (max_mobile_command_name_bytes + 1),
++    last_command_name: [max_mobile_command_name_bytes + 1]u8 = @as([(max_mobile_command_name_bytes + 1)]u8, @splat(0)),
+
+     pub fn create() !*MobileHostApp {
+         const allocator = std.heap.page_allocator;
+@@ -770,7 +770,7 @@ pub const MobileHostApp = struct {
+         self.chrome_tabs_projected = false;
+         self.presented = .{};
+         self.present_pixels_chain = null;
+-        self.last_command_name = [_]u8{0} ** (max_mobile_command_name_bytes + 1);
++        self.last_command_name = @as([(max_mobile_command_name_bytes + 1)]u8, @splat(0));
+         self.embedded.initInPlace(.{
+             .context = self,
+             .name = "native-sdk-mobile",
+diff --git a/src/embed/ui_host.zig b/src/embed/ui_host.zig
+index 3e6fc2e2205b93993e8a5d5519409083f4ceb818..422ddcfad0026b4b5483cc1ab9e58a6ec31dd4f6 100644
+--- a/src/embed/ui_host.zig
++++ b/src/embed/ui_host.zig
+@@ -73,7 +73,7 @@ pub fn UiAppHost(comptime AppDef: type) type {
+         frame_index: u64 = 0,
+         last_error: ?anyerror = null,
+         command_count: usize = 0,
+-        last_command_name: [max_mobile_command_name_bytes + 1]u8 = [_]u8{0} ** (max_mobile_command_name_bytes + 1),
++        last_command_name: [max_mobile_command_name_bytes + 1]u8 = @as([(max_mobile_command_name_bytes + 1)]u8, @splat(0)),
+         asset_root: [max_mobile_asset_root_bytes]u8 = undefined,
+         asset_root_len: usize = 0,
+         asset_entry: [max_mobile_asset_entry_bytes]u8 = undefined,
+@@ -131,7 +131,7 @@ pub fn UiAppHost(comptime AppDef: type) type {
+             self.frame_index = 0;
+             self.last_error = null;
+             self.command_count = 0;
+-            self.last_command_name = [_]u8{0} ** (max_mobile_command_name_bytes + 1);
++            self.last_command_name = @as([(max_mobile_command_name_bytes + 1)]u8, @splat(0));
+             self.asset_root = undefined;
+             self.asset_root_len = 0;
+             self.asset_entry = undefined;
+diff --git a/src/platform/null_platform.zig b/src/platform/null_platform.zig
+index 68cfd814b79de8fcc997c7085b9481690e583b99..97caf67409ca6dfd3df97e683ac41a0633a1ef1a 100644
+--- a/src/platform/null_platform.zig
++++ b/src/platform/null_platform.zig
+@@ -317,29 +317,29 @@ pub const NullPlatform = struct {
+     menu_item_count: usize = 0,
+     shortcuts: [max_shortcuts]Shortcut = undefined,
+     shortcut_count: usize = 0,
+-    window_sources: [max_windows]?WebViewSource = [_]?WebViewSource{null} ** max_windows,
++    window_sources: [max_windows]?WebViewSource = @as([max_windows]?WebViewSource, @splat(null)),
+     windows: [max_windows]WindowInfo = undefined,
+     /// Captured `WindowOptions.resizable` per created window, indexed
+     /// like `windows` — `WindowInfo` does not carry it, and tests need
+     /// to assert the flag survives to the platform seam (the macOS host
+     /// used to drop it at the C ABI).
+-    window_resizable: [max_windows]bool = [_]bool{true} ** max_windows,
++    window_resizable: [max_windows]bool = @as([max_windows]bool, @splat(true)),
+     /// Captured `WindowOptions.titlebar` per created window, indexed
+     /// like `windows` — same seam-regression purpose as
+     /// `window_resizable` (the startup create used to hardcode it).
+-    window_titlebar: [max_windows]WindowTitlebarStyle = [_]WindowTitlebarStyle{.standard} ** max_windows,
+-    window_transparent: [max_windows]bool = [_]bool{false} ** max_windows,
+-    window_always_on_top: [max_windows]bool = [_]bool{false} ** max_windows,
+-    window_click_through: [max_windows]bool = [_]bool{false} ** max_windows,
+-    window_activate_on_show: [max_windows]bool = [_]bool{true} ** max_windows,
++    window_titlebar: [max_windows]WindowTitlebarStyle = @as([max_windows]WindowTitlebarStyle, @splat(.standard)),
++    window_transparent: [max_windows]bool = @as([max_windows]bool, @splat(false)),
++    window_always_on_top: [max_windows]bool = @as([max_windows]bool, @splat(false)),
++    window_click_through: [max_windows]bool = @as([max_windows]bool, @splat(false)),
++    window_activate_on_show: [max_windows]bool = @as([max_windows]bool, @splat(true)),
+     /// Minimize calls per window (`minimize_window_fn`), indexed like
+     /// `windows`: the observable seam for app-drawn minimize controls —
+     /// the null platform has no Dock to genie into, so the count IS the
+     /// behavior tests pin.
+-    window_minimize_count: [max_windows]u32 = [_]u32{0} ** max_windows,
++    window_minimize_count: [max_windows]u32 = @as([max_windows]u32, @splat(0)),
+     /// Show calls per window (`show_window_fn`), indexed like `windows`
+     /// — the counterpart seam (tray "Open", the un-hide verb).
+-    window_show_count: [max_windows]u32 = [_]u32{0} ** max_windows,
++    window_show_count: [max_windows]u32 = @as([max_windows]u32, @splat(0)),
+     /// Graceful-quit requests (`quit_app_fn`). The real hosts QUEUE
+     /// the stop onto their run loop (macOS dispatch_async, GTK
+     /// g_idle_add, Windows PostQuitMessage) so `app_shutdown` emits
+@@ -362,16 +362,16 @@ pub const NullPlatform = struct {
+     /// macOS/Windows hosts. Defaults to false — a modeled window is on
+     /// glass unless a test says otherwise — so window-less harnesses
+     /// and every suite that never occludes keep their reports.
+-    window_occluded: [max_windows]bool = [_]bool{false} ** max_windows,
++    window_occluded: [max_windows]bool = @as([max_windows]bool, @splat(false)),
+     /// Captured `WindowOptions.show` per created window: the
+     /// present-before-show policy that must survive to the create seam.
+-    window_show: [max_windows]types.WindowShowMode = [_]types.WindowShowMode{.immediate} ** max_windows,
++    window_show: [max_windows]types.WindowShowMode = @as([max_windows]types.WindowShowMode, @splat(.immediate)),
+     /// Captured `WindowOptions.close_policy` per created window — the
+     /// seam-regression capture (like `window_resizable`) AND the
+     /// modeled behavior: `userCloseWindow` consults it exactly like the
+     /// real hosts' close delegates, hiding instead of closing under
+     /// `.hide`.
+-    window_close_policy: [max_windows]types.WindowClosePolicy = [_]types.WindowClosePolicy{.quit} ** max_windows,
++    window_close_policy: [max_windows]types.WindowClosePolicy = @as([max_windows]types.WindowClosePolicy, @splat(.quit)),
+     /// Test seam: make the NEXT `close_window_fn` call fail with
+     /// `error.CloseFailed` (the real hosts' refusal), consuming the
+     /// flag — the injection runtime rollback tests use to assert
+@@ -387,25 +387,25 @@ pub const NullPlatform = struct {
+     /// window — the content min-size floor that must survive to the
+     /// create seam (macOS applies it as `contentMinSize`); same
+     /// seam-regression purpose as `window_resizable`.
+-    window_min_width: [max_windows]f32 = [_]f32{0} ** max_windows,
+-    window_min_height: [max_windows]f32 = [_]f32{0} ** max_windows,
++    window_min_width: [max_windows]f32 = @as([max_windows]f32, @splat(0)),
++    window_min_height: [max_windows]f32 = @as([max_windows]f32, @splat(0)),
+     /// Live visibility per window, modeling the macOS host: immediate
+     /// windows are visible at create; `.on_first_present` windows stay
+     /// hidden until their first gpu-surface present (or an explicit
+     /// `focusWindow`) shows them.
+-    window_visible: [max_windows]bool = [_]bool{false} ** max_windows,
++    window_visible: [max_windows]bool = @as([max_windows]bool, @splat(false)),
+     /// The present-before-show ORDERING seam: a per-platform op counter
+     /// stamps when each window's first gpu-surface present landed and
+     /// when it became visible (0 = never), so tests can assert the
+     /// present strictly precedes visibility.
+     show_op_seq: usize = 0,
+-    window_first_present_seq: [max_windows]usize = [_]usize{0} ** max_windows,
+-    window_shown_seq: [max_windows]usize = [_]usize{0} ** max_windows,
++    window_first_present_seq: [max_windows]usize = @as([max_windows]usize, @splat(0)),
++    window_shown_seq: [max_windows]usize = @as([max_windows]usize, @splat(0)),
+     /// Window ids handed to `startWindowDrag`, in call order: the
+     /// window-drag region channel's recording seam. A double-click is
+     /// two recorded calls (the host side decides drag vs zoom from the
+     /// native event's click count).
+-    window_drag_starts: [max_windows * 4]WindowId = [_]WindowId{0} ** (max_windows * 4),
++    window_drag_starts: [max_windows * 4]WindowId = @as([(max_windows * 4)]WindowId, @splat(0)),
+     window_drag_start_count: usize = 0,
+     /// Chrome overlay geometry `windowChrome` reports for every window
+     /// — settable so tests model a hidden-titlebar macOS host (insets
+@@ -507,7 +507,7 @@ pub const NullPlatform = struct {
+     /// First bytes of the last binary packet payload (magic + version +
+     /// header), enough for tests to pin the wire framing without
+     /// retaining whole packets.
+-    gpu_surface_packet_present_binary_prefix: [16]u8 = [_]u8{0} ** 16,
++    gpu_surface_packet_present_binary_prefix: [16]u8 = @as([16]u8, @splat(0)),
+     gpu_surface_packet_present_binary_count: usize = 0,
+     /// Full copy of the last binary packet payload, so patch tests can
+     /// decode the wire bytes and replay them against a reference retained
+@@ -529,7 +529,7 @@ pub const NullPlatform = struct {
+     /// without a real GPU. Disable `gpu_surface_image_uploads` to model a
+     /// platform without the seam (`error.UnsupportedService`).
+     gpu_surface_image_uploads: bool = true,
+-    gpu_surface_images: [max_gpu_surface_images]NullGpuSurfaceImage = [_]NullGpuSurfaceImage{.{}} ** max_gpu_surface_images,
++    gpu_surface_images: [max_gpu_surface_images]NullGpuSurfaceImage = @as([max_gpu_surface_images]NullGpuSurfaceImage, @splat(.{})),
+     gpu_surface_image_count: usize = 0,
+     gpu_surface_image_upload_count: usize = 0,
+     gpu_surface_image_remove_count: usize = 0,
+@@ -553,7 +553,7 @@ pub const NullPlatform = struct {
+     /// Per-instance where the real host tables are per-process: tests
+     /// model "one process" by pointing every runtime at ONE instance.
+     gpu_surface_font_registrations: bool = false,
+-    gpu_surface_fonts: [max_gpu_surface_fonts]NullGpuSurfaceFont = [_]NullGpuSurfaceFont{.{}} ** max_gpu_surface_fonts,
++    gpu_surface_fonts: [max_gpu_surface_fonts]NullGpuSurfaceFont = @as([max_gpu_surface_fonts]NullGpuSurfaceFont, @splat(.{})),
+     gpu_surface_font_count: usize = 0,
+     gpu_surface_font_register_count: usize = 0,
+     /// The mirror's monotonic token counter, pre-incremented per
+@@ -573,7 +573,7 @@ pub const NullPlatform = struct {
+     gpu_surface_font_unregister_count: usize = 0,
+     gpu_surface_font_unregister_id: u64 = 0,
+     gpu_surface_font_unregister_token: u64 = 0,
+-    timers: [max_null_timers]NullTimer = [_]NullTimer{.{}} ** max_null_timers,
++    timers: [max_null_timers]NullTimer = @as([max_null_timers]NullTimer, @splat(.{})),
+     timer_count: usize = 0,
+     timer_start_count: usize = 0,
+     timer_cancel_count: usize = 0,
+@@ -610,7 +610,7 @@ pub const NullPlatform = struct {
+     /// A `.loaded` acknowledgment waiting to be taken — set by a
+     /// successful `audioLoad`, consumed by `takeAudioLoaded`.
+     audio_loaded_pending: bool = false,
+-    audio_durations: [max_null_audio_durations]NullAudioDuration = [_]NullAudioDuration{.{}} ** max_null_audio_durations,
++    audio_durations: [max_null_audio_durations]NullAudioDuration = @as([max_null_audio_durations]NullAudioDuration, @splat(.{})),
+     audio_duration_count: usize = 0,
+     /// The fake track cache: hashes of URLs whose streamed playback ran
+     /// to completion. `audioLoadUrl` answers `.cache` for these — the
+@@ -644,7 +644,7 @@ pub const NullPlatform = struct {
+     /// A `.loaded` acknowledgment waiting to be taken — set by a
+     /// successful video load, consumed by `takeVideoLoaded`.
+     video_loaded_pending: bool = false,
+-    video_metas: [max_null_video_metas]NullVideoMeta = [_]NullVideoMeta{.{}} ** max_null_video_metas,
++    video_metas: [max_null_video_metas]NullVideoMeta = @as([max_null_video_metas]NullVideoMeta, @splat(.{})),
+     video_meta_count: usize = 0,
+     video_load_count: usize = 0,
+     video_load_url_count: usize = 0,
+diff --git a/src/platform/null_platform_tests.zig b/src/platform/null_platform_tests.zig
+index 7c208741620ed3b9b89b0e1a6693ee1e251781fc..079b98b8ffc2ffb8213c5f629e8ff7c5310d1c10 100644
+--- a/src/platform/null_platform_tests.zig
++++ b/src/platform/null_platform_tests.zig
+@@ -305,7 +305,7 @@ test "null platform records configured shortcuts" {
+     try std.testing.expect(null_platform.configuredShortcuts()[0].modifiers.primary);
+     try std.testing.expect(null_platform.configuredShortcuts()[0].modifiers.shift);
+
+-    const long_key = [_]u8{'x'} ** (max_shortcut_key_bytes + 1);
++    const long_key = @as([(max_shortcut_key_bytes + 1)]u8, @splat('x'));
+     const invalid = [_]Shortcut{.{ .id = "invalid", .key = long_key[0..] }};
+     try std.testing.expectError(error.InvalidShortcut, null_platform.platform().services.configureShortcuts(&invalid));
+
+diff --git a/src/primitives/app_manifest/tests.zig b/src/primitives/app_manifest/tests.zig
+index 3a2c6a4d9964dff777639c561feb212beb679b11..88ce4dada371855686d399417635b63c369c4ad9 100644
+--- a/src/primitives/app_manifest/tests.zig
++++ b/src/primitives/app_manifest/tests.zig
+@@ -353,7 +353,7 @@ test "manifest validates keyboard shortcuts" {
+     };
+     try std.testing.expectError(error.InvalidShortcut, validateManifest(unmodified_text_key));
+
+-    const too_many = [_]Shortcut{.{ .id = "duplicate-ok-for-limit-check", .key = "p" }} ** (max_shortcuts + 1);
++    const too_many = @as([(max_shortcuts + 1)]Shortcut, @splat(.{ .id = "duplicate-ok-for-limit-check", .key = "p" }));
+     const too_many_manifest: Manifest = .{
+         .identity = .{ .id = "com.example.app", .name = "example" },
+         .version = .{ .major = 1, .minor = 0, .patch = 0 },
+@@ -361,7 +361,7 @@ test "manifest validates keyboard shortcuts" {
+     };
+     try std.testing.expectError(error.InvalidShortcut, validateManifest(too_many_manifest));
+
+-    const long_id = [_]u8{'x'} ** (max_shortcut_id_bytes + 1);
++    const long_id = @as([(max_shortcut_id_bytes + 1)]u8, @splat('x'));
+     const long_id_manifest: Manifest = .{
+         .identity = .{ .id = "com.example.app", .name = "example" },
+         .version = .{ .major = 1, .minor = 0, .patch = 0 },
+@@ -407,7 +407,7 @@ test "manifest validates command metadata" {
+         .commands = &invalid_control_commands,
+     }));
+
+-    const long_title = [_]u8{'x'} ** (max_command_title_bytes + 1);
++    const long_title = @as([(max_command_title_bytes + 1)]u8, @splat('x'));
+     const long_title_commands = [_]Command{.{ .id = "app.long-title", .title = long_title[0..] }};
+     try std.testing.expectError(error.InvalidName, validateManifest(.{
+         .identity = .{ .id = "com.example.app", .name = "example" },
+@@ -454,7 +454,7 @@ test "manifest validates native menus" {
+         .menus = &invalid_key_menus,
+     }));
+
+-    const too_many = [_]Menu{.{ .title = "View" }} ** (max_menus + 1);
++    const too_many = @as([(max_menus + 1)]Menu, @splat(.{ .title = "View" }));
+     try std.testing.expectError(error.InvalidLayout, validateManifest(.{
+         .identity = .{ .id = "com.example.app", .name = "example" },
+         .version = .{ .major = 1, .minor = 0, .patch = 0 },
+@@ -645,7 +645,7 @@ test "description validation" {
+     try std.testing.expectError(error.InvalidDescription, validateDescription(""));
+     try std.testing.expectError(error.InvalidDescription, validateDescription("two\nlines"));
+     try std.testing.expectError(error.InvalidDescription, validateDescription("tab\tcharacter"));
+-    try std.testing.expectError(error.InvalidDescription, validateDescription("x" ** 257));
++    try std.testing.expectError(error.InvalidDescription, validateDescription(@as([257]u8, @splat('x'))));
+ }
+
+ test "version validation and formatting" {
+diff --git a/src/primitives/app_manifest/validation.zig b/src/primitives/app_manifest/validation.zig
+index a218f13484e73a0cda1bc66cb9030152053c3c48..e593dfa238402a891a230a7dc20f4394271770dd 100644
+--- a/src/primitives/app_manifest/validation.zig
++++ b/src/primitives/app_manifest/validation.zig
+@@ -260,7 +260,7 @@ const ShellViewVisitState = enum {
+ };
+
+ fn validateShellViewParentGraph(views: []const ShellView) ValidationError!void {
+-    var states = [_]ShellViewVisitState{.unvisited} ** max_shell_views_per_window;
++    var states = @as([max_shell_views_per_window]ShellViewVisitState, @splat(.unvisited));
+     for (views, 0..) |_, index| {
+         try validateShellViewParentAcyclic(views, index, &states);
+     }
+diff --git a/src/primitives/assets/root.zig b/src/primitives/assets/root.zig
+index 4e0dea70204cee54c2ca0892474568bdb135e065..184ccc261606b4d9b9daf8c24b679a5a410f99e3 100644
+--- a/src/primitives/assets/root.zig
++++ b/src/primitives/assets/root.zig
+@@ -63,7 +63,7 @@ pub const Hash = struct {
+     }
+
+     pub fn zero() Hash {
+-        return .{ .bytes = [_]u8{0} ** digest_len };
++        return .{ .bytes = @as([digest_len]u8, @splat(0)) };
+     }
+
+     pub fn toHex(self: Hash) [hex_len]u8 {
+diff --git a/src/primitives/canvas/drawing.zig b/src/primitives/canvas/drawing.zig
+index 7e68aa1e51109dd7f8200e481912bff5b3f4a571..387c92ccaf3be59ed0f83c14bfc950e1d942f373 100644
+--- a/src/primitives/canvas/drawing.zig
++++ b/src/primitives/canvas/drawing.zig
+@@ -170,7 +170,7 @@ pub const PathVerb = enum {
+
+ pub const PathElement = struct {
+     verb: PathVerb,
+-    points: [3]geometry.PointF = [_]geometry.PointF{geometry.PointF.zero()} ** 3,
++    points: [3]geometry.PointF = @as([3]geometry.PointF, @splat(geometry.PointF.zero())),
+ };
+
+ pub const FillPath = struct {
+diff --git a/src/primitives/canvas/font_ttf.zig b/src/primitives/canvas/font_ttf.zig
+index e43b357902476d26250cb368550a7ad05f899b6a..baf7ff1e79f1c56e8046afc0cd122df2e9cad13d 100644
+--- a/src/primitives/canvas/font_ttf.zig
++++ b/src/primitives/canvas/font_ttf.zig
+@@ -583,7 +583,7 @@ fn diagnoseParseFailure(bytes: []const u8) []const u8 {
+         .{ .tag = "hmtx", .teach = "missing required table 'hmtx' (horizontal advances)" },
+         .{ .tag = "hhea", .teach = "missing required table 'hhea' (horizontal header)" },
+     };
+-    var found = [_]bool{false} ** required.len;
++    var found = @as([required.len]bool, @splat(false));
+     var index: usize = 0;
+     while (index < table_count) : (index += 1) {
+         const record = 12 + index * 16;
+diff --git a/src/primitives/canvas/font_ttf_tests.zig b/src/primitives/canvas/font_ttf_tests.zig
+index c1fe0ac61fa02904c70d1a436dcc8431b503b856..7dd281fafe41ba97d85ab1c09a7c0b74752017fc 100644
+--- a/src/primitives/canvas/font_ttf_tests.zig
++++ b/src/primitives/canvas/font_ttf_tests.zig
+@@ -20,7 +20,7 @@ const Affine = drawing.Affine;
+ const grid_size: usize = 24;
+
+ const Grid = struct {
+-    data: [grid_size * grid_size]u8 = [_]u8{0} ** (grid_size * grid_size),
++    data: [grid_size * grid_size]u8 = @as([(grid_size * grid_size)]u8, @splat(0)),
+
+     pub fn pixel(self: *Grid, x: i32, y: i32, coverage: f32) void {
+         if (x < 0 or y < 0) return;
+diff --git a/src/primitives/canvas/layout_audit.zig b/src/primitives/canvas/layout_audit.zig
+index bd0af784fc431136823353275cd0120327f70083..964b1aeb5d894744e361523e95f7c68a398f66a0 100644
+--- a/src/primitives/canvas/layout_audit.zig
++++ b/src/primitives/canvas/layout_audit.zig
+@@ -141,7 +141,7 @@ pub fn auditWidgetLayout(
+
+     // Escape findings attribute to the outermost offender: once a widget
+     // is reported, its descendants stay quiet about the same damage.
+-    var escape_flagged = [_]bool{false} ** max_layout_audit_nodes;
++    var escape_flagged = @as([max_layout_audit_nodes]bool, @splat(false));
+
+     var index: usize = 0;
+     while (index < node_count) : (index += 1) {
+diff --git a/src/primitives/canvas/lazy_tls.zig b/src/primitives/canvas/lazy_tls.zig
+index e033f57da00218154fe4cd7a7bdb2027770b4081..2add7415a51d98c11e545d1332185b790aad8075 100644
+--- a/src/primitives/canvas/lazy_tls.zig
++++ b/src/primitives/canvas/lazy_tls.zig
+@@ -46,8 +46,9 @@ pub fn LazyTls(comptime T: type) type {
+         fn create() *T {
+             const ptr = std.heap.page_allocator.create(T) catch
+                 @panic("out of memory allocating per-thread canvas scratch");
+-            inline for (@typeInfo(T).@"struct".fields) |field| {
+-                if (comptime field.defaultValue()) |value| @field(ptr, field.name) = value;
++            const info = @typeInfo(T).@"struct";
++            inline for (info.field_names, info.field_types, info.field_attrs) |name, FieldType, attrs| {
++                if (comptime attrs.defaultValue(FieldType)) |value| @field(ptr, name) = value;
+             }
+             instance = ptr;
+             return ptr;
+diff --git a/src/primitives/canvas/markdown_hostile_tests.zig b/src/primitives/canvas/markdown_hostile_tests.zig
+index a15de0cfbdc962ecd90a60b12c721795e5a699dc..382617c8c22872c345404f92a8f922fa651b935c 100644
+--- a/src/primitives/canvas/markdown_hostile_tests.zig
++++ b/src/primitives/canvas/markdown_hostile_tests.zig
+@@ -63,7 +63,7 @@ fn buildHostile(source: []const u8) !BuildResult {
+     var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+     defer arena_state.deinit();
+     var ui = Ui.init(arena_state.allocator());
+-    const expanded = [_]bool{true} ** markdown.max_markdown_details_per_document;
++    const expanded = @as([markdown.max_markdown_details_per_document]bool, @splat(true));
+     const node = Md.view(&ui, source, .{
+         .on_link = Ui.linkMsg(.open_url),
+         .on_details = Md.detailsMsg(.toggle_details),
+diff --git a/src/primitives/canvas/reference.zig b/src/primitives/canvas/reference.zig
+index bbf819b583b28eb21eead3f69fb1baec6c92cfc1..97c278c4c95db5df7e65b309c42ae2258e57a943 100644
+--- a/src/primitives/canvas/reference.zig
++++ b/src/primitives/canvas/reference.zig
+@@ -608,7 +608,7 @@ pub const ReferenceRenderSurface = struct {
+             .phase_y = phase_y,
+             .dst_width_px = panel_width,
+             .dst_height_px = panel_height,
+-            .sampling = @intFromEnum(value.sampling),
++            .sampling = @backingInt(value.sampling),
+         };
+         if (memo.findImageScale(key)) |pixels| return .{ .pixels = pixels, .width = panel_width };
+         // Fill only when this draw would render the WHOLE panel anyway
+@@ -1056,13 +1056,13 @@ fn referenceMemoHashValue(hasher: *std.hash.Wyhash, value: anytype) void {
+     const T = @TypeOf(value);
+     switch (@typeInfo(T)) {
+         .float => {
+-            const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
++            const Bits = @Int(.unsigned, @bitSizeOf(T));
+             const bits: Bits = @bitCast(value);
+             hasher.update(std.mem.asBytes(&bits));
+         },
+         .int => hasher.update(std.mem.asBytes(&value)),
+         .bool => hasher.update(&[1]u8{@intFromBool(value)}),
+-        .@"enum" => referenceMemoHashValue(hasher, @intFromEnum(value)),
++        .@"enum" => referenceMemoHashValue(hasher, @backingInt(value)),
+         .optional => {
+             if (value) |inner| {
+                 hasher.update(&[1]u8{1});
+@@ -1072,12 +1072,12 @@ fn referenceMemoHashValue(hasher: *std.hash.Wyhash, value: anytype) void {
+             }
+         },
+         .@"struct" => |info| {
+-            inline for (info.fields) |field| referenceMemoHashValue(hasher, @field(value, field.name));
++            inline for (info.field_names) |name| referenceMemoHashValue(hasher, @field(value, name));
+         },
+         .@"union" => {
+             switch (value) {
+                 inline else => |inner, tag| {
+-                    referenceMemoHashValue(hasher, @intFromEnum(tag));
++                    referenceMemoHashValue(hasher, @backingInt(tag));
+                     referenceMemoHashValue(hasher, inner);
+                 },
+             }
+@@ -1124,7 +1124,6 @@ fn referenceScaleRect(rect: geometry.RectF, scale: f32) geometry.RectF {
+     return geometry.RectF.init(rect.x * scale, rect.y * scale, rect.width * scale, rect.height * scale);
+ }
+
+-
+ fn referencePixelCenter(x: usize, y: usize) geometry.PointF {
+     return geometry.PointF.init(@as(f32, @floatFromInt(x)) + 0.5, @as(f32, @floatFromInt(y)) + 0.5);
+ }
+diff --git a/src/primitives/canvas/reference_blur.zig b/src/primitives/canvas/reference_blur.zig
+index 41363b75599a68a44cd94c1e58aba560dd9f45a3..8e505683e49e689adf11c05b900b7f575d2c27d2 100644
+--- a/src/primitives/canvas/reference_blur.zig
++++ b/src/primitives/canvas/reference_blur.zig
+@@ -18,7 +18,7 @@ pub fn referenceBlurSampleWithKernel(source: []const u8, width: usize, height: u
+     const width_i: i64 = @intCast(width);
+     const height_i: i64 = @intCast(height);
+     const kernel_width: usize = @intCast(kernel_radius * 2 + 1);
+-    var premultiplied = [_]f32{0} ** 3;
++    var premultiplied = @as([3]f32, @splat(0));
+     var alpha_total: f32 = 0;
+     var weight_total: f32 = 0;
+
+@@ -51,7 +51,7 @@ pub fn referenceBlurSampleWithKernel(source: []const u8, width: usize, height: u
+ pub fn referenceBlurSample(source: []const u8, width: usize, height: usize, x: i64, y: i64, kernel_radius: i64, radius: f32) [4]u8 {
+     const width_i: i64 = @intCast(width);
+     const height_i: i64 = @intCast(height);
+-    var premultiplied = [_]f32{0} ** 3;
++    var premultiplied = @as([3]f32, @splat(0));
+     var alpha_total: f32 = 0;
+     var weight_total: f32 = 0;
+
+diff --git a/src/primitives/canvas/render_tests.zig b/src/primitives/canvas/render_tests.zig
+index ba60f6bf2410060be6ca844f803a044158aad5b0..75dbf4a094b9a06a339ffa16a0bef67efcc04522 100644
+--- a/src/primitives/canvas/render_tests.zig
++++ b/src/primitives/canvas/render_tests.zig
+@@ -2313,7 +2313,14 @@ test "canvas gpu packet text serializes engine measured line breaks" {
+     const tight_width = estimateTextWidth("Songs", 12);
+     // 70 explicit lines exceed the packet line budget (64): the serializer
+     // must fall back to `null` so the host keeps its wrapping fallback.
+-    const overflow_text = "a\n" ** 70;
++    const overflow_text = blk: {
++        const u = "a\n";
++        var o: [u.len * (70)]u8 = undefined;
++        for (0..(70)) |ii| {
++            @memcpy(o[ii * u.len ..][0..u.len], u);
++        }
++        break :blk o;
++    };
+     const commands = [_]CanvasGpuCommand{
+         .{
+             .command_index = 0,
+diff --git a/src/primitives/canvas/svg_icon_tests.zig b/src/primitives/canvas/svg_icon_tests.zig
+index fb98433fc9cad00f09728997c2bb26216733a1a2..34efcc47ba71e9f3d9f18c47ae0be85dcb5b5e75 100644
+--- a/src/primitives/canvas/svg_icon_tests.zig
++++ b/src/primitives/canvas/svg_icon_tests.zig
+@@ -230,7 +230,7 @@ test "every built-in icon is a 24x24 stroke-dialect icon" {
+ const grid_size: usize = 24;
+
+ const Grid = struct {
+-    data: [grid_size * grid_size]u8 = [_]u8{0} ** (grid_size * grid_size),
++    data: [grid_size * grid_size]u8 = @as([(grid_size * grid_size)]u8, @splat(0)),
+
+     pub fn pixel(self: *Grid, x: i32, y: i32, coverage: f32) void {
+         if (x < 0 or y < 0) return;
+diff --git a/src/primitives/canvas/terminal_grid.zig b/src/primitives/canvas/terminal_grid.zig
+index f36fa7d8cbaed57ec7e67ecd75cb19bc1a33d38c..02f69abc0a8429a76e609fa391f446b8264e16c1 100644
+--- a/src/primitives/canvas/terminal_grid.zig
++++ b/src/primitives/canvas/terminal_grid.zig
+@@ -203,7 +203,8 @@ pub const TerminalCellMetrics = struct {
+ /// (every mono cell the same), so column N lands where the painter's
+ /// backgrounds, cursor, and selection put it.
+ const advance_probe_len = 16;
+-const advance_probe = "M" ** advance_probe_len;
++const advance_probe_bytes = @as([advance_probe_len]u8, @splat('M'));
++const advance_probe: []const u8 = &advance_probe_bytes;
+
+ pub fn cellMetrics(tokens: canvas.DesignTokens) TerminalCellMetrics {
+     const font_size = tokens.typography.label_size;
+diff --git a/src/primitives/canvas/terminal_grid_tests.zig b/src/primitives/canvas/terminal_grid_tests.zig
+index ef7c02776163ccc4f99cabb64baecd03f7b976bf..51cea0bb64ffd04b317dbef37b866d893b479bdf 100644
+--- a/src/primitives/canvas/terminal_grid_tests.zig
++++ b/src/primitives/canvas/terminal_grid_tests.zig
+@@ -440,7 +440,7 @@ test "the text preflight counts referenced sibling text already in the list" {
+     // against the per-view text budget, so the grid must degrade against
+     // it. Pre-emit a referenced-text command consuming most of the view
+     // budget, then a terminal row that would cross the ceiling drops.
+-    const filler = "x" ** (canvas.max_display_list_text_bytes - 4);
++    const filler = @as([(canvas.max_display_list_text_bytes - 4)]u8, @splat('x'));
+     const row = comptime asciiRow("cells", white);
+     const rows = [_]grid_model.TerminalRow{.{ .cells = &row }};
+
+@@ -655,7 +655,7 @@ test "a row adding no text paints even when siblings spent the text share" {
+     // Earlier widgets already sit past the grid's reserved text share;
+     // an all-box row ADDS no text, so it must paint — the ceiling bounds
+     // what the grid adds, never what siblings spent.
+-    const filler = "x" ** (canvas.max_display_list_text_bytes - 100);
++    const filler = @as([(canvas.max_display_list_text_bytes - 100)]u8, @splat('x'));
+     var cells: [8]grid_model.TerminalCell = undefined;
+     for (&cells) |*c| c.* = .{ .cp = 0x2500, .fg = white };
+     const rows = [_]grid_model.TerminalRow{.{ .cells = &cells }};
+@@ -912,7 +912,7 @@ test "a wide cheap terminal paints its rows under the widget command budget" {
+     var text_rows: usize = 0;
+     for (builder.displayList().commands) |command| {
+         switch (command) {
+-            .draw_text => |t| if (std.mem.eql(u8, t.text, "a" ** 198)) {
++            .draw_text => |t| if (std.mem.eql(u8, t.text, @as([198]u8, @splat('a')))) {
+                 text_rows += 1;
+             },
+             else => {},
+@@ -1064,7 +1064,7 @@ test "the text preflight accounts for bytes earlier widgets already consumed" {
+     var builder = canvas.Builder.init(&commands);
+     // Pre-consume all but 2 bytes of the store, as an earlier widget
+     // would.
+-    const filler = [_]u8{'x'} ** (canvas.max_display_list_text_bytes - 2);
++    const filler = @as([(canvas.max_display_list_text_bytes - 2)]u8, @splat('x'));
+     _ = try builder.allocTextBytes(&filler);
+
+     try grid_model.paint(baseGrid(&rows), &builder, .{
+diff --git a/src/primitives/canvas/text_tests.zig b/src/primitives/canvas/text_tests.zig
+index d1ec07c0ef76f434d0d44edb05dfd4b752cad190..9db48367ccb4ca0b5fbe18e8af6a3341974ab141 100644
+--- a/src/primitives/canvas/text_tests.zig
++++ b/src/primitives/canvas/text_tests.zig
+@@ -790,7 +790,7 @@ test "text bounds and reference renderer honor per-run wrapping" {
+     try std.testing.expectEqual(@as(usize, 1), render_plan.commandCount());
+     try expectRectApprox(geometry.RectF.init(-1, 0, 11.61, 49), render_plan.commands[0].bounds);
+
+-    var pixels: [16 * 32 * 4]u8 = [_]u8{0} ** (16 * 32 * 4);
++    var pixels: [16 * 32 * 4]u8 = @as([(16 * 32 * 4)]u8, @splat(0));
+     const surface = try ReferenceRenderSurface.init(16, 32, &pixels);
+     try surface.renderPass(.{
+         .commands = render_plan.commands,
+@@ -1051,7 +1051,14 @@ test "text layout caret selection and point queries have no line-count cap" {
+     // with TextLayoutLineListFull and killed the app from a keystroke).
+     // The streaming queries must resolve caret, selection, and hit
+     // offsets for a document of any length.
+-    const doc = "word\n" ** 100;
++    const doc = blk: {
++        const u = "word\n";
++        var o: [u.len * (100)]u8 = undefined;
++        for (0..(100)) |ii| {
++            @memcpy(o[ii * u.len ..][0..u.len], u);
++        }
++        break :blk o;
++    };
+     const text = DrawText{
+         .font_id = 1,
+         .size = 10,
+@@ -1160,7 +1167,7 @@ test "text layout maps caret selection and points across shaped glyph lines" {
+     } }};
+     var render_commands: [1]RenderCommand = undefined;
+     const render_plan = try (DisplayList{ .commands = &commands }).renderPlan(&render_commands);
+-    var pixels: [24 * 32 * 4]u8 = [_]u8{0} ** (24 * 32 * 4);
++    var pixels: [24 * 32 * 4]u8 = @as([(24 * 32 * 4)]u8, @splat(0));
+     const surface = try ReferenceRenderSurface.init(24, 32, &pixels);
+     try surface.renderPass(.{
+         .commands = render_plan.commands,
+@@ -1871,8 +1878,8 @@ fn tailInkDroppedByBoundsClip(comptime body: []const u8, text_layout: ?TextLayou
+
+     const width = 360;
+     const height = 40;
+-    var clipped_pixels: [width * height * 4]u8 = [_]u8{0} ** (width * height * 4);
+-    var unclipped_pixels: [width * height * 4]u8 = [_]u8{0} ** (width * height * 4);
++    var clipped_pixels: [width * height * 4]u8 = @as([(width * height * 4)]u8, @splat(0));
++    var unclipped_pixels: [width * height * 4]u8 = @as([(width * height * 4)]u8, @splat(0));
+
+     const clipped = try ReferenceRenderSurface.init(width, height, &clipped_pixels);
+     try clipped.renderPass(.{
+diff --git a/src/primitives/canvas/ui.zig b/src/primitives/canvas/ui.zig
+index c50b1f513eb70a54f0284e022f356db056b6445b..cc7a8bf9cf2cb16126bbd41757a25d6f5a2f03ad 100644
+--- a/src/primitives/canvas/ui.zig
++++ b/src/primitives/canvas/ui.zig
+@@ -438,7 +438,7 @@ pub fn Ui(comptime Msg: type) type {
+         virtual_extent_source: ?VirtualExtentSourceFn = null,
+         /// The windowed virtual lists this build declared (`virtualList`),
+         /// for the app loop's coverage check and scroll re-derivation.
+-        virtual_window_records: [max_virtual_windows]VirtualWindowRecord = [_]VirtualWindowRecord{.{}} ** max_virtual_windows,
++        virtual_window_records: [max_virtual_windows]VirtualWindowRecord = @as([max_virtual_windows]VirtualWindowRecord, @splat(.{})),
+         virtual_window_record_count: usize = 0,
+         /// Widget provenance collector (write-back's read half): when set,
+         /// the markup engines stamp each built node's source, and
+diff --git a/src/primitives/canvas/ui_markup_contract_tests.zig b/src/primitives/canvas/ui_markup_contract_tests.zig
+index e2d35c26371dca8c1f879d3df81946dca0e543a6..528f09bbec8edbff3beb69e4f5f9eee3bc47df51 100644
+--- a/src/primitives/canvas/ui_markup_contract_tests.zig
++++ b/src/primitives/canvas/ui_markup_contract_tests.zig
+@@ -29,7 +29,7 @@ const Card = struct {
+     id: u32,
+     done: bool = false,
+     weight: f32 = 1,
+-    label_storage: [16]u8 = [_]u8{0} ** 16,
++    label_storage: [16]u8 = @as([16]u8, @splat(0)),
+     label_len: usize = 0,
+
+     pub fn label(card: *const Card) []const u8 {
+diff --git a/src/primitives/canvas/ui_markup_expr_tests.zig b/src/primitives/canvas/ui_markup_expr_tests.zig
+index 7c3f46517efb8c8129fb10a78f5e3be119941ef6..458b3fa7b3f4afe922f8be6444a51c4e21f904b6 100644
+--- a/src/primitives/canvas/ui_markup_expr_tests.zig
++++ b/src/primitives/canvas/ui_markup_expr_tests.zig
+@@ -313,7 +313,7 @@ test "division by zero and overflow are loud, defined failures" {
+ test "huge literals are rejected at parse time" {
+     try expectParseFail("123456789012345678901234567890", expr.integer_literal_overflow_message);
+     // A float literal past f32's range never becomes inf.
+-    const big = "9" ** 60 ++ ".0";
++    const big = @as([60]u8, @splat('9')) ++ ".0";
+     try expectParseFail(big, expr.number_literal_range_message);
+ }
+
+@@ -334,11 +334,11 @@ test "complexity bounds are taught one past" {
+
+     // Depth: 16 nested parens parse, 17 teach.
+     {
+-        const at = "(" ** (expr.max_expression_depth - 1) ++ "1" ++ ")" ** (expr.max_expression_depth - 1);
++        const at = @as([(expr.max_expression_depth - 1)]u8, @splat('(')) ++ "1" ++ @as([(expr.max_expression_depth - 1)]u8, @splat(')'));
+         var tree: expr.ExprTree = .{};
+         var diagnostic: expr.Diagnostic = .{};
+         try testing.expect(expr.parse(at, &tree, &diagnostic));
+-        const past = "(" ** expr.max_expression_depth ++ "1" ++ ")" ** expr.max_expression_depth;
++        const past = @as([expr.max_expression_depth]u8, @splat('(')) ++ "1" ++ @as([expr.max_expression_depth]u8, @splat(')'));
+         try expectParseFail(past, expr.expression_too_deep_message);
+     }
+
+@@ -764,7 +764,7 @@ test "expression bounds hold inside markup attributes end to end" {
+
+     // One past the depth bound inside an attribute value, through the
+     // validator (what native markup check runs)...
+-    const deep = "(" ** expr.max_expression_depth ++ "1" ++ ")" ** expr.max_expression_depth;
++    const deep = @as([expr.max_expression_depth]u8, @splat('(')) ++ "1" ++ @as([expr.max_expression_depth]u8, @splat(')'));
+     const source = try std.fmt.allocPrint(arena, "<row gap=\"{{{s}}}\" />", .{deep});
+     var parser = markup.Parser.init(arena, source);
+     const info = markup.validate(try parser.parse()) orelse return error.TestUnexpectedResult;
+diff --git a/src/primitives/canvas/ui_markup_view_tests.zig b/src/primitives/canvas/ui_markup_view_tests.zig
+index 2a0f262d3cc98fbb45b5804a63c4c10ca8814890..33c4ef6a97a48031091eea804c3f9c2e5efc1943 100644
+--- a/src/primitives/canvas/ui_markup_view_tests.zig
++++ b/src/primitives/canvas/ui_markup_view_tests.zig
+@@ -8,7 +8,7 @@ pub const Filter = enum { all, active, done };
+
+ pub const Task = struct {
+     id: u32,
+-    title_storage: [24]u8 = [_]u8{0} ** 24,
++    title_storage: [24]u8 = @as([24]u8, @splat(0)),
+     title_len: usize = 0,
+     done: bool = false,
+
+diff --git a/src/primitives/canvas/vector_tests.zig b/src/primitives/canvas/vector_tests.zig
+index 421031e39c839c89bae8d5451a11d777364f75e7..bd40ae198ed5f07d6eacbcb99a9b526228f3331e 100644
+--- a/src/primitives/canvas/vector_tests.zig
++++ b/src/primitives/canvas/vector_tests.zig
+@@ -20,7 +20,7 @@ const PathElement = drawing.PathElement;
+ const grid_size: usize = 24;
+
+ const Grid = struct {
+-    data: [grid_size * grid_size]u8 = [_]u8{0} ** (grid_size * grid_size),
++    data: [grid_size * grid_size]u8 = @as([(grid_size * grid_size)]u8, @splat(0)),
+
+     pub fn pixel(self: *Grid, x: i32, y: i32, coverage: f32) void {
+         if (x < 0 or y < 0) return;
+diff --git a/src/primitives/canvas/widget_builtin_tests.zig b/src/primitives/canvas/widget_builtin_tests.zig
+index 82f97bb59069d9fb3c6a8dcdd0cc040539183fc5..110bc033027219421020883ac2fc1e29581971ed 100644
+--- a/src/primitives/canvas/widget_builtin_tests.zig
++++ b/src/primitives/canvas/widget_builtin_tests.zig
+@@ -1588,14 +1588,14 @@ test "built-in component catalog covers house component set" {
+         try std.testing.expectEqualStrings(expected, actual);
+     }
+
+-    var seen = [_]bool{false} ** enum_len;
++    var seen = @as([enum_len]bool, @splat(false));
+     for (builtin_component_kinds, 0..) |kind, index| {
+         const descriptor = builtinComponentDescriptor(kind);
+         try std.testing.expectEqual(kind, descriptor.kind);
+         try std.testing.expectEqualStrings(builtin_component_names[index], descriptor.name);
+         try std.testing.expectEqualStrings(builtin_component_names[index], builtinComponentName(kind));
+         try std.testing.expectEqual(BuiltinComponentStyle.house, descriptor.style);
+-        const ordinal = @intFromEnum(kind);
++        const ordinal = @backingInt(kind);
+         try std.testing.expectEqual(index, ordinal);
+         try std.testing.expect(!seen[ordinal]);
+         seen[ordinal] = true;
+@@ -3295,8 +3295,8 @@ test "label-exact controls at intrinsic width never elide under geometry pixel s
+     // edge, at both snap scales, across labels whose fractional widths
+     // land on both sides of the rounding boundary.
+     const kinds = [_]canvas.WidgetKind{
+-        .toggle_button, .button,   .toggle, .segmented_control,
+-        .menu_item,     .checkbox, .radio,  .switch_control,
++        .toggle_button, .button,   .toggle,    .segmented_control,
++        .menu_item,     .checkbox, .radio,     .switch_control,
+         .tooltip,       .badge,    .list_item,
+     };
+     const labels = [_][]const u8{ "PID", "CPU", "Memory", "Name", "Filter processes", "Quarterly report" };
+diff --git a/src/primitives/canvas/widget_invalidation.zig b/src/primitives/canvas/widget_invalidation.zig
+index ac40e5549122ba0f745b1f270b35bb4a6fe7010c..ad7164addef9f6295974eca59155e4e177d6e98c 100644
+--- a/src/primitives/canvas/widget_invalidation.zig
++++ b/src/primitives/canvas/widget_invalidation.zig
+@@ -326,7 +326,7 @@ fn widgetChange(previous: WidgetLayoutNode, next: WidgetLayoutNode, previous_ind
+ }
+
+ pub fn widgetRenderStateDirtyBounds(layout: anytype, previous: WidgetRenderState, next: WidgetRenderState, tokens: DesignTokens) ?geometry.RectF {
+-    var ids: [8]?ObjectId = [_]?ObjectId{null} ** 8;
++    var ids: [8]?ObjectId = @as([8]?ObjectId, @splat(null));
+     var id_len: usize = 0;
+     if (previous.focused_id != next.focused_id) {
+         appendOptionalObjectId(&ids, &id_len, previous.focused_id);
+diff --git a/src/primitives/canvas/widget_semantics.zig b/src/primitives/canvas/widget_semantics.zig
+index 2fc0b2829f63380c044ae7bad2ba1791437d0150..882f8ed2e0a616d2626aba8881d4ba4d2c6aa426 100644
+--- a/src/primitives/canvas/widget_semantics.zig
++++ b/src/primitives/canvas/widget_semantics.zig
+@@ -25,7 +25,7 @@ const max_widget_depth: usize = 32;
+
+ pub fn collectWidgetSemantics(layout: anytype, output: []WidgetSemanticsNode, scroll_semantics_fn: anytype) Error![]const WidgetSemanticsNode {
+     var len: usize = 0;
+-    var semantic_stack: [max_widget_depth]?usize = [_]?usize{null} ** max_widget_depth;
++    var semantic_stack: [max_widget_depth]?usize = @as([max_widget_depth]?usize, @splat(null));
+     var hidden_depth: ?usize = null;
+     var concealed_depth: ?usize = null;
+
+diff --git a/src/runtime/bridge_payload.zig b/src/runtime/bridge_payload.zig
+index 0ac11d31d74eeaff48e1808cd06901d3581871fc..9ed20e67a5349dfb3a6b0550abc4f5465ba0beac 100644
+--- a/src/runtime/bridge_payload.zig
++++ b/src/runtime/bridge_payload.zig
+@@ -22,8 +22,8 @@ pub fn viewWindowIdFromJson(payload: []const u8, default_window_id: platform.Win
+ }
+
+ pub fn viewKindFromString(value: []const u8) ?platform.ViewKind {
+-    inline for (@typeInfo(platform.ViewKind).@"enum".fields) |field| {
+-        if (std.mem.eql(u8, value, field.name)) return @field(platform.ViewKind, field.name);
++    inline for (@typeInfo(platform.ViewKind).@"enum".field_names) |name| {
++        if (std.mem.eql(u8, value, name)) return @field(platform.ViewKind, name);
+     }
+     if (std.mem.eql(u8, value, "titlebarAccessory")) return .titlebar_accessory;
+     if (std.mem.eql(u8, value, "iconButton")) return .icon_button;
+@@ -37,8 +37,8 @@ pub fn viewKindFromString(value: []const u8) ?platform.ViewKind {
+ }
+
+ pub fn windowTitlebarStyleFromString(value: []const u8) ?platform.WindowTitlebarStyle {
+-    inline for (@typeInfo(platform.WindowTitlebarStyle).@"enum".fields) |field| {
+-        if (std.mem.eql(u8, value, field.name)) return @field(platform.WindowTitlebarStyle, field.name);
++    inline for (@typeInfo(platform.WindowTitlebarStyle).@"enum".field_names) |name| {
++        if (std.mem.eql(u8, value, name)) return @field(platform.WindowTitlebarStyle, name);
+     }
+     if (std.mem.eql(u8, value, "hiddenInset")) return .hidden_inset;
+     if (std.mem.eql(u8, value, "hiddenInsetTall")) return .hidden_inset_tall;
+@@ -69,43 +69,43 @@ pub fn gpuSurfaceOptionsFromJson(payload: []const u8, storage: *json.StringStora
+ }
+
+ fn gpuSurfaceBackendFromString(value: []const u8) ?platform.GpuSurfaceBackend {
+-    inline for (@typeInfo(platform.GpuSurfaceBackend).@"enum".fields) |field| {
+-        if (std.mem.eql(u8, value, field.name)) return @field(platform.GpuSurfaceBackend, field.name);
++    inline for (@typeInfo(platform.GpuSurfaceBackend).@"enum".field_names) |name| {
++        if (std.mem.eql(u8, value, name)) return @field(platform.GpuSurfaceBackend, name);
+     }
+     return null;
+ }
+
+ fn gpuSurfacePixelFormatFromString(value: []const u8) ?platform.GpuSurfacePixelFormat {
+-    inline for (@typeInfo(platform.GpuSurfacePixelFormat).@"enum".fields) |field| {
+-        if (std.mem.eql(u8, value, field.name)) return @field(platform.GpuSurfacePixelFormat, field.name);
++    inline for (@typeInfo(platform.GpuSurfacePixelFormat).@"enum".field_names) |name| {
++        if (std.mem.eql(u8, value, name)) return @field(platform.GpuSurfacePixelFormat, name);
+     }
+     return null;
+ }
+
+ fn gpuSurfacePresentModeFromString(value: []const u8) ?platform.GpuSurfacePresentMode {
+-    inline for (@typeInfo(platform.GpuSurfacePresentMode).@"enum".fields) |field| {
+-        if (std.mem.eql(u8, value, field.name)) return @field(platform.GpuSurfacePresentMode, field.name);
++    inline for (@typeInfo(platform.GpuSurfacePresentMode).@"enum".field_names) |name| {
++        if (std.mem.eql(u8, value, name)) return @field(platform.GpuSurfacePresentMode, name);
+     }
+     return null;
+ }
+
+ fn gpuSurfaceAlphaModeFromString(value: []const u8) ?platform.GpuSurfaceAlphaMode {
+-    inline for (@typeInfo(platform.GpuSurfaceAlphaMode).@"enum".fields) |field| {
+-        if (std.mem.eql(u8, value, field.name)) return @field(platform.GpuSurfaceAlphaMode, field.name);
++    inline for (@typeInfo(platform.GpuSurfaceAlphaMode).@"enum".field_names) |name| {
++        if (std.mem.eql(u8, value, name)) return @field(platform.GpuSurfaceAlphaMode, name);
+     }
+     return null;
+ }
+
+ fn gpuSurfaceColorSpaceFromString(value: []const u8) ?platform.GpuSurfaceColorSpace {
+-    inline for (@typeInfo(platform.GpuSurfaceColorSpace).@"enum".fields) |field| {
+-        if (std.mem.eql(u8, value, field.name)) return @field(platform.GpuSurfaceColorSpace, field.name);
++    inline for (@typeInfo(platform.GpuSurfaceColorSpace).@"enum".field_names) |name| {
++        if (std.mem.eql(u8, value, name)) return @field(platform.GpuSurfaceColorSpace, name);
+     }
+     return null;
+ }
+
+ pub fn platformFeatureFromString(value: []const u8) ?platform.PlatformFeature {
+-    inline for (@typeInfo(platform.PlatformFeature).@"enum".fields) |field| {
+-        if (std.mem.eql(u8, value, field.name)) return @field(platform.PlatformFeature, field.name);
++    inline for (@typeInfo(platform.PlatformFeature).@"enum".field_names) |name| {
++        if (std.mem.eql(u8, value, name)) return @field(platform.PlatformFeature, name);
+     }
+     if (std.mem.eql(u8, value, "mainWebView")) return .main_webview;
+     if (std.mem.eql(u8, value, "childWebViews")) return .child_webviews;
+diff --git a/src/runtime/bridge_permission_tests.zig b/src/runtime/bridge_permission_tests.zig
+index 76ba3e4bad6e1e2c3fee1af2a716d3fce0475358..60d5fb4831319604acfb2eff26283f75bae48fd3 100644
+--- a/src/runtime/bridge_permission_tests.zig
++++ b/src/runtime/bridge_permission_tests.zig
+@@ -242,7 +242,7 @@ test "runtime validates native OS actions before platform dispatch" {
+     try std.testing.expectError(error.InvalidDialogOptions, harness.runtime.showOpenDialog(.{}, dialog_paths[0..0]));
+     var small_dialog_paths: [4]u8 = undefined;
+     try std.testing.expectError(error.NoSpaceLeft, harness.runtime.showOpenDialog(.{}, &small_dialog_paths));
+-    const long_dialog_title = [_]u8{'x'} ** (platform.max_dialog_title_bytes + 1);
++    const long_dialog_title = @as([(platform.max_dialog_title_bytes + 1)]u8, @splat('x'));
+     try std.testing.expectError(error.DialogFieldTooLarge, harness.runtime.showOpenDialog(.{ .title = &long_dialog_title }, &dialog_paths));
+     const open_result = try harness.runtime.showOpenDialog(.{ .title = "Open" }, &dialog_paths);
+     try std.testing.expectEqual(@as(usize, 1), open_result.count);
+diff --git a/src/runtime/canvas_widget_context_menu_tests.zig b/src/runtime/canvas_widget_context_menu_tests.zig
+index a5a4fa112a8c7cdca050ff86ad2e6c22b518205e..492a2564211fcce01c443f57f4747213f01fbb42 100644
+--- a/src/runtime/canvas_widget_context_menu_tests.zig
++++ b/src/runtime/canvas_widget_context_menu_tests.zig
+@@ -1118,7 +1118,7 @@ test "context-menu declarations sum across widgets to the budget and overflow lo
+     const harness = try createMenuHarness(app);
+     defer harness.destroy(std.testing.allocator);
+
+-    const bulk = [_]canvas.WidgetContextMenuItem{.{ .label = "Op" }} ** (budget - 1);
++    const bulk = @as([(budget - 1)]canvas.WidgetContextMenuItem, @splat(.{ .label = "Op" }));
+     const pair = [_]canvas.WidgetContextMenuItem{ .{ .label = "A" }, .{ .label = "B" } };
+     var nodes = [_]canvas.WidgetLayoutNode{
+         .{
+diff --git a/src/runtime/canvas_widget_text_tests.zig b/src/runtime/canvas_widget_text_tests.zig
+index 818bb45822ca495787b79f70fddeb0335f484320..cf6904638c7c748e7f3e58aae3e71f0474ae852f 100644
+--- a/src/runtime/canvas_widget_text_tests.zig
++++ b/src/runtime/canvas_widget_text_tests.zig
+@@ -1894,7 +1894,14 @@ test "typing into a textarea seeded with a long document survives dispatch" {
+     });
+
+     // ~40 source lines that wrap into even more layout lines at 180px.
+-    const doc = "The quick brown fox jumps over the lazy dog.\n" ** 40;
++    const doc = blk: {
++        const u = "The quick brown fox jumps over the lazy dog.\n";
++        var o: [u.len * (40)]u8 = undefined;
++        for (0..(40)) |ii| {
++            @memcpy(o[ii * u.len ..][0..u.len], u);
++        }
++        break :blk o;
++    };
+     const textarea = canvas.Widget{
+         .id = 2,
+         .kind = .textarea,
+@@ -1978,7 +1985,7 @@ test "a widget text budget overflow on input degrades instead of exiting" {
+     // Fill the view's widget text storage to within 512 bytes of the
+     // budget, so a 510-byte insert overflows the storage rewrite while
+     // still fitting the edit-apply scratch.
+-    const filler = [_]u8{'a'} ** (runtime_module.max_canvas_widget_text_bytes_per_view - 512);
++    const filler = @as([(runtime_module.max_canvas_widget_text_bytes_per_view - 512)]u8, @splat('a'));
+     const textarea = canvas.Widget{
+         .id = 2,
+         .kind = .textarea,
+@@ -1998,7 +2005,7 @@ test "a widget text budget overflow on input degrades instead of exiting" {
+         .y = 30,
+     } });
+
+-    const burst = [_]u8{'b'} ** 510;
++    const burst = @as([510]u8, @splat('b'));
+     try harness.runtime.dispatchPlatformEvent(app, .{ .gpu_surface_input = .{
+         .window_id = 1,
+         .label = "canvas",
+diff --git a/src/runtime/core.zig b/src/runtime/core.zig
+index 237310da0fa7e2c21c018fc29c45b9fd0a09d389..cd3d9c4ddddeced744bfd06cc45d8d7b2b8e96b2 100644
+--- a/src/runtime/core.zig
++++ b/src/runtime/core.zig
+@@ -289,7 +289,7 @@ pub const Runtime = struct {
+     loaded_source: ?platform.WebViewSource = null,
+     loaded_source_storage: RuntimeSourceStorage = .{},
+     /// Degraded dispatch errors, oldest first (see `max_dispatch_errors`).
+-    dispatch_errors: [max_dispatch_errors]DispatchError = [_]DispatchError{.{}} ** max_dispatch_errors,
++    dispatch_errors: [max_dispatch_errors]DispatchError = @as([max_dispatch_errors]DispatchError, @splat(.{})),
+     dispatch_error_len: usize = 0,
+     /// See `DispatchErrorPolicy`: production loops always degrade;
+     /// the TestHarness propagates so capacity errors fail tests instead
+@@ -309,7 +309,7 @@ pub const Runtime = struct {
+     /// snapshot's `frame_profile` line. Larger than the small-default
+     /// copy bound, so `initAt` assigns it explicitly.
+     frame_profile: runtime_frame_profile.FrameProfile = .{},
+-    async_bridge_responses: [max_async_bridge_responses]AsyncBridgeResponseSlot = [_]AsyncBridgeResponseSlot{.{}} ** max_async_bridge_responses,
++    async_bridge_responses: [max_async_bridge_responses]AsyncBridgeResponseSlot = @as([max_async_bridge_responses]AsyncBridgeResponseSlot, @splat(.{})),
+     automation_windows: [automation.snapshot.max_windows]automation.snapshot.Window = undefined,
+     /// Snapshot-side storage for the frame profile's per-stage stats
+     /// (the snapshot Input only references runtime-owned memory).
+@@ -393,8 +393,8 @@ pub const Runtime = struct {
+     canvas_widget_reconcile_text_bytes: [canvas_limits.max_canvas_widget_text_bytes_per_view]u8 = undefined,
+     canvas_widget_invalidations_scratch: [canvas_limits.max_canvas_widget_invalidations_per_view]canvas.WidgetInvalidation = undefined,
+     canvas_widget_copy_scratch: runtime_canvas_widget_runtime.CanvasWidgetCopyScratch = undefined,
+-    canvas_widget_display_list_refresh_pending: [platform.max_views]bool = [_]bool{false} ** platform.max_views,
+-    canvas_widget_accessibility_publish_pending: [platform.max_views]bool = [_]bool{false} ** platform.max_views,
++    canvas_widget_display_list_refresh_pending: [platform.max_views]bool = @as([platform.max_views]bool, @splat(false)),
++    canvas_widget_accessibility_publish_pending: [platform.max_views]bool = @as([platform.max_views]bool, @splat(false)),
+     canvas_frame_render_commands: [max_canvas_commands_per_view]canvas.RenderCommand = undefined,
+     canvas_frame_render_batches: [max_canvas_commands_per_view]canvas.RenderBatch = undefined,
+     canvas_frame_pipeline_cache_entries: [max_canvas_pipelines_per_view]canvas.RenderPipelineCacheEntry = undefined,
+@@ -430,9 +430,9 @@ pub const Runtime = struct {
+     /// where an embedded pool at the budget would put 16 x 1 MiB =
+     /// 16 MiB in EVERY Runtime, the media-texture-pool regression's
+     /// twin.
+-    canvas_image_entries: [canvas_limits.max_registered_canvas_images]runtime_canvas_images.CanvasImageEntry = [_]runtime_canvas_images.CanvasImageEntry{.{}} ** canvas_limits.max_registered_canvas_images,
++    canvas_image_entries: [canvas_limits.max_registered_canvas_images]runtime_canvas_images.CanvasImageEntry = @as([canvas_limits.max_registered_canvas_images]runtime_canvas_images.CanvasImageEntry, @splat(.{})),
+     canvas_image_count: usize = 0,
+-    canvas_image_pixels: [canvas_limits.max_registered_canvas_images][]u8 = [_][]u8{&.{}} ** canvas_limits.max_registered_canvas_images,
++    canvas_image_pixels: [canvas_limits.max_registered_canvas_images][]u8 = @as([canvas_limits.max_registered_canvas_images][]u8, @splat(&.{})),
+     /// `ReferenceImage` scratch the frame planner hands to renderers
+     /// each plan: the registered images plus the adopted media-surface
+     /// textures (appended as `presentation_only` entries).
+@@ -448,9 +448,9 @@ pub const Runtime = struct {
+     /// producer existed). The cross-thread mailbox producers push into
+     /// is process-lived module state, deliberately NOT here — a
+     /// producer outliving this runtime must never reach runtime memory.
+-    media_surface_entries: [canvas_limits.max_media_surface_channels]runtime_media_surface.MediaSurfaceTextureEntry = [_]runtime_media_surface.MediaSurfaceTextureEntry{.{}} ** canvas_limits.max_media_surface_channels,
++    media_surface_entries: [canvas_limits.max_media_surface_channels]runtime_media_surface.MediaSurfaceTextureEntry = @as([canvas_limits.max_media_surface_channels]runtime_media_surface.MediaSurfaceTextureEntry, @splat(.{})),
+     media_surface_count: usize = 0,
+-    media_surface_pixels: [canvas_limits.max_media_surface_channels][]u8 = [_][]u8{&.{}} ** canvas_limits.max_media_surface_channels,
++    media_surface_pixels: [canvas_limits.max_media_surface_channels][]u8 = @as([canvas_limits.max_media_surface_channels][]u8, @splat(&.{})),
+     /// Process-unique tag stamped on mailbox slots this runtime claims
+     /// (0 until the first acquire): slot ownership survives allocator
+     /// address reuse across runtimes in one process.
+@@ -464,7 +464,7 @@ pub const Runtime = struct {
+     /// `ReferenceFont` scratch the frame planner hands to renderers, and
+     /// the font-aware measure provider installed on first registration
+     /// for platforms without host-side text measurement.
+-    canvas_font_entries: [canvas_limits.max_registered_canvas_fonts]runtime_canvas_fonts.CanvasFontEntry = [_]runtime_canvas_fonts.CanvasFontEntry{.{}} ** canvas_limits.max_registered_canvas_fonts,
++    canvas_font_entries: [canvas_limits.max_registered_canvas_fonts]runtime_canvas_fonts.CanvasFontEntry = @as([canvas_limits.max_registered_canvas_fonts]runtime_canvas_fonts.CanvasFontEntry, @splat(.{})),
+     canvas_font_count: usize = 0,
+     canvas_font_faces: [canvas_limits.max_registered_canvas_fonts]canvas.font_ttf.Face = undefined,
+     canvas_font_resources_scratch: [canvas_limits.max_registered_canvas_fonts]canvas.ReferenceFont = undefined,
+@@ -486,9 +486,10 @@ pub const Runtime = struct {
+     /// builds that overflows default thread stacks, so every embedding
+     /// constructs through a pointer.
+     pub fn initAt(self: *Runtime, options: Options) void {
+-        inline for (@typeInfo(Runtime).@"struct".fields) |field| {
+-            if (comptime fieldHasSmallDefault(field)) {
+-                @field(self, field.name) = @as(*const field.type, @ptrCast(@alignCast(field.default_value_ptr.?))).*;
++        const runtime_info = @typeInfo(Runtime).@"struct";
++        inline for (runtime_info.field_names, runtime_info.field_types, runtime_info.field_attrs) |name, FieldType, attrs| {
++            if (comptime fieldHasSmallDefault(FieldType, attrs)) {
++                @field(self, name) = attrs.defaultValue(FieldType).?;
+             }
+         }
+         self.options = options;
+@@ -578,20 +579,20 @@ pub const Runtime = struct {
+             if (buffer.len != 0) self.owned_allocator.free(buffer.*);
+             buffer.* = &.{};
+         }
+-        self.canvas_image_entries = [_]runtime_canvas_images.CanvasImageEntry{.{}} ** canvas_limits.max_registered_canvas_images;
++        self.canvas_image_entries = @as([canvas_limits.max_registered_canvas_images]runtime_canvas_images.CanvasImageEntry, @splat(.{}));
+         self.canvas_image_count = 0;
+         for (&self.media_surface_pixels) |*buffer| {
+             if (buffer.len != 0) self.owned_allocator.free(buffer.*);
+             buffer.* = &.{};
+         }
+-        self.media_surface_entries = [_]runtime_media_surface.MediaSurfaceTextureEntry{.{}} ** canvas_limits.max_media_surface_channels;
++        self.media_surface_entries = @as([canvas_limits.max_media_surface_channels]runtime_media_surface.MediaSurfaceTextureEntry, @splat(.{}));
+         self.media_surface_count = 0;
+     }
+
+-    fn fieldHasSmallDefault(comptime field: std.builtin.Type.StructField) bool {
++    fn fieldHasSmallDefault(comptime FieldType: type, comptime attrs: std.builtin.Type.Struct.FieldAttributes) bool {
+         // Large fixed-capacity arrays default to undefined; skip writing
+         // them so construction touches kilobytes, not megabytes.
+-        return field.default_value_ptr != null and @sizeOf(field.type) <= 4096;
++        return attrs.default_value_ptr != null and @sizeOf(FieldType) <= 4096;
+     }
+
+     pub fn invalidate(self: *Runtime) void {
+diff --git a/src/runtime/effects.zig b/src/runtime/effects.zig
+index 016d6f6abe35394ea746d44559c8ff754ab7efe9..7b7e64f541ae990e67ba79794b39b04dbb43d5a0 100644
+--- a/src/runtime/effects.zig
++++ b/src/runtime/effects.zig
+@@ -4042,7 +4042,7 @@ pub fn Effects(comptime Msg: type) type {
+         /// Journaled wall-clock values queued for replay-mode `wallMs`
+         /// reads (FIFO; fed from `.clock` records before the consuming
+         /// event dispatches).
+-        replay_clock: [max_effect_replay_clock_entries]i64 = [_]i64{0} ** max_effect_replay_clock_entries,
++        replay_clock: [max_effect_replay_clock_entries]i64 = @as([max_effect_replay_clock_entries]i64, @splat(0)),
+         replay_clock_head: usize = 0,
+         replay_clock_len: usize = 0,
+         /// Replay `wallMs` reads that found no journaled value: a
+@@ -4247,10 +4247,10 @@ pub fn Effects(comptime Msg: type) type {
+         /// process-lifetime posting handles. Seedable in tests to pin
+         /// the non-wrapping guarantee without 2^32 opens.
+         channel_generation: u64 = 0,
+-        slots: [max_effects]Slot = [_]Slot{.{}} ** max_effects,
++        slots: [max_effects]Slot = @as([max_effects]Slot, @splat(.{})),
+         /// Fixed fx timer table (see `max_effect_timers`): timers live
+         /// beside the effect slots, never in them. Loop-thread only.
+-        timer_slots: [max_effect_timers]TimerSlot = [_]TimerSlot{.{}} ** max_effect_timers,
++        timer_slots: [max_effect_timers]TimerSlot = @as([max_effect_timers]TimerSlot, @splat(.{})),
+         /// The single audio playback channel (see `AudioChannel`).
+         /// Loop-thread only, like the timer table.
+         audio: AudioChannel = .{},
+@@ -4263,7 +4263,7 @@ pub fn Effects(comptime Msg: type) type {
+         /// `max_effect_channels`): long-lived keyed occupancies beside
+         /// the effect slots. Loop-thread only — the thread-shared half
+         /// of each slot lives behind its `ChannelSlot.shared` header.
+-        channel_slots: [max_effect_channels]ChannelSlot = [_]ChannelSlot{.{}} ** max_effect_channels,
++        channel_slots: [max_effect_channels]ChannelSlot = @as([max_effect_channels]ChannelSlot, @splat(.{})),
+         /// Monotonic post-order stamp shared by every channel's staging
+         /// FIFO and the close markers: the cross-channel delivery order
+         /// and the drain boundary's causality cut (posts stamped at or
+@@ -4282,7 +4282,7 @@ pub fn Effects(comptime Msg: type) type {
+         /// occupancies beside the channel table. Loop-thread only —
+         /// the thread-shared half of each slot lives behind its
+         /// `PtySlot.shared` header.
+-        pty_slots: [max_effect_ptys]PtySlot = [_]PtySlot{.{}} ** max_effect_ptys,
++        pty_slots: [max_effect_ptys]PtySlot = @as([max_effect_ptys]PtySlot, @splat(.{})),
+         /// Monotonic stamp shared by every pty's staged output backlog
+         /// and exit marker — the channels' `channel_seq`, pty-shaped:
+         /// cross-pty delivery order and the drain boundary's causality
+@@ -12411,7 +12411,7 @@ pub fn Effects(comptime Msg: type) type {
+                 // by the abandon net. Job objects would kill the whole
+                 // tree properly — the future strengthening; not built
+                 // here.
+-                _ = std.os.windows.ntdll.NtTerminateProcess(id, @enumFromInt(1));
++                _ = std.os.windows.ntdll.NtTerminateProcess(id, @fromBackingInt(@intCast(1)));
+             } else {
+                 // The child owns its process group (see the spawn in
+                 // `runChild`), so the negative-pid form signals every
+@@ -12836,7 +12836,7 @@ pub fn Effects(comptime Msg: type) type {
+                 .extra_headers = slot.fetchHeaders(),
+                 // Mirrors `std.http.Client.fetch`: payloads cannot be
+                 // replayed across redirects.
+-                .redirect_behavior = if (slot.payload_len > 0) .unhandled else @enumFromInt(3),
++                .redirect_behavior = if (slot.payload_len > 0) .unhandled else @fromBackingInt(@intCast(3)),
+             }) catch |err| {
+                 // Establishing the connection is what `request` does, so
+                 // an UNTYPED failure here is a connect failure. (The
+@@ -12859,7 +12859,7 @@ pub fn Effects(comptime Msg: type) type {
+             }
+             var redirect_buffer: [8 * 1024]u8 = undefined;
+             var response = try request.receiveHead(&redirect_buffer);
+-            slot.fetch_status = @intFromEnum(response.head.status);
++            slot.fetch_status = @backingInt(response.head.status);
+
+             const decompress_buffer: []u8 = switch (response.head.content_encoding) {
+                 .identity => &.{},
+@@ -13309,7 +13309,7 @@ pub fn Effects(comptime Msg: type) type {
+             defer client.deinit();
+             var request = client.request(.GET, uri, .{
+                 .keep_alive = false,
+-                .redirect_behavior = @enumFromInt(3),
++                .redirect_behavior = @fromBackingInt(@intCast(3)),
+             }) catch |err| {
+                 // See `runFetch`: an untyped failure here is a connect
+                 // failure.
+@@ -13320,7 +13320,7 @@ pub fn Effects(comptime Msg: type) type {
+             try request.sendBodiless();
+             var redirect_buffer: [8 * 1024]u8 = undefined;
+             var response = try request.receiveHead(&redirect_buffer);
+-            slot.fetch_status = @intFromEnum(response.head.status);
++            slot.fetch_status = @backingInt(response.head.status);
+             if (response.head.status.class() != .success) {
+                 slot.image_outcome = .http_status;
+                 slot.body_len = 0;
+diff --git a/src/runtime/effects_channel_tests.zig b/src/runtime/effects_channel_tests.zig
+index ba0d7bf98b58eea5093839c32f01cbfb2a66ff94..3291fdf04ce91a3c2458d34f9aa9654881457453 100644
+--- a/src/runtime/effects_channel_tests.zig
++++ b/src/runtime/effects_channel_tests.zig
+@@ -214,9 +214,9 @@ test "an oversized post answers dropped_oversized and counts as a drop" {
+     fx.executor = .fake;
+
+     const handle = fx.openChannel(.{ .key = 4, .on_event = DirectFx.channelMsg(.event) });
+-    const oversized = [_]u8{'x'} ** (effects_mod.max_effect_channel_bytes + 1);
++    const oversized = @as([(effects_mod.max_effect_channel_bytes + 1)]u8, @splat('x'));
+     try testing.expectEqual(PostResult.dropped_oversized, handle.post(&oversized));
+-    const at_bound = [_]u8{'y'} ** effects_mod.max_effect_channel_bytes;
++    const at_bound = @as([effects_mod.max_effect_channel_bytes]u8, @splat('y'));
+     try testing.expectEqual(PostResult.accepted, handle.post(&at_bound));
+
+     const event = try expectData(&fx, 4, &at_bound);
+@@ -2436,7 +2436,7 @@ test "rejected posts never wake the host: the pending-wake count stays flat unde
+     while (index < 64) : (index += 1) {
+         try testing.expectEqual(PostResult.dropped_full, handle.post("refused"));
+     }
+-    const oversized = [_]u8{'x'} ** (effects_mod.max_effect_channel_bytes + 1);
++    const oversized = @as([(effects_mod.max_effect_channel_bytes + 1)]u8, @splat('x'));
+     try testing.expectEqual(PostResult.dropped_oversized, handle.post(&oversized));
+     try testing.expectEqual(before_refused, harness.null_platform.pendingWakeCount());
+
+@@ -2581,7 +2581,7 @@ test "a channel record with bytes over the post bound refuses replay as damage"
+     // A recorded post can never exceed max_effect_channel_bytes — the
+     // handle refuses the bound before staging — so the gate must fire
+     // before the fed bytes could reach a fixed-size feed buffer.
+-    const oversized = [_]u8{'z'} ** (effects_mod.max_effect_channel_bytes + 1);
++    const oversized = @as([(effects_mod.max_effect_channel_bytes + 1)]u8, @splat('z'));
+     const result = replayChannelDamageRecord(.{
+         .kind = .channel,
+         .key = session_channel_key,
+@@ -3115,7 +3115,7 @@ const MixedRejectionModel = struct {
+         }
+         var fold: [9]u8 = undefined;
+         std.mem.writeInt(u64, fold[0..8], event.key, .little);
+-        fold[8] = @intFromEnum(event.kind);
++        fold[8] = @backingInt(event.kind);
+         model.order_digest = std.hash.Wyhash.hash(model.order_digest, &fold);
+     }
+ };
+diff --git a/src/runtime/effects_fetch_tests.zig b/src/runtime/effects_fetch_tests.zig
+index c409a0eeca90fc3ec74ce67a5823ac029b09b5c8..888ef91ffc910038346f5d07a70850ede9847e8f 100644
+--- a/src/runtime/effects_fetch_tests.zig
++++ b/src/runtime/effects_fetch_tests.zig
+@@ -44,7 +44,7 @@ const FetchModel = struct {
+     last_line_len: usize = 0,
+     last_line_hash: u64 = 0,
+     line_storage: [max_recorded_stream_lines][max_recorded_stream_line_bytes]u8 = undefined,
+-    line_lens: [max_recorded_stream_lines]usize = [_]usize{0} ** max_recorded_stream_lines,
++    line_lens: [max_recorded_stream_lines]usize = @as([max_recorded_stream_lines]usize, @splat(0)),
+
+     /// Copy what we keep: the body slice is drain scratch and dies with
+     /// the update call that delivers it.
+@@ -487,12 +487,12 @@ fn rejectFetchUpdate(model: *RejectModel, msg: RejectMsg, fx: *RejectEffects) vo
+         .bad_url => fx.fetch(.{ .key = 1, .url = "not a url at all", .on_response = on_response }),
+         .bad_scheme => fx.fetch(.{ .key = 2, .url = "ftp://example.test/file", .on_response = on_response }),
+         .long_url => {
+-            const long = [_]u8{'a'} ** (effects_mod.max_effect_url_bytes + 1);
++            const long = @as([(effects_mod.max_effect_url_bytes + 1)]u8, @splat('a'));
+             fx.fetch(.{ .key = 3, .url = &long, .on_response = on_response });
+         },
+         .many_headers => {
+             const header: std.http.Header = .{ .name = "x-h", .value = "v" };
+-            const headers = [_]std.http.Header{header} ** (effects_mod.max_effect_fetch_headers + 1);
++            const headers = @as([(effects_mod.max_effect_fetch_headers + 1)]std.http.Header, @splat(header));
+             fx.fetch(.{ .key = 4, .url = "http://example.test/", .headers = &headers, .on_response = on_response });
+         },
+         .bad_header => fx.fetch(.{
+@@ -502,7 +502,7 @@ fn rejectFetchUpdate(model: *RejectModel, msg: RejectMsg, fx: *RejectEffects) vo
+             .on_response = on_response,
+         }),
+         .huge_payload => {
+-            const huge = [_]u8{'p'} ** (effects_mod.max_effect_fetch_payload_bytes + 1);
++            const huge = @as([(effects_mod.max_effect_fetch_payload_bytes + 1)]u8, @splat('p'));
+             fx.fetch(.{ .key = 6, .url = "http://example.test/", .body = &huge, .on_response = on_response });
+         },
+         .duplicate => {
+diff --git a/src/runtime/effects_host_tests.zig b/src/runtime/effects_host_tests.zig
+index 6431a4bf748f2c1d9b1848b16ff51836d2111e52..37b9d3071b7f9b6cf965084fc4b0de9eeb8cb64c 100644
+--- a/src/runtime/effects_host_tests.zig
++++ b/src/runtime/effects_host_tests.zig
+@@ -42,7 +42,7 @@ const HostModel = struct {
+     // Payload proof: the result slice is drain scratch, so the model
+     // copies a bounded prefix of what it keeps.
+     bytes_len: usize = 0,
+-    bytes_prefix: [max_recorded_bytes]u8 = [_]u8{0} ** max_recorded_bytes,
++    bytes_prefix: [max_recorded_bytes]u8 = @as([max_recorded_bytes]u8, @splat(0)),
+     bytes_prefix_len: usize = 0,
+
+     fn record(model: *HostModel, result: effects_mod.EffectHostResult) void {
+diff --git a/src/runtime/effects_pty_tests.zig b/src/runtime/effects_pty_tests.zig
+index a92c59f675662c97eee7685c20c93a9a0e0f3496..952e29509830f30fcb8c386ef143d79a0f4c5859 100644
+--- a/src/runtime/effects_pty_tests.zig
++++ b/src/runtime/effects_pty_tests.zig
+@@ -118,7 +118,7 @@ test "pty admission: every refused spawn delivers exactly one rejected exit" {
+     _ = try expectExit(&fx, 2, .rejected);
+
+     // argv over the byte budget.
+-    const big = "y" ** (effects_mod.max_effect_argv_bytes + 1);
++    const big = @as([(effects_mod.max_effect_argv_bytes + 1)]u8, @splat('y'));
+     fx.ptySpawn(.{ .key = 3, .argv = &.{big}, .on_event = DirectFx.ptyMsg(.pty) });
+     _ = try expectExit(&fx, 3, .rejected);
+
+@@ -127,7 +127,7 @@ test "pty admission: every refused spawn delivers exactly one rejected exit" {
+     _ = try expectExit(&fx, 4, .rejected);
+
+     // TERM over its bound.
+-    const long_term = "t" ** (effects_mod.max_effect_pty_term_bytes + 1);
++    const long_term = @as([(effects_mod.max_effect_pty_term_bytes + 1)]u8, @splat('t'));
+     fx.ptySpawn(.{ .key = 5, .argv = &.{"sh"}, .term = long_term, .on_event = DirectFx.ptyMsg(.pty) });
+     _ = try expectExit(&fx, 5, .rejected);
+
+@@ -158,7 +158,7 @@ test "fake pty write capture, resize mirror, and kill mirror" {
+     try testing.expectEqualStrings("ls -la\r", fx.ptyWrittenBytes(11));
+
+     // Over-bound single write: refused whole (returns false), never a cut.
+-    const oversized = "z" ** (effects_mod.max_effect_pty_write_bytes + 1);
++    const oversized = @as([(effects_mod.max_effect_pty_write_bytes + 1)]u8, @splat('z'));
+     try testing.expect(!fx.ptyWrite(11, oversized));
+     try testing.expectEqualStrings("ls -la\r", fx.ptyWrittenBytes(11));
+
+@@ -1130,7 +1130,7 @@ fn ptySessionUpdate(model: *PtySessionModel, msg: PtySessionMsg, fx: *PtySession
+         // model and the fingerprint.
+         .type_oversized => model.recordWriteVerdict(fx.ptyWrite(
+             session_pty_key,
+-            &(comptime [_]u8{'z'} ** (effects_mod.max_effect_pty_write_bytes + 1)),
++            &(comptime @as([(effects_mod.max_effect_pty_write_bytes + 1)]u8, @splat('z'))),
+         )),
+         .event => |event| model.record(event),
+     }
+diff --git a/src/runtime/effects_tests.zig b/src/runtime/effects_tests.zig
+index 6121d4502a89d6b30cdadeed0767859cf328d0dd..5fe8a2bc61af0110799c9cf709e485561c9f36ed 100644
+--- a/src/runtime/effects_tests.zig
++++ b/src/runtime/effects_tests.zig
+@@ -28,7 +28,7 @@ const max_recorded_output_bytes = 128;
+
+ const StreamModel = struct {
+     line_storage: [max_recorded_lines][max_recorded_line_bytes]u8 = undefined,
+-    line_lens: [max_recorded_lines]usize = [_]usize{0} ** max_recorded_lines,
++    line_lens: [max_recorded_lines]usize = @as([max_recorded_lines]usize, @splat(0)),
+     line_count: usize = 0,
+     truncated_count: usize = 0,
+     // Full-length proof for lines beyond the recording prefix (raised
+@@ -389,7 +389,7 @@ test "queue overflow drops lines with a carried drop count and truncates over-lo
+     try std.testing.expectEqual(@as(u32, 0), h.app_state.model.dropped_before_total);
+
+     // Over-long lines arrive truncated and flagged.
+-    const long_line = [_]u8{'x'} ** (effects_mod.max_effect_line_bytes + 100);
++    const long_line = @as([(effects_mod.max_effect_line_bytes + 100)]u8, @splat('x'));
+     try fx.feedLine(stream_key, &long_line);
+     try h.drainWakes();
+     try std.testing.expectEqual(@as(usize, 1), h.app_state.model.truncated_count);
+@@ -615,7 +615,7 @@ fn rejectUpdate(model: *RejectModel, msg: RejectMsg, fx: *RejectEffects) void {
+             fx.spawn(.{ .key = 500, .argv = &.{"cmd"}, .on_exit = RejectEffects.exitMsg(.done) });
+         },
+         .spawn_huge => {
+-            const huge = [_]u8{'a'} ** (effects_mod.max_effect_argv_bytes + 1);
++            const huge = @as([(effects_mod.max_effect_argv_bytes + 1)]u8, @splat('a'));
+             fx.spawn(.{ .key = 600, .argv = &.{&huge}, .on_exit = RejectEffects.exitMsg(.done) });
+         },
+         .done => |exit| switch (exit.reason) {
+@@ -1027,14 +1027,14 @@ test "teardown abandons a spawn worker held hostage by an escaped descendant and
+     try std.posix.kill(escaped_pid, .KILL);
+     var waited_ms: usize = 0;
+     while (waited_ms < 20_000) : (waited_ms += 10) {
+-        if (std.posix.kill(direct_pid, @enumFromInt(0))) |_| {
++        if (std.posix.kill(direct_pid, @fromBackingInt(@intCast(0)))) |_| {
+             try std.Io.sleep(io, std.Io.Duration.fromMilliseconds(10), .awake);
+         } else |err| {
+             try std.testing.expectEqual(error.ProcessNotFound, err);
+             break;
+         }
+     }
+-    try std.testing.expectError(error.ProcessNotFound, std.posix.kill(direct_pid, @enumFromInt(0)));
++    try std.testing.expectError(error.ProcessNotFound, std.posix.kill(direct_pid, @fromBackingInt(@intCast(0))));
+ }
+
+ test "an abandoned spawn worker survives the owner's allocator dying: its leak is process-lived only" {
+@@ -1099,14 +1099,14 @@ test "an abandoned spawn worker survives the owner's allocator dying: its leak i
+     // would crash the test. The zombie's disappearance proves the wake.
+     var waited_ms: usize = 0;
+     while (waited_ms < 20_000) : (waited_ms += 10) {
+-        if (std.posix.kill(direct_pid, @enumFromInt(0))) |_| {
++        if (std.posix.kill(direct_pid, @fromBackingInt(@intCast(0)))) |_| {
+             try std.Io.sleep(io, std.Io.Duration.fromMilliseconds(10), .awake);
+         } else |err| {
+             try std.testing.expectEqual(error.ProcessNotFound, err);
+             break;
+         }
+     }
+-    try std.testing.expectError(error.ProcessNotFound, std.posix.kill(direct_pid, @enumFromInt(0)));
++    try std.testing.expectError(error.ProcessNotFound, std.posix.kill(direct_pid, @fromBackingInt(@intCast(0))));
+
+     // And the happy path still frees everything through the same seams:
+     // a fresh channel backed DIRECTLY by the testing allocator runs a
+diff --git a/src/runtime/flow.zig b/src/runtime/flow.zig
+index 68ba0741a279cc6630b639e10fb6dfc457107b53..ec3fec9f076f040e05549a142188c4cbf725a0e7 100644
+--- a/src/runtime/flow.zig
++++ b/src/runtime/flow.zig
+@@ -231,17 +231,41 @@ pub fn RuntimeFlow(comptime Runtime: type) type {
+                     // platform stop path and the only trace is a bare
+                     // `app.stop` right after `start` — which reads like a
+                     // clean exit while the main window sits blank.
+-                    errdefer |err| recordDispatchError(self, "app_start", err);
+                     launch_timing.lap("app_start");
+-                    try reservePrimaryStartupWindow(self);
+-                    try app.start(self);
+-                    if (self.options.extensions) |registry| try registry.startAll(extensionContext(self));
+-                    try dispatchEvent(self, app, .{ .lifecycle = .start });
++                    // Zig 0.17 removed errdefer |err| payload capture; preserve error recording.
++                    reservePrimaryStartupWindow(self) catch |err| {
++                        recordDispatchError(self, "app_start", err);
++                        return err;
++                    };
++                    app.start(self) catch |err| {
++                        recordDispatchError(self, "app_start", err);
++                        return err;
++                    };
++                    if (self.options.extensions) |registry| {
++                        registry.startAll(extensionContext(self)) catch |err| {
++                            recordDispatchError(self, "app_start", err);
++                            return err;
++                        };
++                    }
++                    dispatchEvent(self, app, .{ .lifecycle = .start }) catch |err| {
++                        recordDispatchError(self, "app_start", err);
++                        return err;
++                    };
+                     launch_timing.lap("app_started");
+-                    if (try app.scene()) |scene| {
+-                        try loadScene(self, app, scene);
++                    const maybe_scene = app.scene() catch |err| {
++                        recordDispatchError(self, "app_start", err);
++                        return err;
++                    };
++                    if (maybe_scene) |scene| {
++                        loadScene(self, app, scene) catch |err| {
++                            recordDispatchError(self, "app_start", err);
++                            return err;
++                        };
+                     } else {
+-                        try loadStartupWindows(self, app);
++                        loadStartupWindows(self, app) catch |err| {
++                            recordDispatchError(self, "app_start", err);
++                            return err;
++                        };
+                     }
+                     launch_timing.lap("scene_loaded");
+                     self.invalidateFor(.startup, null);
+diff --git a/src/runtime/markdown_app_tests.zig b/src/runtime/markdown_app_tests.zig
+index 4be56f511d3c8f7e6920a5a20f24b73e76c58bd1..9860debea6a6a9265dc3b7b96436b79622131bf7 100644
+--- a/src/runtime/markdown_app_tests.zig
++++ b/src/runtime/markdown_app_tests.zig
+@@ -38,7 +38,7 @@ const note_source =
+ ;
+
+ const NotesModel = struct {
+-    opened_url: [128]u8 = [_]u8{0} ** 128,
++    opened_url: [128]u8 = @as([128]u8, @splat(0)),
+     opened_len: usize = 0,
+     details_expanded: [4]bool = .{ false, false, false, false },
+
+diff --git a/src/runtime/media_surface.zig b/src/runtime/media_surface.zig
+index be474469fd48bbd5efea3bed877ddab1bf1090b8..ac31630372c4380780dcc25a6a883f2816f4f983 100644
+--- a/src/runtime/media_surface.zig
++++ b/src/runtime/media_surface.zig
+@@ -221,7 +221,7 @@ const MediaSurfaceSlot = struct {
+ };
+
+ var media_surface_slots: [max_media_surface_channels]MediaSurfaceSlot =
+-    [_]MediaSurfaceSlot{.{}} ** max_media_surface_channels;
++    @as([max_media_surface_channels]MediaSurfaceSlot, @splat(.{}));
+
+ /// Process-wide monotonic runtime tags: unique per runtime instance for
+ /// the life of the process, so slot ownership survives allocator
+diff --git a/src/runtime/platform_config_tests.zig b/src/runtime/platform_config_tests.zig
+index 67c74ff27a528b73b5a896f0ef9a8dd10a02a09b..c28441a4f762307e2ffc8aed634d537db4b73880 100644
+--- a/src/runtime/platform_config_tests.zig
++++ b/src/runtime/platform_config_tests.zig
+@@ -162,7 +162,7 @@ test "runtime rejects invalid keyboard shortcuts" {
+         }
+     };
+
+-    const long_id = [_]u8{'x'} ** (platform.max_shortcut_id_bytes + 1);
++    const long_id = @as([(platform.max_shortcut_id_bytes + 1)]u8, @splat('x'));
+     const shortcuts = [_]platform.Shortcut{.{ .id = long_id[0..], .key = "p" }};
+     const harness = try TestHarness().create(std.testing.allocator, .{});
+     defer harness.destroy(std.testing.allocator);
+@@ -193,7 +193,7 @@ test "runtime rejects invalid command catalog" {
+
+ test "runtime rejects oversized webview source" {
+     const TestApp = struct {
+-        bytes: [platform.max_window_source_bytes + 1]u8 = [_]u8{'x'} ** (platform.max_window_source_bytes + 1),
++        bytes: [platform.max_window_source_bytes + 1]u8 = @as([(platform.max_window_source_bytes + 1)]u8, @splat('x')),
+
+         fn app(self: *@This()) App {
+             return .{ .context = self, .name = "oversized-source", .source = platform.WebViewSource.html(&self.bytes) };
+diff --git a/src/runtime/session_record.zig b/src/runtime/session_record.zig
+index f12618b14c16adca23e66867e9f36499df31447d..562fa058d59e032c18dbb3dc616458a590168b81 100644
+--- a/src/runtime/session_record.zig
++++ b/src/runtime/session_record.zig
+@@ -63,8 +63,8 @@ pub const SessionRecorder = struct {
+     /// journal's WHOLE representation of the interaction (see
+     /// `stageEvent`).
+     suppress_owner_depth: ?usize = null,
+-    staged_lens: [journal.max_session_event_depth]usize = [_]usize{0} ** journal.max_session_event_depth,
+-    staged_suppressed: [journal.max_session_event_depth]bool = [_]bool{false} ** journal.max_session_event_depth,
++    staged_lens: [journal.max_session_event_depth]usize = @as([journal.max_session_event_depth]usize, @splat(0)),
++    staged_suppressed: [journal.max_session_event_depth]bool = @as([journal.max_session_event_depth]bool, @splat(false)),
+     staged: [journal.max_session_event_depth][journal.max_session_event_bytes]u8 = undefined,
+     /// Encode scratch for effect payloads (up to a whole file read).
+     effect_buffer: [journal.max_session_record_bytes]u8 = undefined,
+@@ -271,7 +271,7 @@ pub const SessionRecorder = struct {
+             return self.fail("the journal exceeded max_session_journal_bytes - recording stopped");
+         }
+         var record_header: [5]u8 = undefined;
+-        record_header[0] = @intFromEnum(kind);
++        record_header[0] = @backingInt(kind);
+         std.mem.writeInt(u32, record_header[1..5], @intCast(payload.len), .little);
+         self.write(&record_header);
+         self.write(payload);
+diff --git a/src/runtime/session_tests.zig b/src/runtime/session_tests.zig
+index a5e94e238e9993b6e44196c7f07ee7647a753e25..d6138c3d1220e378030efec8fb6bf99beb725278 100644
+--- a/src/runtime/session_tests.zig
++++ b/src/runtime/session_tests.zig
+@@ -21,7 +21,7 @@ const canvas_label = "session-canvas";
+
+ const SessionModel = struct {
+     count: u32 = 0,
+-    body: [64]u8 = [_]u8{0} ** 64,
++    body: [64]u8 = @as([64]u8, @splat(0)),
+     body_len: usize = 0,
+     fetch_status: u16 = 0,
+     line_count: u32 = 0,
+@@ -38,7 +38,7 @@ const SessionModel = struct {
+     /// types into the field and Escape-clears it: the journal records
+     /// only the RAW click/type/Escape platform events, so replay must
+     /// re-derive the same clear edit the recording's editor applied.
+-    query: [32]u8 = [_]u8{0} ** 32,
++    query: [32]u8 = @as([32]u8, @splat(0)),
+     query_len: usize = 0,
+     query_anchor: usize = 0,
+     query_focus: usize = 0,
+@@ -46,7 +46,7 @@ const SessionModel = struct {
+     /// A SECOND editable field's mirror: the direct-verb replay tests
+     /// need two editors so a composition targeting one can prove it
+     /// does not land on whichever field the session left focused.
+-    name: [32]u8 = [_]u8{0} ** 32,
++    name: [32]u8 = @as([32]u8, @splat(0)),
+     name_len: usize = 0,
+     name_anchor: usize = 0,
+     name_focus: usize = 0,
+@@ -175,7 +175,7 @@ fn applyMirrorEdit(store: *[32]u8, len: *usize, anchor: *usize, focus: *usize, e
+         .text = store[0..len.*],
+         .selection = .{ .anchor = anchor.*, .focus = focus.* },
+     }).apply(edit, &scratch) catch return;
+-    var out = [_]u8{0} ** 32;
++    var out = @as([32]u8, @splat(0));
+     const out_len = @min(next.text.len, out.len);
+     std.mem.copyForwards(u8, out[0..out_len], next.text[0..out_len]);
+     store.* = out;
+@@ -2918,7 +2918,7 @@ fn zeroFirstLoadedImageBlobLen(bytes: []u8) bool {
+         const len = std.mem.readInt(u32, bytes[pos + 1 ..][0..4], .little);
+         const payload = bytes[pos + 5 .. pos + 5 + len];
+         pos += 5 + len;
+-        if (kind != @intFromEnum(journal.RecordKind.effect)) continue;
++        if (kind != @backingInt(journal.RecordKind.effect)) continue;
+         const record = journal.decodeEffect(payload) catch continue;
+         if (record.kind != .image or record.image_outcome != .loaded or record.image_blob_len == 0) continue;
+         const end = payload.len - effect_post_image_trailer_len;
+@@ -2943,7 +2943,7 @@ fn patchFirstImageDims(bytes: []u8, outcome: effects_mod.EffectImageOutcome, wid
+         const len = std.mem.readInt(u32, bytes[pos + 1 ..][0..4], .little);
+         const payload = bytes[pos + 5 .. pos + 5 + len];
+         pos += 5 + len;
+-        if (kind != @intFromEnum(journal.RecordKind.effect)) continue;
++        if (kind != @backingInt(journal.RecordKind.effect)) continue;
+         const record = journal.decodeEffect(payload) catch continue;
+         if (record.kind != .image or record.image_outcome != outcome) continue;
+         const end = payload.len - effect_post_image_trailer_len;
+diff --git a/src/runtime/ts_core_host.zig b/src/runtime/ts_core_host.zig
+index 33562b9923f45e07033d2d72f330145a78146beb..291ae3eb0798e24d2bd2cfe58cf05bf71f5011ea 100644
+--- a/src/runtime/ts_core_host.zig
++++ b/src/runtime/ts_core_host.zig
+@@ -2118,7 +2118,7 @@ pub fn TsCoreHost(comptime core: type) type {
+         fn reconcileTimers(fx: *Fx) void {
+             if (comptime !has_subscriptions) return;
+             const subs = core.subscriptions(model_root);
+-            var seen = [_]bool{false} ** timers.len;
++            var seen = @as([timers.len]bool, @splat(false));
+             var at: usize = 0;
+             while (at < subs.len) {
+                 const op = takeByte(subs, &at);
+@@ -2356,7 +2356,7 @@ pub fn TsCoreHost(comptime core: type) type {
+         fn audioStateValue(comptime E: type, kind: runtime_effects.EffectAudioEventKind) E {
+             const name = @tagName(kind);
+             inline for (@typeInfo(E).@"enum".fields) |f| {
+-                if (std.mem.eql(u8, f.name, name)) return @enumFromInt(f.value);
++                if (std.mem.eql(u8, f.name, name)) return @fromBackingInt(@intCast(f.value));
+             }
+             @panic("ts core host: an audio event kind has no member in the event arm's state union - the transpiler's own shape check should have stopped this build");
+         }
+@@ -2429,7 +2429,7 @@ pub fn TsCoreHost(comptime core: type) type {
+         fn videoStateValue(comptime E: type, kind: runtime_effects.EffectVideoEventKind) E {
+             const name = @tagName(kind);
+             inline for (@typeInfo(E).@"enum".fields) |f| {
+-                if (std.mem.eql(u8, f.name, name)) return @enumFromInt(f.value);
++                if (std.mem.eql(u8, f.name, name)) return @fromBackingInt(@intCast(f.value));
+             }
+             @panic("ts core host: a video event kind has no member in the event arm's state union - the transpiler's own shape check should have stopped this build");
+         }
+@@ -2494,7 +2494,7 @@ pub fn TsCoreHost(comptime core: type) type {
+         fn imageStateValue(comptime E: type, outcome: runtime_effects.EffectImageOutcome) E {
+             const name = @tagName(outcome);
+             inline for (@typeInfo(E).@"enum".fields) |f| {
+-                if (std.mem.eql(u8, f.name, name)) return @enumFromInt(f.value);
++                if (std.mem.eql(u8, f.name, name)) return @fromBackingInt(@intCast(f.value));
+             }
+             @panic("ts core host: an image outcome has no member in the result arm's state union - the transpiler's own shape check should have stopped this build");
+         }
+@@ -2559,7 +2559,7 @@ pub fn TsCoreHost(comptime core: type) type {
+         fn channelStateValue(comptime E: type, kind: runtime_effects.EffectChannelEventKind) E {
+             const name = @tagName(kind);
+             inline for (@typeInfo(E).@"enum".fields) |f| {
+-                if (std.mem.eql(u8, f.name, name)) return @enumFromInt(f.value);
++                if (std.mem.eql(u8, f.name, name)) return @fromBackingInt(@intCast(f.value));
+             }
+             @panic("ts core host: a channel event kind has no member in the event arm's state union - the transpiler's own shape check should have stopped this build");
+         }
+@@ -2644,7 +2644,7 @@ pub fn TsCoreHost(comptime core: type) type {
+         fn ptyStateValue(comptime E: type, kind: runtime_effects.EffectPtyEventKind) E {
+             const name = @tagName(kind);
+             inline for (@typeInfo(E).@"enum".fields) |f| {
+-                if (std.mem.eql(u8, f.name, name)) return @enumFromInt(f.value);
++                if (std.mem.eql(u8, f.name, name)) return @fromBackingInt(@intCast(f.value));
+             }
+             @panic("ts core host: a pty event kind has no member in the event arm's state union - the transpiler's own shape check should have stopped this build");
+         }
+@@ -2654,7 +2654,7 @@ pub fn TsCoreHost(comptime core: type) type {
+         fn ptyReasonValue(comptime E: type, reason: runtime_effects.EffectExitReason) E {
+             const name = @tagName(reason);
+             inline for (@typeInfo(E).@"enum".fields) |f| {
+-                if (std.mem.eql(u8, f.name, name)) return @enumFromInt(f.value);
++                if (std.mem.eql(u8, f.name, name)) return @fromBackingInt(@intCast(f.value));
+             }
+             @panic("ts core host: a pty exit reason has no member in the event arm's reason union - the transpiler's own shape check should have stopped this build");
+         }
+diff --git a/src/runtime/ts_core_host_tests.zig b/src/runtime/ts_core_host_tests.zig
+index bf55b77b50a6a02b9e6b5e01587baed816ff1db4..96b018ea1c6d420cf3ae5a9b251f716e22f9790c 100644
+--- a/src/runtime/ts_core_host_tests.zig
++++ b/src/runtime/ts_core_host_tests.zig
+@@ -1647,7 +1647,7 @@ test "a truncated collect routes err - a cut stdout never parses as whole" {
+     Host.dispatch(fx, .run_collect);
+     // Overfill the collect buffer past the engine bound; the fake
+     // executor mirrors the real truncation flag.
+-    const chunk = "x" ** 4096;
++    const chunk = @as([4096]u8, @splat('x'));
+     var fed: usize = 0;
+     while (fed <= effects_mod.max_effect_collect_bytes) : (fed += chunk.len) {
+         try fx.feedOutput(job_spawn_key, chunk);
+diff --git a/src/runtime/ui_app.zig b/src/runtime/ui_app.zig
+index ebe93644c9b73b33ee73e5861c287cb348f2ec8d..9c554ad0fb76a606fc372d5a89cc208e296b8130 100644
+--- a/src/runtime/ui_app.zig
++++ b/src/runtime/ui_app.zig
+@@ -919,7 +919,7 @@ pub fn UiAppWithFeatures(comptime ModelT: type, comptime MsgT: type, comptime fe
+         effects: Effects,
+         /// Applied webview-pane state (`Options.web_panes`), keyed by
+         /// shell label.
+-        web_pane_states: [max_web_panes]WebPaneState = [_]WebPaneState{.{}} ** max_web_panes,
++        web_pane_states: [max_web_panes]WebPaneState = @as([max_web_panes]WebPaneState, @splat(.{})),
+         web_pane_state_count: usize = 0,
+         /// Exactly-once guard for `Options.status_item`/`status_item_fn`.
+         status_item_installed: bool = false,
+@@ -978,7 +978,7 @@ pub fn UiAppWithFeatures(comptime ModelT: type, comptime MsgT: type, comptime fe
+         /// ownership from chain position so retained entries never need
+         /// their captures moved or re-taken.
+         hover_msg_slots: [canvas.max_widget_depth]u8 = undefined,
+-        hover_msg_slot_used: [hover_msg_slot_count]bool = [_]bool{false} ** hover_msg_slot_count,
++        hover_msg_slot_used: [hover_msg_slot_count]bool = @as([hover_msg_slot_count]bool, @splat(false)),
+         /// Captured leave Msgs BY SLOT (see `hover_msg_slots`).
+         hover_msg_leave_msgs: [hover_msg_slot_count]?MsgT = undefined,
+         /// Per-SLOT arenas owning the captured leave Msgs' payload
+@@ -1069,16 +1069,16 @@ pub fn UiAppWithFeatures(comptime ModelT: type, comptime MsgT: type, comptime fe
+         /// re-derive the view even without an app `on_scroll` binding,
+         /// and the coverage check re-runs a build whose fresh geometry
+         /// proved a window too small.
+-        virtual_windows: [canvas.max_virtual_windows]canvas.VirtualWindowRecord = [_]canvas.VirtualWindowRecord{.{}} ** canvas.max_virtual_windows,
++        virtual_windows: [canvas.max_virtual_windows]canvas.VirtualWindowRecord = @as([canvas.max_virtual_windows]canvas.VirtualWindowRecord, @splat(.{})),
+         virtual_window_count: usize = 0,
+         /// Scroll regions whose `on_reach_end` fired and has not re-armed
+         /// (the approach-end hysteresis state, keyed by widget id AND the
+         /// axis the reach was measured on: a region whose primary axis
+         /// changes — content growing sideways after a vertical fire —
+         /// must not have the stale axis's latch suppress the fresh one).
+-        reach_end_fired: [max_reach_latches]ReachLatch = [_]ReachLatch{.{}} ** max_reach_latches,
++        reach_end_fired: [max_reach_latches]ReachLatch = @as([max_reach_latches]ReachLatch, @splat(.{})),
+         /// The approach-START mirror (`on_reach_start` hysteresis).
+-        reach_start_fired: [max_reach_latches]ReachLatch = [_]ReachLatch{.{}} ** max_reach_latches,
++        reach_start_fired: [max_reach_latches]ReachLatch = @as([max_reach_latches]ReachLatch, @splat(.{})),
+         /// Retained offset tables for VARIABLE-extent virtual lists,
+         /// claimed per list identity during builds (`Ui.virtualWindow`
+         /// through the extent source) and patched by the post-layout
+@@ -1086,7 +1086,7 @@ pub fn UiAppWithFeatures(comptime ModelT: type, comptime MsgT: type, comptime fe
+         /// declarable window; a build declaring more variable lists than
+         /// slots drops the excess to estimate-only math with a debug
+         /// warning.
+-        virtual_extent_tables: [canvas.max_virtual_windows]canvas.VirtualExtentTable = [_]canvas.VirtualExtentTable{.{}} ** canvas.max_virtual_windows,
++        virtual_extent_tables: [canvas.max_virtual_windows]canvas.VirtualExtentTable = @as([canvas.max_virtual_windows]canvas.VirtualExtentTable, @splat(.{})),
+         /// The `<video src>` declaration the LAST main-canvas build
+         /// recorded (`Ui.video_declaration`), captured by the build pass
+         /// for the post-rebuild reconcile; the src slice lives in that
+diff --git a/src/runtime/ui_app_provenance.zig b/src/runtime/ui_app_provenance.zig
+index 6540bb6f044987b8030bf7a0d01673f01a0ee8c9..e45fad5e1b892aa150e3da8312f180bb297a1ecc 100644
+--- a/src/runtime/ui_app_provenance.zig
++++ b/src/runtime/ui_app_provenance.zig
+@@ -350,7 +350,7 @@ test "provenance record caps truncate honestly" {
+     var chain: [max_chain + 2]canvas.ui_provenance.UseSite = undefined;
+     for (&chain) |*site| site.* = .{ .src_path = "a.native", .span = .{ .start = 1, .end = 2 }, .line = 1, .column = 1 };
+     const source = canvas.ui_provenance.NodeSource{ .src_path = "a.native", .span = .{ .start = 0, .end = 4 }, .chain = &chain };
+-    const long_key = "k" ** (max_key_bytes + 8);
++    const long_key = @as([(max_key_bytes + 8)]u8, @splat('k'));
+     const keys = [_]canvas.ui_provenance.Key{.{ .str = long_key }};
+     try table.appendRecord(5, &source, &keys, false);
+     const record = table.find(5).?;
+diff --git a/src/runtime/ui_app_tests.zig b/src/runtime/ui_app_tests.zig
+index 9397510b3661cc881b82c71f4c1dd70af0e37cbd..e8422f1c8c0792a9dad56a25d657168e64f65abc 100644
+--- a/src/runtime/ui_app_tests.zig
++++ b/src/runtime/ui_app_tests.zig
+@@ -6007,7 +6007,7 @@ const CaptureModel = struct {
+     two_entered: u32 = 0,
+     two_left: u32 = 0,
+     field: canvas.TextBuffer(16) = .{},
+-    left_storage: [32]u8 = [_]u8{0} ** 32,
++    left_storage: [32]u8 = @as([32]u8, @splat(0)),
+     left_len: usize = 0,
+
+     fn leftText(model: *const CaptureModel) []const u8 {
+@@ -6373,10 +6373,10 @@ test "a failed build keeps the still-matching pair live: edges flow through it"
+ // -------------------------------------------- over-aligned payload probe
+
+ const AlignedModel = struct {
+-    bytes: [64]u8 align(64) = [_]u8{'a'} ** 64,
++    bytes: [64]u8 align(64) = @as([64]u8, @splat('a')),
+     show_row: bool = true,
+     left_len: usize = 0,
+-    z_payload: [4]u8 = [_]u8{0} ** 4,
++    z_payload: [4]u8 = @as([4]u8, @splat(0)),
+
+     fn payload(model: *const AlignedModel) []align(64) const u8 {
+         return @alignCast(model.bytes[0..8]);
+diff --git a/src/runtime/webview_view_bridge_tests.zig b/src/runtime/webview_view_bridge_tests.zig
+index 150a2440cf042f8ad128e8fe14b44cf40cc68147..fd083c9a569895aff7538b36978974d7749b9905 100644
+--- a/src/runtime/webview_view_bridge_tests.zig
++++ b/src/runtime/webview_view_bridge_tests.zig
+@@ -600,7 +600,7 @@ test "runtime validates webview bridge commands" {
+     try std.testing.expect(std.mem.indexOf(u8, harness.null_platform.lastBridgeResponse(), "WebView was not found") != null);
+     try std.testing.expect(std.mem.indexOf(u8, harness.null_platform.lastBridgeResponse(), "\"invalid_request\"") != null);
+
+-    var long_label = [_]u8{'a'} ** (platform.max_webview_label_bytes + 1);
++    var long_label = @as([(platform.max_webview_label_bytes + 1)]u8, @splat('a'));
+     var long_label_request_buffer: [512]u8 = undefined;
+     const long_label_request = try std.fmt.bufPrint(&long_label_request_buffer, "{{\"id\":\"long-label\",\"command\":\"native-sdk.webview.create\",\"payload\":{{\"label\":\"{s}\",\"url\":\"https://example.com\",\"frame\":{{\"width\":300,\"height\":200}}}}}}", .{&long_label});
+     try harness.runtime.dispatchPlatformEvent(app_state.app(), .{ .bridge_message = .{
+@@ -611,7 +611,7 @@ test "runtime validates webview bridge commands" {
+     try std.testing.expect(std.mem.indexOf(u8, harness.null_platform.lastBridgeResponse(), "WebView label is too large") != null);
+     try std.testing.expect(std.mem.indexOf(u8, harness.null_platform.lastBridgeResponse(), "\"invalid_request\"") != null);
+
+-    var long_url = [_]u8{'a'} ** (platform.max_webview_url_bytes + 1);
++    var long_url = @as([(platform.max_webview_url_bytes + 1)]u8, @splat('a'));
+     var long_url_request_buffer: [platform.max_webview_url_bytes + 256]u8 = undefined;
+     const long_url_request = try std.fmt.bufPrint(&long_url_request_buffer, "{{\"id\":\"long-url\",\"command\":\"native-sdk.webview.create\",\"payload\":{{\"label\":\"too-long-url\",\"url\":\"{s}\",\"frame\":{{\"width\":300,\"height\":200}}}}}}", .{&long_url});
+     try harness.runtime.dispatchPlatformEvent(app_state.app(), .{ .bridge_message = .{
+diff --git a/src/runtime/window_views.zig b/src/runtime/window_views.zig
+index 4bd73802492e92c6a66621dabbe85dd2ceb1480a..42c5489e96d33873936ccdc68cc65f627e8b716c 100644
+--- a/src/runtime/window_views.zig
++++ b/src/runtime/window_views.zig
+@@ -290,7 +290,7 @@ pub fn RuntimeWindowViews(comptime Runtime: type) type {
+
+         pub fn applyShellViews(self: *Runtime, window_id: platform.WindowId, views: []const app_manifest.ShellView, bounds: geometry.RectF, mode: ShellApplyMode, tracked_labels: ?*[app_manifest.max_shell_views_per_window][]const u8, tracked_count: ?*usize) anyerror!void {
+             var layout = ShellLayout.init(bounds, views);
+-            var created: [app_manifest.max_shell_views_per_window]bool = [_]bool{false} ** app_manifest.max_shell_views_per_window;
++            var created: [app_manifest.max_shell_views_per_window]bool = @as([app_manifest.max_shell_views_per_window]bool, @splat(false));
+             var created_count: usize = 0;
+             while (created_count < views.len) {
+                 var progressed = false;
+diff --git a/src/tooling/package.zig b/src/tooling/package.zig
+index 02f78969f0a3856de159057eca56b8f25ec3789b..dd41d8897dd96b08ea8c3a834813ff38c32bb64c 100644
+--- a/src/tooling/package.zig
++++ b/src/tooling/package.zig
+@@ -28,7 +28,7 @@ pub const PackageTarget = enum {
+
+     pub fn parse(value: []const u8) ?PackageTarget {
+         inline for (@typeInfo(PackageTarget).@"enum".fields) |field| {
+-            if (std.mem.eql(u8, value, field.name)) return @enumFromInt(field.value);
++            if (std.mem.eql(u8, value, field.name)) return @fromBackingInt(@intCast(field.value));
+         }
+         return null;
+     }
+@@ -2726,7 +2726,7 @@ test "package refuses an exclude against a resolved Chromium engine" {
+ /// carries. The COFF machine field stays zero, which the arch sniff
+ /// reads as x64.
+ fn testWebLayerPeBytes() [0x80 + "WebView2Loader.dll".len * 2]u8 {
+-    var bytes = [_]u8{0} ** (0x80 + "WebView2Loader.dll".len * 2);
++    var bytes = @as([(0x80 + "WebView2Loader.dll".len * 2)]u8, @splat(0));
+     bytes[0] = 'M';
+     bytes[1] = 'Z';
+     std.mem.writeInt(u32, bytes[0x3c..0x40], 0x40, .little);
+@@ -2742,7 +2742,7 @@ fn testWebLayerPeBytes() [0x80 + "WebView2Loader.dll".len * 2]u8 {
+ /// subsystem tests: MZ + PE + a COFF header declaring a 240-byte
+ /// optional header, with the Subsystem field set as asked.
+ fn testSubsystemPeBytes(subsystem: u16) [0x200]u8 {
+-    var bytes = [_]u8{0} ** 0x200;
++    var bytes = @as([0x200]u8, @splat(0));
+     bytes[0] = 'M';
+     bytes[1] = 'Z';
+     std.mem.writeInt(u32, bytes[0x3c..0x40], 0x40, .little);
+@@ -2801,7 +2801,7 @@ test "a PE offset past the header ceiling proves nothing and allocates nothing"
+     try cwd.deleteTree(std.testing.io, root);
+     defer cwd.deleteTree(std.testing.io, root) catch {};
+     try cwd.createDirPath(std.testing.io, root);
+-    var bytes = [_]u8{0} ** 0x40;
++    var bytes = @as([0x40]u8, @splat(0));
+     bytes[0] = 'M';
+     bytes[1] = 'Z';
+     std.mem.writeInt(u32, bytes[0x3c..0x40], 8 * 1024 * 1024, .little);
+diff --git a/src/tooling/process_tree.zig b/src/tooling/process_tree.zig
+index e4632194fb8171665c86e659e96612c3d7022c16..58f44c9f05e01861d50dd808feb093eb4cb1cdef 100644
+--- a/src/tooling/process_tree.zig
++++ b/src/tooling/process_tree.zig
+@@ -18,7 +18,7 @@ const builtin = @import("builtin");
+ pub const supported = builtin.os.tag != .windows and builtin.os.tag != .wasi;
+
+ const max_groups = 4;
+-var group_pids = [_]std.atomic.Value(i32){std.atomic.Value(i32).init(0)} ** max_groups;
++var group_pids = @as([max_groups]std.atomic.Value(i32), @splat(std.atomic.Value(i32).init(0)));
+ var signals_installed = false;
+
+ /// Value for `std.process.SpawnOptions.pgid`: 0 places the child in a
+@@ -92,7 +92,7 @@ fn installSignalHandlers() void {
+ fn handleExitSignal(sig: std.posix.SIG) callconv(.c) void {
+     killAllOwned();
+     // Conventional 128+signal exit code.
+-    std.process.exit(128 +| @as(u8, @truncate(@intFromEnum(sig))));
++    std.process.exit(128 +| @as(u8, @truncate(@backingInt(sig))));
+ }
+
+ test "spawnPgid requests a fresh group on posix" {

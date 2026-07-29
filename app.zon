@@ -1,0 +1,45 @@
+.{
+    .id = "me.eshmaki.onyx",
+    .name = "onyx",
+    .display_name = "Onyx",
+    .version = "0.1.1",
+    .icons = .{"assets/icon.png"},
+    // Native SDK 0.6.2 system-WebView hosts: macOS (WKWebView), Linux (WebKitGTK 6),
+    // Windows (WebView2). Do not claim Chromium/CEF parity; this scaffold uses system.
+    .platforms = .{ "macos", "linux", "windows" },
+    .permissions = .{},
+    .capabilities = .{"webview"},
+    .frontend = .{
+        .dist = "dist",
+        .entry = "index.html",
+        .spa_fallback = true,
+        .dev = .{
+            .url = "http://127.0.0.1:3000/",
+            .command = .{ "pnpm", "dev", "--", "--host", "127.0.0.1", "--port", "3000" },
+            .ready_path = "/",
+            .timeout_ms = 30000,
+        },
+    },
+    .security = .{
+        .navigation = .{
+            // Packaged assets use productionSource origin zero://app only.
+            // Dev is the exact Vite loopback origin (no trailing slash in origin form).
+            // zero://inline is not required by productionSource — omit it.
+            .allowed_origins = .{ "zero://app", "http://127.0.0.1:3000" },
+            .external_links = .{ .action = "deny" },
+        },
+    },
+    .web_engine = "system",
+    .cef = .{ .dir = "third_party/cef/macos", .auto_install = false },
+    .windows = .{
+        .{
+            .label = "main",
+            .title = "Onyx",
+            .width = 1280,
+            .height = 800,
+            .min_width = 900,
+            .min_height = 600,
+            .restore_state = true,
+        },
+    },
+}

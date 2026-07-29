@@ -1,21 +1,24 @@
-/* HomeView — the connected community home (deep-water language) */
+/* HomeView — commercial public home (Deep Current reading flow) */
 .home {
   height: 100%;
   min-height: 0;
   flex: 1 1 0;
+  overflow-x: hidden;
   overflow-y: auto;
   display: flex;
   justify-content: center;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
 }
 .home-inner {
   width: 100%;
-  max-width: 880px;
-  padding: clamp(24px, 5vh, 64px) 24px 48px;
+  max-width: min(720px, 100%);
+  padding: clamp(28px, 6vh, 72px) clamp(18px, 4vw, 32px) 56px;
+  box-sizing: border-box;
 }
 
-.home-masthead { margin-bottom: 28px; }
+.home-masthead { margin-bottom: clamp(28px, 4vh, 40px); }
 .home-kicker {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.26em;
@@ -23,18 +26,21 @@
   color: var(--lapis-bright);
 }
 .home-title {
-  margin: 0 0 10px;
-  font-family: var(--font-display);
-  font-size: clamp(1.9rem, 1.3rem + 2.4vw, 3rem);
-  letter-spacing: 0.015em;
-  line-height: 1.06;
+  margin: 0 0 12px;
+  font-family: var(--font-display); /* Anton — editorial display only */
+  font-size: clamp(2rem, 1.35rem + 2.6vw, 3.15rem);
+  letter-spacing: 0.01em;
+  line-height: 1.05;
   color: var(--paper);
+  font-weight: 400;
 }
 .home-sub {
   margin: 0;
-  max-width: 56ch;
+  max-width: 42ch;
   color: var(--paper-dim);
-  font-size: 0.95rem;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
 }
 .home-sub b {
   color: var(--paper);
@@ -46,18 +52,57 @@
   border-radius: 5px;
   background: var(--stone);
 }
+.home-welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
 .home-offline-note {
   width: fit-content;
   max-width: 62ch;
-  margin: 14px 0 0;
-  padding: 8px 11px;
+  margin: 16px 0 0;
+  padding: 10px 12px;
   border: 1px solid color-mix(in oklab, var(--gold) 34%, var(--line));
   border-left: 2px solid var(--gold);
   border-radius: var(--r-md);
   background: color-mix(in oklab, var(--gold) 9%, var(--stone));
   color: var(--paper-dim);
-  font-size: 0.8rem;
-  line-height: 1.4;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* Sparse cyan current line: Needs you → Continue */
+.home-current-rail {
+  position: relative;
+  display: grid;
+  gap: 28px;
+  margin: 8px 0 32px;
+  padding-left: 0;
+}
+.home-current-rail--active {
+  padding-left: 14px;
+}
+.home-current-rail--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--lapis-bright) 88%, transparent),
+    color-mix(in oklab, var(--lapis) 42%, transparent) 55%,
+    color-mix(in oklab, var(--lapis) 12%, transparent)
+  );
+  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 28%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-current-rail--active::before {
+    box-shadow: none;
+  }
 }
 
 /* ── Device outbox journal ──────────────────────────────────────────────── */
@@ -339,7 +384,7 @@
   color: var(--paper-mute);
 }
 
-/* Actions */
+/* Actions — 44px touch targets on coarse pointers */
 .home-actions {
   display: flex;
   flex-wrap: wrap;
@@ -349,26 +394,174 @@
 .home-cta {
   font: inherit;
   font-weight: 600;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
   color: var(--on-accent);
   background: linear-gradient(180deg, var(--lapis-bright), var(--lapis));
   border: 0;
   border-radius: 999px;
-  padding: 9px 20px;
+  min-height: 44px;
+  padding: 10px 22px;
   cursor: pointer;
   transition: transform var(--dur, 200ms) var(--ease), filter var(--dur, 200ms) var(--ease);
 }
 .home-cta:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.home-cta:focus-visible,
+.home-action:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 3px;
+}
 .home-action {
   font: inherit;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
   color: var(--paper-dim);
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 9px 18px;
+  min-height: 44px;
+  padding: 10px 18px;
   cursor: pointer;
   transition: color var(--dur, 200ms) var(--ease), border-color var(--dur, 200ms) var(--ease);
 }
 .home-action:hover { color: var(--paper); border-color: var(--stone-line); }
+.home-action--primary {
+  border-color: color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
+  color: var(--paper);
+}
+.home-action--quiet {
+  border-color: transparent;
+  color: var(--paper-mute);
+  min-height: 40px;
+}
+.home-action--quiet:hover {
+  color: var(--paper-dim);
+  border-color: var(--line);
+}
+
+/* Continue band */
+.home-continue {
+  margin: 0;
+}
+.home-continue-head,
+.home-explore-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.home-continue-head .home-section-label,
+.home-explore-head .home-section-label {
+  margin: 0;
+}
+.home-continue-summary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-mute);
+}
+.home-resume-label {
+  margin: 0;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: var(--paper-dim);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.home-continue .home-resume {
+  margin-bottom: 16px;
+}
+
+/* Explore + empty */
+.home-explore {
+  margin: 8px 0 28px;
+}
+.home-explore-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.home-explore-kicker {
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+}
+.home-empty {
+  margin: 8px 0 28px;
+  padding: 8px 0 4px;
+  max-width: 40ch;
+}
+.home-empty-title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 1.1rem + 1vw, 1.75rem);
+  color: var(--paper);
+  letter-spacing: 0.01em;
+}
+.home-empty-copy {
+  margin: 0;
+  color: var(--paper-dim);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* More activity — technical demotion */
+.home-more-activity {
+  margin: 12px 0 8px;
+  border: 0;
+  background: transparent;
+}
+.home-more-activity__summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+}
+.home-more-activity__summary::-webkit-details-marker { display: none; }
+.home-more-activity__summary:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.home-more-activity__summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--lapis-bright);
+  transition: transform var(--dur, 200ms) var(--ease);
+}
+.home-more-activity[open] > .home-more-activity__summary::before {
+  transform: rotate(90deg);
+}
+.home-more-activity__body {
+  display: grid;
+  gap: 28px;
+  padding: 12px 0 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-more-activity__summary::before,
+  .home-cta,
+  .home-action,
+  .home-card,
+  .home-memory-card {
+    transition: none;
+  }
+  .home-cta:hover,
+  .home-card:hover,
+  .home-memory-card:hover {
+    transform: none;
+  }
+}
 
 /* Room rhythm */
 .home-rhythm {
@@ -947,7 +1140,18 @@
   .home-review-history__actions button {
     flex: 1 1 8.5rem;
     min-height: 44px;
+    min-width: 0;
     justify-content: center;
+  }
+  .home-catchup-details {
+    width: 100%;
+    max-width: 100%;
+  }
+  .home-catchup-details__summary {
+    min-height: 44px;
+  }
+  .home-catchup-details:not([open]) > .home-recap-strip {
+    display: none;
   }
   .home-review-history__item {
     grid-template-columns: 1fr;
@@ -1148,6 +1352,7 @@
    Grouped by a quiet left rail + faint wash — never a full gold panel, so
    Needs you stays the single primary focus on the surface. */
 .home-catchup-tier--followed {
+  margin-top: 8px;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-2) var(--space-1) var(--space-3);
   border-left: 2px solid color-mix(in oklab, var(--lapis-bright) 48%, transparent);
@@ -1417,16 +1622,77 @@
   color: var(--gold-bright);
   font-weight: 500;
 }
+/* Catch-up details disclosure — dense recaps stay collapsed so Needs you
+   does not look like an always-expanded mobile dashboard. Content remains
+   in the DOM; closed <details> keeps it out of the visible flow. */
+.home-catchup-details {
+  margin-top: var(--space-3);
+  min-width: 0;
+}
+.home-catchup-details__summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--space-2) 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+}
+.home-catchup-details__summary::-webkit-details-marker {
+  display: none;
+}
+.home-catchup-details__summary::before {
+  content: '';
+  width: 0.45em;
+  height: 0.45em;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dur, 200ms) var(--ease);
+  flex: none;
+}
+.home-catchup-details[open] > .home-catchup-details__summary::before {
+  transform: rotate(45deg);
+}
+.home-catchup-details__summary:hover,
+.home-catchup-details__summary:focus-visible {
+  color: var(--paper);
+  outline: none;
+}
+.home-catchup-details__summary:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+.home-catchup-details[open] > .home-catchup-details__summary {
+  margin-bottom: var(--space-2);
+  color: var(--paper);
+}
+/* When closed, no recap chrome bleeds into the reading flow (UA + explicit). */
+.home-catchup-details:not([open]) > .home-recap-strip {
+  display: none;
+}
+
 /* Recaps sit under the tier strata — gold is a soft wash, not a second
    "Needs you" panel. Primary action on each card is still the Open seal. */
 .home-recap-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
   gap: var(--space-2);
-  margin-top: var(--space-3);
+  margin-top: 0;
+  min-width: 0;
+  overflow-x: clip;
 }
 .home-recap-card {
   min-width: 0;
+  max-width: 100%;
   min-height: 150px;
   display: grid;
   grid-template-rows: auto auto minmax(2.8em, 1fr) auto;
@@ -1441,6 +1707,7 @@
     color-mix(in oklab, var(--stone) 78%, transparent);
   border: 1px solid color-mix(in oklab, var(--line) 88%, var(--gold));
   border-radius: var(--r-md);
+  overflow: hidden;
 }
 .home-recap-card__head,
 .home-recap-card__actions {

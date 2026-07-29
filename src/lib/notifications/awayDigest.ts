@@ -7,12 +7,14 @@
 // preset and per-channel notification mode:
 //
 //   attention → DMs + channels where you were mentioned (the "needs attention"
-//               tier). Under the `power` preset, followed channels escalate here
-//               too — a power user wants everything up top.
-//   followed  → active followed channels with unread but no mention. Summarised
-//               but NEVER escalated to `attention` under `calm`/`regular`.
-//   quiet     → the collapsed ambient tail: everything else with unread, plus
-//               MUTED channels (a muted channel is never "needs attention").
+//               tier). A direct mention/highlight in a MUTED channel still
+//               lands here — mute only quiets ambient traffic. Under the
+//               `power` preset, followed channels escalate here too.
+//   followed  → active followed channels with unread but no mention, and not
+//               muted. Summarised but NEVER escalated to `attention` under
+//               `calm`/`regular`.
+//   quiet     → the collapsed ambient tail: unfollowed unread, plus muted
+//               channels that have NO highlights (ambient mute stays quiet).
 //
 // PURITY: no clock read, no store read, no I/O. The caller injects the
 // notification-level map + the active calm preset. Read state already drives the
@@ -27,11 +29,11 @@ import type { CalmPreset } from './calmMode';
 export type AwayTier = 'attention' | 'followed' | 'quiet';
 
 export interface AwayDigest {
-  /** DMs + mentions (and, under `power`, followed) — the "needs attention" tier. */
+  /** DMs + mentions including muted-room highlights (and, under `power`, followed). */
   attention: CatchUpItem[];
   /** Active followed channels, unread, not muted, no mention. */
   followed: CatchUpItem[];
-  /** Collapsed ambient tail: other unread + muted channels. */
+  /** Collapsed ambient tail: other unread + muted channels with zero highlights. */
   quiet: CatchUpItem[];
   totalUnread: number;
   totalMentions: number;
@@ -50,7 +52,7 @@ export interface AwayDigestOptions {
 
 const DEFAULT_QUIET_LIMIT = 6;
 
-/** A muted channel is never "needs attention"; DMs are never channel-muted. */
+/** Channel mute only; DMs are never channel-muted via this map. */
 function isMuted(item: CatchUpItem, levels: ReadonlyMap<string, NotifyLevel>): boolean {
   return item.kind === 'channel' && channelNotifyMode(levels, item.target) === 'mute';
 }
@@ -60,10 +62,11 @@ function tierFor(
   levels: ReadonlyMap<string, NotifyLevel>,
   preset: CalmPreset,
 ): AwayTier {
-  // Muted channels drop to the quiet tail regardless of follow/mention state.
-  if (isMuted(item, levels)) return 'quiet';
-  // DMs and mentions always demand attention.
+  // Mention / DM attention BEFORE mute demotion: a direct highlight in a muted
+  // channel still routes to Needs you. Ambient mute (zero highlights) stays quiet.
   if (item.kind === 'dm' || item.highlights > 0) return 'attention';
+  // Mute demotes only non-highlight channel traffic (ambient + followed-no-ping).
+  if (isMuted(item, levels)) return 'quiet';
   // Followed channels sit in their own tier — never escalated to attention
   // under calm/regular. A power user pulls them up top.
   if (item.followed) return preset === 'power' ? 'attention' : 'followed';

@@ -787,6 +787,53 @@
     0 0 24px -16px var(--lapis-bright);
 }
 
+/* First-party OnyxOS service mark — non-human surface (not initials disc). */
+.onyx-avatar--service {
+  color: var(--lapis-bright);
+  border-radius: clamp(0.42rem, 22%, 0.72rem);
+  border-color: color-mix(in oklab, var(--lapis-bright) 58%, var(--seam));
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in oklab, var(--lapis-deep) 72%, var(--ink)),
+      color-mix(in oklab, var(--lapis) 48%, var(--stone-3)) 52%,
+      color-mix(in oklab, var(--lapis-bright) 28%, var(--lapis-deep))
+    );
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 34%, transparent) inset,
+    0 0 18px -10px var(--lapis-bright),
+    0 8px 18px -16px var(--lapis);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.onyx-avatar--service.onyx-avatar--owner {
+  border-color: var(--gold);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--gold-bright) 40%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 28%, transparent) inset,
+    0 0 22px -12px var(--lapis-bright);
+}
+
+.onyx-avatar__service-mark {
+  display: block;
+  width: 62%;
+  height: 62%;
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--lapis-bright) 55%, transparent));
+}
+
+.onyx-avatar--sm .onyx-avatar__service-mark {
+  width: 58%;
+  height: 58%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onyx-avatar__service-mark {
+    filter: none;
+  }
+}
+
 .onyx-toaster {
   position: fixed;
   right: 1rem;

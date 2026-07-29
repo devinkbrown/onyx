@@ -15,7 +15,7 @@ if (import.meta.env.PROD && typeof navigator !== 'undefined' && 'serviceWorker' 
 }
 import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
-import { createEffect, createSignal, lazy, Show, type JSX } from 'solid-js';
+import { createEffect, createSignal, ErrorBoundary, lazy, Show, Suspense, type Component, type JSX } from 'solid-js';
 import '@fontsource/anton';
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/jetbrains-mono';
@@ -31,6 +31,7 @@ import { ThemeProvider } from './theme';
 // first opened, so it is lazy + gated behind the open signal to keep it off
 // the eager landing entry chunk.
 import { SpotlightProvider, useSpotlight } from './chat/spotlight/useSpotlight';
+import { lazyRouteFallback } from './app/StaleChunkRecovery';
 import Landing from './routes/Landing';
 
 const About = lazy(() => import('./routes/About'));
@@ -42,6 +43,44 @@ const Roadmap = lazy(() => import('./routes/Roadmap'));
 const Invite = lazy(() => import('./routes/Invite'));
 const PublicInfo = lazy(() => import('./routes/PublicInfo').then((m) => ({ default: m.PublicInfo })));
 const Spotlight = lazy(() => import('./chat/spotlight/Spotlight'));
+
+/**
+ * Guard a lazy route so a 404'd post-deploy chunk shows recovery UI instead of
+ * a wallpaper-only blank shell. No automatic reload loop.
+ */
+function LazyRouteBoundary(props: { children: JSX.Element }): JSX.Element {
+  return (
+    <ErrorBoundary fallback={lazyRouteFallback}>
+      <Suspense
+        fallback={(
+          <div class="route-lazy-pending" role="status" data-testid="route-lazy-pending">
+            Loading…
+          </div>
+        )}
+      >
+        {props.children}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+function withLazyRoute(Lazy: Component): Component {
+  return function LazyRouteGuarded() {
+    return (
+      <LazyRouteBoundary>
+        <Lazy />
+      </LazyRouteBoundary>
+    );
+  };
+}
+
+const AboutRoute = withLazyRoute(About);
+const AppRouteGuarded = withLazyRoute(AppShell);
+const AppearanceRoute = withLazyRoute(Appearance);
+const StatsRoute = withLazyRoute(Stats);
+const StatusRoute = withLazyRoute(Status);
+const RoadmapRoute = withLazyRoute(Roadmap);
+const InviteRoute = withLazyRoute(Invite);
 
 // Global command palette host. The panel + its command catalogue live in a
 // lazy chunk; we ARM (and permanently keep mounted) on the first open so the
@@ -77,21 +116,49 @@ render(
       <SpotlightProvider>
         <Router>
           <Route path="/" component={Landing} />
-          <Route path="/about" component={About} />
-          <Route path="/app" component={AppShell} />
-          <Route path="/appearance" component={Appearance} />
-          <Route path="/stats" component={Stats} />
-          <Route path="/stats/" component={Stats} />
-          <Route path="/status" component={Status} />
-          <Route path="/status/" component={Status} />
-          <Route path="/roadmap" component={Roadmap} />
-          <Route path="/roadmap/" component={Roadmap} />
-          <Route path="/invite" component={Invite} />
-          <Route path="/invite/" component={Invite} />
-          <Route path="/accessibility/" component={() => <PublicInfo page="accessibility" />} />
-          <Route path="/glossary/" component={() => <PublicInfo page="glossary" />} />
-          <Route path="/integrations/" component={() => <PublicInfo page="integrations" />} />
-          <Route path="/agents/" component={() => <PublicInfo page="agents" />} />
+          <Route path="/about" component={AboutRoute} />
+          <Route path="/app" component={AppRouteGuarded} />
+          <Route path="/appearance" component={AppearanceRoute} />
+          <Route path="/stats" component={StatsRoute} />
+          <Route path="/stats/" component={StatsRoute} />
+          <Route path="/status" component={StatusRoute} />
+          <Route path="/status/" component={StatusRoute} />
+          <Route path="/roadmap" component={RoadmapRoute} />
+          <Route path="/roadmap/" component={RoadmapRoute} />
+          <Route path="/invite" component={InviteRoute} />
+          <Route path="/invite/" component={InviteRoute} />
+          <Route
+            path="/accessibility/"
+            component={() => (
+              <LazyRouteBoundary>
+                <PublicInfo page="accessibility" />
+              </LazyRouteBoundary>
+            )}
+          />
+          <Route
+            path="/glossary/"
+            component={() => (
+              <LazyRouteBoundary>
+                <PublicInfo page="glossary" />
+              </LazyRouteBoundary>
+            )}
+          />
+          <Route
+            path="/integrations/"
+            component={() => (
+              <LazyRouteBoundary>
+                <PublicInfo page="integrations" />
+              </LazyRouteBoundary>
+            )}
+          />
+          <Route
+            path="/agents/"
+            component={() => (
+              <LazyRouteBoundary>
+                <PublicInfo page="agents" />
+              </LazyRouteBoundary>
+            )}
+          />
         </Router>
         {/* Global command palette — Cmd/Ctrl+K or / opens it from any route.
             Its lazy chunk (command catalogue + fuzzy matcher) is fetched only

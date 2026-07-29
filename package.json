@@ -15,7 +15,20 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "check:server-contract": "node tools/check-server-contract.mjs ../onyx-server/docs/reference/protocol/onyx-client-contract.v1.json",
-    "announce": "python3 tools/announce_bot.py"
+    "announce": "python3 tools/announce_bot.py",
+    "desktop:validate": "native validate app.zon",
+    "desktop:doctor": "native doctor --manifest app.zon",
+    "desktop:check": "native check",
+    "desktop:build": "node tools/desktop-zig.mjs build",
+    "desktop:test": "node tools/desktop-zig.mjs build test",
+    "desktop:dev": "node tools/desktop-zig.mjs build dev",
+    "desktop:build:null": "node tools/desktop-zig.mjs build -Dplatform=null",
+    "desktop:test:null": "node tools/desktop-zig.mjs build test -Dplatform=null",
+    "desktop:build:linux": "node tools/desktop-zig.mjs build -Dplatform=linux",
+    "desktop:test:linux": "node tools/desktop-zig.mjs build test -Dplatform=linux",
+    "desktop:build:windows": "node tools/desktop-zig.mjs build -Dplatform=windows -Dtarget=x86_64-windows",
+    "desktop:package:windows": "node tools/desktop-zig.mjs build package -Dplatform=windows -Dtarget=x86_64-windows",
+    "desktop:release:windows": "node tools/release-windows.mjs"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.2.9",
@@ -43,6 +56,12 @@
     "typescript-eslint": "^8.62.1",
     "vite": "^7.1.0",
     "vite-plugin-solid": "^2.11.6",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "@native-sdk/cli": "0.6.2"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@native-sdk/cli@0.6.2": "patches/@native-sdk__cli@0.6.2.patch"
+    }
   }
 }

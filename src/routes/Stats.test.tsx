@@ -1,13 +1,33 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@solidjs/testing-library';
+import { fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { Suspense } from 'solid-js';
 
-import StatsRoute, { roomDeepLink } from './Stats';
+import StatsRoute, { revealStatsInspector, roomDeepLink, STATS_INSPECTOR_ID } from './Stats';
+
+function channelDetailPayload(channel: string, now: number, extras: Record<string, unknown> = {}) {
+  return {
+    channel,
+    generated_at: now,
+    first_seen: now - 86_400,
+    last_active: now - 60,
+    present: 3,
+    last_speaker: 'alice',
+    totals: { messages: 12, words: 72, active_users: 4, joins: 9, parts: 2, quits: 1, kicks: 0, topic_changes: 2 },
+    hours: Array.from({ length: 24 }, (_, hour) => hour),
+    days: [{ date: '2026-07-21', messages: 12 }],
+    heatmap: Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 1)),
+    records: { busiest_day: { date: '2026-07-21', messages: 12 }, peak_hour: 23 },
+    top_users: [{ nick: 'private-ranking', messages: 12 }],
+    top_words: [{ word: 'private-profile', count: 12 }],
+    ...extras,
+  };
+}
 
 describe('StatsRoute', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('renders the public stats page shell without a live feed', async () => {
@@ -164,5 +184,168 @@ describe('StatsRoute', () => {
 
     expect(screen.getByRole('heading', { name: /the rooms in motion/i })).toBeInTheDocument();
     expect(screen.queryByTestId('stats-suspended')).not.toBeInTheDocument();
+  });
+
+  it('does not steal focus or scroll on initial load when the default room auto-inspects', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/root.json')) {
+        return new Response(JSON.stringify(channelDetailPayload('#root', now)));
+      }
+      return new Response(JSON.stringify({
+        generated_at: now,
+        users_online: 4,
+        network_days: [{ date: '2026-07-21', messages: 12 }],
+        channels: [{ channel: '#root', messages: 12, present: 3, last_active: now - 60, spark: [12] }],
+      }));
+    }));
+
+    render(() => <StatsRoute />);
+
+    expect(await screen.findByRole('heading', { name: 'When the room talks' })).toBeInTheDocument();
+    const inspector = document.getElementById(STATS_INSPECTOR_ID);
+    expect(inspector).not.toBeNull();
+    expect(document.activeElement).not.toBe(inspector);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    // Native focus may run for other controls; inspector must not be the target.
+    expect(focus.mock.instances.some((el) => el === inspector)).toBe(false);
+  });
+
+  it('same-room Inspect activation scrolls, focuses, and keeps the selected state', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false,
+      media: '',
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/root.json')) {
+        return new Response(JSON.stringify(channelDetailPayload('#root', now)));
+      }
+      return new Response(JSON.stringify({
+        generated_at: now,
+        users_online: 4,
+        network_days: [{ date: '2026-07-21', messages: 12 }],
+        channels: [{ channel: '#root', messages: 12, present: 3, last_active: now - 60, spark: [12] }],
+      }));
+    }));
+
+    render(() => <StatsRoute />);
+    await screen.findByRole('heading', { name: 'When the room talks' });
+
+    const inspect = screen.getByRole('button', { name: 'Inspect' });
+    expect(inspect).toHaveAttribute('aria-pressed', 'true');
+    expect(inspect).toHaveAttribute('aria-controls', STATS_INSPECTOR_ID);
+
+    fireEvent.click(inspect);
+
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalled();
+    });
+    const inspector = document.getElementById(STATS_INSPECTOR_ID)!;
+    expect(scrollIntoView.mock.calls.some((call) => {
+      const opts = call[0] as ScrollIntoViewOptions | undefined;
+      return opts?.behavior === 'smooth' && opts?.block === 'start';
+    })).toBe(true);
+    expect(document.activeElement).toBe(inspector);
+    expect(inspect).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('heading', { name: /inside #root/i })).toBeInTheDocument();
+  });
+
+  it('switching rooms never paints the previous room detail while the new feed is pending', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    let resolveQuiet: ((value: Response) => void) | null = null;
+
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/root.json')) {
+        return new Response(JSON.stringify(channelDetailPayload('#root', now, {
+          totals: { messages: 999, words: 72, active_users: 4, joins: 9, parts: 2, quits: 1, kicks: 0, topic_changes: 2 },
+        })));
+      }
+      if (url.endsWith('/quiet.json')) {
+        return new Promise<Response>((resolve) => {
+          resolveQuiet = resolve;
+        });
+      }
+      return new Response(JSON.stringify({
+        generated_at: now,
+        users_online: 4,
+        network_days: [{ date: '2026-07-21', messages: 12 }],
+        channels: [
+          { channel: '#root', messages: 90, present: 3, last_active: now - 60, spark: [12] },
+          { channel: '#quiet', messages: 10, present: 0, last_active: now - 120, spark: [1] },
+        ],
+      }));
+    }));
+
+    render(() => <StatsRoute />);
+    expect(await screen.findByRole('heading', { name: 'When the room talks' })).toBeInTheDocument();
+    expect(screen.getByLabelText('#root summary')).toBeInTheDocument();
+    expect(screen.getByText('999')).toBeInTheDocument();
+
+    const rows = document.querySelectorAll('.data-room-row');
+    const quietRow = Array.from(rows).find((row) => row.textContent?.includes('#quiet'));
+    expect(quietRow).toBeTruthy();
+    fireEvent.click(within(quietRow as HTMLElement).getByRole('button', { name: 'Inspect' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/loading #quiet insights/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText('#root summary')).not.toBeInTheDocument();
+    expect(screen.queryByText('999')).not.toBeInTheDocument();
+    expect(within(quietRow as HTMLElement).getByRole('button', { name: 'Inspect' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('heading', { name: /inside #quiet/i })).toBeInTheDocument();
+
+    resolveQuiet!(new Response(JSON.stringify(channelDetailPayload('#quiet', now, {
+      totals: { messages: 10, words: 20, active_users: 1, joins: 1, parts: 0, quits: 0, kicks: 0, topic_changes: 0 },
+      records: { busiest_day: { date: '2026-07-21', messages: 10 }, peak_hour: 11 },
+    }))));
+
+    expect(await screen.findByLabelText('#quiet summary')).toBeInTheDocument();
+    expect(screen.queryByLabelText('#root summary')).not.toBeInTheDocument();
+  });
+
+  it('uses non-smooth scroll when prefers-reduced-motion is reduce', () => {
+    const target = document.createElement('section');
+    target.id = STATS_INSPECTOR_ID;
+    target.tabIndex = -1;
+    document.body.appendChild(target);
+    const scrollIntoView = vi.fn();
+    target.scrollIntoView = scrollIntoView;
+    const focus = vi.fn();
+    target.focus = focus;
+
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+
+    revealStatsInspector(target);
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' });
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    target.remove();
   });
 });

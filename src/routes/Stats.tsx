@@ -120,11 +120,36 @@ export function roomDeepLink(channel: string, lastActiveUnixSec = 0): string {
   return `/app/?${params.toString()}`;
 }
 
+/** Stable id for the room inspector region — linked from every Inspect control. */
+export const STATS_INSPECTOR_ID = 'stats-room-inspector';
+
+function prefersReducedMotion(): boolean {
+  try {
+    return typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
+/** User-activated reveal of the inspector: scroll + focus. Never call on initial load. */
+export function revealStatsInspector(target: HTMLElement | null = document.getElementById(STATS_INSPECTOR_ID)): void {
+  if (!target) return;
+  const behavior: ScrollBehavior = prefersReducedMotion() ? 'auto' : 'smooth';
+  target.scrollIntoView({ block: 'start', behavior });
+  // preventScroll avoids a second jump after scrollIntoView; focus still lands for AT/keyboard.
+  if (typeof target.focus === 'function') {
+    target.focus({ preventScroll: true });
+  }
+}
+
 function ChannelRow(props: {
   channel: StatsChannel;
   nowMs: number;
   rank: number;
   selected: boolean;
+  inspectorId: string;
   onInspect: (channel: string) => void;
 }) {
   const c = () => props.channel;
@@ -167,6 +192,7 @@ function ChannelRow(props: {
             type="button"
             class="data-action data-action--inspect"
             aria-pressed={props.selected}
+            aria-controls={props.inspectorId}
             onClick={() => props.onInspect(c().channel)}
           >
             Inspect
@@ -210,6 +236,28 @@ export default function StatsRoute() {
   const roomsWithPeople = createMemo(() => channels().filter((channel) => channel.present > 0).length);
   const inspectedChannel = createMemo(() => inspectedRoom() || busiest()?.channel || '');
   const [channelDetail, { refetch: refetchChannelDetail }] = createResource(inspectedChannel, fetchChannelDetail, { initialValue: null });
+  // createResource keeps `.latest` across source changes; never paint another room's detail
+  // while the newly selected room is loading or failed.
+  const matchingChannelDetail = createMemo(() => {
+    const detail = channelDetail.latest;
+    const room = inspectedChannel();
+    if (!detail || !room) return null;
+    if (detail.channel.toLocaleLowerCase('en') !== room.toLocaleLowerCase('en')) return null;
+    return detail;
+  });
+  const inspectorAwaitingMatch = createMemo(() => {
+    const room = inspectedChannel();
+    if (!room || matchingChannelDetail()) return false;
+    if (channelDetail.loading) return true;
+    // Transitional: previous room still in `.latest` while the new source is resolving.
+    const stale = channelDetail.latest;
+    return !!stale && stale.channel.toLocaleLowerCase('en') !== room.toLocaleLowerCase('en');
+  });
+  const inspectRoom = (channel: string) => {
+    setInspectedRoom(channel);
+    // Defer until after Solid commits selected state so scroll/focus target the current inspector.
+    queueMicrotask(() => revealStatsInspector());
+  };
   const visibleChannels = createMemo(() => {
     const query = roomQuery().trim().toLocaleLowerCase('en');
     const scoped = channels().filter((channel) => {
@@ -231,7 +279,7 @@ export default function StatsRoute() {
       return delta || left.channel.localeCompare(right.channel);
     });
   });
-  const heatmapMax = createMemo(() => Math.max(0, ...(channelDetail.latest?.heatmap.flat() ?? [])));
+  const heatmapMax = createMemo(() => Math.max(0, ...(matchingChannelDetail()?.heatmap.flat() ?? [])));
   const feedState = createMemo<PublicFeedFreshness | 'partial' | 'unavailable'>(() => {
     const data = stats.latest;
     if (!data) return 'unavailable';
@@ -384,7 +432,12 @@ export default function StatsRoute() {
         </aside>
       </section>
 
-      <section class="r-wrap r-section stats-inspector" aria-labelledby="inspector-heading">
+      <section
+        id={STATS_INSPECTOR_ID}
+        class="r-wrap r-section stats-inspector"
+        aria-labelledby="inspector-heading"
+        tabindex="-1"
+      >
         <div class="stats-inspector-head">
           <div>
             <span class="r-eyebrow">room inspector</span>
@@ -404,10 +457,10 @@ export default function StatsRoute() {
         </div>
 
         <Show
-          when={channelDetail.latest}
+          when={matchingChannelDetail()}
           fallback={
             <div class="data-empty" role="status">
-              {channelDetail.loading
+              {inspectorAwaitingMatch()
                 ? `Loading ${inspectedChannel() || 'room'} insights…`
                 : 'Detailed room telemetry is unavailable. The public index above is still usable.'}
             </div>
@@ -562,7 +615,8 @@ export default function StatsRoute() {
                   nowMs={nowMs()}
                   rank={index() + 1}
                   selected={inspectedChannel().toLowerCase() === channel.channel.toLowerCase()}
-                  onInspect={setInspectedRoom}
+                  inspectorId={STATS_INSPECTOR_ID}
+                  onInspect={inspectRoom}
                 />
               )}
             </For>

@@ -81,7 +81,8 @@ afterEach(() => {
 
 describe('SPA route entrypoint materializer', () => {
   it('covers every non-root route in the Solid router table', () => {
-    const routes = [...routeTable.matchAll(/<Route path="\/([^"/]+)\/?"/g)]
+    // Whitespace-robust: lazy PublicInfo routes use multiline <Route\n path=.../>.
+    const routes = [...routeTable.matchAll(/<Route\s+path="\/([^"/]+)\/?"/g)]
       .map((match) => match[1])
       .filter((route): route is string => route !== undefined);
 

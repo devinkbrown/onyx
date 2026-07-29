@@ -113,8 +113,8 @@ describe('HomeView — cold / vault-first paint', () => {
     expect(
       screen.getByRole('region', { name: 'Resume where you left off' }),
     ).toBeInTheDocument();
-    // Offline banner still honest — local memory, not a live mesh claim.
-    expect(screen.getByText(/Local-memory mode:/i)).toBeInTheDocument();
+    // Offline banner still honest — on-device only, not a live mesh claim.
+    expect(screen.getByText(/On this device:/i)).toBeInTheDocument();
   });
 
   it('paints Device memory from vault auto-join targets before rooms are live', async () => {
