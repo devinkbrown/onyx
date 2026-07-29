@@ -33,6 +33,11 @@ vi.mock('@/backgrounds', async (importOriginal) => {
 import { ThemeProvider, THEME_IDS } from '@/theme';
 import { backgroundOptions } from '@/backgrounds';
 import { getState } from '@/lib/store';
+import {
+  resetSceneMotion,
+  sceneMotion,
+  setSceneMotion,
+} from '@/lib/prefs/sceneMotion';
 import Appearance, {
   POINTER_PREVIEW_DELAY_MS,
   isTouchPointerEvent,
@@ -70,11 +75,13 @@ beforeEach(() => {
   backgroundHarness.ids.length = 0;
   backgroundHarness.throwOnId = null;
   getState().setBackground('obsidian');
+  resetSceneMotion();
   window.matchMedia = originalMatchMedia;
 });
 
 afterEach(() => {
   cleanup();
+  resetSceneMotion();
   vi.useRealTimers();
   window.matchMedia = originalMatchMedia;
 });
@@ -144,6 +151,16 @@ describe('Appearance', () => {
     expect(goldVeins).toHaveAttribute('aria-pressed', 'true');
     vi.advanceTimersByTime(POINTER_PREVIEW_DELAY_MS);
     expect(backgroundHarness.ids).toEqual(['obsidian', 'gold-veins']);
+  });
+
+  it('makes an explicit wallpaper selection visible after motion was Off', () => {
+    setSceneMotion('off');
+    const { container } = renderAppearance();
+
+    fireEvent.click(getBackgroundChip(container, 'Gold Veins'));
+
+    expect(getState().backgroundId).toBe('gold-veins');
+    expect(sceneMotion()).toBe('animated');
   });
 
   it('previews keyboard focus immediately and restores selection on blur', () => {

@@ -2273,6 +2273,62 @@
   color: var(--paper-mute);
 }
 
+.ap-panel-current {
+  min-width: 0;
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ap-motion-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 26%, transparent);
+}
+
+.ap-motion-label {
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ap-motion-options {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 38%, transparent);
+}
+
+.ap-motion-option {
+  min-height: 44px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  color: var(--paper-dim);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+}
+
+.ap-motion-option--on {
+  color: var(--paper);
+  border-color: color-mix(in oklab, var(--lapis-bright) 40%, transparent);
+  background: color-mix(in oklab, var(--lapis) 32%, var(--stone-2));
+}
+
 .ap-panel-heading-row {
   display: flex;
   align-items: center;
@@ -2440,6 +2496,30 @@
 .ap-panel-studio:hover {
   color: var(--gold-bright);
   border-color: var(--gold-bright);
+}
+
+/* On phones the Appearance sheet fills the viewport. An opaque sheet made
+   every successful wallpaper selection look broken because the live renderer
+   was completely hidden behind it. Keep enough glass for the chosen scene to
+   remain unmistakably visible while preserving text contrast. */
+@media (max-width: 42rem) {
+  .onyx-sheet:has(.ap-panel) .onyx-sheet__backdrop {
+    background: color-mix(in oklab, var(--ink) 38%, transparent);
+  }
+
+  .onyx-sheet:has(.ap-panel) .onyx-sheet__panel {
+    background: color-mix(in oklab, var(--stone) 76%, transparent);
+    backdrop-filter: blur(14px) saturate(1.08);
+    -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  }
+
+  .onyx-sheet:has(.ap-panel) .onyx-sheet__header {
+    background: color-mix(in oklab, var(--stone-2) 66%, transparent);
+  }
+
+  .onyx-sheet:has(.ap-panel) .onyx-sheet__body {
+    background: color-mix(in oklab, var(--ink) 12%, transparent);
+  }
 }
 
 /* ── Channel settings panel ── */

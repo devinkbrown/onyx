@@ -14,6 +14,11 @@ import { encodeTheme } from '@/lib/theme/themeShare';
 import { THEME_IDS, type CustomTheme } from '@/theme';
 import { AppearancePanel } from './AppearancePanel';
 import { AUTO_BACKGROUND_ID } from './themeBackground';
+import {
+  resetSceneMotion,
+  sceneMotion,
+  setSceneMotion,
+} from '@/lib/prefs/sceneMotion';
 
 const initialState = store.getInitialState();
 
@@ -21,10 +26,12 @@ describe('AppearancePanel', () => {
   beforeEach(() => {
     store.setState(initialState, true);
     localStorage.clear();
+    resetSceneMotion();
   });
 
   afterEach(() => {
     cleanup();
+    resetSceneMotion();
     localStorage.clear();
   });
 
@@ -84,6 +91,30 @@ describe('AppearancePanel', () => {
     expect(store.getState().backgroundId).toBe('starfield');
     expect(localStorage.getItem('onyx:bg')).toBe('starfield');
     expect(screen.getByRole('radio', { name: /starfield/i })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('recovers a wallpaper selection from a persisted Off motion state', () => {
+    setSceneMotion('off');
+    store.getState().openAppearance();
+    render(() => <AppearancePanel />);
+
+    fireEvent.click(screen.getByRole('radio', { name: /starfield/i }));
+
+    expect(store.getState().backgroundId).toBe('starfield');
+    expect(sceneMotion()).toBe('animated');
+    expect(localStorage.getItem('onyx:scene-motion')).toBe('animated');
+  });
+
+  it('exposes background motion controls beside the mobile-safe picker', () => {
+    store.getState().openAppearance();
+    render(() => <AppearancePanel />);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Still' }));
+    expect(sceneMotion()).toBe('still');
+    expect(screen.getByRole('radio', { name: 'Still' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Animated' }));
+    expect(sceneMotion()).toBe('animated');
   });
 
   it('imports a shared theme code from the appearance panel', () => {

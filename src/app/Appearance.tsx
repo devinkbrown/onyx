@@ -9,6 +9,7 @@ import { useTheme, THEMES, THEME_IDS, type ThemeId } from '@/theme';
 // this lazy /appearance chunk, where it's the sole consumer.
 import { ThemeStudio } from '@/theme/ThemeStudio';
 import { useStore, getState } from '@/lib/store';
+import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import { AUTO_BACKGROUND_ID, resolveBackgroundId } from '@/shell/themeBackground';
 import './appearance.css';
 
@@ -78,7 +79,13 @@ function BackgroundFallback() {
 export default function Appearance() {
   const theme = useTheme();
   const backgroundId = useStore((s) => s.backgroundId);
-  const chooseBg = (id: string) => getState().setBackground(id);
+  const chooseBg = (id: string) => {
+    // Selecting a wallpaper is explicit intent to display it. Recover from a
+    // previously persisted Off state instead of accepting a tap that appears
+    // to do nothing, especially on coarse-pointer/mobile devices.
+    if (sceneMotion() === 'off') setSceneMotion('animated');
+    getState().setBackground(id);
+  };
 
   // Pointer hover waits for intent before changing the lazy Background source;
   // keyboard focus and explicit activation stay immediate. Touch / (hover:none)
