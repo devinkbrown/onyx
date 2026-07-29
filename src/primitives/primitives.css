@@ -622,6 +622,13 @@
     line-height: 1.1;
   }
 
+  .onyx-sheet__close {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .onyx-sheet__header p:last-child {
     position: absolute;
     width: 1px;

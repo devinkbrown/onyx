@@ -663,6 +663,10 @@
   .pref-category-tab__summary {
     display: none;
   }
+
+  .pref-segment {
+    min-height: 44px;
+  }
 }
 
 /* A short 400%-zoom viewport cannot afford a scrollable title region above a
