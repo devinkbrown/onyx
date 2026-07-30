@@ -52,6 +52,18 @@ describe('public shared controls — mineral-night contract', () => {
     expect(enter).toMatch(/min-height:\s*var\(--target-min,\s*44px\)/);
   });
 
+  it('keeps public header and footer navigation at the shared touch-target floor', () => {
+    expect(ruleBlock(landing, '.r-status .brand')).toMatch(
+      /min-height:\s*var\(--target-min,\s*44px\)/,
+    );
+    expect(ruleBlock(landing, '.r-status nav a')).toMatch(
+      /min-height:\s*var\(--target-min,\s*44px\)/,
+    );
+    expect(ruleBlock(landing, '.r-footer .col a')).toMatch(
+      /min-height:\s*var\(--target-min,\s*44px\)/,
+    );
+  });
+
   it('ghost buttons stay matte (no glass blur / no bright electric hover fill)', () => {
     const ghost = ruleBlock(landing, '.r-btn.ghost');
     expect(ghost).not.toMatch(/backdrop-filter/);

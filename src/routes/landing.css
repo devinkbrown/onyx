@@ -204,6 +204,7 @@
 .r-status .brand {
   display: inline-flex;
   align-items: center;
+  min-height: var(--target-min, 44px);
   gap: 10px;
   color: var(--paper);
   font-weight: 700;
@@ -219,6 +220,9 @@
   min-width: 0;
 }
 .r-status nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min, 44px);
   color: var(--paper-mute);
   transition: color var(--dur) var(--ease);
   position: relative;
@@ -1237,7 +1241,9 @@
   color: var(--lapis-bright);
 }
 .r-footer .col a {
-  display: block;
+  display: flex;
+  align-items: center;
+  min-height: var(--target-min, 44px);
   padding: 6px 0;
   font-family: var(--font-sans);
   font-size: 0.93rem;
