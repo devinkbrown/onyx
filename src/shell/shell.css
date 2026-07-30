@@ -4764,6 +4764,10 @@
     var(--space-2);
   border: none;
   outline: none;
+  margin: 0;
+  display: block;
+  appearance: none;
+  -webkit-appearance: none;
   resize: none;
   font-family: var(--font-sans);
   font-size: 0.91rem;

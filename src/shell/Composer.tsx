@@ -252,8 +252,10 @@ export function Composer(props: ComposerProps): JSX.Element {
     deliveryFailed: outboxDeliveryFailed(),
   }));
 
-  // Accessible name stays short and stable; the visible placeholder can carry
-  // light slash-command discoverability without polluting aria-label.
+  // Accessible name carries the destination context. Keep the visible
+  // placeholder deliberately short: mobile WebKit includes wrapped placeholder
+  // lines in textarea.scrollHeight, so command advertising here turns an empty
+  // one-line composer into a tall, visually misaligned field.
   const accessibleName = createMemo(() => {
     const t = target();
     if (activeEditing()) return 'Edit message';
@@ -267,7 +269,7 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (activeEditing()) return 'Edit message';
     if (isOffline()) return t ? `Offline — queues for ${t}` : 'Reconnecting…';
     if (!t) return 'Pick a room or a person to begin';
-    return `Message ${t}  ·  /search  /mute  /export  /help`;
+    return 'Message';
   });
 
   const emojiMatches = createMemo(() => searchEmojis(emojiQuery(), 36));

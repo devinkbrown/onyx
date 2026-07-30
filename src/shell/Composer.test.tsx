@@ -68,7 +68,10 @@ describe('Composer accessibility', () => {
     const { getByRole, queryByRole } = render(() => <Composer />);
 
     // Assert — Standard primary: Attach · message · Emoji · More · Send
-    expect(getByRole('textbox', { name: /message #room/i })).toBeDefined();
+    const message = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
+    expect(message).toBeDefined();
+    expect(message.placeholder).toBe('Message');
+    expect(message.placeholder).not.toMatch(/\/search|\/mute|\/export|\/help/);
     expect(getByRole('button', { name: 'Attach files' })).toBeDefined();
     expect(getByRole('button', { name: 'Insert emoji' })).toBeDefined();
     expect(getByRole('button', { name: 'More tools' })).toBeDefined();
