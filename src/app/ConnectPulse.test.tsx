@@ -2,7 +2,7 @@
 import { cleanup, render, screen, waitFor } from '@solidjs/testing-library';
 import { Suspense } from 'solid-js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ConnectPulse } from './ConnectPulse';
+import { ConnectPulse, roomPresenceLabel } from './ConnectPulse';
 import { NODES, pingNode } from './nodes';
 
 vi.mock('@/lib/stats/networkIndex', () => ({
@@ -26,6 +26,22 @@ afterEach(() => {
 });
 
 describe('ConnectPulse node probes', () => {
+  it('labels current presence from present, never rolling active_users', () => {
+    const room = {
+      channel: '#root',
+      messages: 908,
+      active_users: 16,
+      present: 7,
+      last_active: 1,
+      topic: '',
+      spark: [],
+    };
+
+    expect(roomPresenceLabel(room, Date.now())).toBe('7 people here now');
+    expect(roomPresenceLabel({ ...room, present: 1 }, Date.now())).toBe('1 person here now');
+    expect(roomPresenceLabel({ ...room, present: 0 }, Date.now())).toBe('now');
+  });
+
   it('keeps the connect surface mounted while optional pulse data is pending', () => {
     render(() => (
       <Suspense fallback={<p data-testid="connect-suspended">Loading connect</p>}>

@@ -805,6 +805,16 @@
   min-width: 0;
 }
 
+/* Exact single-line geometry keeps the input text from sitting low in WebKit
+   or at fractional-rem display scales. Instrument Sans needs two more pixels
+   below its line box for optical, not merely mathematical, centering. */
+.conn .onyx-field__input {
+  height: 48px;
+  min-height: 48px;
+  padding: 10px 12px 12px;
+  line-height: 24px;
+}
+
 .conn-password-toggle {
   appearance: none;
   flex: none;

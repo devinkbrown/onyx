@@ -18,7 +18,11 @@ import {
   Show,
   type JSX,
 } from 'solid-js';
-import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
+import {
+  fetchStatsIndex,
+  relTime,
+  type StatsChannel,
+} from '@/lib/stats/networkIndex';
 import { NODES, pingNode } from './nodes';
 
 type NodePing = { host: string; ms: number };
@@ -35,6 +39,15 @@ async function pingAll(signal?: AbortSignal): Promise<NodePing[]> {
     NODES.map(async (n) => ({ host: n.host, ms: await pingNode(n, 2500, signal) })),
   );
   return results;
+}
+
+/** `active_users` is a rolling activity measure, not current occupancy.
+ * Connect must use `present` when it says somebody is here now. */
+export function roomPresenceLabel(room: StatsChannel, nowMs: number): string {
+  if (room.present > 0) {
+    return `${room.present.toLocaleString('en-US')} ${room.present === 1 ? 'person' : 'people'} here now`;
+  }
+  return relTime(room.last_active, nowMs);
 }
 
 export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
@@ -119,9 +132,7 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
                 <div class="cpulse-room-head">
                   <span class="cpulse-room-name">{room.channel}</span>
                   <span class="cpulse-room-meta">
-                    {room.active_users > 0
-                      ? `${room.active_users} chatting`
-                      : relTime(room.last_active, nowMs())}
+                    {roomPresenceLabel(room, nowMs())}
                   </span>
                 </div>
                 <p class={`cpulse-room-topic${room.topic ? '' : ' is-empty'}`}>
