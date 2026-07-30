@@ -2467,7 +2467,7 @@ describe('AppShell', () => {
       const directory = screen.getByRole('list', { name: 'Active channel directory' });
       expect(within(directory).getAllByRole('listitem')).toHaveLength(2);
       expect(within(rhythm).getByText('#general')).toBeInTheDocument();
-      expect(within(rhythm).getByText('2 chatting')).toBeInTheDocument();
+      expect(within(rhythm).getByText('3 people here now')).toBeInTheDocument();
       expect(within(rhythm).getByText('Planning call')).toBeInTheDocument();
       expect(within(rhythm).getByText('Office hours')).toBeInTheDocument();
       expect(within(rhythm).queryByText('#outside')).not.toBeInTheDocument();
@@ -2478,7 +2478,7 @@ describe('AppShell', () => {
 
       store.getState().navigate({ kind: 'home' });
       const nextRhythm = await screen.findByLabelText('Room rhythm');
-      fireEvent.click(within(nextRhythm).getByRole('button', { name: /Open #general, 2 chatting/i }));
+      fireEvent.click(within(nextRhythm).getByRole('button', { name: /Open #general, 3 people here now/i }));
       expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
       expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date(eventAt * 1000));
       travelToSpy.mockRestore();

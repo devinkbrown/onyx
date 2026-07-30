@@ -33,7 +33,12 @@ function makeChannel(name: string): Channel {
   };
 }
 
-function statsPayload(channels: Array<{ channel: string; messages?: number }>) {
+function statsPayload(channels: Array<{
+  channel: string;
+  messages?: number;
+  activeUsers?: number;
+  present?: number;
+}>) {
   const now = Math.floor(Date.now() / 1000);
   return {
     generated_at: now,
@@ -44,8 +49,8 @@ function statsPayload(channels: Array<{ channel: string; messages?: number }>) {
     channels: channels.map((c) => ({
       channel: c.channel,
       messages: c.messages ?? 10,
-      active_users: 1,
-      present: 1,
+      active_users: c.activeUsers ?? 1,
+      present: c.present ?? 1,
       last_active: now - 30,
       topic: 'test topic',
       spark: [1, 2, 1],
@@ -98,6 +103,37 @@ describe('HomeView — Active rooms open-or-join', () => {
 
     expect(joinSpy).not.toHaveBeenCalled();
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+  });
+
+  it('labels current room presence instead of rolling active users', async () => {
+    store.setState({
+      channels: new Map(),
+      activeView: { kind: 'home' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify(statsPayload([{
+          channel: '#root',
+          messages: 908,
+          activeUsers: 16,
+          present: 7,
+        }])), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+
+    render(() => <HomeView />);
+
+    const directory = await screen.findByRole('list', { name: 'Active channel directory' });
+    expect(directory).toHaveTextContent('7 people here now');
+    expect(directory).toHaveTextContent('908 messages tracked');
+    expect(directory).not.toHaveTextContent('16 chatting');
   });
 
   it('joins an unjoined room without navigating away from Home', async () => {

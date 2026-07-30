@@ -208,7 +208,7 @@ function spotlightQueryFor(item: CatchUpItem): string {
 
 function trendLabel(item: HomeRhythmItem): string {
   if (item.activeUsers > 0) {
-    return `${item.activeUsers} chatting`;
+    return `${item.activeUsers} ${item.activeUsers === 1 ? 'person' : 'people'} here now`;
   }
   return `${item.total.toLocaleString()} tracked`;
 }
@@ -803,9 +803,6 @@ export function HomeView(): JSX.Element {
   const totalMessages = createMemo(() =>
     (stats.latest?.channels ?? []).reduce((sum, c) => sum + c.messages, 0),
   );
-  const totalChatting = createMemo(() =>
-    (stats.latest?.channels ?? []).reduce((sum, c) => sum + c.active_users, 0),
-  );
   const isJoined = (name: string) => channels().has(name.toLowerCase());
   /**
    * Active-rooms directory card: open an already-joined room without re-JOIN,
@@ -834,7 +831,9 @@ export function HomeView(): JSX.Element {
         spark: channel.spark.slice(-14),
         total: channel.messages,
         peak: Math.max(1, ...channel.spark),
-        activeUsers: channel.active_users,
+        // `active_users` is a rolling activity measure. Room rhythm says who
+        // is here now, so it must use the current channel presence count.
+        activeUsers: channel.present,
         lastActive: channel.last_active,
         event: events.get(channel.channel.toLowerCase()) ?? null,
       }))
@@ -1324,8 +1323,8 @@ export function HomeView(): JSX.Element {
                       <header class="home-card-head">
                         <h4 class="home-card-name">{c.channel}</h4>
                         <span class="home-card-when">
-                          {c.active_users > 0
-                            ? `${c.active_users} chatting`
+                          {c.present > 0
+                            ? `${c.present} ${c.present === 1 ? 'person' : 'people'} here now`
                             : relTime(c.last_active, nowMs())}
                         </span>
                       </header>
@@ -1335,7 +1334,7 @@ export function HomeView(): JSX.Element {
                       <Sparkline values={c.spark} />
                       <footer class="home-card-foot">
                         <span class="home-card-msgs">
-                          {c.messages.toLocaleString('en-US')} msgs
+                          {c.messages.toLocaleString('en-US')} messages tracked
                         </span>
                         <button
                           type="button"
@@ -1459,8 +1458,8 @@ export function HomeView(): JSX.Element {
                       <span class="home-pulse-label">messages tracked</span>
                     </div>
                     <div class="home-pulse-tile">
-                      <span class="home-pulse-num">{totalChatting().toLocaleString('en-US')}</span>
-                      <span class="home-pulse-label">chatting now</span>
+                      <span class="home-pulse-num">{data().users_online.toLocaleString('en-US')}</span>
+                      <span class="home-pulse-label">people online</span>
                     </div>
                     <div class="home-pulse-tile">
                       <span class="home-pulse-num">{relTime(data().generated_at, nowMs())}</span>
