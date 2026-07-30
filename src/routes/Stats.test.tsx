@@ -69,6 +69,10 @@ describe('StatsRoute', () => {
     expect(screen.getByRole('button', { name: /refresh data/i })).toBeInTheDocument();
     expect(screen.getByText(/activity ledger/i)).toBeInTheDocument();
     expect(screen.getByText('14-day pulse')).toBeInTheDocument();
+    expect(document.querySelector('main.stats-page')).not.toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Stats sections' })).toHaveTextContent('Network pulse');
+    expect(document.querySelector('.stats-summary [data-tone="presence"]')).not.toBeNull();
+    expect(document.querySelector('.stats-summary [data-tone="messages"]')).not.toBeNull();
     expect(screen.getAllByRole('link', { name: /open/i }).some((a) =>
       a.getAttribute('href')?.startsWith('/app/?join=%23root&at='),
     )).toBe(true);

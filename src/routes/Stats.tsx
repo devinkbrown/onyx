@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './data-pages.css';
+import './stats.css';
 import { createMemo, createResource, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { fetchChannelDetail, type ChannelDetail } from '@/lib/stats/channelDetail';
@@ -24,7 +25,7 @@ function PageChrome(props: {
     }
   };
   return (
-    <main class="r data-page">
+    <main class="r data-page stats-page">
       <div class="r-ground" aria-hidden="true" />
       <div class="r-flecks" aria-hidden="true" />
       <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
@@ -291,19 +292,19 @@ export default function StatsRoute() {
 
   return (
     <PageChrome feedState={feedState()}>
-      <section class="r-wrap data-hero" aria-labelledby="stats-heading">
-        <p class="r-kicker">network activity</p>
+      <section class="r-wrap data-hero stats-hero" aria-labelledby="stats-heading">
+        <p class="r-kicker">live network · public rooms</p>
         <h1 id="stats-heading">The rooms <br /><span class="gold">in motion</span></h1>
         <p class="sub">
-          Live channel activity from the network itself: people present now, recent
-          message volume, and the rhythm of the rooms without opening the app.
+          See where people are talking, follow the network’s rhythm, and step
+          directly into a public conversation. No member rankings. No message text.
         </p>
         <Show when={stats.latest} fallback={<div class="data-empty">Stats are waiting for the next exported feed.</div>}>
           {(data) => (
             <>
               <div class="stats-ledger" aria-label="Live feed ledger">
                 <span class="stats-ledger-mark" data-state={feedState()} aria-hidden="true" />
-                <p><strong>{data().network || 'Onyx'} activity ledger</strong> · {data().node || 'network export'} · refreshed {relTime(data().generated_at, nowMs())}</p>
+                <p><strong>{data().network || 'Onyx'} activity ledger</strong> · conversation current · {data().node || 'network export'} · updated {relTime(data().generated_at, nowMs())}</p>
                 <button
                   type="button"
                   class="stats-refresh"
@@ -316,23 +317,23 @@ export default function StatsRoute() {
                 </button>
               </div>
               <div class="data-summary stats-summary" aria-label="Network summary">
-                <div class="data-metric stats-primary-metric">
+                <div class="data-metric stats-primary-metric" data-tone="presence">
                   <span class="label">people online</span>
                   <span class="value">{formatCount(data().users_online)}</span>
-                  <span class="note">authoritative network presence</span>
+                  <span class="note"><i aria-hidden="true" /> live network presence</span>
                 </div>
-                <div class="data-metric">
-                  <span class="label">active in 24 hours</span>
+                <div class="data-metric" data-tone="rooms">
+                  <span class="label">rooms moving</span>
                   <span class="value">{formatCount(activeRooms())}</span>
-                  <span class="note">{formatCount(roomsWithPeople())} with people present now</span>
+                  <span class="note">{formatCount(roomsWithPeople())} live right now</span>
                 </div>
-                <div class="data-metric">
-                  <span class="label">tracked messages</span>
+                <div class="data-metric" data-tone="messages">
+                  <span class="label">messages observed</span>
                   <span class="value">{formatCount(totalMessages())}</span>
                   <span class="note">{data().channels_complete ? 'across the complete public room index' : 'across a partial public room index'}</span>
                 </div>
-                <div class="data-metric">
-                  <span class="label">latest tide</span>
+                <div class="data-metric" data-tone="momentum">
+                  <span class="label">latest day</span>
                   <span class="value">{formatCount(latestDay()?.messages ?? dailyAverage())}</span>
                   <span class="note">
                     {previousDay()
@@ -348,15 +349,19 @@ export default function StatsRoute() {
         </Show>
       </section>
 
-      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
+      <nav class="r-wrap stats-view-nav" aria-label="Stats sections">
+        <a href="#network-overview"><span>01</span> Network pulse</a>
+        <a href={`#${STATS_INSPECTOR_ID}`}><span>02</span> Room inspector</a>
+        <a href="#rooms"><span>03</span> All rooms</a>
+      </nav>
 
-      <section class="r-wrap r-section data-grid" aria-label="Activity detail">
+      <section id="network-overview" class="r-wrap r-section data-grid stats-overview" aria-label="Activity detail">
         <article class="data-card">
           <div class="stats-card-heading">
-            <span class="label">last exported days</span>
+            <span class="label">network pulse</span>
             <span class="stats-card-quiet">{days().length} samples</span>
           </div>
-          <h2>Network tide</h2>
+          <h2>Conversation current</h2>
           <Show when={days().length > 0} fallback={<p>No daily series has been exported yet.</p>}>
             <figure class="data-chart" aria-labelledby="network-tide-caption">
               <div class="data-bars" aria-hidden="true">
@@ -389,42 +394,42 @@ export default function StatsRoute() {
               </ol>
             </figure>
           </Show>
-          <p>
-            The bars are the network-wide message total per exported day, oldest to newest.
+          <p class="stats-chart-note">
+            Network-wide public messages per exported day, oldest to newest.
             {!stats.latest?.network_days_complete ? ' Some malformed or duplicate day rows were omitted. ' : ' '}
-            The strongest bar is the busiest exported day, not a forecast.
+            This is observed activity, not a forecast.
           </p>
         </article>
 
-        <aside class="data-card">
+        <aside class="data-card stats-busiest-card">
           <div class="stats-card-heading">
-            <span class="label">busiest room</span>
-            <span class="stats-card-quiet">all tracked activity</span>
+            <span class="label">room spotlight</span>
+            <span class="stats-card-quiet">most messages</span>
           </div>
           <Show when={busiest()} fallback={<h3>No rooms yet</h3>}>
             {(room) => (
               <>
                 <h3>{room().channel}</h3>
                 <p>{room().topic || 'No topic set yet.'}</p>
-                <div class="data-summary">
-                  <div class="data-metric">
+                <div class="data-summary stats-spotlight-metrics">
+                  <div class="data-metric" data-tone="messages">
                     <span class="label">messages</span>
                     <span class="value">{room().messages.toLocaleString('en-US')}</span>
                     <span class="note">tracked total</span>
                   </div>
-                  <div class="data-metric">
+                  <div class="data-metric" data-tone="momentum">
                     <span class="label">activity pulse</span>
                     <span class="value">{formatCount(roomPulse(room()))}</span>
                     <span class="note">recent exported intervals</span>
                   </div>
-                  <div class="data-metric">
+                  <div class="data-metric" data-tone="presence">
                     <span class="label">present</span>
                     <span class="value">{(room().present || room().active_users).toLocaleString('en-US')}</span>
                     <span class="note">right now</span>
                   </div>
                 </div>
                 <div class="r-cta">
-                  <a class="r-btn ghost" href={roomDeepLink(room().channel, room().last_active)}>Open this room &rarr;</a>
+                  <a class="r-btn primary" href={roomDeepLink(room().channel, room().last_active)}>Join the conversation <span aria-hidden="true">&rarr;</span></a>
                 </div>
               </>
             )}
@@ -440,7 +445,7 @@ export default function StatsRoute() {
       >
         <div class="stats-inspector-head">
           <div>
-            <span class="r-eyebrow">room inspector</span>
+            <span class="r-eyebrow">room signal</span>
             <h2 class="r-title" id="inspector-heading">
               <Show when={inspectedChannel()} fallback="Choose a room">
                 {(channel) => <>Inside <span class="gold">{channel()}</span></>}
@@ -449,7 +454,7 @@ export default function StatsRoute() {
           </div>
           <Show when={inspectedChannel()}>
             {(channel) => (
-              <a class="r-btn ghost stats-inspector-open" href={roomDeepLink(channel())}>
+              <a class="r-btn primary stats-inspector-open" href={roomDeepLink(channel())}>
                 Open room <span aria-hidden="true">&rarr;</span>
               </a>
             )}
@@ -479,12 +484,12 @@ export default function StatsRoute() {
               </div>
 
               <div class="stats-inspector-metrics" aria-label={`${detail().channel} summary`}>
-                <div><span>present now</span><strong>{formatCount(detail().present)}</strong><small>live mesh roster</small></div>
-                <div><span>messages tracked</span><strong>{formatCount(detail().totals.messages)}</strong><small>durable public aggregate</small></div>
-                <div><span>contributors</span><strong>{formatCount(detail().totals.activeUsers)}</strong><small>distinct recorded authors</small></div>
-                <div><span>words / message</span><strong>{averageWords(detail())}</strong><small>aggregate average</small></div>
-                <div><span>busiest day</span><strong>{formatCount(detail().busiestDay?.messages ?? 0)}</strong><small>{detail().busiestDay?.date ?? 'not enough history'}</small></div>
-                <div><span>peak hour</span><strong>{formatHour(detail().peakHour)}</strong><small>all recorded activity</small></div>
+                <div data-tone="presence"><span>present now</span><strong>{formatCount(detail().present)}</strong><small>live mesh roster</small></div>
+                <div data-tone="messages"><span>messages tracked</span><strong>{formatCount(detail().totals.messages)}</strong><small>durable public aggregate</small></div>
+                <div data-tone="people"><span>contributors</span><strong>{formatCount(detail().totals.activeUsers)}</strong><small>distinct recorded authors</small></div>
+                <div data-tone="words"><span>words / message</span><strong>{averageWords(detail())}</strong><small>aggregate average</small></div>
+                <div data-tone="momentum"><span>busiest day</span><strong>{formatCount(detail().busiestDay?.messages ?? 0)}</strong><small>{detail().busiestDay?.date ?? 'not enough history'}</small></div>
+                <div data-tone="time"><span>peak hour</span><strong>{formatHour(detail().peakHour)}</strong><small>all recorded activity</small></div>
               </div>
 
               <div class="stats-inspector-grid">
@@ -518,7 +523,7 @@ export default function StatsRoute() {
                     <span class="label">room flow</span>
                     <span class="stats-card-quiet">aggregate events</span>
                   </div>
-                  <h3>Arrivals and changes</h3>
+                  <h3>Room movement</h3>
                   <dl class="stats-flow-list">
                     <div><dt>joins</dt><dd>{formatCount(detail().totals.joins)}</dd></div>
                     <div><dt>parts</dt><dd>{formatCount(detail().totals.parts)}</dd></div>
@@ -577,10 +582,10 @@ export default function StatsRoute() {
         </Show>
       </section>
 
-      <section class="r-wrap r-section" aria-labelledby="rooms-heading">
-        <span class="r-eyebrow">rooms</span>
-        <h2 class="r-title" id="rooms-heading">Room by room,<br />in the open</h2>
-        <p class="stats-section-note">Search the complete bounded index or filter by live presence and activity in the last 24 hours. The 14-day pulse sums the daily samples exported for each room.</p>
+      <section id="rooms" class="r-wrap r-section stats-rooms-section" aria-labelledby="rooms-heading">
+        <span class="r-eyebrow">public room directory</span>
+        <h2 class="r-title" id="rooms-heading">Find the conversation</h2>
+        <p class="stats-section-note">Search by room or topic, see who is present, and open the room at its latest recorded moment. The 14-day pulse shows activity without exposing what anyone said.</p>
         <div class="stats-room-controls" aria-label="Room list controls">
           <label class="stats-room-search">
             <span>Find a room or topic</span>
