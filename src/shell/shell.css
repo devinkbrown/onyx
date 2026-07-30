@@ -4750,17 +4750,24 @@
 }
 
 .shell-composer-textarea {
+  --composer-field-height: 38px;
+  --composer-line-box: 1.52em;
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 38px;
+  min-height: var(--composer-field-height);
   max-height: 200px;
-  padding: var(--space-2) var(--space-2);
+  /* A textarea lays its line box from the padding edge instead of centering it.
+     Consume the full one-line field height explicitly so placeholder and typed
+     text sit on the same optical center as the surrounding controls. */
+  padding:
+    max(0px, calc((var(--composer-field-height) - var(--composer-line-box)) / 2))
+    var(--space-2);
   border: none;
   outline: none;
   resize: none;
   font-family: var(--font-sans);
   font-size: 0.91rem;
-  line-height: 1.52;
+  line-height: var(--composer-line-box);
   color: var(--paper);
   background: transparent;
   overflow-y: auto;
@@ -6142,12 +6149,11 @@
     background: color-mix(in oklab, var(--stone-2) 42%, transparent);
   }
   .shell-composer-textarea {
+    --composer-field-height: 44px;
+    --composer-line-box: 1.4em;
     font-size: 16px;
-    min-height: 44px;
     max-height: min(28svh, 148px);
-    padding: 10px 8px 10px 10px;
     padding-inline: 10px;
-    line-height: 1.4;
     /* Comfortable reading density for long drafts on phone. */
     letter-spacing: 0;
   }
@@ -6571,9 +6577,8 @@
   }
 
   .shell-composer-textarea {
-    min-height: 40px;
+    --composer-field-height: 40px;
     max-height: min(22svh, 96px);
-    padding-block: 8px;
   }
 
   .shell-msg-group {
