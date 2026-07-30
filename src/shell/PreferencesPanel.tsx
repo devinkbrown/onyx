@@ -2730,7 +2730,7 @@ function PwaReadinessPanel(): JSX.Element {
     <section class="pref-group pref-pwa-readiness" aria-labelledby="pref-pwa-readiness-title">
       <div class="pref-group-head">
         <h3 id="pref-pwa-readiness-title" class="pref-label">Installed app readiness</h3>
-        <a class="pref-a11y-link" href="/install/">Install guide</a>
+        <a class="pref-a11y-link" href="/download/">Install guide</a>
       </div>
       <p class="pref-desc">
         Browser PWA and wrapper health on this device. Desktop shells should

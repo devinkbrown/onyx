@@ -53,6 +53,12 @@ export const ROUTE_ENTRYPOINTS = [
       'Download unsigned Onyx v0.1.3 Windows zip and Linux/FreeBSD/OpenBSD tar.gz packages with SHA-256 sidecars. macOS Intel and Apple Silicon native packages are coming soon. Not signed or notarized. Browser and PWA remain the primary paths.',
   },
   {
+    route: 'install',
+    title: 'Install Onyx — native packages and browser app',
+    description:
+      'Install Onyx from the browser or download unsigned Windows, Linux, FreeBSD, and OpenBSD packages with runtimes, install steps, and SHA-256 verification.',
+  },
+  {
     route: 'accessibility',
     title: 'Onyx accessibility — access is a requirement',
     description: 'Read the public Onyx accessibility contract for keyboard use, focus recovery, motion, contrast, and status announcements.',

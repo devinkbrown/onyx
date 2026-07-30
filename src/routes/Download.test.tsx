@@ -112,8 +112,22 @@ describe('downloadMeta', () => {
 describe('Download page', () => {
   afterEach(() => {
     cleanup();
+    window.history.replaceState(null, '', '/');
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it('turns the legacy install URL into the current package and runtime guide', () => {
+    window.history.replaceState(null, '', '/install/');
+    const { getByRole } = render(() => <Download />);
+
+    expect(document.title).toBe('Install Onyx — native packages and browser app');
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      'http://localhost:3000/install/',
+    );
+    expect(getByRole('heading', { name: 'Install Onyx' })).toBeInTheDocument();
+    expect(getByRole('heading', { name: /install on linux/i })).toBeInTheDocument();
   });
 
   it('renders four active lanes plus combined macOS coming-soon (no fake DMG controls)', () => {

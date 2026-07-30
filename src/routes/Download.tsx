@@ -286,10 +286,16 @@ function MacosComingSoonCard(): JSX.Element {
  * macOS Intel + Apple Silicon: combined coming-soon (no fake DMG controls). Browser remains primary.
  */
 export default function Download(): JSX.Element {
+  const installGuide = typeof window !== 'undefined'
+    && /^\/install(?:\/|$)/.test(window.location.pathname);
   setPageMeta(
-    'Download Onyx — unsigned native packages',
-    'Download unsigned Onyx v0.1.3 Windows zip and Linux/FreeBSD/OpenBSD tar.gz packages with SHA-256 sidecars. macOS Intel and Apple Silicon native packages are coming soon. Not signed or notarized. Browser and PWA remain the primary paths.',
-    '/download/',
+    installGuide
+      ? 'Install Onyx — native packages and browser app'
+      : 'Download Onyx — unsigned native packages',
+    installGuide
+      ? 'Install Onyx from the browser or use unsigned Windows, Linux, FreeBSD, and OpenBSD packages with runtimes, install steps, and SHA-256 verification.'
+      : 'Download unsigned Onyx v0.1.3 Windows zip and Linux/FreeBSD/OpenBSD tar.gz packages with SHA-256 sidecars. macOS Intel and Apple Silicon native packages are coming soon. Not signed or notarized. Browser and PWA remain the primary paths.',
+    installGuide ? '/install/' : '/download/',
   );
 
   const [catalog] = createResource(loadCatalog);
@@ -314,8 +320,12 @@ export default function Download(): JSX.Element {
       </header>
 
       <section class="r-wrap data-hero" aria-labelledby="download-heading">
-        <p class="r-kicker">v{DOWNLOAD_PRODUCT_VERSION} · unsigned native packages</p>
-        <h1 id="download-heading">Windows, Linux, FreeBSD &amp; OpenBSD</h1>
+        <p class="r-kicker">
+          {installGuide ? 'Install guide' : `v${DOWNLOAD_PRODUCT_VERSION} · unsigned native packages`}
+        </p>
+        <h1 id="download-heading">
+          {installGuide ? 'Install Onyx' : 'Windows, Linux, FreeBSD & OpenBSD'}
+        </h1>
         <p class="sub">
           Operator packages now: Windows zip, Linux tar.gz, and FreeBSD/OpenBSD hosts with
           {' '}

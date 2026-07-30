@@ -131,6 +131,8 @@ render(
           <Route path="/invite/" component={InviteRoute} />
           <Route path="/download" component={DownloadRoute} />
           <Route path="/download/" component={DownloadRoute} />
+          <Route path="/install" component={DownloadRoute} />
+          <Route path="/install/" component={DownloadRoute} />
           <Route
             path="/accessibility/"
             component={() => (

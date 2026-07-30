@@ -127,7 +127,7 @@ describe('Connect screen rendering', () => {
 
   it('links first-time visitors to the install guide before they connect', () => {
     render(() => <Connect />);
-    expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/install/');
+    expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/download/');
   });
 
   it('aborts its latency selection when the connect screen unmounts', async () => {

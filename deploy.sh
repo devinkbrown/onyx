@@ -60,7 +60,6 @@ DRY_RUN="${DEPLOY_DRY_RUN:-0}"
 LEGACY_SUPPORT_ALLOWLIST=(
   guides
   community
-  install
   self-host
   why
   memory
@@ -80,6 +79,7 @@ SPA_OWNED_BLOCKLIST=(
   appearance
   invite
   download
+  install
   stats
   status
   roadmap
