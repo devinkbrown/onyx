@@ -5,11 +5,9 @@
 Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
 "IRCXNet" is retired public identity only.*
 
-> **Product-complete north-star (eras, exit criteria, fleet scale):**  
-> [`/home/kain/ONYX_PRODUCT_COMPLETE_ROADMAP.md`](/home/kain/ONYX_PRODUCT_COMPLETE_ROADMAP.md)  
-> Design research synthesis: [`/home/kain/research/ONYX_PLATFORM_DESIGN_SYNTHESIS.md`](/home/kain/research/ONYX_PLATFORM_DESIGN_SYNTHESIS.md)  
-> Token-preserving Claude + Codex ops: [`/home/kain/CLAUDE_CODEX_SCALED_WORKFLOW.md`](/home/kain/CLAUDE_CODEX_SCALED_WORKFLOW.md)  
-> This file remains the detailed ✅ archaeology + competitive notes.
+> This file is historical strategy and implementation archaeology. Some earlier
+> planning inputs lived outside this repository and are intentionally not linked
+> here; the source, tests, and current focused docs are authoritative.
 
 ## Status at a glance (2026-07-21)
 
@@ -98,8 +96,8 @@ paid cloud for continuity. Onyx Server's session-sync already replaces the bounc
 What none of them have: push when the tab is closed, local-first scrollback,
 voice. Those three make Onyx categorically different, not incrementally better.
 
-**Unique assets nobody can copy quickly:** the Comic Chat data plane (+ the
-reverse-engineered renderer in /home/kain/comicchat), IRCX key ladders, the
+**Unique assets nobody can copy quickly:** the Comic Chat data plane, IRCX key
+ladders, the
 stats↔chat↔site triangle on one identity, pure-Zig ownership of every layer
 down to TLS.
 
@@ -516,8 +514,8 @@ down to TLS.
 
 ## Master roadmap backlog folded into Onyx/public-site scope
 
-Source: `/home/kain/ONYX_ONYX_MASTER_ROADMAP.md`, filtered to Onyx and the
-main website. Onyx Server daemon work stays out of this client roadmap unless the
+Source: an internal master roadmap, filtered to Onyx and the main website. Onyx
+Server daemon work stays out of this client roadmap unless the
 client or public site needs to expose the result.
 
 ## Phase 8 — Torii Product Entry ← PLANNED

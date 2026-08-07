@@ -46,7 +46,7 @@ export type NetworkStatus = {
   peers_complete: boolean;
 };
 
-export type PublicMeshFeedState = PublicFeedFreshness | 'degraded' | 'unavailable';
+export type PublicMeshFeedState = PublicFeedFreshness | 'loading' | 'degraded' | 'unavailable';
 
 export function publicMeshFeedState(
   status: (Pick<NetworkStatus, 'generated_at' | 'mesh'>
@@ -63,6 +63,7 @@ export function publicMeshFeedState(
 
 export function publicMeshFeedLabel(state: PublicMeshFeedState): string {
   switch (state) {
+    case 'loading': return 'checking mesh';
     case 'current': return 'mesh online';
     case 'degraded': return 'mesh degraded';
     case 'stale': return 'status stale';

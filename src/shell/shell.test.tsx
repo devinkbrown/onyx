@@ -310,6 +310,30 @@ describe('AppShell', () => {
       });
     });
 
+    it('does not add automatic topic-suggestion bubbles to messages', () => {
+      const channel = makeChannel(
+        '#general',
+        [makeMessage('msg-plain', 'kain', 'ding ding dong', '#general', null)],
+        [makeUser('kain')],
+      );
+      store.setState({
+        ...initialState,
+        server: memoryServer,
+        channels: new Map([['#general', channel]]),
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+      }, true);
+
+      setPreference('topicTools', true);
+      render(() => <AppShell />);
+
+      expect(screen.getByText('ding ding dong')).toBeInTheDocument();
+      expect(screen.queryByRole('button', {
+        name: 'Split message from kain into topic ding dong',
+      })).not.toBeInTheDocument();
+    });
+
     it('tracks interleaved topic reads independently and reserves the server room marker for All', () => {
       const sendRaw = vi.fn();
       const channel = makeChannel(
@@ -1619,13 +1643,63 @@ describe('AppShell', () => {
       expect(screen.getByRole('button', { name: 'Open Home' })).toHaveAttribute('aria-current', 'page');
     });
 
+    it('uses the public five-part information architecture on mobile', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+
+      const nav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+      expect(within(nav).getAllByRole('button').map((button) => button.textContent)).toEqual([
+        '⌂Home',
+        '#Rooms',
+        '@Messages',
+        '◉Calls',
+        '◇You',
+      ]);
+    });
+
+    it('opens direct messages as their own mobile collection', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open Messages' }));
+
+      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
+      expect(within(drawer).getByRole('region', { name: 'Direct messages' })).toBeInTheDocument();
+      expect(within(drawer).getByRole('searchbox', { name: 'Filter direct messages' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('opens a truthful calls hub without starting a call', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open Calls' }));
+
+      expect(screen.getByRole('heading', { name: 'Talk where the conversation already lives.' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Choose a room' })).toBeInTheDocument();
+      expect(store.getState().voice.callState).toBe('idle');
+      expect(screen.getByRole('button', { name: 'Open Calls' })).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('opens account management from You', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open You' }));
+
+      expect(store.getState().showAccount).toBe(true);
+      expect(screen.getByRole('button', { name: 'Open You' })).toHaveAttribute('aria-current', 'page');
+    });
+
     it('moves focus into the mobile channel drawer and restores it on Escape', async () => {
       stubMobileViewport();
       seedStore('#general');
 
       const { container } = render(() => <AppShell />);
 
-      const roomsButton = screen.getByRole('button', { name: 'Toggle channel list' });
+      const roomsButton = screen.getByRole('button', { name: 'Open Rooms' });
       const conversation = container.querySelector<HTMLElement>('.shell-conversation');
       const mobileNav = container.querySelector<HTMLElement>('.shell-mobile-nav');
       expect(conversation).not.toHaveAttribute('inert');
@@ -1656,7 +1730,7 @@ describe('AppShell', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Toggle channel list' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open Rooms' }));
       const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
       await waitFor(() => expect(drawer.contains(document.activeElement)).toBe(true));
 
@@ -1680,7 +1754,7 @@ describe('AppShell', () => {
 
       const { container } = render(() => <AppShell />);
 
-      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       const sidebar = container.querySelector<HTMLElement>('.shell-sidebar-slot');
       const conversation = container.querySelector<HTMLElement>('.shell-conversation');
@@ -1729,7 +1803,7 @@ describe('AppShell', () => {
       seedStore('#general');
 
       const { container } = render(() => <AppShell />);
-      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       membersButton.focus();
       fireEvent.click(membersButton);
 
@@ -1763,7 +1837,7 @@ describe('AppShell', () => {
       seedStore('#general');
 
       const { container } = render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Toggle member list' }));
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
 
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
@@ -1796,7 +1870,7 @@ describe('AppShell', () => {
       const { container } = render(() => <AppShell />);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
-      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       membersButton.focus();
       fireEvent.click(membersButton);
       await waitFor(() => expect(memberList).toHaveAttribute('aria-label', 'Member list for #general'));
@@ -1816,14 +1890,14 @@ describe('AppShell', () => {
       store.setState({ activeView: { kind: 'home' } });
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
-        expect(screen.queryByRole('button', { name: 'Toggle member list' })).toBeNull();
+        expect(screen.queryByRole('button', { name: /members — toggle member list/i })).toBeNull();
       });
 
       store.setState({ activeView: { kind: 'channel', channel: '#general' } });
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-label', 'Member list for #general');
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
-        expect(screen.getByRole('button', { name: 'Toggle member list' })).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.getByRole('button', { name: /members — toggle member list/i })).toHaveAttribute('aria-expanded', 'false');
       });
     });
 
@@ -1837,7 +1911,7 @@ describe('AppShell', () => {
       store.setState({ channels });
 
       render(() => <AppShell />);
-      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       membersButton.focus();
       fireEvent.click(membersButton);
 
@@ -1915,7 +1989,7 @@ describe('AppShell', () => {
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
       if (mobile) {
-        fireEvent.click(screen.getByRole('button', { name: 'Toggle member list' }));
+        fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
         await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
       }
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
@@ -1976,7 +2050,7 @@ describe('AppShell', () => {
 
       fireEvent.keyDown(document, { key: 'Escape' });
 
-      const mobileMembersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const mobileMembersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
         expect(memberList).toHaveAttribute('inert');
@@ -2014,7 +2088,7 @@ describe('AppShell', () => {
       });
 
       fireEvent.keyDown(document, { key: 'Escape' });
-      const mobileMembersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const mobileMembersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
         expect(memberList).toHaveAttribute('inert');
@@ -2039,7 +2113,7 @@ describe('AppShell', () => {
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
       if (mobile) {
-        fireEvent.click(screen.getByRole('button', { name: 'Toggle member list' }));
+        fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
         await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
       }
 
@@ -2066,7 +2140,7 @@ describe('AppShell', () => {
       });
 
       const { container } = render(() => <AppShell />);
-      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
       membersButton.focus();
       fireEvent.click(membersButton);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
@@ -2107,7 +2181,7 @@ describe('AppShell', () => {
       expect(container.querySelector('[data-testid="app-shell"]')).toHaveClass('shell--members-hidden');
       expect(container.querySelector('aside.shell-members')).toHaveAttribute('inert');
       expect(screen.queryByRole('region', { name: /Channel members/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Toggle member list' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /members — toggle member list/i })).not.toBeInTheDocument();
     });
 
     it('summarizes unread home recaps and hands them to Spotlight', async () => {

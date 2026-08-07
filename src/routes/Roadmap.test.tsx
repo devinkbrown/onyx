@@ -1,28 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
 
-import {
-  CANONICAL_ROADMAP_PATH,
-  RoadmapBridge,
-  redirectToCanonicalRoadmap,
-} from './Roadmap';
+import { RoadmapBridge } from './Roadmap';
 
 describe('RoadmapRoute', () => {
-  it('contains no duplicate roadmap catalogue and links to the canonical page', () => {
+  it('renders a useful standalone public roadmap instead of a redirect-only bridge', () => {
     render(() => <RoadmapBridge />);
 
-    expect(screen.getByRole('heading', { name: /opening the onyx roadmap/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open roadmap/i })).toHaveAttribute(
-      'href',
-      CANONICAL_ROADMAP_PATH,
-    );
-    expect(screen.queryByText(/Phase 1/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /a place for your people\s*that you can trust/i })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument();
+    expect(screen.getByText(/first-class native experience inside OnyxOS/i)).toBeInTheDocument();
   });
 
-  it('uses a hard document navigation so the SPA cannot render a second roadmap', () => {
-    const replace = vi.fn();
-    redirectToCanonicalRoadmap(replace);
-    expect(replace).toHaveBeenCalledWith(CANONICAL_ROADMAP_PATH);
+  it('shows the current execution sequence without protocol jargon', () => {
+    render(() => <RoadmapBridge />);
+
+    expect(screen.getByRole('heading', { name: /repair the front door/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /make the client dependable/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /bring Onyx into OnyxOS/i })).toBeInTheDocument();
+    expect(screen.queryByText(/IRCv3|IRCX/)).not.toBeInTheDocument();
   });
 });

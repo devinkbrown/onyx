@@ -332,6 +332,60 @@
 .shell-sidebar-dot--disconnected { background: var(--paper-mute); }
 .shell-sidebar-dot--error { background: var(--shu); }
 
+.shell-primary-nav {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-bottom: 1px solid var(--seam-faint);
+}
+
+.shell-primary-nav-btn {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--paper-dim);
+  font: 600 0.84rem/1 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.shell-primary-nav-btn span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: var(--paper-mute);
+  font: 700 0.78rem/1 var(--font-mono);
+  background: color-mix(in oklab, var(--stone-2) 30%, transparent);
+}
+
+.shell-primary-nav-btn:hover {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--stone-2) 36%, transparent);
+}
+
+.shell-primary-nav-btn--active {
+  color: var(--paper);
+  border-color: color-mix(in oklab, var(--lapis) 28%, var(--seam-faint));
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+
+.shell-primary-nav-btn--active span {
+  color: var(--ink);
+  background: var(--lapis-bright);
+}
+
 .shell-sidebar-filter {
   display: flex;
   align-items: center;
@@ -403,6 +457,14 @@
   font-size: 0.85rem;
   color: var(--paper-dim);
   line-height: 1.4;
+}
+
+.shell-sidebar-empty {
+  margin: 0;
+  padding: 6px 10px 14px;
+  color: var(--paper-mute);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .shell-notify-controls {
@@ -5216,6 +5278,106 @@
   }
 }
 
+/* ── Calls hub ── */
+.shell-calls-hub {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(28px, 6vw, 84px);
+  color: var(--paper);
+  background:
+    radial-gradient(circle at 82% 18%, color-mix(in oklab, var(--lapis) 17%, transparent), transparent 32%),
+    linear-gradient(150deg, color-mix(in oklab, var(--ink) 78%, transparent), color-mix(in oklab, var(--stone) 46%, transparent));
+}
+
+.shell-calls-kicker {
+  width: fit-content;
+  margin-bottom: 18px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in oklab, var(--lapis) 44%, var(--seam-faint));
+  border-radius: var(--r-pill);
+  color: var(--lapis-bright);
+  font: 700 0.68rem/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.shell-calls-hub h1 {
+  max-width: 760px;
+  margin: 0;
+  color: var(--paper);
+  font: 400 clamp(2.2rem, 5vw, 4.8rem)/0.98 var(--font-display);
+  letter-spacing: -0.035em;
+}
+
+.shell-calls-intro {
+  max-width: 650px;
+  margin: 24px 0 0;
+  color: var(--paper-dim);
+  font: 400 clamp(1rem, 1.7vw, 1.25rem)/1.58 var(--font-sans);
+}
+
+.shell-calls-primary {
+  min-height: 44px;
+  margin-top: 28px;
+  padding: 11px 18px;
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 55%, transparent);
+  border-radius: var(--r-pill);
+  background: var(--lapis-bright);
+  color: var(--ink);
+  font: 700 0.86rem/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.shell-calls-primary:hover {
+  background: var(--paper);
+}
+
+.shell-calls-proof {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 880px;
+  margin-top: clamp(48px, 8vw, 96px);
+}
+
+.shell-calls-proof article {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 38%, transparent);
+}
+
+.shell-calls-proof article > span {
+  color: var(--lapis-bright);
+  font: 700 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+.shell-calls-proof h2 {
+  margin: 18px 0 8px;
+  color: var(--paper);
+  font: 600 1rem/1.2 var(--font-sans);
+}
+
+.shell-calls-proof p {
+  margin: 0;
+  color: var(--paper-mute);
+  font: 400 0.86rem/1.48 var(--font-sans);
+}
+
+@media (max-width: 680px) {
+  .shell-calls-hub {
+    padding: 28px 18px calc(var(--mnav-h, 58px) + env(safe-area-inset-bottom, 0px) + 24px);
+  }
+
+  .shell-calls-proof {
+    grid-template-columns: 1fr;
+    margin-top: 40px;
+  }
+}
+
 /* ── Home / empty state ── */
 .shell-home {
   flex: 1;
@@ -5425,6 +5587,10 @@
   }
 
   .shell-rail { display: none; }
+
+  /* The fixed bottom rail already owns these five destinations on mobile.
+     Repeating them inside the room drawer wastes most of a zoomed viewport. */
+  .shell-sidebar .shell-primary-nav { display: none; }
 
   /* Channel drawer — slides in from the left, stops above the tab bar */
   .shell-sidebar {
@@ -6134,6 +6300,72 @@
     height: 32px;
     flex: none;
     font-size: 24px;
+  }
+
+  /* Fixed drawers need an explicit short-height box at extreme zoom. Their
+     rem-based form controls otherwise contribute intrinsic height before the
+     flex scrollports can shrink, leaving content clipped behind mobile nav. */
+  .shell-sidebar,
+  .shell-members {
+    top: 0;
+    bottom: auto;
+    height: calc(
+      100svh
+      - var(--mnav-h)
+      - env(safe-area-inset-bottom, 0px)
+      - var(--shell-virtual-keyboard-inset, 0px)
+    );
+    max-height: calc(
+      100svh
+      - var(--mnav-h)
+      - env(safe-area-inset-bottom, 0px)
+      - var(--shell-virtual-keyboard-inset, 0px)
+    );
+    min-height: 0;
+    box-sizing: border-box;
+  }
+
+  .shell-join-form {
+    flex: none;
+    margin: 4px 8px;
+  }
+
+  .shell-join-input,
+  .shell-join-btn {
+    height: 44px;
+    min-height: 44px;
+    padding: 6px 8px;
+    font-size: 16px;
+  }
+
+  .shell-sidebar-filter {
+    flex: none;
+    padding: 4px 8px;
+  }
+
+  .shell-sidebar-filter-input,
+  .shell-sidebar-filter-unread,
+  .shell-sidebar-filter-clear {
+    height: 44px;
+    min-height: 44px;
+    padding: 6px 8px;
+    font-size: 16px;
+  }
+
+  /* At 400% in a short landscape viewport, preserve the room destinations and
+     join action. Filtering remains available at ordinary mobile heights. */
+  .shell-sidebar-filter { display: none; }
+
+  .shell-members-filter {
+    flex: none;
+    padding: 4px 8px;
+  }
+
+  .shell-members-filter-input {
+    height: 44px;
+    min-height: 44px;
+    padding: 6px 8px;
+    font-size: 16px;
   }
 
   .shell-members-head {

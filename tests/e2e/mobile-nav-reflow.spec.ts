@@ -94,9 +94,9 @@ test('contains enlarged mobile navigation in a safe-area-aware horizontal rail',
     expect(button.scrollHeight).toBeLessThanOrEqual(button.clientHeight);
   }
 
-  const disconnect = page.getByRole('button', { name: 'Disconnect from network' });
-  await disconnect.focus();
-  await expect(disconnect).toBeFocused();
+  const finalAction = page.getByRole('button', { name: 'Open You' });
+  await finalAction.focus();
+  await expect(finalAction).toBeFocused();
   const focusedGeometry = await nav.evaluate((element) => {
     const last = element.querySelector<HTMLButtonElement>('button:last-child')!;
     const navRect = element.getBoundingClientRect();

@@ -1,42 +1,38 @@
-# LICENSE & RELEASE STATUS
+# Onyx notices
 
-## Facts
+## Project boundary
 
-- **This client tree is not a public open-source product.** README status has long been
-  **pre-release / internal — not published.** Do not treat it as a released FOSS app.
-- A remote named `github` may exist on this machine; that does **not** mean the
-  client was ever offered as open source to the public. Product policy is
-  **proprietary first-party client**.
-- **Onyx Server** (separate repo: `github.com/devinkbrown/onyx-server`) is the
-  AGPL pure-Zig **engine** — that is the open piece people clone and self-host.
+This repository is the **Onyx browser client**. It is a SolidJS application
+that connects to an Onyx Server network over IRC/IRCX WebSocket transport.
 
-## Product split
+**Onyx Server** is the separate pure-Zig daemon and has its own repository,
+source tree, operational configuration, and release notes:
 
-| Piece | Role | Posture |
-|-------|------|---------|
-| **Onyx client** (this tree) | First-party app sauce — UX, vault, themes, Home, Cadence browser | **Proprietary / closed** — competitive surface |
-| **Onyx network** | Public community at eshmaki.me / ircx.us | **Open to join** (service), not “client source for free” |
-| **Onyx Server** | Mesh IRC daemon | **AGPL open source** |
-| **Wire** | IRCv3 / IRCX | Open protocol; third-party clients welcome |
+<https://github.com/devinkbrown/onyx-server>
 
-## About the AGPL `LICENSE` file in this tree
+The hosted Onyx network at <https://eshmaki.me/> is a service operated from
+this client and the separate daemon; using that service does not grant access
+to its operational infrastructure or user data.
 
-An AGPL license file may still sit in the repo from early scaffolding or
-template habit. **That is not a claim that Onyx client was published under AGPL
-or that the public may treat it as FOSS.**
+## License
 
-Going forward:
+The client source in this repository is released under the GNU Affero General
+Public License, version 3 or any later version. The complete license text is in
+[`LICENSE`](LICENSE).
 
-- Do **not** market the Onyx *client* as open source / AGPL.
-- Do market **Onyx Server** as AGPL pure Zig.
-- Prefer: *“Join the public Onyx network. Run open-source Onyx Server if you want.
-  The first-party Onyx app is ours.”*
+The `private` field in `package.json` is an npm publication guard for this web
+application. It prevents an accidental `npm publish`; it does not describe the
+GitHub repository's visibility or the source license.
 
-Replacing or removing `LICENSE` / SPDX headers to match proprietary product is
-an owner cleanup when ready — not required to state the product truth above.
+Third-party dependencies, fonts, WebAssembly components, and other bundled
+materials may carry additional notices or licenses. Preserve their upstream
+notices when redistributing a build and consult each package's metadata.
 
-## What this is not
+## Naming
 
-- Not a claim the **network** is private or paywalled.
-- Not a claim IRC/IRCX is proprietary.
-- Not a change to Onyx Server’s AGPL terms.
+- **Onyx** means the network and this first-party browser client.
+- **Onyx Server** means the daemon/engine.
+- **Cadence** means the browser media stack; `cadencevox` and `cadencevis` are
+  wire codec identifiers.
+- Historical wire literals such as `TSUMUGI1` may remain in compatibility code;
+  they are not current product names.

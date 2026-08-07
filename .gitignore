@@ -21,6 +21,10 @@
 # production
 /build
 
+# local deployment snapshots (never publish generated site output)
+/.onyx-deploy-backups/
+/deploy-backups/
+
 # misc
 .DS_Store
 *.pem

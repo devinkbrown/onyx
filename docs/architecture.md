@@ -272,6 +272,7 @@ state). Almost every module has a co-located `*.test.ts`.
 - `./deploy.sh` — the only writer of `out/`. It builds to `dist/`, uses
   `tools/materialize-route-entrypoints.mjs` for route-specific `index.html`
   documents and metadata, stamps the service-worker cache name, overlays the community site from
-  `/home/kain/landing`, then `rsync --delete dist/ → out/`. nginx serves `out/`
+  the first-party community-site overlay, then `rsync --delete dist/ → out/`.
+  nginx serves `out/`
   at eshmaki.me. See [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for the safety
   rationale.

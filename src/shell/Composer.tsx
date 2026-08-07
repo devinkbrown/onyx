@@ -1275,7 +1275,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         <button
           type="button"
           class="shell-composer-tool"
-          disabled={!canSchedule()}
+          disabled={!canSchedule() && scheduledCount() === 0}
           aria-label="Schedule message to send later"
           aria-haspopup="dialog"
           aria-expanded={scheduleOpen()}

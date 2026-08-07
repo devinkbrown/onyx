@@ -35,6 +35,7 @@ import type { Channel } from '@/lib/irc/types';
 export type PresenceRibbonProps = {
   selfNick?: string;
   onToggleMembers?: () => void;
+  membersExpanded?: boolean;
   showJoinVoice?: boolean;
   onJoinVoice?: (withVideo: boolean) => void;
 };
@@ -117,7 +118,7 @@ export function buildVoiceRoomStatus(input: VoiceRoomStatusInput): VoiceRoomStat
 }
 
 export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
-  const [local] = splitProps(props, ['selfNick', 'onToggleMembers', 'showJoinVoice', 'onJoinVoice']);
+  const [local] = splitProps(props, ['selfNick', 'onToggleMembers', 'membersExpanded', 'showJoinVoice', 'onJoinVoice']);
 
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -610,11 +611,12 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               </button>
             </Show>
             {/* Member count is presence-as-place (stable roster trigger), not chrome. */}
-            <Show when={memberCount() > 0}>
+            <Show when={activeChannel()}>
               <button
                 type="button"
                 class="shell-ribbon-iconbtn shell-ribbon-members"
                 aria-label={`${memberCount()} members — toggle member list`}
+                aria-expanded={local.membersExpanded}
                 data-testid="ribbon-members"
                 onClick={handleMembersClick}
               >

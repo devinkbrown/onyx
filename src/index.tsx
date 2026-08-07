@@ -40,6 +40,7 @@ const Stats = lazy(() => import('./routes/Stats'));
 const Status = lazy(() => import('./routes/Status'));
 const Roadmap = lazy(() => import('./routes/Roadmap'));
 const Invite = lazy(() => import('./routes/Invite'));
+const OnyxOS = lazy(() => import('./routes/OnyxOS'));
 const PublicInfo = lazy(() => import('./routes/PublicInfo').then((m) => ({ default: m.PublicInfo })));
 const Spotlight = lazy(() => import('./chat/spotlight/Spotlight'));
 
@@ -88,6 +89,8 @@ render(
           <Route path="/roadmap/" component={Roadmap} />
           <Route path="/invite" component={Invite} />
           <Route path="/invite/" component={Invite} />
+          <Route path="/onyxos" component={OnyxOS} />
+          <Route path="/onyxos/" component={OnyxOS} />
           <Route path="/accessibility/" component={() => <PublicInfo page="accessibility" />} />
           <Route path="/glossary/" component={() => <PublicInfo page="glossary" />} />
           <Route path="/integrations/" component={() => <PublicInfo page="integrations" />} />

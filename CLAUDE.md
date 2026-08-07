@@ -1,7 +1,7 @@
 # Onyx — IRC webchat (SolidJS)
 
 Modern web client for the **Onyx** network, running on the **Onyx Server** engine
-(pure-Zig mesh daemon; formerly called Onyx Server). Pre-release; branch `onyx-solid`.
+(pure-Zig mesh daemon). Public source; default branch `onyx-solid`.
 The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
 Branded house: **Onyx** = network/product/client; **Onyx Server** = engine/daemon/
 protocol; "IRCXNet" = retired public identity, legacy/wire token only.
@@ -16,10 +16,9 @@ names — do not reintroduce Japanese names in new code or UI.
 English subsystem names: Cadence (CadenceVox/CadenceVis), MooringSession/MooringGroup,
 Event Spine.
 
-**License: AGPL-3.0-or-later** (see `LICENSE`). Onyx is copyleft-licensed but NOT yet
-publicly released — it lives only in the PRIVATE `github.com/devinkbrown/onyx` repo. The
-`.git/hooks/pre-push` guard still blocks any non-private GitHub remote; a public release is a
-separate, deliberate decision (the AGPL grant only takes effect on public distribution).
+**License: AGPL-3.0-or-later** (see `LICENSE`). The client source is public under
+that license. The hosted Onyx network and the separately maintained Onyx Server
+daemon are operational products with their own deployment and release boundaries.
 
 ## Stack
 - **SolidJS 1.9** + `@solidjs/router` — SPA, no SSR
@@ -56,8 +55,8 @@ separate, deliberate decision (the AGPL grant only takes effect on public distri
 - Uploads: `src/lib/upload/` — multipart POST (field `file`) to
   `${VITE_MEDIA_URL}/upload`; prod default is same-origin `/upload`
 - Link previews: `src/lib/preview/linkPreview.ts` → same-origin
-  `/linkpreview?url=` (SSRF-guarded OG fetcher in
-  /home/kain/website/upload_server.py); preference-gated (`linkPreviews`)
+  `/linkpreview?url=` (an SSRF-guarded deployment proxy); preference-gated
+  (`linkPreviews`)
 
 ## Persistence conventions
 - localStorage keys: `onyx:` prefix. Legacy `ocean-*` keys are migrated
@@ -81,9 +80,8 @@ separate, deliberate decision (the AGPL grant only takes effect on public distri
 ```bash
 pnpm dev        # dev server
 pnpm build      # → dist/ (safe: NEVER touches production)
-./deploy.sh     # dist/ build + route-correct SPA entrypoints + sw stamp
-                # + community-site overlay from /home/kain/landing,
-                # then rsync --delete dist/ → out/ (nginx serves out/)
+./deploy.sh     # first-party dist/ build + route entrypoints + sw stamp,
+                # host-specific site overlay, then rsync --delete dist/ → out/
 ```
 nginx serves `out/` at eshmaki.me. ONLY deploy.sh writes out/ — plain builds
 go to dist/, so tests/e2e can never wipe or half-replace production.

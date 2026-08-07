@@ -12,14 +12,13 @@ import {
 import { setPageMeta } from './pageMeta';
 import { PublicFooter } from './PublicFooter';
 
-/** Onyx launch site — deep-water dark luxury, community-first.
- *  Leads with people and place: a real IRC network you join, not a product you buy.
- *  Atmosphere is deep-water depth + flowing azure currents + drifting bioluminescence,
- *  all reduced-motion safe. The friendly water-dragon Mascot is the brand face. */
+/** Onyx launch site — the human front door to the product.
+ *  The transport and operator engine remain inspectable below the primary story;
+ *  the first decision is whether Onyx helps a visitor and their people. */
 export default function Landing() {
   setPageMeta(
-    'Onyx — open rooms on the mesh',
-    'Onyx is the public front door to the mesh: open rooms, honest media security, live network stats, and a name that is yours.',
+    'Onyx — a place for your people that you can trust',
+    'Onyx brings rooms, calls, useful catch-up, and honest protection state together in one communication product.',
     '/',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
@@ -34,7 +33,9 @@ export default function Landing() {
   const busiest = createMemo(() =>
     [...(stats.latest?.channels ?? [])].sort((a, b) => b.messages - a.messages)[0] ?? null,
   );
-  const feedState = createMemo(() => publicMeshFeedState(status.latest, nowMs()));
+  const feedState = createMemo(() =>
+    status.loading ? 'loading' as const : publicMeshFeedState(status.latest, nowMs()),
+  );
   const meshState = createMemo(() => {
     switch (feedState()) {
       case 'current': return 'operational';
@@ -62,19 +63,14 @@ export default function Landing() {
       <div class="r-grain" aria-hidden="true" />
 
       {/* ── top bar ── */}
-      <header class="r-status" role="banner">
+      <header class="r-status r-status--landing" role="banner">
         <a class="brand" href="/" aria-label="Onyx home">
           <Mascot variant="mark" />ONYX
         </a>
         <nav aria-label="Primary">
-          <a class="hideable" href="#community">Who's here</a>
-          <a class="hideable" href="#rooms">Rooms</a>
-          <a class="hideable" href="/stats/">Stats</a>
-          <a class="hideable" href="/status/">Status</a>
-          <a class="hideable" href="/roadmap/">Roadmap</a>
-          <a class="hideable" href="/about/">About</a>
-          <a class="hideable" href="/invite/?join=%23root">Invite</a>
-          <a class="hideable" href="#join">Join</a>
+          <a class="hideable r-nav-detail" href="#product">Product</a>
+          <a class="hideable r-nav-detail" href="#trust">Trust</a>
+          <a class="hideable" href="/onyxos/">OnyxOS</a>
           <span class="live hideable" data-feed-state={feedState()}>
             <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
           </span>
@@ -86,23 +82,24 @@ export default function Landing() {
       <section class="r-wrap r-hero" aria-labelledby="hero-heading">
         <div class="r-hero-grid">
           <div class="r-hero-copy">
-            <p class="r-kicker">a home on the open IRC mesh</p>
-            <h1 id="hero-heading">Come live<br /><span class="gold">on the water</span></h1>
-            <p class="serif-sub">A real network of real people — rooms that stay open, names that are yours, and a place no one can quietly take away.</p>
+            <p class="r-kicker">rooms · calls · catch-up · honest protection</p>
+            <h1 id="hero-heading">A place for<br /><span class="gold">your people</span></h1>
+            <p class="serif-sub">Fast enough to feel alive. Clear enough to trust.</p>
             <p class="sub">
-              Onyx is the warm front door to the mesh: drop into a channel,
-              find your people, talk in text or hop into voice and video with its
-              exact security state shown.
-              It's open, it's yours, and there's no account to rent and no ads to dodge.
+              Onyx brings your conversations, calls, and everything you missed
+              into one calm home. It shows what is protected, keeps useful
+              history on your device, and never turns your relationships into
+              an advertising product.
             </p>
             <div class="r-cta">
               <a class="r-btn primary" href="/app/">Open Onyx &rarr;</a>
-              <a class="r-btn ghost" href="#community">See who's around</a>
+              <a class="r-btn ghost" href="#product">See how it works</a>
             </div>
-            <div class="r-ticker">
-              <span><b>open protocol</b> · IRCv3 + IRCX</span>
-              <span><b>honest media state</b> · voice, video, screen</span>
-              <span><b>yours to keep</b> · no ads, no rental</span>
+            <div class="r-proof-rail" id="trust" aria-label="What Onyx makes visible">
+              <span><b>Conversation</b> ready</span>
+              <span><b>History</b> on this device</span>
+              <span><b>Protection</b> shown honestly</span>
+              <a href="/about/">Why you can trust it &rarr;</a>
             </div>
           </div>
           <div class="r-hero-art" aria-hidden="true">
@@ -114,7 +111,7 @@ export default function Landing() {
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
       {/* ── live pulse from public feeds ── */}
-      <section id="live" class="r-wrap r-section r-live" aria-labelledby="live-heading">
+      <section id="product" class="r-wrap r-section r-live" aria-labelledby="live-heading">
         <div class="r-live-head">
           <div>
             <span class="r-eyebrow">live pulse</span>

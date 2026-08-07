@@ -170,6 +170,7 @@ test.describe('invite create → consume round-trip (connected DEV build)', () =
       );
 
       // Open Channel settings from the ribbon gear (the real user affordance).
+      await page.getByTestId('ribbon-more').click();
       const gear = page.getByTestId('ribbon-settings-gear');
       await expect(gear).toBeVisible({ timeout: 30_000 });
       await gear.click();

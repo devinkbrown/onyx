@@ -29,18 +29,12 @@ test('keeps every ribbon capability reachable at 400% short reflow', async ({ pa
                 <span class="shell-ribbon-voice-mark" aria-hidden="true"></span>
                 <span class="shell-ribbon-voice-text">3 in voice</span>
               </button>
-              <button class="shell-ribbon-iconbtn shell-ribbon-settings" aria-label="Channel settings">
+              <button class="shell-ribbon-iconbtn shell-ribbon-more-trigger" aria-label="More actions">
                 <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg>
               </button>
             </div>
             <span class="shell-ribbon-divider" aria-hidden="true"></span>
             <div class="shell-ribbon-group" role="group" aria-label="Workspace">
-              <button class="shell-ribbon-iconbtn shell-ribbon-appearance" aria-label="Appearance — theme and background">
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg>
-              </button>
-              <button class="shell-ribbon-iconbtn shell-ribbon-preferences" aria-label="Open preferences">
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16" /></svg>
-              </button>
               <button class="shell-ribbon-account" aria-label="Account: Alexandria — open account panel">
                 <span class="shell-ribbon-account-text"><span class="shell-ribbon-account-name">Alexandria</span></span>
               </button>

@@ -63,7 +63,7 @@ test('keeps the high-zoom member drawer close and roster keyboard reachable', as
     });
   });
 
-  const toggle = page.getByRole('button', { name: 'Toggle member list', exact: true });
+  const toggle = page.getByTestId('ribbon-members');
   await expect(toggle).toBeVisible();
   await toggle.click();
 
@@ -103,6 +103,8 @@ test('keeps the high-zoom member drawer close and roster keyboard reachable', as
   expect(openingGeometry.rosterClientHeight).toBeGreaterThan(0);
   expect(openingGeometry.rosterScrollHeight).toBeGreaterThanOrEqual(openingGeometry.rosterClientHeight);
 
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('searchbox', { name: 'Filter members' })).toBeFocused();
   await page.keyboard.press('Tab');
   const member = page.getByRole('button', { name: /ui-qa/ });
   await expect(member).toBeFocused();

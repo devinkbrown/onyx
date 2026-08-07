@@ -1,37 +1,61 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
-import { onMount } from 'solid-js';
+import { Mascot } from '@/components/brand/Mascot';
 import { setPageMeta } from './pageMeta';
-
-/**
- * The authored roadmap lives on the public website. Keeping a second catalogue
- * in the client made status claims drift, so this SPA route is intentionally a
- * document-navigation bridge to the one canonical page.
- */
-export const CANONICAL_ROADMAP_PATH = '/roadmap/index.html';
-
-export function redirectToCanonicalRoadmap(
-  replace: (path: string) => void = (path) => window.location.replace(path),
-) {
-  replace(CANONICAL_ROADMAP_PATH);
-}
+import { PublicFooter } from './PublicFooter';
 
 export function RoadmapBridge() {
   return (
-    <main class="landing-page" aria-labelledby="roadmap-bridge-title">
-      <section class="landing-hero">
-        <div class="landing-container">
-          <p class="landing-eyebrow">One roadmap · one source of truth</p>
-          <h1 id="roadmap-bridge-title">Opening the Onyx roadmap</h1>
-          <p>
-            Product status now lives on one canonical public page, checked against
-            shipped source and acceptance evidence.
-          </p>
-          <a class="landing-primary" href={CANONICAL_ROADMAP_PATH}>
-            Open roadmap
-          </a>
+    <main class="r" aria-labelledby="roadmap-bridge-title">
+      <div class="r-ground" aria-hidden="true" />
+      <div class="r-flecks" aria-hidden="true" />
+      <div class="r-grain" aria-hidden="true" />
+      <header class="r-status" role="banner">
+        <a class="brand" href="/" aria-label="Onyx home">
+          <Mascot variant="mark" />ONYX
+        </a>
+        <nav aria-label="Primary">
+          <a class="hideable" href="/">Home</a>
+          <a class="hideable" href="/stats/">Stats</a>
+          <a class="hideable" href="/status/">Status</a>
+          <a class="hideable" href="/roadmap/" aria-current="page">Roadmap</a>
+          <a class="hideable" href="/about/">About</a>
+          <a class="hideable" href="/onyxos/">OnyxOS</a>
+          <a class="enter" href="/app/">Open Onyx</a>
+        </nav>
+      </header>
+
+      <section class="r-wrap r-section" aria-labelledby="roadmap-bridge-title">
+        <p class="r-kicker">what we are building</p>
+        <h1 id="roadmap-bridge-title" class="r-title">
+          A place for your people<br /><span class="gold">that you can trust</span>
+        </h1>
+        <p class="r-lede">
+          Onyx is becoming a dependable public communication product: easy
+          rooms and calls, useful catch-up, honest protection state, and an open
+          engine. It will work everywhere and become a first-class native
+          experience inside OnyxOS.
+        </p>
+
+        <div class="r-board" aria-label="Current Onyx product priorities">
+          <article class="r-card">
+            <span class="k">now</span>
+            <h2>Repair the front door</h2>
+            <p>Remove false outage states, broken routes, clipped forms, contradictory claims, and unreliable first-run paths.</p>
+          </article>
+          <article class="r-card">
+            <span class="k">next</span>
+            <h2>Make the client dependable</h2>
+            <p>Unify the experience around Home, Rooms, DMs, Calls, and You while preserving the tested protocol, vault, crypto, and media kernel.</p>
+          </article>
+          <article class="r-card">
+            <span class="k">native</span>
+            <h2>Bring Onyx into OnyxOS</h2>
+            <p>Integrate identity, notifications, local history, media, accessibility, and system security without making OnyxOS a requirement.</p>
+          </article>
         </div>
       </section>
+      <PublicFooter />
     </main>
   );
 }
@@ -41,10 +65,6 @@ export default function RoadmapRoute() {
     'Onyx roadmap — shipped, building, and later',
     'The canonical, evidence-led Onyx product roadmap.',
   );
-
-  onMount(() => {
-    redirectToCanonicalRoadmap();
-  });
 
   return <RoadmapBridge />;
 }

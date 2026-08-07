@@ -30,6 +30,8 @@ pnpm dev          # Vite dev server on http://localhost:3000
 | `pnpm test:watch` | Vitest in watch mode. |
 | `pnpm test:coverage` | Vitest with V8 coverage. |
 | `pnpm test:e2e` | Playwright e2e (`tests/e2e`). |
+| `pnpm site:check` | Safe website gate: typecheck, lint, tests, then build to `dist/`. |
+| `pnpm site:workbench` | Interactive local menu for dev, safe gates, preview, and deploy-plan inspection. Never writes `out/`. |
 
 ## Quality gates (run before you finish)
 
@@ -77,8 +79,8 @@ TypeScript is **strict**, and `noUncheckedIndexedAccess` is on
 
 ## Deploy safety — the `dist/` vs `out/` invariant
 
-**Only `deploy.sh` writes `out/`.** nginx serves `/home/kain/onyx/out` directly
-at eshmaki.me, so `out/` *is* production. To keep a plain build, a test run, or a
+**Only `deploy.sh` writes `out/`.** nginx serves this checkout's `out/` tree
+directly at eshmaki.me, so `out/` *is* production. To keep a plain build, a test run, or a
 Playwright web server from ever wiping or half-replacing the live site, Vite
 builds to `dist/` (`vite.config.ts`), and `deploy.sh` is the single path that
 syncs `dist/ → out/`.
@@ -92,14 +94,30 @@ syncs `dist/ → out/`.
    `tools/materialize-route-entrypoints.mjs` in sync with the `<Route>` table in
    `src/index.tsx`.**
 3. Stamps the service-worker cache name (`onyx-shell-<version>`) into `dist/sw.js`.
-4. Overlays the community site from `/home/kain/landing`.
+4. Overlays the separately managed community-site build configured on the
+   first-party host.
 5. `rsync -a --delete dist/ out/`.
 
 Never point a build, test, or script at `out/` yourself.
 
-## Branch conventions
+## Interactive website workbench
+
+Use `pnpm site:workbench` for an operator-facing local loop. It offers only
+safe actions: start Vite, run the full `site:check` gate, preview the current
+`dist/` build, or inspect the deployment boundary. It intentionally has no
+deploy action: `./deploy.sh` remains an explicit, separately reviewed operator
+decision and the sole writer of the nginx-served `out/` tree.
+
+## Public repository conventions
 
 Active development is on the `onyx-solid` branch. The brand is **Onyx** (formerly
 Ocean, briefly Ruri — both are dead names; do not reintroduce them except as the
-documented `ocean.*` wire keys and legacy `ocean-*` migration shims). This
-project is pre-release / internal — keep it local; do not publish.
+documented `ocean.*` wire keys and legacy `ocean-*` migration shims). The client
+source is public under AGPL-3.0-or-later. Do not commit credentials, private
+deployment output, generated `out/`, or machine-specific secrets.
+
+Keep pull requests focused and explain the observable behavior they change.
+Include tests for store, protocol, vault, crypto, or accessibility behavior and
+update the relevant guide when a user-visible contract changes. The code of
+conduct is [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md); security reports belong
+in [`SECURITY.md`](SECURITY.md), not in a public issue.

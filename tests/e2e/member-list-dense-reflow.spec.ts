@@ -158,7 +158,7 @@ test('dense mobile nicklist stays contained, scrollable, and keyboard-reachable 
 
   await seedDenseChannel(page, { highZoom: true });
 
-  const toggle = page.getByRole('button', { name: 'Toggle member list', exact: true });
+  const toggle = page.getByTestId('ribbon-members');
   await expect(toggle).toBeVisible();
   await toggle.click();
 

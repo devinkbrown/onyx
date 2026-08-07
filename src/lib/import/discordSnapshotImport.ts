@@ -11,7 +11,7 @@
  * A browser CANNOT call discord.com/api directly: the Discord REST API sends no
  * CORS headers and rejects the `Authorization`-header preflight. So EVERY call
  * routes through a same-origin, read-only proxy (`GET /discord-import/<path>` in
- * /home/kain/website/upload_server.py) that forwards to
+ * the deployment's same-origin upload proxy) that forwards to
  * https://discord.com/api/v10/<path>, GET-only, host-locked, with snowflake-id
  * validation and verbatim rate-limit-header pass-through. This module owns the
  * CLIENT half: pacing, pagination, abort, normalization, and the fail-loud

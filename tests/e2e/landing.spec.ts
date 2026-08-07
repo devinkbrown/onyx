@@ -5,13 +5,13 @@ import { stubPublicFeeds } from './public-feed-fixture';
 test.describe('Onyx landing', () => {
   test('hero loads with the current headline', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText(/come live/i);
-    await expect(page.locator('h1')).toContainText(/on the water/i);
+    await expect(page.locator('h1')).toContainText(/a place for/i);
+    await expect(page.locator('h1')).toContainText(/your people/i);
   });
 
   test('kicker + primary CTAs render', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText(/a home on the open IRC mesh/i)).toBeVisible();
+    await expect(page.getByText(/rooms · calls · catch-up · honest protection/i)).toBeVisible();
     await expect(page.getByRole('link', { name: /open onyx/i }).first()).toBeVisible();
   });
 

@@ -1,0 +1,182 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+.onyxos-page { --ink: #e9ede6; --muted: #a8b2aa; --panel: #151b1c; --line: #344044; --acid: #d0ff4f; --ember: #ff7659; color: var(--ink); background: #101516; min-height: 100vh; overflow: hidden; font-family: 'Instrument Sans Variable', system-ui, sans-serif; }
+.onyxos-grid { position: fixed; inset: 0; pointer-events: none; opacity: .35; background-image: linear-gradient(#273235 1px, transparent 1px), linear-gradient(90deg, #273235 1px, transparent 1px); background-size: 56px 56px; mask-image: linear-gradient(to bottom, black, transparent 72%); }
+.onyxos-nav, .onyxos-hero, .onyxos-native, .onyxos-method, .onyxos-workbench, .onyxos-close { position: relative; width: min(1180px, calc(100% - 3rem)); margin-inline: auto; }
+.onyxos-nav { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 0; border-bottom: 1px solid var(--line); }
+.onyxos-wordmark { color: var(--ink); font: 800 1.1rem/1 'Anton', Impact, sans-serif; letter-spacing: .16em; text-decoration: none; }.onyxos-wordmark span { color: var(--acid); }
+.onyxos-nav nav { display: flex; align-items: center; gap: 1.25rem; }.onyxos-nav nav a { color: var(--muted); font-size: .88rem; text-decoration: none; }.onyxos-nav nav a:hover { color: var(--acid); }.onyxos-nav .onyxos-nav__open { color: #101516; background: var(--acid); padding: .55rem .8rem; }
+.onyxos-hero { padding: clamp(5rem, 12vw, 11rem) 0 7rem; max-width: min(1180px, calc(100% - 3rem)); }.onyxos-eyebrow { color: var(--acid); font: 700 .73rem/1.3 'JetBrains Mono Variable', monospace; letter-spacing: .13em; text-transform: uppercase; }.onyxos-hero h1, .onyxos-section-heading h2, .onyxos-workbench h2, .onyxos-close h2 { margin: .65rem 0 1.5rem; font: 400 clamp(3.5rem, 9vw, 8.6rem)/.86 'Fraunces Variable', Georgia, serif; letter-spacing: -.075em; }.onyxos-hero h1 em { color: var(--acid); font-style: italic; }.onyxos-lede { width: min(720px, 100%); color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.35rem); line-height: 1.6; }.onyxos-hero__actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 2rem; }.onyxos-button { display: inline-flex; gap: .75rem; align-items: center; border: 1px solid var(--line); color: var(--ink); padding: .85rem 1rem; text-decoration: none; font: 700 .8rem/1 'JetBrains Mono Variable', monospace; }.onyxos-button:hover { border-color: var(--acid); color: var(--acid); }.onyxos-button--primary { border-color: var(--acid); background: var(--acid); color: #101516; }.onyxos-button--primary:hover { background: transparent; color: var(--acid); }.onyxos-proof { color: var(--muted); font-size: .85rem; margin-top: 4rem; }.onyxos-proof span { color: var(--ember); margin-right: .5rem; }
+.onyxos-native { padding: 5rem 0; border-top: 1px solid var(--line); }.onyxos-section-heading > p:not(.onyxos-eyebrow) { color: var(--muted); line-height: 1.65; max-width: 680px; }.onyxos-native__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-block: 1px solid var(--line); margin-top: 3rem; }.onyxos-native__grid article { padding: 1.6rem; border-right: 1px solid var(--line); }.onyxos-native__grid article:last-child { border-right: 0; }.onyxos-native__grid article > span { color: var(--acid); font: 700 .72rem/1 'JetBrains Mono Variable', monospace; }.onyxos-native__grid h3 { margin: .8rem 0; font: 400 1.8rem/1 'Fraunces Variable', serif; }.onyxos-native__grid p { margin: 0; color: var(--muted); line-height: 1.55; font-size: .92rem; }
+.onyxos-method { border-top: 1px solid var(--line); padding: 5rem 0; }.onyxos-section-heading { max-width: 720px; }.onyxos-section-heading h2, .onyxos-workbench h2 { font-size: clamp(2.4rem, 5vw, 4.8rem); line-height: .95; }.onyxos-console { display: grid; grid-template-columns: minmax(210px, .78fr) 1.6fr; margin-top: 3rem; border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 92%, transparent); }.onyxos-console__tabs { display: grid; align-content: start; border-right: 1px solid var(--line); }.onyxos-console__tabs button { text-align: left; color: var(--muted); background: transparent; border: 0; border-bottom: 1px solid var(--line); padding: 1.25rem; cursor: pointer; font: 700 .75rem/1.4 'JetBrains Mono Variable', monospace; }.onyxos-console__tabs button small { display: block; color: #748077; margin-top: .4rem; font-weight: 400; }.onyxos-console__tabs button:hover, .onyxos-console__tabs button.is-active { color: var(--acid); background: #1c2522; }.onyxos-console__body { padding: clamp(1.6rem, 4vw, 4rem); min-height: 335px; outline: none; }.onyxos-console__signal { color: var(--ember); font: 700 .75rem/1.2 'JetBrains Mono Variable', monospace; text-transform: uppercase; letter-spacing: .12em; }.onyxos-console__body h3 { margin: .75rem 0; font: 400 clamp(2rem, 4vw, 3.65rem)/1 'Fraunces Variable', serif; letter-spacing: -.05em; }.onyxos-console__body > p:not(.onyxos-console__signal) { color: var(--muted); max-width: 600px; line-height: 1.65; }.onyxos-console__body ul { list-style: none; padding: 1rem 0 0; margin: 0; display: grid; gap: .7rem; font: .82rem/1.4 'JetBrains Mono Variable', monospace; }.onyxos-console__body li span { color: var(--acid); margin-right: .65rem; }
+.onyxos-workbench { display: grid; grid-template-columns: 1.1fr .9fr; gap: clamp(2rem, 7vw, 7rem); padding: 5rem 0; border-top: 1px solid var(--line); }.onyxos-workbench > div > p:not(.onyxos-eyebrow) { color: var(--muted); line-height: 1.65; max-width: 630px; }.onyxos-command { align-self: center; border-left: 2px solid var(--acid); background: #111c19; padding: 1.5rem; font: .84rem/1.6 'JetBrains Mono Variable', monospace; }.onyxos-command p { margin: 0; }.onyxos-command span { color: var(--acid); padding-right: .5rem; }.onyxos-command .onyxos-command__muted { color: #829087; padding: 0 0 1.3rem 1.15rem; font-size: .73rem; }.onyxos-command .onyxos-command__muted:last-child { padding-bottom: 0; }
+.onyxos-close { padding: 7rem 0 6rem; border-top: 1px solid var(--line); }.onyxos-close h2 { font-size: clamp(3rem, 7vw, 6.6rem); }.onyxos-close .onyxos-button { margin-top: .8rem; }
+@media (max-width: 900px) { .onyxos-native__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.onyxos-native__grid article:nth-child(2) { border-right: 0; }.onyxos-native__grid article:nth-child(-n + 2) { border-bottom: 1px solid var(--line); } }
+@media (max-width: 720px) { .onyxos-nav nav a:not(.onyxos-nav__open) { display: none; }.onyxos-console, .onyxos-workbench { grid-template-columns: 1fr; }.onyxos-console__tabs { border-right: 0; border-bottom: 1px solid var(--line); grid-template-columns: repeat(2, 1fr); }.onyxos-console__tabs button:nth-child(odd) { border-right: 1px solid var(--line); }.onyxos-workbench { gap: 1rem; }.onyxos-nav, .onyxos-hero, .onyxos-native, .onyxos-method, .onyxos-workbench, .onyxos-close { width: min(100% - 2rem, 1180px); } }
+@media (max-width: 520px) { .onyxos-hero h1 { font-size: clamp(2.8rem, 12vw, 3.4rem); line-height: .92; overflow-wrap: anywhere; }.onyxos-native__grid { grid-template-columns: 1fr; }.onyxos-native__grid article { border-right: 0; border-bottom: 1px solid var(--line); }.onyxos-native__grid article:last-child { border-bottom: 0; } }
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyxos-nav,
+  .onyxos-hero,
+  .onyxos-native,
+  .onyxos-method,
+  .onyxos-workbench,
+  .onyxos-close {
+    width: calc(100% - 24px);
+    min-width: 0;
+  }
+
+  .onyxos-nav {
+    gap: 8px;
+    padding-block: 8px;
+  }
+
+  .onyxos-wordmark { font-size: 16px; }
+  .onyxos-nav nav { min-width: 0; gap: 8px; }
+  .onyxos-nav .onyxos-nav__open {
+    padding: 8px 10px;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-hero { padding: 40px 0 32px; }
+  .onyxos-hero h1 {
+    font-size: 48px;
+    line-height: .92;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-eyebrow {
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-lede,
+  .onyxos-section-heading > p:not(.onyxos-eyebrow),
+  .onyxos-native__grid p,
+  .onyxos-console__body > p:not(.onyxos-console__signal),
+  .onyxos-workbench > div > p:not(.onyxos-eyebrow) {
+    font-size: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-button {
+    padding: 10px 12px;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-proof {
+    margin-top: 24px;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-native,
+  .onyxos-method,
+  .onyxos-workbench,
+  .onyxos-close {
+    padding-block: 40px;
+  }
+
+  .onyxos-section-heading h2,
+  .onyxos-workbench h2,
+  .onyxos-close h2 {
+    font-size: 40px;
+    line-height: .96;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-native__grid {
+    grid-template-columns: 1fr;
+    min-width: 0;
+  }
+
+  .onyxos-native__grid article {
+    min-width: 0;
+    padding: 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .onyxos-native__grid article:last-child { border-bottom: 0; }
+  .onyxos-native__grid h3 {
+    font-size: 28px;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-console {
+    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .onyxos-console__tabs {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    border-right: 0;
+  }
+
+  .onyxos-console__tabs button,
+  .onyxos-console__tabs button:nth-child(odd) {
+    min-width: 0;
+    padding: 16px;
+    border-right: 0;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-console__tabs button small { font-size: 16px; }
+  .onyxos-console__body {
+    min-width: 0;
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .onyxos-console__signal { font-size: 12px; overflow-wrap: anywhere; }
+  .onyxos-console__body h3 { font-size: 32px; overflow-wrap: anywhere; }
+  .onyxos-console__body ul { font-size: 16px; }
+  .onyxos-console__body li { overflow-wrap: anywhere; }
+
+  .onyxos-workbench {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .onyxos-workbench > *,
+  .onyxos-command {
+    min-width: 0;
+  }
+
+  .onyxos-command {
+    padding: 16px;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-command .onyxos-command__muted {
+    padding-left: 0;
+    font-size: 16px;
+  }
+
+  .onyxos-page .r-footer {
+    min-width: 0;
+    padding: 32px 12px;
+  }
+
+  .onyxos-page .r-footer .cols {
+    grid-template-columns: 1fr;
+  }
+
+  .onyxos-page .r-footer .cols > *,
+  .onyxos-page .r-footer .sig,
+  .onyxos-page .r-footer .col,
+  .onyxos-page .r-footer .col a,
+  .onyxos-page .r-footer .base {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .onyxos-page .r-footer .sig .logo { font-size: 32px; }
+  .onyxos-page .r-footer .sig p,
+  .onyxos-page .r-footer .col a { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .onyxos-page *, .onyxos-page *::before, .onyxos-page *::after { scroll-behavior: auto !important; transition: none !important; } }

@@ -49,6 +49,7 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
     });
   });
 
+  await page.getByTestId('ribbon-more').click();
   const openPreferences = page.getByTestId('ribbon-preferences');
   await expect(openPreferences).toBeVisible();
   await openPreferences.click();

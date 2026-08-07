@@ -40,6 +40,11 @@ export const ROUTE_ENTRYPOINTS = [
     description: 'Track the public Onyx roadmap across memory, reach, privacy, presence, operations, and the time-native client work next.',
   },
   {
+    route: 'onyxos',
+    title: 'OnyxOS + Onyx — communication at home in the system',
+    description: 'See how Onyx is becoming a first-class native OnyxOS experience while staying cross-platform, backed by evidence-led system engineering.',
+  },
+  {
     route: 'invite',
     title: 'Join Onyx — open a room invite',
     description: 'Open an Onyx invite to join a room as a guest or with your account, carrying its topic, moment, and reading context.',

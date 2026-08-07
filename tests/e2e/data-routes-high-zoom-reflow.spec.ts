@@ -1,10 +1,30 @@
 import { expect, test } from '@playwright/test';
 
 const routes = [
-  { path: '/roadmap/', heading: 'What shipped, what is next' },
-  { path: '/status/', heading: 'Mesh health, in public' },
-  { path: '/stats/', heading: 'The rooms in motion' },
-  { path: '/invite/?join=%23root', heading: 'Join #root' },
+  {
+    path: '/roadmap/',
+    heading: 'A place for your people that you can trust',
+    heroSelector: '.r-section h1',
+    copySelector: '.r-card p',
+  },
+  {
+    path: '/status/',
+    heading: 'Mesh health, in public',
+    heroSelector: '.data-hero h1',
+    copySelector: '.data-card p',
+  },
+  {
+    path: '/stats/',
+    heading: 'The rooms in motion',
+    heroSelector: '.data-hero h1',
+    copySelector: '.data-card p',
+  },
+  {
+    path: '/invite/?join=%23root',
+    heading: 'Join #root',
+    heroSelector: '.data-hero h1',
+    copySelector: '.data-card p',
+  },
 ] as const;
 
 for (const route of routes) {
@@ -20,9 +40,9 @@ for (const route of routes) {
     await expect(heading).toBeVisible();
     await page.locator('.r-section').first().scrollIntoViewIfNeeded();
 
-    const geometry = await page.evaluate(() => {
+    const geometry = await page.evaluate(({ heroSelector, copySelector }) => {
       const surfaces = Array.from(document.querySelectorAll<HTMLElement>(
-        '.data-hero, .data-summary, .data-card, .roadmap-track, .peer-table, .r-section',
+        '.data-hero, .data-summary, .data-card, .roadmap-track, .peer-table, .r-section, .r-card',
       )).map((element) => {
         const rect = element.getBoundingClientRect();
         return {
@@ -33,8 +53,8 @@ for (const route of routes) {
           right: rect.right,
         };
       });
-      const heroTitle = document.querySelector<HTMLElement>('.data-hero h1')!;
-      const cardCopy = document.querySelector<HTMLElement>('.data-card p');
+      const heroTitle = document.querySelector<HTMLElement>(heroSelector)!;
+      const cardCopy = document.querySelector<HTMLElement>(copySelector);
       return {
         documentClientWidth: document.documentElement.clientWidth,
         documentScrollWidth: document.documentElement.scrollWidth,
@@ -55,6 +75,9 @@ for (const route of routes) {
           .slice(0, 16),
         surfaces,
       };
+    }, {
+      heroSelector: route.heroSelector,
+      copySelector: route.copySelector,
     });
 
     expect(geometry.documentScrollWidth, JSON.stringify(geometry.overflowers)).toBe(geometry.documentClientWidth);

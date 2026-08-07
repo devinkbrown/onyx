@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Autonomous E2E harness for Ocean.
+const previewPort = Number(process.env.ONYX_PLAYWRIGHT_PORT ?? 4173);
+const previewUrl = `http://localhost:${previewPort}`;
+
+// Autonomous E2E harness for Onyx.
 // Headless Chromium with FAKE media devices so voice/video paths (getUserMedia,
 // CADENCE encode/MEDIAFRAME) can be exercised without real hardware or a human.
 export default defineConfig({
@@ -12,7 +15,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: previewUrl,
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
@@ -27,11 +30,11 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   // Test the real production build via Vite preview (instant serve — avoids dev
-  // cold-start). Reuses an already-running preview on :4173 when present.
+  // cold-start). Never reuse another process: that could test a different checkout.
   webServer: {
-    command: 'pnpm preview --port 4173 --host',
-    url: 'http://localhost:4173',
-    reuseExistingServer: true,
+    command: `pnpm preview --port ${previewPort} --host`,
+    url: previewUrl,
+    reuseExistingServer: false,
     timeout: 120_000,
     stdout: 'ignore',
     stderr: 'pipe',

@@ -9,16 +9,27 @@ describe('Landing', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the community-first hero headline', () => {
-    const { getByText } = render(() => <Landing />);
-    expect(getByText(/come live/i)).toBeInTheDocument();
-    expect(getByText(/on the water/i)).toBeInTheDocument();
+  it('renders the public product promise', () => {
+    const { getByRole, getByText } = render(() => <Landing />);
+    expect(getByRole('heading', { name: /a place foryour people/i })).toBeInTheDocument();
+    expect(getByText(/Fast enough to feel alive/i)).toBeInTheDocument();
   });
 
   it('leads with people and place, not jargon', () => {
-    const { getByText } = render(() => <Landing />);
+    const { getByText, getByRole } = render(() => <Landing />);
+    expect(getByRole('heading', { name: /a place foryour people/i })).toBeInTheDocument();
     expect(getByText(/People, not\s*a product/i)).toBeInTheDocument();
     expect(getByText(/Rooms to\s*wander into/i)).toBeInTheDocument();
+    expect(getByRole('heading', { name: /a place foryour people/i })).not.toHaveTextContent(/IRC|mesh/i);
+  });
+
+  it('shows the signature proof rail without overstating encryption', () => {
+    const { getByLabelText } = render(() => <Landing />);
+    const rail = getByLabelText('What Onyx makes visible');
+
+    expect(rail).toHaveTextContent(/History on this device/i);
+    expect(rail).toHaveTextContent(/Protection shown honestly/i);
+    expect(rail).not.toHaveTextContent(/fully encrypted|end-to-end encrypted rooms/i);
   });
 
   it('invites the visitor to join in seconds', () => {
@@ -78,8 +89,8 @@ describe('Landing', () => {
   it('sets root website metadata', () => {
     render(() => <Landing />);
 
-    expect(document.title).toMatch(/open rooms/i);
-    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toMatch(/front door/i);
+    expect(document.title).toMatch(/place for your people/i);
+    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toMatch(/rooms, calls/i);
   });
 
   it('keeps the landing shell visible while public feeds are pending', () => {
@@ -91,8 +102,8 @@ describe('Landing', () => {
       </Suspense>
     ));
 
-    expect(getByRole('heading', { name: /come liveon the water/i })).toBeInTheDocument();
-    expect(getByText('status unavailable')).toHaveAttribute('data-feed-state', 'unavailable');
+    expect(getByRole('heading', { name: /a place foryour people/i })).toBeInTheDocument();
+    expect(getByText('checking mesh')).toHaveAttribute('data-feed-state', 'loading');
     expect(queryByText('network online')).not.toBeInTheDocument();
     expect(queryByTestId('landing-suspended')).not.toBeInTheDocument();
   });

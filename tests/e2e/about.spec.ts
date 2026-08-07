@@ -11,7 +11,7 @@ test.describe('Onyx /about', () => {
   test('media model claims are present and accurate', async ({ page }) => {
     await page.goto('/about');
     await expect(page.getByText(/our codec/i).first()).toBeVisible();
-    await expect(page.getByText(/never sees/i).first()).toBeVisible();
+    await expect(page.getByText(/forwards encrypted frames without transcoding/i).first()).toBeVisible();
   });
 
   test('no console errors on load', async ({ page }) => {

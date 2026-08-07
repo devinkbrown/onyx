@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a focused improvement to the Onyx client.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or integration problem should Onyx solve?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior, not only an implementation idea.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and boundaries
+      description: Note IRC/IRCX compatibility, privacy, accessibility, mobile, or server dependencies.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Examples or evidence
+      description: Add sanitized examples, screenshots, or comparable behavior.

@@ -170,12 +170,14 @@ describe('public mesh feed state', () => {
 
   it('gives every non-current state truthful public wording', () => {
     expect([
+      publicMeshFeedLabel('loading'),
       publicMeshFeedLabel('degraded'),
       publicMeshFeedLabel('stale'),
       publicMeshFeedLabel('future'),
       publicMeshFeedLabel('unknown'),
       publicMeshFeedLabel('unavailable'),
     ]).toEqual([
+      'checking mesh',
       'mesh degraded',
       'status stale',
       'status time mismatch',

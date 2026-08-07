@@ -49,7 +49,7 @@ test('keeps the high-zoom channel drawer aligned and keyboard reachable', async 
     });
   });
 
-  const toggle = page.getByRole('button', { name: 'Toggle channel list', exact: true });
+  const toggle = page.getByRole('button', { name: 'Open Rooms', exact: true });
   await expect(toggle).toBeVisible();
   await toggle.click();
 
