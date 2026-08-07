@@ -157,6 +157,14 @@ describe('historyVault', () => {
       expect('target_key' in back).toBe(false);
     });
 
+    it('round-trips an explicit reaction count while keeping named users', () => {
+      const original = msg('reaction-count', 1000, {
+        reactions: [{ emoji: '🔥', users: ['trev'], count: 50 }],
+      });
+      const back = deserializeMessage(serializeMessage('#room', original));
+      expect(back.reactions).toEqual([{ emoji: '🔥', users: ['trev'], count: 50 }]);
+    });
+
     it('strips every OMIT_AT_REST field, and the set includes plaintext', () => {
       // plaintext is the load-bearing case today; assert the allowlist covers it
       // so a future rename/removal of the constant fails loudly here.

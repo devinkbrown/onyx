@@ -34,7 +34,7 @@ import {
   type ReviewHistoryEntry,
 } from '@/lib/notifications/reviewHistory';
 import { buildSinceDigest } from '@/lib/notifications/sinceDigest';
-import { aggregateBoosts } from '@/lib/reactions/quietBoosts';
+import { aggregateMessageReactions } from '@/lib/reactions/quietBoosts';
 import {
   createEffect,
   createMemo,
@@ -538,12 +538,7 @@ function ReaderMemoryStrip(props: {
 // ── Quiet boosts ─────────────────────────────────────────────────────────────
 
 function boostGroupsFor(msg: ChatMessage, selfNick: string) {
-  return aggregateBoosts(
-    (msg.reactions ?? []).flatMap((reaction) =>
-      reaction.users.map((from) => ({ emoji: reaction.emoji, from })),
-    ),
-    selfNick,
-  );
+  return aggregateMessageReactions(msg.reactions ?? [], selfNick);
 }
 
 // ── Thread indicator ─────────────────────────────────────────────────────────

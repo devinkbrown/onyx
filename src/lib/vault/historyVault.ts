@@ -13,7 +13,7 @@
  *  - Dumb storage: messages serialize flat (Dates → epoch ms); reactions and
  *    reply metadata survive; functions/Sets never enter a ChatMessage.
  */
-import type { ChatMessage } from '@/lib/irc/types';
+import type { ChatMessage, MessageReaction } from '@/lib/irc/types';
 import {
   isEncryptedWireText,
   sanitizePersistedReplyPreviewText,
@@ -85,6 +85,8 @@ export const MAX_VAULT_TOPIC_LENGTH = 512;
 export const MAX_VAULT_REACTIONS = 64;
 export const MAX_VAULT_REACTION_USERS = 128;
 export const MAX_VAULT_REACTION_FIELD_LENGTH = 128;
+/** Maximum reaction total accepted from imported/exported data. */
+export const MAX_VAULT_REACTION_COUNT = 100_000;
 export const MAX_VAULT_REPLY_TEXT_LENGTH = 4096;
 
 /**
@@ -765,6 +767,36 @@ function isBoundedWireToken(value: unknown, maxLength: number, allowEmpty = fals
     && !/[\u0000-\u0020\u007f]/u.test(value);
 }
 
+function boundedReactionCount(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return undefined;
+  return Math.min(value, MAX_VAULT_REACTION_COUNT);
+}
+
+function reviveExportReaction(raw: unknown): MessageReaction | null {
+  if (!isRecord(raw)) return null;
+  const emoji = isBoundedWireToken(raw.emoji, MAX_VAULT_REACTION_FIELD_LENGTH)
+    ? raw.emoji
+    : '';
+  if (!emoji) return null;
+
+  const rawUsers = Array.isArray(raw.users) ? raw.users.slice(0, MAX_VAULT_REACTION_USERS) : [];
+  const users = rawUsers
+    .filter((user): user is string => isBoundedWireToken(user, MAX_VAULT_REACTION_FIELD_LENGTH));
+  const explicitCount = boundedReactionCount(raw.count);
+  // Older imported snapshots represented anonymous reactors as empty strings.
+  // Keep those exports readable while ensuring empty placeholders never return
+  // as identities in the current shape.
+  const legacyPlaceholderCount = explicitCount === undefined && rawUsers.some((user) => user === '')
+    ? rawUsers.length
+    : undefined;
+  const count = explicitCount ?? legacyPlaceholderCount;
+  const total = count === undefined ? undefined : Math.max(count, users.length);
+
+  const reaction: MessageReaction = { emoji, users };
+  if (total !== undefined && total > 0) reaction.count = Math.min(total, MAX_VAULT_REACTION_COUNT);
+  return reaction;
+}
+
 function reviveExportMessage(raw: unknown, fallbackTarget: string): ChatMessage | null {
   if (!isRecord(raw)) return null;
   const id = raw.id;
@@ -817,20 +849,8 @@ function reviveExportMessage(raw: unknown, fallbackTarget: string): ChatMessage 
   if (Array.isArray(raw.reactions)) {
     message.reactions = raw.reactions
       .slice(0, MAX_VAULT_REACTIONS)
-      .filter(isRecord)
-      .map((reaction) => ({
-        emoji: isBoundedWireToken(reaction.emoji, MAX_VAULT_REACTION_FIELD_LENGTH)
-          ? reaction.emoji
-          : '',
-        users: Array.isArray(reaction.users)
-          ? reaction.users
-              .slice(0, MAX_VAULT_REACTION_USERS)
-              .filter((user): user is string => (
-                isBoundedWireToken(user, MAX_VAULT_REACTION_FIELD_LENGTH)
-              ))
-          : [],
-      }))
-      .filter((reaction) => reaction.emoji.length > 0);
+      .map(reviveExportReaction)
+      .filter((reaction): reaction is MessageReaction => reaction !== null);
   }
   if (
     isRecord(raw.replyTo)

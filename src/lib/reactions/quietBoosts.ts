@@ -2,13 +2,15 @@
 /**
  * quietBoosts.ts — pure aggregation and optimistic toggles for calm reactions.
  */
-import type { ChatMessage } from '@/lib/irc/types';
+import type { ChatMessage, MessageReaction } from '@/lib/irc/types';
 
 export const BOOST_NOTIFIES = false;
 
 export interface Boost {
   emoji: string;
   from: string;
+  /** Optional source total, independent of the named actor in `from`. */
+  count?: number;
 }
 
 export interface BoostGroup {
@@ -53,34 +55,67 @@ function sortBoostGroups(groups: readonly BoostGroup[]): BoostGroup[] {
   return [...groups].sort(compareBoostGroups);
 }
 
-function makeBoostGroup(emoji: string, reactors: readonly string[], you: string): BoostGroup {
+function makeBoostGroup(
+  emoji: string,
+  reactors: readonly string[],
+  you: string,
+  count = reactors.length,
+): BoostGroup {
   return {
     emoji,
-    count: reactors.length,
+    count: Math.max(reactors.length, count),
     reactors: [...reactors],
     youBoosted: hasReactor(reactors, you),
   };
 }
 
 export function aggregateBoosts(boosts: readonly Boost[], you: string): BoostGroup[] {
-  const reactorsByEmoji = new Map<string, string[]>();
+  const reactorsByEmoji = new Map<string, { reactors: string[]; count: number }>();
 
   for (const boost of boosts) {
-    if (boost.emoji.length === 0 || boost.from.length === 0) continue;
+    if (boost.emoji.length === 0) continue;
+    const explicitCount = typeof boost.count === 'number'
+      && Number.isSafeInteger(boost.count)
+      && boost.count > 0
+      ? boost.count
+      : 0;
+    if (boost.from.length === 0 && explicitCount === 0) continue;
 
-    const reactors = reactorsByEmoji.get(boost.emoji);
-    if (!reactors) {
-      reactorsByEmoji.set(boost.emoji, [boost.from]);
+    const entry = reactorsByEmoji.get(boost.emoji);
+    if (!entry) {
+      reactorsByEmoji.set(boost.emoji, {
+        reactors: boost.from.length > 0 ? [boost.from] : [],
+        count: explicitCount,
+      });
       continue;
     }
 
-    if (!hasReactor(reactors, boost.from)) {
-      reactors.push(boost.from);
+    entry.count = Math.max(entry.count, explicitCount);
+    if (boost.from.length > 0 && !hasReactor(entry.reactors, boost.from)) {
+      entry.reactors.push(boost.from);
     }
   }
 
-  const groups = Array.from(reactorsByEmoji.entries(), ([emoji, reactors]) => makeBoostGroup(emoji, reactors, you));
+  const groups = Array.from(
+    reactorsByEmoji.entries(),
+    ([emoji, entry]) => makeBoostGroup(emoji, entry.reactors, you, Math.max(entry.count, entry.reactors.length)),
+  );
   return sortBoostGroups(groups);
+}
+
+/** Aggregate message reactions while retaining imported totals and named actors separately. */
+export function aggregateMessageReactions(
+  reactions: readonly MessageReaction[],
+  you: string,
+): BoostGroup[] {
+  return aggregateBoosts(
+    reactions.flatMap((reaction) => {
+      const count = reaction.count;
+      if (reaction.users.length === 0) return [{ emoji: reaction.emoji, from: '', count }];
+      return reaction.users.map((from) => ({ emoji: reaction.emoji, from, count }));
+    }),
+    you,
+  );
 }
 
 export function toggleBoost(groups: readonly BoostGroup[], emoji: string, you: string): BoostGroup[] {
@@ -115,12 +150,7 @@ export function totalBoosts(groups: readonly BoostGroup[]): number {
 }
 
 function messageBoosts(message: ChatMessage, you: string): BoostGroup[] {
-  return aggregateBoosts(
-    (message.reactions ?? []).flatMap((reaction) =>
-      reaction.users.map((from) => ({ emoji: reaction.emoji, from })),
-    ),
-    you,
-  );
+  return aggregateMessageReactions(message.reactions ?? [], you);
 }
 
 export function buildQuietBoostDigest(

@@ -166,9 +166,10 @@ describe('parseDiscordExport — content mapping', () => {
       },
     ] }));
     const reactions = result!.snapshot.targets[0]!.messages[0]!.reactions!;
-    expect(reactions[0]!).toEqual({ emoji: '🔥', users: ['a', 'b'] });
+    expect(reactions[0]!).toEqual({ emoji: '🔥', users: ['a', 'b'], count: 2 });
     expect(reactions[1]!.emoji).toBe(':party:');
-    expect(reactions[1]!.users).toHaveLength(1); // count preserved via placeholder
+    expect(reactions[1]!.users).toEqual([]);
+    expect(reactions[1]!.count).toBe(1);
   });
 
   it('resolves replies to earlier messages in the same channel', () => {
@@ -279,7 +280,8 @@ describe('parseDiscordExport — robustness (independent review fixes)', () => {
       },
     ] }));
     const reaction = result!.snapshot.targets[0]!.messages[0]!.reactions![0]!;
-    expect(reaction.users).toHaveLength(50);
+    expect(reaction.users).toEqual(['alice']);
+    expect(reaction.count).toBe(50);
     expect(reaction.users[0]).toBe('alice');
   });
 
@@ -287,7 +289,8 @@ describe('parseDiscordExport — robustness (independent review fixes)', () => {
     const result = parseDiscordExport(exportFixture({ messages: [
       { id: 'm1', type: 'Default', timestamp: '2025-01-01T00:00:00Z', content: 'x', author: { name: 'a' }, reactions: [{ emoji: { name: '🔥' }, count: 100000 }] },
     ] }));
-    expect(result!.snapshot.targets[0]!.messages[0]!.reactions![0]!.users).toHaveLength(99);
+    expect(result!.snapshot.targets[0]!.messages[0]!.reactions![0]!.users).toEqual([]);
+    expect(result!.snapshot.targets[0]!.messages[0]!.reactions![0]!.count).toBe(100_000);
   });
 
   it('keeps both messages when Discord ids collide within a channel', () => {
@@ -371,6 +374,7 @@ describe('parseDiscordExport — robustness (independent review fixes)', () => {
     expect(message.reactions).toHaveLength(64);
     expect(message.reactions![0]!.users).toHaveLength(99);
     expect(message.reactions![0]!.users[0]).toBe('user-0');
+    expect(message.reactions![0]!.count).toBe(150);
     expect(parseVaultExport(result!.snapshot)).not.toBeNull();
   });
 
@@ -433,7 +437,7 @@ describe('parseDiscordExport — vault interop', () => {
     const reply = revived!.targets[0]!.messages.find((m) => m.text === 'hi back')!;
     expect(reply.replyTo?.from).toBe('a');
     const reacted = revived!.targets[0]!.messages.find((m) => m.text === 'hello')!;
-    expect(reacted.reactions?.[0]).toEqual({ emoji: '👍', users: ['b'] });
+    expect(reacted.reactions?.[0]).toEqual({ emoji: '👍', users: ['b'], count: 1 });
   });
 
   it('never emits HTML — imported markup stays inert text', () => {

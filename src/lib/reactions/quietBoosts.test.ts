@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '@/lib/irc/types';
 import {
   aggregateBoosts,
+  aggregateMessageReactions,
   BOOST_NOTIFIES,
   buildQuietBoostDigest,
   type BoostGroup,
@@ -59,6 +60,19 @@ describe('quiet boost aggregation', () => {
     const groups = aggregateBoosts([{ emoji: '🌊', from: 'Kain' }], 'kain');
 
     expect(groups).toEqual([{ emoji: '🌊', count: 1, reactors: ['Kain'], youBoosted: true }]);
+  });
+
+  it('keeps imported totals independent from genuine named reactors', () => {
+    const groups = aggregateMessageReactions([
+      { emoji: '👍', users: ['alice'], count: 50 },
+      { emoji: '🎉', users: [], count: 3 },
+    ], 'kai');
+
+    expect(groups).toEqual([
+      { emoji: '👍', count: 50, reactors: ['alice'], youBoosted: false },
+      { emoji: '🎉', count: 3, reactors: [], youBoosted: false },
+    ]);
+    expect(totalBoosts(groups)).toBe(53);
   });
 
   it('ignores empty emoji/from values and deduplicates reactors first-seen', () => {

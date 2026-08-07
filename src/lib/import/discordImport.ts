@@ -35,6 +35,7 @@ import {
   MAX_EXPORT_TOTAL_RAW_MESSAGES,
   MAX_VAULT_MESSAGE_TEXT_LENGTH,
   MAX_VAULT_REACTIONS,
+  MAX_VAULT_REACTION_COUNT,
   MAX_VAULT_REACTION_FIELD_LENGTH,
   MAX_VAULT_SENDER_LENGTH,
   MAX_VAULT_TARGET_LENGTH,
@@ -195,14 +196,18 @@ function mapReactions(raw: unknown): MessageReaction[] | undefined {
           .map((u) => boundedWireToken(u, MAX_VAULT_REACTION_FIELD_LENGTH))
           .filter((u): u is string => u.length > 0)
       : [];
-    // Preserve the reaction count even when the reactor list is absent or
-    // partial: pad with anonymous placeholders so the facepile shows "N",
-    // bounded so a `count: 100000` can't bloat the vault.
-    const count = finitePositiveInt(entry.count, 0);
-    const target = Math.min(Math.max(count, named.length), MAX_REACTION_USERS);
-    const users = named.slice(0, target);
-    while (users.length < target) users.push('');
-    if (users.length > 0) reactions.push({ emoji, users });
+    // Preserve the source total explicitly. Anonymous reactors must not be
+    // represented as fake identities; the renderer aggregates this count
+    // independently from the genuine names above.
+    const rawCount = finitePositiveInt(entry.count, 0);
+    const count = rawCount > 0 ? Math.min(rawCount, MAX_VAULT_REACTION_COUNT) : undefined;
+    const users = named.slice(0, MAX_REACTION_USERS);
+    const total = count === undefined ? undefined : Math.max(count, users.length);
+    if (users.length > 0 || (total !== undefined && total > 0)) {
+      const reaction: MessageReaction = { emoji, users };
+      if (total !== undefined) reaction.count = total;
+      reactions.push(reaction);
+    }
   }
   return reactions.length > 0 ? reactions : undefined;
 }

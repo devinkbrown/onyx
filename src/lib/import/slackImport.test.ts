@@ -186,7 +186,7 @@ describe('parseSlackExport — content mapping', () => {
     expect(result!.snapshot.targets[0]!.messages[0]!.text).toBe('https://slack.example/file');
   });
 
-  it('maps reactions with user names and preserves count via placeholders', () => {
+  it('maps reactions with user names and preserves count separately', () => {
     const result = parseSlackExport(exportFixture({ messages: [
       {
         type: 'message',
@@ -198,15 +198,16 @@ describe('parseSlackExport — content mapping', () => {
     ] }));
     const reaction = result!.snapshot.targets[0]!.messages[0]!.reactions![0]!;
     expect(reaction.emoji).toBe(':thumbsup:');
-    expect(reaction.users).toHaveLength(3);
-    expect(reaction.users[0]).toBe('alice');
+    expect(reaction.users).toEqual(['alice']);
+    expect(reaction.count).toBe(3);
   });
 
   it('caps a huge reaction count at MAX_REACTION_USERS', () => {
     const result = parseSlackExport(exportFixture({ messages: [
       { type: 'message', user: 'U1', text: 'x', ts: '1735725600.000000', reactions: [{ name: 'fire', count: 100000 }] },
     ] }));
-    expect(result!.snapshot.targets[0]!.messages[0]!.reactions![0]!.users).toHaveLength(99);
+    expect(result!.snapshot.targets[0]!.messages[0]!.reactions![0]!.users).toEqual([]);
+    expect(result!.snapshot.targets[0]!.messages[0]!.reactions![0]!.count).toBe(100_000);
   });
 
   it('resolves thread replies to earlier messages in the same channel', () => {
@@ -469,7 +470,7 @@ describe('parseSlackExport — vault interop', () => {
     const reply = revived!.targets[0]!.messages.find((message) => message.text === 'hi back')!;
     expect(reply.replyTo?.from).toBe('alice');
     const reacted = revived!.targets[0]!.messages.find((message) => message.text === 'hello')!;
-    expect(reacted.reactions?.[0]).toEqual({ emoji: ':wave:', users: ['bob'] });
+    expect(reacted.reactions?.[0]).toEqual({ emoji: ':wave:', users: ['bob'], count: 1 });
   });
 
   it('never emits HTML — imported markup stays inert text', () => {

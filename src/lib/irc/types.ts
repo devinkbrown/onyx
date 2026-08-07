@@ -42,6 +42,12 @@ export interface MessageReaction {
   emoji: string;
   /** nicks who reacted */
   users: string[];
+  /**
+   * Explicit total when the source knows more reactors than it can name
+   * (for example, a history import). Live IRC reactions omit this and derive
+   * their total from `users`.
+   */
+  count?: number;
 }
 
 export interface ChatMessage {

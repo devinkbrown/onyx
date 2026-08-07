@@ -35,6 +35,7 @@ import {
   MAX_VAULT_MESSAGE_TEXT_LENGTH,
   MAX_VAULT_MESSAGE_TYPE_LENGTH,
   MAX_VAULT_REACTIONS,
+  MAX_VAULT_REACTION_COUNT,
   MAX_VAULT_REACTION_FIELD_LENGTH,
   MAX_VAULT_REACTION_USERS,
   MAX_VAULT_REPLY_TEXT_LENGTH,
@@ -550,5 +551,36 @@ describe('parseVaultExport — vault import validation contract', () => {
     expect(twice.targets[0]!.messages.map(messageDigest)).toEqual(
       once.targets[0]!.messages.map(messageDigest),
     );
+  });
+
+  it('parses explicit counts and revives legacy empty-user placeholders compatibly', () => {
+    const raw = {
+      kind: 'onyx-vault',
+      version: 1,
+      targets: [{
+        target: '#reactions',
+        messages: [
+          {
+            ...message('explicit', '#reactions', 1),
+            reactions: [{ emoji: '👍', users: ['alice'], count: 50 }],
+          },
+          {
+            ...message('legacy', '#reactions', 2),
+            reactions: [{ emoji: '🎉', users: ['bob', '', ''] }],
+          },
+          {
+            ...message('bounded', '#reactions', 3),
+            reactions: [{ emoji: '🔥', users: [], count: Number.MAX_SAFE_INTEGER }],
+          },
+        ],
+      }],
+    };
+
+    const parsed = parseVaultExport(raw)!;
+    expect(parsed.targets[0]!.messages.map((item) => item.reactions)).toEqual([
+      [{ emoji: '👍', users: ['alice'], count: 50 }],
+      [{ emoji: '🎉', users: ['bob'], count: 3 }],
+      [{ emoji: '🔥', users: [], count: MAX_VAULT_REACTION_COUNT }],
+    ]);
   });
 });

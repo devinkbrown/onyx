@@ -28,6 +28,7 @@ import {
   MAX_EXPORT_TOTAL_RAW_MESSAGES,
   MAX_VAULT_MESSAGE_TEXT_LENGTH,
   MAX_VAULT_REACTIONS,
+  MAX_VAULT_REACTION_COUNT,
   MAX_VAULT_REACTION_FIELD_LENGTH,
   MAX_VAULT_SENDER_LENGTH,
   MAX_VAULT_TARGET_LENGTH,
@@ -268,11 +269,15 @@ function mapReactions(raw: unknown, users: SlackUserDirectory): MessageReaction[
           .map((user) => boundedWireToken(user, MAX_VAULT_REACTION_FIELD_LENGTH))
           .filter((user): user is string => user.length > 0)
       : [];
-    const count = finitePositiveInt(entry.count, 0);
-    const target = Math.min(Math.max(count, named.length), MAX_REACTION_USERS);
-    const reactionUsers = named.slice(0, target);
-    while (reactionUsers.length < target) reactionUsers.push('');
-    if (reactionUsers.length > 0) reactions.push({ emoji: `:${name}:`, users: reactionUsers });
+    const rawCount = finitePositiveInt(entry.count, 0);
+    const count = rawCount > 0 ? Math.min(rawCount, MAX_VAULT_REACTION_COUNT) : undefined;
+    const reactionUsers = named.slice(0, MAX_REACTION_USERS);
+    const total = count === undefined ? undefined : Math.max(count, reactionUsers.length);
+    if (reactionUsers.length > 0 || (total !== undefined && total > 0)) {
+      const reaction: MessageReaction = { emoji: `:${name}:`, users: reactionUsers };
+      if (total !== undefined) reaction.count = total;
+      reactions.push(reaction);
+    }
   }
   return reactions.length > 0 ? reactions : undefined;
 }

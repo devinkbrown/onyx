@@ -574,6 +574,32 @@ describe('AppShell', () => {
       ]);
     });
 
+    it('renders imported reaction totals without inventing reactor identities', () => {
+      const channel = makeChannel(
+        '#general',
+        [{
+          ...makeMessage('imported-boost', 'alice', 'Imported history', '#general'),
+          reactions: [{ emoji: '🌊', users: ['alice'], count: 50 }],
+        }],
+        [makeUser('alice'), makeUser('testuser')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+      }, true);
+
+      render(() => <AppShell />);
+
+      const boosts = screen.getByLabelText('Boosts');
+      expect(within(boosts).getByText('50')).toBeInTheDocument();
+      expect(within(boosts).getByTitle('alice +49')).toBeInTheDocument();
+    });
+
     it('renders a since-you-left digest from the unread boundary', () => {
       const scrollIntoView = vi.fn();
       Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
