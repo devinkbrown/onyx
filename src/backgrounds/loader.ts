@@ -46,15 +46,27 @@ const SCENE_LOADERS: Record<string, SceneLoader> = {
 
 /**
  * Fetch the render module for `id`. Resolves to the concrete variant (canvas or
- * scene) or `undefined` for an unknown id. The caller decides canvas vs scene
- * from the synchronous catalogue metadata before awaiting this.
+ * scene) or `undefined` for an unknown id / failed chunk fetch. Import failures
+ * (stale, missing, or network-failed hashed chunks a tab still references)
+ * resolve to `undefined` instead of rejecting — `<Background>` keeps the inert
+ * placeholder and a later different selection reloads cleanly.
+ *
+ * The caller decides canvas vs scene from the synchronous catalogue metadata
+ * before awaiting this when it needs kind; a failed load looks like "no variant".
  */
 export async function loadBackgroundVariant(id: string | null | undefined): Promise<AnyBackgroundVariant | undefined> {
   const canonical = resolveBackgroundId(id);
   if (canonical == null) return undefined;
-  const canvas = CANVAS_LOADERS[canonical];
-  if (canvas) return canvas();
-  const scene = SCENE_LOADERS[canonical];
-  if (scene) return scene();
-  return undefined;
+  try {
+    const canvas = CANVAS_LOADERS[canonical];
+    if (canvas) return await canvas();
+    const scene = SCENE_LOADERS[canonical];
+    if (scene) return await scene();
+    return undefined;
+  } catch {
+    // Stale/missing/network chunk failure. Do not poison createResource's error
+    // channel (which would throw on read and can blank the shell). Placeholder +
+    // later selection is the recovery path.
+    return undefined;
+  }
 }

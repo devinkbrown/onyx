@@ -39,6 +39,7 @@ import { NotificationRuntime } from '@/lib/notifications';
 import { TopicReadRuntime } from '@/lib/topics/TopicReadRuntime';
 import { ServerRail } from './ServerRail';
 import { ChannelSidebar } from './ChannelSidebar';
+import { CallsHub } from './CallsHub';
 import { HomeView } from './HomeView';
 const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
 const WhoisSheet = lazy(() => import('./WhoisSheet').then((m) => ({ default: m.WhoisSheet })));
@@ -1087,7 +1088,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
         />
       </div>
 
-      {/* Mobile bottom tab bar */}
+      {/* Mobile bottom tab bar — product frame: Home / Rooms / Messages / Calls / You.
+          No Leave here; disconnect remains on ServerRail / account. Members stay
+          on the presence ribbon (not a bottom-tab). */}
       <nav class="shell-mobile-nav" aria-label="Mobile navigation">
         <button
           type="button"

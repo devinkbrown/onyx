@@ -1,12 +1,12 @@
-/* ── Onyx connect screen — deep-water dark-luxury ────────────────────────────
-   The elegant front door to the network: deep-water atmosphere (depth gradient,
-   azure currents, sparse bioluminescent motes, faint caustics + grain), a
-   refined surface card with sea-foam text and azure accents, fluid radii and
-   designed focus / hover / active states.
+/* ── Onyx connect screen — quiet threshold ───────────────────────────────────
+   Client entry door: matte mineral night, fine borders, restrained static
+   atmosphere. Instrument Sans headings, limited Fraunces lede, JetBrains Mono
+   status, quiet cyan state marks. No decorative glow, text-shadow, pulsing
+   motes, caustics, or current drift on the normal entry path.
 
-   All atmosphere is self-contained here (.conn-sea-*) so the connect screen
-   carries its own depth motifs. Every animation freezes under reduced-motion.
-   Tokens only — no raw hex (SVG/gradient stops reference the theme vars).
+   Atmosphere stays namespaced (.conn-sea-*) for existing markup; it is static.
+   Semantic progress (routing / connecting) may still move; status colors stay
+   truthful. Freezes under reduced-motion. Tokens only.
    ─────────────────────────────────────────────────────────────────────────── */
 
 .conn {
@@ -24,50 +24,44 @@
   padding-bottom: max(clamp(40px, 10vw, 96px), calc(env(safe-area-inset-bottom, 0px) + 28px));
 }
 
-/* ── Deep-water atmosphere ────────────────────────────────────────────────── */
+/* ── Static mineral atmosphere (no caustic / mote / current motion) ───────── */
 
-/* Depth gradient — abyss at the bottom, light filtering down from the surface. */
+/* Soft mineral depth — void at the bottom, quiet face light from above. */
 .conn-sea-depth {
   position: absolute;
   inset: 0;
   z-index: -3;
   pointer-events: none;
   background:
-    radial-gradient(120% 80% at 50% -10%,
-      color-mix(in oklab, var(--lapis-deep) 30%, transparent) 0%,
-      color-mix(in oklab, var(--stone-2) 24%, transparent) 26%,
-      transparent 62%),
-    radial-gradient(90% 60% at 76% 8%,
-      color-mix(in oklab, var(--lapis) 12%, transparent) 0%,
-      transparent 55%),
+    radial-gradient(90% 55% at 50% -8%,
+      color-mix(in oklab, var(--lapis) 8%, transparent) 0%,
+      transparent 58%),
+    radial-gradient(70% 40% at 88% 10%,
+      color-mix(in oklab, var(--stone-2) 50%, transparent) 0%,
+      transparent 60%),
     linear-gradient(180deg,
-      color-mix(in oklab, var(--stone-2) 60%, var(--ink)) 0%,
-      color-mix(in oklab, var(--stone)   40%, var(--ink)) 34%,
-      var(--ink) 82%);
+      color-mix(in oklab, var(--stone-2) 55%, var(--ink)) 0%,
+      color-mix(in oklab, var(--stone) 35%, var(--ink)) 40%,
+      var(--ink) 100%);
 }
 
-/* Caustics — very faint light bands drifting near the surface. */
+/* Legacy caustic layer — static hairline grid wash, never animated. */
 .conn-sea-caustics {
   position: absolute;
-  inset: -20% 0 auto 0;
-  height: 56%;
+  inset: -10% 0 auto 0;
+  height: 48%;
   z-index: -3;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.22;
   background:
-    repeating-linear-gradient(64deg,
-      transparent 0 26px,
-      color-mix(in oklab, var(--lapis-bright) 8%, transparent) 26px 30px,
-      transparent 30px 64px);
-  mask-image: linear-gradient(180deg, transparent, #000 18%, transparent 92%);
-  animation: conn-caustic-drift 26s linear infinite;
+    linear-gradient(var(--seam-faint) 1px, transparent 1px),
+    linear-gradient(90deg, var(--seam-faint) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(120% 90% at 50% 0%, #000 8%, transparent 72%);
+  animation: none;
 }
 
-@keyframes conn-caustic-drift {
-  to { background-position: 320px -120px; }
-}
-
-/* Currents — flowing azure SVG paths; one slowly drifts its dash offset. */
+/* Currents markup retained — hairline strokes only, no drift, no glow. */
 .conn-sea-currents {
   position: absolute;
   inset: 0;
@@ -75,25 +69,22 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.18;
 }
 .conn-sea-currents path {
   fill: none;
-  stroke: var(--lapis);
-  stroke-width: 1.2;
-  opacity: 0.42;
-  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--lapis) 50%, transparent));
+  stroke: color-mix(in oklab, var(--lapis) 55%, var(--seam));
+  stroke-width: 1;
+  opacity: 0.55;
+  filter: none;
 }
 .conn-sea-currents path.drift {
-  stroke: var(--lapis-bright);
-  stroke-dasharray: 4 12;
-  animation: conn-current-drift 11s linear infinite;
-}
-@keyframes conn-current-drift {
-  to { stroke-dashoffset: -160; }
+  stroke: color-mix(in oklab, var(--lapis) 40%, var(--seam));
+  stroke-dasharray: none;
+  animation: none;
 }
 
-/* Bioluminescence — sparse motes that softly pulse and rise. */
+/* Mote nodes kept for markup parity — static dim marks, no pulse/glow. */
 .conn-sea-motes {
   position: absolute;
   inset: 0;
@@ -105,32 +96,23 @@
   width: var(--mote-size, 2px);
   height: var(--mote-size, 2px);
   border-radius: var(--r-pill);
-  background: var(--lapis-bright);
-  box-shadow:
-    0 0 6px color-mix(in oklab, var(--lapis-bright) 80%, transparent),
-    0 0 12px color-mix(in oklab, var(--lapis) 60%, transparent);
-  opacity: 0.55;
-  animation: conn-mote-glow 5.4s var(--ease) infinite;
-  animation-delay: var(--mote-delay, 0ms);
+  background: color-mix(in oklab, var(--lapis) 45%, var(--paper-mute));
+  box-shadow: none;
+  opacity: 0.22;
+  animation: none;
 }
 .conn-sea-mote[data-tone='gold'] {
-  background: var(--gold-bright);
-  box-shadow:
-    0 0 6px color-mix(in oklab, var(--gold-bright) 80%, transparent),
-    0 0 12px color-mix(in oklab, var(--gold) 55%, transparent);
-}
-@keyframes conn-mote-glow {
-  0%, 100% { opacity: 0.22; transform: translateY(2px) scale(0.9); }
-  50%      { opacity: 0.85; transform: translateY(-4px) scale(1.1); }
+  background: color-mix(in oklab, var(--paper-mute) 70%, var(--gold));
+  box-shadow: none;
 }
 
-/* Film grain — faint texture over the water. */
+/* Film grain — faint static texture. */
 .conn-sea-grain {
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.04;
+  opacity: 0.03;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
@@ -138,46 +120,44 @@
 /* ── Surface card ──────────────────────────────────────────────────────────── */
 .conn-card {
   position: relative;
-  width: min(540px, calc(100vw - 40px));
-  border-radius: var(--r-md);
+  width: min(520px, calc(100vw - 40px));
+  border-radius: var(--r-lg, var(--r-md));
   background:
     linear-gradient(180deg,
-      color-mix(in oklab, var(--stone-3) 60%, var(--ink)),
-      color-mix(in oklab, var(--stone)   40%, var(--ink))
+      color-mix(in oklab, var(--surface-edge, var(--stone-3)) 48%, var(--surface-void, var(--ink))),
+      color-mix(in oklab, var(--surface-face, var(--stone)) 32%, var(--surface-void, var(--ink)))
     );
   border: 1px solid var(--seam-faint);
-  box-shadow:
-    0 48px 120px -56px rgba(0, 0, 0, 0.9),
-    0 0 70px -40px color-mix(in oklab, var(--lapis) 60%, transparent),
-    inset 0 1px 0 color-mix(in oklab, var(--lapis-bright) 18%, transparent);
-  backdrop-filter: blur(2px);
+  /* Shared elev-3 with landing aperture — landing → connect continuity */
+  box-shadow: var(--elev-3,
+    0 28px 56px -32px color-mix(in oklab, var(--ink) 90%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--paper) 5%, transparent));
+  backdrop-filter: none;
 }
 
-/* Bioluminescent crest hairline runs across the top edge of the card. */
+/* Quiet cyan crest hairline — no glow. */
 .conn-crest {
   position: absolute;
   inset: 0 0 auto 0;
-  height: 2px;
+  height: 1px;
   border-radius: var(--r-md) var(--r-md) 0 0;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in oklab, var(--lapis) 60%, transparent) 14%,
-    var(--lapis) 40%,
-    var(--lapis-bright) 50%,
-    var(--lapis) 60%,
-    color-mix(in oklab, var(--lapis) 60%, transparent) 86%,
+    color-mix(in oklab, var(--lapis) 45%, transparent) 18%,
+    color-mix(in oklab, var(--lapis) 70%, transparent) 50%,
+    color-mix(in oklab, var(--lapis) 45%, transparent) 82%,
     transparent 100%
   );
-  box-shadow: 0 0 14px color-mix(in oklab, var(--lapis-bright) 60%, transparent);
+  box-shadow: none;
 }
 
 /* ── Card body ── */
 .conn-body {
-  padding: clamp(26px, 4.4vw, 42px);
+  padding: clamp(24px, 4vw, 40px);
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: var(--gap-section, 1.5rem);
 }
 
 /* ── Brand header ── */
@@ -192,8 +172,8 @@
   align-items: center;
   justify-content: center;
   margin-bottom: 10px;
-  color: var(--lapis-bright);
-  filter: drop-shadow(0 0 14px color-mix(in oklab, var(--lapis-bright) 55%, transparent));
+  color: var(--lapis);
+  filter: none;
 }
 
 .conn-brand-mark {
@@ -207,9 +187,9 @@
   gap: 10px;
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.26em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--lapis-bright);
+  color: var(--paper-mute);
 }
 
 .conn-eyebrow::before {
@@ -221,25 +201,25 @@
 
 .conn-title {
   margin: 8px 0 0;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(2.2rem, 1rem + 4.8vw, 3.6rem);
-  line-height: 0.92;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: clamp(1.65rem, 1rem + 2.1vw, 2.2rem);
+  line-height: var(--leading-tight, 1.15);
+  letter-spacing: var(--tracking-title, -0.02em);
+  text-transform: none;
   color: var(--paper);
-  text-shadow: 0 0 30px color-mix(in oklab, var(--lapis) 30%, transparent);
+  text-shadow: none;
 }
 
 .conn-sub {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   font-family: var(--font-serif);
   font-style: italic;
   font-weight: 380;
-  font-size: 1.02rem;
-  line-height: 1.55;
+  font-size: var(--text-lg, 1.0625rem);
+  line-height: var(--leading-body, 1.55);
   color: var(--paper-dim);
-  max-width: 44ch;
+  max-width: 42ch;
 }
 
 /* ── Divider seam — a whisper hairline with an azure head ── */
@@ -271,14 +251,14 @@
   border-radius: var(--r-pill);
   flex: none;
   background: var(--ok);
-  box-shadow: 0 0 10px var(--ok);
+  box-shadow: none;
 }
 .conn-route[data-routing='true'] {
   color: var(--paper-mute);
 }
 .conn-route[data-routing='true'] .conn-route-dot {
-  background: var(--lapis-bright);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--lapis-bright) 80%, transparent);
+  background: var(--lapis);
+  box-shadow: none;
   animation: conn-pulse 1.6s var(--ease) infinite;
 }
 
@@ -296,18 +276,18 @@
 .conn-mode {
   display: flex;
   min-width: 0;
-  min-height: 62px;
+  min-height: var(--target-min, 44px);
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   appearance: none;
   border: 1px solid transparent;
   border-radius: calc(var(--r-sm) - 1px);
-  padding: 10px 12px;
+  padding: 10px 11px;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--text-xs, 0.6875rem);
+  letter-spacing: var(--tracking-kicker, 0.12em);
   text-align: left;
   color: var(--paper-mute);
   background: transparent;
@@ -339,22 +319,24 @@
 
 .conn-mode:hover:not([data-active='true']):not(:disabled) {
   color: var(--paper-dim);
-  background: color-mix(in oklab, var(--stone-2) 30%, transparent);
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 36%, transparent);
 }
 
 .conn-mode[data-active='true'] {
-  color: var(--ink);
-  background: linear-gradient(180deg, var(--lapis-bright), var(--lapis));
-  border-color: transparent;
+  color: var(--on-accent, var(--ink));
+  background: var(--lapis);
+  border-color: color-mix(in oklab, var(--lapis) 70%, var(--seam));
   font-weight: 700;
-  box-shadow:
-    0 0 18px -6px color-mix(in oklab, var(--lapis-bright) 70%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 12%, transparent);
+}
+
+.conn-mode:active:not(:disabled) {
+  box-shadow: var(--elev-press, inset 0 1px 0 color-mix(in oklab, var(--ink) 18%, transparent));
 }
 
 .conn-mode:focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 2px;
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
 }
 
 .conn-mode:disabled {
@@ -367,28 +349,17 @@
   position: relative;
   overflow: hidden;
   display: grid;
-  gap: 16px;
-  padding: 18px;
-  border: 1px solid color-mix(in oklab, var(--lapis) 38%, var(--seam-faint));
+  gap: var(--gap-row, 0.75rem);
+  padding: var(--pad-panel, 1rem);
+  border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
-  background:
-    radial-gradient(100% 150% at 100% 0%,
-      color-mix(in oklab, var(--lapis-deep) 34%, transparent), transparent 60%),
-    color-mix(in oklab, var(--ink) 58%, var(--stone));
-  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--lapis-bright) 10%, transparent);
+  background: color-mix(in oklab, var(--surface-void, var(--ink)) 52%, var(--surface-face, var(--stone)));
+  box-shadow: var(--elev-1, inset 0 1px 0 color-mix(in oklab, var(--paper) 4%, transparent));
   animation: conn-rise var(--dur) var(--ease) both;
 }
 
 .conn-arrival::after {
-  content: '01';
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  font-family: var(--font-display);
-  font-size: 3.8rem;
-  line-height: 1;
-  color: color-mix(in oklab, var(--lapis-bright) 8%, transparent);
-  pointer-events: none;
+  content: none;
 }
 
 .conn-arrival-copy {
@@ -401,17 +372,17 @@
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--lapis-bright);
+  color: var(--paper-mute);
 }
 
 .conn-arrival-title {
   margin: 5px 0 0;
   font-family: var(--font-serif);
-  font-size: 1.15rem;
+  font-size: var(--text-lg, 1.0625rem);
   font-weight: 520;
-  line-height: 1.25;
+  line-height: var(--leading-snug, 1.35);
   color: var(--paper);
 }
 
@@ -425,7 +396,10 @@
 .conn-arrival-switch {
   appearance: none;
   margin-top: 10px;
-  padding: 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 2px;
   border: 0;
   border-bottom: 1px solid color-mix(in oklab, var(--lapis-bright) 38%, transparent);
   background: transparent;
@@ -487,12 +461,9 @@
   gap: 12px;
   padding: 13px 15px;
   border-radius: var(--r-sm);
-  border: 1px solid color-mix(in oklab, var(--lapis) 36%, transparent);
-  background:
-    radial-gradient(120% 140% at 0% 0%,
-      color-mix(in oklab, var(--lapis-deep) 30%, transparent), transparent 60%),
-    color-mix(in oklab, var(--ink) 56%, var(--stone));
-  box-shadow: 0 0 22px -12px color-mix(in oklab, var(--lapis) 70%, transparent);
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 52%, var(--stone));
+  box-shadow: none;
 }
 
 .conn-identities-head {
@@ -506,9 +477,9 @@
   display: block;
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--lapis-bright);
+  color: var(--paper-mute);
 }
 
 .conn-identities-title {
@@ -525,12 +496,12 @@
   width: 26px;
   height: 26px;
   flex: none;
-  border: 1px solid color-mix(in oklab, var(--lapis) 40%, transparent);
+  border: 1px solid var(--seam-faint);
   border-radius: 999px;
-  background: color-mix(in oklab, var(--lapis-deep) 24%, transparent);
+  background: color-mix(in oklab, var(--stone) 40%, transparent);
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--lapis-bright);
+  color: var(--paper-dim);
 }
 
 .conn-identities-list {
@@ -754,8 +725,8 @@
 }
 
 .conn-claim-step[data-current='true'] .conn-claim-dot {
-  background: var(--lapis-bright);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
+  background: var(--lapis);
+  box-shadow: none;
 }
 
 .conn-claim-copy {
@@ -784,29 +755,26 @@
   gap: 6px;
   padding: 15px 17px;
   border-radius: var(--r-sm);
-  border: 1px solid color-mix(in oklab, var(--lapis) 34%, transparent);
-  background:
-    radial-gradient(130% 150% at 100% 0%,
-      color-mix(in oklab, var(--lapis-deep) 26%, transparent), transparent 62%),
-    color-mix(in oklab, var(--ink) 58%, var(--stone));
-  box-shadow: 0 0 26px -14px color-mix(in oklab, var(--lapis) 70%, transparent);
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 52%, var(--stone));
+  box-shadow: none;
 }
 
 .conn-invite-eyebrow {
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--lapis-bright);
+  color: var(--paper-mute);
 }
 
 .conn-invite-title {
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 1.12rem;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.08rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   color: var(--paper);
 }
 
@@ -835,6 +803,16 @@
 .conn-password-row .onyx-field__input {
   flex: 1;
   min-width: 0;
+}
+
+/* Exact single-line geometry keeps the input text from sitting low in WebKit
+   or at fractional-rem display scales. Instrument Sans needs two more pixels
+   below its line box for optical, not merely mathematical, centering. */
+.conn .onyx-field__input {
+  height: 48px;
+  min-height: 48px;
+  padding: 10px 12px 12px;
+  line-height: 24px;
 }
 
 .conn-password-toggle {
@@ -957,12 +935,12 @@
 }
 .conn-strength-seg[data-on='true'] {
   background: var(--lapis);
-  box-shadow: 0 0 8px -2px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
+  box-shadow: none;
 }
 .conn-strength[data-score='1'] .conn-strength-seg[data-on='true'] { background: var(--shu); box-shadow: none; }
 .conn-strength[data-score='2'] .conn-strength-seg[data-on='true'] { background: var(--warn); box-shadow: none; }
 .conn-strength[data-score='3'] .conn-strength-seg[data-on='true'] { background: var(--lapis); }
-.conn-strength[data-score='4'] .conn-strength-seg[data-on='true'] { background: var(--ok); box-shadow: 0 0 8px -2px color-mix(in oklab, var(--ok) 70%, transparent); }
+.conn-strength[data-score='4'] .conn-strength-seg[data-on='true'] { background: var(--ok); box-shadow: none; }
 
 .conn-strength-label {
   flex: none;
@@ -995,9 +973,9 @@
 }
 .conn-step-dot[data-done='true'] { background: var(--ok); border-color: transparent; }
 .conn-step-dot[data-active='true'] {
-  background: var(--lapis-bright);
+  background: var(--lapis);
   border-color: transparent;
-  box-shadow: 0 0 10px color-mix(in oklab, var(--lapis-bright) 80%, transparent);
+  box-shadow: none;
   animation: conn-pulse 1.6s var(--ease) infinite;
 }
 .conn-step-line {
@@ -1142,9 +1120,9 @@
 }
 
 .conn-toggle-switch input:checked + .conn-toggle-track {
-  background: color-mix(in oklab, var(--lapis-deep) 70%, var(--stone));
+  background: color-mix(in oklab, var(--lapis) 55%, var(--stone));
   border-color: var(--lapis);
-  box-shadow: 0 0 16px -4px color-mix(in oklab, var(--lapis) 80%, transparent);
+  box-shadow: none;
 }
 
 .conn-toggle-switch input:focus-visible + .conn-toggle-track {
@@ -1166,8 +1144,8 @@
 
 .conn-toggle-switch input:checked ~ .conn-toggle-thumb {
   transform: translateX(20px);
-  background: var(--lapis-bright);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--lapis-bright) 80%, transparent);
+  background: var(--paper);
+  box-shadow: none;
 }
 
 /* ── Status feedback (aria-live region) ── */
@@ -1199,8 +1177,8 @@
 }
 
 .conn-status[data-phase='idle']        .conn-status-dot { background: var(--paper-mute); }
-.conn-status[data-phase='connecting']  .conn-status-dot { background: var(--lapis-bright); box-shadow: 0 0 10px color-mix(in oklab, var(--lapis-bright) 80%, transparent); animation: conn-pulse 1.6s var(--ease) infinite; }
-.conn-status[data-phase='error']       .conn-status-dot { background: var(--shu); box-shadow: 0 0 10px color-mix(in oklab, var(--shu) 60%, transparent); }
+.conn-status[data-phase='connecting']  .conn-status-dot { background: var(--lapis); box-shadow: none; animation: conn-pulse 1.6s var(--ease) infinite; }
+.conn-status[data-phase='error']       .conn-status-dot { background: var(--shu); box-shadow: none; }
 
 @keyframes conn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
@@ -1217,7 +1195,7 @@
   color: var(--paper-dim);
 }
 
-.conn-status[data-phase='connecting']  .conn-status-phase { color: var(--lapis-bright); }
+.conn-status[data-phase='connecting']  .conn-status-phase { color: var(--lapis); }
 .conn-status[data-phase='error']       .conn-status-phase { color: var(--shu-bright); }
 
 .conn-status-msg {
@@ -1312,11 +1290,8 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Reduced motion — freeze the water ── */
+/* ── Reduced motion — freeze semantic pulse + enter transitions ── */
 @media (prefers-reduced-motion: reduce) {
-  .conn-sea-caustics,
-  .conn-sea-currents path.drift,
-  .conn-sea-mote,
   .conn-route[data-routing='true'] .conn-route-dot,
   .conn-status[data-phase='connecting'] .conn-status-dot,
   .conn-step-dot[data-active='true'],
@@ -1393,31 +1368,32 @@
     justify-content: flex-start;
     overflow-y: auto;
     padding: 0;
-    background:
-      radial-gradient(110% 54% at 50% -10%, color-mix(in oklab, var(--lapis-deep) 34%, transparent), transparent 72%),
-      var(--ink);
+    /* Keep the front door recognizably Onyx without returning to decorative
+       glow: a single mineral-blue threshold behind the full-height card. */
+    background: linear-gradient(
+      160deg,
+      color-mix(in oklab, var(--lapis-deep) 14%, var(--ink)),
+      var(--ink) 42%
+    );
   }
 
   .conn-sea-caustics,
   .conn-sea-currents,
   .conn-sea-motes {
-    opacity: 0.28;
+    opacity: 0.08;
   }
 
   .conn-card {
+    display: flex;
+    flex-direction: column;
     width: 100%;
     min-height: 100svh;
+    min-height: 100dvh;
     border-radius: 0;
     border-inline: 0;
     border-block: 0;
     box-shadow: none;
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in oklab, var(--stone-3) 64%, var(--ink)),
-        color-mix(in oklab, var(--stone) 28%, var(--ink)) 42%,
-        var(--ink) 100%
-      );
+    background: color-mix(in oklab, var(--stone) 22%, var(--ink));
   }
 
   .conn-crest {
@@ -1425,11 +1401,13 @@
   }
 
   .conn-body {
-    gap: 18px;
+    flex: 1 1 auto;
+    gap: 16px;
     padding:
-      max(22px, calc(env(safe-area-inset-top, 0px) + 16px))
-      18px
-      max(22px, calc(env(safe-area-inset-bottom, 0px) + 18px));
+      max(24px, calc(env(safe-area-inset-top, 0px) + 14px))
+      max(16px, env(safe-area-inset-right, 0px))
+      24px
+      max(16px, env(safe-area-inset-left, 0px));
   }
 
   .conn-header {
@@ -1445,8 +1423,8 @@
   }
 
   .conn-brand-mark {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
   }
 
   .conn-eyebrow::before {
@@ -1456,8 +1434,8 @@
   .conn-title {
     grid-column: 1 / -1;
     margin-top: 10px;
-    font-size: clamp(3rem, 1.5rem + 15vw, 4.7rem);
-    line-height: 0.86;
+    font-size: clamp(1.55rem, 1.15rem + 3.8vw, 2rem);
+    line-height: 1.12;
   }
 
   .conn-sub {
@@ -1472,14 +1450,13 @@
     position: sticky;
     top: max(8px, env(safe-area-inset-top, 0px));
     z-index: 4;
-    gap: 6px;
-    padding: 6px;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--seam-faint);
     border-radius: var(--r-md);
-    background:
-      linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 70%, transparent), transparent),
-      color-mix(in oklab, var(--ink) 92%, var(--stone));
-    -webkit-backdrop-filter: blur(16px) saturate(1.2);
-    backdrop-filter: blur(16px) saturate(1.2);
+    background: color-mix(in oklab, var(--ink) 94%, var(--stone));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   .conn-mode {
@@ -1494,7 +1471,7 @@
   }
 
   .conn-arrival {
-    padding: 16px;
+    padding: 14px;
   }
 
   .conn-arrival-map {
@@ -1506,7 +1483,7 @@
   .conn-arrival-map > div:first-child,
   .conn-arrival-map > div:last-child {
     display: grid;
-    grid-template-columns: 90px minmax(0, 1fr);
+    grid-template-columns: minmax(72px, 88px) minmax(0, 1fr);
     gap: 10px;
     align-items: baseline;
     padding: 8px 0;
@@ -1558,6 +1535,7 @@
 
   .conn-password-toggle {
     min-width: 58px;
+    min-height: 48px;
     padding-inline: 10px;
   }
 
@@ -1572,11 +1550,75 @@
   }
 
   .conn-actions {
-    margin-top: 14px !important;
+    position: sticky;
+    z-index: 3;
+    bottom: 0;
+    margin-top: 12px !important;
+    padding: 10px 0 4px;
+    background: color-mix(in oklab, var(--ink) 96%, var(--stone));
+  }
+
+  .conn-submit {
+    width: 100%;
   }
 
   .conn-foot {
+    flex: none;
     padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Short landscape phones: keep modes + primary action reachable. */
+@media (max-width: 900px) and (max-height: 420px) and (orientation: landscape) {
+  .conn-body {
+    gap: 10px;
+    padding-block: 10px;
+  }
+
+  .conn-title {
+    font-size: 1.35rem;
+    margin-top: 4px;
+  }
+
+  .conn-sub {
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
+
+  .conn-modes {
+    top: 4px;
+  }
+
+  .conn-mode {
+    min-height: 40px;
+    padding-block: 8px;
+  }
+
+  .conn .onyx-field__input,
+  .conn-password-toggle,
+  .conn-passkey-button,
+  .conn-submit {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 520px) and (forced-colors: active) {
+  .conn,
+  .conn-card,
+  .conn-modes,
+  .conn-actions {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+  }
+
+  .conn-mode,
+  .conn-submit,
+  .conn-passkey-button,
+  .conn-password-toggle {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
   }
 }
 

@@ -17,8 +17,10 @@
 import 'fake-indexeddb/auto';
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { IDBFactory } from 'fake-indexeddb';
+import { createRoot } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { store } from '@/lib/store/store';
 import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import { _resetVaultForTests, queueOutbox } from '@/lib/vault/historyVault';
@@ -63,23 +65,84 @@ describe('Composer accessibility', () => {
     seedActiveChannel();
 
     // Act
-    const { getByRole } = render(() => <Composer />);
+    const { getByRole, queryByRole } = render(() => <Composer />);
 
-    // Assert
-    expect(getByRole('textbox', { name: /message #room/i })).toBeDefined();
+    // Assert — Standard primary: Attach · message · Emoji · More · Send
+    const message = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
+    expect(message).toBeDefined();
+    expect(message.placeholder).toBe('Message');
+    expect(message.placeholder).not.toMatch(/\/search|\/mute|\/export|\/help/);
     expect(getByRole('button', { name: 'Attach files' })).toBeDefined();
     expect(getByRole('button', { name: 'Insert emoji' })).toBeDefined();
-    expect(getByRole('button', { name: 'Jump to date in conversation history' })).toBeDefined();
+    expect(getByRole('button', { name: 'More tools' })).toBeDefined();
     expect(getByRole('button', { name: 'Send message' })).toBeDefined();
+    // Advanced controls stay out of the primary row until More opens.
+    expect(queryByRole('button', { name: 'Jump to date in conversation history' })).toBeNull();
+    expect(queryByRole('button', { name: 'Schedule message to send later' })).toBeNull();
+    expect(queryByRole('button', { name: /export|format/i })).toBeNull();
   });
 
-  it('opens the jump-to-date sheet from the composer tool', () => {
+  it('locks Standard primary control order: attach, message, emoji, more, send', () => {
     seedActiveChannel();
-    const { getByRole } = render(() => <Composer />);
+    const { container } = render(() => <Composer />);
+    const row = container.querySelector('[data-composer-primary-row]') as HTMLElement;
+    expect(row).toBeTruthy();
+    const primaries = Array.from(row.querySelectorAll('[data-composer-primary]')).map(
+      (el) => el.getAttribute('data-composer-primary'),
+    );
+    expect(primaries).toEqual(['attach', 'message', 'emoji', 'more', 'send']);
+  });
 
+  it('opens More tools with aria state and restores focus on Escape', async () => {
+    seedActiveChannel();
+    const { getByRole, getByTestId, queryByTestId } = render(() => <Composer />);
+    const more = getByRole('button', { name: 'More tools' }) as HTMLButtonElement;
+
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    expect(more.getAttribute('aria-controls')).toBe('shell-composer-tools');
+    fireEvent.click(more);
+
+    const tray = getByTestId('composer-tools-tray');
+    expect(tray.getAttribute('role')).toBe('dialog');
+    expect(tray.getAttribute('aria-modal')).toBe('false');
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    // Advanced controls appear only after More.
+    expect(getByRole('button', { name: 'Schedule message to send later' })).toBeDefined();
+    expect(getByRole('button', { name: 'Jump to date in conversation history' })).toBeDefined();
+    expect(getByRole('button', { name: 'Insert /' })).toBeDefined();
+    // No invented formatting/export chrome.
+    expect(queryByTestId('composer-tools-tray')!.textContent).not.toMatch(/\bExport\b|\bFormat\b/);
+
+    fireEvent.keyDown(tray, { key: 'Escape' });
+    expect(queryByTestId('composer-tools-tray')).toBeNull();
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    await Promise.resolve();
+    expect(document.activeElement).toBe(more);
+  });
+
+  it('opens the jump-to-date sheet from More tools and closes the tray', () => {
+    seedActiveChannel();
+    const { getByRole, queryByTestId } = render(() => <Composer />);
+
+    fireEvent.click(getByRole('button', { name: 'More tools' }));
     fireEvent.click(getByRole('button', { name: 'Jump to date in conversation history' }));
 
     expect(store.getState().showJumpToDate).toBe(true);
+    expect(queryByTestId('composer-tools-tray')).toBeNull();
+  });
+
+  it('Insert / only focuses and inserts a slash without sending a command', async () => {
+    seedActiveChannel();
+    const sendSpy = vi.spyOn(store.getState(), 'sendMessage').mockImplementation(() => {});
+    const { getByRole } = render(() => <Composer />);
+    const textarea = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
+
+    fireEvent.click(getByRole('button', { name: 'More tools' }));
+    fireEvent.click(getByRole('button', { name: 'Insert /' }));
+
+    await Promise.resolve();
+    expect(textarea.value).toBe('/');
+    expect(sendSpy).not.toHaveBeenCalled();
   });
 
   it('releases a local attachment preview when the account owner changes', async () => {
@@ -419,35 +482,51 @@ describe('Composer schedule (send later)', () => {
     cleanup();
   });
 
-  it('disables the schedule button until there is plain text', () => {
+  function openScheduleFromMore(
+    getByRole: ReturnType<typeof render>['getByRole'],
+  ): void {
+    fireEvent.click(getByRole('button', { name: 'More tools' }));
+    fireEvent.click(getByRole('button', { name: 'Schedule message to send later' }));
+  }
+
+  it('disables the schedule control until there is plain text (truthful in More)', () => {
     seedActiveChannel();
-    const { getByRole } = render(() => <Composer />);
+    const { getByRole, queryByRole } = render(() => <Composer />);
+    // Schedule is not a primary control.
+    expect(queryByRole('button', { name: 'Schedule message to send later' })).toBeNull();
+
+    fireEvent.click(getByRole('button', { name: 'More tools' }));
     const scheduleBtn = getByRole('button', {
       name: 'Schedule message to send later',
     }) as HTMLButtonElement;
 
     // Empty composer: nothing to schedule.
     expect(scheduleBtn.disabled).toBe(true);
+    expect(scheduleBtn.textContent).toMatch(/Type a message before scheduling/i);
 
     // Plain text enables it; a slash command does not (never queued).
     const textarea = getByRole('textbox', { name: /message #room/i });
     fireEvent.input(textarea, { target: { value: 'ping later' } });
     expect(scheduleBtn.disabled).toBe(false);
+    expect(scheduleBtn.textContent).toMatch(/Schedule this message for a time you pick/i);
 
     fireEvent.input(textarea, { target: { value: '/me waves' } });
     expect(scheduleBtn.disabled).toBe(true);
+    expect(scheduleBtn.textContent).toMatch(/Slash commands cannot be scheduled/i);
   });
 
-  it('round-trips: a preset queues the composer text and clears it', () => {
+  it('round-trips: More → schedule preset queues the composer text and clears it', () => {
     seedActiveChannel();
-    const { getByRole } = render(() => <Composer />);
+    const { getByRole, queryByTestId } = render(() => <Composer />);
     const textarea = getByRole('textbox', {
       name: /message #room/i,
     }) as HTMLTextAreaElement;
 
-    // Arrange — write a message and open the schedule dialog.
+    // Arrange — write a message and open schedule through More tools.
     fireEvent.input(textarea, { target: { value: 'stand-up reminder' } });
-    fireEvent.click(getByRole('button', { name: 'Schedule message to send later' }));
+    openScheduleFromMore(getByRole);
+    // Opening schedule closes the tools tray.
+    expect(queryByTestId('composer-tools-tray')).toBeNull();
 
     // Act — pick the first preset.
     const dialog = getByRole('dialog', { name: 'Schedule message' });
@@ -478,7 +557,7 @@ describe('Composer schedule (send later)', () => {
     fireEvent.input(getByRole('textbox', { name: /message #room/i }), {
       target: { value: 'Bob draft' },
     });
-    fireEvent.click(getByRole('button', { name: 'Schedule message to send later' }));
+    openScheduleFromMore(getByRole);
 
     expect(queryByRole('button', { name: 'View 1 scheduled' })).toBeNull();
 
@@ -492,11 +571,64 @@ describe('Composer schedule (send later)', () => {
     const textarea = getByRole('textbox', { name: /message #room/i });
     fireEvent.input(textarea, { target: { value: 'hi' } });
 
-    fireEvent.click(getByRole('button', { name: 'Schedule message to send later' }));
+    openScheduleFromMore(getByRole);
     const dialog = getByRole('dialog', { name: 'Schedule message' });
     expect(dialog.querySelectorAll('.shell-schedule-preset').length).toBeGreaterThan(0);
     // The custom time field is labelled for keyboard/AT users.
     expect(getByRole('textbox', { name: /message #room/i })).toBeDefined();
+  });
+
+  it('opens schedule via the always-mounted data-composer-schedule bridge while More is closed', async () => {
+    seedActiveChannel();
+    let disposeKb: (() => void) | undefined;
+    createRoot((dispose) => {
+      disposeKb = dispose;
+      useKeyboardShortcuts();
+    });
+    const { getByRole, queryByRole, container } = render(() => <Composer />);
+    const textarea = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
+    fireEvent.input(textarea, { target: { value: 'send me later' } });
+
+    // No accessible Schedule control in the primary row / AT tree while More is closed.
+    expect(queryByRole('button', { name: 'Schedule message to send later' })).toBeNull();
+    const primaryRow = container.querySelector('[data-composer-primary-row]');
+    expect(primaryRow?.querySelector('[aria-label="Schedule message to send later"]')).toBeNull();
+    expect(queryByRole('dialog', { name: 'More composer tools' })).toBeNull();
+
+    // Bridge is always mounted, uniquely owns data-composer-schedule, truthful disabled.
+    const bridges = document.querySelectorAll<HTMLButtonElement>('[data-composer-schedule]');
+    expect(bridges).toHaveLength(1);
+    const bridge = bridges[0]!;
+    expect(bridge.disabled).toBe(false);
+    expect(bridge.getAttribute('aria-hidden')).toBe('true');
+    expect(bridge.hasAttribute('hidden')).toBe(true);
+
+    // Invoke the real registered chord (composer.schedule → clickComposerControl).
+    textarea.focus();
+    fireEvent.keyDown(textarea, { key: 'l', ctrlKey: true, shiftKey: true });
+
+    const dialog = getByRole('dialog', { name: 'Schedule message' });
+    expect(dialog).toBeDefined();
+    // Still a single accessible Schedule name path (none) — dialog is Schedule message, not a button.
+    expect(queryByRole('button', { name: 'Schedule message to send later' })).toBeNull();
+
+    await waitFor(() => {
+      const firstPreset = dialog.querySelector('.shell-schedule-preset');
+      expect(firstPreset).toBeTruthy();
+      expect(document.activeElement).toBe(firstPreset);
+    });
+
+    disposeKb?.();
+  });
+
+  it('bridge stays disabled when the composer cannot schedule (More still closed)', () => {
+    seedActiveChannel();
+    const { queryByRole } = render(() => <Composer />);
+    // Empty text → cannot schedule; bridge mirrors canSchedule.
+    const bridge = document.querySelector<HTMLButtonElement>('[data-composer-schedule]');
+    expect(bridge).toBeTruthy();
+    expect(bridge!.disabled).toBe(true);
+    expect(queryByRole('button', { name: 'Schedule message to send later' })).toBeNull();
   });
 });
 

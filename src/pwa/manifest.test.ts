@@ -43,7 +43,39 @@ describe('PWA manifest', () => {
 
     expect(publicMetadata).not.toMatch(/IRCXNet/i);
     expect(manifest.description).toContain('Onyx mesh');
-    expect(entryDocument).toContain('<title>Onyx — open rooms on the mesh</title>');
+    expect(entryDocument).toContain('<title>Onyx — a room for your people</title>');
+  });
+
+  it('states public-service entry truth and rejects premature desktop ship wording', () => {
+    const entryDocument = readFileSync(entryDocumentPath, 'utf8');
+    const document = new DOMParser().parseFromString(entryDocument, 'text/html');
+    const title = document.querySelector('title')?.textContent ?? '';
+    const description = document.querySelector('meta[name="description"]')?.getAttribute('content') ?? '';
+    const ogDescription = document.querySelector('meta[property="og:description"]')?.getAttribute('content') ?? '';
+    const twitterDescription = document.querySelector('meta[name="twitter:description"]')?.getAttribute('content') ?? '';
+    const entryMetadata = [title, description, ogDescription, twitterDescription].join('\n');
+
+    expect(title).toBe('Onyx — a room for your people');
+    expect(description).toMatch(/Open Onyx in your browser/i);
+    expect(description).toMatch(/rooms, messages, calls/i);
+    expect(description).toMatch(/desktop and mobile/i);
+    expect(description).toMatch(/native download/i);
+    expect(ogDescription).toBe(description);
+    expect(twitterDescription).toBe(description);
+
+    // Premature native-ship promises must stay out of entry/share metadata.
+    // Keep patterns specific so form-factor labels like "desktop connect screen"
+    // in the install manifest are not false positives.
+    for (const surface of [entryDocument, entryMetadata]) {
+      expect(surface).not.toMatch(/desktop apps are part of the launch/i);
+      expect(surface).not.toMatch(/desktop apps with the launch/i);
+      expect(surface).not.toMatch(/Desktop apps ship with the launch/i);
+      expect(surface).not.toMatch(/Desktop with the launch/i);
+      expect(surface).not.toMatch(/downloadable desktop apps are part of/i);
+      expect(surface).not.toMatch(/signed installer available/i);
+      expect(surface).not.toMatch(/get the desktop app/i);
+      expect(surface).not.toMatch(/download now/i);
+    }
   });
 
   it('keeps installed launches on the app route with wrapper-safe display metadata', () => {
@@ -134,8 +166,9 @@ describe('PWA manifest', () => {
     const occurrences = worker.match(new RegExp(placeholder, 'g')) ?? [];
 
     expect(occurrences).toHaveLength(1);
-    expect(deploy).toContain('s/onyx-shell-__BUILD_VERSION__/onyx-shell-${VERSION}/');
-    expect(deploy).toContain('grep -q "onyx-shell-${VERSION}" dist/sw.js');
+    // deploy_main stamps with lowercase shell `version` (compose_version result).
+    expect(deploy).toContain('s/onyx-shell-__BUILD_VERSION__/onyx-shell-${version}/');
+    expect(deploy).toContain('grep -q "onyx-shell-${version}" dist/sw.js');
 
     const stamped = worker.replace(placeholder, 'onyx-shell-20260716-test');
     expect(stamped).not.toContain('__BUILD_VERSION__');
@@ -144,38 +177,75 @@ describe('PWA manifest', () => {
 
   it('fails closed before a missing community site can erase public routes', () => {
     const deploy = readFileSync(deployScriptPath, 'utf8');
-    const landingGuard = deploy.indexOf('test -d "${LANDING}"');
-    const clientBuild = deploy.indexOf('NODE_OPTIONS="--disable-warning=DEP0205" pnpm build');
-    const liveSync = deploy.indexOf('rsync -a --delete dist/ out/');
+    // Pin deploy_main ordering: LANDING must exist before client build and live sync.
+    const deployMain = deploy.indexOf('deploy_main() {');
+    const landingGuard = deploy.indexOf('test -d "${LANDING}"', deployMain);
+    const clientBuild = deploy.indexOf(
+      'NODE_OPTIONS="--disable-warning=DEP0205" pnpm build',
+      deployMain,
+    );
+    const liveSync = deploy.indexOf(
+      'sync_live_with_rollback "${ROOT}/dist" "${live_out}" "${version}"',
+      deployMain,
+    );
 
-    expect(landingGuard).toBeGreaterThan(0);
-    expect(landingGuard).toBeLessThan(clientBuild);
-    expect(landingGuard).toBeLessThan(liveSync);
-    expect(deploy).toContain('refusing to remove the public website');
+    expect(deployMain).toBeGreaterThanOrEqual(0);
+    expect(landingGuard).toBeGreaterThan(deployMain);
+    expect(clientBuild).toBeGreaterThan(landingGuard);
+    expect(liveSync).toBeGreaterThan(clientBuild);
+    expect(deploy).toContain(
+      'FAIL: ${LANDING} missing — cannot stage legacy support resources',
+    );
+    // Fail-closed only — no optional/bare-SPA landing path.
     expect(deploy).not.toContain('deploying the bare SPA');
     expect(deploy).not.toMatch(/if \[ -d "\$\{LANDING\}" \]/);
   });
 
   it('keeps landing overlays out of application-owned routes and PWA assets', () => {
     const deploy = readFileSync(deployScriptPath, 'utf8');
-    const reservedSource = deploy.match(/for reserved in \\\n([\s\S]*?); do/)?.[1];
-    const reserved = reservedSource?.replaceAll('\\', ' ').trim().split(/\s+/).sort();
+    // Deterministic parse of SPA_OWNED_BLOCKLIST=( ... ) — not the removed for-reserved loop.
+    const blocklistMatch = deploy.match(
+      /SPA_OWNED_BLOCKLIST=\(\n([\s\S]*?)\n\)/,
+    );
+    expect(blocklistMatch).not.toBeNull();
+    const blocklist = (blocklistMatch?.[1] ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith('#'))
+      .sort();
 
-    expect(reserved).toEqual([
+    expect(blocklist).toEqual([
       'about',
+      'accessibility',
+      'agents',
       'app',
       'appearance',
       'assets',
+      'codecs',
+      'download',
+      'downloads',
+      'favicon.ico',
+      'favicon.svg',
+      'glossary',
       'icon-192.png',
       'icon-512.png',
+      'index.html',
+      'integrations',
       'invite',
       'manifest.json',
       'opcodec_wasm.js',
       'opcodec_wasm.wasm',
+      'roadmap',
+      'robots.txt',
       'screenshots',
+      'sitemap.xml',
+      'stats',
+      'status',
       'sw.js',
     ]);
-    expect(deploy).toContain('landing dist/${reserved} would clobber the SPA');
+    // Current collision guard contract (assert_no_spa_owned_in_landing_dist).
+    expect(deploy).toContain("conflicts with SPA-owned blocklist");
+    expect(deploy).toContain("must not be on the legacy allowlist");
   });
 
   it('bounds push content and keeps notification targets on canonical app routes', async () => {

@@ -15,6 +15,12 @@ import { Sheet } from '@/primitives';
 import { useStore, getState } from '@/lib/store';
 import { useThemeOptional, THEMES, THEME_IDS, customThemeTokens, getCustomTheme, type CustomTheme } from '@/theme';
 import { backgroundOptions } from '@/backgrounds';
+import {
+  SCENE_MOTIONS,
+  sceneMotion,
+  setSceneMotion,
+  type SceneMotion,
+} from '@/lib/prefs/sceneMotion';
 import { AUTO_BACKGROUND_ID } from './themeBackground';
 import { ThemeImportDialog } from './ThemeImportDialog';
 
@@ -34,6 +40,23 @@ export function AppearancePanel(): JSX.Element {
   const open = useStore((s) => s.showAppearance);
   const backgroundId = useStore((s) => s.backgroundId);
   const [themeDialogOpen, setThemeDialogOpen] = createSignal(false);
+  const selectedBackground = createMemo(() => {
+    if (backgroundId() === AUTO_BACKGROUND_ID) return 'Auto · matches theme';
+    return backgroundOptions.find((option) => option.id === backgroundId())?.label ?? 'Custom background';
+  });
+
+  function chooseBackground(id: string): void {
+    // A new wallpaper selection is explicit intent to see it. Do not let an
+    // old hidden "Off" setting make every mobile tap appear broken.
+    if (sceneMotion() === 'off') setSceneMotion('animated');
+    getState().setBackground(id);
+  }
+
+  const motionLabel: Record<SceneMotion, string> = {
+    animated: 'Animated',
+    still: 'Still',
+    off: 'Off',
+  };
 
   // Built-in themes followed by the user's saved custom themes.
   const themeEntries = createMemo<ThemeEntry[]>(() => {
@@ -86,7 +109,7 @@ export function AppearancePanel(): JSX.Element {
                 Share / import
               </button>
             </div>
-            <div class="ap-panel-themes" role="radiogroup" aria-label="Theme">
+            <div class="ap-panel-themes" role="radiogroup" aria-label="Theme" style={{ 'touch-action': 'manipulation' }}>
               <For each={themeEntries()}>
                 {(entry) => {
                   const active = () => theme.themeId() === entry.id;
@@ -99,6 +122,7 @@ export function AppearancePanel(): JSX.Element {
                       aria-checked={active()}
                       aria-label={`${entry.label} theme`}
                       title={entry.title}
+                      style={{ 'min-height': '44px', 'touch-action': 'manipulation' }}
                       onClick={() => theme.setTheme(entry.id)}
                     >
                       <span class="ap-theme-swatch" aria-hidden="true">
@@ -114,8 +138,30 @@ export function AppearancePanel(): JSX.Element {
 
           {/* ── Background ── */}
           <section class="ap-panel-group">
-            <h3 class="ap-panel-label">Background</h3>
-            <div class="ap-panel-bgs" role="radiogroup" aria-label="Background">
+            <div class="ap-panel-heading-row">
+              <h3 class="ap-panel-label">Background</h3>
+              <span class="ap-panel-current" aria-live="polite">{selectedBackground()}</span>
+            </div>
+            <div class="ap-motion-control">
+              <span class="ap-motion-label">Motion</span>
+              <div class="ap-motion-options" role="radiogroup" aria-label="Background motion">
+                <For each={SCENE_MOTIONS}>
+                  {(value) => (
+                    <button
+                      type="button"
+                      class="ap-motion-option"
+                      classList={{ 'ap-motion-option--on': sceneMotion() === value }}
+                      role="radio"
+                      aria-checked={sceneMotion() === value}
+                      onClick={() => setSceneMotion(value)}
+                    >
+                      {motionLabel[value]}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+            <div class="ap-panel-bgs" role="radiogroup" aria-label="Background" style={{ 'touch-action': 'manipulation' }}>
               <button
                 type="button"
                 class="ap-bg-chip"
@@ -123,7 +169,8 @@ export function AppearancePanel(): JSX.Element {
                 role="radio"
                 aria-checked={backgroundId() === AUTO_BACKGROUND_ID}
                 aria-label="Auto — theme-matched background"
-                onClick={() => getState().setBackground(AUTO_BACKGROUND_ID)}
+                style={{ 'min-height': '44px', 'touch-action': 'manipulation' }}
+                onClick={() => chooseBackground(AUTO_BACKGROUND_ID)}
               >
                 <span class="ap-bg-name">Auto</span>
                 <span class="ap-bg-kind" data-kind="animated">match theme</span>
@@ -138,7 +185,8 @@ export function AppearancePanel(): JSX.Element {
                       classList={{ 'ap-bg-chip--on': active() }}
                       role="radio"
                       aria-checked={active()}
-                      onClick={() => getState().setBackground(opt.id)}
+                      style={{ 'min-height': '44px', 'touch-action': 'manipulation' }}
+                      onClick={() => chooseBackground(opt.id)}
                     >
                       <span class="ap-bg-name">{opt.label}</span>
                       <span class="ap-bg-kind" data-kind={opt.kind}>{opt.kind}</span>

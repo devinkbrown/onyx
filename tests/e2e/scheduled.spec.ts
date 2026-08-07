@@ -5,11 +5,13 @@ import { test, expect, chromium, type Browser, type Page } from '@playwright/tes
 // prior browser coverage. Two journeys, both asserted on what a HUMAN observes:
 //
 //   1. SCHEDULE → QUEUE → CANCEL (no timing dependency, fully UI-driven):
-//        connect → join a fresh channel → type in the real composer → open the
-//        composer's "send later" clock → pick a preset → the message lands in the
-//        ScheduledMessagesSheet pending queue with the right channel + text +
-//        time → hit Cancel → it's gone. Nothing here waits on a wall clock, so it
-//        is deterministic.
+//        connect → join a fresh channel → type in the real composer → open
+//        More tools → assert the More composer tools tray → click
+//        "Schedule message to send later" → pick a preset → the message lands in
+//        the ScheduledMessagesSheet pending queue with the right channel + text +
+//        time → re-open schedule via More tools → View N scheduled → Cancel →
+//        it's gone. Schedule is NOT a primary-row control (lives only in More).
+//        Nothing here waits on a wall clock, so it is deterministic.
 //
 //   2. DUE ENTRY DISPATCHES (real invariant, near-future time): schedule a
 //        message just past the minimum lead (MIN_LEAD_MS = 30s) and prove the
@@ -195,7 +197,7 @@ test.describe('scheduled messages · "send later" (connected DEV build)', () => 
     await browser?.close();
   });
 
-  test('schedule via the composer clock → it appears in the queue → cancel removes it', async () => {
+  test('schedule via More tools → it appears in the queue → cancel removes it', async () => {
     test.setTimeout(120_000);
     const chan = freshChannel('schedqa');
     const nick = 'schedA' + Math.floor(Math.random() * 1e4);
@@ -206,19 +208,31 @@ test.describe('scheduled messages · "send later" (connected DEV build)', () => 
       const page = await ctx.newPage();
       const composer = await enterFreshChannel(page, nick, chan);
 
-      // Real user action: type a message, then open the composer's "send later"
-      // clock. The clock trigger only enables for plain, non-empty text.
+      // Real user action: type a message, open More tools, then Schedule message
+      // to send later. Schedule is not a primary-row control — it lives only inside
+      // the More composer tools tray (plain, non-empty text enables it).
       await composer.click();
       await composer.fill(body);
 
-      const clock = page.getByRole('button', { name: 'Schedule message to send later' });
-      await expect(clock).toBeEnabled();
-      await clock.click();
+      // No accessible Schedule control on the primary row before More is open.
+      await expect(
+        page.getByRole('button', { name: 'Schedule message to send later' }),
+      ).toHaveCount(0);
+
+      const moreTools = page.getByRole('button', { name: 'More tools' });
+      await moreTools.click();
+      const toolsTray = page.getByRole('dialog', { name: 'More composer tools' });
+      await expect(toolsTray).toBeVisible();
+
+      const scheduleBtn = page.getByRole('button', { name: 'Schedule message to send later' });
+      await expect(scheduleBtn).toBeEnabled();
+      await scheduleBtn.click();
 
       // The scheduling popover is a labelled dialog — its visibility is the
-      // observable signal the affordance opened.
+      // observable signal the affordance opened. Opening schedule closes More.
       const picker = page.getByRole('dialog', { name: 'Schedule message' });
       await expect(picker).toBeVisible();
+      await expect(toolsTray).toBeHidden();
 
       const approxNow = Date.now();
       // Pick the "In 15 minutes" preset — a concrete, checkable target time.
@@ -236,9 +250,13 @@ test.describe('scheduled messages · "send later" (connected DEV build)', () => 
       expect(leadMs, 'scheduled ~15 minutes out').toBeGreaterThan(14 * 60_000);
       expect(leadMs, 'scheduled ~15 minutes out').toBeLessThan(16 * 60_000);
 
-      // Observable success signal (what the human sees): open the queue sheet and
-      // find the entry rendered with its channel + text.
-      await clock.click();
+      // Observable success signal (what the human sees): re-open schedule via
+      // More tools (composer clears after queue, so re-type a stub to re-enable),
+      // then open the queue sheet and find the entry.
+      await composer.fill('stub-to-reopen-schedule');
+      await moreTools.click();
+      await expect(toolsTray).toBeVisible();
+      await scheduleBtn.click();
       await expect(picker).toBeVisible();
       await picker.getByRole('button', { name: /^View \d+ scheduled$/ }).click();
 

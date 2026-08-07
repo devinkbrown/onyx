@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { cleanup, render, waitFor } from '@solidjs/testing-library';
+import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadBackgroundVariant = vi.hoisted(() => vi.fn());
@@ -64,7 +65,7 @@ describe('Background lazy resource gating', () => {
     setSceneMotion('animated');
 
     await waitFor(() => expect(loadBackgroundVariant).toHaveBeenCalledTimes(1));
-    expect(loadBackgroundVariant).toHaveBeenCalledWith('starfield', expect.any(Object));
+    expect(loadBackgroundVariant.mock.calls[0]?.[0]).toBe('starfield');
     const host = await waitFor(() => {
       const element = container.querySelector('[data-background-id="starfield"]');
       expect(element).not.toBeNull();
@@ -118,5 +119,71 @@ describe('Background lazy resource gating', () => {
       expect(container.querySelector('[data-background-id="starfield"]')).toBeNull();
       expect(container.querySelector('[data-background-reduced-data="true"]')).not.toBeNull();
     });
+  });
+
+  it('loads a new chunk when Auto-resolved id transitions to an explicit scene', async () => {
+    // Hosts resolve 'auto' → theme signature before Background; simulate that
+    // by changing props.id from deep-current (signature) to starfield (pin).
+    const [id, setId] = createSignal('deep-current');
+    const { container } = render(() => <Background id={id()} />);
+    await waitFor(() => expect(loadBackgroundVariant.mock.calls.some((c) => c[0] === 'deep-current')).toBe(true));
+    await waitFor(() => expect(container.querySelector('[data-background-id="deep-current"]')).not.toBeNull());
+
+    loadBackgroundVariant.mockClear();
+    setId('starfield');
+
+    await waitFor(() => expect(loadBackgroundVariant.mock.calls.some((c) => c[0] === 'starfield')).toBe(true));
+    await waitFor(() => {
+      expect(container.querySelector('[data-background-id="starfield"]')).not.toBeNull();
+      expect(container.querySelector('[data-background-id="deep-current"]')).toBeNull();
+    });
+    expect((container.querySelector('[data-background-id="starfield"]') as HTMLElement).style.zIndex)
+      .toBe('0');
+  });
+
+  it('keeps the inert placeholder when a wallpaper chunk rejects (shell stays usable)', async () => {
+    loadBackgroundVariant.mockRejectedValueOnce(
+      new TypeError('Failed to fetch dynamically imported module: /assets/Starfield-deadbeef.js'),
+    );
+
+    const { container } = render(() => (
+      <div data-testid="shell-chrome">
+        <Background id="starfield" />
+        <button type="button">Open room</button>
+      </div>
+    ));
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-background-placeholder="true"]')).not.toBeNull();
+      expect(container.querySelector('[data-background-load-failed="true"]')).not.toBeNull();
+    });
+    // Interface chrome is not unmounted by a wallpaper load failure.
+    expect(container.querySelector('[data-testid="shell-chrome"] button')).toHaveTextContent('Open room');
+    expect(container.querySelector('[data-background-id="starfield"]')).toBeNull();
+  });
+
+  it('recovers when a later different wallpaper selection succeeds after a rejected chunk', async () => {
+    loadBackgroundVariant
+      .mockRejectedValueOnce(new TypeError('Failed to fetch dynamically imported module'))
+      .mockImplementation(async (id: string) => ({
+        id,
+        label: 'Test Scene',
+        kind: 'scene',
+        component: TestScene,
+      }));
+
+    const [id, setId] = createSignal('starfield');
+    const { container } = render(() => <Background id={id()} />);
+    await waitFor(() => {
+      expect(container.querySelector('[data-background-load-failed="true"]')).not.toBeNull();
+    });
+
+    setId('lightning');
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-background-id="lightning"]')).not.toBeNull();
+    });
+    expect(container.querySelector('[data-background-load-failed="true"]')).toBeNull();
+    expect(loadBackgroundVariant.mock.calls.some((c) => c[0] === 'lightning')).toBe(true);
   });
 });

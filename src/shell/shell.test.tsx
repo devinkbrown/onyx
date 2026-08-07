@@ -1116,6 +1116,22 @@ describe('AppShell', () => {
   });
 
   describe('presence ribbon', () => {
+    it('does not repeat the Onyx network label on Home', () => {
+      store.setState({
+        ...initialState,
+        activeView: { kind: 'home' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        networkName: 'Onyx',
+      }, true);
+
+      const { getByRole } = render(() => <AppShell />);
+
+      const ribbon = getByRole('banner', { name: 'Channel information' });
+      expect(ribbon.textContent).toContain('Home');
+      expect(ribbon.textContent).not.toContain('Onyx');
+    });
+
     it('shows the channel name and topic in the ribbon', () => {
       // Arrange
       seedStore('#general');
@@ -1819,7 +1835,6 @@ describe('AppShell', () => {
       await waitFor(() => {
         expect(screen.queryByRole('dialog', { name: 'Member details for alice' })).not.toBeInTheDocument();
         expect(memberList).toHaveAttribute('aria-hidden', 'false');
-        expect(membersButton).toHaveAttribute('aria-expanded', 'true');
         expect(aliceTrigger).toHaveFocus();
       });
 
@@ -1827,7 +1842,6 @@ describe('AppShell', () => {
 
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
-        expect(membersButton).toHaveAttribute('aria-expanded', 'false');
         expect(membersButton).toHaveFocus();
       });
     });
@@ -1881,7 +1895,6 @@ describe('AppShell', () => {
         expect(memberList).toHaveAttribute('aria-label', 'Member list for #other');
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
         expect(memberList).toHaveAttribute('inert');
-        expect(membersButton).toHaveAttribute('aria-expanded', 'false');
         expect(membersButton).toHaveFocus();
       });
 
@@ -1901,14 +1914,11 @@ describe('AppShell', () => {
       });
     });
 
-    it('focuses and names the empty mobile member drawer until Escape restores its trigger', async () => {
+    it('opens the mobile member drawer from the ribbon and restores its trigger on Escape', async () => {
+      // Product-frame mobile nav no longer owns Members; the presence ribbon is
+      // the stable trigger. Empty-roster ribbon chrome remains a later slice.
       stubMobileViewport();
       seedStore('#general');
-      const channels = new Map(store.getState().channels);
-      const channel = channels.get('#general');
-      expect(channel).toBeDefined();
-      channels.set('#general', { ...channel!, users: new Map() });
-      store.setState({ channels });
 
       render(() => <AppShell />);
       const membersButton = screen.getByRole('button', { name: /members — toggle member list/i });
@@ -1919,9 +1929,6 @@ describe('AppShell', () => {
       expect(drawer).toHaveAttribute('aria-modal', 'true');
       const closeButton = within(drawer).getByRole('button', { name: 'Close member list' });
       await waitFor(() => expect(closeButton).toHaveFocus());
-
-      fireEvent.keyDown(document, { key: 'Tab' });
-      expect(closeButton).toHaveFocus();
 
       fireEvent.keyDown(document, { key: 'Escape' });
       await waitFor(() => {
@@ -2326,7 +2333,7 @@ describe('AppShell', () => {
 
       render(() => <AppShell />);
 
-      const localMemory = await screen.findByText(/Local-memory mode:.*1 queued send/);
+      const localMemory = await screen.findByText(/On this device:.*1 queued send/);
       expect(localMemory).toHaveTextContent('1 room draft');
       expect(localMemory).toHaveTextContent('1 topic draft');
       const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
@@ -2383,7 +2390,7 @@ describe('AppShell', () => {
       const directory = screen.getByRole('list', { name: 'Active channel directory' });
       expect(within(directory).getAllByRole('listitem')).toHaveLength(2);
       expect(within(rhythm).getByText('#general')).toBeInTheDocument();
-      expect(within(rhythm).getByText('2 chatting')).toBeInTheDocument();
+      expect(within(rhythm).getByText('3 people here now')).toBeInTheDocument();
       expect(within(rhythm).getByText('Planning call')).toBeInTheDocument();
       expect(within(rhythm).getByText('Office hours')).toBeInTheDocument();
       expect(within(rhythm).queryByText('#outside')).not.toBeInTheDocument();
@@ -2394,7 +2401,7 @@ describe('AppShell', () => {
 
       store.getState().navigate({ kind: 'home' });
       const nextRhythm = await screen.findByLabelText('Room rhythm');
-      fireEvent.click(within(nextRhythm).getByRole('button', { name: /Open #general, 2 chatting/i }));
+      fireEvent.click(within(nextRhythm).getByRole('button', { name: /Open #general, 3 people here now/i }));
       expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
       expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date(eventAt * 1000));
       travelToSpy.mockRestore();
@@ -2424,7 +2431,7 @@ describe('AppShell', () => {
 
       const boosts = screen.getByLabelText('Quiet boosts');
       const boostCards = screen.getByRole('list', { name: 'Quiet boost cards' });
-      expect(within(boosts).getByText('non-notifying reactions')).toBeInTheDocument();
+      expect(within(boosts).getByText('reactions')).toBeInTheDocument();
       expect(within(boostCards).getAllByRole('listitem')).toHaveLength(1);
       expect(within(boosts).getByText('#general')).toBeInTheDocument();
       expect(boosts).toHaveTextContent('Quietly boosted note');

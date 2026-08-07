@@ -15,6 +15,8 @@ export default tseslint.config(
       'scratchpad/**',
       'deploy-backups/**',
       'out/**',
+      'zig-out/**',
+      '.zig-cache/**',
       'coverage/**',
       'dist/**',
       'test-results/**',

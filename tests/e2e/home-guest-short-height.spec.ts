@@ -5,7 +5,7 @@ type RuntimeStore = {
   setState: (partial: Record<string, unknown>) => void;
 };
 
-test('keeps guest claim and Home as separate short-height scrollers', async ({ page, browserName }) => {
+test('keeps the compact guest chip and claim sheet usable at short-height reflow', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'Safe-area inset override uses the Chromium DevTools protocol.');
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 320, height: 256 });
@@ -49,9 +49,9 @@ test('keeps guest claim and Home as separate short-height scrollers', async ({ p
     });
   });
 
-  const guest = page.getByRole('region', { name: 'Guest account' });
+  const guest = page.getByRole('region', { name: 'Keep this nick' });
   const home = page.locator('.home');
-  const searchAction = page.getByRole('button', { name: 'Search device memory' });
+  const searchAction = page.getByRole('button', { name: 'Search messages' });
   await expect(guest).toBeVisible();
   await expect(home).toBeVisible();
 
@@ -59,7 +59,7 @@ test('keeps guest claim and Home as separate short-height scrollers', async ({ p
     const guestRect = element.getBoundingClientRect();
     const home = document.querySelector<HTMLElement>('.home')!;
     const homeRect = home.getBoundingClientRect();
-    const dismissRect = element.querySelector<HTMLElement>('.guest-claim__dismiss')!
+    const dismissRect = element.querySelector<HTMLElement>('.guest-claim-chip__dismiss')!
       .getBoundingClientRect();
     return {
       documentClientWidth: document.documentElement.clientWidth,
@@ -69,7 +69,6 @@ test('keeps guest claim and Home as separate short-height scrollers', async ({ p
       guestTop: guestRect.top,
       guestRight: guestRect.right,
       guestBottom: guestRect.bottom,
-      guestOverflowY: getComputedStyle(element).overflowY,
       homeTop: homeRect.top,
       homeBottom: homeRect.bottom,
       homeClientHeight: home.clientHeight,
@@ -86,7 +85,6 @@ test('keeps guest claim and Home as separate short-height scrollers', async ({ p
   expect(collapsedGeometry.guestScrollWidth).toBe(collapsedGeometry.guestClientWidth);
   expect(collapsedGeometry.guestTop).toBeGreaterThanOrEqual(12);
   expect(collapsedGeometry.guestRight).toBeLessThanOrEqual(320 - 24);
-  expect(collapsedGeometry.guestOverflowY).toBe('auto');
   expect(collapsedGeometry.homeTop).toBeGreaterThanOrEqual(collapsedGeometry.guestBottom);
   expect(collapsedGeometry.homeBottom).toBeLessThanOrEqual(256);
   expect(collapsedGeometry.homeClientHeight).toBeGreaterThan(0);
@@ -101,34 +99,50 @@ test('keeps guest claim and Home as separate short-height scrollers', async ({ p
   await expect(page.getByRole('searchbox', { name: 'Search messages' })).toBeFocused();
   await page.getByRole('searchbox', { name: 'Search messages' }).press('Escape');
 
-  await page.getByRole('button', { name: 'Claim your nick' }).click();
+  await page.getByRole('button', { name: 'Keep this nick' }).click();
   const email = page.getByRole('textbox', { name: 'Recovery email (optional)' });
   await expect(email).toBeVisible();
   await email.focus();
 
-  const expandedGeometry = await guest.evaluate((element) => {
-    const guestRect = element.getBoundingClientRect();
-    const dismissRect = element.querySelector<HTMLElement>('.guest-claim__dismiss')!
+  const dialog = page.getByRole('dialog', { name: 'Keep this nick' });
+  await expect(dialog).toBeVisible();
+  const expandedGeometry = await dialog.evaluate((element) => {
+    const panelRect = element.getBoundingClientRect();
+    const body = element.querySelector<HTMLElement>('.onyx-sheet__body')!;
+    const bodyRect = body.getBoundingClientRect();
+    const closeRect = element.querySelector<HTMLElement>('.onyx-sheet__close')!
       .getBoundingClientRect();
     const emailRect = element.querySelector<HTMLElement>('#guest-claim-email')!
       .getBoundingClientRect();
     return {
-      clientHeight: element.clientHeight,
-      scrollHeight: element.scrollHeight,
-      scrollTop: element.scrollTop,
-      dismissTop: dismissRect.top,
-      dismissBottom: dismissRect.bottom,
+      panelTop: panelRect.top,
+      panelBottom: panelRect.bottom,
+      bodyClientHeight: body.clientHeight,
+      bodyScrollHeight: body.scrollHeight,
+      bodyScrollTop: body.scrollTop,
+      bodyOverflowY: getComputedStyle(body).overflowY,
+      closeTop: closeRect.top,
+      closeBottom: closeRect.bottom,
+      closeRight: closeRect.right,
+      closeWidth: closeRect.width,
+      closeHeight: closeRect.height,
       emailTop: emailRect.top,
       emailBottom: emailRect.bottom,
-      guestTop: guestRect.top,
-      guestBottom: guestRect.bottom,
+      bodyTop: bodyRect.top,
+      bodyBottom: bodyRect.bottom,
     };
   });
 
-  expect(expandedGeometry.scrollHeight).toBeGreaterThan(expandedGeometry.clientHeight);
-  expect(expandedGeometry.scrollTop).toBeGreaterThan(0);
-  expect(expandedGeometry.emailBottom).toBeGreaterThan(expandedGeometry.guestTop);
-  expect(expandedGeometry.emailTop).toBeLessThan(expandedGeometry.guestBottom);
-  expect(expandedGeometry.dismissTop).toBeGreaterThanOrEqual(expandedGeometry.guestTop);
-  expect(expandedGeometry.dismissBottom).toBeLessThanOrEqual(expandedGeometry.guestBottom);
+  expect(expandedGeometry.panelTop).toBeGreaterThanOrEqual(0);
+  expect(expandedGeometry.panelBottom).toBeLessThanOrEqual(256);
+  expect(expandedGeometry.bodyOverflowY).toBe('auto');
+  expect(expandedGeometry.bodyScrollHeight).toBeGreaterThan(expandedGeometry.bodyClientHeight);
+  expect(expandedGeometry.bodyScrollTop).toBeGreaterThan(0);
+  expect(expandedGeometry.emailBottom).toBeGreaterThan(expandedGeometry.bodyTop);
+  expect(expandedGeometry.emailTop).toBeLessThan(expandedGeometry.bodyBottom);
+  expect(expandedGeometry.closeTop).toBeGreaterThanOrEqual(12);
+  expect(expandedGeometry.closeBottom).toBeLessThanOrEqual(256);
+  expect(expandedGeometry.closeRight).toBeLessThanOrEqual(320 - 24);
+  expect(expandedGeometry.closeWidth).toBeGreaterThanOrEqual(44);
+  expect(expandedGeometry.closeHeight).toBeGreaterThanOrEqual(44);
 });

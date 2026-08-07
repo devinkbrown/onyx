@@ -1,17 +1,22 @@
-/* ── Onyx AppShell — Bioluminescence × Terminal ──────────────────────────────
+/* ── Onyx AppShell — quiet threshold × terminal ──────────────────────────────
    Layout: CSS grid — [ ServerRail | ChannelSidebar | ConversationColumn | MemberList ]
    PresenceRibbon spans the top of the conversation column.
-   Background canvas is fixed behind everything (z-index: -1).
+   Background canvas is fixed at page layer 0; shell chrome sits at layer 1.
+   Matte surfaces, fine borders, quiet cyan signal — no decorative drift/glow.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ── Grid root ── */
 .shell {
   position: relative;
+  z-index: 1;
   isolation: isolate;
+  /* Commercial product rail (was 224px power-user). Mobile drawer overrides
+     width independently at the max-width:900px breakpoint. */
+  --shell-sidebar-w: 272px;
   display: grid;
   grid-template-columns:
     var(--shell-rail-w, 54px)
-    var(--shell-sidebar-w, 224px)
+    var(--shell-sidebar-w, 272px)
     1fr
     var(--shell-members-w, 220px);
   /* minmax(0, 1fr): plain `1fr` is minmax(auto, 1fr), so a dense nicklist (or
@@ -22,23 +27,15 @@
   overflow: hidden;
   font-family: var(--font-sans);
   color: var(--paper);
-  /* Light legibility wash ONLY — let the real animated Background canvas (z-index
-     -1) read through just like it does in the Theme Factory. A faint top glow and
-     a soft bottom fade keep the header and composer legible without a heavy ink
-     veil burying the scene. (The old ::before/::after faux current + biolume
-     layers were removed: they competed with and dimmed the real, theme-matched
-     canvas, and their CSS animation ignored prefers-reduced-motion.) */
+  /* Quiet legibility wash — let the Background canvas (page layer 0) read through
+     without a top glow spectacle. Soft bottom fade only. */
   background:
-    radial-gradient(
-      ellipse at 50% 0%,
-      color-mix(in oklab, var(--lapis-deep) 14%, transparent) 0%,
-      transparent 42%
-    ),
     linear-gradient(
       180deg,
-      transparent 0%,
-      transparent 62%,
-      color-mix(in oklab, var(--ink) 22%, transparent) 100%
+      color-mix(in oklab, var(--ink) 18%, transparent) 0%,
+      transparent 28%,
+      transparent 70%,
+      color-mix(in oklab, var(--ink) 28%, transparent) 100%
     );
 }
 
@@ -47,30 +44,14 @@
   z-index: 1;
 }
 
-@keyframes shell-current-drift {
-  from { transform: translate3d(-2.5%, -1%, 0); }
-  to { transform: translate3d(2.5%, 1%, 0); }
-}
-
-@keyframes shell-biolume-drift {
-  from {
-    transform: translate3d(0, 0, 0);
-    opacity: 0.34;
-  }
-  to {
-    transform: translate3d(0, -1.8%, 0);
-    opacity: 0.54;
-  }
-}
-
 .shell button:focus-visible,
 .shell [role='button']:focus-visible,
 .shell input:focus-visible,
 .shell textarea:focus-visible,
 .shell-mobile-nav-btn:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: 2px solid var(--lapis);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--lapis) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--lapis) 22%, transparent);
 }
 
 .sr-only {
@@ -89,7 +70,7 @@
   --shell-rail-w: 0px;
   grid-template-columns:
     0px
-    var(--shell-sidebar-w, 224px)
+    var(--shell-sidebar-w, 272px)
     1fr
     var(--shell-members-w, 220px);
 }
@@ -98,13 +79,13 @@
   --shell-members-w: 0px;
   grid-template-columns:
     var(--shell-rail-w, 54px)
-    var(--shell-sidebar-w, 224px)
+    var(--shell-sidebar-w, 272px)
     1fr
     0px;
 }
 
 .shell--no-rail.shell--members-hidden {
-  grid-template-columns: 0px var(--shell-sidebar-w, 224px) 1fr 0px;
+  grid-template-columns: 0px var(--shell-sidebar-w, 272px) 1fr 0px;
 }
 
 .shell[data-room-identity] {
@@ -169,28 +150,21 @@
 .shell-rail-entry:hover {
   color: var(--lapis-bright);
   border-color: var(--seam);
-  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
-  box-shadow: inset 0 0 18px color-mix(in oklab, var(--lapis) 14%, transparent);
+  background: color-mix(in oklab, var(--stone-2) 70%, transparent);
 }
 
 /* The Appearance link is an <a>, which the global .shell focus rule (button /
    [role=button] / input / textarea) does not cover — give it a focus ring. */
 .shell-rail-entry:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: 2px solid var(--lapis);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--lapis) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--lapis) 22%, transparent);
 }
 
 .shell-rail-entry--active {
   color: var(--lapis-bright);
-  border-color: var(--seam);
-  background:
-    radial-gradient(
-      circle at 50% 20%,
-      color-mix(in oklab, var(--lapis-bright) 18%, transparent) 0%,
-      transparent 58%
-    ),
-    color-mix(in oklab, var(--stone-2) 56%, transparent);
+  border-color: color-mix(in oklab, var(--lapis) 34%, var(--seam-faint));
+  background: color-mix(in oklab, var(--stone-2) 72%, transparent);
 }
 
 .shell-rail-entry--active::before {
@@ -200,8 +174,9 @@
   top: 20%;
   bottom: 20%;
   width: 2px;
-  background: var(--lapis-bright);
-  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+  background: var(--lapis);
+  /* Matte marker — no glow halo */
+  box-shadow: none;
 }
 
 /* Forced colors: the active server entry must stay visible. In Windows High
@@ -537,7 +512,7 @@
 }
 
 /* Quiet hours are a deliberate instrument, not two mystery timestamps jammed
-   into the 224px sidebar header. The Q trigger keeps the control row bounded;
+   into the product-rail sidebar header. The Q trigger keeps the control row bounded;
    its labelled range opens in the top-layer popover. */
 .shell-notify-quiet-popover {
   display: inline-flex;
@@ -1435,8 +1410,9 @@
   align-items: center;
   gap: var(--space-3);
   padding: 0 clamp(12px, 1.8vw, 20px);
+  /* Commercial header budget — primary Call/People/More targets ≥40px desktop. */
   height: 52px;
-  background: color-mix(in oklab, var(--ink) 88%, var(--stone));
+  background: color-mix(in oklab, var(--surface-void, var(--ink)) 88%, var(--surface-face, var(--stone)));
   border-bottom: 1px solid var(--seam);
   overflow: hidden;
 }
@@ -1504,8 +1480,8 @@
 
 .shell-ribbon-channel {
   font-family: var(--font-sans);
-  font-size: 1rem;
-  font-weight: 750;
+  font-size: var(--text-md, 0.9375rem);
+  font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
   color: var(--paper);
@@ -1513,7 +1489,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   flex: none;
-  max-width: 22ch;
+  max-width: 24ch;
 }
 
 .shell[data-room-identity] .shell-ribbon-channel {
@@ -1720,14 +1696,15 @@
   margin-inline: 2px;
 }
 
-/* Unified icon-button base — settings, appearance, members all build on this. */
+/* Unified icon-button base — Call/People/More primary targets ≥40×40 desktop. */
 .shell-ribbon-iconbtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  height: 32px;
-  min-width: 32px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   padding: 0;
   color: var(--paper-dim);
   background: transparent;
@@ -1781,11 +1758,10 @@
   letter-spacing: 0;
 }
 
-/* ── More overflow (A8 place-strip compression) ─────────────────────────────
-   Residual hierarchy: place chips (event · voice · members) own the eye;
-   Time/Date and Inbox stay one-click instruments; More is secondary chrome
-   (pins / notify / settings / appearance / prefs / account). The More trigger
-   defaults quieter than place controls so the strip never reads as a toolbar. */
+/* ── More overflow (commercial 4-zone header) ───────────────────────────────
+   Place chips (event · voice · Call) + People own the eye; Date/Inbox stay
+   one-click reach instruments; More groups Alerts · This room · Workspace.
+   Pins / mark-read / DND / AI policy demote into More — not primary density. */
 .shell-ribbon-group .onyx-popover {
   display: inline-flex;
 }
@@ -1855,7 +1831,11 @@
   color: var(--paper-mute);
 }
 
-/* In-menu scope kickers (Channel / Workspace) — visual hierarchy only. */
+/*
+ * Section kickers (Alerts / This room / Conversation / Workspace) live as
+ * normal text outside role=menu, associated via aria-labelledby. The --in-menu
+ * modifier remains for any residual single-menu layouts; prefer section labels.
+ */
 .shell-ribbon-more-label--in-menu {
   margin-top: var(--space-2);
   margin-bottom: var(--space-1);
@@ -1867,6 +1847,12 @@
   margin-top: 0;
   border-top: 0;
   padding-block: 0;
+}
+
+/* More panel root hosts multiple section menus; drop trailing seam on last. */
+.shell-ribbon-more > .shell-ribbon-more-section:last-child {
+  border-bottom: 0;
+  padding-bottom: var(--space-1);
 }
 
 .shell-ribbon-more-notify {
@@ -1996,10 +1982,12 @@
 }
 
 /* Connection status — terminal mono kicker at the far edge. Connected is the
-   calm default (faint); reconnect/error light up. Never competes with place. */
+   calm default (faint); reconnect/error light up. Never competes with place.
+   Contract: may compact the word at narrow widths; must NEVER display:none. */
 .shell-ribbon-conn {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   padding: 3px 9px;
   border-radius: var(--r-sm);
   border: 1px solid var(--seam-faint);
@@ -2009,21 +1997,44 @@
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--paper-mute);
+  flex: none;
+  min-width: 10px;
+  min-height: 22px;
+}
+
+.shell-ribbon-conn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: color-mix(in oklab, var(--paper-mute) 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--seam) 40%, transparent);
 }
 
 .shell-ribbon-conn[data-state='connected'] {
   border-color: color-mix(in oklab, var(--ok) 22%, var(--seam-faint));
   background: transparent;
 }
+.shell-ribbon-conn[data-state='connected'] .shell-ribbon-conn-dot {
+  background: color-mix(in oklab, var(--ok) 72%, var(--paper-dim));
+}
 
 .shell-ribbon-conn[data-state='connecting'],
 .shell-ribbon-conn[data-state='reconnecting'] {
   border-color: color-mix(in oklab, var(--lapis-bright) 38%, var(--seam-faint));
 }
+.shell-ribbon-conn[data-state='connecting'] .shell-ribbon-conn-dot,
+.shell-ribbon-conn[data-state='reconnecting'] .shell-ribbon-conn-dot {
+  background: var(--lapis-bright);
+}
 
 .shell-ribbon-conn[data-state='disconnected'],
 .shell-ribbon-conn[data-state='error'] {
   border-color: color-mix(in oklab, var(--shu) 36%, var(--seam-faint));
+}
+.shell-ribbon-conn[data-state='disconnected'] .shell-ribbon-conn-dot,
+.shell-ribbon-conn[data-state='error'] .shell-ribbon-conn-dot {
+  background: var(--shu);
 }
 
 .shell-ribbon-conn-label { line-height: 1; color: var(--paper-mute); }
@@ -2039,16 +2050,49 @@
   color: var(--shu);
 }
 
+/* Call lifecycle sparse status (ringing / provisional) — never established paint. */
+.shell-ribbon-call-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--lapis) 34%, var(--line));
+  background: color-mix(in oklab, var(--lapis) 10%, var(--stone) 48%);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.shell-ribbon-call-status--provisional {
+  border-color: color-mix(in oklab, var(--gold) 40%, var(--line));
+  background: color-mix(in oklab, var(--gold) 12%, var(--stone) 50%);
+  color: var(--paper);
+}
+.shell-ribbon-call-status[data-presentation='ringing_in'],
+.shell-ribbon-call-status[data-presentation='ringing_out'] {
+  border-color: color-mix(in oklab, var(--lapis-bright) 48%, var(--line));
+}
+
 /* Responsive: shed secondary detail as the column narrows, keeping the icon
    clusters and dividers intact so the bar never crowds or overflows. */
 @media (max-width: 760px) {
+  /* Word may drop; state affordance (dot + border) and sr-only text remain. */
   .shell-ribbon-conn-label { display: none; }
   .shell-ribbon-conn {
-    border-color: transparent;
-    background: transparent;
-    padding: 0;
+    padding: 4px;
     gap: 0;
+    /* Keep border/dot visible — do not transparent the whole chip into nothing. */
+    min-width: 18px;
+    min-height: 18px;
   }
+  /* Secondary facepile yields before Call / People / More / conn.
+     Target Facepile root (.shell-facepile); !important beats its inline display. */
+  .shell-facepile { display: none !important; }
 }
 
 @media (max-width: 600px) {
@@ -2118,18 +2162,36 @@
 
   .shell-ribbon-topic,
   .shell-ribbon-sep,
-  .shell-ribbon-divider,
-  .shell-ribbon-conn {
+  .shell-ribbon-divider {
     display: none;
+  }
+
+  /* Conn must stay present: compact word off, keep state affordance + a11y text. */
+  .shell-ribbon-conn-label {
+    display: none;
+  }
+  .shell-ribbon-conn {
+    display: inline-flex;
+    padding: 4px;
+    gap: 0;
+    min-width: 18px;
+    min-height: 18px;
   }
 
   .shell-ribbon-channel {
     max-width: min(18vw, 12ch);
   }
 
+  /* Narrow conversation column: hide secondary facepile so primary chrome wins.
+     Target Facepile root (.shell-facepile); !important beats its inline display. */
+  .shell-facepile {
+    display: none !important;
+  }
+
   .shell-ribbon-action {
-    width: 34px;
-    min-width: 34px;
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
     padding-inline: 0;
   }
 
@@ -2176,6 +2238,62 @@
   color: var(--paper-mute);
 }
 
+.ap-panel-current {
+  min-width: 0;
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ap-motion-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 26%, transparent);
+}
+
+.ap-motion-label {
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ap-motion-options {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 38%, transparent);
+}
+
+.ap-motion-option {
+  min-height: 44px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  color: var(--paper-dim);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+}
+
+.ap-motion-option--on {
+  color: var(--paper);
+  border-color: color-mix(in oklab, var(--lapis-bright) 40%, transparent);
+  background: color-mix(in oklab, var(--lapis) 32%, var(--stone-2));
+}
+
 .ap-panel-heading-row {
   display: flex;
   align-items: center;
@@ -2185,6 +2303,9 @@
 
 .ap-panel-link {
   appearance: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   border: 0;
   border-bottom: 1px solid color-mix(in oklab, var(--lapis-bright) 30%, transparent);
   border-radius: 0;
@@ -2343,6 +2464,30 @@
 .ap-panel-studio:hover {
   color: var(--gold-bright);
   border-color: var(--gold-bright);
+}
+
+/* On phones the Appearance sheet fills the viewport. An opaque sheet made
+   every successful wallpaper selection look broken because the live renderer
+   was completely hidden behind it. Keep enough glass for the chosen scene to
+   remain unmistakably visible while preserving text contrast. */
+@media (max-width: 42rem) {
+  .onyx-sheet:has(.ap-panel) .onyx-sheet__backdrop {
+    background: color-mix(in oklab, var(--ink) 38%, transparent);
+  }
+
+  .onyx-sheet:has(.ap-panel) .onyx-sheet__panel {
+    background: color-mix(in oklab, var(--stone) 76%, transparent);
+    backdrop-filter: blur(14px) saturate(1.08);
+    -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  }
+
+  .onyx-sheet:has(.ap-panel) .onyx-sheet__header {
+    background: color-mix(in oklab, var(--stone-2) 66%, transparent);
+  }
+
+  .onyx-sheet:has(.ap-panel) .onyx-sheet__body {
+    background: color-mix(in oklab, var(--ink) 12%, transparent);
+  }
 }
 
 /* ── Channel settings panel ── */
@@ -4538,13 +4683,16 @@
   .shell-typing-dots span { animation: none; opacity: 0.7; }
 }
 
+/* Single calm input vessel: attach · message · emoji · more · send */
 .shell-composer-inner {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1);
   align-items: flex-end;
+  min-width: 0;
+  padding: 3px;
   background: color-mix(in oklab, var(--ink) 70%, var(--stone-2));
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
+  border-radius: calc(var(--r-md) + 2px);
   transition:
     border-color var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease),
@@ -4567,16 +4715,28 @@
 }
 
 .shell-composer-textarea {
-  flex: 1;
-  min-height: 38px;
+  --composer-field-height: 38px;
+  --composer-line-box: 1.52em;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--composer-field-height);
   max-height: 200px;
-  padding: var(--space-2) var(--space-3);
+  /* A textarea lays its line box from the padding edge instead of centering it.
+     Consume the full one-line field height explicitly so placeholder and typed
+     text sit on the same optical center as the surrounding controls. */
+  padding:
+    max(0px, calc((var(--composer-field-height) - var(--composer-line-box)) / 2))
+    var(--space-2);
   border: none;
   outline: none;
+  margin: 0;
+  display: block;
+  appearance: none;
+  -webkit-appearance: none;
   resize: none;
   font-family: var(--font-sans);
   font-size: 0.91rem;
-  line-height: 1.52;
+  line-height: var(--composer-line-box);
   color: var(--paper);
   background: transparent;
   overflow-y: auto;
@@ -4590,10 +4750,12 @@
   flex: none;
   width: 34px;
   height: 34px;
-  margin-bottom: 3px;
+  min-width: 34px;
+  min-height: 34px;
+  margin-bottom: 2px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--seam-faint);
+  border: 1px solid transparent;
   border-radius: var(--r-md);
   cursor: pointer;
   color: var(--paper-dim);
@@ -4604,11 +4766,33 @@
     background var(--dur) var(--ease);
 }
 
+/* Plus (attach) and emoji stay readable; More stays quieter until open. */
+.shell-composer-tool--attach {
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.shell-composer-tool--more {
+  color: var(--paper-mute);
+  opacity: 0.82;
+}
+
 .shell-composer-tool:hover:not(:disabled),
 .shell-composer-tool[aria-expanded='true'] {
   color: var(--lapis-bright);
   border-color: var(--seam);
   background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+  opacity: 1;
+}
+
+.shell-composer-tool--more:hover:not(:disabled),
+.shell-composer-tool--more[aria-expanded='true'] {
+  opacity: 1;
+}
+
+.shell-composer-tool:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
 }
 
 .shell-composer-tool:disabled {
@@ -4617,11 +4801,116 @@
   opacity: 0.5;
 }
 
+/* More tools tray — power controls with plain labels (not primary row). */
+.shell-composer-more-wrap {
+  position: relative;
+  flex: none;
+  align-self: flex-end;
+}
+
+.shell-composer-tools {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 6;
+  display: grid;
+  gap: 6px;
+  width: min(280px, calc(100vw - 24px));
+  padding: 8px;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 90%, var(--ink));
+  box-shadow:
+    0 16px 44px -24px color-mix(in oklab, var(--ink) 96%, transparent),
+    inset 0 0 0 1px color-mix(in oklab, var(--lapis) 10%, transparent);
+}
+
+.shell-composer-tools-item,
+.shell-composer-tools-action {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+  color: var(--paper);
+  background: color-mix(in oklab, var(--ink) 42%, var(--stone-2));
+}
+
+.shell-composer-tools-item:hover:not(:disabled),
+.shell-composer-tools-action:hover:not(:disabled) {
+  border-color: var(--lapis);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+
+.shell-composer-tools-item:focus-visible,
+.shell-composer-tools-action:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.shell-composer-tools-item:disabled,
+.shell-composer-tools-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.shell-composer-tools-item-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--paper);
+}
+
+.shell-composer-tools-item-desc {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--paper-mute);
+}
+
+.shell-composer-tools-tip {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed color-mix(in oklab, var(--seam) 70%, transparent);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 28%, transparent);
+}
+
+.shell-composer-tools-kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.2em;
+  padding: 0 4px;
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--ink) 50%, transparent);
+}
+
+.shell-composer-tools-action {
+  place-items: center;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--lapis-bright);
+}
+
 .shell-composer-send {
   flex: none;
   width: 36px;
   height: 36px;
-  margin: 0 3px 2px 0;
+  min-width: 36px;
+  min-height: 36px;
+  margin: 0 1px 1px 0;
   display: grid;
   place-items: center;
   border: 1px solid var(--seam-faint);
@@ -4636,6 +4925,11 @@
     background var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease),
     transform var(--dur) var(--ease);
+}
+
+.shell-composer-send:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
 }
 
 /* Armed: there is text to send. Fills with current, glows, invites the tap. */
@@ -4664,6 +4958,19 @@
   border-color: var(--seam-faint);
   background: transparent;
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-composer-inner,
+  .shell-composer-tool,
+  .shell-composer-send {
+    transition: none;
+  }
+
+  .shell-composer-send:hover:not(:disabled),
+  .shell-composer-send:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 /* Offline / outbox status chrome — honest queue + failed-flush cues (Era 1 A2). */
@@ -5572,8 +5879,8 @@
   }
   .shell {
     /* Keep the rail compact at ordinary sizes, but let enlarged text grow its
-       content box instead of clipping icons and labels into a fixed 58px row. */
-    --mnav-h: max(58px, 2.25rem);
+       content box instead of clipping icons and labels into a fixed row. */
+    --mnav-h: max(56px, 2.25rem);
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
     /* Sit above the fixed bottom tab bar; clear the notch up top. */
@@ -5603,13 +5910,17 @@
     );
     left: 0;
     z-index: 90;
-    width: min(300px, 86vw);
+    width: min(300px, 88vw);
+    max-width: 320px;
     padding-top: env(safe-area-inset-top, 0px);
     padding-left: env(safe-area-inset-left, 0px);
     transform: translateX(-100%);
     transition: transform var(--dur) var(--ease);
     grid-column: unset;
-    box-shadow: 24px 0 60px -30px color-mix(in oklab, var(--ink) 92%, transparent);
+    border-right: 1px solid var(--seam);
+    border-radius: 0 var(--r-lg) var(--r-lg) 0;
+    background: color-mix(in oklab, var(--ink) 96%, var(--stone));
+    box-shadow: 18px 0 48px -28px color-mix(in oklab, var(--ink) 88%, transparent);
   }
   /* The open class lives on the wrapper; flip the fixed child's transform.
      (A transform on the wrapper itself would make the fixed child a containing
@@ -5621,7 +5932,7 @@
     position: fixed;
     inset: 0;
     z-index: 89;
-    background: color-mix(in oklab, var(--ink) 64%, transparent);
+    background: color-mix(in oklab, var(--ink) 58%, transparent);
     backdrop-filter: blur(2px);
   }
 
@@ -5636,13 +5947,17 @@
     );
     right: 0;
     z-index: 90;
-    width: min(290px, 84vw);
+    width: min(290px, 86vw);
+    max-width: 320px;
     padding-top: env(safe-area-inset-top, 0px);
     padding-right: env(safe-area-inset-right, 0px);
     transform: translateX(100%);
     transition: transform var(--dur) var(--ease);
     grid-column: unset;
-    box-shadow: -24px 0 60px -30px color-mix(in oklab, var(--ink) 92%, transparent);
+    border-left: 1px solid var(--seam);
+    border-radius: var(--r-lg) 0 0 var(--r-lg);
+    background: color-mix(in oklab, var(--ink) 96%, var(--stone));
+    box-shadow: -18px 0 48px -28px color-mix(in oklab, var(--ink) 88%, transparent);
   }
   /* Override desktop display:none so the drawer can animate off-screen instead */
   .shell-members--hidden {
@@ -5655,62 +5970,96 @@
   .shell-conversation {
     grid-column: 1;
     min-width: 0;
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in oklab, var(--ink) 68%, transparent) 0%,
-        color-mix(in oklab, var(--ink) 78%, transparent) 100%
-      );
+    /* Preserve the selected Onyx backdrop instead of burying it under a nearly
+       opaque black sheet. The wash protects text while letting mineral color
+       and motion remain part of the product identity. */
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--ink) 70%, transparent),
+      color-mix(in oklab, var(--ink) 82%, transparent)
+    );
   }
 
   .shell-conversation::before {
     top: 42px;
-    opacity: 0.45;
+    opacity: 0.28;
   }
 
+  /* Ribbon lives inside the shell, which already applies safe-area-inset-top.
+     Do not double-pad; keep a compact identity rail with 44px primary controls. */
   .shell-ribbon {
-    height: 42px;
+    height: 52px;
+    min-height: 52px;
     padding: 0 10px;
-    background:
-      linear-gradient(180deg, color-mix(in oklab, var(--ink) 86%, var(--stone)), color-mix(in oklab, var(--ink) 94%, var(--stone)));
+    background: color-mix(in oklab, var(--ink) 94%, var(--stone));
+    border-bottom: 1px solid var(--seam-faint);
+    box-shadow: none;
   }
 
   .shell-ribbon-inner {
-    gap: 8px;
+    gap: 6px;
+    min-height: 52px;
   }
 
   .shell-ribbon-identity {
     gap: 6px;
+    min-width: 0;
   }
 
   .shell-ribbon-channel {
     max-width: min(42vw, 15ch);
     font-size: 1.02rem;
     letter-spacing: 0;
+    font-weight: 650;
   }
 
   .shell-ribbon-right {
     gap: 2px;
+    min-width: 0;
   }
 
   .shell-ribbon-group {
     gap: 2px;
   }
 
-  /* A8: place chips (event/voice) stay primary. Only shed legacy strip chrome
-     that now lives in More, plus connection text and hairlines for density. */
+  /* Commercial mobile: place chips stay primary; legacy strip chrome lives in More.
+     Connection stays present (compact visual, full 44px hit); do not display:none
+     .shell-ribbon-conn. Secondary facepile is desktop-only — never crowds Call /
+     People / More / conn. Hide Facepile root (.shell-facepile). */
   .shell-ribbon-account,
   .shell-ribbon-appearance,
   .shell-ribbon-preferences,
-  .shell-ribbon-conn,
   .shell-ribbon-divider {
     display: none;
   }
+  .shell-facepile {
+    display: none !important;
+  }
 
-  .shell-ribbon-iconbtn {
-    min-width: 34px;
-    width: 34px;
-    height: 34px;
+  .shell-ribbon-conn-label {
+    display: none;
+  }
+  .shell-ribbon-conn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    gap: 0;
+  }
+
+  /* Primary targets Call / People / More ≥44×44 on phone. */
+  .shell-ribbon-iconbtn,
+  .shell-ribbon-more-trigger,
+  .shell-ribbon-group .onyx-popover__trigger {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
   }
 
   .shell-ribbon-action {
@@ -5721,18 +6070,28 @@
     display: none;
   }
 
+  .shell-ribbon-more-item {
+    min-height: 44px;
+  }
+
   .shell-ribbon-count {
     font-size: 0.64rem;
   }
 
   .shell-ribbon-voice-chip {
     max-width: 8.75rem;
-    height: 32px;
+    height: 36px;
+    min-height: 36px;
     padding-inline: 8px;
   }
 
   .shell-ribbon-voice-text {
     max-width: 7.2rem;
+  }
+
+  .shell-ribbon-event-chip {
+    height: 36px;
+    min-height: 36px;
   }
 
   .time-scrubber {
@@ -5830,11 +6189,12 @@
     padding: 0 6px;
   }
 
-  /* Composer: 16px kills iOS zoom-on-focus; larger send target; drop the hint */
+  /* Composer: 16px kills iOS zoom-on-focus; 44px primary tools; drop the hint */
   .shell-composer {
-    padding: 7px 9px 8px;
-    background:
-      linear-gradient(180deg, color-mix(in oklab, var(--ink) 70%, transparent), color-mix(in oklab, var(--ink) 94%, var(--stone)));
+    padding: 8px 10px;
+    background: color-mix(in oklab, var(--ink) 94%, var(--stone));
+    border-top: 1px solid var(--seam-faint);
+    /* Stay clear of the virtual keyboard via shell height + keyboard inset. */
   }
   .shell-composer-measure {
     max-width: none;
@@ -5842,44 +6202,62 @@
   .shell-composer-context,
   .shell-composer-topic {
     max-width: 100%;
-    min-height: 32px;
+    min-height: 40px;
     margin-bottom: 6px;
-    padding-block: 5px;
+    padding-block: 6px;
   }
   .shell-composer-inner {
-    gap: 5px;
-    border-radius: 16px;
+    gap: 4px;
+    border-radius: var(--r-md);
+    padding: 3px;
+    border: 1px solid var(--seam);
+    background: color-mix(in oklab, var(--stone-2) 42%, transparent);
   }
   .shell-composer-textarea {
+    --composer-field-height: 44px;
+    --composer-line-box: 1.4em;
     font-size: 16px;
-    min-height: 38px;
-    max-height: min(26svh, 132px);
-    padding: 8px 7px 8px 9px;
+    max-height: min(28svh, 148px);
     padding-inline: 10px;
-    line-height: 1.35;
+    /* Comfortable reading density for long drafts on phone. */
+    letter-spacing: 0;
   }
+  /* Phone/tablet (incl. 320–430 widths): Attach/Emoji/More/Send ≥44×44.
+     Four 44px targets + small gaps still fit a ~374px inner row with a usable textarea. */
   .shell-composer-tool {
-    width: 38px;
-    height: 38px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     margin-bottom: 0;
-    border-radius: 13px;
+    border-radius: var(--r-sm);
   }
   .shell-composer-send {
-    width: 40px;
-    height: 40px;
-    margin: 0 2px 1px 0;
-    border-radius: 14px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0 2px 0 0;
+    border-radius: var(--r-sm);
+  }
+  .shell-composer-tools {
+    width: min(300px, calc(100vw - 16px));
+  }
+  .shell-composer-tools-item,
+  .shell-composer-tools-action {
+    min-height: 44px;
   }
   .shell-composer-hint { display: none; }
   .shell-command-menu,
-  .shell-emoji-picker {
+  .shell-emoji-picker,
+  .shell-schedule-picker {
     max-height: min(46svh, 320px);
     overflow-y: auto;
   }
 
-  /* Bottom tab bar — fixed, safe-area aware, real touch targets */
+  /* Bottom tab bar — fixed, safe-area aware, real thumb targets */
   .shell-mobile-nav {
-    --mnav-h: max(58px, 2.25rem);
+    --mnav-h: max(56px, 2.25rem);
 
     display: flex;
     align-items: stretch;
@@ -5899,18 +6277,16 @@
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scrollbar-width: thin;
-    background:
-      linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 42%, transparent), transparent 42%),
-      color-mix(in oklab, var(--ink) 94%, var(--stone));
+    /* Matte product rail — no gradient wash / glow stack. */
+    background: color-mix(in oklab, var(--surface-void, var(--ink)) 96%, var(--surface-face, var(--stone)));
     border-top: 1px solid var(--seam);
-    box-shadow:
-      0 -22px 54px -34px color-mix(in oklab, var(--ink) 92%, transparent),
-      inset 0 1px 0 color-mix(in oklab, var(--paper) 7%, transparent);
-    -webkit-backdrop-filter: blur(18px) saturate(1.2);
-    backdrop-filter: blur(18px) saturate(1.2);
+    box-shadow: 0 -8px 24px -20px color-mix(in oklab, var(--ink) 70%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   .shell-mobile-nav-btn {
+    --mobile-accent: var(--lapis);
     /* Equal fifths at ordinary text sizes; intrinsic min-content width wins at
        high zoom, turning the containing nav into a single-axis rail. */
     flex: 1 0 20%;
@@ -5918,38 +6294,71 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    min-height: 50px;
-    padding: 4px 3px 6px;
+    gap: 4px;
+    min-width: var(--target-min, 44px);
+    min-height: var(--target-min, 44px);
+    height: 100%;
+    padding: 6px 3px 8px;
     color: var(--paper-mute);
-    font-family: var(--font-mono);
-    font-size: 0.52rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs, 0.625rem);
+    font-weight: 650;
+    letter-spacing: 0.03em;
+    text-transform: none;
     background: transparent;
     border: none;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition: color var(--dur) var(--ease);
+    transition: color var(--dur) var(--ease), background var(--dur-micro) var(--ease);
   }
+
+  .shell-mobile-nav-btn:nth-child(2) { --mobile-accent: var(--lapis-bright); }
+  .shell-mobile-nav-btn:nth-child(3) { --mobile-accent: var(--ok); }
+  .shell-mobile-nav-btn:nth-child(4) { --mobile-accent: var(--shu); }
+  .shell-mobile-nav-btn:nth-child(5) { --mobile-accent: var(--gold); }
+
   .shell-mobile-nav-btn b {
-    width: 1.36rem;
-    height: 1.26rem;
+    width: 1.55rem;
+    height: 1.4rem;
     display: grid;
     place-items: center;
-    border-radius: var(--r-pill);
-    font-size: 0.96rem;
+    border-radius: var(--r-sm);
+    font-size: 1rem;
     line-height: 1;
     font-weight: 400;
-    background: color-mix(in oklab, var(--stone-2) 28%, transparent);
+    background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 36%, transparent);
   }
-  .shell-mobile-nav-btn:active { color: var(--lapis-bright); }
+  .shell-mobile-nav-btn:active {
+    color: var(--lapis-bright);
+    background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 28%, transparent);
+  }
   .shell-mobile-nav-btn:hover,
-  .shell-mobile-nav-btn--active { color: var(--lapis-bright); }
+  .shell-mobile-nav-btn--active { color: var(--mobile-accent); }
   .shell-mobile-nav-btn--active b {
-    color: var(--ink);
-    background: linear-gradient(180deg, var(--lapis-bright), var(--lapis));
-    box-shadow: 0 0 18px -8px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+    color: var(--on-accent, var(--ink));
+    background: var(--mobile-accent);
+    box-shadow: none;
+    border: 1px solid color-mix(in oklab, var(--mobile-accent) 60%, var(--stone-line));
+  }
+  .shell-mobile-nav-btn:focus-visible {
+    outline: var(--focus-ring, 2px solid var(--lapis));
+    outline-offset: -2px;
+  }
+  /* Quiet signal bar on the active mobile primary destination — no animated glow. */
+  .shell-mobile-nav-btn {
+    position: relative;
+  }
+  .shell-mobile-nav-btn--active::after {
+    content: '';
+    position: absolute;
+    left: 30%;
+    right: 30%;
+    top: 2px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--mobile-accent);
+    box-shadow: none;
+    pointer-events: none;
   }
 
   .shell-topic-filter {
@@ -6077,8 +6486,8 @@
   }
 
   .shell-msg-text {
-    font-size: 0.92rem;
-    line-height: 1.46;
+    font-size: 0.95rem;
+    line-height: 1.5;
   }
 
   .shell-msg-actions {
@@ -6086,12 +6495,18 @@
     margin-top: 3px;
   }
 
+  .shell-msg-action {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
   .shell-reactions {
     margin-top: 4px;
   }
 
   .shell-reaction {
-    padding: 2px 7px 2px 5px;
+    min-height: 32px;
+    padding: 4px 8px 4px 6px;
   }
 
   .shell-day-divider {
@@ -6103,6 +6518,19 @@
     padding-inline: 9px;
     font-size: 0.56rem;
   }
+
+  /* Sidebar filter / search rows remain thumb-reachable inside the drawer. */
+  .shell-sidebar-filter,
+  .shell-sidebar-search,
+  .shell-sidebar input[type='search'],
+  .shell-sidebar input[type='text'] {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .shell-channel-item {
+    min-height: 44px;
+  }
 }
 
 @media (min-width: 901px) {
@@ -6111,13 +6539,13 @@
   .shell-members-backdrop { display: none; }
 }
 
-/* Phone-specific tightening */
+/* Phone-specific tightening (320 / 360 / 390 / 430 CSS widths) */
 @media (max-width: 480px) {
   .shell,
   .shell-mobile-nav {
     --mnav-h: max(56px, 2.25rem);
   }
-  .shell-ribbon { gap: 6px; padding: 0 8px; }
+  .shell-ribbon { gap: 4px; padding: 0 8px; }
   .shell-ribbon-channel { font-size: 0.98rem; max-width: min(48vw, 13ch); }
   .shell-ribbon-topic { display: none; }
   /* Keep the identity (channel NAME) — hiding the whole block left a dead
@@ -6133,8 +6561,11 @@
   .shell-ribbon-voice-text {
     max-width: 5.6rem;
   }
+  .shell-ribbon-event-chip {
+    max-width: 6.5rem;
+  }
   .shell-composer { padding: 6px 8px 7px; }
-  .shell-composer-inner { gap: 4px; }
+  .shell-composer-inner { gap: 3px; }
   .shell-command-item { grid-template-columns: 1fr; gap: 2px; }
   .shell-emoji-grid { grid-template-columns: repeat(7, minmax(28px, 1fr)); }
   .shell-attachment { grid-template-columns: 34px minmax(0, 1fr) 24px; max-width: 100%; }
@@ -6149,10 +6580,148 @@
   }
 }
 
+/* Narrowest phones (~320 CSS px): keep five destinations + usable composer. */
+@media (max-width: 360px) {
+  .shell-ribbon-channel {
+    max-width: min(40vw, 11ch);
+    font-size: 0.94rem;
+  }
+  .shell-ribbon-voice-chip,
+  .shell-ribbon-event-chip {
+    max-width: 5.5rem;
+  }
+  .shell-composer-inner {
+    gap: 2px;
+  }
+  .shell-composer-textarea {
+    padding-inline: 8px;
+  }
+  .shell-mobile-nav-btn {
+    font-size: 0.56rem;
+    letter-spacing: 0.04em;
+    padding-inline: 1px;
+  }
+}
+
+/* Landscape phones / short wide viewports: reclaim vertical room for transcript
+   + composer while keeping 44px targets and safe-area bottom nav. */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 480px) {
+  .shell,
+  .shell-mobile-nav {
+    --mnav-h: 48px;
+  }
+
+  .shell-ribbon {
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .shell-ribbon-inner {
+    min-height: 44px;
+  }
+
+  .shell-mobile-nav-btn {
+    flex-direction: row;
+    gap: 6px;
+    padding: 4px 8px;
+    font-size: 0.62rem;
+  }
+
+  .shell-mobile-nav-btn b {
+    width: 1.25rem;
+    height: 1.25rem;
+    font-size: 0.9rem;
+  }
+
+  .shell-mobile-nav-btn--active::after {
+    display: none;
+  }
+
+  .shell-composer {
+    padding: 4px 8px 5px;
+  }
+
+  .shell-composer-textarea {
+    --composer-field-height: 40px;
+    max-height: min(22svh, 96px);
+  }
+
+  .shell-msg-group {
+    padding-block: 4px 2px;
+  }
+
+  .shell-feed {
+    padding-top: 2px;
+  }
+}
+
+/* Forced colors: mobile chrome must remain operable without seam washes. */
+@media (max-width: 900px) and (forced-colors: active) {
+  .shell-mobile-nav,
+  .shell-ribbon,
+  .shell-composer,
+  .shell-sidebar,
+  .shell-members {
+    background: Canvas;
+    border-color: CanvasText;
+    color: CanvasText;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .shell-mobile-nav-btn,
+  .shell-ribbon-iconbtn,
+  .shell-composer-tool,
+  .shell-composer-send {
+    border: 1px solid ButtonText;
+    color: ButtonText;
+    background: ButtonFace;
+    forced-color-adjust: none;
+  }
+
+  .shell-mobile-nav-btn--active,
+  .shell-mobile-nav-btn--active b,
+  .shell-composer-send {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+
+  .shell-mobile-nav-btn--active::after {
+    background: Highlight;
+  }
+
+  .shell-sidebar-backdrop,
+  .shell-members-backdrop {
+    background: Canvas;
+    opacity: 0.72;
+    backdrop-filter: none;
+  }
+}
+
+/* Drawer motion freezes under reduced-motion (keep instant open/close). */
+@media (max-width: 900px) and (prefers-reduced-motion: reduce) {
+  .shell-sidebar,
+  .shell-members {
+    transition: none;
+  }
+
+  .shell-sidebar-backdrop,
+  .shell-members-backdrop {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .shell-mobile-nav-btn {
+    transition: none;
+  }
+}
+
 /* A 400% zoomed phone can expose less than 30rem of CSS height. Keep visible
    labels enlarged, but put their decorative glyphs beside them so the bottom
    rail does not consume the member/channel drawer's entire working area. */
-@media (max-width: 900px) and (max-height: 30rem) {
+@media (max-width: 42rem) and (max-height: 30rem) {
   .shell,
   .shell-mobile-nav {
     --mnav-h: 56px;
@@ -6195,6 +6764,7 @@
   }
 
   .shell-ribbon-iconbtn {
+    display: inline-flex;
     width: 44px;
     min-width: 44px;
     height: 44px;
@@ -6289,10 +6859,14 @@
   }
 
   .shell-mobile-nav-btn {
+    flex: 0 0 auto;
     flex-direction: row;
     justify-content: flex-start;
     gap: 4px;
+    min-width: 92px;
     padding: 4px 10px;
+    font-size: 16px;
+    line-height: 1.2;
   }
 
   .shell-mobile-nav-btn b {
@@ -6369,6 +6943,9 @@
   }
 
   .shell-members-head {
+    flex: none;
+    min-height: 60px;
+    max-height: 60px;
     flex-wrap: nowrap;
     justify-content: flex-start;
     gap: 8px;
@@ -6380,6 +6957,19 @@
     overscroll-behavior-x: contain;
     scroll-padding-inline: 12px;
     scrollbar-width: thin;
+  }
+
+  .shell-members-filter {
+    flex: none;
+    min-height: 60px;
+    padding: 8px;
+  }
+
+  .shell-members-filter-input {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 16px;
   }
 
   .shell-sidebar-head button {
@@ -6395,6 +6985,13 @@
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scrollbar-width: thin;
+  }
+
+  .shell-sidebar .shell-notify-quiet-popover .onyx-popover__trigger {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
   }
 
   .shell-sidebar-network {
@@ -6432,6 +7029,35 @@
      navigation remains scannable and its count badges do not overflow. */
   .shell-sidebar-scroll {
     padding-bottom: 4px;
+  }
+
+  .shell-sidebar-filter {
+    flex: none;
+    min-height: 60px;
+    padding: 8px;
+  }
+
+  .shell-sidebar-filter-input,
+  .shell-sidebar-filter-unread,
+  .shell-sidebar-filter-clear {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 8px;
+    font-size: 14px;
+  }
+
+  .shell-join-form {
+    flex: none;
+    min-height: 52px;
+    margin: 4px 8px;
+  }
+
+  .shell-join-input,
+  .shell-join-btn {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 8px;
+    font-size: 16px;
   }
 
   .shell-sidebar-section {
@@ -6588,15 +7214,31 @@
 
   .shell-composer-inner {
     min-width: 0;
-    gap: 4px;
+    max-width: 100%;
+    gap: 2px;
+    padding: 2px;
+    overflow: hidden;
   }
 
   .shell-composer-textarea {
     min-width: 0;
     min-height: 44px;
     max-height: 96px;
-    padding: 8px;
+    padding: 8px 4px;
     font-size: 16px;
+  }
+
+  /* 390px: tools tray stacks as readable labelled rows; no horizontal overflow */
+  .shell-composer-tools {
+    left: auto;
+    right: 0;
+    width: min(100vw - 16px, 320px);
+    max-width: calc(100vw - 16px);
+  }
+
+  .shell-composer-tools-item,
+  .shell-composer-tools-action {
+    min-height: 44px;
   }
 }
 
@@ -7380,6 +8022,15 @@
   .shell-msg-pending {
     animation: none;
   }
+}
+
+/* Secondary facepile host in Z1 — roomy desktop only.
+   Hide rules target Facepile root `.shell-facepile` (not this host class). */
+.shell-ribbon-facepile {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-width: 0;
 }
 
 /* ── Presence heatline — live 24h activity rhythm in the channel ribbon ──── */

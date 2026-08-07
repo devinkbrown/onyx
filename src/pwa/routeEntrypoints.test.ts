@@ -45,6 +45,16 @@ const expected = {
     title: 'Join Onyx — open a room invite',
     description: 'Open an Onyx invite to join a room as a guest or with your account, carrying its topic, moment, and reading context.',
   },
+  download: {
+    title: 'Download Onyx — unsigned native packages',
+    description:
+      'Download unsigned Onyx v0.1.3 Windows zip and Linux/FreeBSD/OpenBSD tar.gz packages with SHA-256 sidecars. macOS Intel and Apple Silicon native packages are coming soon. Not signed or notarized. Browser and PWA remain the primary paths.',
+  },
+  install: {
+    title: 'Install Onyx — native packages and browser app',
+    description:
+      'Install Onyx from the browser or download unsigned Windows, Linux, FreeBSD, and OpenBSD packages with runtimes, install steps, and SHA-256 verification.',
+  },
   accessibility: {
     title: 'Onyx accessibility — access is a requirement',
     description: 'Read the public Onyx accessibility contract for keyboard use, focus recovery, motion, contrast, and status announcements.',
@@ -85,7 +95,8 @@ afterEach(() => {
 
 describe('SPA route entrypoint materializer', () => {
   it('covers every non-root route in the Solid router table', () => {
-    const routes = [...routeTable.matchAll(/<Route path="\/([^"/]+)\/?"/g)]
+    // Whitespace-robust: lazy PublicInfo routes use multiline <Route\n path=.../>.
+    const routes = [...routeTable.matchAll(/<Route\s+path="\/([^"/]+)\/?"/g)]
       .map((match) => match[1])
       .filter((route): route is string => route !== undefined);
 

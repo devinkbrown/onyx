@@ -1,11 +1,14 @@
-/* Stage panel — Discord Stages-class strip under the presence ribbon. */
+/* Stage panel — room capability strip under the presence ribbon.
+   Mineral tokens; dormant stages stay scannable without crowding chat. */
+
 .stage-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  background: color-mix(in oklab, var(--surface, #12141a) 92%, transparent);
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-bottom: 1px solid var(--line, var(--seam-faint));
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 78%, var(--surface-void, var(--ink)));
+  box-shadow: var(--elev-1, none);
 }
 
 .stage-panel__head {
@@ -17,38 +20,42 @@
 
 .stage-panel__title {
   margin: 0;
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs, 0.6875rem);
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-kicker, 0.12em);
   text-transform: uppercase;
-  color: var(--muted, #9aa3b2);
+  color: var(--paper-mute, var(--muted, #9aa3b2));
 }
 
 .stage-panel__hint {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--fg-muted, #b6bfcc);
+  font-size: var(--text-sm, 0.8125rem);
+  line-height: var(--leading-snug, 1.35);
+  color: var(--paper-dim, var(--fg-muted, #b6bfcc));
 }
 
 .stage-panel__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: var(--space-2, 0.35rem);
 }
 
 .stage-panel__invite {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2, 0.5rem);
   padding: 0.4rem 0.55rem;
-  border-radius: 0.4rem;
-  background: color-mix(in oklab, var(--accent, #6ea8fe) 18%, transparent);
+  border: 1px solid color-mix(in oklab, var(--lapis) 28%, var(--line, transparent));
+  border-radius: var(--r-md, 0.4rem);
+  background: color-mix(in oklab, var(--lapis, var(--accent, #6ea8fe)) 12%, transparent);
 }
 
 .stage-panel__invite p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--text-md, 0.9rem);
+  color: var(--paper);
 }
 
 .stage-panel__hands {
@@ -65,13 +72,62 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  font-size: 0.9rem;
+  min-height: 2rem;
+  font-size: var(--text-md, 0.9rem);
+  color: var(--paper);
+}
+
+@media (max-width: 600px) {
+  .stage-panel {
+    padding: 8px 10px;
+  }
+
+  /* A dormant Stage is an available room capability, not the current task.
+     Keep it discoverable without allowing explanatory chrome to displace the
+     transcript and composer on every operator-owned room. */
+  .stage-panel[data-active='false'] {
+    min-height: 52px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .stage-panel[data-active='false'] .stage-panel__head {
+    flex: 0 0 auto;
+  }
+
+  .stage-panel[data-active='false'] .stage-panel__hint {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .stage-panel__actions {
+    min-width: 0;
+  }
+
+  .stage-panel__actions .onyx-button {
+    min-height: var(--target-min, 44px);
+  }
+
+  .stage-panel__invite,
+  .stage-panel__hand-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 .room-insights {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2, 0.5rem);
 }
 
 .room-insights__head {
@@ -83,13 +139,14 @@
 
 .room-insights__title {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--text-sm, 0.85rem);
   font-weight: 600;
+  color: var(--paper);
 }
 
 .room-insights__link {
-  font-size: 0.8rem;
-  color: var(--accent, #6ea8fe);
+  font-size: var(--text-sm, 0.8rem);
+  color: var(--lapis, var(--accent, #6ea8fe));
   text-decoration: none;
 }
 
@@ -97,10 +154,21 @@
   text-decoration: underline;
 }
 
+.room-insights__link:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
+
 .room-insights__empty {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--muted, #9aa3b2);
+  padding: var(--space-3, 0.75rem);
+  font-size: var(--text-sm, 0.85rem);
+  line-height: var(--leading-body, 1.55);
+  color: var(--paper-mute, var(--muted, #9aa3b2));
+  border: 1px solid var(--seam-faint, var(--line));
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 36%, transparent);
+  border-left: 2px solid color-mix(in oklab, var(--lapis) 36%, var(--stone-line, transparent));
 }
 
 .room-insights__metrics {
@@ -116,15 +184,17 @@
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm, 0.8rem);
 }
 
 .room-insights__metrics span {
-  color: var(--muted, #9aa3b2);
+  color: var(--paper-mute, var(--muted, #9aa3b2));
 }
 
 .room-insights__metrics strong {
-  font-size: 0.95rem;
+  font-size: var(--text-md, 0.95rem);
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
 }
 
 .oper-event-console {
@@ -137,17 +207,18 @@
   padding: 0;
   max-height: 12rem;
   overflow: auto;
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  border-radius: 0.4rem;
+  border: 1px solid var(--line, var(--seam-faint));
+  border-radius: var(--r-md, 0.4rem);
+  background: color-mix(in oklab, var(--surface-void, var(--ink)) 40%, transparent);
 }
 
 .oper-event-console__row {
   display: grid;
   grid-template-columns: 5rem 1fr;
   gap: 0.5rem;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.8rem;
-  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.06));
+  padding: 0.4rem 0.55rem;
+  font-size: var(--text-sm, 0.8rem);
+  border-bottom: 1px solid var(--line-faint, var(--seam-faint));
 }
 
 .oper-event-console__row--json {
@@ -155,22 +226,23 @@
 }
 
 .oper-event-console__src {
-  color: var(--muted, #9aa3b2);
-  font-family: ui-monospace, monospace;
+  color: var(--paper-mute, var(--muted, #9aa3b2));
+  font-family: var(--font-mono, ui-monospace, monospace);
 }
 
 .oper-event-console__sev {
-  color: var(--accent, #8ab4ff);
-  font-family: ui-monospace, monospace;
-  font-size: 0.75rem;
+  color: var(--lapis-bright, var(--accent, #8ab4ff));
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs, 0.75rem);
   text-transform: lowercase;
 }
 
 .oper-event-console__text {
   word-break: break-word;
+  color: var(--paper);
 }
 
 .oper-event-console__list--json {
   margin-bottom: 0.75rem;
-  border-color: color-mix(in srgb, var(--accent, #8ab4ff) 35%, var(--border, rgba(255, 255, 255, 0.08)));
+  border-color: color-mix(in oklab, var(--lapis, #8ab4ff) 28%, var(--line, transparent));
 }

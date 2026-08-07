@@ -26,7 +26,7 @@ describe('HomeView channel directory', () => {
     store.setState({ client: { sendRaw, isupport: { CHANTYPES: '#&' } } as never });
     render(() => <HomeView />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Browse all channels' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Browse rooms' }));
 
     expect(sendRaw).toHaveBeenCalledOnce();
     expect(sendRaw).toHaveBeenCalledWith('LIST');

@@ -2,40 +2,41 @@
 /**
  * HomeView — the connected-but-idle surface (no active channel).
  *
- * A real community home rather than a placeholder: a live network pulse fed
- * by the same stats JSON the website uses (same-origin `/stats/data/index.json`),
- * a joinable channel directory with sparklines, quick actions, and the
- * recently-visited rooms strip.
+ * Commercial public default answers one question: "what needs me, and where
+ * do I continue?" Hierarchy (reading flow, not admin dashboard):
+ *   1. Calm welcome + Search / Browse rooms
+ *   2. Conditional connection + outbox strip
+ *   3. Needs you — failed delivery context, unread DMs, direct mentions
+ *   4. Continue — exact first-unread resume + followed activity
+ *   5. Live now — real scheduled / live / call state only (never invented;
+ *      never auto-join media)
+ *   6. Explore — directory + recent rooms
+ *   7. Caught-up empty state when nothing needs attention
+ * Technical/power surfaces (pulse, room rhythm, quiet activity/boosts,
+ * review history, remembered rooms) live in a collapsed "More activity"
+ * disclosure — capability preserved, not primary.
  *
- * Strata (A9): catch-up is thesis-first — Needs you strongest, Followed next,
- * Quiet demoted (collapsed), Device memory a calm local-first voice. Visual
- * weight lives in home-view.css via home-catchup-tier--* modifiers.
+ * Strata (A9): data-home-stratum markers remain (attention / followed / quiet /
+ * resume / memory). Visual weight lives in home-view.css via
+ * home-catchup-tier--* and home-current-rail.
  *
  * Cold / vault-first paint: catch-up + resume prefer live store buffers and
  * stay visible while reconnecting (not only when `connected`) — unreads already
  * on-device are local truth. When the live map is empty (true cold return before
- * JOINs land), Home paints the last ranked catch-up snapshot from device memory
+ * JOINs land), Home paints the last ranked catch-up snapshot
  * (`catchUpMemory`) and enriches recaps from the vault. Before the network is
  * connected, an owner-scoped vault enumeration (`exportVault`) also paints
  * "Catch up from this device" cards that open exact retained rows — never
- * inventing unreads/membership the live server alone can establish. Device
- * memory also loads vault previews for recently-left + auto-join rooms not yet
- * in the live map.
+ * inventing unreads/membership the live server alone can establish.
  *
  * Reader handoff (A13): catch-up review paths (open / review-from-start /
  * resume-at-unread / reopen-reviewed) enable readerMode so the Time-Native
  * venue is the default reading experience. Mirrors Connect deep-link
- * `?reader=1` via setPreference — sticky until the user toggles off (prefs
- * have no session-only channel; same contract as invite/deep-link handoff).
+ * `?reader=1` via setPreference — sticky until the user toggles off.
  *
  * SOLID IDIOMS: components run once; never destructure props; useStore for
  * reactive reads; getState() only in handlers; createMemo for derived lists;
  * For/Show for lists/conditionals; onCleanup for the shared clock.
- *
- * Solid notes: the stats fetch is a createResource behind a graceful
- * fallback (dev servers 404 it — the view must never look broken); one
- * shared 30s clock signal drives every relative-time label; sorted/joined
- * derivations are memos.
  */
 import './home-view.css';
 import {
@@ -207,7 +208,7 @@ function spotlightQueryFor(item: CatchUpItem): string {
 
 function trendLabel(item: HomeRhythmItem): string {
   if (item.activeUsers > 0) {
-    return `${item.activeUsers} chatting`;
+    return `${item.activeUsers} ${item.activeUsers === 1 ? 'person' : 'people'} here now`;
   }
   return `${item.total.toLocaleString()} tracked`;
 }
@@ -244,7 +245,6 @@ export function HomeView(): JSX.Element {
   const composerDrafts = useStore((s) => s.composerDrafts);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const outboxDeliveryFailed = useStore((s) => s.outboxDeliveryFailed);
-  const networkName = useStore((s) => s.networkName);
   const ourNick = useStore((s) => s.ourNick);
   const serverUrl = useStore((s) => s.server?.url.trim() ?? '');
   const accountIdentity = useStore((s) =>
@@ -314,9 +314,9 @@ export function HomeView(): JSX.Element {
       topicDraftCount() > 0 ? countLabel(topicDraftCount(), 'topic draft') : null,
     ].filter(Boolean);
     if (waiting.length > 0) {
-      return `Local-memory mode: ${waiting.join(', ')} waiting on this device. Remembered rooms and reviewed spans stay available until reconnect.`;
+      return `On this device: ${waiting.join(', ')} waiting. Rooms and recent reviews stay available until you reconnect.`;
     }
-    return 'Local-memory mode: remembered rooms, reviewed spans, drafts, and queued sends stay available until reconnect.';
+    return 'On this device: remembered rooms, recent reviews, drafts, and queued sends stay available until you reconnect.';
   });
 
   function openQueuedSend(entry: OutboxEntry): void {
@@ -393,8 +393,9 @@ export function HomeView(): JSX.Element {
   // Tiered "since you were away" digest: mentions/DMs first, followed channels
   // next, ambient chatter collapsed into a quiet tail — honouring the calm
   // preset (followed never escalates under calm; power pulls it up top) and
-  // per-channel mute (muted channels drop out of "needs attention"). Value
-  // equality keeps the tiers stable across a no-op 30s clock tick.
+  // per-channel mute (muted-room highlights stay in Needs you; only ambient
+  // muted unread is quiet). Value equality keeps the tiers stable across a
+  // no-op 30s clock tick.
   const awayDigest = createMemo<AwayDigest>(
     () => buildAwayDigest(catchUp(), { notifyLevels: channelNotify(), preset: calmPreset() }),
     buildAwayDigest([], { notifyLevels: new Map(), preset: 'regular' }),
@@ -404,8 +405,37 @@ export function HomeView(): JSX.Element {
     () => hasRooms() || catchUpFromMemory(),
   );
   const catchUpSourceLabel = createMemo(() =>
-    catchUpFromMemory() ? 'device memory' : connectionStatus() === 'connected' ? 'live' : 'local buffers',
+    catchUpFromMemory()
+      ? 'saved on this device'
+      : connectionStatus() === 'connected'
+        ? 'live'
+        : 'on this device',
   );
+
+  const callState = useStore((s) => s.voice.callState);
+  const callChannel = useStore((s) => s.voice.callChannel);
+  const callWith = useStore((s) => s.voice.callWith);
+  /** Truthful live call surface only — never invent occupancy; never join. */
+  const liveCallPresent = createMemo(() => callState() !== 'idle');
+  const openLiveCallRoom = () => {
+    const channel = callChannel();
+    const peer = callWith().trim();
+    const state = getState();
+    // Navigate only — never joinVoiceChannel / accept from Home.
+    if (channel) {
+      state.navigate({ kind: 'channel', channel });
+      return;
+    }
+    if (peer) state.navigate({ kind: 'dm', nick: peer });
+  };
+  const liveCallLabel = createMemo(() => {
+    const state = callState();
+    const place = callChannel() || (callWith().trim() ? `@${callWith().trim()}` : 'call');
+    if (state === 'in_call') return `In a call · ${place}`;
+    if (state === 'ringing_in') return `Incoming call · ${place}`;
+    if (state === 'ringing_out') return `Calling · ${place}`;
+    return `Call · ${place}`;
+  });
 
   // "Resume where you left off" — the ranked catch-up items that have an
   // authoritative first-unread boundary, so one tap lands you at the exact
@@ -773,10 +803,21 @@ export function HomeView(): JSX.Element {
   const totalMessages = createMemo(() =>
     (stats.latest?.channels ?? []).reduce((sum, c) => sum + c.messages, 0),
   );
-  const totalChatting = createMemo(() =>
-    (stats.latest?.channels ?? []).reduce((sum, c) => sum + c.active_users, 0),
-  );
   const isJoined = (name: string) => channels().has(name.toLowerCase());
+  /**
+   * Active-rooms directory card: open an already-joined room without re-JOIN,
+   * otherwise preserve join-only behavior (JOIN does not invent a local view).
+   * Reads getState() at click time so join/open is not a stale render snapshot.
+   */
+  const openOrJoinActiveRoom = (channel: string) => {
+    const state = getState();
+    const existing = state.channels.get(channel.toLowerCase());
+    if (existing) {
+      state.navigate({ kind: 'channel', channel: existing.name });
+      return;
+    }
+    void state.joinChannel(channel);
+  };
   const roomRhythm = createMemo<HomeRhythmItem[]>(() => {
     const data = stats.latest;
     if (!data) return [];
@@ -790,7 +831,9 @@ export function HomeView(): JSX.Element {
         spark: channel.spark.slice(-14),
         total: channel.messages,
         peak: Math.max(1, ...channel.spark),
-        activeUsers: channel.active_users,
+        // `active_users` is a rolling activity measure. Room rhythm says who
+        // is here now, so it must use the current channel presence count.
+        activeUsers: channel.present,
         lastActive: channel.last_active,
         event: events.get(channel.channel.toLowerCase()) ?? null,
       }))
@@ -804,16 +847,71 @@ export function HomeView(): JSX.Element {
       .slice(0, HOME_RHYTHM_LIMIT);
   });
 
+  const liveNowVisible = createMemo(
+    () =>
+      (connectionStatus() === 'connected' && scheduledEvents().length > 0)
+      || liveCallPresent(),
+  );
+  const showCaughtUpEmpty = createMemo(
+    () =>
+      showCatchUp()
+      && awayDigest().empty
+      && resumePoints().length === 0
+      && !liveNowVisible()
+      && coldRememberedRooms().length === 0
+      && awayDigest().followed.length === 0,
+  );
+  const showFirstRoomPrompt = createMemo(
+    () =>
+      connectionStatus() === 'connected'
+      && !hasRooms()
+      && directory().length === 0
+      && recentRooms().length === 0,
+  );
+  const moreActivityHasContent = createMemo(() =>
+    !!stats.latest
+    || (connectionStatus() === 'connected' && roomRhythm().length > 0)
+    || (preferences().localHistory && rememberedRooms().length > 0)
+    || (connectionStatus() === 'connected' && quietActivity().length > 0)
+    || (connectionStatus() === 'connected' && quietBoosts().length > 0)
+    || reviewHistory().length > 0,
+  );
+  const continueVisible = createMemo(
+    () => resumePoints().length > 0 || awayDigest().followed.length > 0,
+  );
+  const welcomeName = createMemo(() => {
+    const nick = ourNick().trim();
+    return nick || null;
+  });
+
   return (
     <div class="home" role="main" aria-label="Network home">
       <div class="home-inner">
+        {/* 1 — Calm personal welcome + Search / Browse */}
         <header class="home-masthead">
-          <p class="home-kicker">{networkName() || 'Onyx'}</p>
-          <h2 class="home-title">You're in the current.</h2>
+          <h2 class="home-title">
+            {welcomeName() ? `Welcome, ${welcomeName()}.` : 'Welcome.'}
+          </h2>
           <p class="home-sub">
-            Pick a hall below, or press <b>/</b> to search rooms, people and commands —{' '}
-            <b>⌘K</b> opens the palette, <b>?</b> shows every shortcut.
+            Your rooms, messages, and calls come together here. Browse a room or
+            search your history to get started.
           </p>
+          <p class="home-shortcut-note">
+            <span>Power tip</span>
+            Press <b>/</b> for the palette or <b>?</b> for shortcuts.
+          </p>
+          <div class="home-welcome-actions" role="group" aria-label="Primary home actions">
+            <button
+              type="button"
+              class="home-cta"
+              onClick={() => getState().openChannelBrowser()}
+            >
+              Browse rooms
+            </button>
+            <button type="button" class="home-action home-action--primary" onClick={openMessageSearch}>
+              Search messages
+            </button>
+          </div>
           <Show when={connectionStatus() !== 'connected'}>
             <p class="home-offline-note" role="status">
               {localMemoryStatus()}
@@ -821,11 +919,13 @@ export function HomeView(): JSX.Element {
           </Show>
         </header>
 
+        {/* 2 — Conditional connection / outbox strip */}
         <Show when={homeOutboxChrome()}>
           {(chrome) => (
             <section
               class={`home-outbox home-outbox--${chrome().tone}`}
               aria-labelledby="home-outbox-title"
+              data-home-stratum="outbox"
             >
               <div class="home-outbox__head">
                 <div>
@@ -888,7 +988,7 @@ export function HomeView(): JSX.Element {
         {/* Owner-scoped vault enumeration while offline/connecting — literal
             retained rows, not invented unreads. Retires once connected. */}
         <Show when={coldRememberedRooms().length > 0}>
-          <section class="home-catchup" aria-label="Device-local catch-up">
+          <section class="home-catchup home-catchup--cold" aria-label="Device-local catch-up">
             <div class="home-catchup-head">
               <h3 class="home-section-label">Catch up from this device</h3>
               <span class="home-catchup-summary">
@@ -903,7 +1003,7 @@ export function HomeView(): JSX.Element {
                     type="button"
                     class="home-memory-card"
                     onClick={() => openColdMemory(item)}
-                    aria-label={`Open ${item.target} from device memory, ${item.count} remembered ${item.count === 1 ? 'message' : 'messages'}`}
+                    aria-label={`Open ${item.target} from this device, ${item.count} remembered ${item.count === 1 ? 'message' : 'messages'}`}
                   >
                     <span class="home-memory-card-head">
                       <span class="home-memory-room">{item.target}</span>
@@ -920,7 +1020,7 @@ export function HomeView(): JSX.Element {
                       </span>
                       <span>
                         {item.participants.length}{' '}
-                        {item.participants.length === 1 ? 'voice' : 'voices'}
+                        {item.participants.length === 1 ? 'person' : 'people'}
                       </span>
                     </span>
                   </button>
@@ -930,57 +1030,191 @@ export function HomeView(): JSX.Element {
           </section>
         </Show>
 
-        {/* Catch-up: live buffers when rooms exist (incl. reconnect); otherwise
-            the durable device-memory snapshot so cold return paints before JOIN. */}
-        <Show when={showCatchUp()}>
-          <section
-            class="home-catchup"
-            data-catchup-source={catchUpFromMemory() ? 'memory' : 'live'}
-            aria-label="Catch up on what you missed"
-          >
-            <div class="home-catchup-head">
-              <h3 class="home-section-label">Catch up</h3>
-              <Show
-                when={!awayDigest().empty}
-                fallback={<span class="home-catchup-clear">You're all caught up ✓</span>}
-              >
-                <span class="home-catchup-summary">
-                  {catchUpTotals().unread} unread
-                  <Show when={catchUpTotals().mentions > 0}>
-                    {' · '}
-                    <b>
-                      {catchUpTotals().mentions} mention{catchUpTotals().mentions === 1 ? '' : 's'}
-                    </b>
-                  </Show>
-                  <Show when={catchUpTotals().followed > 0}>
-                    {' · '}
-                    {catchUpTotals().followed} followed
-                  </Show>
-                  {' · '}
-                  <span class="home-catchup-source">{catchUpSourceLabel()}</span>
-                </span>
-              </Show>
-            </div>
-            <Show when={!awayDigest().empty}>
-              {/* markRead needs live room state — hide on pure cold snapshot. */}
-              <Show when={!catchUpFromMemory()}>
-                <MarkAllCaughtUp />
-              </Show>
-              <Show when={awayDigest().attention.length > 0}>
-                <div
-                  class="home-catchup-tier home-catchup-tier--attention"
-                  data-home-stratum="attention"
-                  role="group"
-                  aria-label="Mentions and direct messages"
+        {/* Thesis rail: Needs you → Continue (sparse cyan current line) */}
+        <div
+          class="home-current-rail"
+          classList={{
+            'home-current-rail--active':
+              (!awayDigest().empty && awayDigest().attention.length > 0) || continueVisible(),
+          }}
+        >
+          {/* 3 — Needs you: DMs + direct mentions (+ catch-up summary shell).
+              When fully caught up, the dedicated empty band owns the calm copy. */}
+          <Show when={showCatchUp() && !showCaughtUpEmpty()}>
+            <section
+              class="home-catchup home-catchup--needs"
+              data-catchup-source={catchUpFromMemory() ? 'memory' : 'live'}
+              data-home-band="needs-you"
+              aria-label="Catch up on what you missed"
+            >
+              <div class="home-catchup-head">
+                <h3 class="home-section-label">Needs you</h3>
+                <Show
+                  when={!awayDigest().empty}
+                  fallback={<span class="home-catchup-clear">You're all caught up</span>}
                 >
-                  <h4 class="home-catchup-tier-label">Needs you</h4>
-                  <ul class="home-catchup-list">
-                    <For each={awayDigest().attention}>
-                      {(item) => <CatchUpRow item={item} />}
+                  <span class="home-catchup-summary">
+                    {catchUpTotals().unread} unread
+                    <Show when={catchUpTotals().mentions > 0}>
+                      {' · '}
+                      <b>
+                        {catchUpTotals().mentions} mention{catchUpTotals().mentions === 1 ? '' : 's'}
+                      </b>
+                    </Show>
+                    <Show when={catchUpTotals().followed > 0}>
+                      {' · '}
+                      {catchUpTotals().followed} followed
+                    </Show>
+                    {' · '}
+                    <span class="home-catchup-source">{catchUpSourceLabel()}</span>
+                  </span>
+                </Show>
+              </div>
+              <Show when={!awayDigest().empty}>
+                <Show when={!catchUpFromMemory()}>
+                  <MarkAllCaughtUp />
+                </Show>
+                <Show when={awayDigest().attention.length > 0}>
+                  <div
+                    class="home-catchup-tier home-catchup-tier--attention"
+                    data-home-stratum="attention"
+                    role="group"
+                    aria-label="Mentions and direct messages"
+                  >
+                    {/* Section already reads "Needs you" once — no duplicate tier label. */}
+                    <ul class="home-catchup-list">
+                      <For each={awayDigest().attention}>
+                        {(item) => <CatchUpRow item={item} />}
+                      </For>
+                    </ul>
+                  </div>
+                </Show>
+                {/* Ambient catch-up stays collapsed here (A9); power analytics go to More. */}
+                <Show when={awayDigest().quiet.length > 0}>
+                  <details
+                    class="home-catchup-quiet home-catchup-tier--quiet"
+                    data-home-stratum="quiet"
+                  >
+                    <summary class="home-catchup-tier-label">
+                      Quiet activity ({awayDigest().quiet.length})
+                    </summary>
+                    <ul class="home-catchup-list">
+                      <For each={awayDigest().quiet}>
+                        {(item) => <CatchUpRow item={item} />}
+                      </For>
+                    </ul>
+                  </details>
+                </Show>
+              </Show>
+              {/* Dense since-you-left recaps stay collapsed until the consumer opens them. */}
+              <Show when={catchUpRecaps().length > 0}>
+                <details class="home-catchup-details home-catchup-details--recaps">
+                  <summary class="home-catchup-details__summary">
+                    Catch-up details ({catchUpRecaps().length})
+                  </summary>
+                  <div class="home-recap-strip" role="list" aria-label="Since you left recaps">
+                    <For each={catchUpRecaps()}>
+                      {(recap) => (
+                        <article class="home-recap-card" role="listitem">
+                          <div class="home-recap-card__head">
+                            <span class="home-recap-card__target">
+                              {recap.item.kind === 'dm' ? `@${recap.item.name}` : recap.item.name}
+                            </span>
+                            <span class="home-recap-card__count">{recapSummary(recap)}</span>
+                          </div>
+                          <p class="home-recap-card__voice">{voiceSummary(recap)}</p>
+                          <p class="home-recap-card__preview">{recap.preview}</p>
+                          <div class="home-recap-card__actions">
+                            <button
+                              type="button"
+                              class="home-recap-card__open"
+                              onClick={() => openCatchUp(recap.item)}
+                            >
+                              Open
+                            </button>
+                            <button
+                              type="button"
+                              class="home-recap-card__review"
+                              onClick={() => reviewCatchUpFromStart(recap)}
+                              aria-label={`Review ${recap.item.name} from first unread line`}
+                            >
+                              Review from start
+                            </button>
+                            <button
+                              type="button"
+                              class="home-recap-card__spotlight"
+                              onClick={() => openCatchUpSpotlight(recap.item)}
+                              aria-label={`Find related actions for ${recap.item.name}`}
+                            >
+                              Find related
+                            </button>
+                          </div>
+                        </article>
+                      )}
+                    </For>
+                  </div>
+                </details>
+              </Show>
+            </section>
+          </Show>
+
+          {/* 4 — Continue: exact resume + followed activity */}
+          <Show when={continueVisible()}>
+            <section
+              class="home-continue"
+              data-home-band="continue"
+              aria-label="Continue where you left off"
+            >
+              <div class="home-continue-head">
+                <h3 class="home-section-label">Continue</h3>
+                <span class="home-continue-summary">pick up exactly</span>
+              </div>
+
+              <Show when={resumePoints().length > 0}>
+                <div
+                  class="home-resume"
+                  data-home-stratum="resume"
+                  role="region"
+                  aria-label="Resume where you left off"
+                >
+                  <div class="home-resume-head">
+                    <h4 class="home-resume-label">Pick up where you left off</h4>
+                    <span class="home-resume-summary">first unread</span>
+                  </div>
+                  <ul class="home-resume-list">
+                    <For each={resumePoints()}>
+                      {(point) => (
+                        <li>
+                          <button
+                            type="button"
+                            class={`home-resume-item is-${point.tier}`}
+                            onClick={() => resumeAt(point)}
+                            aria-label={`Resume ${point.name} at your first unread message, ${point.unread} unread${point.highlights > 0 ? `, ${point.highlights} mention${point.highlights === 1 ? '' : 's'}` : ''}`}
+                          >
+                            <span class="home-resume-name">
+                              <span class="home-resume-kind" aria-hidden="true">
+                                {point.kind === 'dm' ? '@' : '#'}
+                              </span>
+                              {point.kind === 'dm' ? point.name : point.name.replace(/^#/, '')}
+                            </span>
+                            <span class="home-resume-meta">
+                              <Show when={point.highlights > 0}>
+                                <span class="home-resume-mention">{point.highlights} @you</span>
+                              </Show>
+                              <Show when={point.tier === 'followed'}>
+                                <span class="home-resume-followed">followed</span>
+                              </Show>
+                              <span class="home-resume-count">{point.unread} unread</span>
+                              <span class="home-resume-cue" aria-hidden="true">Resume →</span>
+                            </span>
+                          </button>
+                        </li>
+                      )}
                     </For>
                   </ul>
                 </div>
               </Show>
+
               <Show when={awayDigest().followed.length > 0}>
                 <div
                   class="home-catchup-tier home-catchup-tier--followed"
@@ -996,468 +1230,419 @@ export function HomeView(): JSX.Element {
                   </ul>
                 </div>
               </Show>
-              <Show when={awayDigest().quiet.length > 0}>
-                <details
-                  class="home-catchup-quiet home-catchup-tier--quiet"
-                  data-home-stratum="quiet"
+            </section>
+          </Show>
+        </div>
+
+        {/* 5 — Live now: scheduled / live events + real call state only */}
+        <Show when={liveNowVisible()}>
+          <section
+            class="home-events home-live-now"
+            data-home-band="live-now"
+            aria-label="Live now"
+          >
+            <div class="home-events-head">
+              <h3 class="home-section-label">Live now</h3>
+              <span class="home-events-summary">
+                <Show
+                  when={scheduledEvents().some((event) => event.live) || liveCallPresent()}
+                  fallback="coming up"
                 >
-                  <summary class="home-catchup-tier-label">
-                    Quiet activity ({awayDigest().quiet.length})
-                  </summary>
-                  <ul class="home-catchup-list">
-                    <For each={awayDigest().quiet}>
-                      {(item) => <CatchUpRow item={item} />}
-                    </For>
-                  </ul>
-                </details>
-              </Show>
+                  happening
+                </Show>
+              </span>
+            </div>
+            <Show when={liveCallPresent()}>
+              <button
+                type="button"
+                class="home-event home-event--call is-live"
+                onClick={openLiveCallRoom}
+                aria-label={`${liveCallLabel()}. Open the room — does not join the call.`}
+              >
+                <span class="home-event-time">
+                  <span class="home-event-state">call</span>
+                  <span>already active</span>
+                </span>
+                <span class="home-event-main">
+                  <span class="home-event-title">{liveCallLabel()}</span>
+                  <span class="home-event-channel">Open the room · join stays explicit</span>
+                </span>
+                <span class="home-event-open" aria-hidden="true">Open →</span>
+              </button>
             </Show>
-            <Show when={catchUpRecaps().length > 0}>
-              <div class="home-recap-strip" role="list" aria-label="Since you left recaps">
-                <For each={catchUpRecaps()}>
-                  {(recap) => (
-                    <article class="home-recap-card" role="listitem">
-                      <div class="home-recap-card__head">
-                        <span class="home-recap-card__target">
-                          {recap.item.kind === 'dm' ? `@${recap.item.name}` : recap.item.name}
+            <Show when={connectionStatus() === 'connected' && scheduledEvents().length > 0}>
+              <ul class="home-events-list">
+                <For each={scheduledEvents()}>
+                  {(event) => (
+                    <li>
+                      <button
+                        type="button"
+                        class={`home-event${event.live ? ' is-live' : ''}`}
+                        onClick={() => openEvent(event)}
+                        aria-label={`Open ${event.channel} for ${event.title}, ${eventCountdown(event, nowMs())}`}
+                      >
+                        <span class="home-event-time">
+                          <span class="home-event-state">{event.live ? 'live' : eventCountdown(event, nowMs())}</span>
+                          <span>{eventWhenLabel(event)}</span>
                         </span>
-                        <span class="home-recap-card__count">{recapSummary(recap)}</span>
-                      </div>
-                      <p class="home-recap-card__voice">{voiceSummary(recap)}</p>
-                      <p class="home-recap-card__preview">{recap.preview}</p>
-                      <div class="home-recap-card__actions">
+                        <span class="home-event-main">
+                          <span class="home-event-title">{event.title}</span>
+                          <span class="home-event-channel">{event.channel}</span>
+                        </span>
+                        <span class="home-event-open" aria-hidden="true">Open →</span>
+                      </button>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
+          </section>
+        </Show>
+
+        {/* 6 — Explore: directory + recent (primary CTAs already in masthead) */}
+        <section class="home-explore" data-home-band="explore" aria-label="Explore">
+          <div class="home-explore-head">
+            <h3 class="home-section-label">Explore</h3>
+            <div class="home-explore-actions">
+              <button type="button" class="home-action home-action--quiet" onClick={() => getState().openAppearance()}>
+                Appearance
+              </button>
+              <button type="button" class="home-action home-action--quiet" onClick={() => getState().openKeyboardShortcuts()}>
+                Shortcuts
+              </button>
+            </div>
+          </div>
+
+          <Show when={directory().length > 0}>
+            <div class="home-directory" aria-label="Active channels">
+              <p class="home-explore-kicker">Active rooms</p>
+              <div class="home-grid" role="list" aria-label="Active channel directory">
+                <For each={directory()}>
+                  {(c) => (
+                    <article class="home-card" role="listitem">
+                      <header class="home-card-head">
+                        <h4 class="home-card-name">{c.channel}</h4>
+                        <span class="home-card-when">
+                          {c.present > 0
+                            ? `${c.present} ${c.present === 1 ? 'person' : 'people'} here now`
+                            : relTime(c.last_active, nowMs())}
+                        </span>
+                      </header>
+                      <p class={`home-card-topic${c.topic ? '' : ' is-empty'}`}>
+                        {c.topic || 'No topic yet — set the tone.'}
+                      </p>
+                      <Sparkline values={c.spark} />
+                      <footer class="home-card-foot">
+                        <span class="home-card-msgs">
+                          {c.messages.toLocaleString('en-US')} messages tracked
+                        </span>
                         <button
                           type="button"
-                          class="home-recap-card__open"
-                          onClick={() => openCatchUp(recap.item)}
+                          class="home-card-join"
+                          aria-label={isJoined(c.channel) ? `Open ${c.channel}` : `Join ${c.channel}`}
+                          onClick={() => openOrJoinActiveRoom(c.channel)}
                         >
-                          Open
+                          {isJoined(c.channel) ? 'Open →' : 'Join →'}
                         </button>
-                        <button
-                          type="button"
-                          class="home-recap-card__review"
-                          onClick={() => reviewCatchUpFromStart(recap)}
-                          aria-label={`Review ${recap.item.name} from first unread line`}
-                        >
-                          Review from start
-                        </button>
-                        <button
-                          type="button"
-                          class="home-recap-card__spotlight"
-                          onClick={() => openCatchUpSpotlight(recap.item)}
-                          aria-label={`Find related actions for ${recap.item.name}`}
-                        >
-                          Find related
-                        </button>
-                      </div>
+                      </footer>
                     </article>
                   )}
                 </For>
               </div>
-            </Show>
-          </section>
-        </Show>
-
-        <Show when={resumePoints().length > 0}>
-          <section
-            class="home-resume"
-            data-home-stratum="resume"
-            aria-label="Resume where you left off"
-          >
-            <div class="home-resume-head">
-              <h3 class="home-section-label">Pick up where you left off</h3>
-              <span class="home-resume-summary">last-read boundary</span>
             </div>
-            <ul class="home-resume-list">
-              <For each={resumePoints()}>
-                {(point) => (
-                  <li>
+          </Show>
+
+          <Show when={recentRooms().length > 0}>
+            <div class="home-recent">
+              <span class="home-section-label">Recent rooms</span>
+              <div class="home-recent-chips">
+                <For each={recentRooms()}>
+                  {(room) => (
                     <button
                       type="button"
-                      class={`home-resume-item is-${point.tier}`}
-                      onClick={() => resumeAt(point)}
-                      aria-label={`Resume ${point.name} at your first unread message, ${point.unread} unread${point.highlights > 0 ? `, ${point.highlights} mention${point.highlights === 1 ? '' : 's'}` : ''}`}
+                      class="home-recent-chip"
+                      onClick={() => void getState().joinChannel(room)}
                     >
-                      <span class="home-resume-name">
-                        <span class="home-resume-kind" aria-hidden="true">
-                          {point.kind === 'dm' ? '@' : '#'}
-                        </span>
-                        {point.kind === 'dm' ? point.name : point.name.replace(/^#/, '')}
-                      </span>
-                      <span class="home-resume-meta">
-                        <Show when={point.highlights > 0}>
-                          <span class="home-resume-mention">{point.highlights} @you</span>
-                        </Show>
-                        <Show when={point.tier === 'followed'}>
-                          <span class="home-resume-followed">followed</span>
-                        </Show>
-                        <span class="home-resume-count">{point.unread} unread</span>
-                        <span class="home-resume-cue" aria-hidden="true">Resume →</span>
-                      </span>
+                      {room}
                     </button>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </section>
-        </Show>
-
-        <Show when={reviewHistory().length > 0}>
-          <section class="home-review-history" aria-label="Recent catch-up reviews">
-            <div class="home-review-history__head">
-              <h3 class="home-section-label">Reviewed recently</h3>
-              <span class="home-review-history__summary">{reviewHistorySummary()}</span>
-            </div>
-            <div class="home-review-history__list" role="list" aria-label="Recent catch-up review cards">
-              <For each={reviewHistory()}>
-                {(entry) => (
-                  <article class="home-review-history__item" role="listitem">
-                    <div class="home-review-history__meta">
-                      <span class="home-review-history__target">
-                        {entry.kind === 'dm' ? `@${entry.name}` : entry.name}
-                      </span>
-                      <span>{reviewCountSummary(entry.messageCount, entry.mentionCount)}</span>
-                      <span>{relTime(Math.floor(Date.parse(entry.reviewedAt) / 1000), nowMs())}</span>
-                    </div>
-                    <p class="home-review-history__preview">{entry.preview}</p>
-                    <div class="home-review-history__actions">
-                      <button
-                        type="button"
-                        onClick={() => reopenReview(entry)}
-                        aria-label={`Reopen reviewed catch-up for ${entry.name}`}
-                      >
-                        Reopen
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openReviewSpotlight(entry)}
-                        aria-label={`Find related actions for reviewed ${entry.name}`}
-                      >
-                        Find related
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => searchReviewText(entry)}
-                        aria-label={`Search reviewed text for ${entry.name}`}
-                      >
-                        Search text
-                      </button>
-                    </div>
-                  </article>
-                )}
-              </For>
-            </div>
-          </section>
-        </Show>
-
-        <Show when={connectionStatus() === 'connected' && scheduledEvents().length > 0}>
-          <section class="home-events" aria-label="Upcoming room events">
-            <div class="home-events-head">
-              <h3 class="home-section-label">Scheduled</h3>
-              <span class="home-events-summary">
-                {scheduledEvents().filter((event) => event.live).length > 0 ? 'live now' : 'coming up'}
-              </span>
-            </div>
-            <ul class="home-events-list">
-              <For each={scheduledEvents()}>
-                {(event) => (
-                  <li>
-                    <button
-                      type="button"
-                      class={`home-event${event.live ? ' is-live' : ''}`}
-                      onClick={() => openEvent(event)}
-                      aria-label={`Open ${event.channel} for ${event.title}, ${eventCountdown(event, nowMs())}`}
-                    >
-                      <span class="home-event-time">
-                        <span class="home-event-state">{event.live ? 'live' : eventCountdown(event, nowMs())}</span>
-                        <span>{eventWhenLabel(event)}</span>
-                      </span>
-                      <span class="home-event-main">
-                        <span class="home-event-title">{event.title}</span>
-                        <span class="home-event-channel">{event.channel}</span>
-                      </span>
-                      <span class="home-event-open" aria-hidden="true">Open →</span>
-                    </button>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </section>
-        </Show>
-
-        <Show when={stats.latest}>
-          {(data) => (
-            <div class="home-pulse" aria-label="Live network figures">
-              <div class="home-pulse-tile">
-                <span class="home-pulse-num">{data().channels.length}</span>
-                <span class="home-pulse-label">channels</span>
-              </div>
-              <div class="home-pulse-tile">
-                <span class="home-pulse-num">{totalMessages().toLocaleString('en-US')}</span>
-                <span class="home-pulse-label">messages tracked</span>
-              </div>
-              <div class="home-pulse-tile">
-                <span class="home-pulse-num">{totalChatting().toLocaleString('en-US')}</span>
-                <span class="home-pulse-label">chatting now</span>
-              </div>
-              <div class="home-pulse-tile">
-                <span class="home-pulse-num">{relTime(data().generated_at, nowMs())}</span>
-                <span class="home-pulse-label">stats updated</span>
+                  )}
+                </For>
               </div>
             </div>
-          )}
-        </Show>
+          </Show>
 
-        <div class="home-actions">
-          <button
-            type="button"
-            class="home-cta"
-            onClick={() => getState().openChannelBrowser()}
-          >
-            Browse all channels
-          </button>
-          <button type="button" class="home-action" onClick={() => void getState().joinChannel('#root')}>
-            Join #root →
-          </button>
-          <button type="button" class="home-action" onClick={openMessageSearch}>
-            Search device memory
-          </button>
-          <button type="button" class="home-action" onClick={() => getState().openAppearance()}>
-            Appearance
-          </button>
-          <button type="button" class="home-action" onClick={() => getState().openKeyboardShortcuts()}>
-            Shortcuts
-          </button>
-        </div>
+          <Show when={showFirstRoomPrompt()}>
+            <div class="home-first-room" role="note" aria-label="Start with a room">
+              <p class="home-first-room__eyebrow">Your space is ready</p>
+              <p class="home-first-room__title">Start with a room.</p>
+              <p class="home-first-room__copy">
+                Rooms hold your conversation, files, and calls in one place.
+                Browse what is open now, or join one by name.
+              </p>
+            </div>
+          </Show>
+        </section>
 
-        <Show when={connectionStatus() === 'connected' && roomRhythm().length > 0}>
-          <section class="home-rhythm" aria-label="Room rhythm">
-            <div class="home-rhythm-head">
-              <h3 class="home-section-label">Room rhythm</h3>
-              <span class="home-rhythm-summary">chanstats heatlines</span>
-            </div>
-            <div class="home-rhythm-list">
-              <For each={roomRhythm()}>
-                {(item) => (
-                  <button
-                    type="button"
-                    class={`home-rhythm-item${item.event?.live ? ' is-live' : ''}`}
-                    onClick={() => item.event ? openEvent(item.event) : getState().navigate({ kind: 'channel', channel: item.channel })}
-                    aria-label={`Open ${item.channel}, ${trendLabel(item)}${item.event ? `, ${item.event.title} ${eventCountdown(item.event, nowMs())}` : ''}`}
-                  >
-                    <span class="home-rhythm-main">
-                      <span class="home-rhythm-title">
-                        <span>{item.channel}</span>
-                        <span>{trendLabel(item)}</span>
-                      </span>
-                      <span class={`home-rhythm-topic${item.topic ? '' : ' is-empty'}`}>
-                        {item.topic || 'No topic set'}
-                      </span>
-                    </span>
-                    <span class="home-rhythm-heat" aria-hidden="true">
-                      <For each={item.spark}>
-                        {(value) => (
-                          <span
-                            class={`home-rhythm-bar${value > 0 ? ' is-active' : ''}`}
-                            style={{ '--heat': (value / item.peak).toFixed(3) }}
-                          />
-                        )}
-                      </For>
-                    </span>
-                    <span class="home-rhythm-event">
-                      <Show
-                        when={item.event}
-                        fallback={<span>{relTime(item.lastActive, nowMs())}</span>}
-                      >
-                        {(event) => (
-                          <>
-                            <b>{event().live ? 'live' : eventCountdown(event(), nowMs())}</b>
-                            <span>{event().title}</span>
-                          </>
-                        )}
-                      </Show>
-                    </span>
-                  </button>
-                )}
-              </For>
-            </div>
+        {/* 7 — Caught-up empty (when primary bands have nothing); after Explore */}
+        <Show when={showCaughtUpEmpty()}>
+          <section class="home-empty" data-home-band="caught-up" aria-label="You're caught up">
+            <p class="home-empty-title">You're caught up</p>
+            <p class="home-empty-copy">
+              No unread messages need you right now. Use Browse rooms or Search messages above when you're ready.
+            </p>
           </section>
         </Show>
 
-        <Show when={preferences().localHistory && rememberedRooms().length > 0}>
-          <section
-            class="home-memory"
-            data-home-stratum="memory"
-            aria-label="Remembered rooms on this device"
-          >
-            <div class="home-memory-head">
-              <h3 class="home-section-label">Device memory</h3>
-              <span class="home-memory-summary">local history</span>
-            </div>
-            <div class="home-memory-grid">
-              <For each={rememberedRooms()}>
-                {(item) => (
-                  <button
-                    type="button"
-                    class="home-memory-card"
-                    onClick={() => openMemory(item)}
-                    aria-label={`Rejoin ${item.target}, last remembered ${relTime(Math.floor(item.lastAt.getTime() / 1000), nowMs())}`}
-                  >
-                    <span class="home-memory-card-head">
-                      <span class="home-memory-room">{item.target}</span>
-                      <span class="home-memory-when">
-                        {relTime(Math.floor(item.lastAt.getTime() / 1000), nowMs())}
-                      </span>
-                    </span>
-                    <span class="home-memory-preview">
-                      <b>{item.lastFrom}</b>: {item.preview}
-                    </span>
-                    <span class="home-memory-foot">
-                      <span>
-                        {item.count} remembered {item.count === 1 ? 'message' : 'messages'}
-                      </span>
-                      <span>
-                        {item.participants.length} {item.participants.length === 1 ? 'voice' : 'voices'}
-                      </span>
-                    </span>
-                  </button>
-                )}
-              </For>
-            </div>
-          </section>
-        </Show>
-
-        <Show when={connectionStatus() === 'connected' && quietActivity().length > 0}>
-          <section class="home-quiet" aria-label="Quiet room activity">
-            <div class="home-quiet-head">
-              <h3 class="home-section-label">Quiet activity</h3>
-              <span class="home-quiet-summary">read rooms</span>
-            </div>
-            <div class="home-quiet-list">
-              <For each={quietActivity()}>
-                {(item) => (
-                  <button
-                    type="button"
-                    class="home-quiet-item"
-                    onClick={() => openQuietActivity(item)}
-                    aria-label={`Open ${item.name}, active ${relTime(Math.floor(item.lastActivity / 1000), nowMs())}`}
-                  >
-                    <span class="home-quiet-main">
-                      <span class="home-quiet-room">{item.name}</span>
-                      <span class={`home-quiet-topic${item.topic ? '' : ' is-empty'}`}>
-                        {item.topic || 'No topic set'}
-                      </span>
-                    </span>
-                    <span class="home-quiet-when">
-                      {relTime(Math.floor(item.lastActivity / 1000), nowMs())}
-                    </span>
-                  </button>
-                )}
-              </For>
-            </div>
-          </section>
-        </Show>
-
-        <Show when={connectionStatus() === 'connected' && quietBoosts().length > 0}>
-          <section class="home-boosts" aria-label="Quiet boosts">
-            <div class="home-boosts-head">
-              <h3 class="home-section-label">Quiet boosts</h3>
-              <span class="home-boosts-summary">non-notifying reactions</span>
-            </div>
-            <div class="home-boosts-list" role="list" aria-label="Quiet boost cards">
-              <For each={quietBoosts()}>
-                {(item) => (
-                  <article class="home-boost-card" role="listitem">
-                    <button
-                      type="button"
-                      class="home-boost-card__open"
-                      onClick={() => openQuietBoost(item)}
-                      aria-label={`Open boosted message in ${item.target}`}
-                    >
-                      <span class="home-boost-card__target">
-                        {item.target.startsWith('#') || item.target.startsWith('&')
-                          ? item.target
-                          : `@${item.target}`}
-                      </span>
-                      <span class="home-boost-card__badges" aria-label={`${item.total} quiet boosts`}>
-                        <For each={item.groups.slice(0, 3)}>
-                          {(group) => (
-                            <span class={`home-boost-card__badge${group.youBoosted ? ' is-you' : ''}`}>
-                              <span aria-hidden="true">{group.emoji}</span>
-                              <span>{group.count}</span>
+        {/* Power / technical surfaces — collapsed by default */}
+        <Show when={moreActivityHasContent()}>
+          <details class="home-more-activity" data-home-band="more-activity">
+            <summary class="home-more-activity__summary">More activity</summary>
+            <div class="home-more-activity__body">
+              <Show when={reviewHistory().length > 0}>
+                <section class="home-review-history" aria-label="Recent catch-up reviews">
+                  <div class="home-review-history__head">
+                    <h3 class="home-section-label">Reviewed recently</h3>
+                    <span class="home-review-history__summary">{reviewHistorySummary()}</span>
+                  </div>
+                  <div class="home-review-history__list" role="list" aria-label="Recent catch-up review cards">
+                    <For each={reviewHistory()}>
+                      {(entry) => (
+                        <article class="home-review-history__item" role="listitem">
+                          <div class="home-review-history__meta">
+                            <span class="home-review-history__target">
+                              {entry.kind === 'dm' ? `@${entry.name}` : entry.name}
                             </span>
-                          )}
-                        </For>
-                      </span>
-                      <span class="home-boost-card__preview">
-                        <b>{item.from}</b>: {clipped(item.text, 96)}
-                      </span>
-                      <span class="home-boost-card__when">
-                        {relTime(Math.floor(item.at.getTime() / 1000), nowMs())}
-                      </span>
-                    </button>
-                  </article>
-                )}
-              </For>
-            </div>
-          </section>
-        </Show>
+                            <span>{reviewCountSummary(entry.messageCount, entry.mentionCount)}</span>
+                            <span>{relTime(Math.floor(Date.parse(entry.reviewedAt) / 1000), nowMs())}</span>
+                          </div>
+                          <p class="home-review-history__preview">{entry.preview}</p>
+                          <div class="home-review-history__actions">
+                            <button
+                              type="button"
+                              onClick={() => reopenReview(entry)}
+                              aria-label={`Reopen reviewed catch-up for ${entry.name}`}
+                            >
+                              Reopen
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openReviewSpotlight(entry)}
+                              aria-label={`Find related actions for reviewed ${entry.name}`}
+                            >
+                              Find related
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => searchReviewText(entry)}
+                              aria-label={`Search reviewed text for ${entry.name}`}
+                            >
+                              Search text
+                            </button>
+                          </div>
+                        </article>
+                      )}
+                    </For>
+                  </div>
+                </section>
+              </Show>
 
-        <Show when={directory().length > 0}>
-          <section class="home-directory" aria-label="Active channels">
-            <h3 class="home-section-label">The halls</h3>
-            <div class="home-grid" role="list" aria-label="Active channel directory">
-              <For each={directory()}>
-                {(c) => (
-                  <article class="home-card" role="listitem">
-                    <header class="home-card-head">
-                      <h4 class="home-card-name">{c.channel}</h4>
-                      <span class="home-card-when">
-                        {c.active_users > 0
-                          ? `${c.active_users} chatting`
-                          : relTime(c.last_active, nowMs())}
-                      </span>
-                    </header>
-                    <p class={`home-card-topic${c.topic ? '' : ' is-empty'}`}>
-                      {c.topic || 'No topic yet — set the tone.'}
-                    </p>
-                    <Sparkline values={c.spark} />
-                    <footer class="home-card-foot">
-                      <span class="home-card-msgs">
-                        {c.messages.toLocaleString('en-US')} msgs
-                      </span>
-                      <button
-                        type="button"
-                        class="home-card-join"
-                        onClick={() => void getState().joinChannel(c.channel)}
-                      >
-                        {isJoined(c.channel) ? 'Open →' : 'Join →'}
-                      </button>
-                    </footer>
-                  </article>
+              <Show when={stats.latest}>
+                {(data) => (
+                  <div class="home-pulse" aria-label="Live network figures">
+                    <div class="home-pulse-tile">
+                      <span class="home-pulse-num">{data().channels.length}</span>
+                      <span class="home-pulse-label">channels</span>
+                    </div>
+                    <div class="home-pulse-tile">
+                      <span class="home-pulse-num">{totalMessages().toLocaleString('en-US')}</span>
+                      <span class="home-pulse-label">messages tracked</span>
+                    </div>
+                    <div class="home-pulse-tile">
+                      <span class="home-pulse-num">{data().users_online.toLocaleString('en-US')}</span>
+                      <span class="home-pulse-label">people online</span>
+                    </div>
+                    <div class="home-pulse-tile">
+                      <span class="home-pulse-num">{relTime(data().generated_at, nowMs())}</span>
+                      <span class="home-pulse-label">stats updated</span>
+                    </div>
+                  </div>
                 )}
-              </For>
-            </div>
-          </section>
-        </Show>
+              </Show>
 
-        <Show when={recentRooms().length > 0}>
-          <div class="home-recent">
-            <span class="home-section-label">Recent rooms</span>
-            <div class="home-recent-chips">
-              <For each={recentRooms()}>
-                {(room) => (
-                  <button
-                    type="button"
-                    class="home-recent-chip"
-                    onClick={() => void getState().joinChannel(room)}
-                  >
-                    {room}
-                  </button>
-                )}
-              </For>
+              <Show when={connectionStatus() === 'connected' && roomRhythm().length > 0}>
+                <section class="home-rhythm" aria-label="Room rhythm">
+                  <div class="home-rhythm-head">
+                    <h3 class="home-section-label">Room rhythm</h3>
+                    <span class="home-rhythm-summary">joined rooms</span>
+                  </div>
+                  <div class="home-rhythm-list">
+                    <For each={roomRhythm()}>
+                      {(item) => (
+                        <button
+                          type="button"
+                          class={`home-rhythm-item${item.event?.live ? ' is-live' : ''}`}
+                          onClick={() => item.event ? openEvent(item.event) : getState().navigate({ kind: 'channel', channel: item.channel })}
+                          aria-label={`Open ${item.channel}, ${trendLabel(item)}${item.event ? `, ${item.event.title} ${eventCountdown(item.event, nowMs())}` : ''}`}
+                        >
+                          <span class="home-rhythm-main">
+                            <span class="home-rhythm-title">
+                              <span>{item.channel}</span>
+                              <span>{trendLabel(item)}</span>
+                            </span>
+                            <span class={`home-rhythm-topic${item.topic ? '' : ' is-empty'}`}>
+                              {item.topic || 'No topic set'}
+                            </span>
+                          </span>
+                          <span class="home-rhythm-heat" aria-hidden="true">
+                            <For each={item.spark}>
+                              {(value) => (
+                                <span
+                                  class={`home-rhythm-bar${value > 0 ? ' is-active' : ''}`}
+                                  style={{ '--heat': (value / item.peak).toFixed(3) }}
+                                />
+                              )}
+                            </For>
+                          </span>
+                          <span class="home-rhythm-event">
+                            <Show
+                              when={item.event}
+                              fallback={<span>{relTime(item.lastActive, nowMs())}</span>}
+                            >
+                              {(event) => (
+                                <>
+                                  <b>{event().live ? 'live' : eventCountdown(event(), nowMs())}</b>
+                                  <span>{event().title}</span>
+                                </>
+                              )}
+                            </Show>
+                          </span>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </section>
+              </Show>
+
+              <Show when={preferences().localHistory && rememberedRooms().length > 0}>
+                <section
+                  class="home-memory"
+                  data-home-stratum="memory"
+                  aria-label="Remembered rooms on this device"
+                >
+                  <div class="home-memory-head">
+                    <h3 class="home-section-label">On this device</h3>
+                    <span class="home-memory-summary">remembered rooms</span>
+                  </div>
+                  <div class="home-memory-grid">
+                    <For each={rememberedRooms()}>
+                      {(item) => (
+                        <button
+                          type="button"
+                          class="home-memory-card"
+                          onClick={() => openMemory(item)}
+                          aria-label={`Rejoin ${item.target}, last remembered ${relTime(Math.floor(item.lastAt.getTime() / 1000), nowMs())}`}
+                        >
+                          <span class="home-memory-card-head">
+                            <span class="home-memory-room">{item.target}</span>
+                            <span class="home-memory-when">
+                              {relTime(Math.floor(item.lastAt.getTime() / 1000), nowMs())}
+                            </span>
+                          </span>
+                          <span class="home-memory-preview">
+                            <b>{item.lastFrom}</b>: {item.preview}
+                          </span>
+                          <span class="home-memory-foot">
+                            <span>
+                              {item.count} remembered {item.count === 1 ? 'message' : 'messages'}
+                            </span>
+                            <span>
+                              {item.participants.length} {item.participants.length === 1 ? 'person' : 'people'}
+                            </span>
+                          </span>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </section>
+              </Show>
+
+              <Show when={connectionStatus() === 'connected' && quietActivity().length > 0}>
+                <section class="home-quiet" aria-label="Quiet room activity">
+                  <div class="home-quiet-head">
+                    <h3 class="home-section-label">Quiet rooms</h3>
+                    <span class="home-quiet-summary">already read</span>
+                  </div>
+                  <div class="home-quiet-list">
+                    <For each={quietActivity()}>
+                      {(item) => (
+                        <button
+                          type="button"
+                          class="home-quiet-item"
+                          onClick={() => openQuietActivity(item)}
+                          aria-label={`Open ${item.name}, active ${relTime(Math.floor(item.lastActivity / 1000), nowMs())}`}
+                        >
+                          <span class="home-quiet-main">
+                            <span class="home-quiet-room">{item.name}</span>
+                            <span class={`home-quiet-topic${item.topic ? '' : ' is-empty'}`}>
+                              {item.topic || 'No topic set'}
+                            </span>
+                          </span>
+                          <span class="home-quiet-when">
+                            {relTime(Math.floor(item.lastActivity / 1000), nowMs())}
+                          </span>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </section>
+              </Show>
+
+              <Show when={connectionStatus() === 'connected' && quietBoosts().length > 0}>
+                <section class="home-boosts" aria-label="Quiet boosts">
+                  <div class="home-boosts-head">
+                    <h3 class="home-section-label">Quiet boosts</h3>
+                    <span class="home-boosts-summary">reactions</span>
+                  </div>
+                  <div class="home-boosts-list" role="list" aria-label="Quiet boost cards">
+                    <For each={quietBoosts()}>
+                      {(item) => (
+                        <article class="home-boost-card" role="listitem">
+                          <button
+                            type="button"
+                            class="home-boost-card__open"
+                            onClick={() => openQuietBoost(item)}
+                            aria-label={`Open boosted message in ${item.target}`}
+                          >
+                            <span class="home-boost-card__target">
+                              {item.target.startsWith('#') || item.target.startsWith('&')
+                                ? item.target
+                                : `@${item.target}`}
+                            </span>
+                            <span class="home-boost-card__badges" aria-label={`${item.total} quiet boosts`}>
+                              <For each={item.groups.slice(0, 3)}>
+                                {(group) => (
+                                  <span class={`home-boost-card__badge${group.youBoosted ? ' is-you' : ''}`}>
+                                    <span aria-hidden="true">{group.emoji}</span>
+                                    <span>{group.count}</span>
+                                  </span>
+                                )}
+                              </For>
+                            </span>
+                            <span class="home-boost-card__preview">
+                              <b>{item.from}</b>: {clipped(item.text, 96)}
+                            </span>
+                            <span class="home-boost-card__when">
+                              {relTime(Math.floor(item.at.getTime() / 1000), nowMs())}
+                            </span>
+                          </button>
+                        </article>
+                      )}
+                    </For>
+                  </div>
+                </section>
+              </Show>
             </div>
-          </div>
+          </details>
         </Show>
       </div>
     </div>

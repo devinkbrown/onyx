@@ -6,8 +6,10 @@ import { pathToFileURL } from 'node:url';
 const ORIGIN = 'https://eshmaki.me';
 
 // Keep this list in sync with the public <Route> table in src/index.tsx.
-// The landing overlay may replace some documents later in deploy.sh, but every
-// SPA entrypoint is truthful on its own before that overlay is applied.
+// The Vite/Solid SPA owns root and these SPA route documents. deploy.sh may
+// stage allowlisted legacy support paths from /home/kain/landing, but never
+// replaces SPA-owned documents (root index, robots/sitemap/favicons, route
+// entrypoints, assets, service worker, icons, or SPA public routes).
 export const ROUTE_ENTRYPOINTS = [
   {
     route: 'app',
@@ -48,6 +50,18 @@ export const ROUTE_ENTRYPOINTS = [
     route: 'invite',
     title: 'Join Onyx — open a room invite',
     description: 'Open an Onyx invite to join a room as a guest or with your account, carrying its topic, moment, and reading context.',
+  },
+  {
+    route: 'download',
+    title: 'Download Onyx — unsigned native packages',
+    description:
+      'Download unsigned Onyx v0.1.3 Windows zip and Linux/FreeBSD/OpenBSD tar.gz packages with SHA-256 sidecars. macOS Intel and Apple Silicon native packages are coming soon. Not signed or notarized. Browser and PWA remain the primary paths.',
+  },
+  {
+    route: 'install',
+    title: 'Install Onyx — native packages and browser app',
+    description:
+      'Install Onyx from the browser or download unsigned Windows, Linux, FreeBSD, and OpenBSD packages with runtimes, install steps, and SHA-256 verification.',
   },
   {
     route: 'accessibility',

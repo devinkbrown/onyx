@@ -104,10 +104,10 @@ describe('HomeView cold-return recap', () => {
     expect(exportVaultMock).toHaveBeenCalledWith(OWNER);
     expect(within(offline).getByText('3 remembered messages')).toBeInTheDocument();
     expect(within(offline).getByRole('button', {
-      name: 'Open #offline from device memory, 2 remembered messages',
+      name: 'Open #offline from this device, 2 remembered messages',
     })).toHaveTextContent('Latest retained line');
     expect(within(offline).getByRole('button', {
-      name: 'Open mira from device memory, 1 remembered message',
+      name: 'Open mira from this device, 1 remembered message',
     })).toHaveTextContent('Encrypted message');
     expect(within(offline).queryByText(/TSUMUGI1/)).not.toBeInTheDocument();
     expect(within(offline).queryByText(/unread/i)).not.toBeInTheDocument();
@@ -144,7 +144,7 @@ describe('HomeView cold-return recap', () => {
     });
 
     const bobCard = await screen.findByRole('button', {
-      name: 'Open #bob from device memory, 1 remembered message',
+      name: 'Open #bob from this device, 1 remembered message',
     });
     expect(bobCard).toHaveTextContent('Bob retained handoff');
     expect(exportVaultMock).toHaveBeenCalledWith(bobOwner);
@@ -175,7 +175,7 @@ describe('HomeView cold-return recap', () => {
 
     render(() => <HomeView />);
     fireEvent.click(await screen.findByRole('button', {
-      name: 'Open #offline from device memory, 1 remembered message',
+      name: 'Open #offline from this device, 1 remembered message',
     }));
 
     expect(openVaultResult).toHaveBeenCalledWith('#offline', 'offline-last');

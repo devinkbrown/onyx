@@ -148,11 +148,14 @@ export function Composer(props: ComposerProps): JSX.Element {
   const [scheduleOpen, setScheduleOpen] = createSignal(false);
   const [scheduleWhen, setScheduleWhen] = createSignal('');
   const [scheduleError, setScheduleError] = createSignal<string | null>(null);
+  /** Standard primary "More tools" disclosure (schedule / jump / command tip). */
+  const [toolsOpen, setToolsOpen] = createSignal(false);
 
   let textareaRef!: HTMLTextAreaElement;
   let fileInputRef!: HTMLInputElement;
   let emojiSearchRef: HTMLInputElement | undefined;
   let scheduleFirstRef: HTMLButtonElement | undefined;
+  let moreToolsTriggerRef: HTMLButtonElement | undefined;
   const previewUrls = new Set<string>();
   let attachmentScopeKey: string | undefined;
   let activeUpload: AbortController | null = null;
@@ -249,8 +252,10 @@ export function Composer(props: ComposerProps): JSX.Element {
     deliveryFailed: outboxDeliveryFailed(),
   }));
 
-  // Accessible name stays short and stable; the visible placeholder can carry
-  // light slash-command discoverability without polluting aria-label.
+  // Accessible name carries the destination context. Keep the visible
+  // placeholder deliberately short: mobile WebKit includes wrapped placeholder
+  // lines in textarea.scrollHeight, so command advertising here turns an empty
+  // one-line composer into a tall, visually misaligned field.
   const accessibleName = createMemo(() => {
     const t = target();
     if (activeEditing()) return 'Edit message';
@@ -264,7 +269,7 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (activeEditing()) return 'Edit message';
     if (isOffline()) return t ? `Offline — queues for ${t}` : 'Reconnecting…';
     if (!t) return 'Pick a room or a person to begin';
-    return `Message ${t}  ·  /search  /mute  /export  /help`;
+    return 'Message';
   });
 
   const emojiMatches = createMemo(() => searchEmojis(emojiQuery(), 36));
@@ -333,6 +338,60 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (restoreFocus) focusTextarea();
   }
 
+  // ── More tools (Schedule / Jump to date / slash tip) ──
+  // Power controls leave the Standard primary row so attach · message · emoji ·
+  // send stays calm for the general public. Capability is preserved behind a
+  // labelled, non-modal disclosure — never deleted.
+  function closeTools(restore: 'trigger' | 'textarea' | false = 'trigger'): void {
+    setToolsOpen(false);
+    if (restore === 'trigger') {
+      queueMicrotask(() => moreToolsTriggerRef?.focus());
+    } else if (restore === 'textarea') {
+      focusTextarea();
+    }
+  }
+
+  function toggleTools(): void {
+    if (toolsOpen()) {
+      closeTools('trigger');
+      return;
+    }
+    // Opening tools should not stack competing transient chrome.
+    setEmojiOpen(false);
+    setScheduleOpen(false);
+    setToolsOpen(true);
+  }
+
+  /** Open schedule via More tools: collapse the tray first, then existing focus handoff. */
+  function openScheduleFromTools(): void {
+    if (!canSchedule()) return;
+    setToolsOpen(false);
+    setScheduleOpen(true);
+  }
+
+  /** Jump-to-date from More tools — close tray then existing sheet open. */
+  function openJumpFromTools(): void {
+    if (!target()) return;
+    setToolsOpen(false);
+    getState().openJumpToDate();
+  }
+
+  /**
+   * Command help: only focuses the textarea and inserts a leading slash so the
+   * existing slash autocomplete can teach. Never executes a command.
+   */
+  function startSlashCommandHelp(): void {
+    setToolsOpen(false);
+    const current = text();
+    const start = textareaRef?.selectionStart ?? current.length;
+    const end = textareaRef?.selectionEnd ?? start;
+    const next = `${current.slice(0, start)}/${current.slice(end)}`;
+    setComposerText(next);
+    setSlashDismissed(false);
+    setSlashIndex(0);
+    focusTextarea(start + 1);
+  }
+
   // ── schedule ("send later") ──
   // Only plain, non-empty text to a real target can be scheduled: slash
   // commands aren't queued (replaying a stale command is surprising), and
@@ -342,6 +401,17 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (activeEditing() || attachments().length > 0) return false;
     const body = text().trim();
     return !!target() && body.length > 0 && !body.startsWith('/');
+  });
+
+  const scheduleDisabledReason = createMemo(() => {
+    if (canSchedule()) return null;
+    if (activeEditing()) return 'Finish editing before scheduling.';
+    if (attachments().length > 0) return 'Remove attachments to schedule plain text.';
+    const body = text().trim();
+    if (!target()) return 'Choose a room or message to schedule.';
+    if (!body) return 'Type a message before scheduling.';
+    if (body.startsWith('/')) return 'Slash commands cannot be scheduled.';
+    return 'Scheduling unavailable.';
   });
 
   // Move focus into the schedule popover when it opens (SC 2.4.3 / 2.1.1).
@@ -634,6 +704,12 @@ export function Composer(props: ComposerProps): JSX.Element {
       return;
     }
 
+    if (e.key === 'Escape' && toolsOpen()) {
+      e.preventDefault();
+      closeTools('trigger');
+      return;
+    }
+
     // Escape dismisses edit, then reply — after transient pickers — so a
     // keyboard user can back out of composer context without the mouse.
     if (e.key === 'Escape' && activeEditing()) {
@@ -810,6 +886,7 @@ export function Composer(props: ComposerProps): JSX.Element {
     clearAttachments();
     setEmojiOpen(false);
     setEmojiQuery('');
+    setToolsOpen(false);
     queueMicrotask(() => {
       if (textareaRef) textareaRef.style.height = 'auto';
     });
@@ -1233,16 +1310,23 @@ export function Composer(props: ComposerProps): JSX.Element {
         </Show>
       </div>
 
-      <div class="shell-composer-inner">
+      {/*
+        Standard primary row (commercial slice 4):
+        Attach · message · Emoji · More tools · Send
+        Schedule + Jump live only inside More tools — no primary duplicates.
+      */}
+      <div class="shell-composer-inner" data-composer-primary-row="">
         <button
           type="button"
-          class="shell-composer-tool"
+          class="shell-composer-tool shell-composer-tool--attach"
+          data-composer-primary="attach"
           disabled={!isEnabled() || !!activeEditing() || isOffline()}
           aria-label="Attach files"
+          title="Attach files"
           onClick={handleAttachClick}
         >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M13.2 7.3 8.3 12.2a3.4 3.4 0 0 1-4.8-4.8l5.4-5.4a2.3 2.3 0 0 1 3.2 3.2L6.7 10.6a1.15 1.15 0 0 1-1.6-1.6l4.6-4.6" />
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+            <path d="M8 3.2v9.6M3.2 8h9.6" />
           </svg>
         </button>
         <input
@@ -1316,6 +1400,7 @@ export function Composer(props: ComposerProps): JSX.Element {
           ref={textareaRef!}
           id="shell-composer-input"
           data-composer-input=""
+          data-composer-primary="message"
           class="shell-composer-textarea"
           placeholder={placeholder()}
           disabled={!isEnabled()}
@@ -1347,9 +1432,144 @@ export function Composer(props: ComposerProps): JSX.Element {
                 : undefined
           }
         />
+
+        <button
+          type="button"
+          class="shell-composer-tool shell-composer-tool--emoji"
+          data-composer-primary="emoji"
+          disabled={!isEnabled()}
+          aria-label="Insert emoji"
+          aria-haspopup="dialog"
+          aria-expanded={emojiOpen()}
+          aria-controls={emojiOpen() ? 'shell-emoji-picker' : undefined}
+          title="Insert emoji"
+          onClick={() => {
+            setToolsOpen(false);
+            setEmojiOpen((open) => !open);
+          }}
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.2" />
+            <path d="M5.6 9.4a3.1 3.1 0 0 0 4.8 0" />
+            <circle cx="6" cy="6.4" r="0.5" fill="currentColor" stroke="none" />
+            <circle cx="10" cy="6.4" r="0.5" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+
+        <div class="shell-composer-more-wrap">
+          <button
+            ref={(el) => { moreToolsTriggerRef = el; }}
+            type="button"
+            class="shell-composer-tool shell-composer-tool--more"
+            data-composer-primary="more"
+            data-testid="composer-more-tools"
+            disabled={!target()}
+            aria-label="More tools"
+            aria-haspopup="dialog"
+            aria-expanded={toolsOpen()}
+            aria-controls="shell-composer-tools"
+            title="More tools"
+            onClick={() => toggleTools()}
+          >
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+              <circle cx="3.5" cy="8" r="1.15" />
+              <circle cx="8" cy="8" r="1.15" />
+              <circle cx="12.5" cy="8" r="1.15" />
+            </svg>
+          </button>
+
+          {/*
+            Always-mounted keyboard bridge for composer.schedule (Ctrl/Cmd+Shift+L).
+            Visible Schedule lives only inside More tools; the registry handler
+            clickComposerControl('[data-composer-schedule]') needs a stable target
+            even when the tray is closed. Non-accessible (hidden + aria-hidden),
+            not a primary-row duplicate, truthful disabled, same open path.
+          */}
+          <button
+            type="button"
+            hidden
+            tabIndex={-1}
+            aria-hidden="true"
+            data-composer-schedule=""
+            disabled={!canSchedule()}
+            onClick={() => openScheduleFromTools()}
+          />
+
+          <Show when={toolsOpen()}>
+            <div
+              id="shell-composer-tools"
+              class="shell-composer-tools"
+              role="dialog"
+              aria-modal="false"
+              aria-label="More composer tools"
+              data-testid="composer-tools-tray"
+              onKeyDown={(e) => {
+                if (keyboardEventIsClaimed(e)) return;
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  closeTools('trigger');
+                }
+              }}
+            >
+              <button
+                type="button"
+                class="shell-composer-tools-item"
+                disabled={!canSchedule()}
+                aria-label="Schedule message to send later"
+                aria-haspopup="dialog"
+                aria-expanded={scheduleOpen()}
+                aria-controls={scheduleOpen() ? 'shell-schedule-picker' : undefined}
+                aria-describedby="shell-composer-tools-schedule-desc"
+                title={scheduleDisabledReason() ?? 'Schedule this message'}
+                data-testid="composer-schedule"
+                onClick={() => openScheduleFromTools()}
+              >
+                <span class="shell-composer-tools-item-title">Send later</span>
+                <span id="shell-composer-tools-schedule-desc" class="shell-composer-tools-item-desc">
+                  {scheduleDisabledReason() ?? 'Schedule this message for a time you pick.'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                class="shell-composer-tools-item"
+                disabled={!target()}
+                aria-label="Jump to date in conversation history"
+                aria-describedby="shell-composer-tools-jump-desc"
+                title="Jump to date"
+                data-testid="composer-jump-to-date"
+                onClick={() => openJumpFromTools()}
+              >
+                <span class="shell-composer-tools-item-title">Jump to date</span>
+                <span id="shell-composer-tools-jump-desc" class="shell-composer-tools-item-desc">
+                  Open the conversation at a day you choose.
+                </span>
+              </button>
+
+              <div class="shell-composer-tools-tip" role="note">
+                <p class="shell-composer-tools-item-title">Slash commands</p>
+                <p class="shell-composer-tools-item-desc">
+                  Type <kbd class="shell-composer-tools-kbd">/</kbd> in the message field for commands. Nothing runs until you send.
+                </p>
+                <button
+                  type="button"
+                  class="shell-composer-tools-action"
+                  data-testid="composer-command-help"
+                  disabled={!isEnabled()}
+                  onClick={() => startSlashCommandHelp()}
+                >
+                  Insert /
+                </button>
+              </div>
+            </div>
+          </Show>
+        </div>
+
         <button
           type="button"
           class="shell-composer-send"
+          data-composer-primary="send"
           disabled={!isEnabled() || !canSend()}
           aria-label={activeEditing() ? 'Save edit' : 'Send message'}
           aria-busy={isSending()}

@@ -15,7 +15,7 @@ if (import.meta.env.PROD && typeof navigator !== 'undefined' && 'serviceWorker' 
 }
 import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
-import { createEffect, createSignal, lazy, Show, type JSX } from 'solid-js';
+import { createEffect, createSignal, ErrorBoundary, lazy, Show, Suspense, type Component, type JSX } from 'solid-js';
 import '@fontsource/anton';
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/jetbrains-mono';
@@ -31,6 +31,7 @@ import { ThemeProvider } from './theme';
 // first opened, so it is lazy + gated behind the open signal to keep it off
 // the eager landing entry chunk.
 import { SpotlightProvider, useSpotlight } from './chat/spotlight/useSpotlight';
+import { lazyRouteFallback } from './app/StaleChunkRecovery';
 import Landing from './routes/Landing';
 
 const About = lazy(() => import('./routes/About'));
@@ -43,6 +44,45 @@ const Invite = lazy(() => import('./routes/Invite'));
 const OnyxOS = lazy(() => import('./routes/OnyxOS'));
 const PublicInfo = lazy(() => import('./routes/PublicInfo').then((m) => ({ default: m.PublicInfo })));
 const Spotlight = lazy(() => import('./chat/spotlight/Spotlight'));
+
+/**
+ * Guard a lazy route so a 404'd post-deploy chunk shows recovery UI instead of
+ * a wallpaper-only blank shell. No automatic reload loop.
+ */
+function LazyRouteBoundary(props: { children: JSX.Element }): JSX.Element {
+  return (
+    <ErrorBoundary fallback={lazyRouteFallback}>
+      <Suspense
+        fallback={(
+          <div class="route-lazy-pending" role="status" data-testid="route-lazy-pending">
+            Loading…
+          </div>
+        )}
+      >
+        {props.children}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+function withLazyRoute(Lazy: Component): Component {
+  return function LazyRouteGuarded() {
+    return (
+      <LazyRouteBoundary>
+        <Lazy />
+      </LazyRouteBoundary>
+    );
+  };
+}
+
+const AboutRoute = withLazyRoute(About);
+const AppRouteGuarded = withLazyRoute(AppShell);
+const AppearanceRoute = withLazyRoute(Appearance);
+const StatsRoute = withLazyRoute(Stats);
+const StatusRoute = withLazyRoute(Status);
+const RoadmapRoute = withLazyRoute(Roadmap);
+const InviteRoute = withLazyRoute(Invite);
+const DownloadRoute = withLazyRoute(Download);
 
 // Global command palette host. The panel + its command catalogue live in a
 // lazy chunk; we ARM (and permanently keep mounted) on the first open so the

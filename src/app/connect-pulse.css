@@ -1,4 +1,4 @@
-/* ConnectPulse — the live half of the connect stage */
+/* ConnectPulse — quiet secondary rail beside the connect card */
 .cpulse {
   display: flex;
   flex-direction: column;
@@ -12,7 +12,7 @@
   margin: 0 0 10px;
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.26em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--paper-mute);
 }
@@ -22,7 +22,7 @@
   width: 44px;
   height: 1px;
   margin-top: 10px;
-  background: linear-gradient(90deg, var(--lapis), transparent);
+  background: linear-gradient(90deg, color-mix(in oklab, var(--lapis) 55%, transparent), transparent);
 }
 
 .cpulse-wire {
@@ -36,21 +36,20 @@
   color: var(--paper-dim);
   overflow-wrap: anywhere;
 }
-/* A small live-pulse dot instead of a cryptic IRC numeric. */
+/* Truthful live mark — solid ok, optional opacity pulse, no expanding glow ring. */
 .cpulse-wire-live {
   flex: none;
   width: 7px;
   height: 7px;
   border-radius: 999px;
   background: var(--ok);
-  box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 60%, transparent);
+  box-shadow: none;
   transform: translateY(1px);
   animation: cpulse-live 2.4s var(--ease) infinite;
 }
 @keyframes cpulse-live {
-  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 55%, transparent); }
-  70%  { box-shadow: 0 0 0 6px color-mix(in oklab, var(--ok) 0%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 0%, transparent); }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
 }
 @media (prefers-reduced-motion: reduce) {
   .cpulse-wire-live { animation: none; }
@@ -70,21 +69,21 @@
   align-items: baseline;
   gap: 10px;
   padding: 10px 14px;
-  border: 1px solid color-mix(in oklab, var(--gold) 35%, transparent);
-  border-radius: 10px;
-  background: color-mix(in oklab, var(--gold) 8%, transparent);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--stone) 40%, transparent);
 }
 .cpulse-deeplink-label {
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--paper-mute);
 }
 .cpulse-deeplink-chan {
   font-family: var(--font-mono);
   font-weight: 600;
-  color: var(--gold-bright);
+  color: var(--lapis);
 }
 
 .cpulse-rooms {
@@ -98,10 +97,10 @@
 .cpulse-room {
   padding: 10px 14px;
   border: 1px solid var(--line);
-  border-left: 2px solid color-mix(in oklab, var(--lapis) 45%, transparent);
-  border-radius: 10px;
-  background: color-mix(in oklab, var(--stone) 55%, transparent);
-  backdrop-filter: blur(6px);
+  border-left: 2px solid color-mix(in oklab, var(--lapis) 40%, transparent);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--stone) 48%, transparent);
+  backdrop-filter: none;
 }
 .cpulse-room-head {
   display: flex;
@@ -118,7 +117,7 @@
   margin-left: auto;
   font-family: var(--font-mono);
   font-size: 0.64rem;
-  color: var(--lapis-bright);
+  color: var(--paper-mute);
 }
 .cpulse-room-topic {
   margin: 3px 0 0;
@@ -150,10 +149,11 @@
   border-radius: 999px;
   background: var(--paper-mute);
   flex: none;
+  box-shadow: none;
 }
 .cpulse-node[data-nearest='true'] .cpulse-node-dot {
   background: var(--lapis);
-  box-shadow: 0 0 8px color-mix(in oklab, var(--lapis) 60%, transparent);
+  box-shadow: none;
 }
 .cpulse-node[data-nearest='true'] .cpulse-node-host { color: var(--paper); }
 .cpulse-node-ms { color: var(--paper-mute); }

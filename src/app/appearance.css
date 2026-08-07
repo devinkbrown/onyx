@@ -1,6 +1,7 @@
-/* /appearance — customization surface (sits over the live Background canvas). */
+/* /appearance — quiet-threshold customization (over live Background canvas). */
 .ap {
   position: relative;
+  isolation: isolate;
   min-height: 100svh;
   font-family: var(--font-sans);
   color: var(--text, var(--paper));
@@ -14,20 +15,39 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 13px clamp(16px, 5vw, 48px);
+  min-height: var(--target-min, 44px);
+  padding: 12px clamp(16px, 5vw, 48px);
   font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.12em;
+  font-size: var(--text-xs, 0.6875rem);
+  letter-spacing: var(--tracking-kicker, 0.12em);
   text-transform: uppercase;
   color: var(--paper-dim);
-  background: color-mix(in oklab, var(--ink) 64%, transparent);
+  background: color-mix(in oklab, var(--surface-void, var(--ink)) 78%, transparent);
   border-bottom: 1px solid var(--seam-faint);
-  backdrop-filter: blur(10px);
+  /* Light matte veil — not noisy glass */
+  backdrop-filter: blur(8px) saturate(110%);
+}
+.ap-bar a {
+  min-height: var(--target-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+  transition: color var(--dur-fast, 160ms) var(--ease);
 }
 .ap-bar a:hover { color: var(--paper); }
-.ap-bar .ap-tag { color: var(--gold-bright); }
+.ap-bar a:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+  border-radius: var(--r-sm);
+}
+.ap-bar .ap-tag { color: var(--lapis); }
 
+/* Chrome must paint above the fixed Background (z-index: -1). Explicit
+   stacking keeps a wallpaper swap from ever covering the picker UI. */
 .ap-wrap {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 1040px;
   margin: 0 auto;
@@ -38,35 +58,37 @@
   margin: 0;
   font-family: var(--font-mono);
   font-size: 12px;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--paper-mute);
 }
 .ap-kicker::before { content: '// '; color: var(--paper-mute); }
 
 .ap-h1 {
-  margin: 14px 0 0;
-  font-family: var(--font-display);
-  font-weight: 400;
-  text-transform: uppercase;
-  font-size: clamp(2.6rem, 1rem + 6vw, 5.5rem);
-  line-height: 0.9;
+  margin: 12px 0 0;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  text-transform: none;
+  font-size: clamp(1.75rem, 1rem + 2.5vw, 2.55rem);
+  line-height: var(--leading-tight, 1.15);
+  letter-spacing: var(--tracking-title, -0.02em);
   color: var(--paper);
 }
 .ap-h1 .gold {
-  background: linear-gradient(98deg, var(--gold-deep), var(--gold) 30%, var(--gold-bright) 52%, var(--gold) 78%, var(--gold-deep));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  /* Keep class for TSX markup; quiet cyan signal, not gradient shout. */
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: var(--lapis);
 }
 
 .ap-lede {
-  margin: 18px 0 0;
-  max-width: 60ch;
+  margin: 14px 0 0;
+  max-width: 48ch;
   font-family: var(--font-serif);
-  font-weight: 380;
-  font-size: clamp(1.05rem, 1rem + 0.5vw, 1.32rem);
-  line-height: 1.5;
+  font-weight: 400;
+  font-size: clamp(1rem, 0.98rem + 0.3vw, 1.12rem);
+  line-height: var(--leading-body, 1.55);
   color: var(--paper-dim);
 }
 
@@ -75,9 +97,9 @@
   display: block;
   font-family: var(--font-mono);
   font-size: 12px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--paper-mute);
   margin-bottom: 14px;
 }
 .ap-chips { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -85,24 +107,34 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 10px 16px;
+  min-height: var(--target-min, 44px);
+  padding: 10px 14px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--text-sm, 0.8125rem);
   letter-spacing: 0.02em;
   color: var(--paper-dim);
-  background: color-mix(in oklab, var(--stone) 32%, transparent);
+  background: color-mix(in oklab, var(--surface-face, var(--stone)) 36%, transparent);
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-0, 0);
+  border-radius: var(--r-sm);
   cursor: pointer;
+  box-shadow: var(--elev-1, none);
   transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease),
-    background var(--dur) var(--ease), transform var(--dur) var(--ease);
+    background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-.ap-chip:hover { color: var(--paper); border-color: var(--seam); transform: translateY(-1px); }
+.ap-chip:hover { color: var(--paper); border-color: var(--seam); }
+.ap-chip:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
+.ap-chip:active {
+  box-shadow: var(--elev-press, inset 0 1px 0 color-mix(in oklab, var(--ink) 18%, transparent));
+}
 .ap-chip.on {
-  color: var(--ink);
-  background: var(--gold-bright);
-  border-color: var(--gold-bright);
+  color: var(--on-accent, var(--ink));
+  background: var(--lapis);
+  border-color: color-mix(in oklab, var(--lapis) 70%, var(--seam));
   font-weight: 700;
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 12%, transparent);
 }
 .ap-chip .ap-kind {
   font-style: normal;
@@ -111,16 +143,15 @@
   text-transform: uppercase;
   opacity: 0.7;
 }
-/* Scene backgrounds get a warm kind-badge so they read as the dramatic set. */
-.ap-chip .ap-kind[data-kind='scene'] { color: var(--gold); opacity: 0.95; }
-.ap-chip .ap-kind[data-kind='auto'] { color: var(--lapis-bright); opacity: 0.95; }
+/* Scene backgrounds — kind mark stays readable, not gold shout. */
+.ap-chip .ap-kind[data-kind='scene'] { color: var(--paper-dim); opacity: 0.95; }
+.ap-chip .ap-kind[data-kind='auto'] { color: var(--lapis); opacity: 0.95; }
 
-/* Live-preview affordance: the chip you're hovering shows a seam ring so it's
-   clear which background is currently painting the page behind you. */
+/* Live-preview affordance: fine seam ring (no glow) while hovering a chip. */
 .ap-chip.previewing {
-  border-color: var(--lapis-bright);
+  border-color: var(--lapis);
   color: var(--paper);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis) 28%, transparent);
 }
 
 /* Theme chips carry a 3-dot palette swatch. */
@@ -145,7 +176,7 @@
   display: block;
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--paper-mute);
   margin: 20px 0 10px;
@@ -155,34 +186,109 @@
   font-size: 12px;
   color: var(--paper-mute);
 }
-.ap-lede-hint { color: var(--lapis-bright); }
+/* Coarse / no-hover devices commit on tap only — hide hover-centric copy. */
+.ap-ghint--coarse { display: none; }
+.ap-lede-hint { color: var(--lapis); }
 .ap-lede-hint b { font-family: var(--font-mono); font-weight: 600; }
 
 .ap-studio { margin-top: clamp(34px, 5vw, 64px); }
 
-/* The display headline and serif introduction are intentionally expansive at
-   normal sizes, but must not become the route's horizontal canvas at 400%.
-   Browser zoom still magnifies these fixed CSS pixels physically. */
-@media (max-width: 42rem) and (max-height: 30rem) {
+/* Touch / coarse primary pointers: 44px targets, no hover-lift that steals taps,
+   no sticky :hover transform after a finger leaves the chip. */
+@media (hover: none), (pointer: coarse) {
+  .ap-ghint--fine { display: none; }
+  .ap-ghint--coarse { display: block; }
+
+  .ap-chip {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .ap-chip:hover {
+    transform: none;
+  }
+}
+
+/* Phone widths 320–430: safe-area bar, readable hierarchy, full-width chips. */
+@media (max-width: 42rem) {
   .ap-bar {
-    gap: 8px;
-    padding: 8px;
-    flex-wrap: wrap;
+    gap: 10px;
+    min-height: 48px;
+    padding:
+      max(10px, env(safe-area-inset-top, 0px))
+      max(14px, env(safe-area-inset-right, 0px))
+      10px
+      max(14px, env(safe-area-inset-left, 0px));
   }
 
   .ap-wrap {
     min-width: 0;
-    padding: 16px;
+    padding:
+      24px
+      max(14px, env(safe-area-inset-right, 0px))
+      max(18vh, calc(env(safe-area-inset-bottom, 0px) + 48px))
+      max(14px, env(safe-area-inset-left, 0px));
   }
 
   .ap-h1 {
-    font-size: 44px;
-    line-height: 1;
+    font-size: clamp(1.55rem, 1.2rem + 3vw, 2.1rem);
+    line-height: 1.14;
     overflow-wrap: anywhere;
   }
 
   .ap-lede {
-    font-size: 16px;
+    margin-top: 12px;
+    font-size: 1rem;
+    line-height: 1.45;
+    max-width: none;
+    overflow-wrap: anywhere;
+  }
+
+  .ap-group {
+    margin-top: 28px;
+  }
+
+  .ap-chips {
+    gap: 8px;
+  }
+
+  .ap-chip {
+    max-width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .ap-studio {
+    margin-top: 28px;
+  }
+}
+
+/* Headings stay readable under extreme zoom; 44px targets preserved. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .ap-bar {
+    position: relative;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px max(8px, env(safe-area-inset-right, 0px)) 8px max(8px, env(safe-area-inset-left, 0px));
+    flex-wrap: nowrap;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .ap-wrap {
+    min-width: 0;
+    padding: 12px max(8px, env(safe-area-inset-right, 0px)) 24px max(8px, env(safe-area-inset-left, 0px));
+  }
+
+  .ap-h1 {
+    font-size: 1.45rem;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .ap-lede {
+    font-size: 0.95rem;
     line-height: 1.4;
     overflow-wrap: anywhere;
   }
@@ -191,5 +297,30 @@
     max-width: 100%;
     min-height: 44px;
     overflow-wrap: anywhere;
+  }
+
+  .ap-group {
+    margin-top: 18px;
+  }
+}
+
+@media (max-width: 42rem) and (forced-colors: active) {
+  .ap-bar,
+  .ap-chip {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .ap-chip.on {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ap-chip {
+    transition: none;
   }
 }

@@ -229,7 +229,9 @@ describe('HomeView — A9 strata visual hierarchy markers', () => {
 
     expect(attention).not.toBeNull();
     expect(attention).toHaveClass('home-catchup-tier--attention');
-    expect(attention?.querySelector('.home-catchup-tier-label')?.textContent).toBe('Needs you');
+    // Section heading already reads "Needs you" once — no duplicate tier label.
+    expect(attention?.querySelector('.home-catchup-tier-label')).toBeNull();
+    expect(attention?.getAttribute('aria-label')).toBe('Mentions and direct messages');
 
     expect(followed).not.toBeNull();
     expect(followed).toHaveClass('home-catchup-tier--followed');
@@ -279,7 +281,7 @@ describe('HomeView — A9 strata visual hierarchy markers', () => {
       const memory = document.querySelector('[data-home-stratum="memory"]');
       expect(memory).not.toBeNull();
       expect(memory).toHaveAttribute('aria-label', 'Remembered rooms on this device');
-      expect(memory?.querySelector('.home-section-label')?.textContent).toBe('Device memory');
+      expect(memory?.querySelector('.home-section-label')?.textContent).toBe('On this device');
     });
   });
 });

@@ -66,63 +66,63 @@ export type ThemeId =
   | 'frost';
 
 // ---------------------------------------------------------------------------
-// Flagship: ocean — deep-water dark luxury (electric azure × bioluminescence ×
-// glacier ice). Formalises what lives in tokens.css as the default :root.
-// Seed { dark, primary 232, accent 205, depth .8, vibrancy .85, warmth -.05,
-// contrast 11 } + soul: electric azure triad, icy glacier triad, coral shu.
+// Flagship: ocean — quiet threshold (mineral night × quiet cyan signal).
+// Formalises what lives in tokens.css as the default :root.
+// Six-hue core: #05070A #0C1016 #1A222C #E6E8EC #8B939E #5BA3C9.
+// Matte strata, restrained signal, no neon/glow spectacle, no Anton display.
 // ---------------------------------------------------------------------------
 const oceanTokens: TokenMap = {
-  // Ground — abyssal trench → mid depth → near-surface crests (azure-tinted ramp)
-  '--ink':        '#000306',
-  '--ink-2':      '#00050a',
-  '--stone':      '#000e17',
-  '--stone-2':    '#051821',
-  '--stone-3':    '#10232c',
-  '--stone-line': '#0f2d3b',
+  // Ground — mineral night void → face → edge
+  '--ink':        '#05070a',
+  '--ink-2':      '#080b10',
+  '--stone':      '#0c1016',
+  '--stone-2':    '#121820',
+  '--stone-3':    '#1a222c',
+  '--stone-line': '#222c38',
 
-  // Azure — electric sky-blue current + bioluminescent crest (primary)
-  '--lapis':       '#00ace9',
-  '--lapis-bright':'#87d6ff',
-  '--lapis-deep':  '#00668c',
+  // Quiet cyan signal (primary)
+  '--lapis':       '#5ba3c9',
+  '--lapis-bright':'#8bc4d9',
+  '--lapis-deep':  '#2e5f7a',
 
-  // Glacier — icy pale azure, second accent (was champagne gold)
-  '--gold':       '#6bc8d5',
-  '--gold-bright':'#a2edf7',
-  '--gold-deep':  '#35818b',
+  // Mineral second accent — cool steel (not neon glacier)
+  '--gold':       '#7a9aab',
+  '--gold-bright':'#a8c0cc',
+  '--gold-deep':  '#4a6570',
 
   // Coral — the single hot accent (danger / badges)
   '--shu':        '#ff6f61',
   '--shu-bright': '#ff9484',
 
-  // Text — sea-foam ivory over deep water
-  '--paper':      '#d1e1e9',
-  '--paper-dim':  '#8c9ba3',
-  '--paper-mute': '#536771',
+  // Text — cool paper over mineral night
+  '--paper':      '#e6e8ec',
+  '--paper-dim':  '#8b939e',
+  '--paper-mute': '#5c6570',
 
   // Status
   '--ok':      '#5bc78e',
-  '--warn':    '#e6d08c', // warnings stay WARM — decoupled from the glacier second accent
+  '--warn':    '#e6d08c', // warnings stay WARM — decoupled from the mineral second accent
   '--danger':  'var(--shu)',
 
-  // Seams (bioluminescent current lines) + bands (pale tide)
-  '--seam':       'color-mix(in oklab, var(--lapis) 42%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
-  '--line':       'color-mix(in oklab, var(--paper) 14%, transparent)',
-  '--line-faint': 'color-mix(in oklab, var(--paper) 7%, transparent)',
+  // Seams + bands — fine borders, not glowing current lines
+  '--seam':       'color-mix(in oklab, var(--lapis) 28%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 12%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 12%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--paper) 6%, transparent)',
 
-  // Radius — fluid, elegant
+  // Radius — tighter matte professional surfaces
   '--r-0':    '0px',
-  '--r-sm':   '5px',
-  '--r-md':   '11px',
+  '--r-sm':   '4px',
+  '--r-md':   '8px',
   '--r-pill': '999px',
 
   // Motion
   '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
-  '--dur':  '260ms',
+  '--dur':  '220ms',
 
-  // Typography
+  // Typography — Instrument Sans display (no Anton on default ocean)
   '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
-  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-display': "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
 };
@@ -1136,7 +1136,8 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
   ocean: {
     id: 'ocean',
     label: 'Ocean',
-    description: 'The flagship — deep water, electric azure current, bioluminescent crests, glacier ice.',
+    description:
+      'The flagship — mineral night, quiet cyan signal, and matte, focused surfaces.',
     scheme: 'dark',
     signatureBg: 'deep-current',
     tokens: oceanTokens,

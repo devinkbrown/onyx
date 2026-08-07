@@ -829,7 +829,7 @@ describe('PreferencesPanel', () => {
     expect(within(reviewedAnchors!).getByRole('button', { name: 'Clear reviewed anchors' })).toBeInTheDocument();
     selectPreferenceCategory('App & tools');
     expect(screen.getByRole('heading', { name: 'Installed app readiness' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/install/');
+    expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/download/');
     expect(screen.getByRole('button', { name: 'Refresh app shell' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Installed app readiness checks' })).toBeInTheDocument();
     expect(screen.getByText('App window')).toBeInTheDocument();

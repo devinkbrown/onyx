@@ -39,6 +39,7 @@ import {
   type JSX,
 } from 'solid-js';
 
+import '../primitives/primitives.css';
 import { Button } from '../primitives/Button';
 import { FormField } from '../primitives/FormField';
 import { Tabs } from '../primitives/Tabs';

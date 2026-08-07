@@ -189,22 +189,21 @@ export function Popover(props: PopoverProps) {
   // clamped to the viewport. The panel is in the top layer (native
   // popover="auto"), where CSS anchor positioning is unreliable and unsupported
   // in Firefox/Safari — it was landing at left:0 then shifting half off-screen.
-  // Measure and place it ourselves; phones keep the CSS bottom-sheet
-  // (primitives.css), so we clear inline pos there.
+  // Measure and place it ourselves on every viewport. Mobile menus must remain
+  // attached to the control that opened them; turning every three-dot menu into
+  // a centered sheet destroys spatial context and can cover the conversation.
   const positionPanel = (): void => {
     const panel = panelRef;
     const trigger = triggerRef;
     if (!panel || typeof window === 'undefined') return;
-    const mobile = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 560px)').matches;
-    if (mobile) {
-      for (const p of ['position', 'left', 'top', 'transform']) panel.style.removeProperty(p);
-      return;
-    }
     const pw = panel.offsetWidth;
     const ph = panel.offsetHeight;
     const margin = 8;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const viewport = window.visualViewport;
+    const viewportLeft = viewport?.offsetLeft ?? 0;
+    const viewportTop = viewport?.offsetTop ?? 0;
+    const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth);
+    const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
     const anchor = local.anchorPoint;
     let left: number;
     let top: number;
@@ -212,25 +211,29 @@ export function Popover(props: PopoverProps) {
       // Context menu: open at the pointer, flip up/left when near edges.
       left = anchor.x;
       top = anchor.y;
-      if (left + pw > vw - margin) left = Math.max(margin, anchor.x - pw);
-      if (top + ph > vh - margin) top = Math.max(margin, anchor.y - ph);
-      left = Math.max(margin, Math.min(left, vw - pw - margin));
-      top = Math.max(margin, Math.min(top, vh - ph - margin));
+      if (left + pw > viewportRight - margin) left = Math.max(viewportLeft + margin, anchor.x - pw);
+      if (top + ph > viewportBottom - margin) top = Math.max(viewportTop + margin, anchor.y - ph);
+      left = Math.max(viewportLeft + margin, Math.min(left, viewportRight - pw - margin));
+      top = Math.max(viewportTop + margin, Math.min(top, viewportBottom - ph - margin));
     } else {
       if (!trigger) return;
       const t = trigger.getBoundingClientRect();
       left = t.left + t.width / 2 - pw / 2;
-      left = Math.max(margin, Math.min(left, vw - pw - margin));
+      left = Math.max(viewportLeft + margin, Math.min(left, viewportRight - pw - margin));
       const placeTop = (local.placement ?? 'bottom') === 'top';
       top = placeTop ? t.top - ph - 10 : t.bottom + 10;
-      if (placeTop && top < margin) top = t.bottom + 10; // no room above → flip down
-      if (!placeTop && top + ph > vh - margin) top = t.top - ph - 10; // flip up
-      top = Math.max(margin, Math.min(top, vh - ph - margin));
+      if (placeTop && top < viewportTop + margin) top = t.bottom + 10; // no room above → flip down
+      if (!placeTop && top + ph > viewportBottom - margin) top = t.top - ph - 10; // flip up
+      top = Math.max(viewportTop + margin, Math.min(top, viewportBottom - ph - margin));
     }
     panel.style.position = 'fixed';
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+    panel.style.margin = '0';
     panel.style.transform = 'none';
+    panel.style.translate = 'none';
   };
 
   createEffect(() => {
@@ -247,9 +250,13 @@ export function Popover(props: PopoverProps) {
     const reflow = () => positionPanel();
     window.addEventListener('resize', reflow);
     window.addEventListener('scroll', reflow, true);
+    window.visualViewport?.addEventListener('resize', reflow);
+    window.visualViewport?.addEventListener('scroll', reflow);
     onCleanup(() => {
       window.removeEventListener('resize', reflow);
       window.removeEventListener('scroll', reflow, true);
+      window.visualViewport?.removeEventListener('resize', reflow);
+      window.visualViewport?.removeEventListener('scroll', reflow);
     });
   });
 

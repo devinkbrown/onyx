@@ -4,7 +4,13 @@ import { Mascot } from '@/components/brand/Mascot';
 import { setPageMeta } from './pageMeta';
 import { PublicFooter } from './PublicFooter';
 
-export function RoadmapBridge() {
+export default function RoadmapRoute(): JSX.Element {
+  setPageMeta(
+    'Onyx roadmap — shipped, building, and later',
+    'The evidence-led public roadmap for Onyx and Onyx Server.',
+    '/roadmap/',
+  );
+
   return (
     <main class="r" aria-labelledby="roadmap-bridge-title">
       <div class="r-ground" aria-hidden="true" />

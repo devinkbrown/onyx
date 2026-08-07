@@ -127,7 +127,7 @@ describe('Connect screen rendering', () => {
 
   it('links first-time visitors to the install guide before they connect', () => {
     render(() => <Connect />);
-    expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/install/');
+    expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/download/');
   });
 
   it('aborts its latency selection when the connect screen unmounts', async () => {
@@ -226,7 +226,7 @@ describe('Mode switching', () => {
 
   it('changes the submit label per mode', () => {
     render(() => <Connect />);
-    expect(screen.getByTestId('conn-submit')).toHaveTextContent(/dive in/i);
+    expect(screen.getByTestId('conn-submit')).toHaveTextContent(/continue/i);
     clickMode(/sign in/i);
     expect(screen.getByTestId('conn-submit')).toHaveTextContent(/sign in/i);
     clickMode(/register/i);

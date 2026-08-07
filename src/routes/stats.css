@@ -1,0 +1,1001 @@
+/* Onyx public observatory
+ *
+ * Stats shares the messaging client's vocabulary: quiet mineral surfaces,
+ * room-shaped rows, live presence, and lapis / sea-green / coral signals.
+ * The page is deliberately not a generic card dashboard or a retro IRC
+ * leaderboard. It shows aggregate room movement without profiling people.
+ */
+
+.stats-page {
+  --stats-cyan: var(--lapis-bright);
+  --stats-blue: var(--lapis);
+  --stats-green: var(--ok);
+  --stats-coral: var(--shu-bright);
+  --stats-violet: #9d8cff;
+  --stats-panel: color-mix(in oklab, var(--stone-2) 74%, transparent);
+  --stats-panel-strong: color-mix(in oklab, var(--stone) 88%, var(--ink));
+  --stats-border: color-mix(in oklab, var(--lapis-bright) 18%, var(--seam-faint));
+  --stats-radius: clamp(16px, 1.5vw, 24px);
+}
+
+.stats-page .r-ground {
+  background:
+    radial-gradient(70% 55% at 88% 5%, color-mix(in oklab, var(--lapis) 22%, transparent), transparent 68%),
+    radial-gradient(55% 46% at 8% 16%, color-mix(in oklab, var(--shu) 13%, transparent), transparent 70%),
+    radial-gradient(48% 38% at 62% 58%, color-mix(in oklab, var(--ok) 7%, transparent), transparent 75%),
+    linear-gradient(160deg, #07131d 0%, var(--ink) 42%, #071019 100%);
+}
+
+.stats-page .r-ground::before {
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--lapis) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--lapis) 7%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(#000 0%, transparent 72%);
+  opacity: 0.46;
+}
+
+.stats-page .r-ground::after {
+  background:
+    radial-gradient(circle at 76% 12%, color-mix(in oklab, var(--lapis-bright) 15%, transparent), transparent 24%),
+    radial-gradient(circle at 18% 24%, color-mix(in oklab, var(--shu) 8%, transparent), transparent 22%);
+}
+
+.stats-page .r-veins {
+  opacity: 0.22;
+}
+
+.stats-page .r-wrap {
+  max-width: 1380px;
+}
+
+/* ── Conversation-current hero ─────────────────────────────────────────── */
+
+.stats-page .stats-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.92fr);
+  grid-template-areas:
+    "kicker ledger"
+    "title summary"
+    "lede summary";
+  gap: 14px clamp(36px, 5vw, 82px);
+  align-items: start;
+  padding-block: clamp(46px, 6vw, 88px) clamp(36px, 5vw, 72px);
+}
+
+.stats-page .stats-hero > .r-kicker {
+  grid-area: kicker;
+  align-self: center;
+  margin: 0;
+  color: var(--stats-cyan);
+  font: 750 0.7rem/1.3 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.stats-page .stats-hero > h1 {
+  grid-area: title;
+  align-self: end;
+  max-width: 760px;
+  margin: clamp(18px, 3vw, 42px) 0 0;
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: clamp(42px, 6vw, 78px);
+  font-weight: 720;
+  line-height: 0.94;
+  letter-spacing: -0.055em;
+  text-transform: none;
+}
+
+.stats-page .stats-hero > h1 .gold {
+  color: var(--stats-cyan);
+  background: linear-gradient(90deg, var(--stats-cyan), color-mix(in oklab, var(--stats-violet) 80%, var(--paper)));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.stats-page .stats-hero > .sub {
+  grid-area: lede;
+  max-width: 58ch;
+  margin: 10px 0 0;
+  color: var(--paper-dim);
+  font-family: var(--font-sans);
+  font-size: clamp(1rem, 0.92rem + 0.35vw, 1.18rem);
+  line-height: 1.62;
+}
+
+.stats-page .stats-ledger {
+  grid-area: ledger;
+  align-self: center;
+  margin: 0;
+  padding: 0 0 13px;
+  border-top: 0;
+  border-bottom-color: var(--stats-border);
+}
+
+.stats-page .stats-ledger-mark {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  background: var(--stats-green);
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--stats-green) 12%, transparent),
+    0 0 14px color-mix(in oklab, var(--stats-green) 44%, transparent);
+}
+
+.stats-page .stats-ledger-mark::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 1px solid color-mix(in oklab, var(--stats-green) 35%, transparent);
+  border-radius: inherit;
+  animation: stats-presence-ring 2.4s ease-out infinite;
+}
+
+@keyframes stats-presence-ring {
+  0%, 30% { opacity: 0; transform: scale(0.65); }
+  45% { opacity: 0.75; }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+
+.stats-page .stats-ledger-mark:not([data-state='current'])::after {
+  display: none;
+}
+
+.stats-page .stats-ledger p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-page .stats-refresh {
+  border: 1px solid var(--stats-border);
+  border-radius: var(--r-pill);
+  padding-inline: 13px;
+  color: var(--paper-dim);
+  text-decoration: none;
+}
+
+.stats-page .stats-refresh:hover,
+.stats-page .stats-refresh:focus-visible {
+  border-color: var(--stats-cyan);
+  background: color-mix(in oklab, var(--stats-blue) 12%, transparent);
+  color: var(--paper);
+}
+
+.stats-page .stats-summary {
+  grid-area: summary;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.stats-page .stats-summary > .data-metric {
+  --metric-accent: var(--stats-blue);
+  position: relative;
+  min-height: 142px;
+  gap: 10px;
+  overflow: hidden;
+  padding: 18px;
+  border-color: color-mix(in oklab, var(--metric-accent) 24%, var(--stats-border));
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, color-mix(in oklab, var(--metric-accent) 11%, transparent), transparent 54%),
+    var(--stats-panel);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 5%, transparent);
+  backdrop-filter: blur(18px) saturate(115%);
+}
+
+.stats-page .data-metric[data-tone='presence'] { --metric-accent: var(--stats-green); }
+.stats-page .data-metric[data-tone='rooms'] { --metric-accent: var(--stats-violet); }
+.stats-page .data-metric[data-tone='messages'] { --metric-accent: var(--stats-cyan); }
+.stats-page .data-metric[data-tone='momentum'] { --metric-accent: var(--stats-coral); }
+
+.stats-page .stats-summary > .data-metric::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 42%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--metric-accent));
+  opacity: 0.85;
+}
+
+.stats-page .stats-summary .label {
+  color: color-mix(in oklab, var(--metric-accent) 82%, var(--paper));
+  letter-spacing: 0.12em;
+}
+
+.stats-page .stats-summary .value {
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 2.8vw, 3.1rem);
+  font-weight: 720;
+  letter-spacing: -0.055em;
+}
+
+.stats-page .stats-summary .note {
+  min-height: 2.7em;
+  color: var(--paper-mute);
+  font-size: 0.78rem;
+}
+
+.stats-page .stats-summary .note i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--stats-green);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--stats-green) 62%, transparent);
+}
+
+/* A compact jump rail mirrors the app's top-level room tabs. */
+.stats-page .stats-view-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding-block: 0;
+  border-top: 1px solid var(--stats-border);
+  border-bottom: 1px solid var(--stats-border);
+  background: color-mix(in oklab, var(--ink) 50%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.stats-page .stats-view-nav a {
+  min-height: 54px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 clamp(16px, 2.5vw, 32px);
+  border-right: 1px solid var(--stats-border);
+  color: var(--paper-dim);
+  font-size: 0.84rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.stats-page .stats-view-nav a:first-child {
+  padding-left: 0;
+}
+
+.stats-page .stats-view-nav a span {
+  color: var(--stats-cyan);
+  font: 650 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+.stats-page .stats-view-nav a:hover,
+.stats-page .stats-view-nav a:focus-visible {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--stats-blue) 10%, transparent);
+  outline: none;
+}
+
+/* ── Network pulse ─────────────────────────────────────────────────────── */
+
+.stats-page .stats-overview {
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.5fr);
+  gap: 14px;
+  padding-block: clamp(42px, 5vw, 72px);
+}
+
+.stats-page .data-card {
+  border-color: var(--stats-border);
+  border-radius: var(--stats-radius);
+  background:
+    linear-gradient(150deg, color-mix(in oklab, var(--paper) 3%, transparent), transparent 48%),
+    var(--stats-panel);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--paper) 5%, transparent),
+    0 24px 70px -52px color-mix(in oklab, var(--stats-blue) 48%, transparent);
+  backdrop-filter: blur(20px) saturate(112%);
+}
+
+.stats-page .stats-overview > .data-card:first-child {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(24px, 3.2vw, 42px);
+}
+
+.stats-page .stats-overview > .data-card:first-child::after {
+  content: '';
+  position: absolute;
+  inset: auto -10% -45% 30%;
+  height: 70%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--stats-blue) 12%, transparent), transparent 68%);
+  pointer-events: none;
+}
+
+.stats-page .data-card h2,
+.stats-page .data-card h3 {
+  font-family: var(--font-sans);
+  font-weight: 690;
+  letter-spacing: -0.035em;
+  text-transform: none;
+}
+
+.stats-page .data-card h2 {
+  max-width: 12ch;
+  font-size: clamp(2rem, 4vw, 4.4rem);
+  line-height: 0.98;
+}
+
+.stats-page .data-card h3 {
+  font-size: clamp(1.3rem, 1.1rem + 0.55vw, 1.7rem);
+}
+
+.stats-page .data-bars {
+  position: relative;
+  z-index: 1;
+  height: 230px;
+  gap: clamp(4px, 0.8vw, 12px);
+  margin-top: 30px;
+  padding: 24px 4px 0;
+  border-top: 1px solid var(--stats-border);
+  background:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent calc(25% - 1px),
+      color-mix(in oklab, var(--paper) 6%, transparent) 25%
+    );
+}
+
+.stats-page .data-bar {
+  position: relative;
+  min-height: 4px;
+  border-radius: 7px 7px 2px 2px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--stats-cyan) 86%, white),
+    color-mix(in oklab, var(--stats-blue) 88%, var(--stats-violet))
+  );
+  box-shadow: 0 0 18px -8px color-mix(in oklab, var(--stats-cyan) 75%, transparent);
+  transform-origin: bottom;
+  animation: stats-bar-rise 620ms var(--ease) both;
+}
+
+.stats-page .data-bar:nth-child(3n) {
+  background: linear-gradient(180deg, var(--stats-violet), var(--stats-blue));
+}
+
+.stats-page .data-bar:nth-child(4n) {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--stats-green) 75%, white), var(--stats-blue));
+}
+
+@keyframes stats-bar-rise {
+  from { opacity: 0.25; transform: scaleY(0.08); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+
+.stats-page .stats-chart-caption {
+  position: relative;
+  z-index: 1;
+}
+
+.stats-page .stats-chart-note {
+  position: relative;
+  z-index: 1;
+  max-width: 72ch;
+  color: var(--paper-mute);
+  font-size: 0.84rem;
+}
+
+.stats-page .stats-busiest-card {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(22px, 2.8vw, 34px);
+  border-color: color-mix(in oklab, var(--stats-violet) 30%, var(--stats-border));
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--stats-violet) 15%, transparent), transparent 38%),
+    var(--stats-panel);
+}
+
+.stats-page .stats-busiest-card > h3 {
+  margin-top: 24px;
+  font-size: clamp(1.8rem, 3vw, 3.2rem);
+  color: var(--stats-cyan);
+}
+
+.stats-page .stats-spotlight-metrics {
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin-top: 24px;
+  border-top: 1px solid var(--stats-border);
+}
+
+.stats-page .stats-spotlight-metrics .data-metric {
+  --metric-accent: var(--stats-blue);
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 14px;
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid var(--stats-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.stats-page .stats-spotlight-metrics .data-metric .value {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: color-mix(in oklab, var(--metric-accent) 70%, var(--paper));
+  font: 720 clamp(1.4rem, 2.2vw, 2rem)/1 var(--font-sans);
+  letter-spacing: -0.04em;
+}
+
+.stats-page .stats-spotlight-metrics .data-metric .note {
+  font-size: 0.72rem;
+}
+
+.stats-page .stats-busiest-card .r-cta {
+  margin-top: auto;
+  padding-top: 26px;
+}
+
+.stats-page .r-btn.primary {
+  border-color: color-mix(in oklab, var(--stats-blue) 72%, var(--seam));
+  background: linear-gradient(135deg, var(--stats-blue), color-mix(in oklab, var(--stats-blue) 62%, var(--stats-violet)));
+  color: white;
+  box-shadow: 0 12px 30px -20px color-mix(in oklab, var(--stats-cyan) 80%, transparent);
+}
+
+/* ── Room signal inspector ─────────────────────────────────────────────── */
+
+.stats-page .stats-inspector {
+  width: min(calc(100% - clamp(32px, 10vw, 112px)), 1268px);
+  margin-block: 22px clamp(42px, 6vw, 86px);
+  padding: clamp(24px, 4vw, 52px);
+  border: 1px solid color-mix(in oklab, var(--stats-cyan) 24%, var(--stats-border));
+  border-radius: calc(var(--stats-radius) + 4px);
+  background:
+    radial-gradient(70% 70% at 100% 0%, color-mix(in oklab, var(--stats-blue) 13%, transparent), transparent 64%),
+    linear-gradient(145deg, color-mix(in oklab, var(--paper) 3%, transparent), transparent 42%),
+    color-mix(in oklab, var(--stone) 82%, var(--ink));
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--paper) 6%, transparent),
+    0 42px 90px -72px var(--stats-cyan);
+}
+
+.stats-page .stats-inspector .r-eyebrow,
+.stats-page .stats-rooms-section .r-eyebrow {
+  color: var(--stats-cyan);
+}
+
+.stats-page .stats-inspector .r-title,
+.stats-page .stats-rooms-section .r-title {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  text-transform: none;
+}
+
+.stats-page .stats-inspector .r-title .gold {
+  color: var(--stats-cyan);
+}
+
+.stats-page .stats-inspector-ledger {
+  padding: 12px 0;
+  border-color: var(--stats-border);
+}
+
+.stats-page .stats-inspector-metrics {
+  gap: 1px;
+  border-color: var(--stats-border);
+  border-radius: 18px;
+  background: var(--stats-border);
+}
+
+.stats-page .stats-inspector-metrics > div {
+  --metric-accent: var(--stats-blue);
+  position: relative;
+  border: 0;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--metric-accent) 7%, transparent), transparent 68%),
+    color-mix(in oklab, var(--ink) 86%, var(--stone));
+}
+
+.stats-page .stats-inspector-metrics > div[data-tone='presence'] { --metric-accent: var(--stats-green); }
+.stats-page .stats-inspector-metrics > div[data-tone='messages'] { --metric-accent: var(--stats-cyan); }
+.stats-page .stats-inspector-metrics > div[data-tone='people'] { --metric-accent: var(--stats-violet); }
+.stats-page .stats-inspector-metrics > div[data-tone='words'] { --metric-accent: var(--stats-coral); }
+.stats-page .stats-inspector-metrics > div[data-tone='momentum'] { --metric-accent: var(--stats-green); }
+.stats-page .stats-inspector-metrics > div[data-tone='time'] { --metric-accent: var(--stats-cyan); }
+
+.stats-page .stats-inspector-metrics > div::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: linear-gradient(transparent, var(--metric-accent), transparent);
+  opacity: 0.72;
+}
+
+.stats-page .stats-inspector-metrics strong {
+  color: color-mix(in oklab, var(--metric-accent) 68%, var(--paper));
+  font-family: var(--font-sans);
+  font-weight: 720;
+  letter-spacing: -0.04em;
+}
+
+.stats-page .stats-inspector-grid {
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+}
+
+.stats-page .stats-hour-chart {
+  border-color: var(--stats-border);
+  background:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent calc(33.333% - 1px),
+      color-mix(in oklab, var(--paper) 5%, transparent) 33.333%
+    );
+}
+
+.stats-page .stats-hour-chart i {
+  border-radius: 5px 5px 1px 1px;
+  background: linear-gradient(180deg, var(--stats-cyan), var(--stats-blue));
+  box-shadow: 0 0 12px -6px var(--stats-cyan);
+}
+
+.stats-page .stats-flow-list {
+  border-color: var(--stats-border);
+}
+
+.stats-page .stats-flow-list div {
+  border-color: var(--stats-border);
+}
+
+.stats-page .stats-flow-list dd {
+  color: var(--paper);
+  font-family: var(--font-mono);
+}
+
+.stats-page .stats-heatmap td {
+  border-color: color-mix(in oklab, var(--stats-cyan) 24%, var(--stats-border));
+  background: color-mix(in oklab, var(--stats-cyan) var(--heat), var(--ink));
+}
+
+.stats-page .stats-method-note {
+  max-width: none;
+  padding: 14px 16px;
+  border-left: 2px solid color-mix(in oklab, var(--stats-green) 62%, var(--stats-border));
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  background: color-mix(in oklab, var(--stats-green) 5%, transparent);
+}
+
+/* ── Public room directory ─────────────────────────────────────────────── */
+
+.stats-page .stats-rooms-section {
+  padding-block: clamp(44px, 6vw, 86px);
+}
+
+.stats-page .stats-rooms-section .r-title {
+  max-width: none;
+  font-size: clamp(2.3rem, 5vw, 5rem);
+}
+
+.stats-page .stats-section-note {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+}
+
+.stats-page .stats-room-controls {
+  position: sticky;
+  top: 70px;
+  z-index: 12;
+  grid-template-columns: minmax(260px, 0.6fr) minmax(0, 1.4fr);
+  gap: 8px 18px;
+  margin-top: 28px;
+  padding: 12px;
+  border: 1px solid var(--stats-border);
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--ink) 78%, transparent);
+  box-shadow: 0 18px 42px -36px black;
+  backdrop-filter: blur(18px) saturate(125%);
+}
+
+.stats-page .stats-room-search {
+  grid-column: auto;
+  grid-template-columns: 1fr;
+  gap: 5px;
+}
+
+.stats-page .stats-room-search > span {
+  padding-inline: 4px;
+}
+
+.stats-page .stats-room-search input {
+  min-height: 46px;
+  border-color: var(--stats-border);
+  border-radius: 13px;
+  background: color-mix(in oklab, var(--stone) 72%, var(--ink));
+}
+
+.stats-page .stats-control-group {
+  align-items: center;
+}
+
+.stats-page .stats-control-group button {
+  min-height: 40px;
+  border-color: transparent;
+  border-radius: 11px;
+}
+
+.stats-page .stats-control-group button.is-active {
+  border-color: color-mix(in oklab, var(--stats-cyan) 42%, var(--stats-border));
+  background: color-mix(in oklab, var(--stats-blue) 22%, var(--stone));
+  color: var(--paper);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--stats-cyan) 10%, transparent);
+}
+
+.stats-page .stats-result-count {
+  padding-inline: 4px;
+}
+
+.stats-page .data-list {
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.stats-page .data-room-row {
+  position: relative;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  min-height: 92px;
+  padding: 14px 16px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--stone-2) 34%, transparent);
+  transition:
+    border-color var(--dur-fast, 160ms) var(--ease),
+    background var(--dur-fast, 160ms) var(--ease),
+    transform var(--dur-fast, 160ms) var(--ease);
+}
+
+.stats-page .data-room-row::before {
+  content: '#';
+  grid-column: 1;
+  grid-row: 1;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--stats-cyan) 24%, var(--stats-border));
+  border-radius: 12px;
+  background: linear-gradient(145deg, color-mix(in oklab, var(--stats-blue) 18%, var(--stone)), var(--stone));
+  color: var(--stats-cyan);
+  font: 720 1rem/1 var(--font-mono);
+}
+
+.stats-page .data-room-rank {
+  position: absolute;
+  left: 28px;
+  bottom: 8px;
+  color: var(--paper-mute);
+  font-size: 0.56rem;
+}
+
+.stats-page .data-room-row:hover {
+  border-color: var(--stats-border);
+  background: color-mix(in oklab, var(--stats-blue) 8%, var(--stats-panel));
+  transform: translateY(-1px);
+}
+
+.stats-page .data-room-row[data-selected='true'] {
+  margin-inline: 0;
+  padding-inline: 16px;
+  border-color: color-mix(in oklab, var(--stats-cyan) 42%, var(--stats-border));
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--stats-blue) 14%, transparent), transparent 72%),
+    var(--stats-panel);
+  box-shadow: inset 3px 0 0 var(--stats-cyan);
+}
+
+.stats-page .data-room-heading strong {
+  font-size: 1rem;
+}
+
+.stats-page .data-room-heading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--stats-green);
+}
+
+.stats-page .data-room-heading > span::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px color-mix(in oklab, currentColor 55%, transparent);
+}
+
+.stats-page .channel-spark-bars i {
+  border-radius: 3px 3px 1px 1px;
+  background: linear-gradient(180deg, var(--stats-cyan), var(--stats-blue));
+}
+
+.stats-page .data-room-numbers dt {
+  color: var(--paper-mute);
+}
+
+.stats-page .data-room-numbers dd {
+  color: var(--paper);
+  font-weight: 650;
+}
+
+.stats-page .data-action {
+  border-color: var(--stats-border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--stone) 46%, transparent);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.stats-page .data-action--inspect[aria-pressed='true'] {
+  border-color: color-mix(in oklab, var(--stats-cyan) 58%, var(--stats-border));
+  background: color-mix(in oklab, var(--stats-blue) 24%, var(--stone));
+  color: var(--paper);
+}
+
+/* ── Responsive behavior ───────────────────────────────────────────────── */
+
+@media (max-width: 1040px) {
+  .stats-page .stats-hero {
+    grid-template-columns: minmax(0, 0.9fr) minmax(380px, 1.1fr);
+    gap: 14px 30px;
+  }
+
+  .stats-page .stats-inspector-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .stats-page .stats-room-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-page .stats-room-search {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 840px) {
+  .stats-page .stats-hero {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "kicker"
+      "title"
+      "lede"
+      "ledger"
+      "summary";
+    gap: 12px;
+  }
+
+  .stats-page .stats-ledger {
+    margin-top: 24px;
+  }
+
+  .stats-page .stats-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-page .stats-inspector {
+    width: calc(100% - 32px);
+  }
+
+  .stats-page .stats-inspector-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-page .stats-view-nav {
+    overflow-x: auto;
+  }
+
+  .stats-page .stats-view-nav a {
+    flex: 0 0 auto;
+  }
+
+  .stats-page .data-room-row {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .stats-page .data-room-telemetry {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 560px) {
+  .stats-page .stats-hero {
+    padding-top: 30px;
+  }
+
+  .stats-page .stats-hero > h1 {
+    margin-top: 12px;
+    font-size: clamp(40px, 13vw, 58px);
+  }
+
+  .stats-page .stats-ledger {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .stats-page .stats-ledger p {
+    white-space: normal;
+  }
+
+  .stats-page .stats-refresh {
+    grid-column: auto;
+    justify-self: auto;
+    width: 44px;
+    overflow: hidden;
+    padding-inline: 0;
+    color: transparent;
+    white-space: nowrap;
+  }
+
+  .stats-page .stats-refresh::before {
+    content: '↻';
+    width: 42px;
+    color: var(--paper);
+    font-size: 1.1rem;
+    text-align: center;
+  }
+
+  .stats-page .stats-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .stats-page .stats-summary > .data-metric {
+    min-height: 128px;
+    padding: 15px;
+  }
+
+  .stats-page .stats-summary .value {
+    font-size: 2rem;
+  }
+
+  .stats-page .stats-summary .note {
+    font-size: 0.7rem;
+  }
+
+  .stats-page .stats-view-nav {
+    padding-inline: 16px;
+  }
+
+  .stats-page .stats-view-nav a:first-child {
+    padding-left: 0;
+  }
+
+  .stats-page .stats-overview > .data-card:first-child,
+  .stats-page .stats-busiest-card {
+    padding: 20px;
+  }
+
+  .stats-page .data-bars {
+    height: 170px;
+    gap: 4px;
+  }
+
+  .stats-page .stats-inspector {
+    width: calc(100% - 24px);
+    padding: 20px 14px;
+  }
+
+  .stats-page .stats-inspector-head {
+    gap: 14px;
+  }
+
+  .stats-page .stats-inspector-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-page .stats-inspector-metrics > div {
+    min-height: 118px;
+    padding: 14px;
+    border: 0;
+  }
+
+  .stats-page .stats-inspector-metrics > div:first-child {
+    border-top: 0;
+  }
+
+  .stats-page .stats-room-controls {
+    position: relative;
+    top: auto;
+    padding: 10px;
+  }
+
+  .stats-page .stats-control-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-page .stats-control-group button {
+    width: 100%;
+    padding-inline: 7px;
+    font-size: 0.62rem;
+  }
+
+  .stats-page .data-room-row {
+    padding: 14px 12px;
+  }
+
+  .stats-page .data-room-row[data-selected='true'] {
+    padding-inline: 12px;
+  }
+
+  .stats-page .data-room-telemetry {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .stats-page .data-room-actions {
+    margin-top: 8px;
+  }
+
+  .stats-page .data-room-telemetry .data-action {
+    margin-top: 0;
+  }
+
+  .stats-page .channel-spark {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .stats-page .stats-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-page .stats-summary > .data-metric {
+    min-height: 112px;
+  }
+
+  .stats-page .stats-inspector-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-page .stats-inspector-metrics > div {
+    min-height: 104px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-page .stats-ledger-mark::after,
+  .stats-page .data-bar {
+    animation: none;
+  }
+
+  .stats-page .data-room-row {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .stats-page .stats-hero > h1 .gold {
+    color: LinkText;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+
+  .stats-page .stats-ledger-mark,
+  .stats-page .data-room-heading > span::before {
+    background: LinkText;
+    box-shadow: none;
+  }
+
+  .stats-page .stats-ledger-mark::after {
+    display: none;
+  }
+
+  .stats-page .data-room-row[data-selected='true'],
+  .stats-page .data-action--inspect[aria-pressed='true'] {
+    border-color: Highlight;
+  }
+}

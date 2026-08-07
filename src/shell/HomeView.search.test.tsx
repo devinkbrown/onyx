@@ -37,7 +37,7 @@ describe('Home Search Center integration', () => {
   it('opens all-device search from Home, refocuses on repeated Cmd/Ctrl-F, and restores focus', async () => {
     render(() => <AppShell />);
 
-    const homeTrigger = screen.getByRole('button', { name: 'Search device memory' });
+    const homeTrigger = screen.getByRole('button', { name: 'Search messages' });
     homeTrigger.focus();
     fireEvent.click(homeTrigger);
     const input = screen.getByRole('searchbox', { name: 'Search messages' });

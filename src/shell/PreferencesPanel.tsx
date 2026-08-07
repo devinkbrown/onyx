@@ -2730,7 +2730,7 @@ function PwaReadinessPanel(): JSX.Element {
     <section class="pref-group pref-pwa-readiness" aria-labelledby="pref-pwa-readiness-title">
       <div class="pref-group-head">
         <h3 id="pref-pwa-readiness-title" class="pref-label">Installed app readiness</h3>
-        <a class="pref-a11y-link" href="/install/">Install guide</a>
+        <a class="pref-a11y-link" href="/download/">Install guide</a>
       </div>
       <p class="pref-desc">
         Browser PWA and wrapper health on this device. Desktop shells should
@@ -3192,8 +3192,14 @@ function PreferenceCategoryNavigation(props: {
           </For>
         </div>
       </nav>
-      <button type="button" class="pref-reset pref-reset-all" onClick={resetToDefaults}>
-        Reset to defaults
+      <button
+        type="button"
+        class="pref-reset pref-reset-all"
+        aria-label="Reset to defaults"
+        onClick={resetToDefaults}
+      >
+        <span class="pref-reset-all__full">Reset to defaults</span>
+        <span class="pref-reset-all__compact" aria-hidden="true">Reset</span>
       </button>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {resetAnnouncement()}
