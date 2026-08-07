@@ -8,14 +8,14 @@ test('contains the landing route at 400% zoom', async ({ page }) => {
     document.documentElement.style.fontSize = '64px';
   });
 
-  const primaryAction = page.locator('.r-hero').getByRole('link', { name: /Open Onyx/ });
+  const primaryAction = page.locator('.home-hero').getByRole('link', { name: /Open Onyx/ });
   await primaryAction.focus();
   await expect(primaryAction).toBeFocused();
-  await page.locator('.r-footer').scrollIntoViewIfNeeded();
+  await page.locator('.home-footer').scrollIntoViewIfNeeded();
 
   const geometry = await page.evaluate(() => {
     const surfaces = Array.from(document.querySelectorAll<HTMLElement>(
-      '.r-hero, .r-live, .r-community, .r-rooms, .r-join, .r-culture, .r-sovereign, .r-built, .r-footer, .r-live-grid, .r-board, .grid2, .r-strip',
+      '.home-hero, .home-aperture, .home-telemetry, .home-capability, .home-shelf, .r-footer, .home-hero-grid, .home-current',
     )).map((element) => {
       const rect = element.getBoundingClientRect();
       return {
@@ -26,9 +26,9 @@ test('contains the landing route at 400% zoom', async ({ page }) => {
         right: rect.right,
       };
     });
-    const heroTitle = document.querySelector<HTMLElement>('.r-hero h1')!;
-    const cardCopy = document.querySelector<HTMLElement>('.r-card p')!;
-    const primary = document.querySelector<HTMLElement>('.r-hero .r-btn.primary')!;
+    const heroTitle = document.querySelector<HTMLElement>('.home-hero h1')!;
+    const cardCopy = document.querySelector<HTMLElement>('.home-aperture-label')!;
+    const primary = document.querySelector<HTMLElement>('.home-hero .home-cta-primary')!;
     const primaryStyle = getComputedStyle(primary);
     return {
       documentClientWidth: document.documentElement.clientWidth,

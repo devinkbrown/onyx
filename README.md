@@ -114,6 +114,7 @@ preview. It never writes the production `out/` tree.
 | `pnpm site:check` | Run typecheck, lint, unit tests, and a production build. |
 | `pnpm site:workbench` | Open the safe local dev/check/preview workbench. |
 | `pnpm check:server-contract` | Compare the client contract against a sibling Onyx Server checkout when available. |
+| `pnpm desktop:test` | Build and test the native desktop host through the pinned Zig/native toolchain. |
 
 Before opening a pull request, run:
 
@@ -137,6 +138,8 @@ your role:
   [`docs/importing.md`](docs/importing.md).
 - **Operator/integrator:** [`docs/configuration.md`](docs/configuration.md) and
   [`ONYX_SERVER_PROTOCOL.md`](ONYX_SERVER_PROTOCOL.md).
+- **Desktop packager:** [`docs/desktop-host.md`](docs/desktop-host.md) and the
+  browser-facing [`/download/`](https://eshmaki.me/download/) release page.
 - **Security reviewer:** [`docs/security.md`](docs/security.md) and
   [`SECURITY.md`](SECURITY.md).
 - **Maintainer:** [`docs/testing-and-release.md`](docs/testing-and-release.md)

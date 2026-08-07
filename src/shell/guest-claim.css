@@ -129,6 +129,16 @@
   background: color-mix(in oklch, var(--stone) 80%, var(--paper) 4%);
 }
 
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyx-sheet:has(.guest-claim-sheet) .onyx-sheet__close {
+    position: fixed;
+    z-index: 2;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    right: max(24px, env(safe-area-inset-right, 0px));
+    margin: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .guest-claim-chip__dismiss {
     transition: none;

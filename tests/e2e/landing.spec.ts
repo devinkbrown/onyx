@@ -5,19 +5,18 @@ import { stubPublicFeeds } from './public-feed-fixture';
 test.describe('Onyx landing', () => {
   test('hero loads with the current headline', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText(/a place for/i);
-    await expect(page.locator('h1')).toContainText(/your people/i);
+    await expect(page.locator('h1')).toHaveText('A room for your people.');
   });
 
   test('kicker + primary CTAs render', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText(/rooms · calls · catch-up · honest protection/i)).toBeVisible();
+    await expect(page.getByText(/public communication · powered by onyx server/i)).toBeVisible();
     await expect(page.getByRole('link', { name: /open onyx/i }).first()).toBeVisible();
   });
 
   test('the page references the network', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'The network is visible' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Public network telemetry' })).toBeVisible();
   });
 
   test('the entry point routes into the app', async ({ page }) => {

@@ -230,6 +230,7 @@ describe('PWA manifest', () => {
       'icon-192.png',
       'icon-512.png',
       'index.html',
+      'install',
       'integrations',
       'invite',
       'manifest.json',

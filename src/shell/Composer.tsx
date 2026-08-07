@@ -1338,59 +1338,6 @@ export function Composer(props: ComposerProps): JSX.Element {
           onChange={handleFileInput}
         />
 
-        <button
-          type="button"
-          class="shell-composer-tool"
-          disabled={!isEnabled()}
-          aria-label="Insert emoji"
-          aria-haspopup="dialog"
-          aria-expanded={emojiOpen()}
-          aria-controls={emojiOpen() ? 'shell-emoji-picker' : undefined}
-          onClick={() => setEmojiOpen((open) => !open)}
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
-            <circle cx="8" cy="8" r="6.2" />
-            <path d="M5.6 9.4a3.1 3.1 0 0 0 4.8 0" />
-            <circle cx="6" cy="6.4" r="0.5" fill="currentColor" stroke="none" />
-            <circle cx="10" cy="6.4" r="0.5" fill="currentColor" stroke="none" />
-          </svg>
-        </button>
-
-        <button
-          type="button"
-          class="shell-composer-tool"
-          disabled={!canSchedule() && scheduledCount() === 0}
-          aria-label="Schedule message to send later"
-          aria-haspopup="dialog"
-          aria-expanded={scheduleOpen()}
-          aria-controls={scheduleOpen() ? 'shell-schedule-picker' : undefined}
-          data-composer-schedule=""
-          onClick={() => setScheduleOpen((open) => !open)}
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="8" cy="8.6" r="5.2" />
-            <path d="M8 5.6v3l2 1.2" />
-            <path d="M5.4 1.8 3.2 3.4M10.6 1.8l2.2 1.6" />
-          </svg>
-        </button>
-
-        <button
-          type="button"
-          class="shell-composer-tool"
-          disabled={!target()}
-          aria-label="Jump to date in conversation history"
-          aria-haspopup="dialog"
-          title="Jump to date"
-          data-testid="composer-jump-to-date"
-          onClick={() => getState().openJumpToDate()}
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="2.2" y="3.4" width="11.6" height="10.4" rx="1.4" />
-            <path d="M5 2.2v2.4M11 2.2v2.4M2.2 7h11.6" />
-            <path d="M8 9.2v2M8 9.2l1.4.8" />
-          </svg>
-        </button>
-
         <label for="shell-composer-input" class="sr-only">
           <Show when={target()} fallback="Message input (no active channel)">
             {(t) => `Message ${t()}`}

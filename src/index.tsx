@@ -42,6 +42,7 @@ const Status = lazy(() => import('./routes/Status'));
 const Roadmap = lazy(() => import('./routes/Roadmap'));
 const Invite = lazy(() => import('./routes/Invite'));
 const OnyxOS = lazy(() => import('./routes/OnyxOS'));
+const Download = lazy(() => import('./routes/Download'));
 const PublicInfo = lazy(() => import('./routes/PublicInfo').then((m) => ({ default: m.PublicInfo })));
 const Spotlight = lazy(() => import('./chat/spotlight/Spotlight'));
 
@@ -82,6 +83,7 @@ const StatsRoute = withLazyRoute(Stats);
 const StatusRoute = withLazyRoute(Status);
 const RoadmapRoute = withLazyRoute(Roadmap);
 const InviteRoute = withLazyRoute(Invite);
+const OnyxOSRoute = withLazyRoute(OnyxOS);
 const DownloadRoute = withLazyRoute(Download);
 
 // Global command palette host. The panel + its command catalogue live in a
@@ -118,23 +120,27 @@ render(
       <SpotlightProvider>
         <Router>
           <Route path="/" component={Landing} />
-          <Route path="/about" component={About} />
-          <Route path="/app" component={AppShell} />
-          <Route path="/appearance" component={Appearance} />
-          <Route path="/stats" component={Stats} />
-          <Route path="/stats/" component={Stats} />
-          <Route path="/status" component={Status} />
-          <Route path="/status/" component={Status} />
-          <Route path="/roadmap" component={Roadmap} />
-          <Route path="/roadmap/" component={Roadmap} />
-          <Route path="/invite" component={Invite} />
-          <Route path="/invite/" component={Invite} />
-          <Route path="/onyxos" component={OnyxOS} />
-          <Route path="/onyxos/" component={OnyxOS} />
-          <Route path="/accessibility/" component={() => <PublicInfo page="accessibility" />} />
-          <Route path="/glossary/" component={() => <PublicInfo page="glossary" />} />
-          <Route path="/integrations/" component={() => <PublicInfo page="integrations" />} />
-          <Route path="/agents/" component={() => <PublicInfo page="agents" />} />
+          <Route path="/about" component={AboutRoute} />
+          <Route path="/app" component={AppRouteGuarded} />
+          <Route path="/appearance" component={AppearanceRoute} />
+          <Route path="/stats" component={StatsRoute} />
+          <Route path="/stats/" component={StatsRoute} />
+          <Route path="/status" component={StatusRoute} />
+          <Route path="/status/" component={StatusRoute} />
+          <Route path="/roadmap" component={RoadmapRoute} />
+          <Route path="/roadmap/" component={RoadmapRoute} />
+          <Route path="/invite" component={InviteRoute} />
+          <Route path="/invite/" component={InviteRoute} />
+          <Route path="/onyxos" component={OnyxOSRoute} />
+          <Route path="/onyxos/" component={OnyxOSRoute} />
+          <Route path="/download" component={DownloadRoute} />
+          <Route path="/download/" component={DownloadRoute} />
+          <Route path="/install" component={DownloadRoute} />
+          <Route path="/install/" component={DownloadRoute} />
+          <Route path="/accessibility/" component={() => <LazyRouteBoundary><PublicInfo page="accessibility" /></LazyRouteBoundary>} />
+          <Route path="/glossary/" component={() => <LazyRouteBoundary><PublicInfo page="glossary" /></LazyRouteBoundary>} />
+          <Route path="/integrations/" component={() => <LazyRouteBoundary><PublicInfo page="integrations" /></LazyRouteBoundary>} />
+          <Route path="/agents/" component={() => <LazyRouteBoundary><PublicInfo page="agents" /></LazyRouteBoundary>} />
         </Router>
         {/* Global command palette — Cmd/Ctrl+K or / opens it from any route.
             Its lazy chunk (command catalogue + fuzzy matcher) is fetched only

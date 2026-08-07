@@ -38,7 +38,12 @@ import type { Channel } from '@/lib/irc/types';
 export type PresenceRibbonProps = {
   selfNick?: string;
   onToggleMembers?: () => void;
-  membersExpanded?: boolean;
+  /**
+   * True when the member surface is actually open for this room — desktop
+   * column or mobile drawer. AppShell should pass `membersVisible()`.
+   * Must be false with zero roster (no member surface can open).
+   */
+  membersOpen?: boolean;
   showJoinVoice?: boolean;
   onJoinVoice?: (withVideo: boolean) => void;
 };
@@ -121,7 +126,13 @@ export function buildVoiceRoomStatus(input: VoiceRoomStatusInput): VoiceRoomStat
 }
 
 export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
-  const [local] = splitProps(props, ['selfNick', 'onToggleMembers', 'membersExpanded', 'showJoinVoice', 'onJoinVoice']);
+  const [local] = splitProps(props, [
+    'selfNick',
+    'onToggleMembers',
+    'membersOpen',
+    'showJoinVoice',
+    'onJoinVoice',
+  ]);
 
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -645,87 +656,28 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 <span class="shell-ribbon-action-label">Call</span>
               </button>
             </Show>
-            {/* Pins chip — always one click away in a channel (B3 polish). Count
-                badges only when pins exist so empty rooms stay quiet. */}
-            <Show when={activeView().kind === 'channel'}>
-              <button
-                type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-pins"
-                aria-label={
-                  pinCount() > 0
-                    ? `${pinCount()} pinned message${pinCount() === 1 ? '' : 's'}`
-                    : 'Pinned messages'
-                }
-                title={pinCount() > 0 ? `${pinCount()} pinned` : 'Pinned messages'}
-                data-testid="ribbon-pins"
-                onClick={() => getState().openPinnedMessages()}
-              >
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
-                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" />
-                  <path d="M12 14v6" />
-                </svg>
-                <Show when={pinCount() > 0}>
-                  <span class="shell-ribbon-count">{pinCount()}</span>
-                </Show>
-              </button>
-            </Show>
-            {/* Mark read — only when this channel has unread (badge hygiene). */}
-            <Show when={(activeChannel()?.unread ?? 0) > 0 || (activeChannel()?.highlights ?? 0) > 0}>
-              <button
-                type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-mark-read"
-                data-testid="ribbon-mark-read"
-                aria-label={`Mark ${activeChannel()?.name ?? 'channel'} as read`}
-                title="Mark as read"
-                onClick={() => {
-                  const ch = activeChannel();
-                  if (!ch) return;
-                  getState().markRead(ch.name);
-                }}
-              >
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
-                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              </button>
-            </Show>
-            {/* DND / quiet-hours — only when active so calm default stays quiet. */}
-            <Show when={dndActive()}>
-              <button
-                type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-dnd"
-                data-testid="ribbon-dnd-active"
-                aria-label="Do not disturb is on — open preferences to change"
-                title="Do not disturb is on"
-                onClick={() => openPreferences()}
-              >
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
-                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 3a6.5 6.5 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-                </svg>
-                <span class="shell-ribbon-action-label">DND</span>
-              </button>
-            </Show>
-            {/* Member count is presence-as-place (stable roster trigger), not chrome. */}
-            <Show when={activeChannel()}>
-              <button
-                type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-members"
-                aria-label={`${memberCount()} members — toggle member list`}
-                aria-expanded={local.membersExpanded}
-                data-testid="ribbon-members"
-                onClick={handleMembersClick}
-              >
-                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
-                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19" />
-                  <circle cx="10" cy="8" r="3" />
-                  <path d="M20 19v-1.4a3.4 3.4 0 0 0-2.6-3.3M15.5 5.2a3 3 0 0 1 0 5.6" />
-                </svg>
-                <span class="shell-ribbon-count">{memberCount()}</span>
-              </button>
-            </Show>
+          </div>
+
+          {/* Z3 People — always on channel, including zero members. */}
+          <div class="shell-ribbon-group" role="group" aria-label="People">
+            <button
+              type="button"
+              class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-members"
+              aria-label={`${memberCount()} members — toggle member list`}
+              aria-pressed={membersPressed()}
+              aria-expanded={membersPressed()}
+              data-testid="ribbon-members"
+              onClick={handleMembersClick}
+            >
+              <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19" />
+                <circle cx="10" cy="8" r="3" />
+                <path d="M20 19v-1.4a3.4 3.4 0 0 0-2.6-3.3M15.5 5.2a3 3 0 0 1 0 5.6" />
+              </svg>
+              <span class="shell-ribbon-count">{memberCount()}</span>
+              <span class="shell-ribbon-action-label">People</span>
+            </button>
           </div>
           <span class="shell-ribbon-divider" aria-hidden="true" />
         </Show>

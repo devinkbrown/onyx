@@ -39,7 +39,6 @@ import { NotificationRuntime } from '@/lib/notifications';
 import { TopicReadRuntime } from '@/lib/topics/TopicReadRuntime';
 import { ServerRail } from './ServerRail';
 import { ChannelSidebar } from './ChannelSidebar';
-import { CallsHub } from './CallsHub';
 import { HomeView } from './HomeView';
 const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
 const WhoisSheet = lazy(() => import('./WhoisSheet').then((m) => ({ default: m.WhoisSheet })));
@@ -999,7 +998,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
           <PresenceRibbon
             selfNick={displayNick()}
             onToggleMembers={handleToggleMembers}
-            membersExpanded={membersVisible()}
+            membersOpen={membersVisible()}
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
           />

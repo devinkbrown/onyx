@@ -48,6 +48,7 @@ The client is licensed under [AGPL-3.0-or-later](../LICENSE). See
 | Document | What it answers |
 | --- | --- |
 | [`configuration.md`](configuration.md) | Vite variables, endpoint selection, uploads, static hosting, and reverse-proxy expectations. |
+| [`desktop-host.md`](desktop-host.md) | Native host architecture, pinned toolchain, package targets, and release commands. |
 | [`../ONYX_SERVER_PROTOCOL.md`](../ONYX_SERVER_PROTOCOL.md) | Client-facing transport, CAP/IRCv3/IRCX, SASL, session resume, and media signaling. |
 | [`protocol/onyx-client-contract.v1.json`](protocol/onyx-client-contract.v1.json) | Machine-readable client/server contract, including the current group-E2EE status. |
 | [`protocol/halloy-cap-matrix.md`](protocol/halloy-cap-matrix.md) | Capability interoperability notes and evidence. |

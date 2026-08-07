@@ -16,6 +16,7 @@
   --stats-panel-strong: color-mix(in oklab, var(--stone) 88%, var(--ink));
   --stats-border: color-mix(in oklab, var(--lapis-bright) 18%, var(--seam-faint));
   --stats-radius: clamp(16px, 1.5vw, 24px);
+  overflow-x: clip;
 }
 
 .stats-page .r-ground {
@@ -945,6 +946,50 @@
 
   .stats-page .channel-spark {
     display: none;
+  }
+}
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .stats-page .data-card,
+  .stats-page .data-card *,
+  .stats-page .stats-view-nav,
+  .stats-page .stats-view-nav * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .stats-page .data-card {
+    overflow-x: hidden;
+  }
+
+  .stats-page .data-card h2 {
+    max-width: 100%;
+    font-size: 36px;
+  }
+
+  .stats-page .data-card h3 {
+    max-width: 100%;
+    font-size: 26px;
+  }
+
+  .stats-page .stats-overview > .data-card:first-child::after {
+    display: none;
+  }
+
+  .stats-page .stats-room-controls,
+  .stats-page .stats-control-group {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .stats-page .stats-control-group button {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 12px;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 

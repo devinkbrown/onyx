@@ -196,14 +196,24 @@ export function Popover(props: PopoverProps) {
     const panel = panelRef;
     const trigger = triggerRef;
     if (!panel || typeof window === 'undefined') return;
-    const pw = panel.offsetWidth;
-    const ph = panel.offsetHeight;
     const margin = 8;
     const viewport = window.visualViewport;
     const viewportLeft = viewport?.offsetLeft ?? 0;
     const viewportTop = viewport?.offsetTop ?? 0;
     const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth);
     const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+    const availableWidth = Math.max(0, viewportRight - viewportLeft - margin * 2);
+    const availableHeight = Math.max(0, viewportBottom - viewportTop - margin * 2);
+    if (panel.offsetWidth > availableWidth) {
+      panel.style.width = `${availableWidth}px`;
+      panel.style.maxWidth = `${availableWidth}px`;
+    }
+    if (panel.offsetHeight > availableHeight) {
+      panel.style.maxHeight = `${availableHeight}px`;
+      panel.style.overflow = 'auto';
+    }
+    const pw = panel.offsetWidth;
+    const ph = panel.offsetHeight;
     const anchor = local.anchorPoint;
     let left: number;
     let top: number;

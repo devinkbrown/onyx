@@ -1,6 +1,6 @@
 {
   "name": "onyx",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "description": "SolidJS IRC web client for Onyx Server with local-first history, end-to-end encrypted direct messages, and Cadence voice/video.",
   "private": true,
   "license": "AGPL-3.0-or-later",

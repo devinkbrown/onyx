@@ -68,6 +68,8 @@ async function seedWatchRoom(page: Page): Promise<void> {
       channelProps: new Map(),
       client: {
         isupport: { CHANTYPES: '#&' },
+        binaryHandlers: new Set(),
+        extraMessageHandlers: new Set(),
         publishWatchTogether: () => undefined,
       },
     });

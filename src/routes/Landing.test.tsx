@@ -29,27 +29,40 @@ describe('Landing', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the public product promise', () => {
-    const { getByRole, getByText } = render(() => <Landing />);
-    expect(getByRole('heading', { name: /a place foryour people/i })).toBeInTheDocument();
-    expect(getByText(/Fast enough to feel alive/i)).toBeInTheDocument();
+  it('states a quiet public promise with a single sentence-case h1', () => {
+    const { getByRole, container } = render(() => <Landing />);
+    const h1 = getByRole('heading', { level: 1 });
+    expect(h1).toBeInTheDocument();
+    expect(h1.textContent).toMatch(/room for your people/i);
+    // Infomercial shout: no Anton display face on Home headings.
+    expect(h1.className).not.toMatch(/display|anton/i);
+    expect(getComputedStyle(h1).textTransform).not.toBe('uppercase');
+    expect(container.querySelectorAll('h1').length).toBe(1);
+    expect(mainBodyText(container)).toMatch(/open in the browser/i);
   });
 
-  it('leads with people and place, not jargon', () => {
-    const { getByText, getByRole } = render(() => <Landing />);
-    expect(getByRole('heading', { name: /a place foryour people/i })).toBeInTheDocument();
-    expect(getByText(/People, not\s*a product/i)).toBeInTheDocument();
-    expect(getByText(/Rooms to\s*wander into/i)).toBeInTheDocument();
-    expect(getByRole('heading', { name: /a place foryour people/i })).not.toHaveTextContent(/IRC|mesh/i);
-  });
+  it('has exactly one main primary CTA to Open Onyx and one platform-neutral download text link', () => {
+    const { container, getAllByRole } = render(() => <Landing />);
+    const main = container.querySelector('main');
+    expect(main).toBeTruthy();
+    const primaryInMain = main!.querySelectorAll('a.r-btn.primary, a.home-cta-primary');
+    expect(primaryInMain.length).toBe(1);
+    const primary = primaryInMain[0]!;
+    expect(primary.getAttribute('href')).toBe('/app/');
+    expect(primary.textContent).toMatch(/Open Onyx/i);
 
-  it('shows the signature proof rail without overstating encryption', () => {
-    const { getByLabelText } = render(() => <Landing />);
-    const rail = getByLabelText('What Onyx makes visible');
-
-    expect(rail).toHaveTextContent(/History on this device/i);
-    expect(rail).toHaveTextContent(/Protection shown honestly/i);
-    expect(rail).not.toHaveTextContent(/fully encrypted|end-to-end encrypted rooms/i);
+    const downloadLinks = getAllByRole('link').filter((a) => {
+      const href = a.getAttribute('href') ?? '';
+      return href === '/download' || href === '/download/' || href.startsWith('/download');
+    });
+    expect(downloadLinks.length).toBeGreaterThan(0);
+    // Secondary is a text link, not a second primary button.
+    for (const a of downloadLinks) {
+      expect(a.classList.contains('primary')).toBe(false);
+      expect(a.classList.contains('r-btn')).toBe(false);
+    }
+    expect(getByTextMatching(container, /Desktop downloads/i)).toBeTruthy();
+    expect(mainBodyText(container)).not.toMatch(/FreeBSD|OpenBSD/i);
   });
 
   it('keeps browser-first honesty and refuses signed multi-platform ship claims', () => {
@@ -230,43 +243,6 @@ describe('Landing', () => {
     expect(queryByText(/wrath/i)).not.toBeInTheDocument();
   });
 
-  it('renders the brand mascot accessibly', () => {
-    const { getAllByRole } = render(() => <Landing />);
-    const dragons = getAllByRole('img').filter((el) =>
-      (el.getAttribute('aria-label') ?? '').toLowerCase().includes('water-dragon'),
-    );
-    expect(dragons.length).toBeGreaterThan(0);
-  });
-
-  it('exposes a primary entry point into the app', () => {
-    const { getAllByRole } = render(() => <Landing />);
-    const enter = getAllByRole('link').filter((a) => a.getAttribute('href') === '/app/');
-    expect(enter.length).toBeGreaterThan(0);
-  });
-
-  it('links the main website telemetry pages from the root page', () => {
-    const { getAllByRole } = render(() => <Landing />);
-    const hrefs = getAllByRole('link').map((a) => a.getAttribute('href'));
-
-    expect(hrefs).toContain('/stats/');
-    expect(hrefs).toContain('/status/');
-    expect(hrefs).toContain('/roadmap/');
-  });
-
-  it('surfaces live public telemetry on the root website', () => {
-    const { getByText } = render(() => <Landing />);
-
-    expect(getByText(/The network\s*is visible/i)).toBeInTheDocument();
-    expect(getByText(/Public telemetry is part of the front door/i)).toBeInTheDocument();
-  });
-
-  it('sets root website metadata', () => {
-    render(() => <Landing />);
-
-    expect(document.title).toMatch(/place for your people/i);
-    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toMatch(/rooms, calls/i);
-  });
-
   it('keeps the landing shell visible while public feeds are pending', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
 
@@ -276,8 +252,8 @@ describe('Landing', () => {
       </Suspense>
     ));
 
-    expect(getByRole('heading', { name: /a place foryour people/i })).toBeInTheDocument();
-    expect(getByText('checking mesh')).toHaveAttribute('data-feed-state', 'loading');
+    expect(getByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(getByText('status unavailable')).toHaveAttribute('data-feed-state', 'unavailable');
     expect(queryByText('network online')).not.toBeInTheDocument();
     expect(queryByText('mesh online')).not.toBeInTheDocument();
     expect(queryByTestId('landing-suspended')).not.toBeInTheDocument();

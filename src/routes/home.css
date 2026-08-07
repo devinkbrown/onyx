@@ -1050,6 +1050,113 @@
   }
 }
 
+/* Extreme text zoom and short landscape reflow: retain the product preview,
+   but prevent rem-scaled miniature chrome from widening the document. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .r-landing.home {
+    overflow-x: clip;
+  }
+
+  .r-landing.home .home-hero,
+  .r-landing.home .home-hero-grid,
+  .r-landing.home .home-hero-copy,
+  .r-landing.home .home-aperture,
+  .r-landing.home .home-aperture-shell,
+  .r-landing.home .home-aperture-body,
+  .r-landing.home .home-aperture-main,
+  .r-landing.home .home-aperture-stage,
+  .r-landing.home .home-aperture-chat,
+  .r-landing.home .home-aperture-spectrum,
+  .r-landing.home .home-telemetry,
+  .r-landing.home .home-capability,
+  .r-landing.home .home-current,
+  .r-landing.home .home-shelf,
+  .r-landing.home .home-footer {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .r-landing.home .home-hero-copy *,
+  .r-landing.home .home-aperture-shell *,
+  .r-landing.home .home-telemetry *,
+  .r-landing.home .home-current *,
+  .r-landing.home .home-shelf *,
+  .r-landing.home .home-footer * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .r-landing.home .home-kicker {
+    font-size: 12px;
+  }
+
+  .r-landing.home .home-h1 {
+    font-size: 56px;
+  }
+
+  .r-landing.home .home-lede,
+  .r-landing.home .home-desktop-note {
+    font-size: 18px;
+  }
+
+  .r-landing.home .home-cta-primary.r-btn.primary,
+  .r-landing.home .home-secondary-link {
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .r-landing.home .home-aperture-body,
+  .r-landing.home .home-aperture-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .r-landing.home .home-aperture-shell,
+  .r-landing.home .home-aperture-body,
+  .r-landing.home .home-aperture-main,
+  .r-landing.home .home-aperture-stage,
+  .r-landing.home .home-aperture-chat,
+  .r-landing.home .home-aperture-spectrum,
+  .r-landing.home .home-current,
+  .r-landing.home .home-current-beat {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .r-landing.home .home-aperture-rail {
+    display: none;
+  }
+
+  .r-landing.home .home-aperture-stage,
+  .r-landing.home .home-aperture-chat {
+    padding: 12px;
+    font-size: 12px;
+  }
+
+  .r-landing.home .home-aperture-label {
+    font-size: 16px;
+  }
+
+  .r-landing.home .home-aperture-spectrum {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .r-landing.home .home-spectrum-seg,
+  .r-landing.home .home-current-beat,
+  .r-landing.home .home-telemetry-item,
+  .r-landing.home .home-shelf-list a,
+  .r-landing.home .home-footer {
+    font-size: 14px;
+  }
+
+  .r-landing.home .home-visually-hidden {
+    overflow: hidden;
+    white-space: nowrap;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .r-landing.home .home-ground::before,
   .r-landing.home .home-ground::after,

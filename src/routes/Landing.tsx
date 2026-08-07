@@ -12,13 +12,17 @@ import {
 } from '@/lib/stats/status';
 import { setPageMeta } from './pageMeta';
 
-/** Onyx launch site — the human front door to the product.
- *  The transport and operator engine remain inspectable below the primary story;
- *  the first decision is whether Onyx helps a visitor and their people. */
+/**
+ * Onyx public homepage — mineral-night front door with a live-room aperture.
+ * Contract: docs/PUBLIC_COMPANY_SITE.md
+ * Proof order: browser entry → aperture preview → compact telemetry →
+ * capability current → operator shelf. One primary Open Onyx CTA.
+ * Native artifacts remain a secondary, platform-neutral link at /download/.
+ */
 export default function Landing() {
   setPageMeta(
-    'Onyx — a place for your people that you can trust',
-    'Onyx brings rooms, calls, useful catch-up, and honest protection state together in one communication product.',
+    'Onyx — a room for your people',
+    'Open Onyx in your browser for rooms, messages, calls, and continuity on your device. Use the same client across desktop and mobile, or choose a native download.',
     '/',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
@@ -34,9 +38,7 @@ export default function Landing() {
   const busiest = createMemo(() =>
     [...(stats.latest?.channels ?? [])].sort((a, b) => b.messages - a.messages)[0] ?? null,
   );
-  const feedState = createMemo(() =>
-    status.loading ? 'loading' as const : publicMeshFeedState(status.latest, nowMs()),
-  );
+  const feedState = createMemo(() => publicMeshFeedState(status.latest, nowMs()));
   const meshState = createMemo(() => {
     switch (feedState()) {
       case 'current': return 'operational';
@@ -54,8 +56,7 @@ export default function Landing() {
       <div class="r-ground home-ground" aria-hidden="true" />
       <div class="r-grain home-grain" aria-hidden="true" />
 
-      {/* ── top bar ── */}
-      <header class="r-status r-status--landing" role="banner">
+      <header class="r-status home-header" role="banner">
         <a class="brand" href="/" aria-label="Onyx home">
           <span class="brand-mark" aria-hidden="true">
             <Mascot variant="mark" />
@@ -63,9 +64,6 @@ export default function Landing() {
           <span class="brand-wordmark" aria-hidden="true">ONYX</span>
         </a>
         <nav aria-label="Primary">
-          <a class="hideable r-nav-detail" href="#product">Product</a>
-          <a class="hideable r-nav-detail" href="#trust">Trust</a>
-          <a class="hideable" href="/onyxos/">OnyxOS</a>
           <span class="live hideable" data-feed-state={feedState()}>
             <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
           </span>
@@ -73,51 +71,120 @@ export default function Landing() {
         </nav>
       </header>
 
-      {/* ── hero ── */}
-      <section class="r-wrap r-hero" aria-labelledby="hero-heading">
-        <div class="r-hero-grid">
-          <div class="r-hero-copy">
-            <p class="r-kicker">rooms · calls · catch-up · honest protection</p>
-            <h1 id="hero-heading">A place for<br /><span class="gold">your people</span></h1>
-            <p class="serif-sub">Fast enough to feel alive. Clear enough to trust.</p>
-            <p class="sub">
-              Onyx brings your conversations, calls, and everything you missed
-              into one calm home. It shows what is protected, keeps useful
-              history on your device, and never turns your relationships into
-              an advertising product.
+      <section class="r-wrap home-hero" aria-labelledby="hero-heading">
+        <div class="home-hero-grid">
+          <div class="home-hero-copy">
+            <p class="home-kicker">Public communication · powered by Onyx Server</p>
+            <h1 id="hero-heading" class="home-h1">A room for your people.</h1>
+            <p class="home-lede">
+              Talk, call, and keep continuity on your device — open in the browser now.
             </p>
-            <div class="r-cta">
-              <a class="r-btn primary" href="/app/">Open Onyx &rarr;</a>
-              <a class="r-btn ghost" href="#product">See how it works</a>
+            <div class="home-cta-row">
+              <a class="r-btn primary home-cta-primary" href="/app/">Open Onyx</a>
+              <a class="home-secondary-link" href="/download/">
+                Desktop downloads
+              </a>
             </div>
-            <div class="r-proof-rail" id="trust" aria-label="What Onyx makes visible">
-              <span><b>Conversation</b> ready</span>
-              <span><b>History</b> on this device</span>
-              <span><b>Protection</b> shown honestly</span>
-              <a href="/about/">Why you can trust it &rarr;</a>
+            <p class="home-desktop-note">
+              No install is required to begin. Use the same client on desktop or mobile;
+              supporting browsers can also install Onyx as a PWA.
+            </p>
+          </div>
+
+          <aside
+            class="home-aperture"
+            data-home-aperture
+            aria-labelledby="aperture-label"
+          >
+            <p class="home-aperture-label" id="aperture-label">
+              <span class="home-aperture-badge">Preview</span>
+              Not live content — a quiet picture of the room you open.
+            </p>
+            <div
+              class="home-aperture-shell"
+              role="img"
+              aria-label="Preview of an Onyx room with a call stage, chat, local continuity, and protection state — not live content"
+            >
+              <div class="home-aperture-chrome">
+                <span class="home-aperture-dots" aria-hidden="true"><i /><i /><i /></span>
+                <span class="home-aperture-title">#root · living room</span>
+                <span class="home-aperture-chip">Preview</span>
+              </div>
+
+              <div class="home-aperture-body">
+                {/* Miniature room rail — product silhouette, not a live list */}
+                <div class="home-aperture-rail" aria-hidden="true">
+                  <span class="home-aperture-rail-k">Rooms</span>
+                  <span class="home-aperture-rail-item is-active">
+                    <i class="mark mark-msg" />#root
+                  </span>
+                  <span class="home-aperture-rail-item">
+                    <i class="mark mark-call" />#stage
+                  </span>
+                  <span class="home-aperture-rail-item mute">
+                    <i class="mark mark-cont" />#ops
+                  </span>
+                </div>
+
+                <div class="home-aperture-main">
+                  <div class="home-aperture-stage">
+                    <div class="home-aperture-stage-meta">
+                      <span class="mark mark-call" aria-hidden="true" />
+                      <span>Call · share</span>
+                    </div>
+                    <div class="home-aperture-tiles" aria-hidden="true">
+                      <span class="home-aperture-tile is-you">you</span>
+                      <span class="home-aperture-tile">mira</span>
+                      <span class="home-aperture-tile is-idle">+</span>
+                    </div>
+                    <p class="home-aperture-stage-title">Voice when you need it</p>
+                    <p class="home-aperture-stage-sub">Camera optional · share when ready</p>
+                    <span class="home-aperture-protect">
+                      <span class="mark mark-protect" aria-hidden="true" />
+                      Protection shown, not assumed
+                    </span>
+                  </div>
+
+                  <div class="home-aperture-chat">
+                    <div class="home-aperture-line">
+                      <span class="who">mira</span>
+                      <span class="msg">Room is open — drop a message when you land.</span>
+                    </div>
+                    <div class="home-aperture-line">
+                      <span class="who mute">you</span>
+                      <span class="msg">History stays on this device.</span>
+                    </div>
+                    <div class="home-aperture-continuity" aria-hidden="true">
+                      <span class="mark mark-cont" />
+                      <span>Local continuity · resume when you return</span>
+                    </div>
+                    <div class="home-aperture-composer" aria-hidden="true">
+                      <span>Message #root</span>
+                      <span class="send">Send</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category-spectrum current under the miniature */}
+              <div class="home-aperture-spectrum" aria-hidden="true">
+                <span class="home-spectrum-seg is-msg">message</span>
+                <span class="home-spectrum-seg is-call">call</span>
+                <span class="home-spectrum-seg is-cont">continuity</span>
+                <span class="home-spectrum-seg is-protect">protection</span>
+              </div>
             </div>
           </aside>
         </div>
       </section>
 
-      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
-
-      {/* ── live pulse from public feeds ── */}
-      <section id="product" class="r-wrap r-section r-live" aria-labelledby="live-heading">
-        <div class="r-live-head">
-          <div>
-            <span class="r-eyebrow">live pulse</span>
-            <h2 class="r-title" id="live-heading">The network<br />is visible</h2>
-          </div>
-          <a class="r-live-link" href="/status/">Open status</a>
-        </div>
-        <p class="r-lede">
-          Public telemetry is part of the front door: room activity, mesh health,
-          and node state are readable before you join.
-        </p>
-        <div class="r-live-grid" aria-label="Live network summary">
-          <article class="r-live-tile">
-            <span class="k">mesh</span>
+      <section
+        class="r-wrap home-telemetry"
+        aria-label="Public network telemetry"
+      >
+        <div class="home-telemetry-strip" data-feed-state={feedState()}>
+          <span class="home-telemetry-item">
+            <span class="k">network</span>
             <strong data-state={meshState()}>{meshState()}</strong>
           </span>
           <span class="home-telemetry-sep" aria-hidden="true">·</span>
