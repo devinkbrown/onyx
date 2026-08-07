@@ -312,12 +312,53 @@ export interface DownloadCatalog {
   unavailable?: Array<{ lane: string; reason?: string }>;
 }
 
+export type DownloadAvailability = 'loading' | 'available' | 'unavailable' | 'unknown';
+
+export type DownloadCatalogLoadState = 'loading' | 'ready' | 'errored';
+
+/**
+ * Resolve the public availability of one lane without guessing from static
+ * filenames. Only an explicit catalog present bit (or unavailable entry) can
+ * establish availability; a missing/failed catalog remains unknown.
+ */
+export function downloadAvailability(
+  catalog: DownloadCatalog | undefined,
+  catalogState: DownloadCatalogLoadState,
+  lane: DownloadLane,
+): DownloadAvailability {
+  if (catalogState === 'loading') return 'loading';
+  if (catalogState === 'errored' || !catalog) return 'unknown';
+  if (!isActiveDownloadLane(lane)) return 'unavailable';
+
+  const lanes = Array.isArray(catalog.lanes) ? catalog.lanes : [];
+  const entry = lanes.find((candidate) => (
+    candidate != null
+    && typeof candidate === 'object'
+    && candidate.lane === lane
+  ));
+  if (entry?.present === true) return 'available';
+  if (entry?.present === false) return 'unavailable';
+  if (Array.isArray(catalog.unavailable) && catalog.unavailable.some((candidate) => (
+    candidate != null
+    && typeof candidate === 'object'
+    && candidate.lane === lane
+  ))) {
+    return 'unavailable';
+  }
+  return 'unknown';
+}
+
 export function checksumFromCatalog(
   catalog: DownloadCatalog | null | undefined,
   lane: DownloadLane,
 ): string | null {
   if (!isActiveDownloadLane(lane)) return null;
-  const entry = catalog?.lanes?.find((l) => l.lane === lane);
+  const lanes = Array.isArray(catalog?.lanes) ? catalog.lanes : [];
+  const entry = lanes.find((candidate) => (
+    candidate != null
+    && typeof candidate === 'object'
+    && candidate.lane === lane
+  ));
   if (!entry?.present) return null;
   const hash = entry.sha256;
   return typeof hash === 'string' && /^[0-9a-f]{64}$/i.test(hash) ? hash.toLowerCase() : null;

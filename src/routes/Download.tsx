@@ -11,21 +11,28 @@ import {
   DOWNLOAD_PRODUCT_VERSION,
   MACOS_COMING_SOON,
   checksumFromCatalog,
+  downloadAvailability,
   installSteps,
   parseSha256SumText,
   type DownloadCard,
   type DownloadCatalog,
+  type DownloadCatalogLoadState,
   type DownloadLane,
 } from './downloadMeta';
 
-async function loadCatalog(): Promise<DownloadCatalog | null> {
-  try {
-    const res = await fetch(DOWNLOAD_CATALOG_URL, { credentials: 'same-origin' });
-    if (!res.ok) return null;
-    return (await res.json()) as DownloadCatalog;
-  } catch {
-    return null;
+async function loadCatalog(): Promise<DownloadCatalog> {
+  const res = await fetch(DOWNLOAD_CATALOG_URL, { credentials: 'same-origin' });
+  if (!res.ok) throw new Error(`Download catalog request failed (${res.status})`);
+
+  const value: unknown = await res.json();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Download catalog has an invalid JSON shape');
   }
+  const catalog = value as DownloadCatalog;
+  if (catalog.lanes !== undefined && !Array.isArray(catalog.lanes)) {
+    throw new Error('Download catalog lanes are invalid');
+  }
+  return catalog;
 }
 
 async function loadSha256(url: string): Promise<string | null> {
@@ -82,19 +89,47 @@ function CopyButton(props: { label: string; value: string; testId: string }): JS
 
 function LaneCard(props: {
   card: DownloadCard;
-  catalog: DownloadCatalog | null | undefined;
+  catalog: () => DownloadCatalog | undefined;
+  catalogState: () => DownloadCatalogLoadState;
 }): JSX.Element {
+  const availability = () => downloadAvailability(
+    props.catalog(),
+    props.catalogState(),
+    props.card.lane,
+  );
   const [shaFromFile] = createResource(
-    () => props.card.sha256Url,
+    () => availability() === 'available' ? props.card.sha256Url : undefined,
     (url) => loadSha256(url),
   );
   const hash = () =>
-    shaFromFile() ?? checksumFromCatalog(props.catalog ?? null, props.card.lane) ?? null;
+    shaFromFile() ?? checksumFromCatalog(props.catalog() ?? null, props.card.lane) ?? null;
   const steps = () => installSteps(props.card.lane).join('\n');
+  const availabilityLabel = () => {
+    switch (availability()) {
+      case 'loading': return 'Checking availability';
+      case 'available': return 'Available';
+      case 'unavailable': return 'Unavailable';
+      case 'unknown': return 'Availability unknown';
+    }
+  };
 
   return (
-    <article class="dl-card data-card" data-testid={`dl-card-${props.card.lane}`}>
-      <span class="label">{props.card.osLabel}</span>
+    <article
+      class="dl-card data-card"
+      data-testid={`dl-card-${props.card.lane}`}
+      data-state={availability()}
+    >
+      <div class="dl-card-head">
+        <span class="label">{props.card.osLabel}</span>
+        <span
+          class="dl-status"
+          data-testid={`dl-status-${props.card.lane}`}
+          data-state={availability()}
+          role="status"
+        >
+          {availabilityLabel()}
+        </span>
+      </div>
       <h2>{props.card.title}</h2>
       <p>{props.card.summary}</p>
       <ul class="dl-facts">
@@ -129,45 +164,74 @@ function LaneCard(props: {
         </li>
       </ul>
       <div class="dl-actions">
-        <a
-          class="r-btn primary"
-          data-testid={`dl-download-${props.card.lane}`}
-          href={props.card.archiveUrl}
-          download={props.card.archiveName}
-        >
-          {archiveButtonLabel(props.card.archiveExt)}
-        </a>
-        <a class="r-btn ghost" href={props.card.noticeUrl}>
-          Honesty notice
-        </a>
-        <a class="r-btn ghost" href={props.card.sha256Url}>
-          SHA-256 file
-        </a>
-      </div>
-      <div class="dl-checksum" data-testid={`dl-checksum-${props.card.lane}`}>
-        <span class="dl-checksum-label">SHA-256</span>
         <Show
-          when={hash()}
+          when={availability() === 'available'}
           fallback={(
-            <p class="dl-checksum-missing">
-              Checksum appears when this artifact is staged under
-              {' '}
-              <code>/downloads/v{DOWNLOAD_PRODUCT_VERSION}/</code>
-              {' '}
-              (not committed to git).
+            <p class="dl-checksum-missing" role="status">
+              {availability() === 'loading'
+                ? 'Checking the staged catalog before showing download controls.'
+                : availability() === 'unavailable'
+                  ? 'This native artifact is not published for this lane. Archive, notice, and checksum links are withheld.'
+                  : 'Artifact availability could not be confirmed. Download controls are withheld until the catalog is available.'}
             </p>
           )}
         >
-          {(h) => (
-            <div class="dl-checksum-row">
-              <code class="dl-hash" data-testid={`dl-hash-${props.card.lane}`}>{h()}</code>
-              <CopyButton
-                label="Copy"
-                value={h()}
-                testId={`dl-copy-hash-${props.card.lane}`}
-              />
-            </div>
-          )}
+          <a
+            class="r-btn primary"
+            data-testid={`dl-download-${props.card.lane}`}
+            href={props.card.archiveUrl}
+            download={props.card.archiveName}
+          >
+            {archiveButtonLabel(props.card.archiveExt)}
+          </a>
+          <a
+            class="r-btn ghost"
+            data-testid={`dl-notice-${props.card.lane}`}
+            href={props.card.noticeUrl}
+          >
+            Honesty notice
+          </a>
+          <a
+            class="r-btn ghost"
+            data-testid={`dl-sha256-${props.card.lane}`}
+            href={props.card.sha256Url}
+          >
+            SHA-256 file
+          </a>
+        </Show>
+      </div>
+      <div class="dl-checksum" data-testid={`dl-checksum-${props.card.lane}`}>
+        <span class="dl-checksum-label">SHA-256</span>
+        <Show when={availability() === 'available'} fallback={(
+          <p class="dl-checksum-missing">
+            {availability() === 'loading'
+              ? 'Checksum will be checked after artifact availability is resolved.'
+              : availability() === 'unavailable'
+                ? 'No checksum is published because this artifact is unavailable.'
+                : 'Checksum is unavailable because artifact availability could not be confirmed.'}
+          </p>
+        )}>
+          <Show
+            when={hash()}
+            fallback={(
+              <p class="dl-checksum-missing">
+                {shaFromFile.state === 'pending' || shaFromFile.state === 'refreshing'
+                  ? 'Loading the published SHA-256 sidecar.'
+                  : 'The archive is published, but its SHA-256 sidecar is not currently available.'}
+              </p>
+            )}
+          >
+            {(h) => (
+              <div class="dl-checksum-row">
+                <code class="dl-hash" data-testid={`dl-hash-${props.card.lane}`}>{h()}</code>
+                <CopyButton
+                  label="Copy"
+                  value={h()}
+                  testId={`dl-copy-hash-${props.card.lane}`}
+                />
+              </div>
+            )}
+          </Show>
         </Show>
       </div>
       <div class="dl-install">
@@ -299,6 +363,12 @@ export default function Download(): JSX.Element {
   );
 
   const [catalog] = createResource(loadCatalog);
+  const catalogValue = () => catalog.state === 'ready' ? catalog() : undefined;
+  const catalogState = (): DownloadCatalogLoadState => {
+    if (catalog.state === 'errored') return 'errored';
+    if (catalog.state === 'ready') return 'ready';
+    return 'loading';
+  };
 
   return (
     <main class="r data-page dl-page" data-testid="download-page">
@@ -394,7 +464,9 @@ export default function Download(): JSX.Element {
 
       <section class="r-wrap r-section dl-grid" aria-label="Native download cards">
         <For each={[...DOWNLOAD_CARDS]}>
-          {(card) => <LaneCard card={card} catalog={catalog()} />}
+          {(card) => (
+            <LaneCard card={card} catalog={catalogValue} catalogState={catalogState} />
+          )}
         </For>
         <MacosComingSoonCard />
       </section>

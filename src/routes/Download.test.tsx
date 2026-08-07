@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, cleanup } from '@solidjs/testing-library';
+import { render, cleanup, waitFor } from '@solidjs/testing-library';
 import Download from './Download';
 import {
   BSD_DOWNLOAD_CARDS,
@@ -8,6 +8,7 @@ import {
   DOWNLOAD_PRODUCT_VERSION,
   MACOS_COMING_SOON,
   checksumFromCatalog,
+  downloadAvailability,
   installSteps,
   isActiveDownloadLane,
   isMacosDownloadLane,
@@ -106,6 +107,14 @@ describe('downloadMeta', () => {
         'macos-arm64',
       ),
     ).toBeNull();
+
+    expect(downloadAvailability(undefined, 'loading', 'freebsd')).toBe('loading');
+    expect(downloadAvailability(undefined, 'errored', 'freebsd')).toBe('unknown');
+    expect(downloadAvailability({ lanes: [{ lane: 'freebsd', present: false }] }, 'ready', 'freebsd'))
+      .toBe('unavailable');
+    expect(downloadAvailability({ lanes: [{ lane: 'freebsd', present: true }] }, 'ready', 'freebsd'))
+      .toBe('available');
+    expect(downloadAvailability({ lanes: [] }, 'ready', 'freebsd')).toBe('unknown');
   });
 });
 
@@ -130,7 +139,7 @@ describe('Download page', () => {
     expect(getByRole('heading', { name: /install on linux/i })).toBeInTheDocument();
   });
 
-  it('renders four active lanes plus combined macOS coming-soon (no fake DMG controls)', () => {
+  it('renders four active lanes and distinguishes an unavailable catalog from missing artifacts', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: false, status: 404, text: async () => '', json: async () => null })),
@@ -146,18 +155,13 @@ describe('Download page', () => {
     expect(getByTestId('dl-card-linux')).toBeInTheDocument();
     expect(getByTestId('dl-card-freebsd')).toBeInTheDocument();
     expect(getByTestId('dl-card-openbsd')).toBeInTheDocument();
-    expect(getByTestId('dl-download-windows').getAttribute('href')).toBe(
-      '/downloads/v0.1.3/onyx-0.1.3-windows-x86_64-ReleaseFast-unsigned.zip',
-    );
-    expect(getByTestId('dl-download-linux').getAttribute('href')).toBe(
-      '/downloads/v0.1.3/onyx-0.1.3-linux-x86_64-ReleaseFast-unsigned.tar.gz',
-    );
-    expect(getByTestId('dl-download-freebsd').getAttribute('href')).toBe(
-      '/downloads/v0.1.3/onyx-0.1.3-freebsd-x86_64-ReleaseFast-unsigned.tar.gz',
-    );
-    expect(getByTestId('dl-download-openbsd').getAttribute('href')).toBe(
-      '/downloads/v0.1.3/onyx-0.1.3-openbsd-x86_64-ReleaseFast-unsigned.tar.gz',
-    );
+    await waitFor(() => {
+      expect(getByTestId('dl-status-windows')).toHaveAttribute('data-state', 'unknown');
+    });
+    expect(queryByTestId('dl-download-windows')).not.toBeInTheDocument();
+    expect(queryByTestId('dl-notice-windows')).not.toBeInTheDocument();
+    expect(queryByTestId('dl-sha256-windows')).not.toBeInTheDocument();
+    expect(getByTestId('dl-card-windows').textContent).toMatch(/could not be confirmed/i);
     expect(getByTestId('dl-card-freebsd').textContent).toMatch(/gtk4/);
     expect(getByTestId('dl-card-openbsd').textContent).toMatch(/webkitgtk60/);
     expect(getByTestId('dl-card-windows').textContent).toMatch(/WebView2/i);
@@ -191,6 +195,29 @@ describe('Download page', () => {
     expect(queryByText(/signed installer available/i)).not.toBeInTheDocument();
     expect(queryByText(/codesigned and ready/i)).not.toBeInTheDocument();
     expect(document.title).toMatch(/Download Onyx/i);
+  });
+
+  it('withholds every artifact control when the catalog authoritatively marks a lane missing', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes('catalog.json')) {
+          return {
+            ok: true,
+            json: async () => ({ lanes: [{ lane: 'freebsd', present: false }] }),
+          };
+        }
+        return { ok: false, status: 404, text: async () => '' };
+      }),
+    );
+
+    const { findByTestId, queryByTestId } = render(() => <Download />);
+    const status = await findByTestId('dl-status-freebsd');
+    await waitFor(() => expect(status).toHaveAttribute('data-state', 'unavailable'));
+    expect(queryByTestId('dl-download-freebsd')).not.toBeInTheDocument();
+    expect(queryByTestId('dl-notice-freebsd')).not.toBeInTheDocument();
+    expect(queryByTestId('dl-sha256-freebsd')).not.toBeInTheDocument();
+    expect(status.parentElement?.parentElement?.textContent).toMatch(/not published/i);
   });
 
   it('shows checksum when sha256 sidecar fetch succeeds and supports copy', async () => {
@@ -230,6 +257,9 @@ describe('Download page', () => {
     const { findByTestId, getByTestId } = render(() => <Download />);
     const hashEl = await findByTestId('dl-hash-freebsd');
     expect(hashEl.textContent).toBe(hash);
+    expect(getByTestId('dl-download-freebsd').getAttribute('href')).toBe(
+      '/downloads/v0.1.3/onyx-0.1.3-freebsd-x86_64-ReleaseFast-unsigned.tar.gz',
+    );
     getByTestId('dl-copy-hash-freebsd').click();
     expect(writeText).toHaveBeenCalledWith(hash);
   });
