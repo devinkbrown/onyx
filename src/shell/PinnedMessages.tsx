@@ -66,8 +66,9 @@ export function PinnedMessages(): JSX.Element {
       // Reuse the landing highlight machinery (feed scrolls + pulses).
       getState().focusMessage(pin.id);
     } else {
-      // Not loaded — pull older history so the pin can resolve on a re-open.
-      getState().requestHistory(ch, 50);
+      // Not loaded — ask the server for the exact pin and focus it only after
+      // the authoritative CHATHISTORY batch has merged.
+      if (!getState().requestPinnedMessage(ch, pin.id)) return;
     }
     getState().closePinnedMessages();
   }
@@ -116,7 +117,7 @@ export function PinnedMessages(): JSX.Element {
                       when={pin.msg}
                       fallback={
                         <span class="pins-item-body pins-item-body--missing">
-                          Pinned message — scroll up to load, then reopen.
+                          Pinned message — load it from history to jump there.
                         </span>
                       }
                     >

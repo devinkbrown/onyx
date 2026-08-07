@@ -1345,6 +1345,8 @@ export interface OnyxState {
   // pinned messages panel (pins are stored in the IRCX PINS channel prop)
   openPinnedMessages(): void;
   closePinnedMessages(): void;
+  /** Fetch one missing pin by msgid and focus it after its history batch closes. */
+  requestPinnedMessage(channel: string, messageId: string): boolean;
 
   // jump-to-date sheet (reuses travelTo; discoverable when scrubber is off)
   openJumpToDate(): void;
@@ -2981,6 +2983,7 @@ export function _resetBatchCollectorsForTests(): void {
   _resetHistoryTargetDiscovery(true);
   _resetServerSearchTransport();
   _pendingLabeledSends.clear();
+  _pendingPinnedMessages.clear();
 }
 
 function _registerPendingLabeledSend(set: SetFn, entry: PendingLabeledSend): void {
@@ -3190,6 +3193,9 @@ function _resolveLabeledChatEcho(
  * scrolls to it and pulses). One-shot; cleared on connect/disconnect resets.
  */
 let _pendingTravel: { key: string; at: Date; preferredMessageId?: string } | null = null;
+
+/** Channel key → exact msgid requested by the pins drawer. */
+const _pendingPinnedMessages = new Map<string, string>();
 
 /** Collected WEBAUTHN AUTH-CHALLENGE + ALLOW-CRED lines; the get ceremony runs
  * once the allow-list has settled (a short debounce after the challenge). */
@@ -5646,6 +5652,7 @@ export const store = createStore<OnyxState>()(
       _clearTempBanTimers();
       _resetServerSearchTransport();
       _pendingTravel = null;
+      _pendingPinnedMessages.clear();
       _clearPendingDeepLinkTopicResolution();
       _namesBursts.clear();
       _lastRosterRefresh.clear();
@@ -5797,6 +5804,7 @@ export const store = createStore<OnyxState>()(
           _clearAccessListTransport();
           _typingLastSent.clear();
           _pendingTravel = null;
+          _pendingPinnedMessages.clear();
           _resetServerSearchTransport();
           set(s => ({
             status: 'disconnected',
@@ -6025,6 +6033,7 @@ export const store = createStore<OnyxState>()(
       const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
       _resetServerSearchTransport();
       _pendingTravel = null;
+      _pendingPinnedMessages.clear();
       _clearPendingDeepLinkTopicResolution();
       _stopRosterPoll();
       _stopScheduledDispatch();
@@ -8453,6 +8462,50 @@ export const store = createStore<OnyxState>()(
       set({ showPinnedMessages: false });
     },
 
+    requestPinnedMessage(channel, messageId) {
+      const target = channel.trim();
+      const pinId = messageId.trim();
+      const key = target.toLowerCase();
+      const { client, historyLoading, channels } = get();
+      const chanTypes = client?.isupport?.CHANTYPES ?? '#&';
+      const validChannel = Boolean(
+        target
+        && target === channel
+        && _validInboundWireToken(target, MAX_VAULT_TARGET_LENGTH)
+        && !target.startsWith(':')
+        && !target.includes(',')
+        && chanTypes.includes(target[0] ?? '')
+        && channels.has(key),
+      );
+      if (
+        !validChannel
+        || !pinId
+        || pinId !== messageId
+        || !_validInboundWireToken(pinId, MAX_VAULT_MESSAGE_ID_LENGTH)
+        || !client
+        || !hasChatHistoryCap(client)
+        || historyLoading.get(key)
+        || _openChathistoryByTarget.has(key)
+        || _pendingTravel?.key === key
+        || _pendingPinnedMessages.has(key)
+        || _batchCollectors.size >= OPEN_BATCH_COLLECTOR_MAX
+      ) return false;
+
+      _pendingPinnedMessages.set(key, pinId);
+      get().setHistoryLoading(target, true);
+      let admitted: boolean;
+      try {
+        admitted = client.sendRaw('CHATHISTORY', 'AROUND', target, `msgid=${pinId}`, String(HISTORY_PAGE_SIZE));
+      } catch {
+        admitted = false;
+      }
+      if (admitted) return true;
+
+      _pendingPinnedMessages.delete(key);
+      get().setHistoryLoading(target, false);
+      return false;
+    },
+
     openJumpToDate() {
       set({ showJumpToDate: true });
     },
@@ -9724,6 +9777,13 @@ export const store = createStore<OnyxState>()(
         if (standard.kind === 'FAIL' && standard.command === 'CHATHISTORY') {
           const channelTarget = standard.context.find((p) => isChan(p));
           if (channelTarget) {
+            const pinnedKey = channelTarget.toLowerCase();
+            if (_pendingPinnedMessages.delete(pinnedKey)) {
+              // A failed AROUND pin lookup is not evidence that the channel's
+              // oldest history was reached, so leave historyExhausted alone.
+              get().setHistoryLoading(channelTarget, false);
+              return;
+            }
             get().setHistoryLoading(channelTarget, false);
             get().setHistoryExhausted(channelTarget);
           } else {
@@ -12850,6 +12910,8 @@ export const store = createStore<OnyxState>()(
               }
               const batchKey = batchTarget.toLowerCase();
               const isTravelBatch = _pendingTravel !== null && _pendingTravel.key === batchKey;
+              const pinnedMessageId = _pendingPinnedMessages.get(batchKey);
+              const isPinnedBatch = pinnedMessageId !== undefined;
 
               if (batchMsgs.length > 0) {
                 set(s => {
@@ -12967,7 +13029,7 @@ export const store = createStore<OnyxState>()(
                 const historyLoading = new Map(s.historyLoading);
                 historyLoading.set(batchKey, false);
                 const historyExhausted = new Map(s.historyExhausted);
-                if (batchMsgs.length < 50 && !isTravelBatch) {
+                if (batchMsgs.length < 50 && !isTravelBatch && !isPinnedBatch) {
                   historyExhausted.set(batchKey, true);
                 }
                 return { historyLoading, historyExhausted };
@@ -13020,6 +13082,19 @@ export const store = createStore<OnyxState>()(
                   ? preferredMessageId
                   : nearestMessageId(buf, at);
                 if (landing) set({ timeTravelLandingId: landing });
+              }
+
+              // A pin request is exact, unlike timestamp travel: only focus the
+              // requested id when the complete authoritative batch returned it.
+              if (isPinnedBatch) {
+                _pendingPinnedMessages.delete(batchKey);
+                if (batchMsgs.some((message) => message.id === pinnedMessageId)) {
+                  const st = get();
+                  const buf = st.channels.get(batchKey)?.messages ?? [];
+                  if (buf.some((message) => message.id === pinnedMessageId)) {
+                    set({ timeTravelLandingId: pinnedMessageId });
+                  }
+                }
               }
             }
           }

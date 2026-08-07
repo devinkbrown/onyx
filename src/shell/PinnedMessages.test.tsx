@@ -81,4 +81,19 @@ describe('PinnedMessages accessibility', () => {
 
     expect(unpin).toHaveBeenCalledWith('#room', 'm1');
   });
+
+  it('requests an unloaded pin by its exact msgid and keeps the drawer open when admission fails', () => {
+    seedPins();
+    store.setState({
+      channels: new Map([['#room', channel([message('m1', 'alice', 'Keep this near the top.')])]]),
+      channelProps: new Map([['#room', { PINS: 'm1,missing-1' }]]),
+    });
+    const request = vi.spyOn(store.getState(), 'requestPinnedMessage').mockReturnValue(false);
+    render(() => <PinnedMessages />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load pinned message missing-1' }));
+
+    expect(request).toHaveBeenCalledWith('#room', 'missing-1');
+    expect(store.getState().showPinnedMessages).toBe(true);
+  });
 });
