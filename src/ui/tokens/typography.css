@@ -1,0 +1,199 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Onyx UI · typography layer
+
+   Three voices, each with one job. The discipline is in the RESTRAINT: a
+   surface that uses all three at once is usually a surface with no hierarchy.
+
+     display    Fraunces          Restrained. Page title, a single hero lede,
+                                  an empty-state line. Not for section headers,
+                                  never for UI chrome, never below ~20px.
+     interface  Instrument Sans   Body copy, labels, controls, everything the
+                                  user reads to operate the product.
+     evidence   JetBrains Mono    Evidence ONLY — verbatim protocol text, IDs,
+                                  hashes, timestamps, key fingerprints, counts
+                                  the user may need to compare character by
+                                  character. Mono is a claim that the glyphs
+                                  matter exactly as written; using it for
+                                  decoration devalues that claim everywhere
+                                  else in the app.
+
+   Aliases the existing theme font stacks (--font-serif / --font-sans /
+   --font-mono) so a theme that reassigns a family is respected. Note the
+   deliberate mapping: Onyx's `--font-display` is Instrument Sans, while THIS
+   system's display voice is Fraunces — so `--ui-font-display` rides
+   `--font-serif`, which is where Fraunces actually lives.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Families ──────────────────────────────────────────────────────────── */
+  --ui-font-display: var(
+    --font-serif,
+    'Fraunces Variable',
+    'Fraunces',
+    'Iowan Old Style',
+    Georgia,
+    'Times New Roman',
+    serif
+  );
+  --ui-font-interface: var(
+    --font-sans,
+    'Instrument Sans Variable',
+    'Instrument Sans',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif
+  );
+  --ui-font-body: var(--ui-font-interface);
+  --ui-font-evidence: var(
+    --font-mono,
+    'JetBrains Mono Variable',
+    'JetBrains Mono',
+    ui-monospace,
+    'SFMono-Regular',
+    Menlo,
+    Consolas,
+    monospace
+  );
+
+  /* ── Interface scale ───────────────────────────────────────────────────────
+     Aliases the shared reading ladder in src/styles/tokens.css.
+
+     Namespaced `--ui-type-*`, NOT `--ui-text-*`: the `--ui-text-` family is
+     text COLOUR (semantic.css). Letting size and colour share a prefix would
+     put `--ui-text-md` one keystroke from `--ui-text-muted`, which is the kind
+     of ambiguity that produces a wrong-but-plausible autocomplete. */
+  --ui-type-2xs: var(--text-2xs, 0.625rem);
+  --ui-type-xs: var(--text-xs, 0.6875rem);
+  --ui-type-sm: var(--text-sm, 0.8125rem);
+  --ui-type-md: var(--text-md, 0.9375rem);
+  --ui-type-lg: var(--text-lg, 1.0625rem);
+  --ui-type-xl: var(--text-xl, 1.25rem);
+  --ui-type-2xl: var(--text-2xl, 1.5rem);
+
+  /* ── Display scale ─────────────────────────────────────────────────────────
+     Fluid, and deliberately short: three steps. There is no fourth, because a
+     surface needing four display sizes is a surface needing an edit. */
+  --ui-display-sm: clamp(1.375rem, 1.2rem + 0.9vw, 1.75rem);
+  --ui-display-md: clamp(1.75rem, 1.4rem + 1.8vw, 2.5rem);
+  --ui-display-lg: clamp(2.25rem, 1.6rem + 3.2vw, 3.5rem);
+
+  /* ── Weight ────────────────────────────────────────────────────────────────
+     Fraunces is a variable face; the display voice stays under 600 so it reads
+     as considered rather than shouted. */
+  --ui-weight-regular: 400;
+  --ui-weight-medium: 500;
+  --ui-weight-semibold: 600;
+  --ui-weight-display: 500;
+
+  /* ── Leading ───────────────────────────────────────────────────────────── */
+  --ui-leading-tight: var(--leading-tight, 1.15);
+  --ui-leading-snug: var(--leading-snug, 1.35);
+  --ui-leading-body: var(--leading-body, 1.55);
+  --ui-leading-evidence: 1.5;
+
+  /* ── Tracking ──────────────────────────────────────────────────────────── */
+  --ui-tracking-kicker: var(--tracking-kicker, 0.12em);
+  --ui-tracking-title: var(--tracking-title, -0.02em);
+  --ui-tracking-normal: 0;
+  --ui-tracking-evidence: 0.01em;
+}
+
+/* ── Role classes ────────────────────────────────────────────────────────────
+   Scoped under `.ui-root` so adopting the token layer never restyles a surface
+   that did not opt in. Each class is one complete typographic decision —
+   family, size, leading, tracking, weight — so a consumer never assembles a
+   voice from loose tokens and drifts. */
+
+.ui-root .ui-display {
+  margin: 0;
+  font-family: var(--ui-font-display);
+  font-size: var(--ui-display-md);
+  font-weight: var(--ui-weight-display);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-title);
+  color: var(--ui-text-primary);
+  text-wrap: balance;
+}
+
+.ui-root .ui-display--lg {
+  font-size: var(--ui-display-lg);
+}
+
+.ui-root .ui-display--sm {
+  font-size: var(--ui-display-sm);
+}
+
+.ui-root .ui-lede {
+  margin: 0;
+  max-width: var(--ui-measure-prose);
+  font-family: var(--ui-font-interface);
+  font-size: var(--ui-type-lg);
+  font-weight: var(--ui-weight-regular);
+  line-height: var(--ui-leading-snug);
+  color: var(--ui-text-secondary);
+  text-wrap: pretty;
+}
+
+.ui-root .ui-heading {
+  margin: 0;
+  font-family: var(--ui-font-interface);
+  font-size: var(--ui-type-xl);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-snug);
+  letter-spacing: var(--ui-tracking-title);
+  color: var(--ui-text-primary);
+}
+
+.ui-root .ui-subheading {
+  margin: 0;
+  font-family: var(--ui-font-interface);
+  font-size: var(--ui-type-md);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-snug);
+  color: var(--ui-text-primary);
+}
+
+.ui-root .ui-body {
+  margin: 0;
+  max-width: var(--ui-measure-prose);
+  font-family: var(--ui-font-body);
+  font-size: var(--ui-type-md);
+  font-weight: var(--ui-weight-regular);
+  line-height: var(--ui-leading-body);
+  color: var(--ui-text-secondary);
+  text-wrap: pretty;
+}
+
+.ui-root .ui-label {
+  font-family: var(--ui-font-interface);
+  font-size: var(--ui-type-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-snug);
+  color: var(--ui-text-primary);
+}
+
+.ui-root .ui-kicker {
+  font-family: var(--ui-font-evidence);
+  font-size: var(--ui-type-xs);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-snug);
+  letter-spacing: var(--ui-tracking-kicker);
+  text-transform: uppercase;
+  color: var(--ui-text-muted);
+}
+
+/* Evidence — verbatim, comparable, never decorative. */
+.ui-root .ui-evidence {
+  font-family: var(--ui-font-evidence);
+  font-size: var(--ui-type-sm);
+  font-weight: var(--ui-weight-regular);
+  line-height: var(--ui-leading-evidence);
+  letter-spacing: var(--ui-tracking-evidence);
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-secondary);
+  overflow-wrap: anywhere;
+}

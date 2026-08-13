@@ -100,6 +100,67 @@ async function withPublic(kp: CryptoKeyPair): Promise<DeviceSigningKeys> {
   return { keyPair: kp, publicRaw: raw, publicHex: toHex(raw) };
 }
 
+type StoredSigningRead =
+  | { kind: 'absent' }
+  | { kind: 'pair'; keyPair: CryptoKeyPair }
+  | { kind: 'invalid' };
+
+/** Stored CryptoKeys are untrusted structured-clone input.  In particular a
+ * corrupt row must not look like absence and trigger silent identity rotation. */
+async function validateStoredSigningPair(value: unknown): Promise<CryptoKeyPair | null> {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<CryptoKeyPair>;
+  const privateKey = candidate.privateKey; const publicKey = candidate.publicKey;
+  if (!(privateKey instanceof CryptoKey) || !(publicKey instanceof CryptoKey)) return null;
+  if (privateKey.type !== 'private' || publicKey.type !== 'public' || privateKey.extractable) return null;
+  if (privateKey.algorithm.name !== 'Ed25519' || publicKey.algorithm.name !== 'Ed25519') return null;
+  if (!privateKey.usages.includes('sign') || !publicKey.usages.includes('verify')) return null;
+  try {
+    const raw = new Uint8Array(await crypto.subtle.exportKey('raw', publicKey));
+    if (raw.byteLength !== ED25519_PUBLIC_KEY_BYTES) return null;
+    let nonzero = 0; for (const byte of raw) nonzero |= byte;
+    if (nonzero === 0) return null;
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const signature = await crypto.subtle.sign('Ed25519', privateKey, challenge as BufferSource);
+    if (!(await crypto.subtle.verify('Ed25519', publicKey, signature, challenge as BufferSource))) return null;
+    return { privateKey, publicKey };
+  } catch { return null; }
+}
+
+function readStoredSigningPair(): Promise<StoredSigningRead> {
+  return new Promise((resolve) => {
+    void openKeysDb().then((db) => {
+      if (!db) { resolve({ kind: 'invalid' }); return; }
+      try {
+        const tx = db.transaction(STORE, 'readonly'); const get = tx.objectStore(STORE).get(KEY_ID);
+        tx.oncomplete = () => {
+          const value = get.result;
+          db.close();
+          if (value === undefined) { resolve({ kind: 'absent' }); return; }
+          void validateStoredSigningPair(value).then((keyPair) => resolve(keyPair ? { kind: 'pair', keyPair } : { kind: 'invalid' }));
+        };
+        tx.onerror = tx.onabort = () => { db.close(); resolve({ kind: 'invalid' }); };
+      } catch { db.close(); resolve({ kind: 'invalid' }); }
+    }).catch(() => resolve({ kind: 'invalid' }));
+  });
+}
+
+function persistSigningPair(kp: CryptoKeyPair): Promise<boolean> {
+  return new Promise((resolve) => {
+    void openKeysDb().then((db) => {
+      if (!db) { resolve(false); return; }
+      let settled = false;
+      const finish = (ok: boolean) => { if (!settled) { settled = true; db.close(); resolve(ok); } };
+      try {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(kp, KEY_ID);
+        tx.oncomplete = () => finish(true);
+        tx.onerror = tx.onabort = () => finish(false);
+      } catch { finish(false); }
+    }).catch(() => resolve(false));
+  });
+}
+
 /**
  * The device signing key pair, created on first use and persisted as
  * structured-clone CryptoKeys (private key non-extractable — it never exists
@@ -110,36 +171,27 @@ export function deviceSigningKeys(): Promise<DeviceSigningKeys | null> {
   if (_signingPromise) return _signingPromise;
   _signingPromise = (async () => {
     try {
-      const db = await openKeysDb();
-      if (!db) return null;
-
-      const existing = await new Promise<CryptoKeyPair | null>((resolve) => {
-        const tx = db.transaction(STORE, 'readonly');
-        const get = tx.objectStore(STORE).get(KEY_ID);
-        get.onsuccess = () => resolve((get.result as CryptoKeyPair | undefined) ?? null);
-        get.onerror = () => resolve(null);
-      });
-      if (existing?.privateKey && existing.publicKey) {
-        return await withPublic(existing);
-      }
+      const existing = await readStoredSigningPair();
+      if (existing.kind === 'pair') return await withPublic(existing.keyPair);
+      if (existing.kind === 'invalid') return null;
 
       const kp = (await crypto.subtle.generateKey(
         'Ed25519',
         false, // private key never leaves WebCrypto
         ['sign', 'verify'],
       )) as CryptoKeyPair;
-      await new Promise<void>((resolve) => {
-        const tx = db.transaction(STORE, 'readwrite');
-        tx.objectStore(STORE).put(kp, KEY_ID);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
-      });
+      const persisted = await persistSigningPair(kp);
+      if (!persisted) return null;
       return await withPublic(kp);
     } catch {
       return null;
     }
   })();
-  return _signingPromise;
+  const pending = _signingPromise;
+  void pending.then((keys) => {
+    if (keys === null && _signingPromise === pending) _signingPromise = null;
+  });
+  return pending;
 }
 
 /** Test hook — drop the cached signing promise (a fresh IDBFactory follows). */

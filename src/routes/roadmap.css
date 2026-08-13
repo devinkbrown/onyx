@@ -1,5 +1,12 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
 .roadmap-page {
   min-height: 100svh;
+  overflow: clip;
+}
+
+.roadmap-page .r-wrap {
+  position: relative;
+  z-index: 1;
 }
 
 .roadmap-hero h1 {
@@ -79,6 +86,10 @@
   background: var(--lapis-bright);
 }
 
+.roadmap-card[data-state='next']::before {
+  background: var(--gold-bright, var(--paper));
+}
+
 .roadmap-card-head {
   display: flex;
   align-items: center;
@@ -146,5 +157,61 @@
 
   .roadmap-card-head {
     margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .roadmap-page .roadmap-legend,
+  .roadmap-page .roadmap-grid,
+  .roadmap-page .roadmap-card,
+  .roadmap-page .roadmap-principle,
+  .roadmap-page .roadmap-principle > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .roadmap-page .roadmap-card-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .roadmap-page .roadmap-card h2,
+  .roadmap-page .roadmap-card p,
+  .roadmap-page .roadmap-principle h2,
+  .roadmap-page .roadmap-principle p {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (forced-colors: active) {
+  .roadmap-legend span,
+  .roadmap-state,
+  .roadmap-card::before {
+    border-color: CanvasText;
+    color: CanvasText;
+    background: Canvas;
+    forced-color-adjust: none;
+  }
+
+  .roadmap-legend span[data-state='active'],
+  .roadmap-card[data-state='active'] .roadmap-state,
+  .roadmap-card[data-state='active']::before {
+    border-color: Highlight;
+    color: HighlightText;
+    background: Highlight;
+  }
+
+  .roadmap-legend span[data-state='next'],
+  .roadmap-card[data-state='next'] .roadmap-state,
+  .roadmap-card[data-state='next']::before {
+    border-color: LinkText;
+    color: LinkText;
+  }
+
+  .roadmap-legend span[data-state='gated'],
+  .roadmap-card[data-state='gated'] .roadmap-state,
+  .roadmap-card[data-state='gated']::before {
+    border-color: GrayText;
+    color: GrayText;
   }
 }

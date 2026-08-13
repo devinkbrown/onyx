@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './data-pages.css';
+import './download.css';
 import { For, Show, createResource, createSignal, type JSX } from 'solid-js';
-import { Mascot } from '@/components/brand/Mascot';
-import { PublicFooter } from './PublicFooter';
+import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
 import {
   DOWNLOAD_CARDS,
@@ -64,6 +64,7 @@ function CopyButton(props: { label: string; value: string; testId: string }): JS
       class="dl-copy"
       data-testid={props.testId}
       data-state={state()}
+      aria-live="polite"
       onClick={async () => {
         try {
           if (!navigator.clipboard?.writeText) {
@@ -130,7 +131,7 @@ function LaneCard(props: {
           {availabilityLabel()}
         </span>
       </div>
-      <h2>{props.card.title}</h2>
+      <h3>{props.card.title}</h3>
       <p>{props.card.summary}</p>
       <ul class="dl-facts">
         <li>
@@ -235,11 +236,11 @@ function LaneCard(props: {
         </Show>
       </div>
       <div class="dl-install">
-        <h3>
+        <h4>
           {props.card.hasInstallScript
             ? `Install on ${props.card.osLabel}`
             : `Use on ${props.card.osLabel}`}
-        </h3>
+        </h4>
         <pre class="dl-pre" data-testid={`dl-install-${props.card.lane}`}>{steps()}</pre>
         <CopyButton
           label={props.card.hasInstallScript ? 'Copy install steps' : 'Copy steps'}
@@ -298,7 +299,7 @@ function MacosComingSoonCard(): JSX.Element {
         <span class="label">{mac.osLabel}</span>
         <span class="dl-status" data-testid="dl-macos-status">{mac.statusLabel}</span>
       </div>
-      <h2>{mac.title}</h2>
+      <h3>{mac.title}</h3>
       <p>{mac.summary}</p>
       <ul class="dl-facts">
         <li>
@@ -317,16 +318,16 @@ function MacosComingSoonCard(): JSX.Element {
           No public DMG, SHA-256 sidecar, or honesty notice is linked until genuine Darwin builds ship.
         </li>
       </ul>
-      <div class="dl-soon-arches" data-testid="dl-macos-arches" aria-label="Planned macOS architectures">
+      <ul class="dl-soon-arches" data-testid="dl-macos-arches" aria-label="Planned macOS architectures">
         <For each={[...mac.arches]}>
           {(arch) => (
-            <div class="dl-soon-arch" data-testid={`dl-macos-arch-${arch.arch}`}>
+            <li class="dl-soon-arch" data-testid={`dl-macos-arch-${arch.arch}`}>
               <strong>{arch.label}</strong>
               <span>{arch.note}</span>
-            </div>
+            </li>
           )}
         </For>
-      </div>
+      </ul>
       <div class="dl-actions">
         <a
           class="r-btn primary"
@@ -371,127 +372,121 @@ export default function Download(): JSX.Element {
   };
 
   return (
-    <main class="r data-page dl-page" data-testid="download-page">
-      <div class="r-ground" aria-hidden="true" />
-      <div class="r-flecks" aria-hidden="true" />
-      <header class="r-status" role="banner">
-        <a class="brand" href="/" aria-label="Onyx home">
-          <span class="brand-mark" aria-hidden="true">
-            <Mascot variant="mark" />
-          </span>
-          <span class="brand-wordmark" aria-hidden="true">ONYX</span>
-        </a>
-        <nav aria-label="Primary">
-          <a href="/">Home</a>
-          <a href="/download/" aria-current="page">Download</a>
-          <a href="/roadmap/">Roadmap</a>
-          <a class="enter" href="/app/">Open Onyx</a>
-        </nav>
-      </header>
+    <PublicFrame currentPath="/download/" mainLabel="Onyx downloads">
+      <div class="ui-root r data-page dl-page" data-testid="download-page">
+        <div class="r-ground" aria-hidden="true" />
+        <div class="r-flecks" aria-hidden="true" />
+        <div class="r-grain" aria-hidden="true" />
 
-      <section class="r-wrap data-hero" aria-labelledby="download-heading">
-        <p class="r-kicker">
-          {installGuide ? 'Install guide' : `v${DOWNLOAD_PRODUCT_VERSION} · unsigned native packages`}
-        </p>
-        <h1 id="download-heading">
-          {installGuide ? 'Install Onyx' : 'Windows, Linux, FreeBSD & OpenBSD'}
-        </h1>
-        <p class="sub">
-          Operator packages now: Windows zip, Linux tar.gz, and FreeBSD/OpenBSD hosts with
-          {' '}
-          <code>install.sh</code>
-          . Every published artifact is
-          {' '}
-          <strong>unsigned</strong>
-          , carries a SHA-256 sidecar and honesty notice, and is site-local under
-          {' '}
-          <code>/downloads/v{DOWNLOAD_PRODUCT_VERSION}/</code>
-          .
-          {' '}
-          <strong>macOS</strong>
-          {' '}
-          Intel and Apple Silicon native packages are
-          {' '}
-          <strong>coming soon</strong>
-          {' '}
-          (built on real Macs only — never fabricated here). Until then, use the browser or PWA.
-        </p>
-      </section>
+        <section class="r-wrap data-hero dl-hero" aria-labelledby="download-heading">
+          <p class="r-kicker">
+            {installGuide ? 'Install guide' : `v${DOWNLOAD_PRODUCT_VERSION} · unsigned native packages`}
+          </p>
+          <h1 id="download-heading">
+            {installGuide
+              ? 'Install Onyx'
+              : <>Windows, Linux, <br /><span class="gold">FreeBSD & OpenBSD</span></>}
+          </h1>
+          <p class="sub">
+            Operator packages now: Windows zip, Linux tar.gz, and FreeBSD/OpenBSD hosts with
+            {' '}
+            <code>install.sh</code>
+            . Every published artifact is
+            {' '}
+            <strong>unsigned</strong>
+            , carries a SHA-256 sidecar and honesty notice, and is site-local under
+            {' '}
+            <code>/downloads/v{DOWNLOAD_PRODUCT_VERSION}/</code>
+            .
+            {' '}
+            <strong>macOS</strong>
+            {' '}
+            Intel and Apple Silicon native packages are
+            {' '}
+            <strong>coming soon</strong>
+            {' '}
+            (built on real Macs only — never fabricated here). Until then, use the browser or PWA.
+          </p>
+        </section>
 
-      <section class="r-wrap r-section" aria-labelledby="honesty-heading">
-        <h2 id="honesty-heading" class="dl-section-title">What this is — and is not</h2>
-        <div class="dl-honesty data-card">
-          <ul>
-            <li>
-              <strong>Is:</strong>
-              {' '}
-              unsigned zip/tar.gz packages with SHA-256 sidecars and honesty notices
-              (Windows Native SDK zip; Linux Native SDK tar.gz; FreeBSD/OpenBSD Zig-native hosts
-              with install.sh).
-            </li>
-            <li>
-              <strong>Is not:</strong>
-              {' '}
-              codesigned, notarized, virus-scanned, store-packaged, auto-updating, or a signed
-              multi-platform installer suite. macOS DMGs are not published yet — no fake download
-              buttons.
-            </li>
-            <li>
-              <strong>Runtime / GUI launch</strong>
-              {' '}
-              is not claimed from the Linux release host — package layout and checksums only.
-              Windows runtime is not verified on real Windows here.
-            </li>
-            <li>
-              <strong>macOS:</strong>
-              {' '}
-              Intel x86_64 and Apple Silicon arm64 native WKWebView packages are planned as separate
-              arch lanes, produced only on genuine matching-arch Darwin. Until they ship, there is
-              no DMG, sidecar, or install path on this page.
-            </li>
-            <li>
-              <strong>Browser first:</strong>
-              {' '}
-              most people should
-              {' '}
-              <a href="/app/">Open Onyx</a>
-              {' '}
-              in a browser or install the PWA — including on Mac today.
-            </li>
-          </ul>
-        </div>
-      </section>
+        <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      <section class="r-wrap r-section dl-grid" aria-label="Native download cards">
-        <For each={[...DOWNLOAD_CARDS]}>
-          {(card) => (
-            <LaneCard card={card} catalog={catalogValue} catalogState={catalogState} />
-          )}
-        </For>
-        <MacosComingSoonCard />
-      </section>
+        <section class="r-wrap r-section" aria-labelledby="honesty-heading">
+          <h2 id="honesty-heading" class="dl-section-title">What this is — and is not</h2>
+          <div class="dl-honesty data-card">
+            <ul>
+              <li>
+                <strong>Is:</strong>
+                {' '}
+                unsigned zip/tar.gz packages with SHA-256 sidecars and honesty notices
+                (Windows Native SDK zip; Linux Native SDK tar.gz; FreeBSD/OpenBSD Zig-native hosts
+                with install.sh).
+              </li>
+              <li>
+                <strong>Is not:</strong>
+                {' '}
+                codesigned, notarized, virus-scanned, store-packaged, auto-updating, or a signed
+                multi-platform installer suite. macOS DMGs are not published yet — no fake download
+                buttons.
+              </li>
+              <li>
+                <strong>Runtime / GUI launch</strong>
+                {' '}
+                is not claimed from the Linux release host — package layout and checksums only.
+                Windows runtime is not verified on real Windows here.
+              </li>
+              <li>
+                <strong>macOS:</strong>
+                {' '}
+                Intel x86_64 and Apple Silicon arm64 native WKWebView packages are planned as separate
+                arch lanes, produced only on genuine matching-arch Darwin. Until they ship, there is
+                no DMG, sidecar, or install path on this page.
+              </li>
+              <li>
+                <strong>Browser first:</strong>
+                {' '}
+                most people should
+                {' '}
+                <a href="/app/">open the browser app</a>
+                {' '}
+                or install the PWA — including on Mac today.
+              </li>
+            </ul>
+          </div>
+        </section>
 
-      <section class="r-wrap r-section">
-        <div class="dl-verify data-card">
-          <h2>Verify a download</h2>
-          <pre class="dl-pre">{`# after download (example: FreeBSD)
+        <section class="r-wrap r-section" aria-labelledby="download-lanes-heading">
+          <h2 id="download-lanes-heading" class="dl-section-title">Native packages</h2>
+          <div class="dl-grid" aria-label="Native download cards">
+            <For each={[...DOWNLOAD_CARDS]}>
+              {(card) => (
+                <LaneCard card={card} catalog={catalogValue} catalogState={catalogState} />
+              )}
+            </For>
+            <MacosComingSoonCard />
+          </div>
+        </section>
+
+        <section class="r-wrap r-section" aria-labelledby="verify-heading">
+          <div class="dl-verify data-card">
+            <h2 id="verify-heading">Verify a download</h2>
+            <pre class="dl-pre">{`# after download (example: FreeBSD)
 sha256 -c onyx-${DOWNLOAD_PRODUCT_VERSION}-freebsd-x86_64-ReleaseFast-unsigned.sha256
 # Linux: sha256sum -c …
 # Windows (PowerShell): Get-FileHash .\\onyx-…-unsigned.zip -Algorithm SHA256
 # macOS native packages: not published yet — no .sha256 sidecar to check`}</pre>
-          <p class="dl-note">
-            Compare the hash on this page (when staged) with the
-            {' '}
-            <code>.sha256</code>
-            {' '}
-            file next to the archive. Onyx does not claim third-party virus-free status or code
-            signing for these artifacts.
-          </p>
-        </div>
-      </section>
-
-      <PublicFooter />
-    </main>
+            <p class="dl-note">
+              Compare the hash on this page (when staged) with the
+              {' '}
+              <code>.sha256</code>
+              {' '}
+              file next to the archive. Onyx does not claim third-party virus-free status or code
+              signing for these artifacts.
+            </p>
+          </div>
+        </section>
+      </div>
+    </PublicFrame>
   );
 }
 

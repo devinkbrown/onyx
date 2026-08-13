@@ -1,0 +1,113 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Onyx UI · motion layer
+
+   Motion in a chat client is feedback, not decoration. The ladder is short and
+   the ceiling is low: nothing in normal operation should outlast --ui-dur-slow,
+   because a message list that animates is a message list you cannot read.
+
+     micro  100ms   press, reaction pop, ACK flash — direct manipulation
+     fast   160ms   local echo, toast/FAB entrance, focus ring
+     base   220ms   the default control settle (hover, expand, colour change)
+     slow   320ms   a sheet or drawer travelling a real distance
+
+   Aliases the existing Onyx duration ladder so a theme retuning `--dur` for
+   personality is respected. Note that Onyx deliberately does NOT let themes
+   override micro/fast — direct-manipulation feedback stays fixed — and this
+   layer preserves that.
+
+   Only compositor-friendly properties are named here (transform, opacity,
+   clip-path, filter). There is no token for animating width/height/top/left,
+   because there should be no such animation.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Duration ──────────────────────────────────────────────────────────── */
+  --ui-dur-instant: 0ms;
+  --ui-dur-micro: var(--dur-micro, 100ms);
+  --ui-dur-fast: var(--dur-fast, 160ms);
+  --ui-dur-base: var(--dur-base, 220ms);
+  --ui-dur-slow: 320ms;
+
+  /* ── Easing ────────────────────────────────────────────────────────────── */
+  --ui-ease: var(--ease, cubic-bezier(0.16, 1, 0.3, 1));
+  --ui-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ui-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ui-ease-linear: linear;
+
+  /* ── Composed transitions ──────────────────────────────────────────────────
+     Named intents so a consumer never hand-rolls a property list and
+     accidentally transitions a layout property. */
+  --ui-transition-control: color var(--ui-dur-base) var(--ui-ease),
+    background-color var(--ui-dur-base) var(--ui-ease),
+    border-color var(--ui-dur-base) var(--ui-ease),
+    opacity var(--ui-dur-base) var(--ui-ease);
+  --ui-transition-press: transform var(--ui-dur-micro) var(--ui-ease),
+    opacity var(--ui-dur-micro) var(--ui-ease);
+  --ui-transition-enter: transform var(--ui-dur-fast) var(--ui-ease),
+    opacity var(--ui-dur-fast) var(--ui-ease);
+  --ui-transition-surface: transform var(--ui-dur-slow) var(--ui-ease),
+    opacity var(--ui-dur-slow) var(--ui-ease);
+
+  /* ── Motion state hook ─────────────────────────────────────────────────────
+     A machine-readable flag components can branch on. `1` = motion permitted.
+     Under reduce it drops to `0`, which is the signal for JS-driven motion
+     (rAF loops, canvas, SMIL, Web Animations) that a CSS duration token can
+     never reach. CSS alone cannot stop a requestAnimationFrame. */
+  --ui-motion-allowed: 1;
+  --ui-motion-scale: 1;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────
+   Zero the ENTIRE ladder, not just the default step, and do it with
+   `!important` so it outranks the theme engine's inline custom properties on
+   documentElement — an authored inline value would otherwise beat a stylesheet
+   rule and quietly keep the animation alive.
+
+   This is the OS-preference half. WCAG 2.2.2 additionally requires an in-app
+   Animated/Still control; that lives in the app's preference layer and drives
+   the same tokens via the `[data-ui-motion]` hook below. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ui-dur-micro: 0ms !important;
+    --ui-dur-fast: 0ms !important;
+    --ui-dur-base: 0ms !important;
+    --ui-dur-slow: 0ms !important;
+    --ui-motion-allowed: 0 !important;
+    --ui-motion-scale: 0 !important;
+  }
+
+  .ui-root *,
+  .ui-root *::before,
+  .ui-root *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── In-app motion override ──────────────────────────────────────────────────
+   `data-ui-motion="still"` freezes motion regardless of OS preference (the
+   user-facing Animated/Still/Off control); `"animated"` is the explicit opt-in
+   a user can choose even when the OS default says reduce. Both are attribute
+   hooks only — this layer never reads or writes app state. */
+[data-ui-motion='still'] {
+  --ui-dur-micro: 0ms;
+  --ui-dur-fast: 0ms;
+  --ui-dur-base: 0ms;
+  --ui-dur-slow: 0ms;
+  --ui-motion-allowed: 0;
+  --ui-motion-scale: 0;
+}
+
+[data-ui-motion='still'] .ui-root *,
+[data-ui-motion='still'] .ui-root *::before,
+[data-ui-motion='still'] .ui-root *::after,
+.ui-root[data-ui-motion='still'] *,
+.ui-root[data-ui-motion='still'] *::before,
+.ui-root[data-ui-motion='still'] *::after {
+  animation-duration: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0ms !important;
+}

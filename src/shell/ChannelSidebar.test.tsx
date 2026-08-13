@@ -13,7 +13,7 @@
  * AAA pattern; descriptive names.
  */
 
-import { cleanup, fireEvent, render } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
@@ -133,6 +133,53 @@ describe('ChannelSidebar accessibility', () => {
     expect(network).not.toHaveTextContent('IRCXNet');
   });
 
+  it('exposes the Conversations spine and singular collection heading', () => {
+    const channels = new Map<string, Channel>();
+    channels.set('#alpha', makeChannel('#alpha'));
+    const dms = new Map<string, DMConversation>();
+    dms.set('dave', makeDm('dave'));
+    store.setState({
+      ...initialState,
+      channels,
+      dms,
+      activeView: { kind: 'channel', channel: '#alpha' },
+      connectionStatus: 'connected',
+    }, true);
+
+    const { container, getByRole } = render(() => <ChannelSidebar mode="messages" activeSection="rooms" />);
+
+    expect(container.querySelector('[data-testid="conversation-spine"]')).toBeInTheDocument();
+    expect(container.querySelector('.shell-conversation-spine-label')).toHaveTextContent('Conversations');
+    expect(getByRole('region', { name: 'Messages · 1 conversation' })).toBeInTheDocument();
+  });
+
+  it('keeps the room location current while Messages is the selected collection', () => {
+    seed();
+
+    const { getByRole } = render(() => (
+      <ChannelSidebar mode="messages" activeSection="rooms" />
+    ));
+    const rooms = getByRole('button', { name: 'Rooms' });
+    const messages = getByRole('button', { name: 'Messages' });
+    expect(rooms).toHaveAttribute('aria-current', 'page');
+    expect(rooms).toHaveAttribute('aria-pressed', 'false');
+    expect(messages).not.toHaveAttribute('aria-current');
+    expect(messages).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('surfaces desktop You dialog state without making it a location', () => {
+    seed();
+
+    const { getByRole } = render(() => (
+      <ChannelSidebar activeSection="rooms" youDialogOpen />
+    ));
+    const primary = getByRole('navigation', { name: 'Primary' });
+    const you = within(primary).getByRole('button', { name: 'You' });
+    expect(you).not.toHaveAttribute('aria-current');
+    expect(you).toHaveAttribute('aria-expanded', 'true');
+    expect(you).toHaveClass('shell-primary-nav-btn--dialog-open');
+  });
+
   it('keeps a single tab stop on the active conversation', () => {
     // Arrange — #bravo is active.
     seed();
@@ -143,7 +190,7 @@ describe('ChannelSidebar accessibility', () => {
 
     // Assert — exactly one row is in the tab order, and it is the active one.
     expect(tabbable).toHaveLength(1);
-    expect(tabbable[0]!.getAttribute('aria-current')).toBe('page');
+    expect(tabbable[0]!.getAttribute('aria-current')).toBe('location');
   });
 
   it('includes unread and mention counts in the accessible name', () => {
@@ -486,7 +533,7 @@ describe('ChannelSidebar accessibility', () => {
     const rooms = render(() => (
       <ChannelSidebar mode="rooms" activeSection="rooms" />
     ));
-    expect(rooms.getByRole('region', { name: 'Rooms' })).toBeInTheDocument();
+    expect(rooms.getByRole('region', { name: 'Rooms · 3 joined' })).toBeInTheDocument();
     expect(rooms.getByRole('button', { name: /#bravo/ })).toBeInTheDocument();
     expect(rooms.queryByRole('button', { name: /DM with dave/ })).toBeNull();
     rooms.unmount();
@@ -494,7 +541,7 @@ describe('ChannelSidebar accessibility', () => {
     const messages = render(() => (
       <ChannelSidebar mode="messages" activeSection="messages" />
     ));
-    expect(messages.getByRole('region', { name: 'Direct messages' })).toBeInTheDocument();
+    expect(messages.getByRole('region', { name: 'Messages · 1 conversation' })).toBeInTheDocument();
     expect(messages.getByRole('button', { name: /DM with dave/ })).toBeInTheDocument();
     expect(messages.queryByRole('button', { name: /#bravo/ })).toBeNull();
   });

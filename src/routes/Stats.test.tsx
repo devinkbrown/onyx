@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { Suspense } from 'solid-js';
 
 import StatsRoute, { revealStatsInspector, roomDeepLink, STATS_INSPECTOR_ID } from './Stats';
+
+const src = readFileSync(resolve(__dirname, 'Stats.tsx'), 'utf8');
 
 function channelDetailPayload(channel: string, now: number, extras: Record<string, unknown> = {}) {
   return {
@@ -26,8 +30,65 @@ function channelDetailPayload(channel: string, now: number, extras: Record<strin
 
 describe('StatsRoute', () => {
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it('uses PublicFrame as the only document frame and keeps Stats out of primary navigation', () => {
+    const { container } = render(() => <StatsRoute />);
+
+    expect(src).toContain("import { PublicFrame } from '@/ui/public'");
+    expect(src).toContain('<PublicFrame currentPath="/stats/" mainLabel="Onyx network stats">');
+    expect(src).not.toContain('<PageChrome');
+    expect(src).not.toContain('<PublicFooter');
+    expect(src).not.toContain('<header');
+    expect(src).not.toContain('<main');
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.getByRole('main', { name: 'Onyx network stats' })).toHaveAttribute('id', 'public-main');
+    expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveAttribute('href', '#public-main');
+    expect(container.querySelectorAll('main')).toHaveLength(1);
+    expect(container.querySelector('main main, main header, main footer')).toBeNull();
+    expect(container.querySelector('.ui-root.stats-page')).toBeTruthy();
+    expect(container.querySelector('.r-ground')).toBeTruthy();
+    expect(container.querySelector('.r-flecks')).toBeTruthy();
+    expect(container.querySelector('.r-grain')).toBeTruthy();
+    const primary = screen.getByRole('navigation', { name: 'Primary navigation' });
+    expect(within(primary).queryByRole('link', { name: 'Stats' })).toBeNull();
+    expect(within(primary).queryByRole('link', { name: 'Home' })).toBeNull();
+    expect(within(primary).getByRole('link', { name: 'Status' })).toHaveAttribute('href', '/status/');
+    expect(screen.getByRole('navigation', { name: 'Stats sections' })).toBeInTheDocument();
+    const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' })
+      .filter((link) => link.classList.contains('public-frame__open'));
+    expect(openOnyx).toHaveLength(1);
+    expect(openOnyx[0]).toHaveAttribute('href', '/app/');
+  });
+
+  it('relocates the six-state live pill into exactly one hero observation', () => {
+    expect(src).toContain("case 'current': return 'stats current'");
+    expect(src).toContain("case 'stale': return 'stats stale'");
+    expect(src).toContain("case 'future': return 'stats time mismatch'");
+    expect(src).toContain("case 'unknown': return 'stats undated'");
+    expect(src).toContain("case 'partial': return 'stats incomplete'");
+    expect(src).toContain("default: return 'stats unavailable'");
+    expect(src).toContain('class="stats-observation"');
+    expect(src).toContain('role="status"');
+    expect(src).toContain('aria-live="polite"');
+    expect(src).toContain('aria-atomic="true"');
+    expect(src.match(/class="stats-observation"/g)).toHaveLength(1);
+  });
+
+  it('keeps the canonical mobile disclosure keyboard operable', () => {
+    render(() => <StatsRoute />);
+    const toggle = screen.getByRole('button', { name: 'Open navigation menu' });
+    expect(toggle).toHaveAttribute('aria-controls', 'public-primary-navigation');
+    toggle.focus();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
   });
 
   it('renders the public stats page shell without a live feed', async () => {
@@ -35,6 +96,12 @@ describe('StatsRoute', () => {
 
     expect(screen.getByRole('heading', { name: /the rooms in motion/i })).toBeInTheDocument();
     expect(await screen.findByText(/stats are waiting/i)).toBeInTheDocument();
+    const observation = document.querySelector('.stats-observation');
+    expect(observation).toHaveAttribute('data-feed-state', 'unavailable');
+    expect(observation).toHaveAttribute('role', 'status');
+    expect(observation).toHaveAttribute('aria-live', 'polite');
+    expect(observation).toHaveAttribute('aria-atomic', 'true');
+    expect(observation).toHaveTextContent('stats unavailable');
     expect(screen.getByText('stats unavailable')).toHaveAttribute('data-feed-state', 'unavailable');
   });
 
@@ -65,11 +132,14 @@ describe('StatsRoute', () => {
     const chart = screen.getByRole('figure', { name: /daily message totals, oldest to newest/i });
     expect(chart.querySelector('.data-bars')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByText('stats current')).toHaveAttribute('data-feed-state', 'current');
+    expect(document.querySelector('.stats-observation')).toHaveAttribute('data-feed-state', 'current');
+    expect(document.querySelectorAll('.stats-observation')).toHaveLength(1);
     expect(screen.getByLabelText(/#root recent activity/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /refresh data/i })).toBeInTheDocument();
     expect(screen.getByText(/activity ledger/i)).toBeInTheDocument();
     expect(screen.getByText('14-day pulse')).toBeInTheDocument();
-    expect(document.querySelector('main.stats-page')).not.toBeNull();
+    expect(document.querySelector('.ui-root.stats-page')).not.toBeNull();
+    expect(document.querySelector('main.stats-page')).toBeNull();
     expect(screen.getByRole('navigation', { name: 'Stats sections' })).toHaveTextContent('Network pulse');
     expect(document.querySelector('.stats-summary [data-tone="presence"]')).not.toBeNull();
     expect(document.querySelector('.stats-summary [data-tone="messages"]')).not.toBeNull();
@@ -101,8 +171,31 @@ describe('StatsRoute', () => {
     render(() => <StatsRoute />);
 
     expect(await screen.findByText('stats incomplete')).toHaveAttribute('data-feed-state', 'partial');
+    expect(document.querySelector('.stats-observation')).toHaveAttribute('data-feed-state', 'partial');
     expect(screen.getAllByText(/partial public room index/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/duplicate day rows were omitted/i)).toBeInTheDocument();
+  });
+
+  it('keeps stale, future, and undated observation labels byte-identical', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const cases = [
+      { generated_at: now - 10 * 60, state: 'stale', label: 'stats stale' },
+      { generated_at: now + 20 * 60, state: 'future', label: 'stats time mismatch' },
+      { generated_at: 0, state: 'unknown', label: 'stats undated' },
+    ] as const;
+
+    for (const entry of cases) {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+        generated_at: entry.generated_at,
+        network_days: [{ date: '2026-07-08', messages: 24 }],
+        channels: [{ channel: '#root', messages: 12 }],
+      }), { status: 200 })));
+      const view = render(() => <StatsRoute />);
+      expect(await view.findByText(entry.label)).toHaveAttribute('data-feed-state', entry.state);
+      expect(view.container.querySelector('.stats-observation')).toHaveAttribute('data-feed-state', entry.state);
+      view.unmount();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('filters to rooms with people present, searches topics, and changes ranking without refetching', async () => {

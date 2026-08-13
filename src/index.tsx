@@ -16,6 +16,7 @@ if (import.meta.env.PROD && typeof navigator !== 'undefined' && 'serviceWorker' 
 import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
 import { createEffect, createSignal, ErrorBoundary, lazy, Show, Suspense, type Component, type JSX } from 'solid-js';
+import { RouteLifecycleRoot } from './ui/a11y/RouteLifecycleRoot';
 import '@fontsource/anton';
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/jetbrains-mono';
@@ -118,25 +119,17 @@ render(
   () => (
     <ThemeProvider>
       <SpotlightProvider>
-        <Router>
+        <Router root={RouteLifecycleRoot}>
           <Route path="/" component={Landing} />
           <Route path="/about" component={AboutRoute} />
           <Route path="/app" component={AppRouteGuarded} />
           <Route path="/appearance" component={AppearanceRoute} />
-          <Route path="/stats" component={StatsRoute} />
-          <Route path="/stats/" component={StatsRoute} />
-          <Route path="/status" component={StatusRoute} />
-          <Route path="/status/" component={StatusRoute} />
-          <Route path="/roadmap" component={RoadmapRoute} />
-          <Route path="/roadmap/" component={RoadmapRoute} />
-          <Route path="/invite" component={InviteRoute} />
-          <Route path="/invite/" component={InviteRoute} />
-          <Route path="/onyxos" component={OnyxOSRoute} />
-          <Route path="/onyxos/" component={OnyxOSRoute} />
-          <Route path="/download" component={DownloadRoute} />
-          <Route path="/download/" component={DownloadRoute} />
-          <Route path="/install" component={DownloadRoute} />
-          <Route path="/install/" component={DownloadRoute} />
+          <Route path={['/stats', '/stats/']} component={StatsRoute} />
+          <Route path={['/status', '/status/']} component={StatusRoute} />
+          <Route path={['/roadmap', '/roadmap/']} component={RoadmapRoute} />
+          <Route path={['/invite', '/invite/']} component={InviteRoute} />
+          <Route path={['/onyxos', '/onyxos/']} component={OnyxOSRoute} />
+          <Route path={['/download', '/download/', '/install', '/install/']} component={DownloadRoute} />
           <Route path="/accessibility/" component={() => <LazyRouteBoundary><PublicInfo page="accessibility" /></LazyRouteBoundary>} />
           <Route path="/glossary/" component={() => <LazyRouteBoundary><PublicInfo page="glossary" /></LazyRouteBoundary>} />
           <Route path="/integrations/" component={() => <LazyRouteBoundary><PublicInfo page="integrations" /></LazyRouteBoundary>} />

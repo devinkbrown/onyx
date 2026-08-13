@@ -336,8 +336,9 @@
 .r-landing.home .home-aperture-shell::after {
   content: '';
   position: absolute;
-  top: -18%;
-  right: -10%;
+  /* Inside the padding box: an outset glow inflates scrollWidth. */
+  top: 0;
+  right: 0;
   width: 52%;
   height: 55%;
   background:
@@ -780,11 +781,16 @@
   width: 1px;
   height: 1px;
   padding: 0;
-  margin: -1px;
+  margin: 0;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
+  clip-path: inset(50%);
+  white-space: normal;
+  overflow-wrap: anywhere;
   border: 0;
+  /* 1px nowrap at 64px root font made scrollWidth 397. */
+  font-size: 1px;
+  line-height: 1;
 }
 
 /* ── Operator / power-user shelf ── */
@@ -1149,11 +1155,6 @@
   .r-landing.home .home-shelf-list a,
   .r-landing.home .home-footer {
     font-size: 14px;
-  }
-
-  .r-landing.home .home-visually-hidden {
-    overflow: hidden;
-    white-space: nowrap;
   }
 }
 

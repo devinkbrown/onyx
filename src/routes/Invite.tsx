@@ -2,11 +2,10 @@
 import './landing.css';
 import './data-pages.css';
 import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
-import { Mascot } from '@/components/brand/Mascot';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { buildInviteCard, inviteDescription, inviteTitle } from '@/lib/invite/inviteCard';
+import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
-import { PublicFooter } from './PublicFooter';
 
 const NETWORK_NAME = 'Onyx';
 
@@ -82,7 +81,8 @@ export default function InviteRoute() {
   }
 
   return (
-    <main class="r data-page invite-page">
+    <PublicFrame currentPath="/invite/" mainLabel="Onyx invite">
+      <div class="ui-root r data-page invite-page">
       <div class="r-ground" aria-hidden="true" />
       <div class="r-flecks" aria-hidden="true" />
       <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
@@ -91,21 +91,6 @@ export default function InviteRoute() {
         <path d="M-40 790 C 380 710, 720 880, 1060 770 S 1340 710, 1540 830" />
       </svg>
       <div class="r-grain" aria-hidden="true" />
-
-      <header class="r-status" role="banner">
-        <a class="brand" href="/" aria-label="Onyx home">
-          <Mascot variant="mark" />ONYX
-        </a>
-        <nav aria-label="Primary">
-          <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="/stats/">Stats</a>
-          <a class="hideable" href="/status/">Status</a>
-          <a class="hideable" href="/roadmap/">Roadmap</a>
-          <a class="hideable" href="/about/">About</a>
-          <a class="hideable" href="/invite/?join=%23root" aria-current="page">Invite</a>
-          <a class="enter" href="/app/">Open Onyx</a>
-        </nav>
-      </header>
 
       <section class="r-wrap data-hero" aria-labelledby="invite-heading">
         <p class="r-kicker">invite</p>
@@ -203,7 +188,7 @@ export default function InviteRoute() {
           <div role="listitem"><strong>After claim</strong><span>Same room path, saved identity, local memory.</span></div>
         </div>
       </section>
-      <PublicFooter />
-    </main>
+      </div>
+    </PublicFrame>
   );
 }

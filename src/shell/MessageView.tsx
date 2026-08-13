@@ -71,7 +71,13 @@ import { activeMessageSearchResultId, openMessageSearchWithQuery } from './searc
 import { TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';
-import { computeMessageWindow } from './messageWindow';
+import {
+  computeMessageWindow,
+  DEFAULT_WINDOW_SIZE,
+  MAX_WINDOW_ROWS,
+  planUnreadNavigation,
+  selectMessageAnchorIndex,
+} from './messageWindow';
 import { threadParentIds } from './threadIndex';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -89,12 +95,13 @@ function clippedReplyPreview(text: string, max = 80): string {
   return safe.length > max ? `${safe.slice(0, max)}…` : safe;
 }
 
-// Bounded-render window. The feed only builds DOM for the trailing
-// BASE_WINDOW_ROWS most-recent rows (plus any anchor an unread divider /
-// time-travel landing / search hit forces into view). "Show earlier" grows the
-// window by WINDOW_STEP_ROWS at a time. This caps DOM subtree count on large
-// channels (VAULT_KEEP=400 + live tail) without touching the store.
-const BASE_WINDOW_ROWS = 120;
+// Bounded-render window. The feed only builds DOM for a contiguous page of
+// at most MAX_WINDOW_ROWS (default DEFAULT_WINDOW_SIZE). A deep unread /
+// time-travel / search anchor becomes a two-sided page around that row —
+// never a tail extension. "Show earlier" grows the trailing page up to the
+// ceiling, then pages backward. Reader Start opens the first page. There is
+// no Infinity / show-all path.
+const BASE_WINDOW_ROWS = DEFAULT_WINDOW_SIZE;
 const WINDOW_STEP_ROWS = 200;
 // Delay before restoring aria-live to "polite" after a window-growth mutation.
 const LIVE_RESTORE_MS = 400;
@@ -1129,14 +1136,50 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const [atBottom, setAtBottom] = createSignal(true);
 
   // ── bounded render window ──
-  // windowSize is the *minimum* trailing rows to render; an anchor can extend it
-  // downward. Set to Infinity to render everything ("show all"). Reset to base
-  // on every conversation switch (in the switch effect below).
+  // windowSize is the finite render capacity (never Infinity). pageStart is an
+  // explicit historical page origin (Reader Start / earlier paging). Reset both
+  // to the live trailing page on every conversation switch.
   const [windowSize, setWindowSize] = createSignal<number>(BASE_WINDOW_ROWS);
+  const [pageStart, setPageStart] = createSignal<number | null>(null);
+  // After the user explicitly pages or jumps to latest, do not let a leftover
+  // unread divider steal the window back. Fresh conversation opens still use it.
+  const [ignoreUnreadAnchor, setIgnoreUnreadAnchor] = createSignal(false);
+  // One-shot unread handoff: Reader New / Review may force the divider into
+  // the window even while a historical pageStart is active.
+  const [forceUnreadNav, setForceUnreadNav] = createSignal(false);
   // aria-live mode for the feed. Flipped to "off" while older rows enter the DOM
-  // (window growth / conversation switch / history replay) so those mutations are
-  // never re-announced, then restored to "polite" for genuine new tail arrivals.
+  // (window growth / conversation switch / history replay / page replace) so
+  // those mutations are never re-announced, then restored to "polite" for
+  // genuine new tail arrivals while the trailing window is active.
   const [liveMode, setLiveMode] = createSignal<'polite' | 'off'>('polite');
+  let liveRestoreTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function muteLiveForWindowChange(): void {
+    setLiveMode('off');
+    if (liveRestoreTimer) clearTimeout(liveRestoreTimer);
+    liveRestoreTimer = setTimeout(() => setLiveMode('polite'), LIVE_RESTORE_MS);
+  }
+
+  function resetToTrailingWindow(): void {
+    setPageStart(null);
+    setWindowSize(BASE_WINDOW_ROWS);
+  }
+
+  function resetFeedToConversation(): void {
+    resetToTrailingWindow();
+    setIgnoreUnreadAnchor(false);
+  }
+
+  function prefersInstantScroll(): boolean {
+    if (preferences().reduceMotion) return true;
+    try {
+      return typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      return false;
+    }
+  }
 
   // Tap-to-reveal action bar (touch): id of the row whose action bar is showing.
   // Declared here so the conversation-switch effect below can clear it.
@@ -1152,27 +1195,44 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const el = feedEl;
     if (!el) return;
     const threshold = 80;
-    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < threshold);
+    const visuallyAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    // A historical page that hides newer rows is never the live tail, even
+    // when the user is scrolled to the bottom of the mounted slice.
+    setAtBottom(visuallyAtBottom && messageWindow().hiddenAfter === 0);
   }
 
   function scrollToBottom(smooth = false): void {
     const el = feedEl;
     if (!el) return;
+    const useSmooth = smooth && !prefersInstantScroll();
     if (typeof el.scrollTo === 'function') {
-      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'instant' });
+      el.scrollTo({ top: el.scrollHeight, behavior: useSmooth ? 'smooth' : 'instant' });
     } else {
       el.scrollTop = el.scrollHeight;
     }
   }
 
+  function jumpToLatest(smooth = false): void {
+    muteLiveForWindowChange();
+    setIgnoreUnreadAnchor(true);
+    resetToTrailingWindow();
+    scrollToBottom(smooth);
+    setAtBottom(true);
+    lastSeenCount = messages().length;
+    setUnreadBelow(0);
+  }
+
   function scrollToReaderStart(): void {
-    // "Start" means the true top of the loaded transcript, so expand the window
-    // fully first. Solid's <For> reconciles synchronously on the signal write, so
-    // the top row is already in the DOM — scroll to it in the same tick (keeps the
-    // jump synchronous for callers/tests, no wasted frame).
-    setWindowSize(Number.POSITIVE_INFINITY);
+    // First loaded page only — never Infinity. Solid's <For> reconciles
+    // synchronously on the signal write, so the first row is already in the
+    // DOM; scroll/focus it in the same tick.
+    muteLiveForWindowChange();
+    setIgnoreUnreadAnchor(true);
+    setWindowSize(BASE_WINDOW_ROWS);
+    setPageStart(0);
     const node = feedEl?.querySelector<HTMLElement>('[data-message-search-id]');
-    node?.scrollIntoView?.({ block: 'center' });
+    node?.scrollIntoView?.({ block: 'start' });
+    node?.focus?.({ preventScroll: true });
     setAtBottom(false);
   }
 
@@ -1192,46 +1252,117 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   }
 
   function showEarlierMessages(): void {
-    preserveScrollAround(() =>
-      setWindowSize((n) => (Number.isFinite(n) ? n + WINDOW_STEP_ROWS : n)),
-    );
+    const win = messageWindow();
+    const size = windowSize();
+    if (win.hiddenBefore <= 0) return;
+    muteLiveForWindowChange();
+    setIgnoreUnreadAnchor(true);
+    const canGrowOnTail = win.hiddenAfter === 0 && size < MAX_WINDOW_ROWS;
+    const nextPageStart = Math.max(0, win.start - Math.max(1, win.rendered));
+    preserveScrollAround(() => {
+      if (canGrowOnTail) {
+        setWindowSize((n) => {
+          const next = Number.isFinite(n) ? n + WINDOW_STEP_ROWS : BASE_WINDOW_ROWS;
+          return Math.min(MAX_WINDOW_ROWS, Math.max(BASE_WINDOW_ROWS, next));
+        });
+        return;
+      }
+      setPageStart(nextPageStart);
+    });
   }
 
-  function scrollToUnreadBoundary(): void {
-    const node = feedEl?.querySelector<HTMLElement>('.shell-unread-divider');
-    node?.scrollIntoView?.({ block: 'center' });
+  function nextPaint(): Promise<void> {
+    return new Promise((resolve) => {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => resolve());
+        return;
+      }
+      queueMicrotask(resolve);
+    });
+  }
+
+  async function settleUnreadDivider(attempts = 8): Promise<HTMLElement | null> {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const node = feedEl?.querySelector<HTMLElement>('.shell-unread-divider');
+      if (node) return node;
+      await nextPaint();
+    }
+    return feedEl?.querySelector<HTMLElement>('.shell-unread-divider') ?? null;
+  }
+
+  /**
+   * Shared unread handoff. Resolves the divider index before any review
+   * clear, selects a bounded page around it, waits for Solid to commit the
+   * replacement, then scrolls and focuses the divider. Returns false when
+   * the index or DOM node cannot be handed off.
+   */
+  async function navigateToUnreadBoundary(): Promise<boolean> {
+    const unreadId = unreadDividerId();
+    if (!unreadId) return false;
+    const unreadIndex = visibleIndexById().get(unreadId);
+    if (unreadIndex == null) return false;
+    const planned = planUnreadNavigation({
+      total: messages().length,
+      unreadIndex,
+      windowSize: BASE_WINDOW_ROWS,
+    });
+    if (!planned) return false;
+
+    muteLiveForWindowChange();
+    setForceUnreadNav(true);
+    setIgnoreUnreadAnchor(false);
+    setWindowSize(BASE_WINDOW_ROWS);
+    setPageStart(planned.window.start);
+
+    await nextPaint();
+    const node = await settleUnreadDivider();
+    setForceUnreadNav(false);
+    if (!node) return false;
+
+    const behavior = prefersInstantScroll() ? 'instant' : 'smooth';
+    node.scrollIntoView({ block: 'center', behavior });
+    node.focus({ preventScroll: true });
     setAtBottom(false);
+    return true;
   }
 
-  function reviewUnreadBoundary(): void {
+  async function reviewUnreadBoundary(): Promise<void> {
     const target = activeTarget();
     if (!target || activeView().kind !== 'channel') return;
     const dividerId = unreadDividerId();
+    if (!dividerId) return;
     const digest = sinceDigest();
-    const divider = dividerId ? allMessages().find((message) => message.id === dividerId) : null;
-    if (dividerId && digest && divider) {
-      const owner = memoryOwner();
-      if (owner) {
-        const indexById = allIndexById();
-        const dividerIndex = indexById.get(dividerId) ?? -1;
-        const unreadMessages = messages().filter(
-          (message) => (indexById.get(message.id) ?? -1) >= dividerIndex && !isSystemMsg(message),
-        );
-        const latest = unreadMessages[unreadMessages.length - 1];
-        recordReviewHistory({
-          target,
-          name: target,
-          kind: 'channel',
-          firstMessageId: dividerId,
-          firstAt: divider.time.toISOString(),
-          reviewedAt: new Date().toISOString(),
-          messageCount: digest.totalMessages,
-          mentionCount: digest.totalMentions,
-          preview: clippedDigestPreview(latest ? (latest.plaintext ?? latest.text) : target),
-        }, owner);
-      }
+    const divider = allMessages().find((message) => message.id === dividerId) ?? null;
+    const owner = memoryOwner();
+    const indexById = allIndexById();
+    const dividerIndex = indexById.get(dividerId) ?? -1;
+    const unreadMessages = dividerIndex >= 0
+      ? messages().filter(
+        (message) => (indexById.get(message.id) ?? -1) >= dividerIndex && !isSystemMsg(message),
+      )
+      : [];
+    const latest = unreadMessages[unreadMessages.length - 1];
+
+    const handedOff = await navigateToUnreadBoundary();
+    if (!handedOff) return;
+
+    if (owner && digest && divider) {
+      recordReviewHistory({
+        target,
+        name: target,
+        kind: 'channel',
+        firstMessageId: dividerId,
+        firstAt: divider.time.toISOString(),
+        reviewedAt: new Date().toISOString(),
+        messageCount: digest.totalMessages,
+        mentionCount: digest.totalMentions,
+        preview: clippedDigestPreview(latest ? (latest.plaintext ?? latest.text) : target),
+      }, owner);
     }
-    scrollToUnreadBoundary();
+    // Clear only after the divider has been scrolled and focused. One paint
+    // lets the handoff be observed before the separator leaves the DOM.
+    await nextPaint();
+    if (unreadDividerId() !== dividerId) return;
     getState().clearViewUnreadDivider(target);
   }
 
@@ -1308,7 +1439,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     scrolledTarget = target;
     setRevealedId(null);
     // Fresh conversation starts from the trailing window again.
-    setWindowSize(BASE_WINDOW_ROWS);
+    resetFeedToConversation();
     // Reset the "new below" baseline for the channel we just opened.
     lastSeenCount = messages().length;
     setUnreadBelow(0);
@@ -1446,20 +1577,32 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   }
 
   // ── bounded render window ──
-  // Any id that MUST be reachable in the DOM (so its querySelector-driven scroll
-  // works and the divider is visible) becomes an anchor; the oldest present one
-  // extends the window down far enough to render all of them.
-  const anchorIndex = createMemo((): number | null => {
+  // Pick one reachable id (search > time-travel > unread-in-tail-mode). Never
+  // union several anchors into one huge range — that was the 60k-row bug.
+  const visibleIndexById = createMemo((): ReadonlyMap<string, number> => {
     const list = messages();
-    if (list.length === 0) return null;
-    const ids = [unreadDividerId(), timeTravelLandingId(), activeMessageSearchResultId()];
-    let min = -1;
-    for (const id of ids) {
-      if (!id) continue;
-      const idx = list.findIndex((m) => m.id === id);
-      if (idx >= 0 && (min < 0 || idx < min)) min = idx;
+    const map = new Map<string, number>();
+    for (let i = 0; i < list.length; i += 1) {
+      const id = list[i]?.id;
+      if (id) map.set(id, i);
     }
-    return min < 0 ? null : min;
+    return map;
+  });
+
+  const anchorIndex = createMemo((): number | null => {
+    const byId = visibleIndexById();
+    if (byId.size === 0) return null;
+    const lookup = (id: string | null | undefined): number | null => {
+      if (!id) return null;
+      return byId.get(id) ?? null;
+    };
+    return selectMessageAnchorIndex({
+      searchIndex: lookup(activeMessageSearchResultId()),
+      landingIndex: lookup(timeTravelLandingId()),
+      unreadIndex: ignoreUnreadAnchor() && !forceUnreadNav() ? null : lookup(unreadDividerId()),
+      pageStart: pageStart(),
+      forceUnread: forceUnreadNav(),
+    });
   });
 
   const messageWindow = createMemo(() =>
@@ -1467,44 +1610,74 @@ export function MessageView(props: MessageViewProps): JSX.Element {
       total: messages().length,
       windowSize: windowSize(),
       anchorIndex: anchorIndex(),
+      pageStart: pageStart(),
     }),
   );
 
-  const windowedMessages = createMemo(() => messages().slice(messageWindow().start));
+  const windowedMessages = createMemo(() => {
+    const win = messageWindow();
+    return messages().slice(win.start, win.end);
+  });
 
-  // Suppress aria-live announcements whenever OLDER rows enter the DOM — window
-  // growth ("show earlier"), an anchor-driven extension (time-travel landing /
-  // search hit), history replay, or a conversation switch. Those all lower (or
-  // reset) the window start; a genuine new tail arrival keeps start flat or
-  // raises it and stays announced. Restored to "polite" shortly after.
+  // Persist a two-sided / start page so clearing a transient landing id
+  // (focusMessage / time-travel) does not snap the feed back to the tail.
+  createEffect(() => {
+    const win = messageWindow();
+    if (win.hiddenAfter > 0 && pageStart() !== win.start) {
+      setPageStart(win.start);
+    }
+  });
+
+  createEffect(() => {
+    if (messageWindow().hiddenAfter > 0) setAtBottom(false);
+  });
+
+  // Suppress aria-live announcements whenever the rendered slice is replaced —
+  // window growth, an anchored page change, history replay, Reader Start,
+  // jump-to-latest restore, or a conversation / topic switch. A genuine new
+  // tail arrival on the live trailing window keeps start flat-or-rising by at
+  // most the number of newly appended rows and stays announced.
   //
   // A topic-filter change is a conversation switch on a SECOND axis: activeTarget()
   // is unchanged, but messages() becomes a different filtered set (see the memo
-  // above) and <For> swaps the whole trailing window. For small sets the window
-  // start stays flat (0) or even RISES when a filter is cleared, so the start-
-  // decrease branch alone never catches it — leaving the log "polite" while every
-  // swapped-in row is read aloud (SC 4.1.3 transcript-replay spam). Fold
-  // activeTopic() into the guard's identity so a topic switch suppresses the log
-  // and resets the trailing window exactly like a channel switch.
+  // above) and <For> swaps the whole trailing window. Fold activeTopic() into
+  // the guard's identity so a topic switch suppresses the log and resets the
+  // trailing window exactly like a channel switch.
   let prevWindowStart = Number.POSITIVE_INFINITY;
+  let prevWindowEnd = Number.POSITIVE_INFINITY;
+  let prevWindowTotal = 0;
+  let prevHiddenAfter = 0;
   let prevLiveTarget: string | null = null;
   let prevLiveTopic: string | null = null;
-  let liveRestoreTimer: ReturnType<typeof setTimeout> | undefined;
   createEffect(() => {
-    const start = messageWindow().start;
+    const win = messageWindow();
+    const start = win.start;
+    const end = win.end;
+    const total = messages().length;
     const target = activeTarget();
     const topic = activeTopic();
     const switched = target !== prevLiveTarget || topic !== prevLiveTopic;
-    if (switched || start < prevWindowStart) {
+    const added = total - prevWindowTotal;
+    const tailArrival = !switched
+      && win.hiddenAfter === 0
+      && prevHiddenAfter === 0
+      && start >= prevWindowStart
+      && (start - prevWindowStart) <= Math.max(0, added)
+      && end >= prevWindowEnd
+      && (end - prevWindowEnd) <= Math.max(0, added);
+    if (switched || !tailArrival) {
       // A switch (channel or topic) starts the new view from the trailing window
       // again; a pure window-growth ("show earlier") must NOT — that would undo
       // the user's own "show earlier", so only reset on an identity change.
-      if (switched) setWindowSize(BASE_WINDOW_ROWS);
-      setLiveMode('off');
-      if (liveRestoreTimer) clearTimeout(liveRestoreTimer);
-      liveRestoreTimer = setTimeout(() => setLiveMode('polite'), LIVE_RESTORE_MS);
+      if (switched) resetFeedToConversation();
+      if (switched || start !== prevWindowStart || end !== prevWindowEnd) {
+        muteLiveForWindowChange();
+      }
     }
     prevWindowStart = start;
+    prevWindowEnd = end;
+    prevWindowTotal = total;
+    prevHiddenAfter = win.hiddenAfter;
     prevLiveTarget = target;
     prevLiveTopic = topic;
   });
@@ -1762,8 +1935,8 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 peerReviews={readerPeerReviews()}
                 hasUnreadBoundary={unreadDividerId() !== null}
                 onJumpStart={scrollToReaderStart}
-                onJumpUnread={scrollToUnreadBoundary}
-                onJumpLatest={() => scrollToBottom(true)}
+                onJumpUnread={() => { void navigateToUnreadBoundary(); }}
+                onJumpLatest={() => jumpToLatest(true)}
                 onReturnHome={() => getState().navigate({ kind: 'home' })}
                 onJumpReviewed={jumpToReviewedSpan}
                 onJumpReviewedContext={jumpToReviewedContext}
@@ -1819,7 +1992,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               // "New messages" boundary, rendered above the captured divider message.
               const dividerEl = (
                 <Show when={msg.id === unreadDividerId()}>
-                  <div class="shell-unread-divider" role="separator" aria-label="New messages">
+                  <div
+                    class="shell-unread-divider"
+                    role="separator"
+                    aria-label="New messages"
+                    tabIndex={-1}
+                  >
                     <span class="shell-unread-divider-label">new messages</span>
                   </div>
                 </Show>
@@ -2008,16 +2186,18 @@ export function MessageView(props: MessageViewProps): JSX.Element {
       </div>
 
       {/* Jump to latest button — shows the new-message count when scrolled up. */}
-      <Show when={!atBottom()}>
+      <Show when={!atBottom() || messageWindow().hiddenAfter > 0}>
         <button
           type="button"
           class="shell-jump-latest"
           classList={{ 'shell-jump-latest--unread': unreadBelow() > 0 }}
-          onClick={() => scrollToBottom(true)}
+          onClick={() => jumpToLatest(true)}
           aria-label={
             unreadBelow() > 0
               ? `${unreadBelow()} new message${unreadBelow() === 1 ? '' : 's'} below — jump to latest`
-              : 'Jump to latest messages'
+              : messageWindow().hiddenAfter > 0
+                ? `Jump to latest — ${messageWindow().hiddenAfter} newer messages not shown`
+                : 'Jump to latest messages'
           }
         >
           <Show when={unreadBelow() > 0} fallback={<span>↓ latest</span>}>

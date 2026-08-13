@@ -1,16 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './home.css';
-import { createMemo, createResource, createSignal, onCleanup, Show } from 'solid-js';
-import { Mascot } from '@/components/brand/Mascot';
+import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
 import { fetchStatsIndex } from '@/lib/stats/networkIndex';
 import {
   fetchNetworkStatus,
   formatDuration,
-  publicMeshFeedLabel,
   publicMeshFeedState,
 } from '@/lib/stats/status';
+import { ProofRail, type TruthState } from '@/ui/proof';
+import { PublicFrame } from '@/ui/public';
+import { PUBLIC_ROUTE_MANIFEST } from '@/ui/navigation/publicRouteManifest';
 import { setPageMeta } from './pageMeta';
+
+const LANDING_SHELF_ITEMS = [
+  [PUBLIC_ROUTE_MANIFEST[4]!.href, 'Status'],
+  [PUBLIC_ROUTE_MANIFEST[9]!.href, 'Stats'],
+  [PUBLIC_ROUTE_MANIFEST[10]!.href, 'Roadmap'],
+  [PUBLIC_ROUTE_MANIFEST[1]!.href, 'About'],
+  [PUBLIC_ROUTE_MANIFEST[2]!.href, 'Download'],
+  [`${PUBLIC_ROUTE_MANIFEST[11]!.href}?join=%23root`, 'Invite'],
+] as const;
 
 /**
  * Onyx public homepage — mineral-night front door with a live-room aperture.
@@ -38,7 +48,33 @@ export default function Landing() {
   const busiest = createMemo(() =>
     [...(stats.latest?.channels ?? [])].sort((a, b) => b.messages - a.messages)[0] ?? null,
   );
-  const feedState = createMemo(() => publicMeshFeedState(status.latest, nowMs()));
+  const feedState = createMemo(() => (
+    status.loading ? 'loading' : publicMeshFeedState(status.latest, nowMs())
+  ));
+  const proofState = createMemo<TruthState>(() => {
+    switch (feedState()) {
+      // A current report only confirms the report's own complete, non-partitioned
+      // quorum observation. It is not an uptime or security assertion.
+      case 'current': return 'verified';
+      case 'degraded': return 'partial';
+      case 'stale': return 'reconnecting';
+      case 'future':
+      case 'unknown': return 'unknown';
+      case 'loading': return 'reconnecting';
+      default: return 'unavailable';
+    }
+  });
+  const proofDetail = createMemo(() => {
+    switch (feedState()) {
+      case 'current': return 'A current public mesh report confirms a complete, non-partitioned quorum observation.';
+      case 'degraded': return 'The public mesh report is current, but its observation is incomplete or degraded.';
+      case 'stale': return 'The last public mesh report is stale; a fresh observation is being awaited.';
+      case 'future': return 'The public mesh report has a future timestamp, so it cannot support a current claim.';
+      case 'unknown': return 'The public mesh report has no usable timestamp, so no current claim can be made.';
+      case 'loading': return 'The public mesh report is still being requested.';
+      default: return 'No public mesh report is available.';
+    }
+  });
   const meshState = createMemo(() => {
     switch (feedState()) {
       case 'current': return 'operational';
@@ -51,25 +87,11 @@ export default function Landing() {
   });
 
   return (
-    <main class="r r-landing home">
+    <PublicFrame currentPath="/" mainLabel="Onyx home">
+      <div class="ui-root r r-landing home">
       {/* Thin mineral atmosphere — motion stacks gated in home.css reduced-motion */}
       <div class="r-ground home-ground" aria-hidden="true" />
       <div class="r-grain home-grain" aria-hidden="true" />
-
-      <header class="r-status home-header" role="banner">
-        <a class="brand" href="/" aria-label="Onyx home">
-          <span class="brand-mark" aria-hidden="true">
-            <Mascot variant="mark" />
-          </span>
-          <span class="brand-wordmark" aria-hidden="true">ONYX</span>
-        </a>
-        <nav aria-label="Primary">
-          <span class="live hideable" data-feed-state={feedState()}>
-            <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
-          </span>
-          <a class="enter" href="/app/">Open Onyx</a>
-        </nav>
-      </header>
 
       <section class="r-wrap home-hero" aria-labelledby="hero-heading">
         <div class="home-hero-grid">
@@ -80,8 +102,7 @@ export default function Landing() {
               Talk, call, and keep continuity on your device — open in the browser now.
             </p>
             <div class="home-cta-row">
-              <a class="r-btn primary home-cta-primary" href="/app/">Open Onyx</a>
-              <a class="home-secondary-link" href="/download/">
+              <a class="home-secondary-link" href={PUBLIC_ROUTE_MANIFEST[2]!.href}>
                 Desktop downloads
               </a>
             </div>
@@ -182,6 +203,13 @@ export default function Landing() {
         class="r-wrap home-telemetry"
         aria-label="Public network telemetry"
       >
+        <ProofRail
+          state={proofState()}
+          label="Public mesh report"
+          detail={proofDetail()}
+          evidenceType="Public status feed"
+          ariaLabel="Public mesh report evidence"
+        />
         <div class="home-telemetry-strip" data-feed-state={feedState()}>
           <span class="home-telemetry-item">
             <span class="k">network</span>
@@ -229,7 +257,7 @@ export default function Landing() {
               </Show>
             </span>
           </span>
-          <a class="home-telemetry-link" href="/status/">Status</a>
+          <a class="home-telemetry-link" href={PUBLIC_ROUTE_MANIFEST[4]!.href}>Status</a>
         </div>
       </section>
 
@@ -263,30 +291,13 @@ export default function Landing() {
       >
         <p class="home-shelf-label">Operators and power users</p>
         <ul class="home-shelf-list">
-          <li><a href="/status/">Status</a></li>
-          <li><a href="/stats/">Stats</a></li>
-          <li><a href="/roadmap/">Roadmap</a></li>
-          <li><a href="/about/">About</a></li>
-          <li><a href="/download/">Download</a></li>
-          <li><a href="/invite/?join=%23root">Invite</a></li>
+          <For each={LANDING_SHELF_ITEMS}>
+            {(item) => <li><a href={item[0]}>{item[1]}</a></li>}
+          </For>
         </ul>
       </nav>
 
-      <footer class="r-wrap home-footer">
-        <div class="home-footer-brand">
-          <span aria-hidden="true"><Mascot variant="mark" /></span>
-          <span>Onyx</span>
-        </div>
-        <p class="home-footer-lede">
-          Open rooms, local continuity, and security state that says what is true.
-        </p>
-        <nav aria-label="Standards and product information">
-          <a href="/accessibility/">Accessibility</a>
-          <a href="/glossary/">Glossary</a>
-          <a href="/about/">About</a>
-        </nav>
-        <small class="home-footer-credit">Powered by Onyx Server · 2026</small>
-      </footer>
-    </main>
+      </div>
+    </PublicFrame>
   );
 }

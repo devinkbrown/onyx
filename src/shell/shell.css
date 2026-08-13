@@ -334,15 +334,12 @@
     background var(--dur) var(--ease);
 }
 
-.shell-primary-nav-btn span {
-  display: grid;
+.shell-primary-nav-icon {
+  display: inline-grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
+  min-width: 24px;
   color: var(--paper-mute);
   font: 700 0.78rem/1 var(--font-mono);
-  background: color-mix(in oklab, var(--stone-2) 30%, transparent);
 }
 
 .shell-primary-nav-btn:hover {
@@ -356,9 +353,55 @@
   background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
 }
 
-.shell-primary-nav-btn--active span {
-  color: var(--ink);
-  background: var(--lapis-bright);
+.shell-primary-nav-btn--active .shell-primary-nav-icon {
+  color: var(--lapis-bright);
+}
+
+/* A selected collection is the list the user asked to browse. It is kept
+   distinct from the current conversation surface, which owns aria-current. */
+.shell-primary-nav-btn--selected:not(.shell-primary-nav-btn--active) {
+  color: var(--paper);
+  border-color: color-mix(in oklab, var(--lapis) 22%, var(--seam-faint));
+  background: color-mix(in oklab, var(--lapis-deep) 10%, transparent);
+}
+
+.shell-primary-nav-btn--selected:not(.shell-primary-nav-btn--active) .shell-primary-nav-icon {
+  color: var(--lapis);
+}
+
+/* You opens an account dialog rather than changing the current location. */
+.shell-primary-nav-btn--dialog-open {
+  color: var(--gold-bright);
+  border-color: color-mix(in oklab, var(--gold) 42%, var(--seam-faint));
+  background: color-mix(in oklab, var(--gold) 10%, transparent);
+}
+
+.shell-primary-nav-btn--dialog-open .shell-primary-nav-icon {
+  color: var(--gold-bright);
+}
+
+@media (forced-colors: active) {
+  .shell-primary-nav-btn--active {
+    color: HighlightText;
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .shell-primary-nav-btn--active .shell-primary-nav-icon {
+    color: HighlightText;
+  }
+
+  .shell-primary-nav-btn--selected:not(.shell-primary-nav-btn--active),
+  .shell-primary-nav-btn--dialog-open {
+    color: Highlight;
+    background: ButtonFace;
+    border-color: Highlight;
+  }
+
+  .shell-primary-nav-btn--selected:not(.shell-primary-nav-btn--active) .shell-primary-nav-icon,
+  .shell-primary-nav-btn--dialog-open .shell-primary-nav-icon {
+    color: Highlight;
+  }
 }
 
 .shell-sidebar-filter {
@@ -636,6 +679,62 @@
   padding-bottom: var(--space-2);
 }
 
+.shell-sidebar-collection-heading {
+  margin: 0;
+  padding: 2px 0 0;
+  color: var(--paper);
+  font: 650 0.82rem/1.25 var(--font-sans);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.shell-conversation-spine {
+  position: relative;
+  min-height: 100%;
+}
+
+.shell-conversation-spine-head {
+  display: grid;
+  gap: 3px;
+  padding: var(--space-3) var(--space-3) var(--space-2);
+}
+
+.shell-conversation-spine-label {
+  margin: 0;
+  color: var(--paper-mute);
+  font: 700 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.shell-conversation-spine-content {
+  position: relative;
+}
+
+@media (min-width: 901px) {
+  .shell-conversation-spine-content {
+    margin-left: 14px;
+    border-left: 1px solid var(--seam-faint);
+    padding-left: 10px;
+  }
+
+  .shell-conversation-spine-content > .shell-sidebar-section {
+    position: relative;
+  }
+
+  .shell-conversation-spine-content > .shell-sidebar-section::before {
+    content: '';
+    position: absolute;
+    left: -15px;
+    top: calc(var(--space-3) + 0.3rem);
+    width: 5px;
+    height: 5px;
+    border: 1px solid var(--seam);
+    border-radius: 50%;
+    background: var(--ink);
+  }
+}
+
 .shell-status-stack {
   display: flex;
   flex-direction: column;
@@ -863,15 +962,15 @@
    same treatment selected controls get in src/styles/a11y-media.css.
    SC 1.4.1 Use of Color. */
 @media (forced-colors: active) {
-  .shell-channel-item[aria-current='page'] {
+  .shell-channel-item[aria-current='location'] {
     color: HighlightText;
     background: Highlight;
     border-color: Highlight;
   }
 
-  .shell-channel-item[aria-current='page'] .shell-channel-sigil,
-  .shell-channel-item[aria-current='page'] .shell-channel-name,
-  .shell-channel-item[aria-current='page'] .shell-channel-time {
+  .shell-channel-item[aria-current='location'] .shell-channel-sigil,
+  .shell-channel-item[aria-current='location'] .shell-channel-name,
+  .shell-channel-item[aria-current='location'] .shell-channel-time {
     color: HighlightText;
   }
 }
@@ -6312,21 +6411,13 @@
     transition: color var(--dur) var(--ease), background var(--dur-micro) var(--ease);
   }
 
-  .shell-mobile-nav-btn:nth-child(2) { --mobile-accent: var(--lapis-bright); }
-  .shell-mobile-nav-btn:nth-child(3) { --mobile-accent: var(--ok); }
-  .shell-mobile-nav-btn:nth-child(4) { --mobile-accent: var(--shu); }
-  .shell-mobile-nav-btn:nth-child(5) { --mobile-accent: var(--gold); }
-
-  .shell-mobile-nav-btn b {
-    width: 1.55rem;
-    height: 1.4rem;
-    display: grid;
+  .shell-mobile-nav-icon {
+    display: inline-grid;
     place-items: center;
-    border-radius: var(--r-sm);
+    min-width: 1.55rem;
     font-size: 1rem;
     line-height: 1;
     font-weight: 400;
-    background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 36%, transparent);
   }
   .shell-mobile-nav-btn:active {
     color: var(--lapis-bright);
@@ -6334,11 +6425,19 @@
   }
   .shell-mobile-nav-btn:hover,
   .shell-mobile-nav-btn--active { color: var(--mobile-accent); }
-  .shell-mobile-nav-btn--active b {
-    color: var(--on-accent, var(--ink));
-    background: var(--mobile-accent);
-    box-shadow: none;
-    border: 1px solid color-mix(in oklab, var(--mobile-accent) 60%, var(--stone-line));
+  .shell-mobile-nav-btn--active .shell-mobile-nav-icon {
+    color: var(--mobile-accent);
+  }
+  .shell-mobile-nav-btn--selected:not(.shell-mobile-nav-btn--active) {
+    color: var(--paper);
+    box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--mobile-accent) 72%, transparent);
+  }
+  .shell-mobile-nav-btn--dialog-open {
+    color: var(--gold-bright);
+    box-shadow: inset 0 -2px 0 var(--gold);
+  }
+  .shell-mobile-nav-btn--dialog-open .shell-mobile-nav-icon {
+    color: var(--gold-bright);
   }
   .shell-mobile-nav-btn:focus-visible {
     outline: var(--focus-ring, 2px solid var(--lapis));
@@ -6627,9 +6726,8 @@
     font-size: 0.62rem;
   }
 
-  .shell-mobile-nav-btn b {
-    width: 1.25rem;
-    height: 1.25rem;
+  .shell-mobile-nav-icon {
+    min-width: 1.25rem;
     font-size: 0.9rem;
   }
 
@@ -6681,11 +6779,17 @@
   }
 
   .shell-mobile-nav-btn--active,
-  .shell-mobile-nav-btn--active b,
   .shell-composer-send {
     background: Highlight;
     color: HighlightText;
     border-color: Highlight;
+  }
+
+  .shell-mobile-nav-btn--selected:not(.shell-mobile-nav-btn--active),
+  .shell-mobile-nav-btn--dialog-open {
+    background: ButtonFace;
+    color: Highlight;
+    border: 1px solid Highlight;
   }
 
   .shell-mobile-nav-btn--active::after {
@@ -6869,9 +6973,8 @@
     line-height: 1.2;
   }
 
-  .shell-mobile-nav-btn b {
-    width: 32px;
-    height: 32px;
+  .shell-mobile-nav-icon {
+    min-width: 32px;
     flex: none;
     font-size: 24px;
   }

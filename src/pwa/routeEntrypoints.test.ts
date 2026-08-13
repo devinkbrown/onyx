@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -93,13 +94,71 @@ afterEach(() => {
   }
 });
 
+function readLiteralPathStrings(initializer: ts.JsxAttributeValue): readonly string[] {
+  if (ts.isStringLiteral(initializer)) return [initializer.text];
+  if (!ts.isJsxExpression(initializer) || initializer.expression === undefined) {
+    throw new Error('Route path must be a string literal or a literal string array');
+  }
+  const expression = initializer.expression;
+  if (ts.isStringLiteral(expression)) return [expression.text];
+  if (!ts.isArrayLiteralExpression(expression)) {
+    throw new Error('Route path expression must be a literal array of string literals');
+  }
+  return expression.elements.map((element) => {
+    if (ts.isSpreadElement(element) || !ts.isStringLiteral(element)) {
+      throw new Error('Route path arrays may contain only string literals');
+    }
+    return element.text;
+  });
+}
+
+function routerPathNames(sourceText: string): readonly string[] {
+  const source = ts.createSourceFile(
+    'src/index.tsx',
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const names: string[] = [];
+  let routeCount = 0;
+  let pathAttributeCount = 0;
+
+  function visit(node: ts.Node): void {
+    const element = ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node) ? node : undefined;
+    if (element && element.tagName.getText(source) === 'Route') {
+      routeCount += 1;
+      let paths: readonly string[] | undefined;
+      for (const attribute of element.attributes.properties) {
+        if (ts.isJsxSpreadAttribute(attribute)) {
+          throw new Error('Route declarations cannot use attribute spreads');
+        }
+        if (!ts.isJsxAttribute(attribute) || attribute.name.getText(source) !== 'path') continue;
+        if (attribute.initializer === undefined) {
+          throw new Error('Route path attribute is missing a value');
+        }
+        paths = readLiteralPathStrings(attribute.initializer);
+      }
+      if (paths === undefined) throw new Error('Route declaration is missing a path attribute');
+      if (paths.length === 0) throw new Error('Route path produced no string literals');
+      pathAttributeCount += 1;
+      for (const path of paths) {
+        const canonical = path === '/' ? path : path.replace(/\/+$/u, '') || '/';
+        if (canonical === '/') continue;
+        names.push(canonical.replace(/^\//u, ''));
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(source);
+  expect(pathAttributeCount).toBe(routeCount);
+  return names;
+}
+
 describe('SPA route entrypoint materializer', () => {
   it('covers every non-root route in the Solid router table', () => {
-    // Whitespace-robust: lazy PublicInfo routes use multiline <Route\n path=.../>.
-    const routes = [...routeTable.matchAll(/<Route\s+path="\/([^"/]+)\/?"/g)]
-      .map((match) => match[1])
-      .filter((route): route is string => route !== undefined);
-
+    const routes = routerPathNames(routeTable);
     expect([...new Set(routes)].sort()).toEqual(Object.keys(expected).sort());
   });
 

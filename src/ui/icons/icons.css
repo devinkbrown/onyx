@@ -1,0 +1,106 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/**
+ * icons.css — foundational icon system styles.
+ *
+ * - currentColor inheritance for text/accent colour awareness
+ * - forced-colors mode support (high-contrast, Windows High Contrast, etc.)
+ * - Size classes (sm, md, lg, xl)
+ * - No decorative animations or hover states (icons are passive; mount on buttons for interactivity)
+ */
+
+/**
+ * Icon wrapper — inline flex container, size-locked.
+ * Inherits text colour via currentColor on SVG.
+ */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+/**
+ * SVG element — use currentColor for all strokes/fills.
+ * This allows icons to respond to parent text colour and accessibility overrides.
+ */
+.icon-svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  fill: none;
+  /* Fallback for forced-colors mode: outline edges become visible. */
+  forced-colors-adjust: none;
+}
+
+/**
+ * High-contrast mode support:
+ * - Force icon borders visible (stroke outline)
+ * - Ensure contrast against any background
+ */
+@media (prefers-contrast: more) {
+  .icon-svg {
+    stroke-width: 2.1;
+  }
+}
+
+/**
+ * Forced-colors mode (Windows High Contrast, etc.):
+ * - SVG inherits CanvasText colour automatically
+ * - forced-color-adjust: none prevents system colours from overriding currentColor
+ */
+@supports (forced-color-adjust: none) {
+  .icon-svg {
+    forced-color-adjust: none;
+    stroke: CanvasText;
+    fill: CanvasText;
+  }
+
+  .icon-svg[opacity] {
+    opacity: 0.4;
+  }
+
+  /* Ensure secondary fills (e.g. opacity="0.12" circles) remain visible in forced-colors. */
+  .icon-svg circle[opacity],
+  .icon-svg rect[opacity],
+  .icon-svg path[opacity] {
+    fill: CanvasText;
+    opacity: 0.3;
+    stroke: CanvasText;
+  }
+}
+
+/**
+ * Size variants: sm (16), md (24), lg (32), xl (48).
+ * Applied via inline style on the wrapper; CSS classes for reference.
+ */
+.icon-size-sm {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-size-md {
+  width: 24px;
+  height: 24px;
+}
+
+.icon-size-lg {
+  width: 32px;
+  height: 32px;
+}
+
+.icon-size-xl {
+  width: 48px;
+  height: 48px;
+}
+
+/**
+ * Reduced-motion support: ensure icons respect prefers-reduced-motion.
+ * (Current icon set has no animations, but this guard prevents future decorative motion.)
+ */
+@media (prefers-reduced-motion: reduce) {
+  .icon-svg {
+    animation: none !important;
+    transition: none !important;
+  }
+}

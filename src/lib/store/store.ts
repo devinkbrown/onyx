@@ -84,6 +84,11 @@ import {
 } from '@/lib/composer/scheduledSend';
 import { deviceKeys, isEnvelope, isValidPeerPublicKey, normalizePeerDeviceKeys } from '@/lib/e2ee/dmCipher';
 import { isGroupEnvelope } from '@/lib/e2ee/groupEnvelope';
+import type { GroupControlRuntimeState } from '@/lib/e2ee/groupControlRuntime';
+import {
+  createGroupControlBridge,
+  type GroupControlBridge,
+} from './groupControlBridge';
 import {
   hasEncryptedMessageBoundary,
   isEncryptedWireText,
@@ -671,6 +676,8 @@ export interface OnyxState {
   reconnectIn: number;
   /** Whether auto-reconnect is enabled */
   autoReconnect: boolean;
+  /** Safe inbound group-control metadata. It is never an encryption-readiness predicate. */
+  groupControlRuntime: GroupControlRuntimeState | null;
   /**
    * True when a connected flush finished with owned outbox rows still waiting
    * and the auto-retry budget is exhausted. Composer + Home chrome surface this
@@ -5391,6 +5398,50 @@ const _initialInvisibleMode = loadInvisibleMode();
 // codec promise can never resurrect a call the user already left.
 let _voiceJoinAttempt = 0;
 
+// Group-control ownership is intentionally module-private. Zustand receives
+// only GroupControlRuntimeState, never the mutable integration or signer-store
+// handles. The token closes stale async subscriptions before client replacement.
+let _groupControlBridge: GroupControlBridge | null = null;
+let _groupControlOwnerToken = 0;
+
+function _groupControlFor(client: IRCClient): GroupControlBridge | null {
+  const bridge = _groupControlBridge;
+  return bridge?.client === client ? bridge : null;
+}
+
+function _destroyGroupControlBridge(set: SetFn, client?: IRCClient): Promise<void> {
+  const bridge = _groupControlBridge;
+  if (!bridge || (client && bridge.client !== client)) return Promise.resolve();
+  _groupControlBridge = null;
+  _groupControlOwnerToken += 1;
+  // Clear the safe projection before any transport owner is destroyed.
+  set({ groupControlRuntime: null });
+  return bridge.destroy();
+}
+
+function _createGroupControlBridge(
+  client: IRCClient,
+  endpoint: string,
+  set: SetFn,
+  get: GetFn,
+): GroupControlBridge {
+  const ownerToken = ++_groupControlOwnerToken;
+  const bridge = createGroupControlBridge({
+    client,
+    endpoint,
+    authenticatedAccount: () => get().server?.account ?? _saslAccount,
+    isConnected: () => get().client === client && get().connectionStatus === 'connected',
+    isCurrent: () => _groupControlOwnerToken === ownerToken && _groupControlBridge === bridge,
+    publish: (runtime) => {
+      if (_groupControlOwnerToken !== ownerToken || _groupControlBridge !== bridge) return;
+      set({ groupControlRuntime: runtime });
+    },
+  });
+  _groupControlBridge = bridge;
+  bridge.start();
+  return bridge;
+}
+
 export const store = createStore<OnyxState>()(
   subscribeWithSelector<OnyxState>((set, get) => ({
     status: 'disconnected',
@@ -5399,6 +5450,7 @@ export const store = createStore<OnyxState>()(
     connectionStatus: 'disconnected',
     reconnectIn: 0,
     autoReconnect: false,
+    groupControlRuntime: null,
     outboxDeliveryFailed: false,
     latencyMs: null,
     serverStats: null,
@@ -5636,7 +5688,10 @@ export const store = createStore<OnyxState>()(
     connect({ url, nick, password, realname, hasClientCert }) {
       const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
       const prev = get().client;
-      if (prev) prev.destroy();
+      if (prev) {
+        void _destroyGroupControlBridge(set, prev);
+        prev.destroy();
+      }
       _resetAccountBoundState(set, true);
       // Clear any in-progress reconnect countdown
       _clearReconnectCountdown();
@@ -5741,6 +5796,7 @@ export const store = createStore<OnyxState>()(
           _clearReconnectCountdown();
           _reconnectAttempts = 0;
           set({ status: 'connected', connectionStatus: 'connected', reconnectIn: 0, autoReconnect: true, connectedAt: new Date() });
+          _groupControlFor(client)?.onConnected();
           get().addServerLog(hasRegistered ? 'Reconnected.' : `Connected to ${get().server?.url ?? 'server'}.`);
           // On a RECONNECT without onyx/session-sync, re-establish every channel
           // the UI still shows. A guest's reconnect is a brand-new session —
@@ -5775,6 +5831,9 @@ export const store = createStore<OnyxState>()(
         },
         onDisconnected(reason) {
           if (get().client !== client) return;
+          // Detach group-control admission and invalidate directory work before
+          // any reconnect countdown can reuse the transport owner.
+          _groupControlFor(client)?.onDisconnected();
           // A credential/mechanism failure is deterministic, not a transient
           // network flap. Retrying the same rejected SASL exchange used to burn
           // through the entire reconnect backoff before finally returning the
@@ -5914,6 +5973,7 @@ export const store = createStore<OnyxState>()(
           get().addRawLogEntry(dir, line);
         },
       });
+      _createGroupControlBridge(client, url, set, get);
       client.onCapChange = () => {
         if (get().client !== client) return;
         // mediaAvailable is NOT a cap: MEDIA is exposed as a plain channel
@@ -5942,6 +6002,7 @@ export const store = createStore<OnyxState>()(
         // immediately instead of leaving it on "connecting" forever.
         _stopRosterPoll();
         _stopScheduledDispatch();
+        void _destroyGroupControlBridge(set, client);
         client.destroy();
         set({
           client: null,
@@ -6005,6 +6066,7 @@ export const store = createStore<OnyxState>()(
               networkName: net,
               serverCapabilities: caps,
             });
+            void _groupControlFor(client)?.refreshAuthenticatedAccount();
             _syncOwnCustomStatusActivity(get, set);
             unsub();
           }
@@ -6045,7 +6107,11 @@ export const store = createStore<OnyxState>()(
       // and close the provisional room so it cannot resurrect after reconnect.
       if (get().voice.callState !== 'idle') get().leaveVoiceChannel();
       else _voiceJoinAttempt += 1;
-      get().client?.destroy();
+      const client = get().client;
+      if (client) {
+        void _destroyGroupControlBridge(set, client);
+        client.destroy();
+      }
       _resetAccountBoundState(set, true, true);
       set({
         client: null,
@@ -10084,6 +10150,9 @@ export const store = createStore<OnyxState>()(
 
         // ── Registration ──────────────────────────────────────────────────
         case '001': { // RPL_WELCOME
+          const registrationClient = get().client;
+          const groupControl = registrationClient ? _groupControlFor(registrationClient) : null;
+          groupControl?.onRegistered(msg);
           _addSessionRestoreIdentity(get, params[0]);
           _addSessionRestoreIdentity(get, _saslAccount);
           _addSessionRestoreIdentity(get, _connectNick);
@@ -10251,6 +10320,8 @@ export const store = createStore<OnyxState>()(
           } else {
             _stopNickReclaim();
           }
+          void (authenticated.client ? _groupControlFor(authenticated.client) : null)
+            ?.setAuthenticatedAccount(account);
           break;
         }
 
@@ -10482,6 +10553,8 @@ export const store = createStore<OnyxState>()(
                   : {}),
               };
             });
+            const partClient = get().client;
+            if (partClient) _groupControlFor(partClient)?.onRoomPart(ch);
           } else {
             _excludeNickFromNames(key, parter);
             let removed = false;
@@ -10635,6 +10708,10 @@ export const store = createStore<OnyxState>()(
             }
             return { channels };
           });
+          if (isSelf) {
+            const kickClient = get().client;
+            if (kickClient) _groupControlFor(kickClient)?.onRoomKick(ch);
+          }
           if (!isSelf && removed) {
             get().addChannelEvent(ch, { type: 'kick', nick: target, text: `${target} was kicked by ${actor}${reason ? ` (${reason})` : ''}`, time: new Date() });
           }
@@ -11164,6 +11241,9 @@ export const store = createStore<OnyxState>()(
                 };
               });
               _saslAccount = null;
+              const logoutClient = get().client;
+              void (logoutClient ? _groupControlFor(logoutClient) : null)
+                ?.setAuthenticatedAccount(null);
               get().addServiceNotice('Account', text);
               break;
             }
@@ -13384,6 +13464,8 @@ export const store = createStore<OnyxState>()(
             } else {
               _stopNickReclaim();
             }
+            void (authenticated.client ? _groupControlFor(authenticated.client) : null)
+              ?.setAuthenticatedAccount(account900);
           }
           break;
         }
@@ -13424,6 +13506,9 @@ export const store = createStore<OnyxState>()(
           if (!_sameOutboxOwner(previousOwner, selectDeviceMemoryOwner(get()))) {
             _replaceOwnedMonitorContacts(get, set, true);
           }
+          const loggedOutClient = get().client;
+          void (loggedOutClient ? _groupControlFor(loggedOutClient) : null)
+            ?.setAuthenticatedAccount(null);
           break;
         }
 

@@ -5,8 +5,8 @@ import { createMemo, createResource, createSignal, onCleanup } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { fetchNetworkStatus, publicMeshFeedLabel, publicMeshFeedState } from '@/lib/stats/status';
 import { AccessibilityStatement } from '@/shell/AccessibilityStatement';
+import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
-import { PublicFooter } from './PublicFooter';
 
 /**
  * Onyx /about — full editorial deep-dive.
@@ -33,9 +33,12 @@ export default function About() {
     void refetch();
   }, 30_000);
   onCleanup(() => clearInterval(refreshTimer));
-  const feedState = createMemo(() => publicMeshFeedState(status.latest, nowMs()));
+  const feedState = createMemo(() => (
+    status.loading ? 'loading' : publicMeshFeedState(status.latest, nowMs())
+  ));
   return (
-    <main class="r ab-ocean">
+    <PublicFrame currentPath="/about/" mainLabel="About Onyx">
+      <div class="ui-root r ab-ocean">
       {/* ── Living atmosphere (shared with landing, blue-tinted here) ── */}
       <div class="r-ground" aria-hidden="true" />
       <div class="r-flecks" aria-hidden="true" />
@@ -53,24 +56,6 @@ export default function About() {
         <circle class="node" cx="1060" cy="770" r="2.5" />
       </svg>
       <div class="r-grain" aria-hidden="true" />
-
-      {/* ── Top status bar ── */}
-      <header class="r-status" role="banner">
-        <a class="brand" href="/" aria-label="Onyx home">
-          <Mascot variant="mark" aria-label="Onyx" />ONYX
-        </a>
-        <nav aria-label="About page navigation">
-          <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="#protocol">Protocol</a>
-          <a class="hideable" href="#media">Media</a>
-          <a class="hideable" href="#mesh">Mesh</a>
-          <a class="hideable" href="#accessibility">Accessibility</a>
-          <span class="live hideable" data-feed-state={feedState()}>
-            <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
-          </span>
-          <a class="enter" href="/app/">Open Onyx</a>
-        </nav>
-      </header>
 
       {/* ── Hero ── */}
       <section class="r-wrap ab-hero" aria-labelledby="about-hero-heading">
@@ -91,6 +76,30 @@ export default function About() {
           cryptography, the mesh, and what each one means for the people who live here
           and the developers who build on it.
         </p>
+        <div
+          class="ab-feed"
+          data-feed-state={feedState()}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span class="ab-feed__mark" aria-hidden="true" />
+          <span>{publicMeshFeedLabel(feedState())}</span>
+          <span class="ab-feed__detail">
+            {feedState() === 'current'
+              ? 'A current public mesh observation is available.'
+              : 'This report state does not establish current network availability.'}
+          </span>
+        </div>
+        <nav class="ab-topics" aria-label="About topics">
+          <a href="#protocol">Protocol</a>
+          <a href="#media">Media</a>
+          <a href="#e2ee">Encryption</a>
+          <a href="#mesh">Mesh</a>
+          <a href="#services">Services</a>
+          <a href="#developer">Build</a>
+          <a href="#accessibility">Accessibility</a>
+        </nav>
       </section>
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
@@ -770,7 +779,7 @@ export default function About() {
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      <PublicFooter />
-    </main>
+      </div>
+    </PublicFrame>
   );
 }

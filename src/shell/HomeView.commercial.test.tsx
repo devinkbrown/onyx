@@ -9,7 +9,7 @@
  * people or occupancy).
  */
 import 'fake-indexeddb/auto';
-import { cleanup, render, screen, within } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
@@ -264,5 +264,58 @@ describe('HomeView — commercial public hierarchy', () => {
     render(() => <HomeView />);
     expect(screen.queryByRole('region', { name: 'Live now' })).not.toBeInTheDocument();
     expect(store.getState().voice.callState).toBe('idle');
+  });
+
+  it('paints the Current Ledger welcome and keeps Live now after Continue', () => {
+    seedHierarchy();
+    store.setState({
+      voice: {
+        ...store.getState().voice,
+        callState: 'ringing_in',
+        callChannel: '#mentions',
+        callWith: '',
+      },
+    });
+    const joinVoice = vi.spyOn(store.getState(), 'joinVoiceChannel');
+    const navigate = vi.spyOn(store.getState(), 'navigate');
+    render(() => <HomeView />);
+
+    expect(screen.getByText('Current ledger')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Welcome, me.' })).toBeInTheDocument();
+    const cont = screen.getByRole('region', { name: 'Continue where you left off' });
+    const live = screen.getByRole('region', { name: 'Live now' });
+    expect(cont.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Incoming call · #mentions/ }));
+    expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#mentions' });
+    expect(joinVoice).not.toHaveBeenCalled();
+  });
+
+  it('marks the live backlog caught up through Home without navigating or joining media', () => {
+    seedHierarchy();
+    const markRead = vi.spyOn(store.getState(), 'markRead');
+    const navigate = vi.spyOn(store.getState(), 'navigate');
+    const joinVoice = vi.spyOn(store.getState(), 'joinVoiceChannel');
+    render(() => <HomeView />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Mark all caught up/ }));
+
+    expect(markRead).toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(joinVoice).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /Mark all caught up/ })).not.toBeInTheDocument();
+  });
+
+  it('does not mark rooms read when opening Needs you or resume', () => {
+    seedHierarchy();
+    const markRead = vi.spyOn(store.getState(), 'markRead');
+    const navigate = vi.spyOn(store.getState(), 'navigate').mockImplementation(() => {});
+    render(() => <HomeView />);
+    fireEvent.click(screen.getByRole('button', { name: /Open #mentions, 3 unread, 2 mentions/ }));
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Resume #mentions at your first unread message, 3 unread, 2 mentions',
+    }));
+    expect(navigate).toHaveBeenCalled();
+    expect(markRead).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, cleanup, waitFor } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import Download from './Download';
 import {
   BSD_DOWNLOAD_CARDS,
@@ -126,6 +128,49 @@ describe('Download page', () => {
     vi.restoreAllMocks();
   });
 
+  it('uses PublicFrame as the only document frame and exposes canonical navigation', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 404, text: async () => '', json: async () => null })),
+    );
+    const { container } = render(() => <Download />);
+
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.getByRole('main', { name: 'Onyx downloads' })).toHaveAttribute('id', 'public-main');
+    expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveAttribute('href', '#public-main');
+    expect(container.querySelectorAll('main')).toHaveLength(1);
+    expect(container.querySelector('main main, main header, main footer')).toBeNull();
+    expect(container.querySelector('.ui-root.dl-page')).toBeTruthy();
+    expect(within(screen.getByRole('navigation', { name: 'Primary navigation' }))
+      .getByRole('link', { name: 'Downloads' })).toHaveAttribute('aria-current', 'page');
+    const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' })
+      .filter((link) => link.classList.contains('public-frame__open'));
+    expect(openOnyx).toHaveLength(1);
+    expect(openOnyx[0]).toHaveAttribute('href', '/app/');
+    expect(screen.getByRole('heading', { level: 1, name: /Windows, Linux,\s*FreeBSD & OpenBSD/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'What this is — and is not' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Native packages' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Verify a download' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Planned macOS architectures' })).toBeInTheDocument();
+  });
+
+  it('keeps the canonical mobile disclosure keyboard operable', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 404, text: async () => '', json: async () => null })),
+    );
+    render(() => <Download />);
+    const toggle = screen.getByRole('button', { name: 'Open navigation menu' });
+    expect(toggle).toHaveAttribute('aria-controls', 'public-primary-navigation');
+    toggle.focus();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+  });
+
   it('turns the legacy install URL into the current package and runtime guide', () => {
     window.history.replaceState(null, '', '/install/');
     const { getByRole } = render(() => <Download />);
@@ -137,6 +182,9 @@ describe('Download page', () => {
     );
     expect(getByRole('heading', { name: 'Install Onyx' })).toBeInTheDocument();
     expect(getByRole('heading', { name: /install on linux/i })).toBeInTheDocument();
+    expect(getByRole('main', { name: 'Onyx downloads' })).toHaveAttribute('id', 'public-main');
+    expect(within(getByRole('navigation', { name: 'Primary navigation' }))
+      .getByRole('link', { name: 'Downloads' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('renders four active lanes and distinguishes an unavailable catalog from missing artifacts', async () => {
@@ -301,5 +349,26 @@ describe('Download page', () => {
     const page = getByTestId('download-page').textContent ?? '';
     expect(page).not.toMatch(/open onyx-0\.1\.3-macos-/i);
     expect(page).toMatch(/not published yet/i);
+  });
+});
+
+describe('Download page — source structure', () => {
+  const src = readFileSync(resolve(__dirname, 'Download.tsx'), 'utf8');
+  const css = readFileSync(resolve(__dirname, 'download.css'), 'utf8');
+
+  it('uses PublicFrame without duplicating document chrome', () => {
+    expect(src).toContain('import { PublicFrame }');
+    expect(src).toContain('<PublicFrame currentPath="/download/" mainLabel="Onyx downloads">');
+    expect(src).not.toContain('<main');
+    expect(src).not.toContain('<header');
+    expect(src).not.toContain('<PublicFooter');
+  });
+
+  it('keeps route-scoped 44px targets, reduced-motion, and forced-colors', () => {
+    expect(css).toContain('min-height: var(--target-min, 44px)');
+    expect(css).toContain('prefers-reduced-motion');
+    expect(css).toContain('forced-colors');
+    expect(css).toContain('@media (max-width: 42rem) and (max-height: 30rem)');
+    expect(css).not.toContain('backdrop-filter');
   });
 });

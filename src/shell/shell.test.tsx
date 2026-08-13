@@ -32,6 +32,7 @@ import { _resetVaultForTests, queueOutbox, saveMessages } from '@/lib/vault/hist
 import { setMountedCadenceMediaEngine } from '@/lib/mediaEngineMount';
 import { Spotlight } from '@/chat/spotlight';
 import { AppShell, _setMediaModuleLoaderForTests } from './AppShell';
+import { DEFAULT_WINDOW_SIZE } from './messageWindow';
 
 // AppShell lazily mounts the media engine on Join voice/video. Keep that path
 // off the real codec graph in unit tests.
@@ -196,9 +197,9 @@ describe('AppShell', () => {
       // Act
       const { getAllByRole } = render(() => <AppShell />);
 
-      // Assert — the active channel button has aria-current=page
+      // Assert — the active conversation row has aria-current=location.
       const buttons = getAllByRole('button', { name: /#general/ });
-      const activeBtn = buttons.find((b) => b.getAttribute('aria-current') === 'page');
+      const activeBtn = buttons.find((b) => b.getAttribute('aria-current') === 'location');
       expect(activeBtn).toBeDefined();
     });
   });
@@ -600,7 +601,7 @@ describe('AppShell', () => {
       expect(within(boosts).getByTitle('alice +49')).toBeInTheDocument();
     });
 
-    it('renders a since-you-left digest from the unread boundary', () => {
+    it('renders a since-you-left digest from the unread boundary', async () => {
       const scrollIntoView = vi.fn();
       Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
         value: scrollIntoView,
@@ -637,8 +638,10 @@ describe('AppShell', () => {
       expect(within(digest).getByText('carol')).toBeInTheDocument();
 
       fireEvent.click(within(digest).getByRole('button', { name: 'Review new messages' }));
-      expect(scrollIntoView).toHaveBeenCalled();
-      expect(screen.queryByRole('region', { name: 'Since you left' })).not.toBeInTheDocument();
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+      await waitFor(() => {
+        expect(screen.queryByRole('region', { name: 'Since you left' })).not.toBeInTheDocument();
+      });
       expect(store.getState().viewUnreadDividerId.has('#general')).toBe(false);
       expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
         target: '#general',
@@ -649,7 +652,115 @@ describe('AppShell', () => {
       });
     });
 
-    it('keeps a valid non-hash channel in reader and reviewed-anchor handoffs', () => {
+    it('reviews new messages from a historical start page only after the unread divider is handed off', async () => {
+      setPreference('readerMode', true);
+      const total = DEFAULT_WINDOW_SIZE + 30;
+      const unreadIndex = DEFAULT_WINDOW_SIZE + 10;
+      const unreadId = `m-${unreadIndex}`;
+      const lastIndex = total - 1;
+      const scrolledDividerWhileMapped: string[] = [];
+      const setupScroll = Element.prototype.scrollIntoView;
+      const scrollIntoView = vi.fn(function (this: HTMLElement) {
+        if (this.getAttribute('aria-label') === 'New messages') {
+          scrolledDividerWhileMapped.push(store.getState().viewUnreadDividerId.get('#general') ?? '');
+        }
+      });
+      Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+        configurable: true,
+        writable: true,
+        value: scrollIntoView,
+      });
+
+      const messages = Array.from({ length: total }, (_, index) => {
+        const message = makeMessage(`m-${index}`, index === unreadIndex ? 'bob' : 'alice', `line ${index}`, '#general');
+        return index === unreadIndex ? { ...message, highlight: true } : message;
+      });
+      const channel = makeChannel('#general', messages, [makeUser('alice'), makeUser('bob')]);
+      store.setState({
+        ...initialState,
+        server: memoryServer,
+        channels: new Map([['#general', channel]]),
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        viewUnreadDividerId: new Map([['#general', unreadId]]),
+      }, true);
+
+      try {
+        render(() => <AppShell />);
+
+        const feed = screen.getByRole('log', { name: 'Message history' });
+        fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+        expect(screen.getByText('line 0')).toBeInTheDocument();
+        expect(screen.queryByText(`line ${unreadIndex}`)).not.toBeInTheDocument();
+        expect(feed.querySelector('.shell-unread-divider')).toBeNull();
+
+        scrollIntoView.mockClear();
+        scrolledDividerWhileMapped.length = 0;
+        fireEvent.click(screen.getByRole('button', { name: 'Review new messages' }));
+
+        await waitFor(() => {
+          const divider = feed.querySelector('.shell-unread-divider');
+          expect(divider).not.toBeNull();
+          expect(document.activeElement).toBe(divider);
+          expect(store.getState().viewUnreadDividerId.get('#general')).toBe(unreadId);
+          expect(scrolledDividerWhileMapped).toContain(unreadId);
+        });
+        await waitFor(() => {
+          expect(store.getState().viewUnreadDividerId.has('#general')).toBe(false);
+        });
+        expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
+          target: '#general',
+          firstMessageId: unreadId,
+          messageCount: total - unreadIndex,
+          mentionCount: 1,
+          preview: `line ${lastIndex}`,
+        });
+        expect(feed.querySelectorAll('[data-message-search-id]').length).toBeLessThanOrEqual(DEFAULT_WINDOW_SIZE);
+      } finally {
+        Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+          configurable: true,
+          writable: true,
+          value: setupScroll,
+        });
+      }
+    });
+
+    it('does not clear the unread divider when review handoff cannot land', async () => {
+      setPreference('readerMode', true);
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-old', 'alice', 'Old note', '#general'),
+          makeMessage('msg-new-a', 'bob', 'New note one', '#general'),
+        ],
+        [makeUser('alice'), makeUser('bob')],
+      );
+      store.setState({
+        ...initialState,
+        server: memoryServer,
+        channels: new Map([['#general', channel]]),
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        viewUnreadDividerId: new Map([['#general', 'msg-new-a']]),
+      }, true);
+
+      render(() => <AppShell />);
+
+      const review = screen.getByRole('button', { name: 'Review new messages' });
+      store.setState({
+        viewUnreadDividerId: new Map([['#general', 'missing-id']]),
+      });
+      fireEvent.click(review);
+
+      await waitFor(() => {
+        expect(store.getState().viewUnreadDividerId.get('#general')).toBe('missing-id');
+      });
+      expect(readReviewHistory(MEMORY_OWNER)).toHaveLength(0);
+    });
+
+    it('keeps a valid non-hash channel in reader and reviewed-anchor handoffs', async () => {
       setPreference('readerMode', true);
       setPreference('localHistory', true);
       const channel = makeChannel(
@@ -677,8 +788,10 @@ describe('AppShell', () => {
       const digest = screen.getByRole('region', { name: 'Since you left' });
       expect(within(digest).getByText('1 message across 1 channel')).toBeInTheDocument();
       fireEvent.click(within(digest).getByRole('button', { name: 'Review new messages' }));
-      expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
-        target: '&ops', kind: 'channel', firstMessageId: 'ops-new',
+      await waitFor(() => {
+        expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
+          target: '&ops', kind: 'channel', firstMessageId: 'ops-new',
+        });
       });
       expect(screen.getByRole('region', { name: 'Device memory context' })).toHaveTextContent('&ops');
     });
@@ -1708,9 +1821,11 @@ describe('AppShell', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Open Messages' }));
 
       const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
-      expect(within(drawer).getByRole('region', { name: 'Direct messages' })).toBeInTheDocument();
+      expect(within(drawer).getByRole('region', { name: 'Messages · 0 conversations' })).toBeInTheDocument();
       expect(within(drawer).getByRole('searchbox', { name: 'Filter direct messages' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveAttribute('aria-current', 'page');
+      const messages = screen.getByRole('button', { name: 'Open Messages' });
+      expect(messages).not.toHaveAttribute('aria-current');
+      expect(messages).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('opens a truthful calls hub without starting a call', () => {
@@ -1732,7 +1847,14 @@ describe('AppShell', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Open You' }));
 
       expect(store.getState().showAccount).toBe(true);
-      expect(screen.getByRole('button', { name: 'Open You' })).toHaveAttribute('aria-current', 'page');
+      const you = screen.getByRole('button', { name: 'Open You' });
+      expect(you).not.toHaveAttribute('aria-current');
+      expect(you).toHaveAttribute('aria-expanded', 'true');
+      const primary = screen.getByRole('navigation', { name: 'Primary' });
+      const desktopYou = within(primary).getByRole('button', { name: 'You' });
+      expect(desktopYou).not.toHaveAttribute('aria-current');
+      expect(desktopYou).toHaveAttribute('aria-expanded', 'true');
+      expect(desktopYou).toHaveClass('shell-primary-nav-btn--dialog-open');
     });
 
     it('moves focus into the mobile channel drawer and restores it on Escape', async () => {

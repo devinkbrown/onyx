@@ -31,7 +31,9 @@ import { PresenceHeatline } from './PresenceHeatline';
 import { Facepile } from './Facepile';
 import { facepileInputsFromUsers } from './facepile';
 import { AiPolicyBadge } from './AiPolicyBadge';
+import { GroupControlRoomIndicator } from './GroupControlRoomIndicator';
 import { classifyCallsHubPresentation, type CallsHubPresentation } from './CallsHub';
+import { selectGroupControlRoom } from '@/lib/e2ee/groupControlSelectors';
 import type { AiPolicy } from '@/lib/irc/aiPolicyProp';
 import type { Channel } from '@/lib/irc/types';
 
@@ -147,6 +149,9 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     return view.kind === 'channel' ? selectChannelEvent(view.channel)(s) : null;
   }, scheduledEventsEqual);
   const account = useStore(selectAccount);
+  // This is a public, metadata-only snapshot. The mutable runtime, controls,
+  // identity tuple, and cryptographic material remain outside the UI store.
+  const groupControlRuntime = useStore((s) => s.groupControlRuntime);
   const voice = useStore((s) => s.voice);
   const voiceChannelParticipants = useStore((s) => s.voiceChannelParticipants);
   const speakingNicks = useStore((s) => s.speakingNicks);
@@ -235,6 +240,14 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
   // Active channel name for the settings panel (display-cased, e.g. "#general").
   const settingsChannel = createMemo(() => activeChannel()?.name ?? null);
+  // Keep the compact status room-local. A missing projection is intentionally
+  // silent rather than an invented encryption or recovery state.
+  const groupControlRoom = createMemo(() => {
+    const room = settingsChannel();
+    const runtime = groupControlRuntime();
+    if (!room || !runtime || !account()) return null;
+    return selectGroupControlRoom(runtime, room) ? room : null;
+  });
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [moreOpen, setMoreOpen] = createSignal(false);
   let moreMenuRef: HTMLDivElement | undefined;
@@ -655,6 +668,15 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 </svg>
                 <span class="shell-ribbon-action-label">Call</span>
               </button>
+            </Show>
+            <Show when={groupControlRoom()}>
+              {(room) => (
+                <GroupControlRoomIndicator
+                  room={room()}
+                  authenticated={Boolean(account())}
+                  projection={groupControlRuntime()}
+                />
+              )}
             </Show>
           </div>
 

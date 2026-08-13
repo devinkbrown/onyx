@@ -1,0 +1,312 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* ─────────────────────────────────────────────────────────────────────────────
+   SystemSpecimen — lab stylesheet.
+
+   This file is a CONSUMER, and it is held to the consumer contract in
+   token-contract.ts: no raw colour literals, no magic z-index, no hand-rolled
+   duration. Everything resolves through `--ui-*`. If a value is missing from
+   the token layer, the fix is to add the token — not to inline a hex here.
+
+   It is also the reference implementation of that contract. A reviewer should
+   be able to read this file and see exactly what an adopting surface is
+   allowed to look like.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ui-specimen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap-section);
+  max-inline-size: var(--ui-measure-shell);
+  margin-inline: auto;
+  padding: var(--ui-pad-region);
+  background: var(--ui-surface-canvas);
+  color: var(--ui-text-primary);
+  font-family: var(--ui-font-interface);
+  font-size: var(--ui-type-md);
+  line-height: var(--ui-leading-body);
+}
+
+/* ── Masthead ─────────────────────────────────────────────────────────────── */
+
+.ui-specimen__masthead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap-tight);
+  padding-block-end: var(--ui-space-5);
+  border-block-end: var(--ui-border-hairline) solid var(--ui-surface-seam);
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────────── */
+
+.ui-specimen__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap-group);
+  padding: var(--ui-pad-panel);
+  border: var(--ui-border-hairline) solid var(--ui-surface-line);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-base);
+  box-shadow: var(--ui-elev-1);
+}
+
+.ui-specimen__section > .ui-subheading {
+  margin-block-start: var(--ui-space-2);
+}
+
+/* ── Layout frame ─────────────────────────────────────────────────────────── */
+
+.ui-specimen__frame {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'rail panel'
+    'rail canvas'
+    'rail aside';
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2);
+  border: var(--ui-border-hairline) solid var(--ui-surface-line-faint);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-sunken);
+}
+
+@media (min-width: 60rem) {
+  .ui-specimen__frame {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 14rem);
+    grid-template-areas:
+      'rail panel  panel'
+      'rail canvas aside';
+  }
+}
+
+.ui-specimen__region {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap-tight);
+  padding: var(--ui-pad-control);
+  border: var(--ui-border-hairline) solid var(--ui-surface-line-faint);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-raised);
+  position: relative;
+  z-index: var(--ui-z-base);
+}
+
+.ui-specimen__region--rail {
+  grid-area: rail;
+  align-items: center;
+  min-inline-size: var(--ui-target-min);
+  background: var(--ui-surface-edge);
+  z-index: var(--ui-z-nav);
+}
+
+.ui-specimen__region--panel {
+  grid-area: panel;
+}
+
+.ui-specimen__region--canvas {
+  grid-area: canvas;
+  min-block-size: var(--ui-target-comfortable);
+}
+
+.ui-specimen__region--aside {
+  grid-area: aside;
+  background: var(--ui-surface-base);
+}
+
+/* ── Swatches ─────────────────────────────────────────────────────────────── */
+
+.ui-specimen__swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--ui-gap-row);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-specimen__swatch {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ui-gap-tight) var(--ui-space-3);
+  padding: var(--ui-space-2);
+  border: var(--ui-border-hairline) solid var(--ui-surface-line-faint);
+  border-radius: var(--ui-radius-sm);
+}
+
+.ui-specimen__swatch-chip {
+  grid-row: span 2;
+  inline-size: var(--ui-space-8);
+  block-size: var(--ui-space-8);
+  border: var(--ui-border-hairline) solid var(--ui-surface-line);
+  border-radius: var(--ui-radius-sm);
+}
+
+.ui-specimen__swatch-role {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-type-sm);
+}
+
+/* ── Definition lists ─────────────────────────────────────────────────────── */
+
+.ui-specimen__defs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap-row);
+  margin: 0;
+}
+
+.ui-specimen__def {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+  gap: var(--ui-space-2) var(--ui-space-4);
+  align-items: baseline;
+  padding-block: var(--ui-space-2);
+  border-block-start: var(--ui-border-hairline) solid var(--ui-surface-line-faint);
+}
+
+.ui-specimen__def:first-child {
+  border-block-start-style: none;
+}
+
+.ui-specimen__def > dt {
+  margin: 0;
+}
+
+.ui-specimen__def > dd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap-tight);
+  margin: 0;
+}
+
+@media (max-width: 48rem) {
+  .ui-specimen__def {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ui-specimen__type-note {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-type-sm);
+}
+
+/* ── Actions ──────────────────────────────────────────────────────────────── */
+
+.ui-specimen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-gap-row);
+}
+
+/* ── Truth states ─────────────────────────────────────────────────────────── */
+
+.ui-specimen__truths {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: var(--ui-gap-row);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-specimen__truth {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap-tight);
+  padding: var(--ui-pad-control);
+  border: var(--ui-border-hairline) solid var(--ui-surface-line);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-raised);
+}
+
+.ui-specimen__truth-meaning {
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-type-sm);
+}
+
+.ui-specimen__truth-token {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-type-xs);
+}
+
+.ui-specimen__footnote {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-type-sm);
+}
+
+/* ── Truth chip ───────────────────────────────────────────────────────────────
+   The chip is the reusable part: glyph + label, tinted by the proof token for
+   its state. The GLYPH and the LABEL are what carry the meaning; the colour is
+   reinforcement only. Removing the colour must leave the chip fully readable —
+   which is exactly what happens under forced-colors. */
+
+.ui-truth-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  align-self: flex-start;
+  min-block-size: var(--ui-target-inline-min);
+  padding-block: var(--ui-space-1);
+  padding-inline: var(--ui-space-2);
+  border: var(--ui-border-hairline) solid var(--ui-surface-line);
+  border-radius: var(--ui-radius-pill);
+  font-family: var(--ui-font-interface);
+  font-size: var(--ui-type-sm);
+  font-weight: var(--ui-weight-medium);
+  color: var(--ui-text-primary);
+  transition: var(--ui-transition-control);
+}
+
+.ui-truth-chip__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ui-space-4);
+  font-family: var(--ui-font-evidence);
+  font-size: var(--ui-type-md);
+  line-height: 1;
+}
+
+.ui-truth-chip__label {
+  white-space: nowrap;
+}
+
+/* Per-state tinting. Each block sets only the chip's ink and wash — never the
+   glyph, never the label text, because those must stay legible if the colour
+   is overridden by the OS. */
+[data-ui-truth='verified'] .ui-truth-chip {
+  color: var(--ui-proof-verified);
+  background: var(--ui-proof-verified-wash);
+  border-color: var(--ui-proof-verified);
+}
+
+[data-ui-truth='partial'] .ui-truth-chip {
+  color: var(--ui-proof-partial);
+  background: var(--ui-proof-partial-wash);
+  border-color: var(--ui-proof-partial);
+}
+
+[data-ui-truth='local'] .ui-truth-chip {
+  color: var(--ui-proof-local);
+  background: var(--ui-proof-local-wash);
+  border-color: var(--ui-proof-local);
+}
+
+[data-ui-truth='reconnecting'] .ui-truth-chip {
+  color: var(--ui-proof-reconnecting);
+  background: var(--ui-proof-reconnecting-wash);
+  border-color: var(--ui-proof-reconnecting);
+}
+
+[data-ui-truth='unavailable'] .ui-truth-chip {
+  color: var(--ui-proof-unavailable);
+  background: var(--ui-proof-unavailable-wash);
+  border-color: var(--ui-proof-unavailable);
+}
+
+[data-ui-truth='unknown'] .ui-truth-chip {
+  color: var(--ui-proof-unknown);
+  background: var(--ui-proof-unknown-wash);
+  border-color: var(--ui-proof-unknown);
+}

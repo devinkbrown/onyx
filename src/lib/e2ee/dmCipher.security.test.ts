@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   ENVELOPE_PREFIX,
+  _isValidDevicePrivateUsagesForTests,
   _resetDeviceKeysForTests,
   _resetSharedKeysForTests,
   _sharedKeyCacheSizeForTests,
@@ -35,6 +36,51 @@ async function makePeerDevice(): Promise<PeerDevice> {
   );
   const rawPublic = new Uint8Array(await crypto.subtle.exportKey('raw', keyPair.publicKey));
   return { keyPair, publicB64: toB64url(rawPublic) };
+}
+
+async function writeStoredDevice(value: unknown): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const open = indexedDB.open('onyx-keys', 1);
+    open.onupgradeneeded = () => {
+      if (!open.result.objectStoreNames.contains('device')) open.result.createObjectStore('device');
+    };
+    open.onsuccess = () => {
+      const db = open.result;
+      try {
+        const tx = db.transaction('device', 'readwrite');
+        tx.objectStore('device').put(value, 'dm-v1');
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
+      } catch (error) {
+        db.close();
+        reject(error);
+      }
+    };
+    open.onerror = () => reject(open.error);
+  });
+}
+
+async function readStoredDevice(): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open('onyx-keys', 1);
+    open.onsuccess = () => {
+      const db = open.result;
+      try {
+        const tx = db.transaction('device', 'readonly');
+        const get = tx.objectStore('device').get('dm-v1');
+        tx.oncomplete = () => { db.close(); resolve(get.result); };
+        tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
+      } catch (error) {
+        db.close();
+        reject(error);
+      }
+    };
+    open.onerror = () => reject(open.error);
+  });
+}
+
+async function rawPublic(keyPair: CryptoKeyPair): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.exportKey('raw', keyPair.publicKey));
 }
 
 async function peerSharedKey(peer: PeerDevice, otherPublicB64: string): Promise<CryptoKey> {
@@ -100,6 +146,99 @@ beforeEach(() => {
 });
 
 describe('dmCipher security contracts', () => {
+  it('accepts only the exact durable P-256 key capabilities', async () => {
+    const keys = requireValue(await deviceKeys(), 'local device keys');
+    const privateAlgorithm = keys.keyPair.privateKey.algorithm as EcKeyAlgorithm;
+    const publicAlgorithm = keys.keyPair.publicKey.algorithm as EcKeyAlgorithm;
+    expect(keys.keyPair.privateKey).toBeInstanceOf(CryptoKey);
+    expect(keys.keyPair.publicKey).toBeInstanceOf(CryptoKey);
+    expect(keys.keyPair.privateKey).toMatchObject({
+      type: 'private',
+      extractable: false,
+      usages: ['deriveBits'],
+    });
+    expect(keys.keyPair.publicKey).toMatchObject({ type: 'public', usages: [] });
+    expect(privateAlgorithm).toMatchObject({ name: 'ECDH', namedCurve: 'P-256' });
+    expect(publicAlgorithm).toMatchObject({ name: 'ECDH', namedCurve: 'P-256' });
+  });
+
+  it('accepts and reuses the exact legacy deriveKey plus deriveBits pair without minting replacement', async () => {
+    const legacy = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      false,
+      ['deriveKey', 'deriveBits'],
+    ) as CryptoKeyPair;
+    const expectedPublic = toB64url(await rawPublic(legacy));
+    await writeStoredDevice(legacy);
+
+    const first = requireValue(await deviceKeys(), 'legacy device keys');
+    expect(first.publicB64).toBe(expectedPublic);
+    expect(new Set(first.keyPair.privateKey.usages)).toEqual(new Set(['deriveKey', 'deriveBits']));
+
+    _resetDeviceKeysForTests();
+    const reloaded = requireValue(await deviceKeys(), 'reloaded legacy device keys');
+    expect(reloaded.publicB64).toBe(expectedPublic);
+    expect(new Set(reloaded.keyPair.privateKey.usages)).toEqual(new Set(['deriveKey', 'deriveBits']));
+  });
+
+  it('accepts only the exact new or legacy private usage set, independent of order', () => {
+    expect(_isValidDevicePrivateUsagesForTests(['deriveBits'])).toBe(true);
+    expect(_isValidDevicePrivateUsagesForTests(['deriveKey', 'deriveBits'])).toBe(true);
+    expect(_isValidDevicePrivateUsagesForTests(['deriveBits', 'deriveKey'])).toBe(true);
+    expect(_isValidDevicePrivateUsagesForTests([])).toBe(false);
+    expect(_isValidDevicePrivateUsagesForTests(['deriveKey'])).toBe(false);
+    expect(_isValidDevicePrivateUsagesForTests(['encrypt'])).toBe(false);
+    expect(_isValidDevicePrivateUsagesForTests(['deriveBits', 'encrypt'])).toBe(false);
+    expect(_isValidDevicePrivateUsagesForTests(['deriveKey', 'deriveBits', 'encrypt'])).toBe(false);
+    expect(_isValidDevicePrivateUsagesForTests(['deriveBits', 'deriveBits'])).toBe(false);
+  });
+
+  it('fails closed on corrupt, extractable, wrong-algorithm, wrong-usage, and mismatched stored pairs without replacement', async () => {
+    await writeStoredDevice({ corrupt: true });
+    await expect(deviceKeys()).resolves.toBeNull();
+    _resetDeviceKeysForTests();
+    await expect(deviceKeys()).resolves.toBeNull();
+    await expect(readStoredDevice()).resolves.toEqual({ corrupt: true });
+
+    const extractable = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveBits'],
+    ) as CryptoKeyPair;
+    const wrongAlgorithm = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-384' },
+      false,
+      ['deriveBits'],
+    ) as CryptoKeyPair;
+    const missingLegacyUsage = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      false,
+      ['deriveKey'],
+    ) as CryptoKeyPair;
+    const [privatePair, publicPair] = await Promise.all([
+      crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']),
+      crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']),
+    ]) as [CryptoKeyPair, CryptoKeyPair];
+    const mismatched = { privateKey: privatePair.privateKey, publicKey: publicPair.publicKey };
+
+    for (const stored of [
+      extractable,
+      wrongAlgorithm,
+      missingLegacyUsage,
+      mismatched,
+    ]) {
+      globalThis.indexedDB = new IDBFactory();
+      _resetDeviceKeysForTests();
+      const expectedPublic = await rawPublic(stored as CryptoKeyPair);
+      await writeStoredDevice(stored);
+      await expect(deviceKeys()).resolves.toBeNull();
+      _resetDeviceKeysForTests();
+      await expect(deviceKeys()).resolves.toBeNull();
+      const retained = requireValue(await readStoredDevice(), 'retained invalid row') as CryptoKeyPair;
+      expect(await rawPublic(retained)).toEqual(expectedPublic);
+    }
+  });
+
   it('round-trips exactly with symmetric static-static derivation in both directions', async () => {
     const peer = await makePeerDevice();
     const mine = requireValue(await deviceKeys(), 'local device keys');

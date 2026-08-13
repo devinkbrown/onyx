@@ -13,11 +13,13 @@
  */
 
 import 'fake-indexeddb/auto';
-import { cleanup, render, screen, waitFor } from '@solidjs/testing-library';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Channel, ChannelUser, ChatMessage } from '@/lib/irc/types';
+import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
+import { DEFAULT_WINDOW_SIZE } from './messageWindow';
 import { MessageView } from './MessageView';
 
 const initialState = store.getInitialState();
@@ -92,6 +94,7 @@ describe('MessageView live-log topic-switch suppression (SC 4.1.3)', () => {
   afterEach(() => {
     cleanup();
     store.setState(initialState, true);
+    resetPreferences();
   });
 
   it('mutes the message log when switching between two topic filters, then restores to polite', async () => {
@@ -165,5 +168,174 @@ describe('MessageView live-log topic-switch suppression (SC 4.1.3)', () => {
     // Assert — still muted on the identity change, then restored.
     await waitFor(() => expect(feed).toHaveAttribute('aria-live', 'off'));
     await waitFor(() => expect(feed).toHaveAttribute('aria-live', 'polite'));
+  });
+});
+
+function seedLongChannel(count: number, unreadId?: string): void {
+  const msgs = Array.from({ length: count }, (_, index) =>
+    makeMessage(`m-${index}`, 'alice', `line ${index}`, null),
+  );
+  const channel = makeChannel(msgs);
+  store.setState(
+    {
+      ...initialState,
+      channels: new Map([['#general', channel]]),
+      activeView: { kind: 'channel', channel: '#general' },
+      connectionStatus: 'connected',
+      ourNick: 'testuser',
+      viewUnreadDividerId: unreadId
+        ? new Map([['#general', unreadId]])
+        : new Map(),
+    },
+    true,
+  );
+}
+
+function renderedMessageCount(feed: HTMLElement): number {
+  return feed.querySelectorAll('[data-message-search-id]').length;
+}
+
+describe('MessageView bounded historical navigation', () => {
+  beforeEach(() => {
+    store.setState(initialState, true);
+    resetPreferences();
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+      value: vi.fn(),
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    store.setState(initialState, true);
+    resetPreferences();
+  });
+
+  it('mounts only the trailing page of a long transcript', () => {
+    seedLongChannel(180);
+    render(() => <MessageView />);
+
+    const feed = screen.getByRole('log', { name: 'Message history' });
+    expect(renderedMessageCount(feed)).toBe(DEFAULT_WINDOW_SIZE);
+    expect(screen.getByText('line 179')).toBeInTheDocument();
+    expect(screen.queryByText('line 0')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show earlier messages/ })).toBeInTheDocument();
+  });
+
+  it('keeps a deep unread divider in a bounded page instead of mounting the tail from there', () => {
+    seedLongChannel(180, 'm-20');
+    render(() => <MessageView />);
+
+    const feed = screen.getByRole('log', { name: 'Message history' });
+    expect(renderedMessageCount(feed)).toBeLessThanOrEqual(DEFAULT_WINDOW_SIZE);
+    expect(screen.getByText('line 20')).toBeInTheDocument();
+    expect(feed.querySelector('.shell-unread-divider')).not.toBeNull();
+    expect(screen.queryByText('line 179')).not.toBeInTheDocument();
+  });
+
+  it('focuses a time-travel landing inside a bounded page and keeps it after the landing id clears', async () => {
+    seedLongChannel(180);
+    render(() => <MessageView />);
+
+    store.getState().focusMessage('m-40');
+
+    const feed = screen.getByRole('log', { name: 'Message history' });
+    await waitFor(() => {
+      expect(screen.getByText('line 40')).toBeInTheDocument();
+    });
+    expect(renderedMessageCount(feed)).toBeLessThanOrEqual(DEFAULT_WINDOW_SIZE);
+    expect(screen.queryByText('line 179')).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(store.getState().timeTravelLandingId).toBeNull();
+    });
+    expect(screen.getByText('line 40')).toBeInTheDocument();
+    expect(renderedMessageCount(feed)).toBeLessThanOrEqual(DEFAULT_WINDOW_SIZE);
+  });
+
+  it('Reader Start opens the first loaded page and focuses the first message', async () => {
+    setPreference('readerMode', true);
+    seedLongChannel(180);
+    render(() => <MessageView />);
+
+    const feed = screen.getByRole('log', { name: 'Message history' });
+    await waitFor(() => expect(feed).toHaveAttribute('aria-live', 'polite'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(screen.getByText('line 0')).toBeInTheDocument();
+    expect(screen.queryByText('line 179')).not.toBeInTheDocument();
+    expect(renderedMessageCount(feed)).toBe(DEFAULT_WINDOW_SIZE);
+    expect(feed).toHaveAttribute('aria-live', 'off');
+    expect(document.activeElement).toBe(
+      feed.querySelector('[data-message-search-id="m-0"]'),
+    );
+  });
+
+  it('jump to latest restores the trailing page without mounting the whole transcript', async () => {
+    setPreference('readerMode', true);
+    seedLongChannel(180, 'm-20');
+    render(() => <MessageView />);
+
+    const feed = screen.getByRole('log', { name: 'Message history' });
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(screen.getByText('line 0')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Jump to latest/ }));
+
+    expect(screen.getByText('line 179')).toBeInTheDocument();
+    expect(screen.queryByText('line 0')).not.toBeInTheDocument();
+    expect(screen.queryByText('line 20')).not.toBeInTheDocument();
+    expect(renderedMessageCount(feed)).toBe(DEFAULT_WINDOW_SIZE);
+  });
+
+  it('show earlier stays bounded and mutes the live region while older rows enter', async () => {
+    seedLongChannel(180);
+    render(() => <MessageView />);
+
+    const feed = screen.getByRole('log', { name: 'Message history' });
+    await waitFor(() => expect(feed).toHaveAttribute('aria-live', 'polite'));
+
+    fireEvent.click(screen.getByRole('button', { name: /Show earlier messages/ }));
+
+    expect(renderedMessageCount(feed)).toBeLessThanOrEqual(180);
+    expect(renderedMessageCount(feed)).toBeGreaterThan(DEFAULT_WINDOW_SIZE);
+    expect(screen.getByText('line 179')).toBeInTheDocument();
+    expect(feed).toHaveAttribute('aria-live', 'off');
+  });
+
+  it('Reader New hands off a near-tail unread that sits outside the Start page', async () => {
+    setPreference('readerMode', true);
+    seedLongChannel(1000, 'm-850');
+    render(() => <MessageView />);
+
+    const feed = screen.getByRole('log', { name: 'Message history' });
+    await waitFor(() => expect(feed).toHaveAttribute('aria-live', 'polite'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(screen.getByText('line 0')).toBeInTheDocument();
+    expect(screen.queryByText('line 850')).not.toBeInTheDocument();
+    expect(feed.querySelector('.shell-unread-divider')).toBeNull();
+    expect(renderedMessageCount(feed)).toBeLessThanOrEqual(DEFAULT_WINDOW_SIZE);
+
+    fireEvent.click(screen.getByRole('button', { name: 'New' }));
+
+    await waitFor(() => {
+      const divider = feed.querySelector('.shell-unread-divider');
+      expect(divider).not.toBeNull();
+      expect(document.activeElement).toBe(divider);
+    });
+    expect(screen.getByText('line 850')).toBeInTheDocument();
+    expect(renderedMessageCount(feed)).toBeLessThanOrEqual(DEFAULT_WINDOW_SIZE);
+    expect(feed).toHaveAttribute('aria-live', 'off');
+    expect(store.getState().viewUnreadDividerId.get('#general')).toBe('m-850');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Latest' }));
+
+    expect(screen.getByText('line 999')).toBeInTheDocument();
+    expect(screen.queryByText('line 0')).not.toBeInTheDocument();
+    expect(screen.queryByText('line 850')).not.toBeInTheDocument();
+    expect(feed.querySelector('.shell-unread-divider')).toBeNull();
+    expect(renderedMessageCount(feed)).toBe(DEFAULT_WINDOW_SIZE);
   });
 });

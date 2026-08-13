@@ -1,0 +1,178 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+.session-truth-bar {
+  container-type: inline-size;
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+  min-width: 0;
+  padding: var(--space-3, 0.75rem);
+  color: var(--paper);
+  background: var(--surface-face, var(--stone));
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--elev-1);
+}
+
+.session-truth-bar__header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+  min-width: 0;
+}
+
+.session-truth-bar__kicker,
+.session-truth-bar__header h2,
+.session-truth-bar__description {
+  margin: 0;
+}
+
+.session-truth-bar__kicker {
+  grid-row: 1;
+  color: var(--gold-bright);
+  font: 650 var(--text-2xs, 0.625rem)/1 var(--font-mono);
+  letter-spacing: var(--tracking-kicker, 0.12em);
+  text-transform: uppercase;
+}
+
+.session-truth-bar__header h2 {
+  grid-row: 1;
+  color: var(--paper);
+  font: 650 var(--text-sm, 0.8125rem)/var(--leading-tight, 1.15) var(--font-sans);
+  letter-spacing: 0.01em;
+}
+
+.session-truth-bar__description {
+  grid-column: 1 / -1;
+  color: var(--paper-dim);
+  font: 450 var(--text-xs, 0.6875rem)/var(--leading-snug, 1.35) var(--font-sans);
+}
+
+.session-truth-bar__facts {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(8.75rem, 1fr));
+  gap: 1px;
+  min-width: 0;
+  margin: 0;
+  padding: 1px;
+  overflow-x: auto;
+  list-style: none;
+  background: var(--line-faint);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-sm);
+}
+
+.session-truth-bar__fact {
+  position: relative;
+  display: grid;
+  grid-template-columns: 0.625rem minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  min-height: 5.75rem;
+  padding: var(--space-3, 0.75rem);
+  color: var(--paper-dim);
+  background: var(--surface-raised, var(--stone-2));
+}
+
+.session-truth-bar__fact[data-group='messages'],
+.session-truth-bar__fact[data-group='calls'] {
+  box-shadow: -1px 0 0 var(--seam) inset;
+}
+
+.session-truth-bar__marker {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.1rem;
+  border: 1.5px solid currentColor;
+  border-radius: var(--r-pill);
+}
+
+.session-truth-bar__label,
+.session-truth-bar__value,
+.session-truth-bar__detail {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.session-truth-bar__label {
+  color: var(--paper-mute);
+  font: 650 var(--text-2xs, 0.625rem)/1.2 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.session-truth-bar__value {
+  color: var(--paper);
+  font: 650 var(--text-sm, 0.8125rem)/var(--leading-tight, 1.15) var(--font-sans);
+}
+
+.session-truth-bar__detail {
+  color: var(--paper-dim);
+  font: 450 var(--text-xs, 0.6875rem)/var(--leading-snug, 1.35) var(--font-sans);
+}
+
+.session-truth-bar__fact[data-tone='progress'] {
+  color: var(--gold-bright);
+}
+
+.session-truth-bar__fact[data-tone='positive'] {
+  color: var(--ok);
+}
+
+.session-truth-bar__fact[data-tone='caution'] {
+  color: var(--warn);
+}
+
+.session-truth-bar__fact[data-tone='critical'] {
+  color: var(--danger);
+}
+
+@container (max-width: 72rem) {
+  .session-truth-bar__facts {
+    grid-template-columns: repeat(4, minmax(9rem, 1fr));
+  }
+}
+
+@container (max-width: 38rem) {
+  .session-truth-bar__facts {
+    grid-template-columns: repeat(2, minmax(9rem, 1fr));
+  }
+}
+
+@container (max-width: 20rem) {
+  .session-truth-bar__facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .session-truth-bar__header {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-truth-bar,
+  .session-truth-bar * {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .session-truth-bar,
+  .session-truth-bar__facts,
+  .session-truth-bar__fact {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+    box-shadow: none;
+    forced-color-adjust: auto;
+  }
+
+  .session-truth-bar__marker {
+    color: CanvasText;
+    background: Canvas;
+    border-color: currentColor;
+  }
+}

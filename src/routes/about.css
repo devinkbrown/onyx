@@ -9,6 +9,18 @@
    The .ab-ocean overrides below re-tint that shared atmosphere from gold-leaf
    into bioluminescent azure currents without touching landing.css. */
 
+.ab-ocean {
+  min-width: 0;
+  color: var(--paper);
+}
+
+.ab-ocean .r-wrap,
+.ab-ocean section,
+.ab-ocean article,
+.ab-ocean aside {
+  min-width: 0;
+}
+
 /* Re-tint the shared gold atmosphere to azure bioluminescence (scoped to /about) */
 .ab-ocean .r-veins path { stroke: var(--lapis); }
 .ab-ocean .r-veins .node { fill: var(--lapis-bright); }
@@ -108,6 +120,89 @@
   line-height: 1.65;
   color: var(--paper-dim);
   text-wrap: pretty;
+}
+
+/* The public report is evidence adjacent to the editorial thesis, never a
+   decorative online light. Non-current states explicitly refuse an uptime
+   claim in visible and announced text. */
+.ab-feed {
+  display: grid;
+  grid-template-columns: auto max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 14px;
+  margin-top: 28px;
+  padding-block: 14px;
+  border-block: 1px solid var(--seam-faint);
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ab-feed__mark {
+  width: 9px;
+  height: 9px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-pill);
+  color: var(--paper-mute);
+}
+
+.ab-feed[data-feed-state='current'] .ab-feed__mark {
+  color: var(--ok);
+  background: currentColor;
+}
+
+.ab-feed[data-feed-state='degraded'] .ab-feed__mark,
+.ab-feed[data-feed-state='stale'] .ab-feed__mark,
+.ab-feed[data-feed-state='future'] .ab-feed__mark,
+.ab-feed[data-feed-state='unknown'] .ab-feed__mark {
+  color: var(--warn);
+  background: currentColor;
+}
+
+.ab-feed[data-feed-state='loading'] .ab-feed__mark {
+  color: var(--lapis-bright);
+  border-style: dashed;
+}
+
+.ab-feed__detail {
+  min-width: 0;
+  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+  line-height: 1.5;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.ab-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-top: 24px;
+}
+
+.ab-topics a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 14px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  color: var(--paper-dim);
+  background: color-mix(in oklab, var(--stone-2) 28%, transparent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.ab-topics a:hover,
+.ab-topics a:focus-visible {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
 }
 
 /* ───────── Section headers ───────── */
@@ -948,6 +1043,9 @@
 }
 
 .ab-dev-card a.more {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--lapis-bright);
@@ -1030,6 +1128,30 @@
     font-size: 24px;
   }
 
+  .ab-feed {
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 8px 12px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .ab-feed__detail {
+    grid-column: 2;
+    font-size: 16px;
+  }
+
+  .ab-topics {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ab-topics a {
+    width: 100%;
+    min-width: 0;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
   .ab-hero p.sub,
   .ab-ocean p,
   .ab-ocean li {
@@ -1094,6 +1216,14 @@
     font-size: 14px;
   }
 
+  .ab-media-diagram,
+  .ab-e2ee-visual,
+  .ab-mesh-vis {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .ab-ocean .r-footer .cols {
     grid-template-columns: 1fr;
   }
@@ -1117,5 +1247,22 @@
   .ab-mythos-grid > *,
   .ab-dev-grid > * {
     min-width: 0;
+  }
+}
+
+@media (forced-colors: active) {
+  .ab-feed,
+  .ab-topics a {
+    border-color: CanvasText;
+  }
+
+  .ab-feed__mark,
+  .ab-feed[data-feed-state] .ab-feed__mark {
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .ab-feed[data-feed-state='current'] .ab-feed__mark {
+    background: Highlight;
   }
 }

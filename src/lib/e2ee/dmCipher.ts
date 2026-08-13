@@ -117,6 +117,126 @@ async function exportPublicB64(kp: CryptoKeyPair): Promise<string> {
   return toB64url(new Uint8Array(raw));
 }
 
+type StoredDeviceRead =
+  | { kind: 'absent' }
+  | { kind: 'pair'; keyPair: CryptoKeyPair }
+  | { kind: 'invalid' };
+
+function exactUsageSet(actualUsages: readonly KeyUsage[], expected: readonly KeyUsage[]): boolean {
+  if (actualUsages.length !== expected.length) return false;
+  const actual = new Set(actualUsages);
+  return actual.size === expected.length && expected.every((usage) => actual.has(usage));
+}
+
+function validPrivateDeviceUsages(usages: readonly KeyUsage[]): boolean {
+  return exactUsageSet(usages, ['deriveBits'])
+    || exactUsageSet(usages, ['deriveKey', 'deriveBits']);
+}
+
+/** Test hook for the exact legacy/new durable-key capability policy. */
+export function _isValidDevicePrivateUsagesForTests(usages: readonly KeyUsage[]): boolean {
+  return validPrivateDeviceUsages(usages);
+}
+
+function equalBytes(left: ArrayBuffer, right: ArrayBuffer): boolean {
+  const a = new Uint8Array(left);
+  const b = new Uint8Array(right);
+  if (a.byteLength !== b.byteLength) return false;
+  let different = 0;
+  for (let i = 0; i < a.byteLength; i += 1) different |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  return different === 0;
+}
+
+/**
+ * IndexedDB rows are untrusted structured-clone input. Validate both key
+ * capabilities and pair correspondence before the durable identity may be
+ * projected or used. A corrupt row is never treated as absence: callers must
+ * fail closed instead of silently rotating the device identity.
+ */
+async function validateStoredDevicePair(value: unknown): Promise<CryptoKeyPair | null> {
+  if (!value || typeof value !== 'object' || typeof CryptoKey === 'undefined') return null;
+  const candidate = value as Partial<CryptoKeyPair>;
+  const privateKey = candidate.privateKey;
+  const publicKey = candidate.publicKey;
+  if (!(privateKey instanceof CryptoKey) || !(publicKey instanceof CryptoKey)) return null;
+  if (privateKey.type !== 'private' || publicKey.type !== 'public' || privateKey.extractable) return null;
+  const privateAlgorithm = privateKey.algorithm as EcKeyAlgorithm;
+  const publicAlgorithm = publicKey.algorithm as EcKeyAlgorithm;
+  const validPrivateUsages = validPrivateDeviceUsages(privateKey.usages);
+  if (
+    privateAlgorithm.name !== 'ECDH'
+    || publicAlgorithm.name !== 'ECDH'
+    || privateAlgorithm.namedCurve !== CURVE
+    || publicAlgorithm.namedCurve !== CURVE
+    || !validPrivateUsages
+    || !exactUsageSet(publicKey.usages, [])
+  ) return null;
+  try {
+    const rawPublic = new Uint8Array(await crypto.subtle.exportKey('raw', publicKey));
+    if (!isValidPeerPublicKey(toB64url(rawPublic))) return null;
+    const witness = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: CURVE },
+      false,
+      ['deriveBits'],
+    ) as CryptoKeyPair;
+    const [fromStoredPrivate, fromWitnessPrivate] = await Promise.all([
+      crypto.subtle.deriveBits({ name: 'ECDH', public: witness.publicKey }, privateKey, 256),
+      crypto.subtle.deriveBits({ name: 'ECDH', public: publicKey }, witness.privateKey, 256),
+    ]);
+    return equalBytes(fromStoredPrivate, fromWitnessPrivate) ? { privateKey, publicKey } : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredDevicePair(): Promise<StoredDeviceRead> {
+  return new Promise((resolve) => {
+    void openKeysDb().then((db) => {
+      if (!db) { resolve({ kind: 'invalid' }); return; }
+      try {
+        const tx = db.transaction(STORE, 'readonly');
+        const get = tx.objectStore(STORE).get(KEY_ID);
+        tx.oncomplete = () => {
+          const value = get.result;
+          db.close();
+          if (value === undefined) { resolve({ kind: 'absent' }); return; }
+          void validateStoredDevicePair(value).then(
+            (keyPair) => resolve(keyPair ? { kind: 'pair', keyPair } : { kind: 'invalid' }),
+            () => resolve({ kind: 'invalid' }),
+          );
+        };
+        tx.onerror = tx.onabort = () => { db.close(); resolve({ kind: 'invalid' }); };
+      } catch {
+        db.close();
+        resolve({ kind: 'invalid' });
+      }
+    }).catch(() => resolve({ kind: 'invalid' }));
+  });
+}
+
+function persistDevicePair(keyPair: CryptoKeyPair): Promise<boolean> {
+  return new Promise((resolve) => {
+    void openKeysDb().then((db) => {
+      if (!db) { resolve(false); return; }
+      let settled = false;
+      const finish = (ok: boolean): void => {
+        if (settled) return;
+        settled = true;
+        db.close();
+        resolve(ok);
+      };
+      try {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(keyPair, KEY_ID);
+        tx.oncomplete = () => finish(true);
+        tx.onerror = tx.onabort = () => finish(false);
+      } catch {
+        finish(false);
+      }
+    }).catch(() => resolve(false));
+  });
+}
+
 /**
  * The device key pair, created on first use and persisted as structured-clone
  * CryptoKeys (private key non-extractable — it never exists as bytes outside
@@ -126,46 +246,27 @@ export function deviceKeys(): Promise<DeviceKeys | null> {
   if (_devicePromise) return _devicePromise;
   _devicePromise = (async () => {
     try {
-      const db = await openKeysDb();
-      if (!db) return null;
-
-      const existing = await new Promise<CryptoKeyPair | null>((resolve) => {
-        const tx = db.transaction(STORE, 'readonly');
-        const get = tx.objectStore(STORE).get(KEY_ID);
-        get.onsuccess = () => resolve((get.result as CryptoKeyPair | undefined) ?? null);
-        get.onerror = () => resolve(null);
-      });
-      if (existing?.privateKey && existing.publicKey) {
-        return { keyPair: existing, publicB64: await exportPublicB64(existing) };
+      const existing = await readStoredDevicePair();
+      if (existing.kind === 'pair') {
+        return { keyPair: existing.keyPair, publicB64: await exportPublicB64(existing.keyPair) };
       }
+      if (existing.kind === 'invalid') return null;
 
       const kp = await crypto.subtle.generateKey(
         { name: 'ECDH', namedCurve: CURVE },
         false, // private key never leaves WebCrypto
-        ['deriveKey', 'deriveBits'],
-      );
+        ['deriveBits'],
+      ) as CryptoKeyPair;
       // Fail closed if the identity key cannot be durable: an ephemeral-only
       // device key would mint a new public point after reload and silently
       // orphan every prior envelope sealed under the discarded identity.
-      const persisted = await new Promise<boolean>((resolve) => {
-        let settled = false;
-        const finish = (ok: boolean) => {
-          if (settled) return;
-          settled = true;
-          resolve(ok);
-        };
-        try {
-          const tx = db.transaction(STORE, 'readwrite');
-          tx.objectStore(STORE).put(kp, KEY_ID);
-          tx.oncomplete = () => finish(true);
-          tx.onerror = () => finish(false);
-          tx.onabort = () => finish(false);
-        } catch {
-          finish(false);
-        }
-      });
+      const persisted = await persistDevicePair(kp);
       if (!persisted) return null;
-      return { keyPair: kp, publicB64: await exportPublicB64(kp) };
+      // Read and validate the structured-cloned row before exposing it. The
+      // generated in-memory pair is not publication authority by itself.
+      const durable = await readStoredDevicePair();
+      if (durable.kind !== 'pair') return null;
+      return { keyPair: durable.keyPair, publicB64: await exportPublicB64(durable.keyPair) };
     } catch {
       return null;
     }

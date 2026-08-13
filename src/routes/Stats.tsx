@@ -2,59 +2,24 @@
 import './landing.css';
 import './data-pages.css';
 import './stats.css';
-import { createMemo, createResource, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
-import { Mascot } from '@/components/brand/Mascot';
+import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
 import { fetchChannelDetail, type ChannelDetail } from '@/lib/stats/channelDetail';
 import { fetchStatsIndex, relTime, type NetworkDay, type StatsChannel } from '@/lib/stats/networkIndex';
 import { publicFeedFreshness, type PublicFeedFreshness } from '@/lib/stats/feedBounds';
+import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
-import { PublicFooter } from './PublicFooter';
 
-function PageChrome(props: {
-  children: JSX.Element;
-  feedState: PublicFeedFreshness | 'partial' | 'unavailable';
-}) {
-  const label = () => {
-    switch (props.feedState) {
-      case 'current': return 'stats current';
-      case 'stale': return 'stats stale';
-      case 'future': return 'stats time mismatch';
-      case 'unknown': return 'stats undated';
-      case 'partial': return 'stats incomplete';
-      default: return 'stats unavailable';
-    }
-  };
-  return (
-    <main class="r data-page stats-page">
-      <div class="r-ground" aria-hidden="true" />
-      <div class="r-flecks" aria-hidden="true" />
-      <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
-        <path class="flow" d="M-40 120 C 280 60, 420 280, 720 220 S 1180 120, 1500 240" />
-        <path class="flow" d="M-40 540 C 320 640, 560 420, 860 520 S 1240 660, 1520 560" />
-        <path d="M-40 760 C 360 700, 700 860, 1040 760 S 1320 700, 1520 800" />
-        <circle class="node" cx="720" cy="220" r="3" />
-        <circle class="node" cx="860" cy="520" r="3" />
-      </svg>
-      <div class="r-grain" aria-hidden="true" />
-      <header class="r-status" role="banner">
-        <a class="brand" href="/" aria-label="Onyx home">
-          <Mascot variant="mark" />ONYX
-        </a>
-        <nav aria-label="Primary">
-          <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="/stats/" aria-current="page">Stats</a>
-          <a class="hideable" href="/status/">Status</a>
-          <a class="hideable" href="/roadmap/">Roadmap</a>
-          <a class="hideable" href="/about/">About</a>
-          <a class="hideable" href="/invite/?join=%23root">Invite</a>
-          <span class="live hideable" data-feed-state={props.feedState}><i aria-hidden="true" />{label()}</span>
-          <a class="enter" href="/app/">Open Onyx</a>
-        </nav>
-      </header>
-      {props.children}
-      <PublicFooter />
-    </main>
-  );
+type StatsFeedState = PublicFeedFreshness | 'partial' | 'unavailable';
+
+function feedStateLabel(state: StatsFeedState): string {
+  switch (state) {
+    case 'current': return 'stats current';
+    case 'stale': return 'stats stale';
+    case 'future': return 'stats time mismatch';
+    case 'unknown': return 'stats undated';
+    case 'partial': return 'stats incomplete';
+    default: return 'stats unavailable';
+  }
 }
 
 function barHeight(day: NetworkDay, max: number): string {
@@ -291,14 +256,36 @@ export default function StatsRoute() {
   });
 
   return (
-    <PageChrome feedState={feedState()}>
-      <section class="r-wrap data-hero stats-hero" aria-labelledby="stats-heading">
+    <PublicFrame currentPath="/stats/" mainLabel="Onyx network stats">
+      <div class="ui-root r data-page stats-page">
+        <div class="r-ground" aria-hidden="true" />
+        <div class="r-flecks" aria-hidden="true" />
+        <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+          <path class="flow" d="M-40 120 C 280 60, 420 280, 720 220 S 1180 120, 1500 240" />
+          <path class="flow" d="M-40 540 C 320 640, 560 420, 860 520 S 1240 660, 1520 560" />
+          <path d="M-40 760 C 360 700, 700 860, 1040 760 S 1320 700, 1520 800" />
+          <circle class="node" cx="720" cy="220" r="3" />
+          <circle class="node" cx="860" cy="520" r="3" />
+        </svg>
+        <div class="r-grain" aria-hidden="true" />
+
+        <section class="r-wrap data-hero stats-hero" aria-labelledby="stats-heading">
         <p class="r-kicker">live network · public rooms</p>
         <h1 id="stats-heading">The rooms <br /><span class="gold">in motion</span></h1>
         <p class="sub">
           See where people are talking, follow the network’s rhythm, and step
           directly into a public conversation. No member rankings. No message text.
         </p>
+        <div
+          class="stats-observation"
+          data-feed-state={feedState()}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span class="stats-observation__marker" aria-hidden="true" />
+          {feedStateLabel(feedState())}
+        </div>
         <Show when={stats.latest} fallback={<div class="data-empty">Stats are waiting for the next exported feed.</div>}>
           {(data) => (
             <>
@@ -628,6 +615,7 @@ export default function StatsRoute() {
           </Show>
         </div>
       </section>
-    </PageChrome>
+      </div>
+    </PublicFrame>
   );
 }

@@ -84,6 +84,8 @@ const ReactionsOverlay = lazy(() =>
   import('./voice/overlays/ReactionsOverlay').then((m) => ({ default: m.ReactionsOverlay })),
 );
 import { MemberList } from './MemberList';
+import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
+import { CallsHub } from './CallsHub';
 // Panels are entered from explicit controls and should not inflate the initial
 // connected-shell bundle. Each preserves its existing Suspense boundary below.
 const AccountPanel = lazy(() => import('@/app/Account').then((m) => ({ default: m.AccountPanel })));
@@ -161,63 +163,6 @@ function LazySurface(props: {
   );
 }
 
-function CallsHub(props: {
-  activeCallChannel: string | null;
-  onOpenRooms: () => void;
-  onReturnToCall: (channel: string) => void;
-}): JSX.Element {
-  return (
-    <main class="shell-calls-hub" aria-labelledby="shell-calls-title">
-      <div class="shell-calls-kicker">Calls</div>
-      <h1 id="shell-calls-title">
-        {props.activeCallChannel ? 'Your call is still here.' : 'Talk where the conversation already lives.'}
-      </h1>
-      <p class="shell-calls-intro">
-        {props.activeCallChannel
-          ? `Return to ${props.activeCallChannel} without losing your place in the room.`
-          : 'Voice and video begin inside a room, so people arrive with the same context before, during, and after the call.'}
-      </p>
-
-      <Show
-        when={props.activeCallChannel}
-        fallback={(
-          <button type="button" class="shell-calls-primary" onClick={() => props.onOpenRooms()}>
-            Choose a room
-          </button>
-        )}
-      >
-        {(channel) => (
-          <button
-            type="button"
-            class="shell-calls-primary"
-            onClick={() => props.onReturnToCall(channel())}
-          >
-            Return to call
-          </button>
-        )}
-      </Show>
-
-      <div class="shell-calls-proof" aria-label="Call capabilities">
-        <article>
-          <span aria-hidden="true">01</span>
-          <h2>Voice and video</h2>
-          <p>Join from the room ribbon when your people are ready.</p>
-        </article>
-        <article>
-          <span aria-hidden="true">02</span>
-          <h2>Live captions</h2>
-          <p>Keep the conversation easier to follow in the moment.</p>
-        </article>
-        <article>
-          <span aria-hidden="true">03</span>
-          <h2>Honest state</h2>
-          <p>Onyx shows connection and protection status instead of hiding uncertainty.</p>
-        </article>
-      </div>
-    </main>
-  );
-}
-
 // ── Disconnected banner ──────────────────────────────────────────────────────
 
 function handleMessageSearchHotkey(event: KeyboardEvent): void {
@@ -278,7 +223,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const showKeyboardShortcuts = useStore((s) => s.showKeyboardShortcuts);
   const reducedData = makeReducedDataSignal();
   const [primarySurface, setPrimarySurface] = createSignal<'conversation' | 'calls'>('conversation');
-  const [browseActive, setBrowseActive] = createSignal(false);
   const [sidebarMode, setSidebarMode] = createSignal<'rooms' | 'messages'>(
     activeView().kind === 'dm' ? 'messages' : 'rooms',
   );
@@ -841,13 +785,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
   function openHome(): void {
     closeActiveMobileDrawer(false);
     setPrimarySurface('conversation');
-    setBrowseActive(false);
     getState().navigate({ kind: 'home' });
   }
 
   function selectSidebarMode(mode: 'rooms' | 'messages'): void {
     setPrimarySurface('conversation');
-    setBrowseActive(true);
     setSidebarMode(mode);
   }
 
@@ -862,7 +804,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   function openCalls(): void {
     closeActiveMobileDrawer(false);
-    setBrowseActive(false);
     setPrimarySurface('calls');
   }
 
@@ -881,7 +822,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   function returnToCall(channel: string): void {
     setPrimarySurface('conversation');
-    setBrowseActive(false);
     getState().navigate({ kind: 'channel', channel });
   }
 
@@ -914,14 +854,31 @@ export function AppShell(props: AppShellProps): JSX.Element {
     hasMemberRoster() && (isMobile() ? mobileMembersOpen() : showMemberList()),
   );
 
-  const activeSection = createMemo<'home' | 'rooms' | 'messages' | 'calls' | 'you'>(() => {
-    if (showAccount()) return 'you';
+  const activeSection = createMemo<PrimaryCurrentSection>(() => {
     if (primarySurface() === 'calls') return 'calls';
-    if (browseActive()) return sidebarMode();
-    if (activeView().kind === 'home') return 'home';
-    if (activeView().kind === 'dm') return 'messages';
-    return sidebarMode();
+    const view = activeView();
+    if (view.kind === 'home') return 'home';
+    if (view.kind === 'dm') return 'messages';
+    return 'rooms';
   });
+
+  function handlePrimaryNavigation(section: PrimarySection): void {
+    switch (section) {
+      case 'home':
+        openHome();
+        break;
+      case 'rooms':
+      case 'messages':
+        openMobileCollection(section);
+        break;
+      case 'calls':
+        openCalls();
+        break;
+      case 'you':
+        openYou();
+        break;
+    }
+  }
 
   function handleDisconnect(): void {
     local.onDisconnect?.();
@@ -975,13 +932,13 @@ export function AppShell(props: AppShellProps): JSX.Element {
           <ChannelSidebar
             mode={sidebarMode()}
             activeSection={activeSection()}
+            youDialogOpen={showAccount()}
             onModeChange={selectSidebarMode}
             onOpenHome={openHome}
             onOpenCalls={openCalls}
             onOpenYou={openYou}
             onConversationOpen={() => {
               setPrimarySurface('conversation');
-              setBrowseActive(false);
             }}
             onMobileClose={closeMobileSidebar}
           />
@@ -1063,7 +1020,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
             )}
           >
             <CallsHub
-              activeCallChannel={inCall() ? voice().callChannel : null}
+              callState={voice().callState}
+              callChannel={voice().callChannel}
+              callWith={voice().callWith}
+              callStartedAt={voice().callStartedAt}
               onOpenRooms={openRoomsFromCalls}
               onReturnToCall={returnToCall}
             />
@@ -1087,60 +1047,18 @@ export function AppShell(props: AppShellProps): JSX.Element {
         />
       </div>
 
-      {/* Mobile bottom tab bar — product frame: Home / Rooms / Messages / Calls / You.
-          No Leave here; disconnect remains on ServerRail / account. Members stay
-          on the presence ribbon (not a bottom-tab). */}
-      <nav class="shell-mobile-nav" aria-label="Mobile navigation">
-        <button
-          type="button"
-          class={`shell-mobile-nav-btn${activeSection() === 'home' ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open Home"
-          aria-current={activeSection() === 'home' ? 'page' : undefined}
-          onClick={openHome}
-        >
-          <b aria-hidden="true">⌂</b>Home
-        </button>
-        <button
-          ref={mobileRoomsButtonRef}
-          type="button"
-          class={`shell-mobile-nav-btn${activeSection() === 'rooms' ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open Rooms"
-          aria-current={activeSection() === 'rooms' ? 'page' : undefined}
-          aria-expanded={mobileSidebarOpen()}
-          onClick={() => openMobileCollection('rooms')}
-        >
-          <b aria-hidden="true">#</b>Rooms
-        </button>
-        <button
-          type="button"
-          class={`shell-mobile-nav-btn${activeSection() === 'messages' ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open Messages"
-          aria-current={activeSection() === 'messages' ? 'page' : undefined}
-          aria-expanded={mobileSidebarOpen() && sidebarMode() === 'messages'}
-          onClick={() => openMobileCollection('messages')}
-        >
-          <b aria-hidden="true">@</b>Messages
-        </button>
-        <button
-          type="button"
-          class={`shell-mobile-nav-btn${activeSection() === 'calls' ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open Calls"
-          aria-current={activeSection() === 'calls' ? 'page' : undefined}
-          onClick={openCalls}
-        >
-          <b aria-hidden="true">◉</b>Calls
-        </button>
-        <button
-          type="button"
-          class={`shell-mobile-nav-btn${activeSection() === 'you' ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open You"
-          aria-current={activeSection() === 'you' ? 'page' : undefined}
-          aria-haspopup="dialog"
-          onClick={openYou}
-        >
-          <b aria-hidden="true">◇</b>You
-        </button>
-      </nav>
+      {/* Mobile bottom tab bar — the same product-frame navigation as the
+          desktop sidebar. The account dialog is transient, so You exposes
+          expanded state without becoming the current location. */}
+      <PrimaryNavigation
+        variant="mobile"
+        currentSection={activeSection()}
+        selectedCollection={sidebarMode()}
+        expandedCollection={mobileSidebarOpen() ? sidebarMode() : null}
+        youDialogOpen={showAccount()}
+        mobileRoomsButtonRef={(element) => { mobileRoomsButtonRef = element; }}
+        onSelect={handlePrimaryNavigation}
+      />
 
       {/* Account management panel — portal modal, gated on store.showAccount */}
       <Show when={showAccount()}>

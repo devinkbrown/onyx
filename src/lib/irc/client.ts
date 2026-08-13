@@ -125,15 +125,54 @@ function hasWebSocketSendCapacity(ws: WebSocket, payloadBytes: number): boolean 
  * line (`AUTHENTICATE PLAIN` / `SCRAM-SHA-256` / `EXTERNAL`). Anything else — any
  * base64 chunk, in either direction — is redacted.
  */
-function redactAuthenticateForLog(line: string): string {
-  const PREFIX = 'AUTHENTICATE ';
-  if (!line.startsWith(PREFIX)) return line;
-  const arg = line.slice(PREFIX.length);
+function redactSensitiveLineForLog(line: string): string {
+  // The parser removes NULs before command dispatch. Classify the same logical
+  // spelling so a NUL-split sensitive token cannot be logged and then become a
+  // valid command downstream. The original bytes still go to wire/parser.
+  line = line.replaceAll('\0', '');
+  const containsSensitiveToken = /(?:^|[\s:\r\n])(?:AUTHENTICATE|E2EEGROUP|E2EE\.KEYPACKAGE|E2EE\.COMMIT|E2EE\.WELCOME|E2EEKEY)(?=$|[\s:\r\n])/iu;
+  let cursor = line.trimStart();
+  if (cursor.startsWith('@')) {
+    const end = cursor.indexOf(' ');
+    if (end < 0) return /E2EE|AUTHENTICATE/iu.test(cursor) ? '<sensitive> <redacted>' : line;
+    cursor = cursor.slice(end + 1).trimStart();
+  }
+  if (cursor.startsWith(':')) {
+    const end = cursor.indexOf(' ');
+    if (end < 0) return /E2EE|AUTHENTICATE/iu.test(cursor) ? '<sensitive> <redacted>' : line;
+    cursor = cursor.slice(end + 1).trimStart();
+  }
+  const boundary = cursor.search(/\s/u);
+  const command = (boundary < 0 ? cursor : cursor.slice(0, boundary)).toUpperCase();
+  const rest = boundary < 0 ? '' : cursor.slice(boundary).trimStart();
+
+  if (command === 'AUTHENTICATE') {
+    const arg = rest;
   // Only the mechanisms this client can actually select are safe to expose.
   // A shape-based uppercase test leaks valid unpadded base64 such as
   // `QUJDREVGR0hJSktM`, which is indistinguishable from a made-up mechanism.
-  if (arg === '+' || arg === 'PLAIN' || arg === 'SCRAM-SHA-256' || arg === 'EXTERNAL') return line;
-  return `${PREFIX}<redacted>`;
+    if (arg === '+' || arg === 'PLAIN' || arg === 'SCRAM-SHA-256' || arg === 'EXTERNAL') return line;
+    return 'AUTHENTICATE <redacted>';
+  }
+
+  if (command === 'E2EEGROUP' || command === 'E2EE.KEYPACKAGE'
+    || command === 'E2EE.COMMIT' || command === 'E2EE.WELCOME' || command === 'E2EEKEY') {
+    return `${command} <redacted>`;
+  }
+  if (command === 'NOTICE') {
+    const trailing = rest.startsWith(':')
+      ? rest.slice(1)
+      : rest.includes(' :') ? rest.slice(rest.indexOf(' :') + 2) : rest.replace(/^\S+\s+:?/u, '');
+    if (/^E2EEKEY(?:\s|$)/iu.test(trailing)) return 'NOTICE E2EEKEY <redacted>';
+  }
+  if (command === 'FAIL' || command === 'WARN' || command === 'NOTE') {
+    const subject = rest.match(/^:?([^\s]+)/u)?.[1]?.toUpperCase();
+    if (subject === 'E2EEGROUP' || subject === 'E2EEKEY') return `${command} ${subject} <redacted>`;
+  }
+  // Fail closed for malformed or multiply-prefixed sensitive-looking lines.
+  // This is a log-copy policy only: parsing and wire delivery still receive
+  // the original bytes.
+  return containsSensitiveToken.test(line) ? '<sensitive> <redacted>' : line;
 }
 
 /** RFC 4616 SASL PLAIN fields are UTF-8; btoa itself accepts Latin-1 only. */
@@ -421,16 +460,14 @@ export class IRCClient {
     // `text.ircv3.net` carries exactly one unterminated IRC line per text
     // message. Onyx's own protocol keeps the legacy CRLF framing because it
     // also multiplexes binary Cadence media on this socket.
-    const payload = ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL && line.endsWith('\r\n')
-      ? line.slice(0, -2)
-      : line;
-    if (
-      ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL
-      && (payload.includes('\r') || payload.includes('\n'))
-    ) {
-      this.opts.onError?.('Message was not sent: text.ircv3.net requires exactly one IRC line per frame.');
+    const lineBody = line.endsWith('\r\n') ? line.slice(0, -2) : line;
+    if (lineBody.includes('\r') || lineBody.includes('\n')) {
+      this.opts.onError?.(ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL
+        ? 'Message was not sent: text.ircv3.net requires exactly one IRC line per frame.'
+        : 'Message was not sent: IRC WebSocket frames require exactly one IRC line.');
       return false;
     }
+    const payload = ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL ? lineBody : line;
 
     // Fast character bound avoids allocating another huge buffer just to learn
     // that a hostile/accidental line cannot be admitted.
@@ -464,7 +501,7 @@ export class IRCClient {
       return false;
     }
 
-    this.opts.onRaw?.(redactAuthenticateForLog(line.replace(/\r\n$/, '')), 'out');
+    this.opts.onRaw?.(redactSensitiveLineForLog(line.replace(/\r\n$/, '')), 'out');
     return true;
   }
 
@@ -769,13 +806,16 @@ export class IRCClient {
     // lines, all of which it returns. No mutable buffer lives here to tempt a
     // reintroduction of the stash.
     for (const line of splitWireFrame(data)) {
-      this.opts.onRaw?.(redactAuthenticateForLog(line), 'in');
+      const logLine = redactSensitiveLineForLog(line);
+      this.opts.onRaw?.(logLine, 'in');
       try {
         const msg = parseIRCMessage(line);
         this._handleMessage(msg);
       } catch (e) {
         // A malformed line must not abort processing of the rest of the frame.
-        console.warn('[nexus] failed to handle IRC line:', line, e);
+        // Handler/parser exceptions are not a safe diagnostic channel: their
+        // messages may contain the original remote control payload.
+        console.warn('[nexus] failed to handle IRC line:', logLine);
       }
     }
   }

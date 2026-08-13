@@ -54,6 +54,7 @@ try {
     solidLib.cleanup();
 
     renderAbout = () => {
+      solidLib.cleanup();
       const result = solidLib.render(() => AboutComponent());
       return { cleanup: result.unmount };
     };
@@ -84,14 +85,16 @@ describe('About page — source structure', () => {
     expect(srcContains("import './about.css'")).toBe(true);
   });
 
-  it('has a <main> root carrying the shared "r" atmosphere class', () => {
-    // Root is <main class="r ab-ocean"> — "r" wires the shared atmosphere,
-    // "ab-ocean" scopes the azure re-tint.
-    expect(/<main class="r(\s|")/.test(src)).toBe(true);
+  it('uses PublicFrame with an About-labelled main and a deep-water content root', () => {
+    expect(srcContains('import { PublicFrame }')).toBe(true);
+    expect(srcContains('<PublicFrame currentPath="/about/" mainLabel="About Onyx">')).toBe(true);
+    expect(srcContains('class="ui-root r ab-ocean"')).toBe(true);
   });
 
-  it('has a <header class="r-status"> top bar', () => {
-    expect(srcContains('class="r-status"')).toBe(true);
+  it('does not duplicate PublicFrame header, main, or footer chrome', () => {
+    expect(srcContains('<header')).toBe(false);
+    expect(srcContains('<main')).toBe(false);
+    expect(srcContains('<PublicFooter')).toBe(false);
   });
 
   it('derives the mesh badge from bounded public feed state', () => {
@@ -101,8 +104,11 @@ describe('About page — source structure', () => {
     expect(src).not.toMatch(/>mesh online<\/span>/);
   });
 
-  it('uses the shared public footer', () => {
-    expect(srcContains('<PublicFooter />')).toBe(true);
+  it('preserves local topic anchors without duplicating primary navigation', () => {
+    expect(srcContains('aria-label="About topics"')).toBe(true);
+    expect(srcContains('href="#protocol"')).toBe(true);
+    expect(srcContains('href="#media"')).toBe(true);
+    expect(srcContains('href="#mesh"')).toBe(true);
   });
 
   it('has an h1 heading in the hero', () => {
@@ -283,8 +289,9 @@ describe('About page — source structure', () => {
     expect(srcContains('BLAKE3-160')).toBe(true);
   });
 
-  it('brand links back to / (home)', () => {
-    expect(srcContains('href="/"')).toBe(true);
+  it('delegates the home brand link to PublicFrame', () => {
+    expect(srcContains('<PublicFrame')).toBe(true);
+    expect(srcContains('<header')).toBe(false);
   });
 
   it('Open Onyx links point to the canonical app route', () => {
@@ -306,8 +313,8 @@ describe('About page — source structure', () => {
     expect(srcContains('aria-label=')).toBe(true);
   });
 
-  it('uses the shared branded footer and no kanji', () => {
-    expect(srcContains('<PublicFooter />')).toBe(true);
+  it('delegates branded footer ownership to PublicFrame and contains no kanji', () => {
+    expect(srcContains('<PublicFrame')).toBe(true);
     expect(srcContains('瑠璃')).toBe(false);
   });
 
@@ -330,8 +337,8 @@ describe('About page — source structure', () => {
     expect(/<Mascot\b/.test(src)).toBe(true);
   });
 
-  it('roots the page in the deep-water aesthetic (ab-ocean root class)', () => {
-    expect(srcContains('class="r ab-ocean"')).toBe(true);
+  it('roots route content in the deep-water aesthetic (ab-ocean root class)', () => {
+    expect(srcContains('class="ui-root r ab-ocean"')).toBe(true);
   });
 });
 
@@ -432,21 +439,42 @@ describe('About page — DOM rendering', () => {
     cleanup();
   });
 
-  it.skipIf(!renderAvailable)('has main.r root element in the DOM', () => {
+  it.skipIf(!renderAvailable)('has exactly one labelled PublicFrame main', () => {
     const { cleanup } = renderAbout!();
-    expect(document.querySelector('main.r')).not.toBeNull();
+    expect(document.querySelectorAll('main')).toHaveLength(1);
+    expect(document.querySelector('main#public-main[aria-label="About Onyx"]')).not.toBeNull();
     cleanup();
   });
 
-  it.skipIf(!renderAvailable)('has header.r-status in the DOM', () => {
+  it.skipIf(!renderAvailable)('has canonical banner and About current-page navigation', () => {
     const { cleanup } = renderAbout!();
-    expect(document.querySelector('header.r-status')).not.toBeNull();
+    expect(document.querySelectorAll('header.public-frame__header')).toHaveLength(1);
+    expect(document.querySelector('a[href="/about/"][aria-current="page"]')).not.toBeNull();
     cleanup();
   });
 
-  it.skipIf(!renderAvailable)('has footer.r-footer in the DOM', () => {
+  it.skipIf(!renderAvailable)('exposes one skip target, canonical handoff, and local topic navigation', () => {
     const { cleanup } = renderAbout!();
-    expect(document.querySelector('footer.r-footer')).not.toBeNull();
+    expect(document.querySelectorAll('main#public-main')).toHaveLength(1);
+    expect(document.querySelector('a.public-frame__skip[href="#public-main"]')).not.toBeNull();
+    expect(document.querySelectorAll('a.public-frame__open[href="/app/"]')).toHaveLength(1);
+    expect(document.querySelector('nav.ab-topics[aria-label="About topics"] a[href="#accessibility"]')).not.toBeNull();
+    cleanup();
+  });
+
+  it.skipIf(!renderAvailable)('announces a bounded public mesh report without inventing availability', () => {
+    const { cleanup } = renderAbout!();
+    const report = document.querySelector<HTMLElement>('.ab-feed[role="status"]');
+    expect(report).not.toBeNull();
+    expect(report?.dataset.feedState).toMatch(/loading|unavailable/u);
+    expect(report?.textContent).toContain('does not establish current network availability');
+    cleanup();
+  });
+
+  it.skipIf(!renderAvailable)('has exactly one canonical footer', () => {
+    const { cleanup } = renderAbout!();
+    expect(document.querySelectorAll('footer')).toHaveLength(1);
+    expect(document.querySelector('footer.public-frame__footer')).not.toBeNull();
     cleanup();
   });
 
@@ -483,13 +511,12 @@ describe('About page — DOM rendering', () => {
     cleanup();
   });
 
-  it.skipIf(!renderAvailable)('shared footer contains brand, Onyx Server, and year', () => {
+  it.skipIf(!renderAvailable)('shared footer contains the canonical brand and accessibility link', () => {
     const { cleanup } = renderAbout!();
-    const footer = document.querySelector('footer.r-footer');
+    const footer = document.querySelector('footer.public-frame__footer');
     const t = footer?.textContent ?? '';
     expect(t).toContain('Onyx');
-    expect(t).toContain('Onyx Server');
-    expect(t).toContain('2026');
+    expect(t).toContain('Accessibility');
     cleanup();
   });
 });

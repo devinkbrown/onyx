@@ -1,0 +1,214 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Status owns an observation ledger, not a second site shell. PublicFrame owns
+   the document chrome; every rule here is route-scoped. */
+.status-route {
+  min-width: 0;
+  color: var(--paper);
+}
+
+.status-route,
+.status-route * {
+  max-width: 100%;
+}
+
+.status-route .r-wrap {
+  min-width: 0;
+}
+
+.status-route .r-section {
+  padding-block: clamp(3rem, 7vw, 6rem);
+}
+
+.status-hero {
+  position: relative;
+}
+
+/* Signature element: a quiet mesh-observation seam. The marker and ruled line
+   encode the state of the exported observation; they are not ornamental uptime
+   lights and never imply more than the adjacent text says. */
+.status-observation {
+  display: grid;
+  grid-template-columns: auto minmax(9rem, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: clamp(1.5rem, 4vw, 2.75rem);
+  padding-block: 0.9rem;
+  border-block: 1px solid var(--seam-faint);
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+}
+
+.status-observation__marker {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1px solid currentColor;
+  border-radius: var(--r-pill);
+  color: var(--paper-mute);
+  background: transparent;
+  box-shadow: 0 0 0 0.25rem color-mix(in oklab, currentColor 12%, transparent);
+}
+
+.status-observation__label {
+  color: var(--paper);
+  font-size: 0.76rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.status-observation__detail {
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.status-observation[data-feed-state='current'] .status-observation__marker {
+  color: var(--ok);
+  background: currentColor;
+}
+
+.status-observation[data-feed-state='degraded'] .status-observation__marker,
+.status-observation[data-feed-state='stale'] .status-observation__marker,
+.status-observation[data-feed-state='future'] .status-observation__marker,
+.status-observation[data-feed-state='unknown'] .status-observation__marker {
+  color: var(--warn);
+  background: currentColor;
+}
+
+.status-observation[data-feed-state='loading'] .status-observation__marker {
+  color: var(--lapis-bright);
+  border-style: dashed;
+}
+
+.status-summary {
+  margin-top: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+.status-route .status-pill[data-state='unknown'] {
+  color: var(--paper-mute);
+}
+
+.status-route .peer-table {
+  table-layout: fixed;
+}
+
+.status-route .peer-table caption {
+  padding: 0.75rem 0;
+  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.status-route .peer-table th[scope='row'] {
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: normal;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.status-route .peer-table td {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .status-observation {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .status-observation__detail {
+    grid-column: 2;
+  }
+
+  .status-route .peer-table,
+  .status-route .peer-table tbody,
+  .status-route .peer-table tr,
+  .status-route .peer-table th[scope='row'],
+  .status-route .peer-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .status-route .peer-table tr {
+    padding: 0.9rem 0;
+    border-top: 1px solid var(--seam-faint);
+  }
+
+  .status-route .peer-table th[scope='row'],
+  .status-route .peer-table td {
+    display: grid;
+    grid-template-columns: minmax(4.5rem, 0.45fr) minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.3rem 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .status-route .peer-table th[scope='row']::before,
+  .status-route .peer-table td::before {
+    content: attr(data-label);
+    color: var(--lapis-bright);
+    font: 400 0.7rem/1.5 var(--font-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+}
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .status-observation {
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 8px 12px;
+    margin-top: 24px;
+    padding-block: 14px;
+  }
+
+  .status-observation__marker {
+    width: 10px;
+    height: 10px;
+    box-shadow: none;
+  }
+
+  .status-observation__label {
+    font-size: 12px;
+  }
+
+  .status-observation__detail,
+  .status-route .peer-table caption,
+  .status-route .peer-table th[scope='row'],
+  .status-route .peer-table td {
+    font-size: 16px;
+  }
+
+  .status-route .peer-table th[scope='row'],
+  .status-route .peer-table td {
+    grid-template-columns: minmax(64px, 0.45fr) minmax(0, 1fr);
+  }
+
+  .status-route .peer-table th[scope='row']::before,
+  .status-route .peer-table td::before {
+    font-size: 11px;
+  }
+}
+
+@media (forced-colors: active) {
+  .status-observation {
+    border-color: CanvasText;
+  }
+
+  .status-observation__marker,
+  .status-observation[data-feed-state] .status-observation__marker {
+    color: CanvasText;
+    background: Canvas;
+    box-shadow: none;
+  }
+
+  .status-observation[data-feed-state='current'] .status-observation__marker {
+    background: Highlight;
+  }
+}

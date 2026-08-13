@@ -15,6 +15,75 @@
   padding: clamp(28px, 6vh, 72px) clamp(18px, 4vw, 32px) 56px;
   box-sizing: border-box;
 }
+@media (min-width: 960px) {
+  .home-inner--ledger {
+    max-width: min(1080px, 100%);
+  }
+}
+
+.home-kicker {
+  margin: 0 0 8px;
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-size: var(--text-xs, 0.6875rem);
+  letter-spacing: var(--tracking-kicker, 0.12em);
+  text-transform: uppercase;
+  color: var(--paper-mute);
+}
+
+.home-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+.home-ledger__main,
+.home-ledger__rail {
+  min-width: 0;
+}
+@media (min-width: 960px) {
+  .home-ledger--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(15.5rem, 18.5rem);
+    column-gap: 32px;
+    align-items: start;
+  }
+  .home-ledger__rail {
+    position: sticky;
+    top: 12px;
+  }
+  .home-ledger__rail .home-live-now {
+    margin-bottom: 0;
+  }
+}
+
+.home-overflow {
+  margin-top: 10px;
+}
+.home-overflow__summary,
+.home-overflow__action {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--paper-dim);
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-size: 12px;
+}
+.home-overflow__summary::-webkit-details-marker { display: none; }
+.home-overflow__summary:focus-visible,
+.home-overflow__action:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
+.home-overflow__body {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
 
 .home-masthead { margin-bottom: clamp(28px, 4vh, 40px); }
 .home-title {
@@ -235,7 +304,8 @@
 
 @media (pointer: coarse) {
   .home-outbox__actions button,
-  .home-outbox__retry {
+  .home-outbox__retry,
+  .home .mark-caught-up__button {
     min-height: 44px;
   }
 }
@@ -261,7 +331,8 @@
   .home-outbox,
   .home-outbox__item,
   .home-outbox__actions button,
-  .home-outbox__retry {
+  .home-outbox__retry,
+  .home-overflow__action {
     border-color: CanvasText;
     background: Canvas;
     color: CanvasText;
@@ -656,6 +727,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .home-more-activity__summary::before,
+  .home-overflow__summary,
   .home-cta,
   .home-action,
   .home-card,
@@ -1312,7 +1384,8 @@
     justify-content: center;
     border-radius: var(--r-md);
   }
-  .home-action--quiet {
+  .home-action--quiet,
+  .home .mark-caught-up__button {
     min-height: 44px;
   }
   .home-current-rail {

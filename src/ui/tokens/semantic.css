@@ -1,0 +1,195 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Onyx UI · semantic layer
+
+   The tier components actually consume. Every token here names an INTENT
+   ("the surface a card sits on", "the colour of a critical action") and
+   resolves in one direction:
+
+       --ui-<role>  →  var(--onyx-theme-var, var(--ui-fallback-*))
+
+   That ordering is the whole contract. The active Onyx theme always wins; the
+   Room Current fallback only appears where a theme genuinely lacks a value.
+   Because the theme engine writes its overrides as custom properties on
+   `document.documentElement`, every alias below re-resolves automatically on a
+   theme switch — no JS, no re-render, no duplicated palette.
+
+   This file declares ZERO raw colour literals (token-contract.ts enforces it).
+
+   Four families:
+     --ui-surface-*   ground, planes, lines, overlays
+     --ui-text-*      ink at each level of emphasis, plus on-fill inks
+     --ui-action-*    interactive intent: primary, secondary, critical, quiet
+     --ui-proof-*     truth/evidence states — how sure we are of what we show
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Fallback slots · DARK contract ────────────────────────────────────────
+     The scheme-selectable indirection. Semantic tokens fall back to these, and
+     these select a Room Current constant. Redefining these six in a light
+     block (below) flips the whole system without touching a semantic name. */
+  --ui-fallback-canvas: var(--room-current-void);
+  --ui-fallback-canvas-2: var(--room-current-void-2);
+  --ui-fallback-base: var(--room-basalt);
+  --ui-fallback-raised: var(--room-basalt-raised);
+  --ui-fallback-edge: var(--room-edge);
+  --ui-fallback-ink: var(--room-paper);
+  --ui-fallback-ink-dim: var(--room-paper-dim);
+  --ui-fallback-ink-mute: var(--room-paper-mute);
+  --ui-fallback-signal: var(--room-signal);
+  --ui-fallback-signal-bright: var(--room-signal-bright);
+  --ui-fallback-signal-deep: var(--room-signal-deep);
+  --ui-fallback-ember: var(--room-ember);
+  --ui-fallback-ember-bright: var(--room-ember-bright);
+  /* Ink that reads on a bright accent fill. Dark contract: the ground itself. */
+  --ui-fallback-on-fill: var(--room-current-void);
+
+  /* ── Surface ───────────────────────────────────────────────────────────────
+     canvas → base → raised → edge is a rising ladder of light. `overlay` is
+     the scrim behind a modal/sheet; `line` and `seam` are the two border
+     weights (neutral hairline vs. accent-tinted seam). */
+  --ui-surface-canvas: var(--ink, var(--ui-fallback-canvas));
+  --ui-surface-sunken: var(--ink-2, var(--ui-fallback-canvas-2));
+  --ui-surface-base: var(--stone, var(--ui-fallback-base));
+  --ui-surface-raised: var(--stone-2, var(--ui-fallback-raised));
+  --ui-surface-edge: var(--stone-3, var(--ui-fallback-edge));
+  --ui-surface-line: var(--line, color-mix(in oklab, var(--ui-fallback-ink) 12%, transparent));
+  --ui-surface-line-faint: var(
+    --line-faint,
+    color-mix(in oklab, var(--ui-fallback-ink) 6%, transparent)
+  );
+  --ui-surface-seam: var(--seam, color-mix(in oklab, var(--ui-fallback-signal) 28%, transparent));
+  --ui-surface-seam-faint: var(
+    --seam-faint,
+    color-mix(in oklab, var(--ui-fallback-signal) 12%, transparent)
+  );
+  --ui-surface-overlay: color-mix(in oklab, var(--ui-surface-canvas) 82%, transparent);
+  --ui-surface-selected: color-mix(in oklab, var(--ui-action-primary) 16%, transparent);
+  --ui-surface-hover: color-mix(in oklab, var(--ui-text-primary) 6%, transparent);
+
+  /* ── Text ──────────────────────────────────────────────────────────────────
+     primary → secondary → muted descends in emphasis, not in legibility below
+     the AA floor. `on-*` inks are for text sitting ON a filled action. */
+  --ui-text-primary: var(--paper, var(--ui-fallback-ink));
+  --ui-text-secondary: var(--paper-dim, var(--ui-fallback-ink-dim));
+  --ui-text-muted: var(--paper-mute, var(--ui-fallback-ink-mute));
+  --ui-text-accent: var(--lapis-bright, var(--ui-fallback-signal-bright));
+  --ui-text-on-action: var(--on-accent, var(--ui-fallback-on-fill));
+  --ui-text-on-critical: var(--on-danger, var(--ui-fallback-on-fill));
+  --ui-text-link: var(--lapis-bright, var(--ui-fallback-signal-bright));
+
+  /* ── Action ────────────────────────────────────────────────────────────────
+     One primary, one secondary, one critical, one quiet. A fifth interactive
+     colour is a design smell, not a missing token. */
+  --ui-action-primary: var(--lapis, var(--ui-fallback-signal));
+  --ui-action-primary-hover: var(--lapis-bright, var(--ui-fallback-signal-bright));
+  --ui-action-primary-pressed: var(--lapis-deep, var(--ui-fallback-signal-deep));
+  --ui-action-secondary: var(--gold, var(--ui-fallback-signal-deep));
+  --ui-action-secondary-hover: var(--gold-bright, var(--ui-fallback-signal-bright));
+  --ui-action-critical: var(--danger, var(--ui-fallback-ember));
+  --ui-action-critical-hover: var(--shu-bright, var(--ui-fallback-ember-bright));
+  --ui-action-quiet: color-mix(in oklab, var(--ui-text-primary) 10%, transparent);
+  --ui-action-quiet-hover: color-mix(in oklab, var(--ui-text-primary) 16%, transparent);
+  --ui-action-disabled: color-mix(in oklab, var(--ui-text-muted) 40%, transparent);
+
+  /* ── Proof ─────────────────────────────────────────────────────────────────
+     Onyx shows history it cannot always vouch for: a line may be server-
+     verified, partially backfilled, local-only, mid-reconnect, unavailable, or
+     simply unknown. These six are the ONLY sanctioned truth states, and every
+     one of them must be carried by text + shape as well as by colour — colour
+     alone fails WCAG 1.4.1 and fails a colour-blind reader outright. */
+  --ui-proof-verified: var(--ok, var(--ui-fallback-signal-bright));
+  --ui-proof-partial: var(--warn, var(--ui-fallback-ember-bright));
+  --ui-proof-local: var(--gold, var(--ui-fallback-signal));
+  --ui-proof-reconnecting: var(--lapis, var(--ui-fallback-signal));
+  --ui-proof-unavailable: var(--danger, var(--ui-fallback-ember));
+  --ui-proof-unknown: var(--paper-mute, var(--ui-fallback-ink-mute));
+
+  /* Proof backing washes — the chip fill behind each state's ink. */
+  --ui-proof-verified-wash: color-mix(in oklab, var(--ui-proof-verified) 14%, transparent);
+  --ui-proof-partial-wash: color-mix(in oklab, var(--ui-proof-partial) 14%, transparent);
+  --ui-proof-local-wash: color-mix(in oklab, var(--ui-proof-local) 14%, transparent);
+  --ui-proof-reconnecting-wash: color-mix(in oklab, var(--ui-proof-reconnecting) 14%, transparent);
+  --ui-proof-unavailable-wash: color-mix(in oklab, var(--ui-proof-unavailable) 14%, transparent);
+  --ui-proof-unknown-wash: color-mix(in oklab, var(--ui-proof-unknown) 14%, transparent);
+}
+
+/* ── Fallback slots · LIGHT contract ─────────────────────────────────────────
+   Two ways in:
+
+     [data-ui-scheme='light']            explicit opt-in, wins everywhere
+     :root:not([data-theme])             OS preference, ONLY before the theme
+                                         engine has claimed the document
+
+   The `:not([data-theme])` guard is load-bearing. ThemeProvider always writes
+   `data-theme`, so a real Onyx theme — including the light cuts (pearl, frost)
+   which already ship their own light values — is never second-guessed by an OS
+   media query. This block exists for the un-themed case: a lab surface, an
+   isolated mount, a consumer that adopted the token layer without the provider.
+
+   Only the fallback SLOTS move. No semantic name is redefined, so there is
+   exactly one definition of `--ui-surface-base` in the system. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --ui-fallback-canvas: var(--room-light-paper);
+    --ui-fallback-canvas-2: var(--room-light-surface);
+    --ui-fallback-base: var(--room-light-surface);
+    --ui-fallback-raised: var(--room-light-paper);
+    --ui-fallback-edge: var(--room-light-edge);
+    --ui-fallback-ink: var(--room-light-ink);
+    --ui-fallback-ink-dim: var(--room-light-ink-dim);
+    --ui-fallback-ink-mute: var(--room-light-ink-mute);
+    --ui-fallback-signal: var(--room-light-signal);
+    --ui-fallback-signal-bright: var(--room-light-signal);
+    --ui-fallback-signal-deep: var(--room-light-ink);
+    --ui-fallback-ember: var(--room-light-ember);
+    --ui-fallback-ember-bright: var(--room-light-ember);
+    --ui-fallback-on-fill: var(--room-light-paper);
+  }
+}
+/* Note: this block deliberately sets NO `color-scheme`. It matches an
+   un-themed :root, which is also the state of the real app for the instant
+   before ThemeProvider writes `data-theme` — declaring a UA-visible property
+   there could flash scrollbars and form controls on first paint. Only the
+   explicit `[data-ui-scheme]` opt-ins below declare `color-scheme`, so this
+   layer cannot alter a document that has not asked for it. */
+
+[data-ui-scheme='light'] {
+  --ui-fallback-canvas: var(--room-light-paper);
+  --ui-fallback-canvas-2: var(--room-light-surface);
+  --ui-fallback-base: var(--room-light-surface);
+  --ui-fallback-raised: var(--room-light-paper);
+  --ui-fallback-edge: var(--room-light-edge);
+  --ui-fallback-ink: var(--room-light-ink);
+  --ui-fallback-ink-dim: var(--room-light-ink-dim);
+  --ui-fallback-ink-mute: var(--room-light-ink-mute);
+  --ui-fallback-signal: var(--room-light-signal);
+  --ui-fallback-signal-bright: var(--room-light-signal);
+  --ui-fallback-signal-deep: var(--room-light-ink);
+  --ui-fallback-ember: var(--room-light-ember);
+  --ui-fallback-ember-bright: var(--room-light-ember);
+  --ui-fallback-on-fill: var(--room-light-paper);
+
+  color-scheme: light;
+}
+
+/* Explicit dark opt-in — the mirror of the light escape hatch, so a surface can
+   pin itself dark inside a light document without reaching for raw colour. */
+[data-ui-scheme='dark'] {
+  --ui-fallback-canvas: var(--room-current-void);
+  --ui-fallback-canvas-2: var(--room-current-void-2);
+  --ui-fallback-base: var(--room-basalt);
+  --ui-fallback-raised: var(--room-basalt-raised);
+  --ui-fallback-edge: var(--room-edge);
+  --ui-fallback-ink: var(--room-paper);
+  --ui-fallback-ink-dim: var(--room-paper-dim);
+  --ui-fallback-ink-mute: var(--room-paper-mute);
+  --ui-fallback-signal: var(--room-signal);
+  --ui-fallback-signal-bright: var(--room-signal-bright);
+  --ui-fallback-signal-deep: var(--room-signal-deep);
+  --ui-fallback-ember: var(--room-ember);
+  --ui-fallback-ember-bright: var(--room-ember-bright);
+  --ui-fallback-on-fill: var(--room-current-void);
+
+  color-scheme: dark;
+}

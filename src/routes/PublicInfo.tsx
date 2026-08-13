@@ -2,7 +2,7 @@
 import './landing.css';
 import './data-pages.css';
 import { createEffect, createMemo } from 'solid-js';
-import { PublicFooter } from './PublicFooter';
+import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
 
 const content = {
@@ -12,36 +12,43 @@ const content = {
   agents: ['Agent safety', 'Automation has a boundary.', 'Agent-visible actions are reviewed, capability-scoped, and labelled with their source. Local data stays local unless you explicitly choose otherwise.'],
 } as const;
 
-export function PublicInfo(props: { page: keyof typeof content }) {
+export type PublicInfoPage = keyof typeof content;
+
+/**
+ * Accessible name for the shared `main` landmark. These supporting routes are
+ * absent from the primary navigation, so the landmark name is the only
+ * page-level orientation a landmark-jumping user gets.
+ */
+const mainLabels = {
+  accessibility: 'Onyx accessibility',
+  glossary: 'Onyx glossary',
+  integrations: 'Onyx integrations',
+  agents: 'Onyx agent safety',
+} as const satisfies Record<PublicInfoPage, string>;
+
+export function PublicInfo(props: { page: PublicInfoPage }) {
   const item = createMemo(() => content[props.page]);
   createEffect(() => {
     setPageMeta(`Onyx — ${item()[0]}`, item()[1], `/${props.page}/`);
   });
   return (
-    <main class="r data-page">
-      <div class="r-ground" aria-hidden="true" />
-      <div class="r-flecks" aria-hidden="true" />
-      <header class="r-status">
-        <a class="brand" href="/">ONYX</a>
-        <nav aria-label="Primary">
-          <a href="/">Home</a>
-          <a href="/roadmap/">Roadmap</a>
-          <a href="/app/" class="enter">Open Onyx</a>
-        </nav>
-      </header>
-      <section class="r-wrap data-hero">
-        <p class="r-kicker">public contract</p>
-        <h1>{item()[0]}</h1>
-        <p class="sub">{item()[1]}</p>
-      </section>
-      <section class="r-wrap r-section">
-        <article class="data-card">
-          <span class="label">Onyx</span>
-          <h2>{item()[0]}</h2>
-          <p>{item()[2]}</p>
-        </article>
-      </section>
-      <PublicFooter />
-    </main>
+    <PublicFrame currentPath={`/${props.page}/`} mainLabel={mainLabels[props.page]}>
+      <div class="ui-root r data-page">
+        <div class="r-ground" aria-hidden="true" />
+        <div class="r-flecks" aria-hidden="true" />
+        <section class="r-wrap data-hero">
+          <p class="r-kicker">public contract</p>
+          <h1>{item()[0]}</h1>
+          <p class="sub">{item()[1]}</p>
+        </section>
+        <section class="r-wrap r-section">
+          <article class="data-card">
+            <div class="label">Onyx</div>
+            <h2>{item()[0]}</h2>
+            <p>{item()[2]}</p>
+          </article>
+        </section>
+      </div>
+    </PublicFrame>
   );
 }

@@ -21,6 +21,10 @@ import {
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const EXACT_PIN = '0.17.0-dev.1476+91a29d707';
+const NATIVE_SDK_PATCH = readFileSync(
+  resolve(REPO_ROOT, 'patches/@native-sdk__cli@0.6.2.patch'),
+  'utf8',
+);
 
 describe('desktop-zig version policy', () => {
   it('loads exact pin from .zigversion and matches fallback constant', () => {
@@ -53,6 +57,17 @@ describe('desktop-zig version policy', () => {
       '0.17.0-dev.1476+91a29d707',
     );
     expect(parseZigVersionOutput('')).toBe('');
+  });
+});
+
+describe('Native SDK packaged SPA patch', () => {
+  it('loads the configured entry through the zero origin root for SPA routers', () => {
+    expect(NATIVE_SDK_PATCH).toContain(
+      '-        char *uri = g_strdup_printf("%s/%s", origin, entry);',
+    );
+    expect(NATIVE_SDK_PATCH).toContain(
+      '+        char *uri = g_strdup_printf("%s/", origin);',
+    );
   });
 });
 

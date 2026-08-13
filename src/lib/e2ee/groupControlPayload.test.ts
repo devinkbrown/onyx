@@ -49,12 +49,14 @@ async function generateSigner(): Promise<{
 const COMMIT_ROUTE: GroupControlRouting = {
   channel: '#Root',
   kind: 'commit',
+  fromAccount: 'Alice',
   fromDevice: 'laptop.1',
 };
 
 const WELCOME_ROUTE: GroupControlRouting = {
   channel: '&staff',
   kind: 'welcome',
+  fromAccount: 'Alice',
   fromDevice: 'desktop',
   toAccount: 'Kain',
   toDevice: 'phone-2',
@@ -85,15 +87,17 @@ describe('normalizeControlChannel / routing', () => {
     expect(normalizeGroupControlRouting(WELCOME_ROUTE)).toEqual({
       channel: '&staff',
       kind: 'welcome',
+      fromAccount: 'alice',
       fromDevice: 'desktop',
       toAccount: 'Kain',
       toDevice: 'phone-2',
     });
     expect(
       normalizeGroupControlRouting({
-        channel: '#root',
-        kind: 'commit',
-        fromDevice: 'phone',
+      channel: '#root',
+      kind: 'commit',
+      fromAccount: 'Alice',
+      fromDevice: 'phone',
         toAccount: 'x',
       }),
     ).toBeNull();
@@ -101,6 +105,7 @@ describe('normalizeControlChannel / routing', () => {
       normalizeGroupControlRouting({
         channel: '#root',
         kind: 'welcome',
+        fromAccount: 'Alice',
         fromDevice: 'phone',
       }),
     ).toBeNull();
@@ -111,16 +116,23 @@ describe('buildGroupControlTranscript', () => {
   it('binds domain, routing, version, epoch, body, and signer_pub in fixed order', () => {
     const body = sampleBody();
     const signerPub = new Uint8Array(32).fill(0xab);
-    const t = buildGroupControlTranscript(COMMIT_ROUTE, 1, 7, body, signerPub);
+    const t = buildGroupControlTranscript(COMMIT_ROUTE, GROUP_CONTROL_PAYLOAD_VERSION, 7, body, signerPub);
     expect(t).not.toBeNull();
     const domain = new TextEncoder().encode(GROUP_CONTROL_PAYLOAD_DOMAIN);
     expectBytes(t!.slice(0, domain.length), domain);
     expect(t![domain.length]).toBe(0);
+    // Canonical lowercase sender account precedes the normalized channel.
+    const accountBytes = new TextEncoder().encode('alice');
+    expect(t![domain.length + 1]).toBe(accountBytes.length);
+    expectBytes(
+      t!.slice(domain.length + 2, domain.length + 2 + accountBytes.length),
+      accountBytes,
+    );
     // Normalized channel is lowercase #root
     const channelBytes = new TextEncoder().encode('#root');
-    expect(t![domain.length + 1]).toBe(channelBytes.length);
+    expect(t![domain.length + 2 + accountBytes.length]).toBe(channelBytes.length);
     expectBytes(
-      t!.slice(domain.length + 2, domain.length + 2 + channelBytes.length),
+      t!.slice(domain.length + 3 + accountBytes.length, domain.length + 3 + accountBytes.length + channelBytes.length),
       channelBytes,
     );
     // signer_pub is the last 32 bytes of the transcript
@@ -130,30 +142,30 @@ describe('buildGroupControlTranscript', () => {
   it('rejects empty body, oversized body, bad epoch/version, and bad signer_pub', () => {
     const pub = new Uint8Array(32);
     expect(
-      buildGroupControlTranscript(COMMIT_ROUTE, 1, 1, new Uint8Array(0), pub),
+      buildGroupControlTranscript(COMMIT_ROUTE, GROUP_CONTROL_PAYLOAD_VERSION, 1, new Uint8Array(0), pub),
     ).toBeNull();
     expect(
       buildGroupControlTranscript(
         COMMIT_ROUTE,
-        1,
+        GROUP_CONTROL_PAYLOAD_VERSION,
         1,
         new Uint8Array(MAX_GROUP_CONTROL_BODY_BYTES + 1),
         pub,
       ),
     ).toBeNull();
     expect(
-      buildGroupControlTranscript(COMMIT_ROUTE, 2, 1, sampleBody(), pub),
+      buildGroupControlTranscript(COMMIT_ROUTE, 99, 1, sampleBody(), pub),
     ).toBeNull();
     expect(
-      buildGroupControlTranscript(COMMIT_ROUTE, 1, -1, sampleBody(), pub),
+      buildGroupControlTranscript(COMMIT_ROUTE, GROUP_CONTROL_PAYLOAD_VERSION, -1, sampleBody(), pub),
     ).toBeNull();
     expect(
-      buildGroupControlTranscript(COMMIT_ROUTE, 1, 1.5, sampleBody(), pub),
+      buildGroupControlTranscript(COMMIT_ROUTE, GROUP_CONTROL_PAYLOAD_VERSION, 1.5, sampleBody(), pub),
     ).toBeNull();
     expect(
       buildGroupControlTranscript(
         COMMIT_ROUTE,
-        1,
+        GROUP_CONTROL_PAYLOAD_VERSION,
         1,
         sampleBody(),
         new Uint8Array(31),
@@ -240,6 +252,7 @@ describe('sign / parse / verify round-trip', () => {
       routing: {
         channel: '#room',
         kind: 'key-package',
+        fromAccount: 'Alice',
         fromDevice: 'phone',
       },
       epoch: 1,
@@ -250,7 +263,7 @@ describe('sign / parse / verify round-trip', () => {
     expect(wire).not.toBeNull();
     const parts = await verifyGroupControlPayload(
       wire!,
-      { channel: '#room', kind: 'key-package', fromDevice: 'phone' },
+      { channel: '#room', kind: 'key-package', fromAccount: 'Alice', fromDevice: 'phone' },
       signer.publicRaw,
     );
     expect(parts).not.toBeNull();
@@ -282,12 +295,26 @@ describe('metadata substitution (fail closed)', () => {
     ).toBeNull();
   });
 
+  it('binds canonical lowercase fromAccount and rejects account substitution', async () => {
+    const signer = await generateSigner();
+    const wire = await signGroupControlPayload({
+      routing: { ...COMMIT_ROUTE, fromAccount: 'ALICE' },
+      epoch: 2,
+      body: sampleBody('account'),
+      signerPub: signer.publicRaw,
+      privateKey: signer.privateKey,
+    });
+    expect(wire).not.toBeNull();
+    expect(await verifyGroupControlPayload(wire!, { ...COMMIT_ROUTE, fromAccount: 'alice' }, signer.publicRaw)).not.toBeNull();
+    expect(await verifyGroupControlPayload(wire!, { ...COMMIT_ROUTE, fromAccount: 'mallory' }, signer.publicRaw)).toBeNull();
+  });
+
   it('rejects kind substitution', async () => {
     const { signer, wire } = await signedCommit();
     expect(
       await verifyGroupControlPayload(
         wire,
-        { channel: '#root', kind: 'key-package', fromDevice: 'laptop.1' },
+        { channel: '#root', kind: 'key-package', fromAccount: 'Alice', fromDevice: 'laptop.1' },
         signer.publicRaw,
       ),
     ).toBeNull();
@@ -457,6 +484,20 @@ describe('magic prefix (fail closed)', () => {
     raw.set(body, 8);
     expect(parseGroupControlPayload(toB64url(raw))).toBeNull();
   });
+
+  it('parses OGC1 v1 only as a diagnostic locked payload', () => {
+    const body = sampleBody('v1');
+    const raw = new Uint8Array(FIXED_ENVELOPE + body.length);
+    raw.set(new TextEncoder().encode(GROUP_CONTROL_PAYLOAD_MAGIC), 0);
+    raw[4] = 1;
+    raw[5] = 3;
+    raw[10] = (body.length >> 8) & 0xff;
+    raw[11] = body.length & 0xff;
+    raw.set(body, 12);
+    const parsed = parseGroupControlPayload(toB64url(raw));
+    expect(parsed?.diagnosticOnly).toBe(true);
+    expect(parsed?.version).toBe(1);
+  });
 });
 
 describe('non-canonical payload and bounds', () => {
@@ -583,6 +624,7 @@ describe('non-canonical payload and bounds', () => {
         routing: {
           channel: '#root',
           kind: 'welcome',
+          fromAccount: 'Alice',
           fromDevice: 'x',
         },
         epoch: 1,

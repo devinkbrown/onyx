@@ -7,6 +7,7 @@ import { cleanup, render, screen, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { writeCatchUpMemory } from '@/lib/catchup/catchUpMemory';
+import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store';
 import { HomeView } from './HomeView';
 
@@ -19,6 +20,7 @@ const MEMORY_OWNER = {
 
 beforeEach(() => {
   localStorage.clear();
+  resetPreferences();
   store.setState(initialState, true);
   vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 404 })));
 });
@@ -26,6 +28,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  resetPreferences();
   store.setState(initialState, true);
   vi.unstubAllGlobals();
 });
@@ -208,5 +211,107 @@ describe('HomeView — cold return catch-up from device memory', () => {
     expect(catchUp).toHaveAttribute('data-catchup-source', 'memory');
     expect(within(catchUp).getByText(/5 unread/)).toBeInTheDocument();
     expect(within(catchUp).getByText('Cold vault preview line')).toBeInTheDocument();
+  });
+
+  it('replaces device fallback with live transcript without an empty flash', () => {
+    seedColdSnapshot();
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'home' },
+      connectionStatus: 'connecting',
+      networkName: 'Onyx',
+      ourNick: 'testuser',
+      server: {
+        id: 'home-cold',
+        name: 'Onyx',
+        network: 'Onyx',
+        url: 'wss://example.test',
+        icon: '',
+        nick: 'testuser',
+        account: 'testuser',
+        connected: false,
+      },
+      channels: new Map(),
+      dms: new Map(),
+    } as never, true);
+
+    render(() => <HomeView />);
+    const catchUp = screen.getByLabelText('Catch up on what you missed');
+    expect(catchUp).toHaveAttribute('data-catchup-source', 'memory');
+    expect(within(catchUp).getByRole('button', { name: /Open alice/ })).toBeInTheDocument();
+
+    const emptyFlashes: string[] = [];
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('[data-home-band="caught-up"]')) emptyFlashes.push('caught-up');
+      const summary = document.querySelector('.home-catchup-clear');
+      if (summary?.textContent?.includes("You're all caught up")) emptyFlashes.push('clear');
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    const channel = {
+      name: '#general',
+      topic: '',
+      topicSetBy: '',
+      topicSetAt: null,
+      modes: '',
+      users: new Map(),
+      unread: 2,
+      highlights: 1,
+      createdAt: null,
+      messages: [
+        {
+          id: 'live-1',
+          time: new Date(),
+          from: 'kai',
+          text: 'live buffer line',
+          type: 'msg' as const,
+          target: '#general',
+          highlight: true,
+        },
+      ],
+    };
+    store.setState({
+      connectionStatus: 'connected',
+      channels: new Map([['#general', channel]]),
+      dms: new Map(),
+      channelLastActivity: new Map([['#general', Date.now()]]),
+    });
+    observer.disconnect();
+
+    const live = screen.getByLabelText('Catch up on what you missed');
+    expect(live).toHaveAttribute('data-catchup-source', 'live');
+    expect(within(live).getByRole('button', { name: /Open #general/ })).toBeInTheDocument();
+    expect(within(live).queryByRole('button', { name: /Open alice/ })).toBeNull();
+    expect(screen.queryByRole('region', { name: "You're caught up" })).not.toBeInTheDocument();
+    expect(emptyFlashes).toEqual([]);
+  });
+
+  it('does not paint device catch-up when local history is off', () => {
+    seedColdSnapshot();
+    setPreference('localHistory', false);
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'home' },
+      connectionStatus: 'connecting',
+      networkName: 'Onyx',
+      ourNick: 'testuser',
+      server: {
+        id: 'home-cold',
+        name: 'Onyx',
+        network: 'Onyx',
+        url: 'wss://example.test',
+        icon: '',
+        nick: 'testuser',
+        account: 'testuser',
+        connected: false,
+      },
+      channels: new Map(),
+      dms: new Map(),
+    } as never, true);
+
+    render(() => <HomeView />);
+    expect(screen.queryByLabelText('Catch up on what you missed')).not.toBeInTheDocument();
+    expect(screen.queryByText('saved on this device')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cold vault preview line')).not.toBeInTheDocument();
   });
 });
