@@ -11,10 +11,18 @@ import {
   SERVER_SEARCH_RESULT_MAX,
   SERVER_SEARCH_ROW_MAX,
   SERVER_SEARCH_TEXT_MAX,
+  isDmE2eeDesignated,
   store,
 } from './store';
 import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
+import { toB64url } from '@/lib/e2ee/dmCipher';
+import { setPreference } from '@/lib/prefs/preferences';
+import {
+  beginVaultDmPrivacyClear,
+  finishVaultDmPrivacyClear,
+  _resetVaultDmSearchPrivacyForTests,
+} from '@/lib/vault/dmSearchPrivacy';
 
 const initialState = store.getInitialState();
 
@@ -47,6 +55,12 @@ function mockClient(caps: string[]) {
 }
 
 const feed = (line: string) => store.getState()._handleMessage(parseIRCMessage(line));
+
+async function validSearchDeviceKey(): Promise<string> {
+  const kp = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+  const raw = new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey));
+  return toB64url(raw);
+}
 
 beforeEach(() => {
   store.getState().disconnect();
@@ -290,6 +304,74 @@ describe('searchServerHistory', () => {
     store.getState().searchServerHistory('Mika', 'private');
     expect(sent).toEqual([]);
     expect(store.getState().serverSearch.error).toMatch(/stays on this device/i);
+  });
+
+  it('refuses SEARCH for a leftover ocean.dm-keys directory after ocean.dm-key clear', async () => {
+    vi.useRealTimers();
+    const { client, sent } = mockClient(['draft/search']);
+    store.setState({ client });
+    const primary = await validSearchDeviceKey();
+    const secondary = await validSearchDeviceKey();
+    store.getState()._applyMetadata('trev', 'ocean.dm-keys', `${primary},${secondary}`);
+    store.getState()._applyMetadata('trev', 'ocean.dm-key', '');
+    expect(store.getState().peerDmKeys.has('trev')).toBe(false);
+    expect(store.getState().peerDmDeviceKeys.get('trev')).toEqual([primary, secondary]);
+    expect(isDmE2eeDesignated(store.getState(), 'trev')).toBe(true);
+
+    setPreference('e2eeDms', false);
+    store.getState().searchServerHistory('trev', 'quiet dock');
+    expect(sent).toEqual([]);
+    expect(store.getState().serverSearch.error).toMatch(/stays on this device/i);
+    expect(store.getState().serverSearch.error).not.toContain(primary);
+    expect(store.getState().serverSearch.error).not.toContain(secondary);
+    setPreference('e2eeDms', true);
+  });
+
+  it('refuses SEARCH for a legacy-only or device-only designation and allows a genuinely plain DM', async () => {
+    vi.useRealTimers();
+    const { client, sent } = mockClient(['draft/search']);
+    store.setState({
+      client,
+      server: {
+        id: 'search-e2ee',
+        name: 'Search',
+        network: 'search',
+        url: 'wss://search.example/ws',
+        icon: 'S',
+        nick: 'kain',
+        account: 'kain',
+        connected: true,
+      },
+    });
+    _resetVaultDmSearchPrivacyForTests();
+    finishVaultDmPrivacyClear(beginVaultDmPrivacyClear(), true);
+
+    store.setState({ peerDmKeys: new Map([['legacy', 'legacy-only-key']]), peerDmDeviceKeys: new Map() });
+    store.getState().searchServerHistory('legacy', 'secret');
+    expect(sent).toEqual([]);
+    expect(store.getState().serverSearch.error).toMatch(/stays on this device/i);
+    expect(store.getState().serverSearch.error).not.toContain('legacy-only-key');
+    store.getState().clearServerSearch();
+
+    store.setState({
+      peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map([['device', ['device-only-key']]]),
+    });
+    store.getState().searchServerHistory('device', 'secret');
+    expect(sent).toEqual([]);
+    expect(store.getState().serverSearch.error).toMatch(/stays on this device/i);
+    expect(store.getState().serverSearch.error).not.toContain('device-only-key');
+    store.getState().clearServerSearch();
+
+    store.setState({
+      peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map(),
+      peerKeyChanges: new Map(),
+      dms: new Map(),
+    });
+    expect(isDmE2eeDesignated(store.getState(), 'bob')).toBe(false);
+    store.getState().searchServerHistory('bob', 'public hello');
+    expect(sent).toEqual(['SEARCH bob public hello']);
   });
 
   it('clears the timeout and pending transport state on disconnect', () => {

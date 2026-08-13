@@ -10,9 +10,10 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store } from './store';
+import { isDmE2eeDesignated, store } from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import type { Channel } from '@/lib/irc/types';
+import { setPreference } from '@/lib/prefs/preferences';
 import {
   ENVELOPE_PREFIX,
   _resetDeviceKeysForTests,
@@ -22,6 +23,7 @@ import {
   isEnvelope,
   toB64url,
 } from '@/lib/e2ee/dmCipher';
+import { _resetVaultForTests, loadOutbox } from '@/lib/vault/historyVault';
 
 const initialState = store.getInitialState();
 const MEMORY_OWNER = { serverUrl: 'wss://e2ee-flow.example/ws', identity: 'alice' } as const;
@@ -96,11 +98,21 @@ function seedChannel(name: string): void {
   store.setState({ channels: new Map([[name.toLowerCase(), channel]]) });
 }
 
+function chromeText(): string {
+  return [
+    ...store.getState().toasts.map((toast) => `${toast.title}\n${toast.description ?? ''}`),
+    ...store.getState().notifications.map((note) => note.text),
+    store.getState().serverSearch.error ?? '',
+  ].join('\n');
+}
+
 beforeEach(() => {
   globalThis.indexedDB = new IDBFactory();
   _resetDeviceKeysForTests();
   _resetSharedKeysForTests();
+  _resetVaultForTests();
   localStorage.clear();
+  setPreference('e2eeDms', true);
   store.setState({
     ...initialState,
     ourNick: 'me',
@@ -316,5 +328,121 @@ describe('E2EE DMs', () => {
     expect(sendRaw).not.toHaveBeenCalledWith('PRIVMSG', 'trev', 'never seal to a stale key');
     expect(store.getState().peerKeyChanges.get('trev')?.newKey).toBe(rotated.publicB64);
     expect(dmMsgs('trev')).toHaveLength(0);
+  });
+});
+
+describe('isDmE2eeDesignated', () => {
+  it('designates a legacy-only ocean.dm-key peer even when the preference is off', () => {
+    setPreference('e2eeDms', false);
+    store.setState({ peerDmKeys: new Map([['trev', 'legacy-peer-key']]) });
+    expect(isDmE2eeDesignated(store.getState(), 'Trev')).toBe(true);
+    expect(isDmE2eeDesignated(store.getState(), '#room')).toBe(false);
+  });
+
+  it('designates a device-only ocean.dm-keys directory', async () => {
+    const mine = await deviceKeys();
+    const peer = await makePeer(mine!.publicB64);
+    store.setState({
+      peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map([['trev', [peer.publicB64]]]),
+    });
+    expect(isDmE2eeDesignated(store.getState(), 'trev')).toBe(true);
+    expect(chromeText()).not.toContain(peer.publicB64);
+  });
+
+  it('does not designate a genuinely plain DM', () => {
+    store.setState({
+      peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map(),
+      peerKeyChanges: new Map(),
+      dms: new Map(),
+    });
+    expect(isDmE2eeDesignated(store.getState(), 'bob')).toBe(false);
+  });
+
+  it('does not designate an empty device directory alone', () => {
+    store.setState({
+      peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map([['trev', []]]),
+    });
+    expect(isDmE2eeDesignated(store.getState(), 'trev')).toBe(false);
+  });
+
+  it('fail-closes a nonempty corrupt device directory', () => {
+    store.setState({
+      peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map([['trev', ['AAAA']]]),
+    });
+    expect(isDmE2eeDesignated(store.getState(), 'trev')).toBe(true);
+  });
+
+  it('fail-closes a nonempty device directory containing only empty corrupt entries', () => {
+    store.setState({
+      peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map([['trev', ['']]]),
+    });
+    expect(isDmE2eeDesignated(store.getState(), 'trev')).toBe(true);
+  });
+
+  it('fail-closes a pending key-change even without a live directory', () => {
+    store.setState({
+      peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map(),
+      peerKeyChanges: new Map([['trev', { pinnedKey: 'pinned-device', newKey: 'rotated-device' }]]),
+    });
+    expect(isDmE2eeDesignated(store.getState(), 'trev')).toBe(true);
+  });
+});
+
+describe('E2EE designation after ocean.dm-key clear', () => {
+  it('keeps online send, offline outbox, and server search encrypted after a leftover device directory', async () => {
+    const mine = await deviceKeys();
+    const primary = await makePeer(mine!.publicB64);
+    const secondary = await makePeer(mine!.publicB64);
+    const send = vi.fn((_line: string) => true);
+    const sendRaw = vi.fn((..._args: string[]) => true);
+    store.setState({ connectionStatus: 'connected', client: mockClient(sendRaw) });
+    store.getState().client!.send = send;
+    store.getState().client!.negotiatedCaps.add('draft/search');
+
+    store.getState()._applyMetadata('trev', 'ocean.dm-keys', `${primary.publicB64} ${secondary.publicB64}`);
+    expect(store.getState().peerDmDeviceKeys.get('trev')).toEqual([
+      primary.publicB64,
+      secondary.publicB64,
+    ]);
+    expect(store.getState().peerDmKeys.get('trev')).toBe(primary.publicB64);
+
+    store.getState()._applyMetadata('trev', 'ocean.dm-key', '');
+    expect(store.getState().peerDmKeys.has('trev')).toBe(false);
+    expect(store.getState().peerDmDeviceKeys.get('trev')).toEqual([
+      primary.publicB64,
+      secondary.publicB64,
+    ]);
+    expect(isDmE2eeDesignated(store.getState(), 'trev')).toBe(true);
+
+    setPreference('e2eeDms', false);
+    expect(isDmE2eeDesignated(store.getState(), 'trev')).toBe(true);
+
+    store.getState().searchServerHistory('trev', 'quiet dock');
+    expect(sendRaw).not.toHaveBeenCalledWith('SEARCH', 'trev', 'quiet dock');
+    expect(store.getState().serverSearch.status).toBe('error');
+    expect(store.getState().serverSearch.error).toMatch(/stays on this device/i);
+
+    store.getState().sendMessage('trev', 'meet at the quiet dock');
+    await until(() => send.mock.calls.length > 0);
+    const wire = String(send.mock.calls[0]![0]);
+    expect(wire).toContain('PRIVMSG trev :');
+    expect(isEnvelope(wire.slice(wire.indexOf(':') + 1))).toBe(true);
+    expect(wire).not.toContain('quiet dock');
+
+    store.setState({ connectionStatus: 'disconnected', client: null });
+    store.getState().sendMessage('trev', 'the vault password is hunter2');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await loadOutbox()).toEqual([]);
+    expect(store.getState().toasts.some((toast) => toast.title.includes("Can't queue encrypted DM"))).toBe(true);
+
+    expect(chromeText()).not.toContain(primary.publicB64);
+    expect(chromeText()).not.toContain(secondary.publicB64);
+    setPreference('e2eeDms', true);
   });
 });

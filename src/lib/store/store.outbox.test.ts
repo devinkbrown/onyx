@@ -411,17 +411,38 @@ describe('offline outbox — E2EE DMs never persist plaintext', () => {
     expect(entry!.text).toBe('plain hello');
   });
 
-  it('still queues a plaintext DM when e2eeDms is off, even with a peer key', async () => {
+  it('refuses to queue a designated E2EE DM when e2eeDms is off', async () => {
     setPreference('e2eeDms', false);
     store.setState({ peerDmKeys: new Map([['trev', 'peer-device-key-b64']]) });
 
-    store.getState().sendMessage('trev', 'e2ee disabled, plain send');
+    store.getState().sendMessage('trev', 'e2ee disabled, still designated');
 
-    await until(async () => (await loadOutbox()).length === 1);
-    const [entry] = await loadOutbox();
-    expect(entry!.target).toBe('trev');
-    expect(entry!.text).toBe('e2ee disabled, plain send');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await loadOutbox()).toEqual([]);
+    expect(store.getState().dms.get('trev')?.messages ?? []).toEqual([]);
+    expect(store.getState().toasts.some((t) => t.title.includes("Can't queue encrypted DM"))).toBe(true);
+    expect(store.getState().toasts.some((t) =>
+      `${t.title}\n${t.description ?? ''}`.includes('peer-device-key-b64'),
+    )).toBe(false);
     setPreference('e2eeDms', true); // restore default for other suites
+  });
+
+  it('refuses to queue when only a leftover ocean.dm-keys directory remains', async () => {
+    setPreference('e2eeDms', true);
+    store.setState({
+      peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map([['trev', ['device-only-directory-key']]]),
+    });
+
+    store.getState().sendMessage('trev', 'do not persist this secret');
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await loadOutbox()).toEqual([]);
+    expect(store.getState().dms.get('trev')?.messages ?? []).toEqual([]);
+    expect(store.getState().toasts.some((t) => t.title.includes("Can't queue encrypted DM"))).toBe(true);
+    expect(store.getState().toasts.some((t) =>
+      `${t.title}\n${t.description ?? ''}`.includes('device-only-directory-key'),
+    )).toBe(false);
   });
 
   it('keeps a queued DM when a newly discovered E2EE key cannot be sealed', async () => {

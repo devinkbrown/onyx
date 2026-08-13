@@ -640,8 +640,9 @@ describe('Packet-C group-control integration owner', () => {
     await integration.initialization;
     const old = integration.runtime!;
     await integration.accept(value.commit);
-    await expect(integration.accept(value.welcome)).resolves.toMatchObject({ status: 'queued', reason: 'session-not-provisioned' });
+    const pending = integration.accept(value.welcome);
     await integration.onVaultReset();
+    await expect(pending).resolves.toMatchObject({ status: 'ignored' });
     const late = GroupSession.create({ room: '#room', account: 'alice', deviceId: 'phone', epochKey: testBytes(8), membershipDigest: testBytes(9) })!;
     expect(old.registerProvisionedSession(late)).toMatchObject({ ok: false, reason: 'runtime-inactive' });
     expect(late.epoch).toBe(0n);

@@ -41,6 +41,72 @@ const CONTROL_FORMS = [
 ];
 
 const INBOUND_VERBS = ['E2EE.KEYPACKAGE', 'E2EE.COMMIT', 'E2EE.WELCOME'];
+const CLIENT_FIELDS = {
+  group_control_observer: {
+    status: 'production_wired',
+    owner: 'connection_and_account_owned_bridge',
+    server_reply_authentication: 'E2EEKEY replies are accepted only from the exact server prefix learned from 001',
+    consumes: INBOUND_VERBS,
+    does_not_consume: 'inbound E2EEGROUP',
+  },
+  group_control_runtime: {
+    status: 'production_wired',
+    trusted_directory_verification: 'production_wired',
+    genesis_session_provisioning: 'production_wired',
+    genesis_semantics: 'authenticated OGC1-v2 commit and welcome pairs may provision an ephemeral epoch-1 GroupSession only for epoch 0 to 1, priorEpoch 0, a zero prior commit hash, and exact routing, identity, commit, membership, body, context, and epoch-key-commitment binding',
+    higher_epoch_semantics: 'requires an existing current session or explicit recovery',
+    session_persistence: 'activation_hold',
+  },
+  group_message_crypto: {
+    envelope_helpers: 'implemented',
+    store_seal: 'activation_hold',
+    store_open: 'activation_hold',
+    outbound: 'required rooms reject plaintext; no production path seals and tags ONYXROOM1',
+    inbound: 'ONYXROOM1 remains ciphertext in the store and renders as a locked placeholder',
+  },
+};
+const REQUIRED_POLICY_FIELDS = {
+  status: 'production_active',
+  admission: 'tag_and_body',
+  tag: '+onyx/e2ee=mls',
+  body: 'canonical ONYXROOM1 envelope',
+  body_validation: 'exact prefix, canonical unpadded base64url, version 1, decoded length at least 33 bytes, and bounded by the server message limit',
+  server_validation: 'structural only; the daemon neither decrypts nor authenticates ciphertext',
+  local_privmsg_failure: 'FAIL PRIVMSG E2EE_REQUIRED',
+  local_notice_failure: 'silent_drop',
+  mesh_relay_failure: 'permanent_reject',
+  tagmsg: 'admitted as a tag-only command without a text envelope',
+};
+const MESSAGE_POLICY_VECTORS = {
+  accepted: {
+    required_room_ciphertext: {
+      line: '@+onyx/e2ee=mls PRIVMSG #secure :ONYXROOM1 AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      outcome: 'accepted',
+    },
+    required_room_tagmsg: {
+      line: '@+typing=active TAGMSG #secure',
+      outcome: 'accepted',
+    },
+  },
+  rejected: {
+    tagged_plaintext: {
+      line: '@+onyx/e2ee=mls PRIVMSG #secure :plaintext',
+      fail: 'FAIL PRIVMSG E2EE_REQUIRED',
+    },
+    untagged_envelope: {
+      line: 'PRIVMSG #secure :ONYXROOM1 AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      fail: 'FAIL PRIVMSG E2EE_REQUIRED',
+    },
+    wrong_tag_value: {
+      line: '@+onyx/e2ee=1 PRIVMSG #secure :ONYXROOM1 AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      fail: 'FAIL PRIVMSG E2EE_REQUIRED',
+    },
+    malformed_envelope: {
+      line: '@+onyx/e2ee=mls PRIVMSG #secure :ONYXROOM1 not+base64url',
+      fail: 'FAIL PRIVMSG E2EE_REQUIRED',
+    },
+  },
+};
 const ACCEPTED_VECTOR_NAMES = [
   'key_package_channel',
   'commit_channel',
@@ -257,7 +323,7 @@ export function validContract(value) {
   const presence = contract.presence;
 
   return contract.schema === 'onyx-client-server-contract/v2'
-    && contract.revision === 2
+    && contract.revision === 3
     && contract.transport?.websocket === 'one IRC message per frame; no trailing frame bytes'
     && exactArray(caps?.required_for_first_party_client, REQUIRED_CAPABILITIES)
     && isDeepStrictEqual(caps?.vendor, VENDOR_CAPABILITIES)
@@ -265,11 +331,8 @@ export function validContract(value) {
     && hasText(server?.group_control_semantics, 'authenticated membership policy and opaque E2EEGROUP control-record delivery are live, including mesh hop custody and exact-once replay metadata')
     && server?.local_authoring_default === true
     && server?.local_authoring_quiesce === 'operator-only E2EEGROUP ON|OFF|STATUS; inbound relay, ACK, and retry stay live while quiesced'
-    && client?.group_crypto === 'staged_unwired'
-    && hasText(client?.group_crypto_semantics, 'OGC1 sign/parse/verify helpers exist; live store send/open, trusted-directory verify, and room-key install are not product-wired')
-    && client?.inbound_adapter?.status === 'staged_unwired'
-    && exactArray(client?.inbound_adapter?.consumes, INBOUND_VERBS)
-    && client?.inbound_adapter?.does_not_consume === 'inbound E2EEGROUP'
+    && exactNamedKeys(client, Object.keys(CLIENT_FIELDS))
+    && isDeepStrictEqual(client, CLIENT_FIELDS)
     && eligibility?.guest?.onyx_e2ee_negotiation === 'allowed'
     && eligibility?.guest?.reusable_session_required === false
     && eligibility?.guest?.authoring === GUEST_AUTHORING
@@ -294,7 +357,7 @@ export function validContract(value) {
     && persistence?.opaque_control_payload === 'none_durable'
     && exactArray(persistence?.allowed_transient, ['bounded_ads1_attachment_spool', 'ram_mesh_hop_custody_until_ack'])
     && persistence?.helix_checkpoint === 'replay_metadata_only'
-    && e2ee?.required_policy === 'encryption-policy=required rejects untagged plaintext'
+    && isDeepStrictEqual(e2ee?.required_policy, REQUIRED_POLICY_FIELDS)
     && exactArray(e2ee?.control_records, CONTROL_RECORDS)
     && command?.name === 'E2EEGROUP'
     && command?.ircx_required === true
@@ -311,6 +374,7 @@ export function validContract(value) {
     && delivery?.welcome_absence === WELCOME_ABSENCE
     && isDeepStrictEqual(presence?.quit, PRESENCE_QUIT_FIELDS)
     && isDeepStrictEqual(presence?.part, PRESENCE_PART_FIELDS)
+    && isDeepStrictEqual(contract.message_policy_vectors, MESSAGE_POLICY_VECTORS)
     && validCommandVectors(contract.command_vectors)
     && isDeepStrictEqual(contract.command_vectors?.accepted, EXPECTED_VECTORS.accepted)
     && isDeepStrictEqual(contract.command_vectors?.rejected, EXPECTED_VECTORS.rejected);

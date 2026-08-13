@@ -2,11 +2,10 @@
 /**
  * Packet-B group-control runtime.
  *
- * This is a control-plane lifecycle/orchestration seam. It never creates a
- * GroupSession, persists or installs room keys, encrypts messages, or exposes
- * control payloads. A caller must provision real GroupSession instances and
- * provide the authenticated directory/trust/key seams before controls can be
- * applied.
+ * This is a control-plane lifecycle/orchestration seam. It never mints a
+ * placeholder GroupSession, persists room keys, encrypts messages, or exposes
+ * control payloads. Authenticated genesis bootstrap may privately register a
+ * session created from a verified commit+welcome pair; activation stays HOLD.
  */
 
 import type { IRCMessage } from '@/lib/irc/types';
@@ -74,7 +73,8 @@ export type GroupControlRuntimeReason =
   | 'identity-mismatch'
   | 'duplicate-session'
   | 'activation-held'
-  | 'transport-unavailable';
+  | 'transport-unavailable'
+  | 'stale';
 
 export type GroupControlRuntimeOutcome = {
   status: GroupControlAdapterOutcome['status'];
@@ -188,11 +188,20 @@ type NormalizedIdentity = {
 
 type Deferred = { resolve: (outcome: GroupControlRuntimeOutcome) => void };
 
+type BootstrapTicket = {
+  generation: number;
+  room: string;
+  roomIncarnation: number;
+  account: string;
+  deviceId: string;
+};
+
 type QueuedJob = {
   generation: number;
   room: string | null;
   roomIncarnation: number;
   boundSession: GroupSession | null;
+  bootstrapTicket?: BootstrapTicket;
   messages: readonly (IRCMessage | string)[];
   adapter: GroupControlSessionAdapter;
   deferred: Deferred;
@@ -208,6 +217,17 @@ type CompletedFingerprint = {
   seenAt: number;
   generation: number;
   epoch: number;
+};
+
+/** Per-room/generation reservation while a pair is queued or executing. */
+type InFlightReservation = {
+  key: string;
+  room: string;
+  commitFingerprint: string;
+  welcomeFingerprint: string;
+  generation: number;
+  epoch: number;
+  roomIncarnation: number;
 };
 
 type HalfPair = {
@@ -438,6 +458,7 @@ function buildRuntime(
   const retries: QueuedJob[] = [];
   const pairs = new Map<string, HalfPair>();
   const completed = new Map<string, CompletedFingerprint>();
+  const inFlightReservations = new Map<string, InFlightReservation>();
   let retrySequence = 0;
   const sessions = new Map<string, GroupSession>();
   const rooms = new Map<string, GroupControlRoomProjection>();
@@ -497,6 +518,7 @@ function buildRuntime(
 
   function roomKnown(room: string): boolean {
     if (rooms.has(room) || sessions.has(room) || [...pairs.values()].some((pair) => pair.room === room)) return true;
+    if ([...inFlightReservations.values()].some((entry) => entry.room === room)) return true;
     return queue.some((job) => job.room === room) || retries.some((job) => job.room === room) || (activeRoomJobs.get(room) ?? 0) > 0;
   }
 
@@ -531,6 +553,7 @@ function buildRuntime(
   function cleanupRoomMetadata(room: string): void {
     if (rooms.has(room) || sessions.has(room) || (activeRoomJobs.get(room) ?? 0) > 0) return;
     if ([...pairs.values()].some((pair) => pair.room === room)) return;
+    if ([...inFlightReservations.values()].some((entry) => entry.room === room)) return;
     if (queue.some((job) => job.room === room) || retries.some((job) => job.room === room)) return;
     roomIncarnations.delete(room);
   }
@@ -579,11 +602,35 @@ function buildRuntime(
     for (const pair of pairs.values()) releaseHalfPairRefs(pair);
     pairs.clear();
     completed.clear();
+    inFlightReservations.clear();
   }
 
   function releaseRoomPairs(room: string): void {
     for (const pair of [...pairs.values()]) if (pair.room === room) clearHalfPair(pair);
     for (const [key, entry] of completed) if (entry.room === room) completed.delete(key);
+    for (const [key, entry] of inFlightReservations) if (entry.room === room) inFlightReservations.delete(key);
+  }
+
+  function tryReserveInFlight(entry: InFlightReservation): boolean {
+    const existing = inFlightReservations.get(entry.key);
+    // Occupied identity/epoch: never replace, even with an exact match.
+    // Exact retransmissions must coalesce in accept() instead of enqueueing.
+    if (existing) return false;
+    if (inFlightReservations.size >= GROUP_CONTROL_RUNTIME_MAX_HALF_PAIRS) return false;
+    inFlightReservations.set(entry.key, entry);
+    return true;
+  }
+
+  function releaseInFlightReservation(job: QueuedJob): void {
+    const fingerprint = job.completed;
+    if (!fingerprint) return;
+    const reserved = inFlightReservations.get(fingerprint.key);
+    if (!reserved) return;
+    if (reserved.generation !== job.generation) return;
+    if (reserved.roomIncarnation !== job.roomIncarnation) return;
+    if (reserved.commitFingerprint !== fingerprint.commitFingerprint) return;
+    if (reserved.welcomeFingerprint !== fingerprint.welcomeFingerprint) return;
+    inFlightReservations.delete(fingerprint.key);
   }
 
   function dropQueuedRoomJobs(room: string): void {
@@ -612,6 +659,10 @@ function buildRuntime(
     }
     for (const [key, entry] of completed) {
       if (entry.generation !== generation || current - entry.seenAt >= ttl) completed.delete(key);
+    }
+    for (const [key, entry] of inFlightReservations) {
+      // Live jobs must keep their reservation; only drop generation-stale rows.
+      if (entry.generation !== generation) inFlightReservations.delete(key);
     }
     for (const job of [...retries]) {
       const entry = job.completed;
@@ -646,7 +697,48 @@ function buildRuntime(
     return source ? abortable(source, signal) : Promise.reject(new Error('directory-unavailable'));
   }
 
-  function createAdapter(boundSession: GroupSession | null): GroupControlSessionAdapter | null {
+  function adoptGenesisSession(session: GroupSession, ticket: BootstrapTicket): boolean {
+    if (destroyedForever || detached || lifecycle === 'recovery-required' || lifecycle === 'inactive') {
+      session.destroy();
+      return false;
+    }
+    if (generation !== ticket.generation) {
+      session.destroy();
+      return false;
+    }
+    if (!identity?.account || !identity.deviceId
+      || identity.account !== ticket.account || identity.deviceId !== ticket.deviceId) {
+      session.destroy();
+      return false;
+    }
+    if (session.account !== identity.account || session.deviceId !== identity.deviceId) {
+      session.destroy();
+      return false;
+    }
+    const room = roomKey(session.room);
+    if (!room || room !== ticket.room || roomIncarnation(room) !== ticket.roomIncarnation) {
+      session.destroy();
+      return false;
+    }
+    if (liveSessionForRoom(room)) {
+      session.destroy();
+      return false;
+    }
+    if (session.isDestroyed) return false;
+    if (!rooms.has(room) && rooms.size >= GROUP_CONTROL_RUNTIME_MAX_ROOMS) {
+      session.destroy();
+      return false;
+    }
+    if (sessions.size >= GROUP_CONTROL_RUNTIME_MAX_SESSIONS) {
+      session.destroy();
+      return false;
+    }
+    sessions.set(room, session);
+    setRoom(room, 'control-applied', Number(session.epoch));
+    return true;
+  }
+
+  function createAdapter(boundSession: GroupSession | null, ticket?: BootstrapTicket): GroupControlSessionAdapter | null {
     if (!identity?.account || !identity.deviceId || !hasDirectorySubstrate(options) || !hasTrustSubstrate(options)) return null;
     const store = resolveStore();
     if (!store || !options.recipientPrivateKeyFor) return null;
@@ -657,6 +749,10 @@ function buildRuntime(
         directoryForAccount: (account) => directoryRequest(account, signal),
         trustedSignerStore: store,
         recipientPrivateKeyFor: options.recipientPrivateKeyFor,
+        localIdentity: { account: identity.account, deviceId: identity.deviceId },
+        adoptBootstrappedSession: ticket
+          ? (session) => adoptGenesisSession(session, ticket)
+          : undefined,
       });
       allAdapters.add(adapter);
       return adapter;
@@ -796,8 +892,11 @@ function buildRuntime(
       // welcome as a harmless duplicate. Preserve the successful transition
       // for tombstoning; never hide a later locked/rejected failure.
       else if (applied && final.status === 'ignored' && final.reason === 'duplicate') final = applied;
+      const sessionMatches = !room
+        || sessions.get(room) === job.boundSession
+        || (job.boundSession === null && Boolean(job.bootstrapTicket) && sessions.has(room));
       const stillCurrent = oldGeneration === generation && !destroyedForever && !detached
-        && (!room || roomIncarnation(room) === incarnation) && (!room || sessions.get(room) === job.boundSession);
+        && (!room || roomIncarnation(room) === incarnation) && sessionMatches;
       if (final.status === 'applied' && job.completed && stillCurrent) {
         completed.set(job.completed.key, { ...job.completed, seenAt: now(), generation });
         while (completed.size > GROUP_CONTROL_RUNTIME_MAX_HALF_PAIRS) completed.delete(completed.keys().next().value!);
@@ -810,6 +909,7 @@ function buildRuntime(
       resolveDeferred(job.deferred, final);
       if (final.status === 'applied' && stillCurrent && room) replayRoom = room;
     } finally {
+      releaseInFlightReservation(job);
       if (!retries.some((job) => job.adapter === activeAdapter)) await safeDestroyAdapter(activeAdapter);
       activeJobs = Math.max(0, activeJobs - 1);
       if (room) {
@@ -822,7 +922,19 @@ function buildRuntime(
       }
       // An applied lower epoch releases the only active slot; replay after the
       // decrement so a retained successor is actually admitted under cap=1.
-      if (replayRoom) replayRetries(replayRoom);
+      if (replayRoom) {
+        const live = liveSessionForRoom(replayRoom);
+        if (live) {
+          const hasReady = [...pairs.values()].some((pair) => (
+            pair.room === replayRoom
+            && !pair.quarantined
+            && pair.commit !== undefined
+            && pair.welcome !== undefined
+          ));
+          if (hasReady) replayCompletePairsForRoom(replayRoom, live);
+        }
+        replayRetries(replayRoom);
+      }
       notify();
     }
   }
@@ -857,15 +969,38 @@ function buildRuntime(
     incarnation: number,
     deferred: Deferred,
     completedFingerprint?: CompletedFingerprint,
+    bootstrapTicket?: BootstrapTicket,
   ): boolean {
     // `maxQueue` bounds waiting work (queued + retained), not the one job
     // currently executing. This permits exactly one retained successor while
     // its predecessor is active, which is necessary to close an epoch gap.
     const lowerThanRetained = retries.some((job) => (job.completed?.epoch ?? 0) > (completedFingerprint?.epoch ?? Number.MAX_SAFE_INTEGER));
     if (queue.length + retries.length >= queueLimit && !(queue.length === 0 && activeJobs === 0 && lowerThanRetained)) return false;
-    const adapter = createAdapter(boundSession);
+    const adapter = createAdapter(boundSession, bootstrapTicket);
     if (!adapter) return false;
-    queue.push({ generation, room, roomIncarnation: incarnation, boundSession, messages, adapter, deferred, completed: completedFingerprint });
+    if (completedFingerprint && !tryReserveInFlight({
+      key: completedFingerprint.key,
+      room: completedFingerprint.room,
+      commitFingerprint: completedFingerprint.commitFingerprint,
+      welcomeFingerprint: completedFingerprint.welcomeFingerprint,
+      generation,
+      epoch: completedFingerprint.epoch,
+      roomIncarnation: incarnation,
+    })) {
+      void safeDestroyAdapter(adapter);
+      return false;
+    }
+    queue.push({
+      generation,
+      room,
+      roomIncarnation: incarnation,
+      boundSession,
+      bootstrapTicket,
+      messages,
+      adapter,
+      deferred,
+      completed: completedFingerprint,
+    });
     bump('accepted');
     bump('queued');
     notify();
@@ -1045,6 +1180,19 @@ function buildRuntime(
       bump('coalesced');
       return runtimeOutcome('ignored', generation, 'coalesced', parsedRoom);
     }
+    const reserved = inFlightReservations.get(key);
+    if (reserved && (reserved.generation !== generation || reserved.roomIncarnation !== roomIncarnation(parsedRoom))) {
+      inFlightReservations.delete(key);
+    } else if (reserved) {
+      const expected = field === 'commit' ? reserved.commitFingerprint : reserved.welcomeFingerprint;
+      if (expected === fingerprint) {
+        bump('coalesced');
+        return runtimeOutcome('ignored', generation, 'coalesced', parsedRoom);
+      }
+      bump('rejected');
+      setRoom(parsedRoom, 'rejected', parsed.payloadParts?.epoch);
+      return runtimeOutcome('rejected', generation, 'equivocation', parsedRoom);
+    }
     let pair = pairs.get(key);
     if (!pair) {
       if (pairs.size >= GROUP_CONTROL_RUNTIME_MAX_HALF_PAIRS) {
@@ -1085,12 +1233,62 @@ function buildRuntime(
     }
     const boundSession = liveSessionForRoom(parsedRoom);
     if (!boundSession) {
-      // Retain the complete pair until a matching GroupSession is bound.
-      // A null-session adapter would requeue internally and then be destroyed.
-      bump('accepted');
-      bump('queued');
-      setRoom(parsedRoom, 'pair-pending', parsed.payloadParts?.epoch);
-      return queuedOutcome(parsed, 'session-not-provisioned');
+      const epoch = parsed.payloadParts?.epoch ?? 0;
+      if (epoch !== 1) {
+        bump('accepted');
+        bump('queued');
+        setRoom(parsedRoom, 'recovery-required', epoch);
+        return {
+          status: 'locked',
+          reason: 'recovery-required',
+          room: parsedRoom,
+          fromAccount: canonicalAccount(parsed.fromAccount) ?? parsed.fromAccount,
+          fromDevice: parsed.fromDevice,
+          epoch,
+          generation,
+        };
+      }
+      if (!identity?.account || !identity.deviceId) {
+        bump('accepted');
+        bump('queued');
+        setRoom(parsedRoom, 'pair-pending', epoch);
+        return queuedOutcome(parsed, 'session-not-provisioned');
+      }
+      const ticket: BootstrapTicket = {
+        generation,
+        room: parsedRoom,
+        roomIncarnation: roomIncarnation(parsedRoom),
+        account: identity.account,
+        deviceId: identity.deviceId,
+      };
+      const commitMessage = pair.commit;
+      const welcomeMessage = pair.welcome;
+      const genesisFingerprint: CompletedFingerprint = {
+        key,
+        room: parsedRoom,
+        commitFingerprint: pair.commitFingerprint!,
+        welcomeFingerprint: pair.welcomeFingerprint!,
+        seenAt: now(),
+        generation,
+        epoch,
+      };
+      clearHalfPair(pair);
+      let resolveGenesis!: (result: GroupControlRuntimeOutcome) => void;
+      const genesisPromise = new Promise<GroupControlRuntimeOutcome>((r) => { resolveGenesis = r; });
+      if (!enqueue(
+        [commitMessage!, welcomeMessage!],
+        parsedRoom,
+        null,
+        ticket.roomIncarnation,
+        { resolve: resolveGenesis },
+        genesisFingerprint,
+        ticket,
+      )) {
+        bump('evicted');
+        setRoom(parsedRoom, 'rejected', epoch);
+        return runtimeOutcome('ignored', generation, 'queue-full', parsedRoom);
+      }
+      return genesisPromise;
     }
     const commitMessage = pair.commit;
     const welcomeMessage = pair.welcome;

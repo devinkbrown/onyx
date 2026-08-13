@@ -28,6 +28,7 @@ import {
 import {
   GroupSession,
   type GroupSessionApplyResult,
+  type GroupSessionBootstrapResult,
 } from './groupSession';
 import {
   resolveTrustedGroupControl,
@@ -67,6 +68,7 @@ export type GroupControlAdapterReason =
   | 'welcome-stage-failed'
   | 'commit-apply-failed'
   | 'destroyed'
+  | 'stale'
   | 'internal-error';
 
 export type GroupControlAdapterOutcome = {
@@ -98,6 +100,16 @@ export type GroupControlSessionAdapterOptions = {
   trustedSignerStore: TrustedGroupSignerStore;
   /** Resolve the non-extractable P-256 private key for the local target device. */
   recipientPrivateKeyFor: (account: string, deviceId: string) => CryptoKey | null | undefined | Promise<CryptoKey | null | undefined>;
+  /**
+   * Optional local identity used to bind genesis bootstrap to this recipient.
+   * When omitted, welcome routing targets are used.
+   */
+  localIdentity?: { account: string; deviceId: string };
+  /**
+   * Transfer a bootstrapped session exactly once. Return false to reject
+   * (stale). The adapter never retains the session after this call.
+   */
+  adoptBootstrappedSession?: (session: GroupSession) => boolean | Promise<boolean>;
 };
 
 export type GroupControlSessionAdapter = {
@@ -219,7 +231,7 @@ function consumeAndZeroOpenedWelcome(opened: OpenedGroupWelcome | null): void {
   zeroOpenedWelcome(opened);
 }
 
-function zeroApplyResult(result: GroupSessionApplyResult): void {
+function zeroApplyResult(result: GroupSessionApplyResult | GroupSessionBootstrapResult): void {
   if (!result.ok) return;
   result.commitHash.fill(0);
   result.commitId.fill(0);
@@ -494,6 +506,62 @@ export function createGroupControlSessionAdapter(
     return outcome('rejected', 'commit-apply-failed', pair);
   }
 
+  async function bootstrapOpenedPair(
+    pair: PendingPair,
+    commit: SafePart,
+    welcome: SafePart,
+    opened: OpenedGroupWelcome,
+  ): Promise<GroupControlAdapterOutcome> {
+    const localAccount = options.localIdentity?.account
+      ?? canonicalAccount(welcome.routing.toAccount ?? '');
+    const localDevice = options.localIdentity?.deviceId
+      ?? welcome.routing.toDevice ?? '';
+    if (options.localIdentity) {
+      const targetAccount = canonicalAccount(welcome.routing.toAccount ?? '');
+      if (targetAccount !== canonicalAccount(options.localIdentity.account)
+        || welcome.routing.toDevice !== options.localIdentity.deviceId) {
+        return outcome('rejected', 'welcome-stage-failed', pair);
+      }
+    }
+    if (!localAccount || !localDevice) return outcome('rejected', 'welcome-stage-failed', pair);
+    if (destroyed) return outcome('ignored', 'destroyed', pair);
+    let bootstrapped: GroupSessionBootstrapResult;
+    try {
+      bootstrapped = await GroupSession.bootstrapVerifiedGenesis({
+        opened,
+        welcomeResolution: welcome.resolution,
+        welcomeRouting: welcome.routing,
+        commitResolution: commit.resolution,
+        commitRouting: commit.routing,
+        room: pair.room,
+        account: localAccount,
+        deviceId: localDevice,
+        signal: abortController.signal,
+      });
+    } catch {
+      return destroyed
+        ? outcome('ignored', 'destroyed', pair)
+        : outcome('rejected', 'commit-apply-failed', pair);
+    }
+    if (!bootstrapped.ok) return mapSessionResult(bootstrapped, pair);
+    let adopted = false;
+    try {
+      if (options.adoptBootstrappedSession) {
+        adopted = await options.adoptBootstrappedSession(bootstrapped.session) === true;
+      }
+    } catch {
+      adopted = false;
+    }
+    if (!adopted) {
+      if (!bootstrapped.session.isDestroyed) bootstrapped.session.destroy();
+      zeroApplyResult(bootstrapped);
+      return destroyed ? outcome('ignored', 'destroyed', pair) : outcome('ignored', 'stale', pair);
+    }
+    const result = outcome('applied', undefined, pair);
+    zeroApplyResult(bootstrapped);
+    return result;
+  }
+
   async function processPair(pair: PendingPair): Promise<GroupControlAdapterOutcome> {
     const metadata = safeMetadata(pair);
     if (destroyed) return outcome('ignored', 'destroyed', pair);
@@ -508,9 +576,8 @@ export function createGroupControlSessionAdapter(
     } catch {
       return outcome('locked', 'session-unavailable', pair);
     }
-    if (!session) return outcome('locked', 'session-unavailable', pair);
     if (destroyed) return outcome('ignored', 'destroyed', pair);
-    if (typeof session.account === 'string' && typeof session.deviceId === 'string') {
+    if (session && typeof session.account === 'string' && typeof session.deviceId === 'string') {
       const targetAccount = canonicalAccount(welcome.routing.toAccount ?? '');
       if (targetAccount !== canonicalAccount(session.account) || welcome.routing.toDevice !== session.deviceId) {
         return outcome('rejected', 'welcome-stage-failed', pair);
@@ -565,6 +632,9 @@ export function createGroupControlSessionAdapter(
       return outcome('ignored', 'destroyed', pair);
     }
     try {
+      if (!session) {
+        return await bootstrapOpenedPair(pair, commit, welcome, opened);
+      }
       if (session.applyVerifiedPair) {
         const applied = await session.applyVerifiedPair({
           opened,

@@ -269,7 +269,7 @@ describe('Packet-B group control session adapter', () => {
     const badWire = toB64url(badRaw);
     await expect(badSigner.accept(`:server E2EE.COMMIT #room alice ${value.deviceId} :${badWire}`)).resolves.toMatchObject({ status: 'locked' });
     const noSession = createGroupControlSessionAdapter({
-      sessionForRoom: () => null,
+      sessionForRoom: () => { throw new Error('directory lookup exploded'); },
       directoryForAccount: () => value.directory,
       trustedSignerStore: createInMemoryTrustedGroupSignerStore(),
       recipientPrivateKeyFor: () => value.recipient.privateKey,
@@ -623,5 +623,75 @@ describe('Packet-B group control session adapter', () => {
     await expect(welcomePromise).resolves.toMatchObject({ status: 'ignored', reason: 'destroyed' });
     expect(value.adapter.isDestroyed).toBe(false);
     expect(adapter.isDestroyed).toBe(true);
+  });
+
+  it('bootstraps a missing session exactly once and never also applies the pair', async () => {
+    const value = await fixture();
+    const adopted: GroupSession[] = [];
+    const bootstrap = vi.spyOn(GroupSession, 'bootstrapVerifiedGenesis');
+    const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
+    const adapter = createGroupControlSessionAdapter({
+      sessionForRoom: () => null,
+      directoryForAccount: () => value.directory,
+      trustedSignerStore: createInMemoryTrustedGroupSignerStore(),
+      recipientPrivateKeyFor: () => value.recipient.privateKey,
+      localIdentity: { account: 'alice', deviceId: 'phone' },
+      adoptBootstrappedSession: (session) => {
+        adopted.push(session);
+        return true;
+      },
+    });
+    await expect(adapter.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued' });
+    await expect(adapter.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'applied', room: '#room', epoch: 1 });
+    expect(adopted).toHaveLength(1);
+    expect(adopted[0]?.epoch).toBe(1n);
+    expect(adopted[0]?.currentEpochKey()).toEqual(bytes(5));
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(apply).not.toHaveBeenCalled();
+    await expect(adapter.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'duplicate' });
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(apply).not.toHaveBeenCalled();
+    adopted[0]?.destroy();
+    bootstrap.mockRestore();
+    apply.mockRestore();
+  });
+
+  it('does not apply bootstrap when adopt rejects, and destroys the new session', async () => {
+    const value = await fixture();
+    let created: GroupSession | undefined;
+    const adapter = createGroupControlSessionAdapter({
+      sessionForRoom: () => null,
+      directoryForAccount: () => value.directory,
+      trustedSignerStore: createInMemoryTrustedGroupSignerStore(),
+      recipientPrivateKeyFor: () => value.recipient.privateKey,
+      localIdentity: { account: 'alice', deviceId: 'phone' },
+      adoptBootstrappedSession: (session) => {
+        created = session;
+        return false;
+      },
+    });
+    await adapter.accept(value.commitLine);
+    await expect(adapter.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'stale' });
+    expect(created).toBeDefined();
+    expect(created?.isDestroyed).toBe(true);
+  });
+
+  it('rejects a local-identity mismatch before transferring a bootstrapped session', async () => {
+    const value = await fixture();
+    const adopt = vi.fn(() => true);
+    const adapter = createGroupControlSessionAdapter({
+      sessionForRoom: () => null,
+      directoryForAccount: () => value.directory,
+      trustedSignerStore: createInMemoryTrustedGroupSignerStore(),
+      recipientPrivateKeyFor: () => value.recipient.privateKey,
+      localIdentity: { account: 'bob', deviceId: 'tablet' },
+      adoptBootstrappedSession: adopt,
+    });
+    await adapter.accept(value.commitLine);
+    await expect(adapter.accept(value.welcomeLine)).resolves.toMatchObject({
+      status: 'rejected',
+      reason: 'welcome-stage-failed',
+    });
+    expect(adopt).not.toHaveBeenCalled();
   });
 });

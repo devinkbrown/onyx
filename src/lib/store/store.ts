@@ -4798,6 +4798,53 @@ export function selectDeviceMemoryOwner(
   return _outboxOwner(state);
 }
 
+/** Snapshot fields that decide whether a DM must stay on the encrypted path. */
+export type DmE2eeDesignationState = Pick<
+  OnyxState,
+  'peerDmKeys' | 'peerDmDeviceKeys' | 'peerKeyChanges' | 'dms' | 'client' | 'server' | 'ourNick'
+>;
+
+function dmDeviceDirectoryDesignates(devices: readonly string[] | undefined): boolean {
+  if (!devices || devices.length === 0) return false;
+  // A nonempty valid directory designates. A nonempty but corrupt list also
+  // designates so the send/outbox/search paths fail closed instead of treating
+  // garbage as "no E2EE".
+  return true;
+}
+
+/**
+ * True when this DM is designated for E2EE and must never fall through to
+ * plaintext send, offline outbox persistence, or server search.
+ *
+ * Independent of the `e2eeDms` preference: a published legacy key, a nonempty
+ * multi-device directory, a pending key-change, loaded ciphertext, or
+ * vault-classified encrypted history keeps the conversation on the encrypted
+ * path. Empty directories and genuinely plain DMs stay undesignated.
+ */
+export function isDmE2eeDesignated(state: DmE2eeDesignationState, peer: string): boolean {
+  const trimmed = peer.trim();
+  if (!trimmed) return false;
+  const chantypes = state.client?.isupport.CHANTYPES ?? '#&';
+  if (chantypes.includes(trimmed[0]!)) return false;
+
+  const key = trimmed.toLowerCase();
+  if (state.peerKeyChanges.has(key)) return true;
+  if (state.peerDmKeys.has(key)) return true;
+  if (dmDeviceDirectoryDesignates(state.peerDmDeviceKeys.get(key))) return true;
+
+  const conversation = state.dms.get(key);
+  if (conversation?.messages.some((message) => hasEncryptedMessageBoundary(message))) {
+    return true;
+  }
+
+  const memoryOwner = selectDeviceMemoryOwner(state);
+  if (memoryOwner) {
+    const privacyTarget = deviceMemoryPrivacyTarget(memoryOwner, key);
+    if (privacyTarget && getVaultDmSearchPrivacy(privacyTarget) === 'encrypted') return true;
+  }
+  return false;
+}
+
 function _loadOwnedComposerDrafts(
   state: Pick<OnyxState, 'server' | 'ourNick'>,
 ): ComposerDrafts {
@@ -5209,9 +5256,10 @@ function deliverChatMessage(
     if (targetIsChannel) get().updateChannelActivity(target);
   };
 
-  // A DM to a peer who published a device key (and with E2EE on) is sealed
-  // before socket admission. A seal or admission failure must not create an
-  // optimistic echo; the offline caller also keeps its durable row untouched.
+  // A designated E2EE DM is sealed before socket admission. Preference cannot
+  // downgrade an already-designated conversation to plaintext. A seal or
+  // admission failure must not create an optimistic echo; the offline caller
+  // also keeps its durable row untouched.
   const cp = client.isupport.CHANTYPES ?? '#&';
   const isDm = target.length > 0 && !cp.includes(target[0]!);
 
@@ -5238,13 +5286,10 @@ function deliverChatMessage(
     ...(get().peerDmDeviceKeys.get(target.toLowerCase()) ?? []),
     ...(peerKey ? [peerKey] : []),
   ]);
-  // Designated E2EE DM: any directory entry (even a structurally invalid key)
-  // MUST enter the encrypted path and fail closed — never fall through to
-  // plaintext because normalizePeerDeviceKeys dropped a bad key.
-  const e2eeDesignated = isDm && preferences().e2eeDms && (
-    !!peerKey
-    || (get().peerDmDeviceKeys.get(target.toLowerCase())?.length ?? 0) > 0
-  );
+  // Designated E2EE DM: leftover device directories, invalid keys, loaded
+  // ciphertext, and key-change state MUST enter the encrypted path and fail
+  // closed — never fall through to plaintext.
+  const e2eeDesignated = isDm && isDmE2eeDesignated(get(), target);
   if (e2eeDesignated) {
     const memoryContext = captureDeviceMemoryContext(get());
     if (!memoryContext) {
@@ -6940,10 +6985,6 @@ export const store = createStore<OnyxState>()(
         return;
       }
 
-      const dm = state.dms.get(targetKey);
-      const encryptedDm = dm?.messages.some(
-        (message) => message.encrypted || isEncryptedWireText(message.text),
-      ) ?? false;
       const chantypes = client.isupport.CHANTYPES ?? '#&';
       const targetIsDm = !chantypes.includes(cleanTarget[0]!);
       const memoryOwner = selectDeviceMemoryOwner(state);
@@ -6953,11 +6994,7 @@ export const store = createStore<OnyxState>()(
       const vaultPrivacy = targetIsDm && privacyTarget
         ? getVaultDmSearchPrivacy(privacyTarget)
         : targetIsDm ? 'unknown' : 'plain';
-      const encryptedBoundary = targetIsDm && (
-        encryptedDm
-        || vaultPrivacy === 'encrypted'
-        || (preferences().e2eeDms && state.peerDmKeys.has(targetKey))
-      );
+      const encryptedBoundary = isDmE2eeDesignated(state, cleanTarget);
       const privacyUnknown = targetIsDm && vaultPrivacy === 'unknown';
       if (encryptedBoundary || privacyUnknown) {
         // The action is a public boundary, not just a UI helper. Start the proof
@@ -7111,7 +7148,7 @@ export const store = createStore<OnyxState>()(
         // reconnected. Non-E2EE DMs and channel messages queue as before.
         const cp = client?.isupport.CHANTYPES ?? '#&';
         const isDm = target.length > 0 && !cp.includes(target[0]!);
-        if (isDm && preferences().e2eeDms && get().peerDmKeys.has(target.toLowerCase())) {
+        if (isDm && isDmE2eeDesignated(get(), target)) {
           get().addToast({
             variant: 'error',
             title: "Can't queue encrypted DM",

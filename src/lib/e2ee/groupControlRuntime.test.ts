@@ -230,17 +230,61 @@ async function expectUnapplied(session: GroupSession, runtime: GroupControlRunti
   expect(runtime.state.rooms.find((entry) => entry.room === room)?.status).not.toBe('control-applied');
 }
 
-async function completePair(runtime: GroupControlRuntime, value: Fixture, order: 'commit-first' | 'welcome-first' = 'commit-first') {
+async function completeGenesis(runtime: GroupControlRuntime, value: Fixture, order: 'commit-first' | 'welcome-first' = 'commit-first') {
   const first = order === 'commit-first' ? value.commitLine : value.welcomeLine;
   const second = order === 'commit-first' ? value.welcomeLine : value.commitLine;
   await expect(runtime.accept(first)).resolves.toMatchObject({ status: 'queued', room: '#room' });
   await expect(runtime.accept(second)).resolves.toMatchObject({
-    status: 'queued',
-    reason: 'session-not-provisioned',
+    status: 'applied',
     room: '#room',
-    fromAccount: 'alice',
-    fromDevice: value.deviceId,
     epoch: 1,
+  });
+}
+
+async function completeHigherEpoch(runtime: GroupControlRuntime, value: Fixture) {
+  const second = await epochTwoPair(value);
+  await expect(runtime.accept(second.commitLine)).resolves.toMatchObject({ status: 'queued', room: '#room' });
+  await expect(runtime.accept(second.welcomeLine)).resolves.toMatchObject({
+    status: 'locked',
+    reason: 'recovery-required',
+    room: '#room',
+    epoch: 2,
+  });
+  return second;
+}
+
+async function startBlockedGenesis(value: Fixture, extra: Partial<Parameters<typeof createGroupControlRuntime>[0]> = {}) {
+  let release!: () => void;
+  let started!: () => void;
+  let directoryCalls = 0;
+  const startedP = new Promise<void>((resolve) => { started = resolve; });
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const runtime = runtimeFor(value, {
+    ...extra,
+    directoryForAccount: async () => {
+      directoryCalls += 1;
+      started();
+      await gate;
+      return value.directory;
+    },
+  });
+  return {
+    runtime,
+    release: () => { release(); },
+    started: startedP,
+    directoryCalls: () => directoryCalls,
+  };
+}
+
+async function waitGenesisApplied(runtime: GroupControlRuntime, room = '#room'): Promise<void> {
+  await vi.waitFor(() => {
+    expect(runtime.state.rooms.find((entry) => entry.room === room)).toMatchObject({
+      status: 'control-applied',
+      provisioned: true,
+      epoch: 1,
+    });
+    expect(runtime.state.sessionCount).toBeGreaterThanOrEqual(1);
+    expect(runtime.state.activation).toBe('hold');
   });
 }
 
@@ -305,30 +349,27 @@ describe('Packet-B group-control runtime', () => {
     await locked.destroy();
   });
 
-  it('requires a provisioned real GroupSession and projects a safe locked room', async () => {
+  it('bootstraps a verified genesis pair without a pre-provisioned session and keeps activation on hold', async () => {
     const value = await fixture();
+    const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
+    const bootstrap = vi.spyOn(GroupSession, 'bootstrapVerifiedGenesis');
     const runtime = runtimeFor(value);
-    await expect(runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued', room: '#room' });
-    const result = await runtime.accept(value.welcomeLine);
-    expect(result).toMatchObject({
-      status: 'queued',
-      reason: 'session-not-provisioned',
-      room: '#room',
-      fromAccount: 'alice',
-      fromDevice: value.deviceId,
-      epoch: 1,
-    });
-    expect(runtime.state.rooms).toEqual([{ room: '#room', status: 'pair-pending', provisioned: false, epoch: 1 }]);
-    expect(runtime.state.activation).toBe('hold');
+    await completeGenesis(runtime, value);
+    await waitGenesisApplied(runtime);
     expect(runtime.activationHeld).toBe(true);
+    expect(runtime.state.activation).toBe('hold');
+    expect(runtime.state.sessionCount).toBe(1);
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(apply).not.toHaveBeenCalled();
     expect(value.session.epoch).toBe(0n);
     expect(JSON.stringify(runtime.state)).not.toContain(value.commitPayload);
     expect(JSON.stringify(runtime.state)).not.toContain(value.welcomePayload);
-    expect(JSON.stringify(runtime.state)).not.toContain('control-applied');
+    bootstrap.mockRestore();
+    apply.mockRestore();
     await runtime.destroy();
   });
 
-  it('replays a retained complete pair exactly once after the matching session is provisioned', async () => {
+  it('applies a genesis pair exactly once and does not double-apply on the same session', async () => {
     const value = await fixture();
     let directoryCalls = 0;
     const runtime = runtimeFor(value, {
@@ -337,47 +378,48 @@ describe('Packet-B group-control runtime', () => {
         return value.directory;
       },
     });
-    const apply = vi.spyOn(value.session, 'applyVerifiedPair');
-    await completePair(runtime, value, 'commit-first');
-    expect(directoryCalls).toBe(0);
-    expect(value.session.epoch).toBe(0n);
-    expect(runtime.registerProvisionedSession(value.session)).toEqual({ ok: true, room: '#room', replaced: false });
-    await waitApplied(value.session, runtime);
-    expect(apply).toHaveBeenCalledTimes(1);
+    const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
+    const bootstrap = vi.spyOn(GroupSession, 'bootstrapVerifiedGenesis');
+    await completeGenesis(runtime, value, 'commit-first');
+    await waitGenesisApplied(runtime);
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(apply).not.toHaveBeenCalled();
     expect(directoryCalls).toBeGreaterThan(0);
-    expect(runtime.registerProvisionedSession(value.session)).toEqual({ ok: true, room: '#room', replaced: false });
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    expect(apply).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(runtime.state)).not.toContain(value.commitPayload);
-    expect(JSON.stringify(runtime.state)).not.toContain(value.welcomePayload);
-    await runtime.destroy();
-  });
-
-  it('replays welcome-then-commit the same way and coalesces exact retained duplicates', async () => {
-    const value = await fixture();
-    const runtime = runtimeFor(value);
-    const apply = vi.spyOn(value.session, 'applyVerifiedPair');
-    await completePair(runtime, value, 'welcome-first');
     await expect(runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
     await expect(runtime.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
-    expect(runtime.registerProvisionedSession(value.session)).toMatchObject({ ok: true, replaced: false });
-    await waitApplied(value.session, runtime);
-    expect(apply).toHaveBeenCalledTimes(1);
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(apply).not.toHaveBeenCalled();
+    expect(JSON.stringify(runtime.state)).not.toContain(value.commitPayload);
+    expect(JSON.stringify(runtime.state)).not.toContain(value.welcomePayload);
+    bootstrap.mockRestore();
+    apply.mockRestore();
     await runtime.destroy();
   });
 
-  it('marks a divergent retained pair as equivocation and does not apply it later', async () => {
+  it('bootstraps welcome-then-commit the same way and coalesces exact duplicates', async () => {
     const value = await fixture();
     const runtime = runtimeFor(value);
-    await completePair(runtime, value);
+    const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
+    await completeGenesis(runtime, value, 'welcome-first');
+    await expect(runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    await expect(runtime.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    await waitGenesisApplied(runtime);
+    expect(apply).not.toHaveBeenCalled();
+    apply.mockRestore();
+    await runtime.destroy();
+  });
+
+  it('marks a divergent pair as equivocation after genesis bootstrap', async () => {
+    const value = await fixture();
+    const runtime = runtimeFor(value);
+    await completeGenesis(runtime, value);
     await expect(runtime.accept(await divergentCommitLine(value)))
       .resolves.toMatchObject({ status: 'rejected', reason: 'equivocation' });
-    expect(runtime.registerProvisionedSession(value.session)).toMatchObject({ ok: true });
-    await expectUnapplied(value.session, runtime);
     expect(runtime.state.rooms.find((entry) => entry.room === '#room')).toMatchObject({
       status: 'rejected',
       provisioned: true,
     });
+    expect(runtime.state.activation).toBe('hold');
     await runtime.destroy();
   });
 
@@ -423,10 +465,11 @@ describe('Packet-B group-control runtime', () => {
     await runtime.destroy();
   });
 
-  it('does not replay a retained pair onto the wrong room or identity tuple', async () => {
+  it('does not bind a bootstrapped genesis session onto the wrong room or identity tuple', async () => {
     const value = await fixture();
     const runtime = runtimeFor(value);
-    await completePair(runtime, value);
+    await completeGenesis(runtime, value);
+    await waitGenesisApplied(runtime);
     const other = GroupSession.create({
       room: '#other',
       account: 'alice',
@@ -438,8 +481,9 @@ describe('Packet-B group-control runtime', () => {
     expect(runtime.registerProvisionedSession(other!)).toMatchObject({ ok: true, room: '#other', replaced: false });
     await expectUnapplied(other!, runtime, '#other');
     expect(runtime.state.rooms.find((entry) => entry.room === '#room')).toMatchObject({
-      status: 'pair-pending',
-      provisioned: false,
+      status: 'control-applied',
+      provisioned: true,
+      epoch: 1,
     });
     const foreign = GroupSession.create({
       room: '#room',
@@ -450,30 +494,32 @@ describe('Packet-B group-control runtime', () => {
     });
     expect(foreign).not.toBeNull();
     expect(runtime.registerProvisionedSession(foreign!)).toMatchObject({ ok: false, reason: 'identity-mismatch' });
-    expect(runtime.registerProvisionedSession(value.session)).toMatchObject({ ok: true, room: '#room', replaced: false });
-    await waitApplied(value.session, runtime);
     expect(other!.epoch).toBe(0n);
     await runtime.destroy();
   });
 
-  it('does not consume the job queue until a retained pair is provisioned', async () => {
+  it('does not consume the job queue for a higher-epoch pair without a session', async () => {
     const value = await fixture();
     const runtime = runtimeFor(value, { maxQueue: 1 });
-    const apply = vi.spyOn(value.session, 'applyVerifiedPair');
-    await completePair(runtime, value);
+    const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
+    await completeHigherEpoch(runtime, value);
     expect(runtime.state.queueDepth).toBe(0);
+    expect(runtime.state.rooms.find((entry) => entry.room === '#room')).toMatchObject({
+      status: 'recovery-required',
+      provisioned: false,
+      epoch: 2,
+    });
     expect(JSON.stringify(runtime.state)).not.toContain(value.commitPayload);
-    expect(runtime.registerProvisionedSession(value.session)).toMatchObject({ ok: true });
-    await waitApplied(value.session, runtime);
-    expect(apply).toHaveBeenCalledTimes(1);
+    expect(apply).not.toHaveBeenCalled();
+    apply.mockRestore();
     await runtime.destroy();
   });
 
-  it('invalidates a retained pair when the provisioned session is replaced', async () => {
+  it('invalidates a bootstrapped genesis session when a replacement is registered', async () => {
     const value = await fixture();
     const runtime = runtimeFor(value);
-    await completePair(runtime, value);
-    expect(runtime.registerProvisionedSession(value.session)).toMatchObject({ ok: true, replaced: false });
+    await completeGenesis(runtime, value);
+    await waitGenesisApplied(runtime);
     const replacement = GroupSession.create({
       room: '#room',
       account: 'alice',
@@ -484,14 +530,13 @@ describe('Packet-B group-control runtime', () => {
     expect(replacement).not.toBeNull();
     expect(runtime.registerProvisionedSession(replacement!)).toMatchObject({ ok: true, replaced: true });
     await expectUnapplied(replacement!, runtime);
-    expect(value.session.isDestroyed).toBe(true);
     expect(runtime.state.rooms.find((entry) => entry.room === '#room')).toMatchObject({
       provisioned: true,
     });
     await runtime.destroy();
   });
 
-  it('releases retained pairs on PART, KICK, disconnect, identity switch, destroy, and TTL', async () => {
+  it('releases retained higher-epoch pairs on PART, KICK, disconnect, identity switch, destroy, and TTL', async () => {
     const value = await fixture();
 
     const partedSession = GroupSession.create({
@@ -503,7 +548,7 @@ describe('Packet-B group-control runtime', () => {
     });
     expect(partedSession).not.toBeNull();
     const parted = runtimeFor(value);
-    await completePair(parted, value);
+    await completeHigherEpoch(parted, value);
     parted.onRoomPart('#room');
     expect(parted.registerProvisionedSession(partedSession!)).toMatchObject({ ok: true });
     await expectUnapplied(partedSession!, parted);
@@ -518,7 +563,7 @@ describe('Packet-B group-control runtime', () => {
     });
     expect(kickedSession).not.toBeNull();
     const kicked = runtimeFor(value);
-    await completePair(kicked, value);
+    await completeHigherEpoch(kicked, value);
     kicked.onRoomKick('#room');
     expect(kicked.registerProvisionedSession(kickedSession!)).toMatchObject({ ok: true });
     await expectUnapplied(kickedSession!, kicked);
@@ -533,7 +578,7 @@ describe('Packet-B group-control runtime', () => {
     });
     expect(disconnectedSession).not.toBeNull();
     const disconnected = runtimeFor(value);
-    await completePair(disconnected, value);
+    await completeHigherEpoch(disconnected, value);
     disconnected.reconnect();
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(disconnected.markRecovered()).toBe(true);
@@ -550,7 +595,7 @@ describe('Packet-B group-control runtime', () => {
     });
     expect(switchedSession).not.toBeNull();
     const switched = runtimeFor(value);
-    await completePair(switched, value);
+    await completeHigherEpoch(switched, value);
     await expect(switched.setIdentity({
       clientId: 'switched-client',
       endpoint: 'wss://other',
@@ -564,7 +609,7 @@ describe('Packet-B group-control runtime', () => {
     await switched.destroy();
 
     const destroyed = runtimeFor(value);
-    await completePair(destroyed, value);
+    await completeHigherEpoch(destroyed, value);
     await destroyed.destroy();
     expect(destroyed.registerProvisionedSession(value.session)).toMatchObject({ ok: false, reason: 'runtime-inactive' });
     expect(JSON.stringify(destroyed.state)).not.toContain(value.commitPayload);
@@ -580,7 +625,7 @@ describe('Packet-B group-control runtime', () => {
     });
     expect(expiredSession).not.toBeNull();
     const expiring = runtimeFor(value, { now: () => clock, halfPairTtlMs: 10 });
-    await completePair(expiring, value);
+    await completeHigherEpoch(expiring, value);
     clock += 20;
     expiring.expire();
     expect(expiring.state.counters.expired).toBe(1);
@@ -589,7 +634,7 @@ describe('Packet-B group-control runtime', () => {
     await expiring.destroy();
   });
 
-  it('does not publish a late replay callback after kick or destroy', async () => {
+  it('does not publish a late bootstrap apply after kick or destroy', async () => {
     const value = await fixture();
     let releaseDirectory!: () => void;
     let directoryStarted!: () => void;
@@ -602,29 +647,21 @@ describe('Packet-B group-control runtime', () => {
         return value.directory;
       },
     });
-    await completePair(runtime, value);
-    expect(runtime.registerProvisionedSession(value.session)).toMatchObject({ ok: true });
+    await expect(runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued' });
+    const pending = runtime.accept(value.welcomeLine);
     await started;
     runtime.onRoomKick('#room');
     releaseDirectory();
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    await expect(pending).resolves.toMatchObject({ status: 'ignored' });
     expect(runtime.state.rooms).toHaveLength(0);
     expect(JSON.stringify(runtime.state)).not.toContain(value.commitPayload);
-    expect(value.session.isDestroyed).toBe(true);
+    expect(runtime.state.sessionCount).toBe(0);
     await runtime.destroy();
 
     let lateRelease!: () => void;
     let lateStarted!: () => void;
     const lateStart = new Promise<void>((resolve) => { lateStarted = resolve; });
     const lateGate = new Promise<void>((resolve) => { lateRelease = resolve; });
-    const lateSession = GroupSession.create({
-      room: '#room',
-      account: 'alice',
-      deviceId: 'phone',
-      epochKey: bytes(11),
-      membershipDigest: bytes(12),
-    });
-    expect(lateSession).not.toBeNull();
     const late = runtimeFor(value, {
       directoryForAccount: async () => {
         lateStarted();
@@ -632,15 +669,16 @@ describe('Packet-B group-control runtime', () => {
         return value.directory;
       },
     });
-    await completePair(late, value);
-    expect(late.registerProvisionedSession(lateSession!)).toMatchObject({ ok: true });
+    await expect(late.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued' });
+    const latePending = late.accept(value.welcomeLine);
     await lateStart;
     const destroying = late.destroy();
     lateRelease();
+    await expect(latePending).resolves.toMatchObject({ status: 'ignored' });
     await destroying;
     expect(late.state.lifecycle).toBe('inactive');
     expect(JSON.stringify(late.state)).not.toContain(value.welcomePayload);
-    expect(lateSession!.isDestroyed).toBe(true);
+    expect(late.state.sessionCount).toBe(0);
   });
 
   it('applies a complete pair through exactly the registered GroupSession', async () => {
@@ -1339,6 +1377,294 @@ describe('Packet-B group-control runtime', () => {
     await expect(runtime.accept(second.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
     expect(apply).toHaveBeenCalledTimes(applied);
     expect(runtime.state.queueDepth).toBeLessThanOrEqual(2); // one active predecessor plus one retained successor
+    await runtime.destroy();
+  });
+
+  it('invalidates an in-flight genesis ticket on PART, identity switch, disconnect, and destroy', async () => {
+    const value = await fixture();
+
+    const startInFlight = async () => {
+      let release!: () => void;
+      let started!: () => void;
+      const startedP = new Promise<void>((resolve) => { started = resolve; });
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      const runtime = runtimeFor(value, {
+        directoryForAccount: async () => {
+          started();
+          await gate;
+          return value.directory;
+        },
+      });
+      await expect(runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued' });
+      const pending = runtime.accept(value.welcomeLine);
+      await startedP;
+      return { runtime, pending, release };
+    };
+
+    const parted = await startInFlight();
+    parted.runtime.onRoomPart('#room');
+    parted.release();
+    await expect(parted.pending).resolves.toMatchObject({ status: 'ignored' });
+    expect(parted.runtime.state.sessionCount).toBe(0);
+    expect(parted.runtime.state.rooms.find((entry) => entry.room === '#room')?.status).not.toBe('control-applied');
+    await parted.runtime.destroy();
+
+    const switched = await startInFlight();
+    const switching = switched.runtime.setIdentity({
+      clientId: 'ticket-switch',
+      endpoint: 'wss://other',
+      account: 'bob',
+      deviceId: 'tablet',
+    });
+    switched.release();
+    await expect(switched.pending).resolves.toMatchObject({ status: 'ignored' });
+    await expect(switching).resolves.toBe(true);
+    expect(switched.runtime.state.sessionCount).toBe(0);
+    await switched.runtime.destroy();
+
+    const disconnected = await startInFlight();
+    disconnected.runtime.reconnect();
+    disconnected.release();
+    await expect(disconnected.pending).resolves.toMatchObject({ status: 'ignored' });
+    expect(disconnected.runtime.state.sessionCount).toBe(0);
+    await disconnected.runtime.destroy();
+
+    const destroyed = await startInFlight();
+    const destroying = destroyed.runtime.destroy();
+    destroyed.release();
+    await expect(destroyed.pending).resolves.toMatchObject({ status: 'ignored' });
+    await destroying;
+    expect(destroyed.runtime.state.sessionCount).toBe(0);
+  });
+
+  it('keeps only one session when a provisioned session arrives during genesis bootstrap', async () => {
+    const value = await fixture();
+    let release!: () => void;
+    let started!: () => void;
+    const startedP = new Promise<void>((resolve) => { started = resolve; });
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const runtime = runtimeFor(value, {
+      directoryForAccount: async () => {
+        started();
+        await gate;
+        return value.directory;
+      },
+    });
+    await expect(runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued' });
+    const pending = runtime.accept(value.welcomeLine);
+    await startedP;
+    expect(runtime.registerProvisionedSession(value.session)).toMatchObject({ ok: true, room: '#room' });
+    release();
+    await expect(pending).resolves.toMatchObject({ status: 'ignored', reason: 'stale' });
+    expect(runtime.state.sessionCount).toBe(1);
+    expect(value.session.isDestroyed).toBe(false);
+    expect(value.session.epoch).toBe(0n);
+    expect(runtime.state.rooms.find((entry) => entry.room === '#room')?.status).not.toBe('control-applied');
+    await runtime.destroy();
+  });
+
+  it('coalesces exact in-flight genesis retransmissions onto one reserved bootstrap', async () => {
+    const value = await fixture();
+    const bootstrap = vi.spyOn(GroupSession, 'bootstrapVerifiedGenesis');
+    const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
+    const blocked = await startBlockedGenesis(value);
+    await expect(blocked.runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued', room: '#room' });
+    const pending = blocked.runtime.accept(value.welcomeLine);
+    await blocked.started;
+    blocked.runtime.expire();
+    await expect(blocked.runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    await expect(blocked.runtime.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    await expect(blocked.runtime.accept(`@label=inflight-dup :other.server E2EE.COMMIT #room alice ${value.deviceId} :${value.commitPayload}`))
+      .resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    expect(bootstrap).not.toHaveBeenCalled();
+    blocked.release();
+    await expect(pending).resolves.toMatchObject({ status: 'applied', room: '#room', epoch: 1 });
+    await waitGenesisApplied(blocked.runtime);
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(apply).not.toHaveBeenCalled();
+    expect(blocked.directoryCalls()).toBe(2);
+    expect(blocked.runtime.state.sessionCount).toBe(1);
+    await expect(blocked.runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    await expect(blocked.runtime.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(blocked.runtime.state.sessionCount).toBe(1);
+    bootstrap.mockRestore();
+    apply.mockRestore();
+    await blocked.runtime.destroy();
+  });
+
+  it('coalesces reordered in-flight genesis parts without a second bootstrap', async () => {
+    const value = await fixture();
+    const bootstrap = vi.spyOn(GroupSession, 'bootstrapVerifiedGenesis');
+    const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
+    const blocked = await startBlockedGenesis(value);
+    await expect(blocked.runtime.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'queued', room: '#room' });
+    const pending = blocked.runtime.accept(value.commitLine);
+    await blocked.started;
+    await expect(blocked.runtime.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    await expect(blocked.runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    await expect(blocked.runtime.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    expect(bootstrap).not.toHaveBeenCalled();
+    blocked.release();
+    await expect(pending).resolves.toMatchObject({ status: 'applied', room: '#room', epoch: 1 });
+    await waitGenesisApplied(blocked.runtime);
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(apply).not.toHaveBeenCalled();
+    expect(blocked.directoryCalls()).toBe(2);
+    expect(blocked.runtime.state.sessionCount).toBe(1);
+    bootstrap.mockRestore();
+    apply.mockRestore();
+    await blocked.runtime.destroy();
+  });
+
+  it('rejects divergent in-flight commit/welcome without replacing the reservation', async () => {
+    const value = await fixture();
+    const bootstrap = vi.spyOn(GroupSession, 'bootstrapVerifiedGenesis');
+    const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
+    const blocked = await startBlockedGenesis(value);
+    await expect(blocked.runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued', room: '#room' });
+    const pending = blocked.runtime.accept(value.welcomeLine);
+    await blocked.started;
+    await expect(blocked.runtime.accept(await divergentCommitLine(value)))
+      .resolves.toMatchObject({ status: 'rejected', reason: 'equivocation' });
+    await expect(blocked.runtime.accept(await divergentWelcomeLine(value)))
+      .resolves.toMatchObject({ status: 'rejected', reason: 'equivocation' });
+    await expect(blocked.runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    await expect(blocked.runtime.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+    expect(bootstrap).not.toHaveBeenCalled();
+    blocked.release();
+    await expect(pending).resolves.toMatchObject({ status: 'applied', room: '#room', epoch: 1 });
+    await waitGenesisApplied(blocked.runtime);
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(apply).not.toHaveBeenCalled();
+    expect(blocked.directoryCalls()).toBe(2);
+    expect(blocked.runtime.state.sessionCount).toBe(1);
+    bootstrap.mockRestore();
+    apply.mockRestore();
+    await blocked.runtime.destroy();
+  });
+
+  it('clears in-flight reservations on teardown and allows a subsequent valid retry', async () => {
+    const value = await fixture();
+    const bootstrap = vi.spyOn(GroupSession, 'bootstrapVerifiedGenesis');
+    const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
+    try {
+    const startInFlight = async () => {
+      const blocked = await startBlockedGenesis(value);
+      await expect(blocked.runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued' });
+      const pending = blocked.runtime.accept(value.welcomeLine);
+      await blocked.started;
+      await expect(blocked.runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'ignored', reason: 'coalesced' });
+      return { ...blocked, pending };
+    };
+
+    const parted = await startInFlight();
+    parted.runtime.onRoomPart('#room');
+    parted.release();
+    await expect(parted.pending).resolves.toMatchObject({ status: 'ignored' });
+    expect(parted.runtime.state.sessionCount).toBe(0);
+    await completeGenesis(parted.runtime, value);
+    await waitGenesisApplied(parted.runtime);
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(parted.runtime.state.sessionCount).toBe(1);
+    await parted.runtime.destroy();
+
+    const kicked = await startInFlight();
+    kicked.runtime.onRoomKick('#room');
+    kicked.release();
+    await expect(kicked.pending).resolves.toMatchObject({ status: 'ignored' });
+    expect(kicked.runtime.state.sessionCount).toBe(0);
+    await kicked.runtime.destroy();
+
+    const disconnected = await startInFlight();
+    disconnected.runtime.reconnect();
+    disconnected.release();
+    await expect(disconnected.pending).resolves.toMatchObject({ status: 'ignored' });
+    expect(disconnected.runtime.state.sessionCount).toBe(0);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(disconnected.runtime.markRecovered()).toBe(true);
+    await completeGenesis(disconnected.runtime, value);
+    await waitGenesisApplied(disconnected.runtime);
+    expect(bootstrap).toHaveBeenCalledTimes(2);
+    expect(disconnected.runtime.state.sessionCount).toBe(1);
+    await disconnected.runtime.destroy();
+
+    const switched = await startInFlight();
+    const switching = switched.runtime.setIdentity({
+      clientId: 'inflight-switch',
+      endpoint: 'wss://other',
+      account: 'bob',
+      deviceId: 'tablet',
+    });
+    switched.release();
+    await expect(switched.pending).resolves.toMatchObject({ status: 'ignored' });
+    await expect(switching).resolves.toBe(true);
+    expect(switched.runtime.state.sessionCount).toBe(0);
+    await expect(switched.runtime.setIdentity({
+      clientId: 'inflight-switch-back',
+      endpoint: 'wss://eshmaki.me',
+      account: 'alice',
+      deviceId: 'phone',
+    })).resolves.toBe(true);
+    expect(switched.runtime.markRecovered()).toBe(true);
+    await completeGenesis(switched.runtime, value);
+    await waitGenesisApplied(switched.runtime);
+    expect(bootstrap).toHaveBeenCalledTimes(3);
+    expect(switched.runtime.state.sessionCount).toBe(1);
+    await switched.runtime.destroy();
+
+    const replaced = await startInFlight();
+    expect(replaced.runtime.registerProvisionedSession(value.session)).toMatchObject({ ok: true, room: '#room' });
+    replaced.release();
+    await expect(replaced.pending).resolves.toMatchObject({ status: 'ignored', reason: 'stale' });
+    expect(replaced.runtime.state.sessionCount).toBe(1);
+    await expect(replaced.runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued' });
+    await expect(replaced.runtime.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'applied', room: '#room', epoch: 1 });
+    expect(value.session.epoch).toBe(1n);
+    expect(replaced.runtime.state.sessionCount).toBe(1);
+    await replaced.runtime.destroy();
+
+    const destroyed = await startInFlight();
+    const destroying = destroyed.runtime.destroy();
+    destroyed.release();
+    await expect(destroyed.pending).resolves.toMatchObject({ status: 'ignored' });
+    await destroying;
+    expect(destroyed.runtime.state.sessionCount).toBe(0);
+    await expect(destroyed.runtime.accept(value.commitLine)).resolves.toMatchObject({ status: 'ignored', reason: 'runtime-inactive' });
+
+    // Three adopted genesis retries plus the doomed in-flight bootstrap that
+    // already started before room replacement; only the provisioned session
+    // is applied afterward.
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(bootstrap).toHaveBeenCalledTimes(4);
+    } finally {
+      bootstrap.mockRestore();
+      apply.mockRestore();
+    }
+  });
+
+  it('recovers a retained higher-epoch pair only after genesis bootstrap creates the room session', async () => {
+    const value = await fixture();
+    const runtime = runtimeFor(value);
+    const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
+    await completeHigherEpoch(runtime, value);
+    expect(runtime.state.rooms.find((entry) => entry.room === '#room')).toMatchObject({
+      status: 'recovery-required',
+      provisioned: false,
+      epoch: 2,
+    });
+    expect(apply).not.toHaveBeenCalled();
+    await completeGenesis(runtime, value);
+    await vi.waitFor(() => {
+      expect(runtime.state.rooms.find((entry) => entry.room === '#room')).toMatchObject({
+        status: 'control-applied',
+        provisioned: true,
+        epoch: 2,
+      });
+    });
+    expect(apply).toHaveBeenCalled();
+    expect(runtime.state.activation).toBe('hold');
+    apply.mockRestore();
     await runtime.destroy();
   });
 });

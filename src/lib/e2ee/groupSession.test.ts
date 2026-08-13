@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 
+import { prepareGroupCommit } from './groupCommit';
 import {
+  consumeOpenedGroupWelcome,
   openGroupWelcome,
   prepareGroupWelcome,
 } from './groupWelcome';
@@ -14,10 +16,16 @@ function session(requireWelcome = false): GroupSession {
   return GroupSession.create({ room: '#Room', account: 'Alice', deviceId: 'phone', epochKey: bytes(1), membershipDigest: bytes(2), requireWelcome })!;
 }
 
-function verified(body: Uint8Array, kind: 'commit' | 'welcome', account = 'alice', deviceId = 'phone'): Extract<ResolveResult, { status: 'verified' }> {
+function verified(
+  body: Uint8Array,
+  kind: 'commit' | 'welcome',
+  account = 'alice',
+  deviceId = 'phone',
+  epoch = 1,
+): Extract<ResolveResult, { status: 'verified' }> {
   return {
     status: 'verified', trust: 'first-use',
-    parts: { version: 2, kind, epoch: 1, body, signerPub: bytes(8), signature: bytes(7, 64) },
+    parts: { version: 2, kind, epoch, body, signerPub: bytes(8), signature: bytes(7, 64) },
     signer: bytes(8), directoryKey: 'key', account, deviceId,
   };
 }
@@ -30,35 +38,43 @@ async function openedWelcome(input: {
   commitId?: Uint8Array;
   toAccount?: string;
   toDevice?: string;
+  room?: string;
+  fromAccount?: string;
+  fromDevice?: string;
+  epoch?: number;
 }) {
+  const room = input.room ?? '#room';
+  const fromAccount = input.fromAccount ?? 'alice';
+  const fromDevice = input.fromDevice ?? 'sender';
   const toAccount = input.toAccount ?? 'alice';
   const toDevice = input.toDevice ?? 'phone';
+  const epoch = input.epoch ?? 1;
   const commitId = input.commitId ?? bytes(4);
   const membershipDigest = input.membershipDigest ?? bytes(3);
   const pair = (await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits'])) as CryptoKeyPair;
   const publicRaw = new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey));
   const prepared = await prepareGroupWelcome({
-    room: '#room',
-    fromAccount: 'alice',
-    fromDevice: 'sender',
+    room,
+    fromAccount,
+    fromDevice,
     toAccount,
     toDevice,
-    epoch: 1,
+    epoch,
     commitId,
     membershipDigest,
     epochKey: input.epochKey,
     recipientWrapPublicKey: publicRaw,
   });
   const body = prepared!.bytes.slice();
-  const resolution = verified(body, 'welcome', 'alice', 'sender');
+  const resolution = verified(body, 'welcome', fromAccount, fromDevice, epoch);
   const opened = await openGroupWelcome({
     wire: body,
-    room: '#room',
-    fromAccount: 'alice',
-    fromDevice: 'sender',
+    room,
+    fromAccount,
+    fromDevice,
     toAccount,
     toDevice,
-    epoch: 1,
+    epoch,
     commitId,
     membershipDigest,
     recipientPrivateKey: pair.privateKey,
@@ -66,6 +82,79 @@ async function openedWelcome(input: {
   });
   expect(opened).not.toBeNull();
   return { opened: opened!, resolution };
+}
+
+async function genesisPair(input: {
+  epochKey?: Uint8Array;
+  membershipDigest?: Uint8Array;
+  commitId?: Uint8Array;
+  room?: string;
+  fromAccount?: string;
+  fromDevice?: string;
+  toAccount?: string;
+  toDevice?: string;
+  priorEpoch?: number;
+  nextEpoch?: number;
+  priorCommitHash?: Uint8Array;
+} = {}) {
+  const room = input.room ?? '#room';
+  const fromAccount = input.fromAccount ?? 'alice';
+  const fromDevice = input.fromDevice ?? 'sender';
+  const toAccount = input.toAccount ?? 'alice';
+  const toDevice = input.toDevice ?? 'phone';
+  const epochKey = input.epochKey ?? bytes(5);
+  const membershipDigest = input.membershipDigest ?? bytes(3);
+  const commitId = input.commitId ?? bytes(4);
+  const nextEpoch = input.nextEpoch ?? 1;
+  const prepared = await prepareGroupCommit({
+    room,
+    fromAccount,
+    fromDevice,
+    priorEpoch: input.priorEpoch ?? 0,
+    priorCommitHash: input.priorCommitHash ?? new Uint8Array(32),
+    membershipDigest,
+    commitId,
+    newEpochKey: epochKey,
+    nextEpoch,
+  });
+  expect(prepared).not.toBeNull();
+  const welcome = await openedWelcome({
+    epochKey,
+    membershipDigest,
+    commitId,
+    room,
+    fromAccount,
+    fromDevice,
+    toAccount,
+    toDevice,
+    epoch: nextEpoch,
+  });
+  return {
+    prepared: prepared!,
+    welcome,
+    welcomeRouting: {
+      channel: room, kind: 'welcome' as const, fromAccount, fromDevice, toAccount, toDevice,
+    },
+    commitRouting: { channel: room, kind: 'commit' as const, fromAccount, fromDevice },
+    commitResolution: verified(prepared!.body, 'commit', fromAccount, fromDevice, nextEpoch),
+    room,
+    account: toAccount,
+    deviceId: toDevice,
+  };
+}
+
+function bootstrapArgs(pair: Awaited<ReturnType<typeof genesisPair>>, overrides: Record<string, unknown> = {}) {
+  return {
+    opened: pair.welcome.opened,
+    welcomeResolution: pair.welcome.resolution,
+    welcomeRouting: pair.welcomeRouting,
+    commitResolution: pair.commitResolution,
+    commitRouting: pair.commitRouting,
+    room: pair.room,
+    account: pair.account,
+    deviceId: pair.deviceId,
+    ...overrides,
+  };
 }
 
 describe('pure GroupSession state machine', () => {
@@ -206,5 +295,168 @@ describe('pure GroupSession state machine', () => {
     localKey.fill(6);
     expect((await apply).ok).toBe(true);
     expect(state.currentEpochKey()).toEqual(bytes(5));
+  });
+
+  it('bootstraps a verified genesis pair directly at epoch 1 and never exposes the welcome key', async () => {
+    const pair = await genesisPair();
+    const result = await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(pair));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.session.epoch).toBe(1n);
+    expect(result.session.room).toBe('#room');
+    expect(result.session.account).toBe('alice');
+    expect(result.session.deviceId).toBe('phone');
+    expect(result.epoch).toBe(1n);
+    expect(result.commitHash).toEqual(pair.prepared.commitHash);
+    expect(result.commitId).toEqual(bytes(4));
+    expect(result.session.commitHash()).toEqual(pair.prepared.commitHash);
+    expect(result.session.currentEpochKey()).toEqual(bytes(5));
+    expect(result.session.membershipDigest()).toEqual(bytes(3));
+    expect(result).not.toHaveProperty('epochKey');
+    expect(JSON.stringify({ epoch: Number(result.epoch), room: result.session.room })).not.toContain('epochKey');
+    expect(consumeOpenedGroupWelcome(pair.welcome.opened)).toBeNull();
+    result.session.destroy();
+    expect(result.session.currentEpochKey()).toBeNull();
+  });
+
+  it('does not weaken create() and still rejects a non-genesis zero anchor', () => {
+    expect(GroupSession.create({
+      room: '#room', account: 'alice', deviceId: 'phone', epoch: 1,
+      epochKey: bytes(1), membershipDigest: bytes(2), commitHash: new Uint8Array(32),
+    })).toBeNull();
+    expect(GroupSession.create({
+      room: '#room', account: 'alice', deviceId: 'phone',
+      epochKey: bytes(1), membershipDigest: bytes(2),
+    })).not.toBeNull();
+  });
+
+  it('rejects unverified and diagnostic controls without creating a session', async () => {
+    const locked = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(locked, {
+      welcomeResolution: { status: 'locked', reason: 'device-absent' },
+    }))).toEqual({ ok: false, reason: 'unverified-control' });
+    expect(consumeOpenedGroupWelcome(locked.welcome.opened)).toBeNull();
+
+    const diagnostic = await genesisPair();
+    const welcomeDiag = {
+      ...diagnostic.welcome.resolution,
+      parts: { ...diagnostic.welcome.resolution.parts, diagnosticOnly: true as const },
+    };
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(diagnostic, {
+      welcomeResolution: welcomeDiag,
+    }))).toEqual({ ok: false, reason: 'legacy-ogc1' });
+
+    const legacyCommit = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(legacyCommit, {
+      commitResolution: { status: 'locked', reason: 'legacy-ogc1' },
+    }))).toEqual({ ok: false, reason: 'legacy-ogc1' });
+  });
+
+  it('rejects routing, identity, room, and recipient mismatches', async () => {
+    const room = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(room, { room: '#other' })))
+      .toEqual({ ok: false, reason: 'welcome-target-mismatch' });
+
+    const commitRoom = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(commitRoom, {
+      commitRouting: { ...commitRoom.commitRouting, channel: '#other' },
+    }))).toEqual({ ok: false, reason: 'room-mismatch' });
+
+    const sender = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(sender, {
+      commitResolution: verified(sender.prepared.body, 'commit', 'mallory', 'sender'),
+    }))).toEqual({ ok: false, reason: 'committer-mismatch' });
+
+    const device = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(device, {
+      welcomeResolution: { ...device.welcome.resolution, deviceId: 'other-phone' },
+    }))).toEqual({ ok: false, reason: 'committer-mismatch' });
+
+    const crossSender = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(crossSender, {
+      commitRouting: { ...crossSender.commitRouting, fromDevice: 'other' },
+      commitResolution: verified(crossSender.prepared.body, 'commit', 'alice', 'other'),
+    }))).toEqual({ ok: false, reason: 'welcome-target-mismatch' });
+
+    const recipient = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(recipient, { account: 'bob' })))
+      .toEqual({ ok: false, reason: 'welcome-target-mismatch' });
+
+    const localDevice = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(localDevice, { deviceId: 'tablet' })))
+      .toEqual({ ok: false, reason: 'welcome-target-mismatch' });
+  });
+
+  it('rejects epoch, commit, membership, context, and commitment mismatches', async () => {
+    const epochLabel = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(epochLabel, {
+      welcomeResolution: {
+        ...epochLabel.welcome.resolution,
+        parts: { ...epochLabel.welcome.resolution.parts, epoch: 2 },
+      },
+    }))).toEqual({ ok: false, reason: 'welcome-epoch-mismatch' });
+
+    const commitId = await genesisPair({ commitId: bytes(4) });
+    const otherWelcome = await openedWelcome({ epochKey: bytes(5), commitId: bytes(9) });
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(commitId, {
+      opened: otherWelcome.opened,
+      welcomeResolution: otherWelcome.resolution,
+    }))).toEqual({ ok: false, reason: 'welcome-mismatch' });
+
+    const membership = await genesisPair({ membershipDigest: bytes(3) });
+    const otherMembership = await openedWelcome({ epochKey: bytes(5), membershipDigest: bytes(9) });
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(membership, {
+      opened: otherMembership.opened,
+      welcomeResolution: otherMembership.resolution,
+    }))).toEqual({ ok: false, reason: 'welcome-mismatch' });
+
+    const context = await genesisPair();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(context, {
+      welcomeRouting: { ...context.welcomeRouting, fromAccount: 'mallory' },
+      welcomeResolution: { ...context.welcome.resolution, account: 'mallory' },
+      commitRouting: { ...context.commitRouting, fromAccount: 'mallory' },
+      commitResolution: { ...context.commitResolution, account: 'mallory' },
+    }))).toEqual({ ok: false, reason: 'welcome-target-mismatch' });
+
+    const body = await genesisPair();
+    const otherBody = await openedWelcome({ epochKey: bytes(5) });
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(body, {
+      welcomeResolution: otherBody.resolution,
+    }))).toEqual({ ok: false, reason: 'welcome-target-mismatch' });
+
+    const commitment = await genesisPair({ epochKey: bytes(5) });
+    const wrongKeyWelcome = await openedWelcome({ epochKey: bytes(6) });
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(commitment, {
+      opened: wrongKeyWelcome.opened,
+      welcomeResolution: wrongKeyWelcome.resolution,
+    }))).toEqual({ ok: false, reason: 'welcome-mismatch' });
+  });
+
+  it('rejects a consumed welcome, non-genesis predecessor/epoch, and abort', async () => {
+    const consumed = await genesisPair();
+    expect(consumeOpenedGroupWelcome(consumed.welcome.opened)).not.toBeNull();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(consumed)))
+      .toEqual({ ok: false, reason: 'invalid-welcome' });
+
+    const predecessor = await genesisPair({
+      priorEpoch: 1, nextEpoch: 2, priorCommitHash: bytes(11),
+    });
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(predecessor)))
+      .toEqual({ ok: false, reason: 'welcome-epoch-mismatch' });
+
+    const higher = await genesisPair({ nextEpoch: 2, priorEpoch: 0 });
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(higher)))
+      .toEqual({ ok: false, reason: 'welcome-epoch-mismatch' });
+
+    const nonzeroPrior = await genesisPair({ priorCommitHash: bytes(12) });
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(nonzeroPrior)))
+      .toEqual({ ok: false, reason: 'prior-hash-mismatch' });
+
+    const aborted = await genesisPair();
+    const controller = new AbortController();
+    controller.abort();
+    expect(await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(aborted, { signal: controller.signal })))
+      .toEqual({ ok: false, reason: 'destroyed' });
+    expect(consumeOpenedGroupWelcome(aborted.welcome.opened)).toBeNull();
   });
 });
