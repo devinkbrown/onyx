@@ -9,6 +9,9 @@ const RouteLifecycle = lazy(() => import('./RouteLifecycle'));
  * The controller (map, resolvers, pending settle) stays out of the eager graph.
  */
 export function RouteLifecycleRoot(props: RouteSectionProps): JSX.Element {
+  // The lazy controller owns subsequent reactive path changes; this value is
+  // deliberately the router's initial hydration snapshot.
+  // eslint-disable-next-line solid/reactivity
   const initialPath = props.location.pathname;
   return (
     <>

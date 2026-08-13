@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, within } from '@solidjs/testing-library';
-import { PublicInfo, type PublicInfoPage } from './PublicInfo';
+import { PublicInfo, resolvePublicInfoPage, type PublicInfoPage } from './PublicInfo';
 
 /** Manifest order for the shared primary navigation. */
 const PRIMARY_LINKS = [
@@ -128,6 +128,13 @@ describe.each(PAGES)('PublicInfo /$page/', (route) => {
 });
 
 describe('PublicInfo route family', () => {
+  it('admits exactly the four explicit support route paths', () => {
+    expect(['/accessibility/', '/glossary/', '/integrations/', '/agents/'].map(resolvePublicInfoPage))
+      .toEqual(['accessibility', 'glossary', 'integrations', 'agents']);
+    expect(() => resolvePublicInfoPage('/agents')).toThrow(/allowlisted/);
+    expect(() => resolvePublicInfoPage('/unknown/')).toThrow(/allowlisted/);
+  });
+
   it('derives currentPath and main label from the page alone', () => {
     for (const route of PAGES) {
       const { unmount } = render(() => <PublicInfo page={route.page} />);

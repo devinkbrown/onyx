@@ -215,6 +215,7 @@ describe('PWA manifest', () => {
       .sort();
 
     expect(blocklist).toEqual([
+      '404.html',
       'about',
       'accessibility',
       'agents',
@@ -247,6 +248,21 @@ describe('PWA manifest', () => {
     // Current collision guard contract (assert_no_spa_owned_in_landing_dist).
     expect(deploy).toContain("conflicts with SPA-owned blocklist");
     expect(deploy).toContain("must not be on the legacy allowlist");
+  });
+
+  it('pins the flat, non-indexable branded 404 materialisation contract', () => {
+    const materializer = readFileSync(join(root, 'tools', 'materialize-route-entrypoints.mjs'), 'utf8');
+    const deploy = readFileSync(deployScriptPath, 'utf8');
+
+    expect(materializer).toContain("writeFile(resolve(root, '404.html'), stampNotFoundMetadata(base), 'utf8')");
+    expect(materializer).toContain("NOT_FOUND_ENTRYPOINT");
+    expect(materializer).toContain('name="robots" content="noindex, nofollow" data-onyx-route-robots="true"');
+    expect(materializer).toContain("'canonical'");
+    expect(materializer).toContain("'og:url'");
+    expect(materializer).toContain('application\\/ld\\+json');
+    expect(deploy).toContain('test -f dist/404.html');
+    expect(deploy).toContain('test ! -e dist/404/index.html');
+    expect(deploy).toContain('live 404.html metadata contract is unsafe');
   });
 
   it('bounds push content and keeps notification targets on canonical app routes', async () => {
@@ -754,129 +770,52 @@ describe('PWA manifest', () => {
     await expect(navigationWork).resolves.toMatchObject({ fallback: '/' });
     expect(currentCacheMatch).toHaveBeenLastCalledWith('/');
 
-    const retainedAppShell = {
-      source: 'retained-app-shell',
-      ok: true,
-      url: 'https://onyx.test/app/',
+    // Unknown app descendants are not aliases for the shell. An online 404 is
+    // returned unchanged and is never cached; an offline request gets a plain
+    // 503/no-store response without consulting any shell cache.
+    const cacheLookupsBeforeUnknownApp = currentCacheMatch.mock.calls.length;
+    const retainedLookupsBeforeUnknownApp = priorCacheMatch.mock.calls.length;
+    const cacheKeysBeforeUnknownApp = caches.keys.mock.calls.length;
+    const unknownAppOnline = {
+      source: 'network-404',
+      ok: false,
+      status: 404,
+      url: 'https://onyx.test/app/retained',
+      clone: vi.fn(),
     };
-    currentCacheMatch.mockResolvedValueOnce(undefined);
-    priorCacheMatch.mockResolvedValueOnce(retainedAppShell);
-    caches.open.mockClear();
+    networkFetch.mockResolvedValueOnce(unknownAppOnline);
+    navigationCacheWork = undefined;
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/retained' },
       respondWith: (work: Promise<unknown>) => {
         navigationWork = work;
       },
-    });
-    await expect(navigationWork).resolves.toBe(retainedAppShell);
-    expect(caches.open.mock.calls.map(([name]) => name)).toEqual([
-      'onyx-shell-__BUILD_VERSION__',
-      'onyx-shell-old-build',
-    ]);
-    expect(caches.open).not.toHaveBeenCalledWith('public-site-cache');
-
-    currentCacheMatch.mockResolvedValueOnce(undefined);
-    priorCacheMatch.mockResolvedValueOnce({
-      source: 'poisoned-retained-shell',
-      ok: true,
-      url: 'https://login.example/app/',
-    });
-    caches.open.mockClear();
-    listeners.get('fetch')?.({
-      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/retained-poisoned' },
-      respondWith: (work: Promise<unknown>) => {
-        navigationWork = work;
+      waitUntil: (work: Promise<unknown>) => {
+        navigationCacheWork = work;
       },
     });
-    const rejectedRetainedShell = await navigationWork as Response;
-    expect(rejectedRetainedShell).toBeInstanceOf(Response);
-    expect(rejectedRetainedShell.status).toBe(503);
-    expect(caches.open).not.toHaveBeenCalledWith('public-site-cache');
+    await expect(navigationWork).resolves.toBe(unknownAppOnline);
+    await navigationCacheWork;
+    expect(unknownAppOnline.clone).not.toHaveBeenCalled();
+    expect(currentCacheMatch).toHaveBeenCalledTimes(cacheLookupsBeforeUnknownApp);
+    expect(priorCacheMatch).toHaveBeenCalledTimes(retainedLookupsBeforeUnknownApp);
+    expect(caches.keys).toHaveBeenCalledTimes(cacheKeysBeforeUnknownApp);
 
-    const manyPriorCaches = Array.from(
-      { length: 7 },
-      (_, index) => `onyx-shell-202607${String(index + 1).padStart(2, '0')}-120000-build${index}`,
-    );
-    caches.keys.mockResolvedValueOnce([
-      'public-site-cache',
-      ...manyPriorCaches,
-      'onyx-shell-__BUILD_VERSION__',
-    ]);
-    currentCacheMatch.mockResolvedValueOnce(undefined);
-    priorCacheMatch.mockResolvedValue(undefined);
-    caches.open.mockClear();
-    listeners.get('fetch')?.({
-      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/bounded-retained' },
-      respondWith: (work: Promise<unknown>) => {
-        navigationWork = work;
-      },
-    });
-    const boundedMiss = await navigationWork as Response;
-    expect(boundedMiss).toBeInstanceOf(Response);
-    expect(boundedMiss.status).toBe(503);
-    expect(caches.open.mock.calls.map(([name]) => name)).toEqual([
-      'onyx-shell-__BUILD_VERSION__',
-      ...manyPriorCaches.sort().reverse().slice(0, 4),
-    ]);
-
-    const matchCallsBeforeDocument = currentCacheMatch.mock.calls.length;
-    const priorMatchCallsBeforeDocument = priorCacheMatch.mock.calls.length;
-    const cacheKeyCallsBeforeDocument = caches.keys.mock.calls.length;
-    listeners.get('fetch')?.({
-      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/guides/' },
-      respondWith: (work: Promise<unknown>) => {
-        navigationWork = work;
-      },
-    });
-    const unavailableDocument = await navigationWork as Response;
-    expect(unavailableDocument).toBeInstanceOf(Response);
-    expect(unavailableDocument.status).toBe(503);
-    expect(unavailableDocument.headers.get('Cache-Control')).toBe('no-store');
-    await expect(unavailableDocument.text()).resolves.toContain('page is unavailable offline');
-    expect(currentCacheMatch).toHaveBeenCalledTimes(matchCallsBeforeDocument);
-    expect(priorCacheMatch).toHaveBeenCalledTimes(priorMatchCallsBeforeDocument);
-    expect(caches.keys).toHaveBeenCalledTimes(cacheKeyCallsBeforeDocument);
-
-    currentCacheMatch.mockResolvedValueOnce({
-      fallback: '/app/',
-      url: 'https://login.example/app/',
-    });
-    listeners.get('fetch')?.({
-      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/poisoned' },
-      respondWith: (work: Promise<unknown>) => {
-        navigationWork = work;
-      },
-    });
-    const poisonedFallback = await navigationWork as Response;
-    expect(poisonedFallback).toBeInstanceOf(Response);
-    expect(poisonedFallback.status).toBe(503);
-
-    currentCacheMatch.mockResolvedValueOnce({
-      fallback: '/app/',
-      ok: false,
-      url: 'https://onyx.test/app/',
-    });
-    listeners.get('fetch')?.({
-      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/failed-shell' },
-      respondWith: (work: Promise<unknown>) => {
-        navigationWork = work;
-      },
-    });
-    const failedShellFallback = await navigationWork as Response;
-    expect(failedShellFallback).toBeInstanceOf(Response);
-    expect(failedShellFallback.status).toBe(503);
-
-    currentCacheMatch.mockRejectedValueOnce(new Error('offline fallback cache unavailable'));
+    networkFetch.mockRejectedValueOnce(new Error('offline unknown app path'));
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/offline' },
       respondWith: (work: Promise<unknown>) => {
         navigationWork = work;
       },
     });
-    const unavailable = await navigationWork as Response;
-    expect(unavailable).toBeInstanceOf(Response);
-    expect(unavailable.status).toBe(503);
-    await expect(unavailable.text()).resolves.toContain('app shell was not cached');
+    const unavailableUnknownApp = await navigationWork as Response;
+    expect(unavailableUnknownApp).toBeInstanceOf(Response);
+    expect(unavailableUnknownApp.status).toBe(503);
+    expect(unavailableUnknownApp.headers.get('Content-Type')).toBe('text/plain; charset=utf-8');
+    expect(unavailableUnknownApp.headers.get('Cache-Control')).toBe('no-store');
+    expect(currentCacheMatch).toHaveBeenCalledTimes(cacheLookupsBeforeUnknownApp);
+    expect(priorCacheMatch).toHaveBeenCalledTimes(retainedLookupsBeforeUnknownApp);
+    expect(caches.keys).toHaveBeenCalledTimes(cacheKeysBeforeUnknownApp);
 
     let assetResponseWork: Promise<unknown> | undefined;
     let assetLifetimeWork: Promise<unknown> | undefined;

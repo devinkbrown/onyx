@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './data-pages.css';
-import { createEffect, createMemo } from 'solid-js';
+import { createEffect, createMemo, Show } from 'solid-js';
+import { useLocation } from '@solidjs/router';
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
+import NotFoundPage from './NotFound';
+
+// Both supporting information and the route terminus are deferred public
+// surfaces. Re-exporting the latter keeps their router entry boundary shared.
+export { NotFoundPage };
 
 const content = {
   accessibility: ['Accessibility', 'Access is a product requirement.', 'Keyboard navigation, focus recovery, motion controls, contrast variants, and live-status announcements are tested in the client. Report a gap in #accessibility.'],
@@ -13,6 +19,18 @@ const content = {
 } as const;
 
 export type PublicInfoPage = keyof typeof content;
+const PUBLIC_INFO_PATHS = {
+  '/accessibility/': 'accessibility',
+  '/glossary/': 'glossary',
+  '/integrations/': 'integrations',
+  '/agents/': 'agents',
+} as const satisfies Readonly<Record<string, PublicInfoPage>>;
+
+export function resolvePublicInfoPage(path: string): PublicInfoPage {
+  const page = PUBLIC_INFO_PATHS[path as keyof typeof PUBLIC_INFO_PATHS];
+  if (!page) throw new Error('Onyx: PublicInfo route was not allowlisted');
+  return page;
+}
 
 /**
  * Accessible name for the shared `main` landmark. These supporting routes are
@@ -50,5 +68,16 @@ export function PublicInfo(props: { page: PublicInfoPage }) {
         </section>
       </div>
     </PublicFrame>
+  );
+}
+
+/** Route-facing resolver; the named component remains useful for focused rendering tests. */
+export default function PublicInfoRoute() {
+  const location = useLocation();
+  const page = () => PUBLIC_INFO_PATHS[location.pathname as keyof typeof PUBLIC_INFO_PATHS];
+  return (
+    <Show when={page()} fallback={<NotFoundPage />}>
+      {(currentPage) => <PublicInfo page={currentPage()} />}
+    </Show>
   );
 }

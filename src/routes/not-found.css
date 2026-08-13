@@ -1,0 +1,27 @@
+/* Route misses use the existing public canvas, with a single deliberate recovery action. */
+.not-found-page__body {
+  display: grid;
+  align-content: center;
+  min-height: min(62vh, 44rem);
+  max-width: 48rem;
+  padding-block: clamp(4rem, 12vh, 9rem);
+}
+
+.not-found-page__body h1 { margin: 0.45rem 0 1rem; }
+
+.not-found-page__action {
+  width: fit-content;
+  margin-top: 1.75rem;
+  padding: 0.72rem 1rem;
+  border: 1px solid var(--lapis);
+  border-radius: var(--r-pill);
+  color: var(--paper);
+  background: color-mix(in oklab, var(--lapis) 22%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+}
+
+.not-found-page__action:hover { background: color-mix(in oklab, var(--lapis) 38%, transparent); }

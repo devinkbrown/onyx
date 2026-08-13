@@ -271,8 +271,12 @@ state). Almost every module has a co-located `*.test.ts`.
   (`vite.config.ts:18`).
 - `./deploy.sh` — the only writer of `out/`. It builds to `dist/`, uses
   `tools/materialize-route-entrypoints.mjs` for route-specific `index.html`
-  documents and metadata, stamps the service-worker cache name, overlays the community site from
-  the first-party community-site overlay, then `rsync --delete dist/ → out/`.
-  nginx serves `out/`
+  documents and metadata plus a flat `404.html` with noindex metadata, stamps
+  the service-worker cache name, overlays the community site from the
+  first-party community-site overlay, then `rsync --delete dist/ → out/`.
+  nginx serves `out/`; its source-controlled include preserves real 404 status
+  for unknown paths while internally rendering that flat document. The service
+  worker only caches/falls back to exact `/` and `/app` or `/app/` navigations,
+  so unknown `/app/*` URLs are never converted into cacheable soft 404s.
   at eshmaki.me. See [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for the safety
   rationale.

@@ -44,7 +44,10 @@ const Roadmap = lazy(() => import('./routes/Roadmap'));
 const Invite = lazy(() => import('./routes/Invite'));
 const OnyxOS = lazy(() => import('./routes/OnyxOS'));
 const Download = lazy(() => import('./routes/Download'));
-const PublicInfo = lazy(() => import('./routes/PublicInfo').then((m) => ({ default: m.PublicInfo })));
+const PublicInfoRoute = lazy(() => import('./routes/PublicInfo'));
+// Both paths share one deferred public-route chunk; the module dispatches the
+// catchall to its route-terminus component after loading.
+const NotFoundRoute = withLazyRoute(PublicInfoRoute);
 const Spotlight = lazy(() => import('./chat/spotlight/Spotlight'));
 
 /**
@@ -130,10 +133,8 @@ render(
           <Route path={['/invite', '/invite/']} component={InviteRoute} />
           <Route path={['/onyxos', '/onyxos/']} component={OnyxOSRoute} />
           <Route path={['/download', '/download/', '/install', '/install/']} component={DownloadRoute} />
-          <Route path="/accessibility/" component={() => <LazyRouteBoundary><PublicInfo page="accessibility" /></LazyRouteBoundary>} />
-          <Route path="/glossary/" component={() => <LazyRouteBoundary><PublicInfo page="glossary" /></LazyRouteBoundary>} />
-          <Route path="/integrations/" component={() => <LazyRouteBoundary><PublicInfo page="integrations" /></LazyRouteBoundary>} />
-          <Route path="/agents/" component={() => <LazyRouteBoundary><PublicInfo page="agents" /></LazyRouteBoundary>} />
+          <Route path={['/accessibility/', '/glossary/', '/integrations/', '/agents/']} component={() => <LazyRouteBoundary><PublicInfoRoute /></LazyRouteBoundary>} />
+          <Route path="/*notFound" component={NotFoundRoute} />
         </Router>
         {/* Global command palette — Cmd/Ctrl+K or / opens it from any route.
             Its lazy chunk (command catalogue + fuzzy matcher) is fetched only

@@ -152,10 +152,12 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
 
   it('covers every public router destination and preserves the install compatibility alias', () => {
     const declarations = routerDeclarations();
+    const terminus = declarations.filter((route) => route.path === '/*notFound');
+    expect(terminus).toEqual([{ path: '/*notFound', component: 'NotFoundRoute' }]);
     const publicRouterPaths = new Set(
       declarations
         .map((route) => canonicalPath(route.path))
-        .filter((path) => path !== '/app' && path !== '/install'),
+        .filter((path) => path !== '/app' && path !== '/install' && path !== '/*notFound'),
     );
     expect([...publicRouterPaths].sort()).toEqual(
       PUBLIC_ROUTE_MANIFEST.map((route) => route.path).toSorted(),

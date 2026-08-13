@@ -9,12 +9,14 @@ import {
   DEFAULT_ROUTE_ANNOUNCER_CLASS,
   DEFAULT_ROUTE_ANNOUNCER_LABEL,
   ROUTE_LIFECYCLE_APP_LABEL,
+  ROUTE_LIFECYCLE_NOT_FOUND_LABEL,
   ROUTE_LIFECYCLE_MAP,
   RouteLifecycleRoot,
   normalizeRouteLifecyclePath,
   resolveRouteLifecycleEntry,
   resolveRouteLifecycleIdentity,
   resolveRouteLifecycleLabel,
+  resolveNotFoundRouteLifecycleEntry,
 } from './index';
 
 afterEach(cleanup);
@@ -153,6 +155,8 @@ describe('route lifecycle identity helpers', () => {
     expect(resolveRouteLifecycleEntry('/download')?.publicNavigation).toBe(true);
     expect(resolveRouteLifecycleEntry('/missing')).toBeUndefined();
     expect(resolveRouteLifecycleLabel('/not-a-route/')).toBeUndefined();
+    expect(resolveNotFoundRouteLifecycleEntry('/not-a-route/')?.label).toBe(ROUTE_LIFECYCLE_NOT_FOUND_LABEL);
+    expect(resolveNotFoundRouteLifecycleEntry('/not-a-route/')?.id).toBe('not-found:/not-a-route');
   });
 });
 
@@ -242,7 +246,7 @@ describe('RouteLifecycleRoot', () => {
     expect(screen.getByTestId('page-app')).toBeTruthy();
   });
 
-  it('keeps unknown routes silent and does not replace the last mapped announcement', async () => {
+  it('announces an unknown route without promoting it into the exact lifecycle map', async () => {
     const history = createMemoryHistory();
     render(() => <LifecycleFixture history={history} />);
     await awaitLifecycleReady();
@@ -251,9 +255,7 @@ describe('RouteLifecycleRoot', () => {
     await expectAnnouncement('About');
 
     history.set({ value: '/definitely-missing', scroll: false });
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(liveRegion()).toHaveTextContent('About');
+    await expectAnnouncement(ROUTE_LIFECYCLE_NOT_FOUND_LABEL);
     expect(screen.queryByTestId('page-about')).toBeNull();
   });
 

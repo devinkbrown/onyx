@@ -4,6 +4,10 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ORIGIN = 'https://eshmaki.me';
+const NOT_FOUND_ENTRYPOINT = {
+  title: 'Onyx — page not found',
+  description: 'This Onyx address does not exist or is no longer available.',
+};
 
 // Keep this list in sync with the public <Route> table in src/index.tsx.
 // The Vite/Solid SPA owns root and these SPA route documents. deploy.sh may
@@ -149,6 +153,41 @@ export function stampRouteMetadata(html, entrypoint) {
   return stamped;
 }
 
+function removeExactlyOnce(html, pattern, label) {
+  const matches = html.match(new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`));
+  if (matches?.length !== 1) {
+    throw new Error(`Expected exactly one ${label} tag in the Vite entry document; found ${matches?.length ?? 0}`);
+  }
+  return html.replace(pattern, '');
+}
+
+// A branded 404 is a document, not an SPA route: it must never advertise a
+// canonical public URL, an Open Graph URL, or route structured data that can
+// cause crawlers to index an unknown address as a successful page.
+export function stampNotFoundMetadata(html) {
+  let stamped = html;
+  stamped = replaceExactlyOnce(
+    stamped,
+    /<title>[\s\S]*?<\/title>/,
+    `<title>${escapeHtml(NOT_FOUND_ENTRYPOINT.title)}</title>`,
+    'title',
+  );
+  stamped = replaceExactlyOnce(
+    stamped,
+    /<meta\s+name="description"[\s\S]*?\/>/,
+    `<meta name="description" content="${escapeHtml(NOT_FOUND_ENTRYPOINT.description)}" />`,
+    'description',
+  );
+  stamped = removeExactlyOnce(stamped, /\s*<link\s+rel="canonical"[\s\S]*?\/>/, 'canonical');
+  stamped = removeExactlyOnce(stamped, /\s*<meta\s+property="og:url"[\s\S]*?\/>/, 'og:url');
+  stamped = stamped.replace(/\s*<script\s+type="application\/ld\+json"[\s\S]*?<\/script>/g, '');
+  stamped = stamped.replace(
+    /(<meta\s+name="description"[\s\S]*?\/>)/,
+    '$1\n    <meta name="robots" content="noindex, nofollow" data-onyx-route-robots="true" />',
+  );
+  return stamped;
+}
+
 export async function materializeRouteEntrypoints(distDir) {
   const root = resolve(distDir);
   const base = await readFile(resolve(root, 'index.html'), 'utf8');
@@ -162,6 +201,11 @@ export async function materializeRouteEntrypoints(distDir) {
       'utf8',
     );
   }
+
+  // Keep this flat. nginx internally serves this exact file while retaining
+  // the original 404 status; a /404/index.html directory would invite a
+  // successful SPA fallback and a soft-404 response.
+  await writeFile(resolve(root, '404.html'), stampNotFoundMetadata(base), 'utf8');
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : '';

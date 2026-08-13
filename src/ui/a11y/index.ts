@@ -30,11 +30,13 @@ export type {
 export { RouteLifecycleRoot } from './RouteLifecycleRoot';
 export {
   ROUTE_LIFECYCLE_APP_LABEL,
+  ROUTE_LIFECYCLE_NOT_FOUND_LABEL,
   ROUTE_LIFECYCLE_MAP,
   normalizeRouteLifecyclePath,
   resolveRouteLifecycleEntry,
   resolveRouteLifecycleIdentity,
   resolveRouteLifecycleLabel,
+  resolveNotFoundRouteLifecycleEntry,
 } from './RouteLifecycle';
 export type {
   RouteLifecycleEntry,

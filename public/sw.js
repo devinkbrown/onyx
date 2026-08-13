@@ -111,7 +111,10 @@ function focusNotificationTarget(clientList, targetPath) {
 }
 
 function navigationFallbackPath(pathname) {
-  if (isAppPath(pathname)) return APP_PATH;
+  // Only canonical shell documents may be cached or used as offline
+  // fallbacks. In particular, /app/* must remain a real online 404 rather
+  // than becoming a cacheable 200 app shell (a soft 404).
+  if (pathname === '/app' || pathname === APP_PATH) return APP_PATH;
   if (pathname === '/') return '/';
   return null;
 }

@@ -19,7 +19,7 @@
 # for the public root and all SPA routes. /home/kain/landing is no longer the
 # public website: it may only contribute explicitly allowlisted, non-conflicting
 # legacy support resources (guides, community, install, …). Root documents
-# (index.html, robots.txt, sitemap.xml, favicons) and SPA-owned paths are never
+# (index.html, 404.html, robots.txt, sitemap.xml, favicons) and SPA-owned paths are never
 # overlaid from landing.
 #
 # Usage:
@@ -70,6 +70,7 @@ LEGACY_SUPPORT_ALLOWLIST=(
 # SPA / app-owned names that must never be copied from landing (defense in depth).
 SPA_OWNED_BLOCKLIST=(
   index.html
+  404.html
   robots.txt
   sitemap.xml
   favicon.ico
@@ -531,6 +532,17 @@ verify_live_out() {
     echo "FAIL: live app/index.html missing after sync" >&2
     return 1
   fi
+  if [[ ! -f "${live_out}/404.html" ]]; then
+    echo "FAIL: live 404.html missing after sync" >&2
+    return 1
+  fi
+  if ! grep -q 'Onyx — page not found' "${live_out}/404.html" \
+    || ! grep -q 'name="robots" content="noindex, nofollow"' "${live_out}/404.html" \
+    || grep -q 'rel="canonical"' "${live_out}/404.html" \
+    || grep -q 'property="og:url"' "${live_out}/404.html"; then
+    echo "FAIL: live 404.html metadata contract is unsafe" >&2
+    return 1
+  fi
   if [[ ! -f "${live_out}/sw.js" ]]; then
     echo "FAIL: live sw.js missing after sync" >&2
     return 1
@@ -694,6 +706,10 @@ deploy_main() {
     || { echo "FAIL: dist/app/index.html missing after materialise"; exit 1; }
   test -f dist/download/index.html \
     || { echo "FAIL: dist/download/index.html missing after materialise"; exit 1; }
+  test -f dist/404.html \
+    || { echo "FAIL: dist/404.html missing after materialise"; exit 1; }
+  test ! -e dist/404/index.html \
+    || { echo "FAIL: materialiser must emit flat dist/404.html, never dist/404/index.html"; exit 1; }
 
   # Optional: stage site-local public release artifacts (never the default).
   # Six public lanes: windows + linux + macos-x86_64 + macos-arm64 + freebsd + openbsd.

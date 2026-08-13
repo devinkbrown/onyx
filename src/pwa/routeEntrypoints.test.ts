@@ -144,7 +144,7 @@ function routerPathNames(sourceText: string): readonly string[] {
       pathAttributeCount += 1;
       for (const path of paths) {
         const canonical = path === '/' ? path : path.replace(/\/+$/u, '') || '/';
-        if (canonical === '/') continue;
+        if (canonical === '/' || canonical === '/*notFound') continue;
         names.push(canonical.replace(/^\//u, ''));
       }
     }
@@ -157,6 +157,25 @@ function routerPathNames(sourceText: string): readonly string[] {
 }
 
 describe('SPA route entrypoint materializer', () => {
+  it('keeps exactly one final client route terminus outside materialized entrypoints', () => {
+    const source = ts.createSourceFile('src/index.tsx', routeTable, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const terminus: string[] = [];
+    function visit(node: ts.Node): void {
+      const element = ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node) ? node : undefined;
+      if (element?.tagName.getText(source) === 'Route') {
+        const path = element.attributes.properties.find((property) => ts.isJsxAttribute(property) && property.name.getText(source) === 'path');
+        const component = element.attributes.properties.find((property) => ts.isJsxAttribute(property) && property.name.getText(source) === 'component');
+        if (path && ts.isJsxAttribute(path) && path.initializer && readLiteralPathStrings(path.initializer).includes('/*notFound')) {
+          terminus.push(component && ts.isJsxAttribute(component) && component.initializer && ts.isJsxExpression(component.initializer)
+            ? component.initializer.expression?.getText(source) ?? '' : '');
+        }
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(source);
+    expect(terminus).toEqual(['NotFoundRoute']);
+  });
+
   it('covers every non-root route in the Solid router table', () => {
     const routes = routerPathNames(routeTable);
     expect([...new Set(routes)].sort()).toEqual(Object.keys(expected).sort());
