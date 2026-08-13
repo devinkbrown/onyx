@@ -850,3 +850,15 @@ The working tree remains intentionally dirty and no commit or push was made.
 - Final browser gates: connected Current Ledger 1/1, existing Home/mobile/forced-color 6/6, authenticated group-control connected runner 1/1.
 - D3 accepted hashes: runtime `b2e21c54876157ca00ca9e0f058a3bc9817489a27ca8235f80b30ee09b256daa`, runtime test `2c8bdaefbfdea824ac427869d033af70bdd794c0f1a9b330375b66db9a09c53d`, integration test `38e3c3d8c4a0c4f975249e14b7e98e8a3e2b22c6ae92f5deb9754b9f5077432c`; independent focused gate 80/80 plus typecheck/ESLint/diff-check.
 - Group-control runtime activation remains truthful: provisioning/retry/lifecycle behavior is implemented and verified, but production activation remains HOLD where the server/session authority is intentionally not wired.
+
+## 2026-08-14 Route Terminus deployment
+
+- Release commit: `7f28acb` (`feat: ship truthful route terminus`).
+- Live client release: `onyx-shell-20260814-000036-7f28acb5` at `https://eshmaki.me`.
+- Atomic client rollback snapshot: `/home/kain/onyx/.onyx-deploy-backups/onyx-out-20260814-000036-7f28acb5`.
+- The final lazy `/*notFound` route renders a path-neutral PublicFrame terminus, provides `/app/` recovery for app misses, and keeps known-route lifecycle resolution unchanged.
+- The deploy materializer owns one flat `404.html` with no canonical, Open Graph URL, or JSON-LD; its marked noindex tag is adopted during hydration and removed on known-route navigation.
+- nginx preserves real 404 status for extensionless, `.html`, and `/app/*` misses while keeping protected assets and stats descendants bare. The service worker only falls back for exact `/`, `/app`, and `/app/` documents.
+- Independent review found and then accepted repairs for hard-load robots restoration and the enclosing nginx `.html` regex precedence edge.
+- Final gates: 501 unit files / 6,411 tests; focused 32/32; route browser 2/2; typecheck; ESLint 0 errors/0 warnings; 487-module production build; UI budget pass; deploy controller 100/100; nginx syntax pass.
+- Live acceptance: staged/live byte equality for `index.html`, `404.html`, and `sw.js`; extensionless, `.html`, and `/app/*` probes returned branded no-store/noindex HTTP 404; protected asset/stats probes returned bare HTTP 404; Chromium hard-load recovered to Home with the robots marker cleared, canonical restored, and no 320 px overflow.
