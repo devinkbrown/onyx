@@ -840,3 +840,13 @@ Deployment:
   `/roadmap/`, `/status/`, and `/sw.js`.
 
 The working tree remains intentionally dirty and no commit or push was made.
+## 2026-08-13 final combined deployment
+
+- Release commit: `a2e547e4` (`feat: ship current desk and resilient group encryption`).
+- Live client release: `onyx-shell-20260813-231920-a2e547e4` at `https://eshmaki.me`.
+- Atomic deploy snapshot: `/home/kain/onyx/.onyx-deploy-backups/onyx-out-20260813-231920-a2e547e4`.
+- Live `index.html`, `/app/index.html`, and `sw.js` were byte-checked against `/home/kain/onyx/out`; the service-worker cache stamp matches the release above.
+- Final source gates: TypeScript pass; ESLint 0 errors (2 existing Solid reactivity warnings); production build 485 modules; UI budget pass; 500 unit files / 6,404 tests pass.
+- Final browser gates: connected Current Ledger 1/1, existing Home/mobile/forced-color 6/6, authenticated group-control connected runner 1/1.
+- D3 accepted hashes: runtime `b2e21c54876157ca00ca9e0f058a3bc9817489a27ca8235f80b30ee09b256daa`, runtime test `2c8bdaefbfdea824ac427869d033af70bdd794c0f1a9b330375b66db9a09c53d`, integration test `38e3c3d8c4a0c4f975249e14b7e98e8a3e2b22c6ae92f5deb9754b9f5077432c`; independent focused gate 80/80 plus typecheck/ESLint/diff-check.
+- Group-control runtime activation remains truthful: provisioning/retry/lifecycle behavior is implemented and verified, but production activation remains HOLD where the server/session authority is intentionally not wired.
