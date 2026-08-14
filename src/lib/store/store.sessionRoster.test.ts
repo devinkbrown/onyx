@@ -439,6 +439,34 @@ describe('remembered session roster restoration', () => {
     expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('late-token');
   });
 
+  it('preserves resume credentials when an unrelated SESSION DROP fails', () => {
+    saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+    storeSessionToken('local-held');
+    storeMeshToken('mesh-held');
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to Onyx');
+
+    receive(':example.test FAIL SESSION STALE_LIST :SESSION LIST snapshot is no longer valid; list again');
+    receive(':example.test FAIL SESSION CANNOT_DROP_CURRENT :Cannot drop this connection; use LOGOUT or disconnect');
+
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('local-held');
+    expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBe('mesh-held');
+
+    FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+    store.getState().reconnectNow();
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome back');
+
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME mesh-held\r\n');
+  });
+
   it('does not promote an ordinary guest from an unsolicited SESSION token note', () => {
     store.getState().connect({ url: 'wss://example.test', nick: 'Guest42' });
     FakeWebSocket.latest?.onopen?.(new Event('open'));
@@ -615,9 +643,9 @@ describe('remembered session roster restoration', () => {
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME notice-mesh\r\n');
   });
 
-  it('records MTOKEN expires= as tokenExpiry so portable state can purge', () => {
+  it('records MTOKEN expires= as meshTokenExpiry so portable state can purge', () => {
     // Live Onyx Server: `SESSION MTOKEN <hex> expires=<unix>` (mesh wall clock,
-    // 12h portable lifetime). Without folding expires into tokenExpiry the
+    // 12h portable lifetime). Without folding expires into meshTokenExpiry the
     // credential lingers in localStorage past the portable window.
     saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
     store.getState().connect({
@@ -634,13 +662,13 @@ describe('remembered session roster restoration', () => {
 
     const creds = loadCredentials('wss://example.test', 'kain');
     expect(creds?.meshToken).toBe('mesh-with-ttl');
-    expect(creds?.tokenExpiry).toBe('2027-01-15T08:00:00.000Z');
+    expect(creds?.meshTokenExpiry).toBe('2027-01-15T08:00:00.000Z');
 
     // Malformed expires must fail closed — do not install a bare token that
     // would never purge (and must not clobber the good one above).
     receive(':example.test NOTICE kain :SESSION MTOKEN evil-token expires=not-a-number');
     expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBe('mesh-with-ttl');
-    expect(loadCredentials('wss://example.test', 'kain')?.tokenExpiry).toBe('2027-01-15T08:00:00.000Z');
+    expect(loadCredentials('wss://example.test', 'kain')?.meshTokenExpiry).toBe('2027-01-15T08:00:00.000Z');
   });
 
   it('WARN SESSION leaves the resume credential intact (retryable mesh path)', () => {

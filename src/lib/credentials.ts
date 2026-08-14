@@ -21,7 +21,7 @@
  * TOKEN). It is longer than the 32-hex local token; `SESSION RESUME <mtoken>`
  * routes through handleMeshReclaim, which either reclaims a detached session
  * held locally or redirects to the owning node. When `expires=` is present it
- * is recorded as `tokenExpiry` so purgeExpiredTokens drops stale portable
+ * is recorded as `meshTokenExpiry` so purgeExpiredTokens drops stale portable
  * state without decoding the sealed value.
  *
  * When no token is present (first login or expired), a saved password can be
@@ -47,7 +47,9 @@ export interface SavedCredentials {
   sessionToken?: string;
   /** Onyx Server-issued mesh-sealed reclaim token (resumes from any mesh node) */
   meshToken?: string;
-  /** Token validity deadline — ISO string */
+  /** Mesh-token validity deadline — ISO string. The node-local token is not governed by it. */
+  meshTokenExpiry?: string;
+  /** @deprecated Read-only v2 migration input; new writes use meshTokenExpiry. */
   tokenExpiry?: string;
   /** When these credentials were last written */
   savedAt: string;
@@ -165,18 +167,24 @@ function sanitizeSavedCredentials(value: unknown): SavedCredentials | null {
   const password = sanitizeCredentialPassword(value.password);
   const sessionToken = sanitizeResumeToken(value.sessionToken);
   const meshToken = sanitizeResumeToken(value.meshToken);
-  const hasPersistedExpiry = Object.hasOwn(value, 'tokenExpiry');
-  const tokenExpiry = sanitizeTimestamp(value.tokenExpiry);
-  const acceptTokens = !hasPersistedExpiry || tokenExpiry !== undefined;
+  // `tokenExpiry` was the v2 field used before local and portable bearer
+  // lifetimes were separated. Treat it as a mesh-only expiry during read so
+  // existing stores migrate without deleting a still-valid local token.
+  const hasPersistedMeshExpiry = Object.hasOwn(value, 'meshTokenExpiry')
+    || Object.hasOwn(value, 'tokenExpiry');
+  const meshTokenExpiry = sanitizeTimestamp(
+    Object.hasOwn(value, 'meshTokenExpiry') ? value.meshTokenExpiry : value.tokenExpiry,
+  );
+  const acceptMeshToken = !hasPersistedMeshExpiry || meshTokenExpiry !== undefined;
 
   return {
     nick,
     server,
     ...(password !== undefined ? { password } : {}),
-    ...(acceptTokens && sessionToken !== undefined ? { sessionToken } : {}),
-    ...(acceptTokens && meshToken !== undefined ? { meshToken } : {}),
-    ...(acceptTokens && tokenExpiry !== undefined && (sessionToken || meshToken)
-      ? { tokenExpiry }
+    ...(sessionToken !== undefined ? { sessionToken } : {}),
+    ...(acceptMeshToken && meshToken !== undefined ? { meshToken } : {}),
+    ...(acceptMeshToken && meshTokenExpiry !== undefined && meshToken
+      ? { meshTokenExpiry }
       : {}),
     savedAt: sanitizeTimestamp(value.savedAt) ?? '',
   };
@@ -258,11 +266,10 @@ function hasPassword(creds: SavedCredentials): boolean {
 }
 
 function hasCurrentToken(creds: SavedCredentials): boolean {
-  const hasToken = (typeof creds.sessionToken === 'string' && creds.sessionToken.length > 0)
-    || (typeof creds.meshToken === 'string' && creds.meshToken.length > 0);
-  if (!hasToken) return false;
-  if (!creds.tokenExpiry) return true;
-  const expiry = Date.parse(creds.tokenExpiry);
+  if (typeof creds.sessionToken === 'string' && creds.sessionToken.length > 0) return true;
+  if (typeof creds.meshToken !== 'string' || creds.meshToken.length === 0) return false;
+  if (!creds.meshTokenExpiry) return true;
+  const expiry = Date.parse(creds.meshTokenExpiry);
   return Number.isFinite(expiry) && Date.now() < expiry;
 }
 
@@ -336,15 +343,13 @@ function writeStore(store: CredentialsStore): void {
 function purgeExpiredTokens(store: CredentialsStore): boolean {
   let changed = false;
   for (const [key, creds] of Object.entries(store.entries)) {
-    const hasToken = (typeof creds.sessionToken === 'string' && creds.sessionToken.length > 0)
-      || (typeof creds.meshToken === 'string' && creds.meshToken.length > 0);
-    const expiry = creds.tokenExpiry ? Date.parse(creds.tokenExpiry) : Number.NaN;
-    if (hasToken && creds.tokenExpiry && (!Number.isFinite(expiry) || Date.now() >= expiry)) {
+    const hasMeshToken = typeof creds.meshToken === 'string' && creds.meshToken.length > 0;
+    const expiry = creds.meshTokenExpiry ? Date.parse(creds.meshTokenExpiry) : Number.NaN;
+    if (hasMeshToken && creds.meshTokenExpiry && (!Number.isFinite(expiry) || Date.now() >= expiry)) {
       store.entries[key] = {
         ...creds,
-        sessionToken: undefined,
         meshToken: undefined,
-        tokenExpiry: undefined,
+        meshTokenExpiry: undefined,
       };
       changed = true;
     }
@@ -485,7 +490,7 @@ export function saveCredentials(opts: {
       password,
       sessionToken: preserveToken ? existing.sessionToken : undefined,
       meshToken:    preserveToken ? existing.meshToken : undefined,
-      tokenExpiry:  preserveToken ? existing.tokenExpiry : undefined,
+      meshTokenExpiry: preserveToken ? existing.meshTokenExpiry : undefined,
       savedAt:      new Date().toISOString(),
     };
     store.entries[key] = creds;
@@ -536,11 +541,6 @@ export function storeSessionToken(
       ...(canonicalExisting ?? existing),
       nick,
       sessionToken: safeToken,
-      // Only set tokenExpiry when the caller supplies one; otherwise preserve any
-      // expiry already governing an existing token rather than clobbering it.
-      ...(expiry !== undefined
-        ? { tokenExpiry: expiry }
-        : {}),
     };
     const wasActive = store.activeKey === entryKey;
     if (nextKey !== entryKey && !canonicalExisting) delete store.entries[entryKey];
@@ -566,7 +566,7 @@ export function clearSessionToken(server?: string, nick?: string): void {
     const key = safeServer && safeNick ? credentialKey(safeServer, safeNick) : store.activeKey;
     const existing = ownCredential(store, key);
     if (!key || !existing) return;
-    store.entries[key] = { ...existing, sessionToken: undefined, meshToken: undefined, tokenExpiry: undefined };
+    store.entries[key] = { ...existing, sessionToken: undefined, meshToken: undefined, meshTokenExpiry: undefined };
     writeStore(store);
   } catch { /* quota */ }
 }
@@ -579,7 +579,7 @@ export function clearSessionToken(server?: string, nick?: string): void {
  * credentials exist (guest sessions).
  *
  * expiresAt — a Unix timestamp (seconds). When provided (current MTOKEN wire
- *   form carries `expires=<unix>`), it is recorded as the local tokenExpiry so
+ *   form carries `expires=<unix>`), it is recorded as meshTokenExpiry so
  *   purgeExpiredTokens evicts the token on the next read/write once it lapses.
  *   When omitted (legacy MTOKEN notes without expiry) the token has NO local
  *   expiry and lingers in localStorage until an explicit clearSessionToken /
@@ -617,15 +617,18 @@ export function storeMeshToken(
     const canonicalExisting = nextKey !== entryKey
       ? ownCredential(store, nextKey)
       : undefined;
-    // Only set tokenExpiry when the caller supplies one; otherwise preserve any
+    const baseCredentials = canonicalExisting ?? existing;
+    // Only set meshTokenExpiry when the caller supplies one; otherwise preserve any
     // expiry already governing an existing token rather than clobbering it.
     const creds: SavedCredentials = {
-      ...(canonicalExisting ?? existing),
+      ...baseCredentials,
       nick,
       meshToken: safeToken,
       ...(expiry !== undefined
-        ? { tokenExpiry: expiry }
-        : {}),
+        ? { meshTokenExpiry: expiry }
+        : baseCredentials.meshToken === safeToken
+          ? {}
+          : { meshTokenExpiry: undefined }),
     };
     const wasActive = store.activeKey === entryKey;
     if (nextKey !== entryKey && !canonicalExisting) delete store.entries[entryKey];

@@ -754,8 +754,8 @@ export function Connect(props: ConnectProps): JSX.Element {
       // Carry the mesh-sealed token into it before store.connect performs its
       // exact (url,nick) lookup; never copy the node-local token across nodes.
       if (resumeCredentials?.meshToken) {
-        const expiryMs = resumeCredentials.tokenExpiry
-          ? new Date(resumeCredentials.tokenExpiry).getTime()
+        const expiryMs = resumeCredentials.meshTokenExpiry
+          ? new Date(resumeCredentials.meshTokenExpiry).getTime()
           : Number.NaN;
         storeMeshToken(
           resumeCredentials.meshToken,

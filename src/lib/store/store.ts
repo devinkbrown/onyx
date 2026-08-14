@@ -9965,15 +9965,23 @@ export const store = createStore<OnyxState>()(
           return;
         }
         if (standard.kind === 'FAIL' && standard.command === 'SESSION') {
-          clearSessionToken(get().server?.url, _connectNick || get().ourNick);
-          // A terminal resume failure invalidates the stale bearer, but a 900
-          // may already have authenticated this socket independently. Keep
-          // accepting the freshly-queued SESSION TOKEN only for that proven
-          // account; an ordinary guest remains unable to persist token notes.
-          _sessionTokenWritesAllowed = Boolean(_saslAccount || get().server?.account);
-          _credentialTokenCanonicalOnly = true;
-          get().client?.clearResumeTokens?.();
-          _clearSessionRestore(set);
+          // SESSION is also the namespace for LIST and DROP failures. Those do
+          // not say anything about the resume bearer and must never erase it.
+          // The daemon reserves INVALID_TOKEN and NO_SESSION for terminal
+          // RESUME rejection; retryable resume conditions arrive as WARN.
+          const resumeCredentialRejected = standard.code === 'INVALID_TOKEN'
+            || standard.code === 'NO_SESSION';
+          if (resumeCredentialRejected) {
+            clearSessionToken(get().server?.url, _connectNick || get().ourNick);
+            // A terminal resume failure invalidates the stale bearer, but a 900
+            // may already have authenticated this socket independently. Keep
+            // accepting the freshly-queued SESSION TOKEN only for that proven
+            // account; an ordinary guest remains unable to persist token notes.
+            _sessionTokenWritesAllowed = Boolean(_saslAccount || get().server?.account);
+            _credentialTokenCanonicalOnly = true;
+            get().client?.clearResumeTokens?.();
+            _clearSessionRestore(set);
+          }
           get().addNotification({ type: 'error', text: standard.description || `SESSION ${standard.code}` });
           return;
         }

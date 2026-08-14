@@ -247,6 +247,8 @@ export class IRCClient {
   private _registered = false;
   /** True once SASL has succeeded (903). Allows a fresh session to request a resume token. */
   private _loggedIn = false;
+  /** Account that authorized this transport's current SESSION generation. */
+  private _sessionAccount: string | null = null;
   /** Prevent duplicate post-registration SESSION commands on one connection. */
   private _sessionCommandsSent = false;
   private _saslPending = false;
@@ -387,6 +389,7 @@ export class IRCClient {
     this.opts.nick = this._authNick;
     this._registered = false;
     this._loggedIn = false;
+    this._sessionAccount = null;
     this._sessionCommandsSent = false;
     this._saslPending = false;
     this._capNegotiating = true;
@@ -1037,9 +1040,28 @@ export class IRCClient {
         // account-scoped, so passwordless reconnects must wait for this proof
         // instead of replaying a bearer while they are still a guest.
         if (msg.params.length >= 4 && msg.params[2]) {
+          const account = msg.params[2];
+          if (this._sessionAccount !== null
+            && this._sessionAccount.toLowerCase() !== account.toLowerCase()) {
+            // IDENTIFY can switch accounts on an already-registered socket.
+            // The old bearer selects a row owned by the old account, so never
+            // replay it into the new account's SESSION generation. Request a
+            // fresh TOKEN only; durable credentials remain separately keyed in
+            // the store.
+            this.clearResumeTokens();
+            this._sessionCommandsSent = false;
+          }
+          this._sessionAccount = account;
           this._loggedIn = true;
           if (this._registered) this._sendSessionCommandsAfterAuthentication();
         }
+        break;
+
+      case '901': // RPL_LOGGEDOUT
+        this._loggedIn = false;
+        this._sessionAccount = null;
+        this._sessionCommandsSent = false;
+        this.clearResumeTokens();
         break;
 
       case '904': // ERR_SASLFAIL (during SASL only)

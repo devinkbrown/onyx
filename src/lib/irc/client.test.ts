@@ -642,6 +642,35 @@ describe('IRCClient session-resume token lifecycle', () => {
     expect(sent.filter(line => line === 'SESSION TOKEN\r\n')).toHaveLength(1);
   });
 
+  it('starts a token-only SESSION generation after switching accounts', () => {
+    const { client, sent, feed001, feed900 } = makeSessionClient({ meshToken: 'old-account-token' });
+    const priv = client as unknown as { _onMessage(ev: { data: string }): void };
+    feed001();
+    feed900();
+    expect(sent).toContain('SESSION RESUME old-account-token\r\n');
+
+    priv._onMessage({
+      data: ':eshmaki.me 900 onyx onyx!web@example second :You are now logged in as second',
+    });
+
+    expect(sent.filter(line => line === 'SESSION TOKEN\r\n')).toHaveLength(2);
+    expect(sent.filter(line => line.startsWith('SESSION RESUME '))).toEqual([
+      'SESSION RESUME old-account-token\r\n',
+    ]);
+  });
+
+  it('can request a fresh token after logout and re-identify on one transport', () => {
+    const { client, sent, feed001, feed900 } = makeSessionClient({ sessionToken: 'old-token' });
+    const priv = client as unknown as { _onMessage(ev: { data: string }): void };
+    feed001();
+    feed900();
+    priv._onMessage({ data: ':eshmaki.me 901 onyx onyx!web@example :You are now logged out' });
+    feed900();
+
+    expect(sent.filter(line => line === 'SESSION TOKEN\r\n')).toHaveLength(2);
+    expect(sent.filter(line => line === 'SESSION RESUME old-token\r\n')).toHaveLength(1);
+  });
+
   it('requests a session token when a connected guest signs in later', () => {
     const { sent, feed001, feed900 } = makeSessionClient();
     feed001();

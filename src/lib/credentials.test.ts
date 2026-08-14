@@ -199,7 +199,7 @@ describe('credentials persistence', () => {
   it('preserves a live session token when the same credentials are saved again', () => {
     saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
     storeSessionToken('session-token', 1_800_000_000);
-    storeMeshToken('mesh-token');
+    storeMeshToken('mesh-token', 1_800_000_000);
 
     saveCredentials({ nick: 'alice', server: 'IRC.EXAMPLE/', password: 'pw' });
 
@@ -209,7 +209,7 @@ describe('credentials persistence', () => {
       password: 'pw',
       sessionToken: 'session-token',
       meshToken: 'mesh-token',
-      tokenExpiry: '2027-01-15T08:00:00.000Z',
+      meshTokenExpiry: '2027-01-15T08:00:00.000Z',
     });
   });
 
@@ -224,7 +224,7 @@ describe('credentials persistence', () => {
     expect(credentials).toMatchObject({ password: 'new' });
     expect(credentials?.sessionToken).toBeUndefined();
     expect(credentials?.meshToken).toBeUndefined();
-    expect(credentials?.tokenExpiry).toBeUndefined();
+    expect(credentials?.meshTokenExpiry).toBeUndefined();
   });
 
   it('stores a session token on the active credentials and rekeys canonical nick changes', () => {
@@ -238,7 +238,6 @@ describe('credentials persistence', () => {
     expect(stored.entries['irc.example|alice']).toMatchObject({
       nick: 'Alice',
       sessionToken: 'session-token',
-      tokenExpiry: '2027-01-15T08:00:00.000Z',
     });
     expect(localStorage.getItem(SAVED_NICK_KEY)).toBe('Alice');
   });
@@ -254,7 +253,7 @@ describe('credentials persistence', () => {
     expect(stored.entries['irc.example|alice']).toMatchObject({
       nick: 'Alice',
       meshToken: 'mesh-token',
-      tokenExpiry: '2027-01-15T08:00:00.000Z',
+      meshTokenExpiry: '2027-01-15T08:00:00.000Z',
     });
     expect(localStorage.getItem(SAVED_NICK_KEY)).toBe('Alice');
   });
@@ -272,7 +271,7 @@ describe('credentials persistence', () => {
       password: 'canonical-pw',
       sessionToken: 'session-token',
       meshToken: 'mesh-token',
-      tokenExpiry: '2027-01-15T08:00:00.000Z',
+      meshTokenExpiry: '2027-01-15T08:00:00.000Z',
     });
     expect(loadCredentials('irc.example', 'Alice_')).toMatchObject({
       nick: 'Alice_',
@@ -352,7 +351,7 @@ describe('credentials persistence', () => {
     expect(credentials).toMatchObject({ password: 'pw' });
     expect(credentials?.sessionToken).toBeUndefined();
     expect(credentials?.meshToken).toBeUndefined();
-    expect(credentials?.tokenExpiry).toBeUndefined();
+    expect(credentials?.meshTokenExpiry).toBeUndefined();
   });
 
   it('purges expired tokens on read without deleting the base credentials', () => {
@@ -374,15 +373,17 @@ describe('credentials persistence', () => {
 
     const credentials = loadCredentials();
     expect(credentials).toMatchObject({ nick: 'Alice', password: 'pw' });
-    expect(credentials?.sessionToken).toBeUndefined();
+    // The legacy v2 expiry governed the portable bearer. Migration must keep
+    // the still-valid node-local fallback while expiring only MTOKEN.
+    expect(credentials?.sessionToken).toBe('expired-session');
     expect(credentials?.meshToken).toBeUndefined();
-    expect(credentials?.tokenExpiry).toBeUndefined();
+    expect(credentials?.meshTokenExpiry).toBeUndefined();
 
     const stored = readStoredCredentials().entries['irc.example|alice'];
     expect(stored).toMatchObject({ nick: 'Alice', password: 'pw' });
-    expect(stored?.sessionToken).toBeUndefined();
+    expect(stored?.sessionToken).toBe('expired-session');
     expect(stored?.meshToken).toBeUndefined();
-    expect(stored?.tokenExpiry).toBeUndefined();
+    expect(stored?.meshTokenExpiry).toBeUndefined();
   });
 
   it('fails closed for a token with an invalid expiry', () => {
@@ -407,35 +408,50 @@ describe('credentials persistence', () => {
     expect(loadCredentials()?.meshToken).toBeUndefined();
   });
 
-  it('records a tokenExpiry when a mesh token is stored with an expiry, and purges it', () => {
+  it('records a meshTokenExpiry and purges only the portable token', () => {
     saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
+    storeSessionToken('session-token');
     // 1_800_000_000s = 2027-01-15T08:00:00Z — well after the frozen NOW.
     storeMeshToken('mesh-token', 1_800_000_000);
 
     expect(loadCredentials()).toMatchObject({
       meshToken: 'mesh-token',
-      tokenExpiry: '2027-01-15T08:00:00.000Z',
+      meshTokenExpiry: '2027-01-15T08:00:00.000Z',
     });
 
     // Jump past the recorded expiry — the mesh token is evicted on read.
     vi.setSystemTime(new Date('2027-02-01T00:00:00.000Z'));
     const purged = loadCredentials();
     expect(purged).toMatchObject({ nick: 'Alice', password: 'pw' });
+    expect(purged?.sessionToken).toBe('session-token');
     expect(purged?.meshToken).toBeUndefined();
-    expect(purged?.tokenExpiry).toBeUndefined();
+    expect(purged?.meshTokenExpiry).toBeUndefined();
   });
 
-  it('leaves an existing token expiry untouched when a mesh token is stored without one', () => {
+  it('leaves an existing mesh expiry untouched when a mesh token is stored without one', () => {
     saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
-    storeSessionToken('session-token', 1_800_000_000);
-    // No expiry arg: must NOT clobber the session token's governing expiry.
+    storeSessionToken('session-token');
+    storeMeshToken('mesh-token', 1_800_000_000);
+    // A legacy/no-expiry rotation must not clobber the existing mesh deadline.
     storeMeshToken('mesh-token');
 
     expect(loadCredentials()).toMatchObject({
       sessionToken: 'session-token',
       meshToken: 'mesh-token',
-      tokenExpiry: '2027-01-15T08:00:00.000Z',
+      meshTokenExpiry: '2027-01-15T08:00:00.000Z',
     });
+  });
+
+  it('does not carry an old mesh expiry onto a different legacy token', () => {
+    saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
+    storeMeshToken('old-mesh-token', 1_800_000_000);
+
+    storeMeshToken('rotated-without-expiry');
+
+    expect(loadCredentials()).toMatchObject({
+      meshToken: 'rotated-without-expiry',
+    });
+    expect(loadCredentials()?.meshTokenExpiry).toBeUndefined();
   });
 
   it('parses handoffs by trimming, truncating, deduplicating, and capping entries', () => {
