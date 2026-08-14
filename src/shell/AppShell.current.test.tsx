@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import 'fake-indexeddb/auto';
 
-import { cleanup, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,5 +58,17 @@ describe('AppShell room current', () => {
     expect(current).toHaveAttribute('data-shell-current-kind', 'room');
     expect(current.textContent).toContain('Room current');
     expect(current.textContent).not.toMatch(/encrypt|secure|protect/i);
+  });
+
+  it('returns focus to the Context trigger when the rail closes', async () => {
+    render(() => <AppShell />);
+    const trigger = screen.getByRole('button', { name: 'Context' });
+    fireEvent.click(trigger);
+    const close = screen.getByRole('button', { name: 'Close room context' });
+    close.focus();
+    fireEvent.click(close);
+    await Promise.resolve();
+    expect(trigger).toHaveFocus();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 });

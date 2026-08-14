@@ -1798,7 +1798,7 @@ describe('AppShell', () => {
       expect(screen.getByRole('button', { name: 'Open Home' })).toHaveAttribute('aria-current', 'page');
     });
 
-    it('uses the public five-part information architecture on mobile', () => {
+    it('keeps mobile navigation focused and exposes Calls and You through More', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
@@ -1807,10 +1807,15 @@ describe('AppShell', () => {
       expect(within(nav).getAllByRole('button').map((button) => button.textContent)).toEqual([
         '⌂Home',
         '#Rooms',
-        '@Messages',
-        '◉Calls',
-        '◇You',
+        '@Inbox',
+        '•••More',
       ]);
+      expect(within(nav).queryByRole('button', { name: /Calls|You/ })).toBeNull();
+
+      fireEvent.click(within(nav).getByRole('button', { name: 'Open More' }));
+      const more = screen.getByRole('dialog', { name: 'More destinations' });
+      expect(within(more).getByRole('button', { name: 'Calls' })).toBeInTheDocument();
+      expect(within(more).getByRole('button', { name: 'You' })).toBeInTheDocument();
     });
 
     it('opens direct messages as their own mobile collection', async () => {
@@ -1818,12 +1823,12 @@ describe('AppShell', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Open Messages' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open Inbox' }));
 
-      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
+      const drawer = screen.getByRole('dialog', { name: 'Inbox switcher' });
       expect(within(drawer).getByRole('region', { name: 'Messages · 0 conversations' })).toBeInTheDocument();
       expect(within(drawer).getByRole('searchbox', { name: 'Filter direct messages' })).toBeInTheDocument();
-      const messages = screen.getByRole('button', { name: 'Open Messages' });
+      const messages = screen.getByRole('button', { name: 'Open Inbox' });
       expect(messages).not.toHaveAttribute('aria-current');
       expect(messages).toHaveAttribute('aria-pressed', 'true');
     });
@@ -1832,24 +1837,25 @@ describe('AppShell', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Open Calls' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open More' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'More destinations' })).getByRole('button', { name: 'Calls' }));
 
       expect(screen.getByRole('heading', { name: 'Talk where the conversation already lives.' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Choose a room' })).toBeInTheDocument();
       expect(store.getState().voice.callState).toBe('idle');
-      expect(screen.getByRole('button', { name: 'Open Calls' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.queryByRole('dialog', { name: 'More destinations' })).not.toBeInTheDocument();
+      expect(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: 'Calls' })).toHaveAttribute('aria-current', 'page');
     });
 
     it('opens account management from You', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Open You' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open More' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'More destinations' })).getByRole('button', { name: 'You' }));
 
       expect(store.getState().showAccount).toBe(true);
-      const you = screen.getByRole('button', { name: 'Open You' });
-      expect(you).not.toHaveAttribute('aria-current');
-      expect(you).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.queryByRole('dialog', { name: 'More destinations' })).not.toBeInTheDocument();
       const primary = screen.getByRole('navigation', { name: 'Primary' });
       const desktopYou = within(primary).getByRole('button', { name: 'You' });
       expect(desktopYou).not.toHaveAttribute('aria-current');
@@ -1871,7 +1877,7 @@ describe('AppShell', () => {
       roomsButton.focus();
       fireEvent.click(roomsButton);
 
-      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
+      const drawer = screen.getByRole('dialog', { name: 'Room switcher' });
       await waitFor(() => {
         expect(drawer.contains(document.activeElement)).toBe(true);
         expect(drawer).not.toHaveAttribute('inert');
@@ -1882,7 +1888,7 @@ describe('AppShell', () => {
       fireEvent.keyDown(document, { key: 'Escape' });
 
       await waitFor(() => {
-        expect(screen.queryByRole('dialog', { name: 'Channel drawer' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('dialog', { name: 'Room switcher' })).not.toBeInTheDocument();
         expect(conversation).not.toHaveAttribute('inert');
         expect(mobileNav).not.toHaveAttribute('inert');
         expect(roomsButton).toHaveFocus();
@@ -1895,16 +1901,16 @@ describe('AppShell', () => {
 
       render(() => <AppShell />);
       fireEvent.click(screen.getByRole('button', { name: 'Open Rooms' }));
-      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
+      const drawer = screen.getByRole('dialog', { name: 'Room switcher' });
       await waitFor(() => expect(drawer.contains(document.activeElement)).toBe(true));
 
       fireEvent.keyDown(document, { key: 'Escape', isComposing: true });
-      expect(screen.getByRole('dialog', { name: 'Channel drawer' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Room switcher' })).toBeInTheDocument();
 
       const claimed = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
       claimed.preventDefault();
       document.dispatchEvent(claimed);
-      expect(screen.getByRole('dialog', { name: 'Channel drawer' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Room switcher' })).toBeInTheDocument();
 
       fireEvent.keyDown(document, { key: 'Escape' });
       await waitFor(() => {

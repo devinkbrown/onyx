@@ -35,14 +35,15 @@ export type ChannelSidebarProps = {
   onMobileClose?: () => void;
   /** Which conversation collection is visible below the primary navigation. */
   mode?: 'rooms' | 'messages';
-  /** Primary product navigation callbacks are owned by AppShell. */
-  onModeChange?: (mode: 'rooms' | 'messages') => void;
+  /** Retained as a compatibility seam for embedded/test hosts; the dock owns it. */
+  activeSection?: PrimaryCurrentSection | null;
+  youDialogOpen?: boolean;
   onOpenHome?: () => void;
   onOpenCalls?: () => void;
   onOpenYou?: () => void;
+  /** Primary product navigation callbacks are owned by AppShell. */
+  onModeChange?: (mode: 'rooms' | 'messages') => void;
   onConversationOpen?: () => void;
-  activeSection?: PrimaryCurrentSection | null;
-  youDialogOpen?: boolean;
 };
 
 type NavigationViewTransition = {
@@ -483,21 +484,10 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   }
 
   function handlePrimarySelect(section: PrimarySection): void {
-    switch (section) {
-      case 'home':
-        local.onOpenHome?.();
-        break;
-      case 'rooms':
-      case 'messages':
-        local.onModeChange?.(section);
-        break;
-      case 'calls':
-        local.onOpenCalls?.();
-        break;
-      case 'you':
-        local.onOpenYou?.();
-        break;
-    }
+    if (section === 'home') local.onOpenHome?.();
+    else if (section === 'rooms' || section === 'messages') local.onModeChange?.(section);
+    else if (section === 'calls') local.onOpenCalls?.();
+    else local.onOpenYou?.();
   }
 
   function renderChannelRow(ch: Channel): JSX.Element {
@@ -579,13 +569,15 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         <NotificationControls />
       </div>
 
-      <PrimaryNavigation
-        variant="desktop"
-        currentSection={local.activeSection}
-        selectedCollection={sidebarMode()}
-        youDialogOpen={local.youDialogOpen}
-        onSelect={handlePrimarySelect}
-      />
+      <Show when={Boolean(local.onOpenHome || local.onOpenCalls || local.onOpenYou || local.activeSection || local.youDialogOpen)}>
+        <PrimaryNavigation
+          variant="desktop"
+          currentSection={local.activeSection}
+          selectedCollection={sidebarMode()}
+          youDialogOpen={local.youDialogOpen}
+          onSelect={handlePrimarySelect}
+        />
+      </Show>
 
       <div class="shell-sidebar-filter" role="search">
         <label class="sr-only" for="sidebar-filter-input">

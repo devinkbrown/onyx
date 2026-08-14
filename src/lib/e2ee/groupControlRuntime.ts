@@ -110,7 +110,9 @@ export type GroupControlRuntimeCounters = {
 export type GroupControlRuntimeState = {
   generation: number;
   lifecycle: GroupControlRuntimeLifecycle;
-  activation: 'hold';
+  /** Message protection is active only when at least one live room session is
+   * provisioned and control-applied in the ready lifecycle. */
+  activation: 'hold' | 'active';
   identity: {
     clientId: string | null;
     endpoint: string | null;
@@ -152,6 +154,13 @@ export type GroupControlRuntimeProvisionResult =
   | { ok: true; room: string; replaced: boolean }
   | { ok: false; reason: GroupControlRuntimeReason };
 
+export type GroupControlRuntimeSealResult =
+  | { ok: true; status: 'sealed'; room: string; epoch: number; envelope: string }
+  | { ok: false; status: 'locked'; reason: GroupControlRuntimeReason | 'destroyed' | 'room-mismatch' | 'epoch-unavailable' | 'seal-failed' | 'open-failed' };
+export type GroupControlRuntimeOpenResult =
+  | { ok: true; status: 'opened'; room: string; epoch: number; plaintext: string }
+  | { ok: false; status: 'locked'; reason: GroupControlRuntimeReason | 'destroyed' | 'room-mismatch' | 'epoch-unavailable' | 'seal-failed' | 'open-failed' };
+
 export type GroupControlRuntime = {
   readonly generation: number;
   readonly isDetached: boolean;
@@ -164,6 +173,8 @@ export type GroupControlRuntime = {
   acceptControl(message: IRCMessage | string): Promise<GroupControlRuntimeOutcome>;
   ingest(message: IRCMessage | string): Promise<GroupControlRuntimeOutcome>;
   registerProvisionedSession(session: GroupSession): GroupControlRuntimeProvisionResult;
+  sealRoomMessage(room: string, plaintext: string): Promise<GroupControlRuntimeSealResult>;
+  openRoomMessage(room: string, envelope: string): Promise<GroupControlRuntimeOpenResult>;
   removeRoom(room: string, reason?: 'part' | 'kick'): void;
   onRoomPart(room: string): void;
   onRoomKick(room: string): void;
@@ -176,7 +187,7 @@ export type GroupControlRuntime = {
   markRecovered(): boolean;
   detach(): Promise<void>;
   destroy(): Promise<void>;
-  readonly activationHeld: true;
+  readonly activationHeld: boolean;
 };
 
 type NormalizedIdentity = {
@@ -484,10 +495,13 @@ function buildRuntime(
   function snapshot(): GroupControlRuntimeState {
     const roomList = [...rooms.values()].map((entry) => ({ ...entry }));
     roomList.sort((a, b) => a.room.localeCompare(b.room));
+    const activation = lifecycle === 'ready' && roomList.some((entry) => (
+      entry.status === 'control-applied' && entry.provisioned
+    )) ? 'active' : 'hold';
     return {
       generation,
       lifecycle,
-      activation: 'hold',
+      activation,
       identity: {
         clientId: identity?.clientId ?? null,
         endpoint: identity?.endpoint ?? null,
@@ -1353,6 +1367,36 @@ function buildRuntime(
     return { ok: true, room, replaced: false };
   }
 
+  function activeSession(room: string): { room: string; session: GroupSession } | null {
+    const normalized = roomKey(room);
+    if (!normalized || destroyedForever || detached || lifecycle !== 'ready' || !identity?.account || !identity.deviceId) return null;
+    const projection = rooms.get(normalized);
+    const session = sessions.get(normalized);
+    if (!projection || projection.status !== 'control-applied' || !projection.provisioned || !session || session.isDestroyed
+      || session.account !== identity.account || session.deviceId !== identity.deviceId) return null;
+    return { room: normalized, session };
+  }
+
+  async function sealRoomMessage(room: string, plaintext: string): Promise<GroupControlRuntimeSealResult> {
+    const active = activeSession(room);
+    if (!active) return { ok: false, status: 'locked', reason: destroyedForever || detached || lifecycle === 'inactive' ? 'runtime-inactive' : 'session-not-provisioned' };
+    const incarnation = roomIncarnation(active.room);
+    const result = await active.session.sealRoomMessage(active.room, plaintext);
+    if (!result.ok) return { ok: false, status: 'locked', reason: result.reason };
+    if (activeSession(active.room)?.session !== active.session || roomIncarnation(active.room) !== incarnation) return { ok: false, status: 'locked', reason: 'stale' };
+    return { ok: true, status: 'sealed', room: result.room, epoch: result.epoch, envelope: result.envelope };
+  }
+
+  async function openRoomMessage(room: string, envelope: string): Promise<GroupControlRuntimeOpenResult> {
+    const active = activeSession(room);
+    if (!active) return { ok: false, status: 'locked', reason: destroyedForever || detached || lifecycle === 'inactive' ? 'runtime-inactive' : 'session-not-provisioned' };
+    const incarnation = roomIncarnation(active.room);
+    const result = await active.session.openRoomMessage(active.room, envelope);
+    if (!result.ok) return { ok: false, status: 'locked', reason: result.reason };
+    if (activeSession(active.room)?.session !== active.session || roomIncarnation(active.room) !== incarnation) return { ok: false, status: 'locked', reason: 'stale' };
+    return { ok: true, status: 'opened', room: result.room, epoch: result.epoch, plaintext: result.plaintext };
+  }
+
   function removeRoom(room: string, _reason?: 'part' | 'kick'): void {
     const normalized = roomKey(room);
     if (!normalized || !roomKnown(normalized)) return;
@@ -1577,6 +1621,8 @@ function buildRuntime(
     acceptControl: accept,
     ingest: accept,
     registerProvisionedSession,
+    sealRoomMessage,
+    openRoomMessage,
     removeRoom,
     onRoomPart,
     onRoomKick,
@@ -1589,7 +1635,7 @@ function buildRuntime(
     markRecovered,
     detach,
     destroy,
-    activationHeld: true,
+    get activationHeld() { return snapshot().activation !== 'active'; },
   };
 
   runtimeAdapter = createAdapter(null);

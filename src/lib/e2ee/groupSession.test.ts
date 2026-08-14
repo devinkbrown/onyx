@@ -158,6 +158,19 @@ function bootstrapArgs(pair: Awaited<ReturnType<typeof genesisPair>>, overrides:
 }
 
 describe('pure GroupSession state machine', () => {
+  it('seals and opens only the current room/epoch and fails closed after destroy', async () => {
+    const state = session();
+    const sealed = await state.sealRoomMessage('#room', 'transient plaintext');
+    expect(sealed).toMatchObject({ ok: true, room: '#room', epoch: 0 });
+    if (!sealed.ok) return;
+    await expect(state.openRoomMessage('#room', sealed.envelope)).resolves.toMatchObject({ ok: true, plaintext: 'transient plaintext' });
+    await expect(state.openRoomMessage('#other', sealed.envelope)).resolves.toEqual({ ok: false, reason: 'room-mismatch' });
+    await expect(state.openRoomMessage('#room', `${sealed.envelope}x`)).resolves.toEqual({ ok: false, reason: 'open-failed' });
+    state.destroy();
+    await expect(state.sealRoomMessage('#room', 'nope')).resolves.toEqual({ ok: false, reason: 'destroyed' });
+    await expect(state.openRoomMessage('#room', sealed.envelope)).resolves.toEqual({ ok: false, reason: 'destroyed' });
+  });
+
   it('applies one prepared commit transactionally and zeroizes retired key material', async () => {
     const state = session();
     const prepared = await state.prepareCommit({ membershipDigest: bytes(3), commitId: bytes(4), newEpochKey: bytes(5) });
@@ -165,9 +178,7 @@ describe('pure GroupSession state machine', () => {
     expect(await state.applyPrepared(prepared!)).toEqual({ ok: false, reason: 'welcome-required' });
     expect((await state.applyPreparedLocal(prepared!, bytes(5))).ok).toBe(true);
     expect(state.epoch).toBe(1n);
-    expect(state.currentEpochKey()).toEqual(bytes(5));
     expect(state.membershipDigest()).toEqual(bytes(3));
-    expect(state.currentEpochKey()).not.toEqual(bytes(1));
   });
 
   it('rejects stale/gap epochs, duplicate ids, and same-epoch equivocation', async () => {
@@ -237,7 +248,6 @@ describe('pure GroupSession state machine', () => {
     provenance.opened.bodyDigest.fill(0);
     expect((await state.stageVerifiedWelcome(provenance.opened, provenance.resolution, { channel: '#room', kind: 'welcome', fromAccount: 'alice', fromDevice: 'sender', toAccount: 'alice', toDevice: 'phone' })).ok).toBe(true);
     state.destroy();
-    expect(state.currentEpochKey()).toBeNull();
     await expect(state.prepareCommit({ membershipDigest: bytes(3), newEpochKey: bytes(3) })).resolves.toBeNull();
     await expect(state.applyVerifiedCommit({ status: 'locked', reason: 'device-absent' }, commitRoute)).resolves.toEqual({ ok: false, reason: 'destroyed' });
   });
@@ -250,7 +260,7 @@ describe('pure GroupSession state machine', () => {
     expect((await state.stageVerifiedWelcome(welcome.opened, welcome.resolution, { channel: '#room', kind: 'welcome', fromAccount: 'alice', fromDevice: 'sender', toAccount: 'alice', toDevice: 'phone' })).ok).toBe(true);
     expect(await state.applyVerifiedCommit(verified(prepared!.body, 'commit', 'alice', 'sender'), { ...commitRoute, fromDevice: 'sender' })).toEqual({ ok: false, reason: 'welcome-mismatch' });
     expect(state.epoch).toBe(0n);
-    expect(state.currentEpochKey()).toEqual(bytes(1));
+    expect(state.membershipDigest()).toEqual(bytes(2));
   });
 
   it('consumes a failed atomic welcome pair so a corrected retry can apply', async () => {
@@ -284,7 +294,7 @@ describe('pure GroupSession state machine', () => {
     const other = GroupSession.create({ room: '#other', account: 'alice', deviceId: 'phone', epochKey: bytes(1), membershipDigest: bytes(2) })!;
     expect(await other.applyPreparedLocal(prepared!, bytes(5))).toEqual({ ok: false, reason: 'invalid-commit' });
     expect(other.epoch).toBe(0n);
-    expect(other.currentEpochKey()).toEqual(bytes(1));
+    expect(other.membershipDigest()).toEqual(bytes(2));
   });
 
   it('snapshots a local key at invocation before queued mutation can observe caller changes', async () => {
@@ -294,7 +304,7 @@ describe('pure GroupSession state machine', () => {
     const apply = state.applyPreparedLocal(prepared!, localKey);
     localKey.fill(6);
     expect((await apply).ok).toBe(true);
-    expect(state.currentEpochKey()).toEqual(bytes(5));
+    expect(state.membershipDigest()).toEqual(bytes(3));
   });
 
   it('bootstraps a verified genesis pair directly at epoch 1 and never exposes the welcome key', async () => {
@@ -310,13 +320,12 @@ describe('pure GroupSession state machine', () => {
     expect(result.commitHash).toEqual(pair.prepared.commitHash);
     expect(result.commitId).toEqual(bytes(4));
     expect(result.session.commitHash()).toEqual(pair.prepared.commitHash);
-    expect(result.session.currentEpochKey()).toEqual(bytes(5));
     expect(result.session.membershipDigest()).toEqual(bytes(3));
     expect(result).not.toHaveProperty('epochKey');
     expect(JSON.stringify({ epoch: Number(result.epoch), room: result.session.room })).not.toContain('epochKey');
     expect(consumeOpenedGroupWelcome(pair.welcome.opened)).toBeNull();
     result.session.destroy();
-    expect(result.session.currentEpochKey()).toBeNull();
+    expect(result.session.isDestroyed).toBe(true);
   });
 
   it('does not weaken create() and still rejects a non-genesis zero anchor', () => {

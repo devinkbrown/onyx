@@ -5,7 +5,7 @@ import { stubPublicFeeds } from './public-feed-fixture';
 test.describe('Onyx landing', () => {
   test('hero loads with the current headline', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toHaveText('A room for your people.');
+    await expect(page.locator('h1')).toHaveText('Make room for the conversations that matter.');
   });
 
   test('kicker + primary CTAs render', async ({ page }) => {

@@ -42,13 +42,14 @@ describe('Landing', () => {
     expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Threshold\s*·\s*Home/);
   });
 
-  it('keeps exactly one primary Open Onyx CTA in the shared public frame', () => {
+  it('keeps the shared header entry and gives the hero an explicit next action', () => {
     const { getAllByRole, container } = render(() => <Landing />);
     const openOnyx = getAllByRole('link', { name: 'Open Onyx' });
-    expect(openOnyx).toHaveLength(1);
+    expect(openOnyx).toHaveLength(2);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');
     expect(openOnyx[0]).toHaveClass('public-frame__open');
-    expect(container.querySelectorAll('a.r-btn.primary, a.home-cta-primary')).toHaveLength(0);
+    expect(container.querySelector('a.home-cta-primary')).toHaveAttribute('href', '/app/');
+    expect(getAllByRole('link', { name: 'Downloads' }).some((link) => link.getAttribute('href') === '/download/')).toBe(true);
   });
 
   it('derives every public destination link from manifest hrefs', () => {
@@ -73,13 +74,15 @@ describe('Landing', () => {
     ]);
   });
 
-  it('preserves the explicit Preview and not-live aperture wording', () => {
-    const { getAllByText, getByText, container } = render(() => <Landing />);
-    expect(getAllByText('Preview').length).toBeGreaterThan(0);
-    expect(getByText(/Not live content/i)).toBeInTheDocument();
-    expect(container.querySelector('[data-home-aperture]')).toBeTruthy();
-    expect(container.querySelector('[data-home-aperture] [role="img"]')).toHaveAccessibleName(/not live content/i);
-    expect(container.querySelector('[data-home-aperture]')!.textContent).not.toMatch(/mira|Room is open/i);
+  it('keeps the product preview static, stateful, and free of fabricated people or messages', () => {
+    const { getByRole, getByText, container } = render(() => <Landing />);
+    const preview = container.querySelector('[data-product-preview]');
+    expect(preview).toHaveAttribute('data-preview-state', 'rooms');
+    expect(getByText(/not live rooms, people, messages/i)).toBeInTheDocument();
+    fireEvent.keyDown(getByRole('tab', { name: 'Rooms' }), { key: 'ArrowRight' });
+    expect(preview).toHaveAttribute('data-preview-state', 'continuity');
+    expect(getByRole('tab', { name: 'Continuity' })).toHaveAttribute('aria-selected', 'true');
+    expect(preview!.textContent).not.toMatch(/mira|Room is open/i);
   });
 
   it('labels the evidence rail with source, state, scope, and a Status ledger link', () => {

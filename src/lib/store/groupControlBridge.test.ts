@@ -291,6 +291,21 @@ describe('group-control store bridge', () => {
     expect((h.accept.mock.calls[0]?.[0] as { raw: string }).raw).toContain('E2EE.COMMIT');
   });
 
+  it('exposes no key material and fails closed when its runtime owner is unavailable', async () => {
+    const h = harness({ account: 'alice' });
+    await expect(h.bridge.sealRoomMessage('#room', 'transient plaintext')).resolves.toEqual({
+      ok: false, status: 'locked', reason: 'session-not-provisioned',
+    });
+    await expect(h.bridge.openRoomMessage('#room', 'ONYXROOM1 malformed')).resolves.toEqual({
+      ok: false, status: 'locked', reason: 'session-not-provisioned',
+    });
+    expect(JSON.stringify(h.bridge)).not.toMatch(/key|epochKey|privateKey/u);
+    await h.bridge.destroy();
+    await expect(h.bridge.sealRoomMessage('#room', 'after destroy')).resolves.toEqual({
+      ok: false, status: 'locked', reason: 'runtime-inactive',
+    });
+  });
+
   it('uses authenticated accounts only, omits device id, and scopes durable adapters exactly', async () => {
     const h = harness({ account: null });
     h.bridge.start();

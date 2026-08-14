@@ -52,21 +52,16 @@ export function selectGroupControlRoomStatus(
   return selectGroupControlRoom(projection, room)?.status ?? null;
 }
 
-/** Group message encryption remains held for this packet. */
 export function selectGroupControlActivation(
   projection: GroupControlProjection,
-): 'hold' {
-  // Keep the literal explicit even when no runtime has been provisioned.
+): 'hold' | 'active' {
   return projection?.activation ?? 'hold';
 }
 
 export function selectGroupControlActivationHeld(
   projection: GroupControlProjection,
-): true {
-  // The runtime contract is activation-held by construction. This selector is
-  // intentionally not a readiness/encryption predicate.
-  void projection;
-  return true;
+): boolean {
+  return selectGroupControlActivation(projection) !== 'active';
 }
 
 export function selectGroupControlQueueDepth(

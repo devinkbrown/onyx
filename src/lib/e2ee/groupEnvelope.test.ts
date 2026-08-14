@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   GROUP_ENVELOPE_PREFIX,
+  MAX_GROUP_ENVELOPE_WIRE_BYTES,
+  MAX_GROUP_PLAINTEXT_BYTES,
   GROUP_LOCKED_PLACEHOLDER,
   buildGroupAad,
   groupMessageDisplayText,
@@ -38,6 +40,17 @@ describe('groupEnvelope (C1 foundation)', () => {
     expect(parts?.keyEpoch).toBe(7);
     // Normalized room form opens the same AAD.
     await expect(openGroupMessage(key, '#root', envelope!, 7)).resolves.toBe('hello #root');
+  });
+
+  it('never produces a room envelope above the daemon wire ceiling', async () => {
+    const key = await testKey();
+    const maximum = await sealGroupMessage(key, '#root', 7, 'x'.repeat(MAX_GROUP_PLAINTEXT_BYTES));
+    expect(maximum).toBeTruthy();
+    expect(maximum!.length).toBeLessThanOrEqual(MAX_GROUP_ENVELOPE_WIRE_BYTES);
+    await expect(openGroupMessage(key, '#root', maximum!, 7)).resolves
+      .toBe('x'.repeat(MAX_GROUP_PLAINTEXT_BYTES));
+    await expect(sealGroupMessage(key, '#root', 7, 'x'.repeat(MAX_GROUP_PLAINTEXT_BYTES + 1)))
+      .resolves.toBeNull();
   });
 
   it('fails closed on wrong key or epoch', async () => {

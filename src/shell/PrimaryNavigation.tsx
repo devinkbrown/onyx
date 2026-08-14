@@ -8,7 +8,7 @@
  * only marks the current top-level surface.
  */
 
-import { For, splitProps, type JSX } from 'solid-js';
+import { For, Show, splitProps, type JSX } from 'solid-js';
 
 export type PrimarySection = 'home' | 'rooms' | 'messages' | 'calls' | 'you';
 export type PrimaryCurrentSection = Exclude<PrimarySection, 'you'>;
@@ -27,6 +27,9 @@ export type PrimaryNavigationProps = {
   youDialogOpen?: boolean;
   /** Focus return target for the mobile Rooms drawer trigger. */
   mobileRoomsButtonRef?: (element: HTMLButtonElement) => void;
+  /** Mobile keeps Calls and You in the More sheet without losing either destination. */
+  moreOpen?: boolean;
+  onOpenMore?: () => void;
   onSelect: (section: PrimarySection) => void;
 };
 
@@ -44,6 +47,12 @@ const NAVIGATION_ITEMS: readonly NavigationItem[] = [
   { section: 'you', label: 'You', glyph: '◇' },
 ];
 
+const MOBILE_ITEMS: readonly NavigationItem[] = [
+  { section: 'home', label: 'Home', glyph: '⌂' },
+  { section: 'rooms', label: 'Rooms', glyph: '#' },
+  { section: 'messages', label: 'Inbox', glyph: '@' },
+];
+
 function isCollection(section: PrimarySection): section is PrimaryCollection {
   return section === 'rooms' || section === 'messages';
 }
@@ -56,6 +65,8 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
     'expandedCollection',
     'youDialogOpen',
     'mobileRoomsButtonRef',
+    'moreOpen',
+    'onOpenMore',
     'onSelect',
   ]);
 
@@ -108,6 +119,23 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
     );
   };
 
+  const renderMore = (): JSX.Element => (
+    <button
+      type="button"
+      class={`shell-mobile-nav-btn${local.moreOpen ? ' shell-mobile-nav-btn--dialog-open' : ''}`}
+      data-primary-nav-item
+      data-section="more"
+      aria-label="Open More"
+      aria-expanded={local.moreOpen}
+      aria-haspopup="dialog"
+      title="Open More"
+      onClick={() => local.onOpenMore?.()}
+    >
+      <span class="shell-mobile-nav-icon" aria-hidden="true">•••</span>
+      More
+    </button>
+  );
+
   return (
     <nav
       class={isMobile() ? 'shell-mobile-nav' : 'shell-primary-nav'}
@@ -116,7 +144,8 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
       data-primary-navigation-variant={local.variant}
     >
       {!isMobile() && <span class="shell-primary-nav-context">Quick switch</span>}
-      <For each={NAVIGATION_ITEMS}>{renderItem}</For>
+      <For each={isMobile() ? MOBILE_ITEMS : NAVIGATION_ITEMS}>{renderItem}</For>
+      <Show when={isMobile()}>{renderMore()}</Show>
     </nav>
   );
 }

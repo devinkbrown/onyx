@@ -56,6 +56,22 @@ describe('GroupControlRoomIndicator', () => {
     expect(indicator.textContent?.toLowerCase()).not.toContain('ready');
   });
 
+  it('reports active protection only from the explicit active projection', () => {
+    render(() => <GroupControlRoomIndicator
+      room="#lobby"
+      authenticated
+      projection={state({
+        activation: 'active',
+        rooms: [{ room: '#lobby', status: 'control-applied', provisioned: true }],
+      })}
+    />);
+    const indicator = screen.getByTestId('group-control-room-indicator');
+    expect(indicator).toHaveAttribute('data-state', 'active');
+    expect(indicator).toHaveTextContent('Message protection: ready');
+    expect(indicator).toHaveTextContent('Protection session ready on this device; room policy is reported separately');
+    expect(indicator).not.toHaveTextContent('Room messages are protected');
+  });
+
   it('fails closed while signed out and never renders for non-channel views', () => {
     render(() => <GroupControlRoomIndicator
       room="#lobby"

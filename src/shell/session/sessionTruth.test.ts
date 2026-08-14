@@ -145,7 +145,7 @@ describe('projectSessionTruth', () => {
     expect(identity.value).toBe('Authenticated as alice');
   });
 
-  it('keeps group-message protection inactive for every control permutation', () => {
+  it('keeps group-message protection inactive for every activation-held control permutation', () => {
     const lifecycles: GroupControlRuntimeLifecycle[] = [
       'inactive', 'identity-pending', 'ready', 'recovery-required',
     ];
@@ -170,11 +170,27 @@ describe('projectSessionTruth', () => {
             }));
             const protection = findSessionTruthFact(projection, 'group-message-protection');
             expect(protection.value).toBe('Not active');
-            expect(protection.detail).toBe('Room controls do not currently protect group messages.');
+            expect(protection.detail).toBe('This room does not currently have an active message-protection session on this device.');
           }
         }
       }
     }
+  });
+
+  it('reports active group-message protection only for an active provisioned room', () => {
+    const activeRuntime = runtime('ready', 'control-applied');
+    activeRuntime.activation = 'active';
+    activeRuntime.rooms = [{ room: '#lobby', status: 'control-applied', provisioned: true, epoch: 1 }];
+    const protection = findSessionTruthFact(projectSessionTruth(baseInput({
+      authenticatedAccount: 'alice',
+      room: '#lobby',
+      groupControl: activeRuntime,
+    })), 'group-message-protection');
+    expect(protection).toMatchObject({
+      value: 'Protection ready',
+      detail: 'This device can seal and open supported encrypted room messages. Room policy enforcement is reported separately.',
+      tone: 'positive',
+    });
   });
 
   it('reports applied group controls without promoting group-message protection', () => {

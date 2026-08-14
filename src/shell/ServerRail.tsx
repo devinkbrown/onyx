@@ -11,16 +11,21 @@
 
 import { createMemo, Show, splitProps, type JSX } from 'solid-js';
 import { useStore } from '@/lib/store';
+import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
 
 export type ServerRailProps = {
   /** Called when the user clicks [disconnect] */
   onDisconnect?: () => void;
   /** Currently active server id (for the active indicator) */
   activeServerId?: string;
+  currentSection?: PrimaryCurrentSection | null;
+  selectedCollection?: 'rooms' | 'messages' | null;
+  youDialogOpen?: boolean;
+  onSelect?: (section: PrimarySection) => void;
 };
 
 export function ServerRail(props: ServerRailProps): JSX.Element {
-  const [local] = splitProps(props, ['onDisconnect', 'activeServerId']);
+  const [local] = splitProps(props, ['onDisconnect', 'activeServerId', 'currentSection', 'selectedCollection', 'youDialogOpen', 'onSelect']);
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
 
@@ -69,6 +74,14 @@ export function ServerRail(props: ServerRailProps): JSX.Element {
       </div>
 
       <div class="shell-rail-sep" aria-hidden="true" />
+
+      <PrimaryNavigation
+        variant="desktop"
+        currentSection={local.currentSection}
+        selectedCollection={local.selectedCollection}
+        youDialogOpen={local.youDialogOpen}
+        onSelect={(section) => local.onSelect?.(section)}
+      />
 
       {/* Bottom controls */}
       <div class="shell-rail-bottom">

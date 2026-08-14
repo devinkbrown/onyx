@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import 'fake-indexeddb/auto';
+import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { GroupControlRuntimeState } from '@/lib/e2ee/groupControlRuntime';
+import { _resetVaultForTests, loadOutbox } from '@/lib/vault/historyVault';
 
 const bridgeMocks = vi.hoisted(() => ({
   sequence: 0,
@@ -33,6 +36,8 @@ vi.mock('./groupControlBridge', () => ({
       }),
       onRoomPart: vi.fn((room: string) => event(`part:${room}`)),
       onRoomKick: vi.fn((room: string) => event(`kick:${room}`)),
+      sealRoomMessage: vi.fn(async () => ({ ok: false as const, status: 'locked' as const, reason: 'session-not-provisioned' as const })),
+      openRoomMessage: vi.fn(async () => ({ ok: false as const, status: 'locked' as const, reason: 'session-not-provisioned' as const })),
       destroy: vi.fn(async () => { event('destroy'); }),
     };
     bridgeMocks.bridges.push(bridge);
@@ -96,6 +101,8 @@ function currentBridge() {
     setAuthenticatedAccount: ReturnType<typeof vi.fn>;
     onRoomPart: ReturnType<typeof vi.fn>;
     onRoomKick: ReturnType<typeof vi.fn>;
+    sealRoomMessage: ReturnType<typeof vi.fn>;
+    openRoomMessage: ReturnType<typeof vi.fn>;
     destroy: ReturnType<typeof vi.fn>;
   };
 }
@@ -104,6 +111,8 @@ describe('store group-control lifecycle ownership', () => {
   beforeEach(() => {
     store.getState().disconnect();
     store.setState(initialState, true);
+    globalThis.indexedDB = new IDBFactory();
+    _resetVaultForTests();
     localStorage.clear();
     bridgeMocks.sequence = 0;
     bridgeMocks.events.length = 0;
@@ -198,6 +207,124 @@ describe('store group-control lifecycle ownership', () => {
     expect(store.getState().groupControlRuntime).toBeNull();
     expect(bridgeMocks.events.indexOf('bridge-1:destroy'))
       .toBeLessThan(bridgeMocks.events.indexOf('socket-1:close'));
+  });
+
+  it('seals required-room plaintext before wire admission and keeps plaintext transient', async () => {
+    store.getState().connect({ url: 'wss://example.test/irc', nick: 'alice' });
+    receive(':example.test 001 alice :Welcome');
+    const bridge = currentBridge();
+    bridge.sealRoomMessage.mockResolvedValueOnce({ ok: true, status: 'sealed', room: '#secure', epoch: 1, envelope: 'ONYXROOM1 ciphertext' });
+    store.setState({
+      channelProps: new Map([['#secure', { 'encryption-policy': 'required' }]]),
+      channels: new Map([['#secure', { name: '#secure', topic: '', topicSetBy: '', topicSetAt: null, modes: '', users: new Map(), unread: 0, highlights: 0, createdAt: null, messages: [] }]]),
+    });
+    store.getState().sendMessage('#secure', 'transient plaintext');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(bridge.sealRoomMessage).toHaveBeenCalledWith('#secure', 'transient plaintext');
+    expect(FakeWebSocket.latest!.send.mock.calls.map(([line]) => String(line))).toContain('@+onyx/e2ee=mls PRIVMSG #secure :ONYXROOM1 ciphertext\r\n');
+    const message = store.getState().channels.get('#secure')?.messages[0];
+    expect(message).toMatchObject({ text: 'ONYXROOM1 ciphertext', plaintext: 'transient plaintext', encrypted: true, e2ee: 'mls' });
+  });
+
+  it('seals required-room user input even when it resembles a prewrapped envelope', async () => {
+    store.getState().connect({ url: 'wss://example.test/irc', nick: 'alice' });
+    receive(':example.test 001 alice :Welcome');
+    const bridge = currentBridge();
+    bridge.sealRoomMessage.mockResolvedValueOnce({ ok: true, status: 'sealed', room: '#secure', epoch: 1, envelope: 'ONYXROOM1 freshly-sealed' });
+    store.setState({
+      channelProps: new Map([['#secure', { 'encryption-policy': 'required' }]]),
+      channels: new Map([['#secure', { name: '#secure', topic: '', topicSetBy: '', topicSetAt: null, modes: '', users: new Map(), unread: 0, highlights: 0, createdAt: null, messages: [] }]]),
+    });
+
+    store.getState().sendMessage('#secure', 'ONYXROOM1 attacker-controlled-input');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(bridge.sealRoomMessage).toHaveBeenCalledWith('#secure', 'ONYXROOM1 attacker-controlled-input');
+    const wire = FakeWebSocket.latest!.send.mock.calls.map(([line]) => String(line));
+    expect(wire).toContain('@+onyx/e2ee=mls PRIVMSG #secure :ONYXROOM1 freshly-sealed\r\n');
+    expect(wire.join('')).not.toContain('PRIVMSG #secure :ONYXROOM1 attacker-controlled-input');
+  });
+
+  it('refuses required-room sends while offline without persisting plaintext or adding a placeholder', async () => {
+    store.getState().connect({ url: 'wss://example.test/irc', nick: 'alice' });
+    receive(':example.test 001 alice :Welcome');
+    store.setState({
+      client: null,
+      connectionStatus: 'disconnected',
+      channelProps: new Map([['#secure', { 'encryption-policy': 'required' }]]),
+      channels: new Map([['#secure', { name: '#secure', topic: '', topicSetBy: '', topicSetAt: null, modes: '', users: new Map(), unread: 0, highlights: 0, createdAt: null, messages: [] }]]),
+    });
+
+    store.getState().sendMessage('#secure', 'offline secret');
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(await loadOutbox()).toEqual([]);
+    expect(store.getState().channels.get('#secure')?.messages).toEqual([]);
+    expect(store.getState().toasts.at(-1)?.title).toBe("Can't queue encrypted room message");
+  });
+
+  it('fails closed for a required-room seal failure and ignores stale completion', async () => {
+    store.getState().connect({ url: 'wss://example.test/irc', nick: 'alice' });
+    receive(':example.test 001 alice :Welcome');
+    const bridge = currentBridge();
+    let release!: (value: { ok: true; status: 'sealed'; room: string; epoch: number; envelope: string }) => void;
+    bridge.sealRoomMessage.mockReturnValueOnce(new Promise((resolve) => { release = resolve; }));
+    store.setState({ channelProps: new Map([['#secure', { 'encryption-policy': 'required' }]]) });
+    store.getState().sendMessage('#secure', 'must not send');
+    store.getState().disconnect();
+    release({ ok: true, status: 'sealed', room: '#secure', epoch: 1, envelope: 'ONYXROOM1 stale' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(FakeWebSocket.latest!.send.mock.calls.map(([line]) => String(line)).join('')).not.toContain('ONYXROOM1 stale');
+
+    store.getState().connect({ url: 'wss://example.test/irc', nick: 'alice' });
+    receive(':example.test 001 alice :Welcome');
+    currentBridge().sealRoomMessage.mockResolvedValueOnce({ ok: false, status: 'locked', reason: 'recovery-required' });
+    store.getState().sendMessage('#secure', 'blocked');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(store.getState().toasts.at(-1)?.title).toBe('Encrypted room is locked');
+  });
+
+  it('opens live and CHATHISTORY room envelopes transiently while retaining ciphertext', async () => {
+    store.getState().connect({ url: 'wss://example.test/irc', nick: 'alice' });
+    receive(':example.test 001 alice :Welcome');
+    const bridge = currentBridge();
+    bridge.openRoomMessage
+      .mockResolvedValueOnce({ ok: true, status: 'opened', room: '#secure', epoch: 1, plaintext: 'live plaintext' })
+      .mockResolvedValueOnce({ ok: true, status: 'opened', room: '#secure', epoch: 1, plaintext: 'history plaintext' });
+    store.setState({ channels: new Map([['#secure', { name: '#secure', topic: '', topicSetBy: '', topicSetAt: null, modes: '', users: new Map(), unread: 0, highlights: 0, createdAt: null, messages: [] }]]) });
+    receive('@msgid=live;+onyx/e2ee=mls :bob!u@h PRIVMSG #secure :ONYXROOM1 live');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    let message = store.getState().channels.get('#secure')?.messages.at(-1);
+    expect(message).toMatchObject({ id: 'live', text: 'ONYXROOM1 live', plaintext: 'live plaintext', encrypted: true });
+    receive('BATCH +history chathistory #secure');
+    receive('@batch=history;msgid=old;+onyx/e2ee=mls :bob!u@h PRIVMSG #secure :ONYXROOM1 old');
+    receive('BATCH -history');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    message = store.getState().channels.get('#secure')?.messages.find((entry) => entry.id === 'old');
+    expect(message).toMatchObject({ text: 'ONYXROOM1 old', plaintext: 'history plaintext', encrypted: true });
+    expect(bridge.openRoomMessage).toHaveBeenCalledWith('#secure', 'ONYXROOM1 live');
+    expect(bridge.openRoomMessage).toHaveBeenCalledWith('#secure', 'ONYXROOM1 old');
+  });
+
+  it('keeps failed and stale room opens ciphertext-only', async () => {
+    store.getState().connect({ url: 'wss://example.test/irc', nick: 'alice' });
+    receive(':example.test 001 alice :Welcome');
+    const bridge = currentBridge();
+    bridge.openRoomMessage.mockResolvedValueOnce({ ok: false, status: 'locked', reason: 'session-not-provisioned' });
+    store.setState({ channels: new Map([['#secure', { name: '#secure', topic: '', topicSetBy: '', topicSetAt: null, modes: '', users: new Map(), unread: 0, highlights: 0, createdAt: null, messages: [] }]]) });
+    receive('@msgid=locked;+onyx/e2ee=mls :bob!u@h PRIVMSG #secure :ONYXROOM1 locked');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const locked = store.getState().channels.get('#secure')?.messages.at(-1);
+    expect(locked).toMatchObject({ text: 'ONYXROOM1 locked', encrypted: true });
+    expect(locked?.plaintext).toBeUndefined();
+
+    let release!: (value: { ok: true; status: 'opened'; room: string; epoch: number; plaintext: string }) => void;
+    bridge.openRoomMessage.mockReturnValueOnce(new Promise((resolve) => { release = resolve; }));
+    receive('@msgid=stale;+onyx/e2ee=mls :bob!u@h PRIVMSG #secure :ONYXROOM1 stale');
+    store.getState().disconnect();
+    release({ ok: true, status: 'opened', room: '#secure', epoch: 1, plaintext: 'must not attach' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(store.getState().channels.get('#secure')?.messages.find((entry) => entry.id === 'stale')?.plaintext).toBeUndefined();
   });
 
   it('forwards only live self PART/KICK room removal events', () => {

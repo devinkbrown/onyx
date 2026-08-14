@@ -416,6 +416,23 @@ describe('Composer accessibility', () => {
     expect(sendSpy).toHaveBeenCalledWith('#room', 'こんにち');
   });
 
+  it('keeps the draft when an encrypted-room send is refused asynchronously', async () => {
+    seedActiveChannel();
+    const sendSpy = vi
+      .spyOn(store.getState(), 'sendMessage')
+      .mockImplementation(async () => false);
+    const { getByRole, findByText } = render(() => <Composer />);
+    const textarea = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
+    fireEvent.input(textarea, { target: { value: 'keep this private draft' } });
+
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    await findByText('Message was not sent. Your draft is still here.');
+    expect(sendSpy).toHaveBeenCalledWith('#room', 'keep this private draft');
+    expect(textarea.value).toBe('keep this private draft');
+    expect(document.activeElement).toBe(textarea);
+  });
+
   it('moves focus into the emoji dialog on open and restores it to the textarea on Escape', async () => {
     // Arrange
     seedActiveChannel();

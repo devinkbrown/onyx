@@ -729,6 +729,8 @@ export interface OnyxState {
 
   // ── Properties (IRCX PROP) ──────────────────────────────────────────
   channelProps: Map<string, Record<string, string>>;
+  /** IRCX channels whose current-connection PROP snapshot ended with 819. */
+  channelPropsSynced: Set<string>;
   userProps: Map<string, Record<string, string>>;
 
   // ── Channel Info Panel ───────────────────────────────────────────────
@@ -1280,7 +1282,7 @@ export interface OnyxState {
   vhostOff(): void;
 
   /** Send a message (PRIVMSG) */
-  sendMessage(target: string, text: string): void;
+  sendMessage(target: string, text: string): void | boolean | Promise<boolean>;
 
   /** Send a raw IRC line (full formatted line including CRLF) */
   sendRaw(line: string): void;
@@ -1584,7 +1586,7 @@ export interface OnyxState {
   // ── Scheduled Messages ──────────────────────────────────────────────
   scheduledMessages: ScheduledMessage[];
   showScheduledMessages: boolean;
-  scheduleMessage: (channel: string, text: string, sendAt: number) => void;
+  scheduleMessage: (channel: string, text: string, sendAt: number) => boolean;
   cancelScheduledMessage: (id: string) => void;
   /** Send every past-due scheduled message (when connected) and drop it. */
   _dispatchScheduledMessages: () => void;
@@ -5263,21 +5265,72 @@ function deliverChatMessage(
   const cp = client.isupport.CHANTYPES ?? '#&';
   const isDm = target.length > 0 && !cp.includes(target[0]!);
 
-  // Era 3 C1: rooms with encryption-policy=required must never accept plaintext
-  // until group envelope seal ships. Locked group ciphertext may still echo.
-  if (targetIsChannel && !isGroupEnvelope(text)) {
+  // Required rooms admit only a freshly sealed ONYXROOM1 envelope from the
+  // connection-owned group runtime.  The runtime/session/key never enter
+  // Zustand, and every async completion is rebound to the exact socket and
+  // bridge owner before ciphertext reaches the wire.
+  if (targetIsChannel) {
     const policy = selectChannelEncryptionPolicy(target)(get());
     if (policy === 'required') {
-      get().addToast({
-        variant: 'error',
-        title: 'Room requires encryption',
-        description: `Messages in ${target} cannot be sent as plaintext yet — group E2EE delivery is not ready on this client.`,
-      });
-      get().addNotification({
-        type: 'error',
-        text: `Encryption required — message to ${target} was not sent (group E2EE not available).`,
-      });
-      return false;
+      const bridge = _groupControlBridge;
+      const ownerToken = _groupControlOwnerToken;
+      if (!bridge) {
+        get().addToast({
+          variant: 'error',
+          title: 'Encrypted room is locked',
+          description: `Your message was not sent. Reconnect or wait for ${target}'s encryption setup to finish, then try again.`,
+        });
+        return false;
+      }
+      return bridge.sealRoomMessage(target, text).then((outcome) => {
+        if (
+          generation !== _accountGeneration
+          || client !== get().client
+          || _groupControlBridge !== bridge
+          || _groupControlOwnerToken !== ownerToken
+        ) return false;
+        if (!outcome.ok) {
+          get().addToast({
+            variant: 'error',
+            title: 'Encrypted room is locked',
+            description: `Your message was not sent. ${outcome.reason === 'recovery-required'
+              ? 'This room needs encryption recovery before sending.'
+              : 'Wait for the room encryption status to become ready, then try again.'}`,
+          });
+          get().addNotification({
+            type: 'error',
+            text: `Encryption unavailable — message to ${target} was not sent.`,
+          });
+          return false;
+        }
+        const encryptedTags = { ...outboundTags, ...e2eeMessageTag('mls') };
+        if (!client.send(formatTaggedLine(encryptedTags, 'PRIVMSG', target, outcome.envelope))) return false;
+        if (label) {
+          commitLabeledOptimistic({
+            text: outcome.envelope,
+            encrypted: true,
+            e2ee: 'mls',
+            plaintext: text,
+          });
+        } else if (!waitForServerEcho) {
+          set(s => _addMessage(s, target, {
+            id: uid(),
+            time: new Date(),
+            from: ourNick,
+            text: outcome.envelope,
+            plaintext: text,
+            type: 'msg',
+            target,
+            encrypted: true,
+            e2ee: 'mls',
+            ...(activeTopic ? { topic: activeTopic } : {}),
+            ...(replySnapshot ? { replyTo: replySnapshot } : {}),
+          }));
+          get().updateChannelActivity(target);
+        }
+        if (activeReply) set({ replyingTo: null });
+        return true;
+      }).catch(() => false);
     }
   }
 
@@ -5448,6 +5501,65 @@ let _voiceJoinAttempt = 0;
 // handles. The token closes stale async subscriptions before client replacement.
 let _groupControlBridge: GroupControlBridge | null = null;
 let _groupControlOwnerToken = 0;
+const _groupRoomOpenInFlight = new Set<string>();
+
+/**
+ * Open one retained room envelope through the private connection runtime.
+ * Ciphertext remains `text`; only the transient `plaintext` view is attached.
+ * The exact account generation, socket, bridge owner, room, id, and ciphertext
+ * are rechecked after WebCrypto so stale completions fail closed.
+ */
+function _openGroupRoomMessage(
+  set: SetFn,
+  get: GetFn,
+  room: string,
+  message: ChatMessage,
+): void {
+  if (!message.encrypted || message.plaintext !== undefined || !isGroupEnvelope(message.text)) return;
+  const bridge = _groupControlBridge;
+  const client = get().client;
+  if (!bridge || !client || bridge.client !== client) return;
+  const generation = _accountGeneration;
+  const ownerToken = _groupControlOwnerToken;
+  const roomKey = room.toLowerCase();
+  const ciphertext = message.text;
+  const flightKey = `${generation}\u0000${roomKey}\u0000${message.id}\u0000${ciphertext}`;
+  if (_groupRoomOpenInFlight.has(flightKey)) return;
+  _groupRoomOpenInFlight.add(flightKey);
+  void bridge.openRoomMessage(room, ciphertext).then((outcome) => {
+    if (
+      !outcome.ok
+      || generation !== _accountGeneration
+      || ownerToken !== _groupControlOwnerToken
+      || bridge !== _groupControlBridge
+      || client !== get().client
+    ) return;
+    // A history collector may still own this object. Mutating the transient
+    // field lets its later immutable merge carry the opened view; the set below
+    // separately notifies an already-live row.
+    message.plaintext = outcome.plaintext;
+    set((state) => {
+      const channel = state.channels.get(roomKey);
+      if (!channel) return {};
+      let changed = false;
+      const messages = channel.messages.map((current) => {
+        if (
+          current.id !== message.id
+          || current.text !== ciphertext
+          || current.plaintext !== undefined
+        ) return current;
+        changed = true;
+        return { ...current, plaintext: outcome.plaintext };
+      });
+      if (!changed) return {};
+      const channels = new Map(state.channels);
+      channels.set(roomKey, { ...channel, messages });
+      return { channels };
+    });
+  }).catch(() => undefined).finally(() => {
+    _groupRoomOpenInFlight.delete(flightKey);
+  });
+}
 
 function _groupControlFor(client: IRCClient): GroupControlBridge | null {
   const bridge = _groupControlBridge;
@@ -5459,6 +5571,7 @@ function _destroyGroupControlBridge(set: SetFn, client?: IRCClient): Promise<voi
   if (!bridge || (client && bridge.client !== client)) return Promise.resolve();
   _groupControlBridge = null;
   _groupControlOwnerToken += 1;
+  _groupRoomOpenInFlight.clear();
   // Clear the safe projection before any transport owner is destroyed.
   set({ groupControlRuntime: null });
   return bridge.destroy();
@@ -5515,6 +5628,7 @@ export const store = createStore<OnyxState>()(
     ourNick: '',
     rosterSyncing: new Set(),
     channelProps: new Map(),
+    channelPropsSynced: new Set(),
     userProps: new Map(),
     showChannelInfo: false,
     channelInfoChannel: null,
@@ -7144,10 +7258,20 @@ export const store = createStore<OnyxState>()(
         // only happens on the online send path (flushOutbox → sendMessage re-
         // seals on reconnect). Queuing an E2EE DM here would therefore write
         // plaintext at rest, breaking the "outbox only ever sees ciphertext"
-        // invariant above. Refuse rather than leak — the user can resend once
-        // reconnected. Non-E2EE DMs and channel messages queue as before.
+        // invariant above. Required E2EE rooms have the same constraint: their
+        // user input must be sealed by the live, connection-owned group runtime.
+        // Refuse rather than leak — the user can resend once reconnected.
         const cp = client?.isupport.CHANTYPES ?? '#&';
         const isDm = target.length > 0 && !cp.includes(target[0]!);
+        const isRequiredRoom = selectChannelEncryptionPolicy(target)(get()) === 'required';
+        if (isRequiredRoom) {
+          get().addToast({
+            variant: 'error',
+            title: "Can't queue encrypted room message",
+            description: `Messages for ${target} must be encrypted while connected, so this plaintext was not stored. Reconnect to send it.`,
+          });
+          return false;
+        }
         if (isDm && isDmE2eeDesignated(get(), target)) {
           get().addToast({
             variant: 'error',
@@ -7566,7 +7690,7 @@ export const store = createStore<OnyxState>()(
         return;
       }
 
-      void deliverChatMessage(set, get, client, target, text);
+      return deliverChatMessage(set, get, client, target, text);
     },
 
     // ── sendRaw ──────────────────────────────────────────────────────────
@@ -10197,7 +10321,7 @@ export const store = createStore<OnyxState>()(
           // Onyx Server exposes voice/video via the MEDIA channel command for any
           // registered member — there is no media cap to gate on, so mark it
           // available on registration. MEDIA EVENTs keep it true.
-          set({ ourNick: params[0], mediaAvailable: true });
+          set({ ourNick: params[0], mediaAvailable: true, channelPropsSynced: new Set() });
           get().addServerLog(params[1] ?? `Welcome, ${params[0]}.`, msg.prefix ?? '');
           // Offline recovery-code login queued from Connect before the socket was up.
           if (_pendingRecoveryLogin) {
@@ -10863,7 +10987,9 @@ export const store = createStore<OnyxState>()(
         case '819': { // RPL_PROPEND — the requested registry snapshot is complete
           const propTarget = _normalizePropertyTarget(params[1] ?? '');
           if (propTarget && isChan(propTarget)) {
+            set(s => ({ channelPropsSynced: new Set(s.channelPropsSynced).add(propTarget.toLowerCase()) }));
             _tryPendingDeepLinkTopicResolution(get, set, propTarget, { registryComplete: true });
+            get()._dispatchScheduledMessages();
           }
           break;
         }
@@ -11679,6 +11805,9 @@ export const store = createStore<OnyxState>()(
             ...(e2eeTag ? { e2ee: e2eeTag } : {}),
             ...(replyTo ? { replyTo } : {}),
           };
+          if (isChannel && isGroupCipher) {
+            _openGroupRoomMessage(set, get, msgTarget, chatMsg);
+          }
           // Never put wire ciphertext into notification rows (in-app center
           // renders note.text directly). Neutral placeholder only.
           const safeNotifyText = isEncryptedBody
@@ -13184,6 +13313,12 @@ export const store = createStore<OnyxState>()(
                 if (dmAfter) for (const m of dmAfter.messages) {
                   if (m.encrypted && m.plaintext === undefined) get()._decryptDm(batchKey, m.id);
                 }
+                const channelAfter = get().channels.get(batchKey);
+                if (channelAfter) for (const m of channelAfter.messages) {
+                  if (m.encrypted && m.plaintext === undefined && isGroupEnvelope(m.text)) {
+                    _openGroupRoomMessage(set, get, batchTarget, m);
+                  }
+                }
               }
 
               // Time-travel landing: this batch answered a travelTo() AROUND
@@ -14350,18 +14485,29 @@ export const store = createStore<OnyxState>()(
     })(),
     showScheduledMessages: false,
     scheduleMessage: (channel, text, sendAt) => {
+      if (selectChannelEncryptionPolicy(channel)(get()) === 'required') {
+        get().addToast({
+          variant: 'error',
+          title: "Encrypted room messages can't be scheduled",
+          description: 'Protected room messages must be sealed by the live session at send time, so plaintext is never saved for later.',
+        });
+        return false;
+      }
       // Defense-in-depth: pure createScheduledSend / enqueueScheduled own the
       // shape checks; owner is required so rows never dispatch under a peer.
       const owner = _scheduledMessageOwner(get());
-      if (!owner) return;
+      if (!owner) return false;
       const entry = createScheduledSend({ channel, text, sendAt, owner });
-      if (!entry) return;
+      if (!entry) return false;
+      let admitted = false;
       set(s => {
         const next = enqueueScheduled(s.scheduledMessages, entry);
         if (!next) return {};
+        admitted = true;
         _persistScheduledMessages(next);
         return { scheduledMessages: next };
       });
+      return admitted;
     },
     cancelScheduledMessage: (id) => {
       set(s => {
@@ -14380,9 +14526,20 @@ export const store = createStore<OnyxState>()(
       if (!owner) return;
       const owned = s.scheduledMessages.filter((message) => _sameScheduledMessageOwner(message.owner, owner));
       const held = s.scheduledMessages.filter((message) => !_sameScheduledMessageOwner(message.owner, owner));
-      const { due, pending: ownedPending } = selectDueMessages(owned, Date.now(), connected);
+      // Legacy rows may predate the protected-room scheduling guard. Never
+      // dispatch their persisted plaintext through an encryption-required
+      // room; keep them visible for explicit user cancellation/recovery.
+      const protectedHeld = owned.filter(
+        (message) => (s.isIRCX && !s.channelPropsSynced.has(message.channel.toLowerCase()))
+          || selectChannelEncryptionPolicy(message.channel)(s) === 'required',
+      );
+      const dispatchable = owned.filter(
+        (message) => (!s.isIRCX || s.channelPropsSynced.has(message.channel.toLowerCase()))
+          && selectChannelEncryptionPolicy(message.channel)(s) !== 'required',
+      );
+      const { due, pending: ownedPending } = selectDueMessages(dispatchable, Date.now(), connected);
       if (due.length === 0) return;
-      const pending = [...held, ...ownedPending].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
+      const pending = [...held, ...protectedHeld, ...ownedPending].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
       // Remove the due entries BEFORE sending (and persist the shrunk queue), so
       // idempotency never depends on the send succeeding: if sendMessage throws,
       // or a second tick fires, the entry is already gone and can't double-send.
@@ -14394,11 +14551,14 @@ export const store = createStore<OnyxState>()(
       // failure) must not swallow its siblings. A throw means the message never
       // reached the wire, so re-queue it for the next tick rather than lose it.
       const failed: typeof due = [];
+      const awaiting: Array<{ message: (typeof due)[number]; admission: Promise<boolean> }> = [];
       let sent = 0;
       for (const m of due) {
         try {
-          get().sendMessage(m.channel, m.text);
-          sent += 1;
+          const admission = get().sendMessage(m.channel, m.text);
+          if (admission instanceof Promise) awaiting.push({ message: m, admission });
+          else if (admission === false) failed.push(m);
+          else sent += 1;
         } catch {
           failed.push(m);
         }
@@ -14408,6 +14568,27 @@ export const store = createStore<OnyxState>()(
           const next = [...s.scheduledMessages, ...failed].sort((a, b) => a.sendAt - b.sendAt);
           _persistScheduledMessages(next);
           return { scheduledMessages: next };
+        });
+      }
+      if (awaiting.length > 0) {
+        void Promise.all(awaiting.map(async ({ message, admission }) => ({
+          message,
+          admitted: await admission.catch(() => false),
+        }))).then((results) => {
+          const rejected = results.filter((result) => !result.admitted).map((result) => result.message);
+          const admitted = results.length - rejected.length;
+          if (rejected.length > 0) {
+            set(current => {
+              const next = [...current.scheduledMessages, ...rejected].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
+              _persistScheduledMessages(next);
+              return { scheduledMessages: next };
+            });
+          }
+          if (admitted > 0) get().addToast({
+            variant: 'success',
+            title: admitted === 1 ? 'Scheduled message sent' : `${admitted} scheduled messages sent`,
+            description: 'Delivered at the time you picked.',
+          });
         });
       }
       if (sent === 0) return;

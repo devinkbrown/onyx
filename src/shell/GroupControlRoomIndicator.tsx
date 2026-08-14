@@ -3,14 +3,15 @@
  * Passive, room-local projection of the group-control plane.
  *
  * This intentionally reports only the public, metadata-only runtime snapshot.
- * It is not an encryption readiness indicator: group message protection remains
- * held in every state represented here.
+ * Readiness is derived from the safe activation + room projection; keys and
+ * mutable runtime handles never enter this component.
  */
 
 import type { JSX } from 'solid-js';
 
 import {
   selectGroupControlLifecycle,
+  selectGroupControlActivation,
   selectGroupControlRoomStatus,
   type GroupControlProjection,
 } from '@/lib/e2ee/groupControlSelectors';
@@ -33,14 +34,13 @@ export type GroupControlIndicatorState =
   | 'locked'
   | 'pending'
   | 'applied'
+  | 'active'
   | 'recovery-required';
 
 type IndicatorPresentation = {
   state: GroupControlIndicatorState;
   detail: string;
 };
-
-const INACTIVE_LABEL = 'Message protection: not active';
 
 function isChannel(room: string | null | undefined): room is string {
   return typeof room === 'string' && /^[#&]/u.test(room);
@@ -75,6 +75,12 @@ export function groupControlIndicatorPresentation(
     case 'pair-pending':
       return { state: 'pending', detail: 'Room controls pending' };
     case 'control-applied':
+      if (selectGroupControlActivation(projection) === 'active') {
+        return {
+          state: 'active',
+          detail: 'Protection session ready on this device; room policy is reported separately',
+        };
+      }
       return {
         state: 'applied',
         detail: 'Room controls applied; message protection remains inactive',
@@ -93,6 +99,9 @@ export function GroupControlRoomIndicator(props: GroupControlRoomIndicatorProps)
     props.authenticated,
     props.projection,
   );
+  const protectionLabel = () => presentation()?.state === 'active'
+    ? 'Message protection: ready'
+    : 'Message protection: not active';
 
   return (
     <>{presentation() && (
@@ -100,10 +109,10 @@ export function GroupControlRoomIndicator(props: GroupControlRoomIndicatorProps)
         class="shell-group-control-indicator"
         data-testid="group-control-room-indicator"
         data-state={presentation()!.state}
-        aria-label={`${INACTIVE_LABEL}. ${presentation()!.detail}.`}
+        aria-label={`${protectionLabel()}. ${presentation()!.detail}.`}
       >
         <span class="shell-group-control-indicator-mark" aria-hidden="true">◇</span>
-        <span class="shell-group-control-indicator-label">{INACTIVE_LABEL}</span>
+        <span class="shell-group-control-indicator-label">{protectionLabel()}</span>
         <span class="shell-group-control-indicator-detail" aria-live="polite" aria-atomic="true">
           {presentation()!.detail}
         </span>

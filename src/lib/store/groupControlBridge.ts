@@ -13,7 +13,7 @@ import {
   type GroupControlIntegrationClient,
   type GroupControlIntegrationOptions,
 } from '@/lib/e2ee/groupControlIntegration';
-import type { GroupControlRuntimeState } from '@/lib/e2ee/groupControlRuntime';
+import type { GroupControlRuntimeOpenResult, GroupControlRuntimeSealResult, GroupControlRuntimeState } from '@/lib/e2ee/groupControlRuntime';
 import {
   createGroupDevicePublisher,
   type GroupDevicePublisher,
@@ -65,6 +65,8 @@ export type GroupControlBridge = Readonly<{
   setAuthenticatedAccount(account: string | null): Promise<boolean>;
   onRoomPart(room: string): void;
   onRoomKick(room: string): void;
+  sealRoomMessage(room: string, plaintext: string): Promise<GroupControlRuntimeSealResult>;
+  openRoomMessage(room: string, envelope: string): Promise<GroupControlRuntimeOpenResult>;
   destroy(): Promise<void>;
 }>;
 
@@ -259,6 +261,16 @@ export function createGroupControlBridge(options: GroupControlBridgeOptions): Gr
     },
     onRoomKick(room) {
       if (!destroyed && options.isCurrent()) integration.onRoomKick(room);
+    },
+    async sealRoomMessage(room, plaintext) {
+      if (destroyed || !options.isCurrent()) return { ok: false, status: 'locked', reason: 'runtime-inactive' };
+      const runtime = integration.runtime;
+      return runtime ? runtime.sealRoomMessage(room, plaintext) : { ok: false, status: 'locked', reason: 'session-not-provisioned' };
+    },
+    async openRoomMessage(room, envelope) {
+      if (destroyed || !options.isCurrent()) return { ok: false, status: 'locked', reason: 'runtime-inactive' };
+      const runtime = integration.runtime;
+      return runtime ? runtime.openRoomMessage(room, envelope) : { ok: false, status: 'locked', reason: 'session-not-provisioned' };
     },
     destroy() {
       if (destroyPromise) return destroyPromise;

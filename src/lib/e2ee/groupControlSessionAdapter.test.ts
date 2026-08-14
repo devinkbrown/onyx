@@ -160,7 +160,7 @@ describe('Packet-B group control session adapter', () => {
     await expect(value.adapter.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'queued' });
     await expect(value.adapter.accept(value.commitLine)).resolves.toMatchObject({ status: 'applied', room: '#room', epoch: 1 });
     expect(value.session.epoch).toBe(1n);
-    expect(value.session.currentEpochKey()).toEqual(bytes(5));
+    expect(value.session.membershipDigest()).toEqual(bytes(3));
   });
 
   it('pairs commit-before-welcome', async () => {
@@ -645,7 +645,7 @@ describe('Packet-B group control session adapter', () => {
     await expect(adapter.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'applied', room: '#room', epoch: 1 });
     expect(adopted).toHaveLength(1);
     expect(adopted[0]?.epoch).toBe(1n);
-    expect(adopted[0]?.currentEpochKey()).toEqual(bytes(5));
+    expect(adopted[0]?.membershipDigest()).toEqual(bytes(3));
     expect(bootstrap).toHaveBeenCalledTimes(1);
     expect(apply).not.toHaveBeenCalled();
     await expect(adapter.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'ignored', reason: 'duplicate' });

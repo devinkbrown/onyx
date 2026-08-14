@@ -55,6 +55,10 @@ import { WatchTogetherActivity } from './WatchTogetherActivity';
 import { MessageView } from './MessageView';
 import { TypingIndicator } from './TypingIndicator';
 import { Composer } from './Composer';
+import { ContextRail } from './ContextRail';
+import { ModerationCockpit } from './ModerationCockpit';
+import { OperEventConsole } from './OperEventConsole';
+import { RoomSwitcherSheet } from './RoomSwitcherSheet';
 type MediaModule = Pick<typeof import('@/media/useCadenceMedia'), 'mountMedia'>;
 const defaultMediaModuleLoader = (): Promise<MediaModule> => import('@/media/useCadenceMedia');
 let mediaModuleLoader = defaultMediaModuleLoader;
@@ -236,8 +240,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const showJumpToDate = useStore((s) => s.showJumpToDate);
   const showWhois = useStore((s) => s.showWhois);
   const showKeyboardShortcuts = useStore((s) => s.showKeyboardShortcuts);
+  const isOper = useStore((s) => s.isOper);
   const reducedData = makeReducedDataSignal();
   const [primarySurface, setPrimarySurface] = createSignal<'conversation' | 'calls'>('conversation');
+  const [contextRailOpen, setContextRailOpen] = createSignal(false);
   const [sidebarMode, setSidebarMode] = createSignal<'rooms' | 'messages'>(
     activeView().kind === 'dm' ? 'messages' : 'rooms',
   );
@@ -544,11 +550,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
     }
   }
 
-  // ── The rail is hidden when fewer than 3 servers are present.
-  //    We only have one Onyx network for now, so the rail collapses.
-  //    Per blueprint #16: "collapse the server rail when <3 servers".
-  const CONNECTED_SERVERS = 1;
-  const showRail = createMemo(() => CONNECTED_SERVERS >= 3);
+  // Atlas keeps a compact product dock available on desktop even on a single
+  // network. Its destination controls replace the old sidebar quick-switch.
+  const showRail = createMemo(() => true);
 
   // ── active background (reactive: live-updates when changed in the panel) ──
   // 'auto' follows the active theme's signature background (see themeBackground).
@@ -579,9 +583,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // so on narrow viewports it gets its own open state.
   const [isMobile, setIsMobile] = createSignal(false);
   const [mobileMembersOpen, setMobileMembersOpen] = createSignal(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = createSignal(false);
   let mobileMembersTarget: string | null = null;
   let sidebarDrawerRef: HTMLDivElement | undefined;
   let mobileRoomsButtonRef: HTMLButtonElement | undefined;
+  let mobileMoreRef: HTMLDivElement | undefined;
+  let contextTriggerRef: HTMLButtonElement | undefined;
   let mobileDrawerRestoreTarget: HTMLElement | null = null;
 
   function rememberMobileDrawerTrigger(): void {
@@ -606,6 +613,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
     if (!isMobile()) return null;
     if (mobileSidebarOpen()) return sidebarDrawerRef ?? null;
     if (mobileMembersOpen()) return membersDrawerElement();
+    if (mobileMoreOpen()) return mobileMoreRef ?? null;
     return null;
   }
 
@@ -677,6 +685,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   function closeActiveMobileDrawer(restoreFocus = true): void {
     if (mobileSidebarOpen()) getState().closeMobileSidebar();
     if (mobileMembersOpen()) setMobileMembersOpen(false);
+    if (mobileMoreOpen()) setMobileMoreOpen(false);
     if (restoreFocus) restoreMobileDrawerFocus();
   }
 
@@ -741,6 +750,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
     rememberMobileDrawerTrigger();
     mobileDrawerRestoreTarget ||= mobileRoomsButtonRef ?? null;
     setMobileMembersOpen(false); // never both drawers at once
+    setMobileMoreOpen(false);
     getState().openMobileSidebar();
     focusFirstInMobileDrawer(sidebarDrawerRef);
   }
@@ -761,6 +771,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
       rememberMobileDrawerTrigger();
       mobileDrawerRestoreTarget ||= document.querySelector<HTMLElement>('[data-testid="ribbon-members"]');
       getState().closeMobileSidebar();
+      setMobileMoreOpen(false);
       setMobileMembersOpen(true);
       queueMicrotask(() => focusFirstInMobileDrawer(membersDrawerElement()));
     } else {
@@ -825,6 +836,32 @@ export function AppShell(props: AppShellProps): JSX.Element {
   function openYou(): void {
     closeActiveMobileDrawer(false);
     getState().openAccount();
+  }
+
+  function openMobileMore(): void {
+    rememberMobileDrawerTrigger();
+    getState().closeMobileSidebar();
+    setMobileMembersOpen(false);
+    setMobileMoreOpen(true);
+    queueMicrotask(() => focusFirstInMobileDrawer(mobileMoreRef));
+  }
+
+  function closeMobileMore(): void {
+    setMobileMoreOpen(false);
+    restoreMobileDrawerFocus();
+  }
+
+  function closeContextRail(): void {
+    setContextRailOpen(false);
+    queueMicrotask(() => {
+      if (contextTriggerRef?.isConnected) contextTriggerRef.focus({ preventScroll: true });
+    });
+  }
+
+  function selectMobileMore(destination: 'calls' | 'you'): void {
+    closeMobileMore();
+    if (destination === 'calls') openCalls();
+    else openYou();
   }
 
   function openRoomsFromCalls(): void {
@@ -938,7 +975,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const shellClass = createMemo(() => {
     const classes = ['shell'];
     if (!showRail()) classes.push('shell--no-rail');
-    if (!showMemberList() || !hasMemberRoster()) classes.push('shell--members-hidden');
+    if (!showMemberList() || !hasMemberRoster() || contextRailOpen()) classes.push('shell--members-hidden');
+    if (contextRailOpen()) classes.push('shell--context-open');
     return classes.join(' ');
   });
 
@@ -959,40 +997,32 @@ export function AppShell(props: AppShellProps): JSX.Element {
       >
         {/* ── Server Rail — hidden when < 3 servers ── */}
         <Show when={showRail()}>
-          <ServerRail onDisconnect={handleDisconnect} />
+          <ServerRail
+            onDisconnect={handleDisconnect}
+            currentSection={activeSection()}
+            selectedCollection={sidebarMode()}
+            youDialogOpen={showAccount()}
+            onSelect={handlePrimaryNavigation}
+          />
         </Show>
 
         {/* ── Channel Sidebar ── */}
         {/* Mobile backdrop */}
-        <Show when={mobileSidebarOpen()}>
-          <div
-            class="shell-sidebar-backdrop"
-            aria-hidden="true"
-            onClick={closeMobileSidebar}
-          />
-        </Show>
-        <div
-          ref={sidebarDrawerRef}
-          class={`shell-sidebar-slot${mobileSidebarOpen() ? ' shell-sidebar--mobile-open' : ''}`}
-          role={isMobile() && mobileSidebarOpen() ? 'dialog' : undefined}
-          aria-modal={isMobile() && mobileSidebarOpen() ? 'true' : undefined}
-          aria-label={isMobile() && mobileSidebarOpen() ? 'Channel drawer' : undefined}
-          tabindex={isMobile() && mobileSidebarOpen() ? -1 : undefined}
+        <RoomSwitcherSheet
+          open={mobileSidebarOpen()}
+          mode={sidebarMode()}
+          onDismiss={closeMobileSidebar}
+          sheetRef={(element) => { sidebarDrawerRef = element; }}
         >
           <ChannelSidebar
             mode={sidebarMode()}
-            activeSection={activeSection()}
-            youDialogOpen={showAccount()}
             onModeChange={selectSidebarMode}
-            onOpenHome={openHome}
-            onOpenCalls={openCalls}
-            onOpenYou={openYou}
             onConversationOpen={() => {
               setPrimarySurface('conversation');
             }}
             onMobileClose={closeMobileSidebar}
           />
-        </div>
+        </RoomSwitcherSheet>
 
         {/* ── Conversation Column ── */}
         {/* Always grid-column 3 (CSS). The rail track stays in the grid at 0px
@@ -1018,6 +1048,16 @@ export function AppShell(props: AppShellProps): JSX.Element {
             <span class="shell-room-current__kicker">Room current</span>
             <span class="shell-room-current__label">{roomCurrent().label}</span>
             <span class="shell-room-current__detail">{roomCurrent().detail}</span>
+            <button
+              ref={(element) => { contextTriggerRef = element; }}
+              type="button"
+              class="shell-room-current__context"
+              aria-expanded={contextRailOpen()}
+              aria-controls="shell-context-rail"
+              onClick={() => setContextRailOpen((open) => !open)}
+            >
+              Context
+            </button>
           </div>
           <Show
             when={primarySurface() === 'calls'}
@@ -1105,6 +1145,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
           onOpenDm={openMemberDm}
           onOpenWhois={openMemberWhois}
         />
+        <ContextRail open={contextRailOpen()} onClose={closeContextRail} />
       </div>
 
       {/* Mobile bottom tab bar — the same product-frame navigation as the
@@ -1116,9 +1157,35 @@ export function AppShell(props: AppShellProps): JSX.Element {
         selectedCollection={sidebarMode()}
         expandedCollection={mobileSidebarOpen() ? sidebarMode() : null}
         youDialogOpen={showAccount()}
+        moreOpen={mobileMoreOpen()}
+        onOpenMore={openMobileMore}
         mobileRoomsButtonRef={(element) => { mobileRoomsButtonRef = element; }}
         onSelect={handlePrimaryNavigation}
       />
+      <Show when={mobileMoreOpen()}>
+        <div class="shell-mobile-more-backdrop" aria-hidden="true" onClick={closeMobileMore} />
+      </Show>
+      <div
+        ref={(element) => { mobileMoreRef = element; }}
+        class={`shell-mobile-more-sheet${mobileMoreOpen() ? ' shell-mobile-more-sheet--open' : ''}`}
+        role={mobileMoreOpen() ? 'dialog' : undefined}
+        aria-modal={mobileMoreOpen() ? 'true' : undefined}
+        aria-label={mobileMoreOpen() ? 'More destinations' : undefined}
+        tabindex={mobileMoreOpen() ? -1 : undefined}
+      >
+        <p class="shell-mobile-more-sheet__title">More</p>
+        <button type="button" onClick={() => selectMobileMore('calls')}>Calls</button>
+        <button type="button" onClick={() => selectMobileMore('you')}>You</button>
+        <Show when={activeView().kind === 'channel' && preferences().experienceMode !== 'standard'}>
+          <section class="shell-mobile-more-sheet__room-tools" aria-label="Room tools">
+            <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
+            <Show when={preferences().experienceMode === 'irc-ops' && isOper()}>
+              <OperEventConsole />
+            </Show>
+          </section>
+        </Show>
+        <button type="button" onClick={closeMobileMore}>Close</button>
+      </div>
 
       {/* Account management panel — portal modal, gated on store.showAccount */}
       <Show when={showAccount()}>

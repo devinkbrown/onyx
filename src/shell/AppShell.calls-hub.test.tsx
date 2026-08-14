@@ -53,7 +53,8 @@ function mountCallsHub(voice: {
   });
 
   render(() => <AppShell />);
-  fireEvent.click(screen.getByRole('button', { name: 'Open Calls' }));
+  const desktopNav = screen.getByRole('navigation', { name: 'Primary' });
+  fireEvent.click(within(desktopNav).getByRole('button', { name: 'Calls' }));
   return screen.getByRole('main');
 }
 

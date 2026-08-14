@@ -1,7 +1,8 @@
 # Group E2EE (Era 3 C1) — control payload
 
-**Status:** revision-3 control lifecycle is production-wired; room message
-seal/open and persistent recovery remain on activation hold.
+**Status:** revision-3 control lifecycle and required-room message seal/open are
+product-wired; persistent recovery and production dual-node acceptance remain
+on activation hold.
 
 This document defines the current **versioned client payload** that rides the
 opaque `E2EEGROUP` trailing parameter. It is an Onyx in-house control format.
@@ -12,7 +13,7 @@ It does **not** claim MLS or RFC 9420 wire interoperability.
 | Side | Reality |
 |------|---------|
 | **Onyx Server** | Source has an **active** opaque `E2EEGROUP` delivery path: authenticated membership/routing policy, local fan-out as `E2EE.KEYPACKAGE` / `E2EE.COMMIT` / `E2EE.WELCOME`, and mesh hop custody for exact origin-signed wires. The daemon does **not** parse the trailing payload as crypto, decrypt group secrets, or act as a group member. |
-| **Onyx client payload** | The connection/account-owned observer verifies authenticated OGC1-v2 controls from the trusted device directory. The runtime can pair a signed genesis commit/welcome and provision an ephemeral epoch-1 `GroupSession` under strict 0→1 bindings. Channel message seal/open is still held, so product room E2EE is not complete. |
+| **Onyx client payload** | The connection/account-owned observer verifies authenticated OGC1-v2 controls from the trusted device directory. The runtime can pair a signed genesis commit/welcome, provision an ephemeral epoch-1 `GroupSession`, and seal/open `ONYXROOM1` messages for policy-required rooms through a private bridge. Persistent recovery, higher-epoch history recovery, and production dual-node acceptance are not complete. |
 
 ## Layers
 
@@ -134,9 +135,10 @@ closed if export is unavailable). The wire key alone is never account auth.
 
 These remain pure crypto/codec helpers. The live observer and runtime call them
 to verify inbound `E2EE.*` records against the authenticated device directory,
-pair commit/welcome controls, and provision a strictly bound ephemeral genesis
-session. Outbound channel message sealing and inbound store opening remain on
-activation hold; the store does not receive room keys or mutable crypto handles.
+pair commit/welcome controls, provision a strictly bound ephemeral genesis
+session, and seal/open required-room messages through narrow bridge operations.
+The store retains ciphertext as `text`, exposes only transient opened plaintext,
+and never receives room keys or mutable crypto handles.
 
 ## What exists elsewhere today
 
@@ -162,14 +164,11 @@ activation hold; the store does not receive room keys or mutable crypto handles.
 
 ## Next implementation slices
 
-1. **Client store message integration**: route outbound room plaintext through
-   the runtime's narrow seal operation and open inbound envelopes through its
-   narrow open operation without exposing sessions or keys to store state.
-2. Higher-epoch recovery and rotation with explicit recovery state; genesis
+1. Higher-epoch recovery and rotation with explicit recovery state; genesis
    provisioning remains intentionally limited to epoch 0→1.
-3. Channel send/open: `ONYXROOM1` + fail-closed locked placeholder when the
-   epoch key is missing; ciphertext stays ciphertext-only at rest.
-4. **Production acceptance** after packaging and dual-node operator gates
+2. Persistent recovery for historical epochs without serializing raw room keys
+   into the history vault.
+3. **Production acceptance** after packaging and dual-node operator gates
    (not claimed by the v0.5.7 pre-deploy note alone).
 
 See also: `onyx-client-contract.v2.json` (`group_e2ee`),

@@ -85,7 +85,7 @@ describe('SessionTruthBar', () => {
 
     const groupProtection = region.querySelector('[data-dimension="group-message-protection"]');
     expect(groupProtection).toHaveTextContent('Not active');
-    expect(groupProtection).toHaveTextContent('do not currently protect group messages');
+    expect(groupProtection).toHaveTextContent('This room does not currently have an active message-protection session on this device.');
     expect(region.textContent?.toLowerCase()).not.toMatch(/\bsecure\b/);
   });
 

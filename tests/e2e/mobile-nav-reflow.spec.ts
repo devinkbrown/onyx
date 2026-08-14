@@ -94,7 +94,7 @@ test('contains enlarged mobile navigation in a safe-area-aware horizontal rail',
     expect(button.scrollHeight).toBeLessThanOrEqual(button.clientHeight);
   }
 
-  const finalAction = page.getByRole('button', { name: 'Open You' });
+  const finalAction = page.getByRole('button', { name: 'Open More' });
   await finalAction.focus();
   await expect(finalAction).toBeFocused();
   const focusedGeometry = await nav.evaluate((element) => {

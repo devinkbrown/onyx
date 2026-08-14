@@ -284,7 +284,7 @@ async function waitGenesisApplied(runtime: GroupControlRuntime, room = '#room'):
       epoch: 1,
     });
     expect(runtime.state.sessionCount).toBeGreaterThanOrEqual(1);
-    expect(runtime.state.activation).toBe('hold');
+    expect(runtime.state.activation).toBe('active');
   });
 }
 
@@ -333,6 +333,21 @@ async function divergentWelcomeLine(value: Fixture): Promise<string> {
 }
 
 describe('Packet-B group-control runtime', () => {
+  it('exposes message crypto only for a live control-applied room session', async () => {
+    const value = await fixture();
+    const runtime = runtimeFor(value);
+    await expect(runtime.sealRoomMessage('#room', 'before')).resolves.toMatchObject({ ok: false, reason: 'session-not-provisioned' });
+    await completeGenesis(runtime, value);
+    await waitGenesisApplied(runtime);
+    const sealed = await runtime.sealRoomMessage('#room', 'transient plaintext');
+    expect(sealed).toMatchObject({ ok: true, status: 'sealed', room: '#room', epoch: 1 });
+    if (sealed.ok) await expect(runtime.openRoomMessage('#room', sealed.envelope)).resolves.toMatchObject({ ok: true, status: 'opened', plaintext: 'transient plaintext' });
+    await expect(runtime.openRoomMessage('#other', sealed.ok ? sealed.envelope : 'bad')).resolves.toMatchObject({ ok: false, reason: 'session-not-provisioned' });
+    runtime.onRoomPart('#room');
+    await expect(runtime.sealRoomMessage('#room', 'after part')).resolves.toMatchObject({ ok: false, reason: 'session-not-provisioned' });
+    await runtime.destroy();
+  });
+
   it('never reports ready when identity or trust substrate is missing', async () => {
     const pending = createGroupControlRuntime({
       identity: { clientId: 'pending-client', endpoint: 'wss://node' },
@@ -349,15 +364,15 @@ describe('Packet-B group-control runtime', () => {
     await locked.destroy();
   });
 
-  it('bootstraps a verified genesis pair without a pre-provisioned session and keeps activation on hold', async () => {
+  it('bootstraps a verified genesis pair and activates message protection', async () => {
     const value = await fixture();
     const apply = vi.spyOn(GroupSession.prototype, 'applyVerifiedPair');
     const bootstrap = vi.spyOn(GroupSession, 'bootstrapVerifiedGenesis');
     const runtime = runtimeFor(value);
     await completeGenesis(runtime, value);
     await waitGenesisApplied(runtime);
-    expect(runtime.activationHeld).toBe(true);
-    expect(runtime.state.activation).toBe('hold');
+    expect(runtime.activationHeld).toBe(false);
+    expect(runtime.state.activation).toBe('active');
     expect(runtime.state.sessionCount).toBe(1);
     expect(bootstrap).toHaveBeenCalledTimes(1);
     expect(apply).not.toHaveBeenCalled();
@@ -1663,7 +1678,7 @@ describe('Packet-B group-control runtime', () => {
       });
     });
     expect(apply).toHaveBeenCalled();
-    expect(runtime.state.activation).toBe('hold');
+    expect(runtime.state.activation).toBe('active');
     apply.mockRestore();
     await runtime.destroy();
   });

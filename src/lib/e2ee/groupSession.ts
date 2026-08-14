@@ -29,6 +29,7 @@ import {
   type GroupControlRouting,
 } from './groupControlPayload';
 import type { ResolveResult } from './trustedGroupSigner';
+import { openGroupMessage, sealGroupMessage } from './groupEnvelope';
 
 export const GROUP_SESSION_INITIAL_COMMIT_HASH_BYTES = 32;
 export const GROUP_SESSION_KEY_BYTES = 32;
@@ -69,6 +70,14 @@ export type GroupSessionApplyFailure =
 export type GroupSessionApplyResult =
   | { ok: true; epoch: bigint; commitHash: Uint8Array; commitId: Uint8Array }
   | { ok: false; reason: GroupSessionApplyFailure };
+
+export type GroupSessionMessageFailure = 'destroyed' | 'room-mismatch' | 'epoch-unavailable' | 'seal-failed' | 'open-failed';
+export type GroupSessionSealResult =
+  | { ok: true; room: string; epoch: number; envelope: string }
+  | { ok: false; reason: GroupSessionMessageFailure };
+export type GroupSessionOpenResult =
+  | { ok: true; room: string; epoch: number; plaintext: string }
+  | { ok: false; reason: GroupSessionMessageFailure };
 
 /** Local identity plus the authenticated commit/welcome pair used for genesis. */
 export type GroupSessionBootstrapInput = {
@@ -367,17 +376,66 @@ export class GroupSession {
   get requireWelcome(): boolean { return true; }
   get isDestroyed(): boolean { return this.destroyed; }
 
-  /** Copy for an immediate caller; the session never exports a private key. */
-  currentEpochKey(): Uint8Array | null {
-    return this.destroyed ? null : copy(this.currentKey);
-  }
-
   membershipDigest(): Uint8Array | null {
     return this.destroyed ? null : copy(this.currentMembership);
   }
 
   commitHash(): Uint8Array | null {
     return this.destroyed ? null : copy(this.currentCommitHash);
+  }
+
+  private messageRoom(room: string): string | null {
+    const normalized = normalizeGroupRoom(room);
+    return normalized === this.roomName ? normalized : null;
+  }
+
+  private async messageKey(): Promise<{ key: CryptoKey; epoch: number; raw: Uint8Array } | null> {
+    if (this.destroyed || this.currentEpochValue > BigInt(0xffffffff)) return null;
+    const raw = copy(this.currentKey);
+    const importBytes = new Uint8Array(raw).buffer as ArrayBuffer;
+    try {
+      const key = await crypto.subtle.importKey('raw', importBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+      new Uint8Array(importBytes).fill(0);
+      return { key, epoch: Number(this.currentEpochValue), raw };
+    } catch {
+      new Uint8Array(importBytes).fill(0);
+      raw.fill(0);
+      return null;
+    }
+  }
+
+  /** Seal only with this live session's current private epoch key. */
+  async sealRoomMessage(room: string, plaintext: string): Promise<GroupSessionSealResult> {
+    return this.withMutation(async () => {
+      const normalized = this.messageRoom(room);
+      if (!normalized) return { ok: false, reason: 'room-mismatch' };
+      if (this.destroyed) return { ok: false, reason: 'destroyed' };
+      const material = await this.messageKey();
+      if (!material) return { ok: false, reason: this.destroyed ? 'destroyed' : 'epoch-unavailable' };
+      try {
+        const envelope = await sealGroupMessage(material.key, normalized, material.epoch, plaintext);
+        if (this.destroyed) return { ok: false, reason: 'destroyed' };
+        if (this.currentEpochValue !== BigInt(material.epoch)) return { ok: false, reason: 'epoch-unavailable' };
+        return envelope ? { ok: true, room: normalized, epoch: material.epoch, envelope } : { ok: false, reason: 'seal-failed' };
+      } finally { material.raw.fill(0); }
+    });
+  }
+
+  /** Open only with this live session's current private epoch key. */
+  async openRoomMessage(room: string, envelope: string): Promise<GroupSessionOpenResult> {
+    return this.withMutation(async () => {
+      const normalized = this.messageRoom(room);
+      if (!normalized) return { ok: false, reason: 'room-mismatch' };
+      if (this.destroyed) return { ok: false, reason: 'destroyed' };
+      const material = await this.messageKey();
+      if (!material) return { ok: false, reason: this.destroyed ? 'destroyed' : 'epoch-unavailable' };
+      try {
+        const plaintext = await openGroupMessage(material.key, normalized, envelope, material.epoch);
+        if (this.destroyed) return { ok: false, reason: 'destroyed' };
+        if (this.currentEpochValue !== BigInt(material.epoch)) return { ok: false, reason: 'epoch-unavailable' };
+        return plaintext === null ? { ok: false, reason: 'open-failed' } : { ok: true, room: normalized, epoch: material.epoch, plaintext };
+      } finally { material.raw.fill(0); }
+    });
   }
 
   /** Serialize state-changing operations so concurrent commits have one

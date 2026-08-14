@@ -254,6 +254,16 @@ test('connected Current Ledger covers busy, caught-up, offline, and failed-outbo
         document.documentElement.style.fontSize = zoom ? '64px' : '';
       }, 'highZoom' in viewport && viewport.highZoom);
       await expect(home).toBeVisible();
+      if ('highZoom' in viewport && viewport.highZoom) {
+        const box = await home.boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThan(0);
+        const browse = home.getByRole('button', { name: 'Browse rooms' });
+        const search = home.getByRole('button', { name: 'Search messages' });
+        await browse.scrollIntoViewIfNeeded();
+        await expect(browse).toBeVisible();
+        await search.scrollIntoViewIfNeeded();
+        await expect(search).toBeVisible();
+      }
       await assertLedgerOrder(page);
       await assertNoHorizontalOverflow(page);
     }

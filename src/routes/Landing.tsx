@@ -12,6 +12,7 @@ import { ProofRail, type TruthState } from '@/ui/proof';
 import { PublicFrame } from '@/ui/public';
 import { PUBLIC_ROUTE_MANIFEST } from '@/ui/navigation/publicRouteManifest';
 import { setPageMeta } from './pageMeta';
+import { ProductPreview } from './ProductPreview';
 
 const LANDING_SHELF_ITEMS = [
   [PUBLIC_ROUTE_MANIFEST[4]!.href, 'Status'],
@@ -121,14 +122,13 @@ export default function Landing() {
         <div class="home-hero-grid">
           <div class="home-hero-copy">
             <p class="home-kicker">Public communication · powered by Onyx Server</p>
-            <h1 id="hero-heading" class="home-h1">A room for your people.</h1>
+            <h1 id="hero-heading" class="home-h1">Make room for the conversations that matter.</h1>
             <p class="home-lede">
-              Talk, call, and keep continuity on your device — open in the browser now.
+              Onyx gives your group a clear place to talk, call, and return to on your own device.
             </p>
             <div class="home-cta-row">
-              <a class="home-secondary-link" href={PUBLIC_ROUTE_MANIFEST[2]!.href}>
-                Desktop downloads
-              </a>
+              <a class="home-cta-primary" href="/app/">Open Onyx</a>
+              <a class="home-secondary-link" href={PUBLIC_ROUTE_MANIFEST[2]!.href}>Downloads</a>
             </div>
             <p class="home-desktop-note">
               No install is required to begin. Use the same client on desktop or mobile;
@@ -136,36 +136,7 @@ export default function Landing() {
             </p>
           </div>
 
-          <aside
-            class="home-aperture"
-            data-home-aperture
-            aria-labelledby="aperture-label"
-          >
-            <p class="home-aperture-label" id="aperture-label">
-              <span class="home-aperture-badge">Preview</span>
-              Not live content — a quiet picture of the room you open.
-            </p>
-            <div
-              class="home-aperture-shell"
-              role="img"
-              aria-label="Preview of an Onyx room doorway with rooms, messages, calls, local continuity, and shown protection — not live content"
-            >
-              <svg class="home-aperture-door" viewBox="0 0 320 220" aria-hidden="true">
-                <rect class="home-aperture-wall" x="10" y="14" width="300" height="192" rx="3" />
-                <rect class="home-aperture-jamb" x="98" y="36" width="124" height="170" />
-                <rect class="home-aperture-void" x="106" y="44" width="108" height="162" />
-                <path class="home-aperture-sill" d="M98 206 H222" />
-                <circle class="home-aperture-current" cx="160" cy="206" r="3.2" />
-              </svg>
-              <ul class="home-aperture-marks">
-                <li class="is-msg">Rooms</li>
-                <li class="is-msg">Messages</li>
-                <li class="is-call">Calls</li>
-                <li class="is-cont">Continuity</li>
-                <li class="is-protect">Protection shown</li>
-              </ul>
-            </div>
-          </aside>
+          <ProductPreview />
         </div>
       </section>
 
@@ -258,6 +229,11 @@ export default function Landing() {
             <span>Calls show how media is protected — never guessed.</span>
           </li>
         </ul>
+        <div class="home-capability-chapters" aria-label="Learn more about Onyx">
+          <a href={PUBLIC_ROUTE_MANIFEST[1]!.href}><strong>How Onyx works</strong><span>Read the product overview</span></a>
+          <a href={PUBLIC_ROUTE_MANIFEST[4]!.href}><strong>Network status</strong><span>See public operational evidence</span></a>
+          <a href={PUBLIC_ROUTE_MANIFEST[2]!.href}><strong>Downloads</strong><span>Choose a native app or browser entry</span></a>
+        </div>
       </section>
 
       <nav

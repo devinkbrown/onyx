@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cleanup, render, within } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, within } from '@solidjs/testing-library';
 import { createComponent } from 'solid-js';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PrimaryNavigation } from '../PrimaryNavigation';
 import { createShellNavigationModel } from './shellNavigationModel';
 
@@ -51,47 +51,71 @@ describe('createShellNavigationModel', () => {
     expect(model.find((item) => item.id === 'you')).not.toHaveProperty('expanded');
   });
 
-  it('matches the rendered PrimaryNavigation labels and ARIA state for both variants', () => {
-    for (const variant of ['desktop', 'mobile'] as const) {
-      const input = {
-        variant,
-        current: 'rooms' as const,
-        selectedCollection: 'messages' as const,
-        expandedCollection: 'messages' as const,
-        youDialogOpen: true,
-      };
-      const model = createShellNavigationModel(input);
-      const rendered = render(() => createComponent(PrimaryNavigation, {
-        variant,
-        currentSection: input.current,
-        selectedCollection: input.selectedCollection,
-        expandedCollection: input.expandedCollection,
-        youDialogOpen: input.youDialogOpen,
-        onSelect: () => undefined,
-      }));
-      const nav = within(rendered.container).getByRole('navigation', { name: model[0]?.landmarkLabel });
-      const buttons = within(nav).getAllByRole('button');
+  it('matches the rendered desktop navigation labels and ARIA state', () => {
+    const input = {
+      variant: 'desktop' as const,
+      current: 'rooms' as const,
+      selectedCollection: 'messages' as const,
+      expandedCollection: 'messages' as const,
+      youDialogOpen: true,
+    };
+    const model = createShellNavigationModel(input);
+    const rendered = render(() => createComponent(PrimaryNavigation, {
+      variant: input.variant,
+      currentSection: input.current,
+      selectedCollection: input.selectedCollection,
+      expandedCollection: input.expandedCollection,
+      youDialogOpen: input.youDialogOpen,
+      onSelect: () => undefined,
+    }));
+    const nav = within(rendered.container).getByRole('navigation', { name: 'Primary' });
+    const buttons = within(nav).getAllByRole('button');
 
-      expect(buttons).toHaveLength(model.length);
-      for (const [index, item] of model.entries()) {
-        const button = buttons[index];
-        expect(button).toBeDefined();
-        expect(button).toHaveAttribute('data-section', item.id);
-        expect(button).toHaveAccessibleName(item.actionLabel);
-        if (item.current) expect(button).toHaveAttribute('aria-current', 'page');
-        else expect(button).not.toHaveAttribute('aria-current');
-        if (item.id === 'rooms' || item.id === 'messages') {
-          expect(button).toHaveAttribute('aria-pressed', String(item.selected));
-          expect(button).toHaveAttribute('aria-expanded', String(item.expanded));
-        } else {
-          expect(button).not.toHaveAttribute('aria-pressed');
-        }
-        if (item.id === 'you') {
-          expect(button).toHaveAttribute('aria-haspopup', item.hasPopup);
-          expect(button).toHaveAttribute('aria-expanded', String(item.expanded));
-        }
+    expect(buttons).toHaveLength(model.length);
+    for (const [index, item] of model.entries()) {
+      const button = buttons[index];
+      expect(button).toBeDefined();
+      expect(button).toHaveAttribute('data-section', item.id);
+      expect(button).toHaveAccessibleName(item.actionLabel);
+      if (item.current) expect(button).toHaveAttribute('aria-current', 'page');
+      else expect(button).not.toHaveAttribute('aria-current');
+      if (item.id === 'rooms' || item.id === 'messages') {
+        expect(button).toHaveAttribute('aria-pressed', String(item.selected));
+        expect(button).toHaveAttribute('aria-expanded', String(item.expanded));
+      } else {
+        expect(button).not.toHaveAttribute('aria-pressed');
       }
-      rendered.unmount();
+      if (item.id === 'you') {
+        expect(button).toHaveAttribute('aria-haspopup', item.hasPopup);
+        expect(button).toHaveAttribute('aria-expanded', String(item.expanded));
+      }
     }
+  });
+
+  it('keeps mobile focused on Home, Rooms, Inbox, and More while preserving Calls and You behind More', () => {
+    const onOpenMore = vi.fn();
+    const rendered = render(() => createComponent(PrimaryNavigation, {
+      variant: 'mobile',
+      currentSection: 'rooms',
+      selectedCollection: 'messages',
+      expandedCollection: 'messages',
+      moreOpen: true,
+      onOpenMore,
+      onSelect: () => undefined,
+    }));
+    const nav = within(rendered.container).getByRole('navigation', { name: 'Mobile navigation' });
+
+    expect(within(nav).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      '⌂Home',
+      '#Rooms',
+      '@Inbox',
+      '•••More',
+    ]);
+    expect(within(nav).queryByRole('button', { name: /Calls|You/ })).toBeNull();
+    const more = within(nav).getByRole('button', { name: 'Open More' });
+    expect(more).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(more).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(more);
+    expect(onOpenMore).toHaveBeenCalledOnce();
   });
 });

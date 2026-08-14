@@ -450,7 +450,10 @@ export function Composer(props: ComposerProps): JSX.Element {
       setScheduleError('Pick a time at least a minute from now.');
       return;
     }
-    getState().scheduleMessage(t, body, epoch);
+    if (!getState().scheduleMessage(t, body, epoch)) {
+      setScheduleError('Protected room messages cannot be stored for later. Send while connected.');
+      return;
+    }
     getState().addToast({
       variant: 'success',
       title: 'Message scheduled',
@@ -989,7 +992,16 @@ export function Composer(props: ComposerProps): JSX.Element {
         return;
       }
 
-      getState().sendMessage(t, content);
+      const admission = getState().sendMessage(t, content);
+      const admitted = admission instanceof Promise ? await admission : admission;
+      // Required encrypted rooms can reject before socket admission when the
+      // session is locked or changes during WebCrypto. Keep the exact draft so
+      // the user can retry instead of turning a safe refusal into data loss.
+      if (admitted === false) {
+        setComposerError('Message was not sent. Your draft is still here.');
+        focusTextarea();
+        return;
+      }
       resetAfterSend(t);
     } finally {
       if (activeUpload === upload) activeUpload = null;

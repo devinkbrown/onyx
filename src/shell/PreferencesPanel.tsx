@@ -153,6 +153,7 @@ import {
 import '@/lib/prefs/preferences.css';
 import { CLOCKS,
   DENSITIES,
+  EXPERIENCE_MODES,
   FONT_SCALES,
   REACTION_DENSITIES,
   WIDTHS,
@@ -166,6 +167,7 @@ import { CLOCKS,
   resetPreferences,
   setPreference,
   type Density,
+  type ExperienceMode,
   type FontScale,
   type PreferenceCategory,
   type ReactionDensityPref,
@@ -176,6 +178,11 @@ const CLOCK_LABELS = { '24h': '24-hour', '12h': '12-hour' } as const;
 const DENSITY_LABELS: Record<Density, string> = { compact: 'Compact', cozy: 'Cozy', roomy: 'Roomy' };
 const FONT_SCALE_LABELS: Record<FontScale, string> = { sm: 'Small', md: 'Medium', lg: 'Large' };
 const WIDTH_LABELS: Record<Width, string> = { measured: 'Measured', full: 'Full-width' };
+const EXPERIENCE_MODE_LABELS: Record<ExperienceMode, string> = {
+  standard: 'Standard',
+  advanced: 'Advanced',
+  'irc-ops': 'IRC Ops',
+};
 /** Labels avoid "Compact" so they never collide with Message density radios. */
 const REACTION_DENSITY_LABELS: Record<ReactionDensityPref, string> = {
   full: 'Full',
@@ -3523,6 +3530,14 @@ export function PreferencesPanel(): JSX.Element {
               description="A calm, typographic single-column layout — quiet chrome, the words lead."
               value={() => preferences().readerMode}
               onToggle={(value) => setPreference('readerMode', value)}
+            />
+            <Segmented
+              legend="Workspace level"
+              description="Standard keeps chat calm. Advanced adds room-management details when you have permission. IRC Ops also shows live server operations when your account is an operator."
+              options={EXPERIENCE_MODES}
+              labels={EXPERIENCE_MODE_LABELS}
+              value={() => preferences().experienceMode}
+              onSelect={(value) => setPreference('experienceMode', value)}
             />
             <Segmented
               legend="Clock"

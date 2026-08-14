@@ -19,8 +19,8 @@ const initialState = store.getInitialState();
 
 function makeClient() {
   return {
-    sendRaw: vi.fn(),
-    send: vi.fn(),
+    sendRaw: vi.fn<(command: string, ...params: string[]) => boolean>(() => true),
+    send: vi.fn<(line: string) => boolean>(() => true),
     isupport: { CHANTYPES: '#&', CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'] },
     negotiatedCaps: new Set<string>(),
     capValues: new Map<string, string>(),
@@ -71,6 +71,16 @@ describe('scheduleMessage', () => {
     const q = store.getState().scheduledMessages;
     expect(q.map((m) => m.text)).toEqual(['sooner', 'later']);
     expect(JSON.parse(localStorage.getItem('onyx:scheduled') || '[]')).toHaveLength(2);
+  });
+
+  it('refuses required-room plaintext without persisting it', () => {
+    store.setState({
+      channelProps: new Map([['#root', { 'encryption-policy': 'required' }]]),
+    });
+
+    expect(store.getState().scheduleMessage('#root', 'never at rest', 5_000)).toBe(false);
+    expect(store.getState().scheduledMessages).toEqual([]);
+    expect(localStorage.getItem('onyx:scheduled')).toBeNull();
   });
 
   it('keeps the in-memory queue usable when localStorage is blocked', () => {
@@ -141,6 +151,25 @@ describe('_dispatchScheduledMessages', () => {
     expect(store.getState().scheduledMessages).toHaveLength(1);
   });
 
+  it('holds legacy channel plaintext until current IRCX PROP sync proves policy', () => {
+    const client = connect();
+    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    store.getState().scheduleMessage('#root', 'legacy pending', 5_000);
+    store.setState({ isIRCX: true, channelPropsSynced: new Set() });
+
+    store.getState()._dispatchScheduledMessages();
+    expect(client.sendRaw).not.toHaveBeenCalledWith('PRIVMSG', '#root', 'legacy pending');
+    expect(store.getState().scheduledMessages).toHaveLength(1);
+
+    store.setState({
+      channelProps: new Map([['#root', { 'encryption-policy': 'required' }]]),
+      channelPropsSynced: new Set(['#root']),
+    });
+    store.getState()._dispatchScheduledMessages();
+    expect(client.sendRaw).not.toHaveBeenCalledWith('PRIVMSG', '#root', 'legacy pending');
+    expect(store.getState().scheduledMessages).toHaveLength(1);
+  });
+
   it('is idempotent — a second tick never re-sends', () => {
     const client = connect();
     vi.spyOn(Date, 'now').mockReturnValue(10_000);
@@ -164,6 +193,7 @@ describe('_dispatchScheduledMessages', () => {
         call += 1;
         if (call === 1) throw new Error('socket closed');
       }
+      return true;
     });
     store.getState().scheduleMessage('#bad', 'boom', 4_000);
     store.getState().scheduleMessage('#ok', 'lands', 5_000);

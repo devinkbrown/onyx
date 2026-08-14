@@ -12,13 +12,15 @@
   isolation: isolate;
   /* Commercial product rail (was 224px power-user). Mobile drawer overrides
      width independently at the max-width:900px breakpoint. */
-  --shell-sidebar-w: 272px;
+  --shell-rail-w: 72px;
+  --shell-sidebar-w: 304px;
+  --shell-members-w: 0px;
   display: grid;
   grid-template-columns:
-    var(--shell-rail-w, 54px)
-    var(--shell-sidebar-w, 272px)
+    var(--shell-rail-w, 72px)
+    var(--shell-sidebar-w, 304px)
     1fr
-    var(--shell-members-w, 220px);
+    var(--shell-members-w, 0px);
   /* minmax(0, 1fr): plain `1fr` is minmax(auto, 1fr), so a dense nicklist (or
      long sidebar/feed) could inflate the row past 100svh and clip under
      overflow:hidden instead of scrolling inside its column. */
@@ -84,6 +86,10 @@
     0px;
 }
 
+.shell--context-open {
+  --shell-members-w: 288px;
+}
+
 .shell--no-rail.shell--members-hidden {
   grid-template-columns: 0px var(--shell-sidebar-w, 272px) 1fr 0px;
 }
@@ -112,7 +118,7 @@
     );
   border-right: 1px solid var(--seam-faint);
   overflow: hidden;
-  width: var(--shell-rail-w, 54px);
+  width: var(--shell-rail-w, 72px);
 }
 
 .shell-rail--hidden {
@@ -125,6 +131,29 @@
   margin: 4px auto;
   background: var(--seam-faint);
 }
+
+/* Atlas product dock: destinations live beside the network mark, leaving the
+   personal rail for conversations rather than a second global nav. */
+.shell-rail .shell-primary-nav {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 0;
+}
+.shell-rail .shell-primary-nav-context { display: none; }
+.shell-rail .shell-primary-nav-btn {
+  display: grid;
+  grid-template-columns: 1fr;
+  place-items: center;
+  gap: 3px;
+  min-height: 44px;
+  padding: 5px 2px;
+  border-radius: var(--r-md);
+  font-size: var(--text-2xs);
+  text-align: center;
+}
+.shell-rail .shell-primary-nav-icon { min-width: 0; font-size: 0.9rem; }
 
 .shell-rail-entry {
   position: relative;
@@ -1062,6 +1091,10 @@
   container-name: conversation;
   container-type: inline-size;
   min-width: 0;
+  margin: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--paper) 8%, var(--seam-faint));
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-2);
   background:
     linear-gradient(
       180deg,
@@ -1070,6 +1103,88 @@
     );
   overflow: hidden;
 }
+
+.shell-room-current__context {
+  margin-left: auto;
+  min-height: 28px;
+  padding: 3px 7px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--paper-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.shell-room-current__context:hover { color: var(--paper); border-color: var(--seam); }
+
+/* Context is an opt-in desktop rail. It does not compete with the initial
+   reading canvas, and replaces (rather than overlays) the member rail. */
+.shell-context-rail {
+  grid-column: 4;
+  display: none;
+  min-width: 0;
+  overflow: auto;
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--surface-face) 92%, var(--ink));
+  border-left: 1px solid var(--seam-faint);
+}
+.shell--context-open .shell-context-rail { display: block; }
+.shell-context-rail__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); padding-bottom: var(--space-4); border-bottom: 1px solid var(--seam-faint); }
+.shell-context-rail__head h2, .shell-context-rail__eyebrow, .shell-context-rail__empty { margin: 0; }
+.shell-context-rail__head h2 { color: var(--paper); font-size: var(--text-lg); overflow-wrap: anywhere; }
+.shell-context-rail__eyebrow { color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+.shell-context-rail__close { display: grid; place-items: center; min-width: 32px; min-height: 32px; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: transparent; color: var(--paper-dim); cursor: pointer; }
+.shell-context-rail__empty { padding-top: var(--space-5); color: var(--paper-mute); font-size: var(--text-sm); line-height: var(--leading-body); }
+.shell-room-switcher-sheet__bar { display: none; }
+
+/* Mobile-only destinations are present in the DOM so their focus management
+   remains stable. Keep them fully absent from desktop layout and interaction. */
+.shell-mobile-more-backdrop,
+.shell-mobile-more-sheet { display: none; }
+
+/* At compact desktop/tablet widths a fourth grid column would crush the
+   conversation. Present Context as an opt-in edge sheet until the canvas has
+   enough room for a persistent rail. */
+@media (min-width: 901px) and (max-width: 1279px) {
+  .shell--context-open { --shell-members-w: 0px; }
+  .shell-context-rail {
+    position: fixed;
+    inset: 0 0 0 auto;
+    z-index: 88;
+    width: min(360px, 42vw);
+    max-width: 100%;
+    grid-column: unset;
+    box-shadow: -18px 0 48px -28px color-mix(in oklab, var(--ink) 88%, transparent);
+  }
+}
+
+.moderation-cockpit { display: grid; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--seam-faint); }
+.moderation-cockpit__head { display: flex; align-items: start; justify-content: space-between; gap: var(--space-2); }
+.moderation-cockpit__head h3, .moderation-cockpit__eyebrow, .moderation-cockpit__empty, .moderation-cockpit__hint { margin: 0; }
+.moderation-cockpit__head h3 { color: var(--paper); font-size: var(--text-md); }
+.moderation-cockpit__eyebrow { color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+.moderation-cockpit__state { color: var(--ok); font: 700 var(--text-2xs)/1.2 var(--font-mono); text-align: right; }
+.moderation-cockpit__state--offline { color: var(--warn); }
+.moderation-cockpit__empty, .moderation-cockpit__hint { color: var(--paper-mute); font-size: var(--text-sm); line-height: var(--leading-body); }
+.moderation-cockpit__modes { display: grid; gap: 5px; }
+.moderation-cockpit__mode { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 8px 10px; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: transparent; color: var(--paper); text-align: left; cursor: pointer; }
+.moderation-cockpit__mode small { color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); }
+.moderation-cockpit__mode[aria-pressed='true'] { border-color: color-mix(in oklab, var(--lapis) 55%, var(--seam)); background: color-mix(in oklab, var(--lapis) 16%, transparent); }
+.moderation-cockpit__mode:disabled { cursor: not-allowed; opacity: .55; }
+.moderation-cockpit__form { display: grid; gap: 6px; }
+.moderation-cockpit__form label { color: var(--paper-dim); font-size: var(--text-sm); font-weight: 650; }
+.moderation-cockpit__form > div { display: flex; gap: 6px; }
+.moderation-cockpit__form input { min-width: 0; flex: 1; min-height: 40px; padding: 7px 9px; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: var(--surface-void); color: var(--paper); font: var(--text-sm) var(--font-sans); }
+.moderation-cockpit__form button { min-height: 40px; padding: 7px 10px; border: 1px solid var(--seam); border-radius: var(--r-sm); background: var(--surface-raised); color: var(--paper); font: 650 var(--text-sm)/1 var(--font-sans); cursor: pointer; }
+.moderation-cockpit__form button:disabled { cursor: not-allowed; opacity: .55; }
+.moderation-cockpit__form--danger > div button, .moderation-cockpit__confirm-action { border-color: color-mix(in oklab, var(--shu) 55%, var(--seam)); }
+.moderation-cockpit__confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px; border: 1px solid color-mix(in oklab, var(--shu) 42%, var(--seam)); border-radius: var(--r-sm); background: color-mix(in oklab, var(--shu) 10%, transparent); }
+.moderation-cockpit__confirm p { flex: 1 0 100%; margin: 0; color: var(--paper); font-size: var(--text-sm); }
+.moderation-cockpit__confirm code { overflow-wrap: anywhere; }
+.moderation-cockpit__protocol { color: var(--paper-mute); font-size: var(--text-sm); line-height: var(--leading-body); }
+.moderation-cockpit__protocol summary { min-height: 32px; color: var(--paper-dim); cursor: pointer; font-weight: 650; }
+.moderation-cockpit__protocol p { margin: 6px 0; }
+.moderation-cockpit__protocol code { display: block; padding: 7px 8px; overflow-wrap: anywhere; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: var(--surface-void); color: var(--paper-dim); font: var(--text-2xs) var(--font-mono); }
 
 /* A true, compact orientation seam: target and unread state already owned by
    the store, placed below the ribbon so it never competes with room controls. */
@@ -6151,6 +6266,28 @@
     background: color-mix(in oklab, var(--ink) 96%, var(--stone));
     box-shadow: 18px 0 48px -28px color-mix(in oklab, var(--ink) 88%, transparent);
   }
+  /* Off-canvas is not enough for keyboard/AT: remove the closed drawer from
+     focus and accessibility navigation until its wrapper is opened. */
+  .shell-sidebar-slot:not(.shell-sidebar--mobile-open) .shell-sidebar {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .shell-sidebar--mobile-open .shell-sidebar {
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .shell-room-switcher-sheet__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-height: 48px;
+    padding: 0 var(--space-2) 0 var(--space-3);
+    border-bottom: 1px solid var(--seam-faint);
+  }
+  .shell-room-switcher-sheet__bar p { margin: 0; color: var(--paper); font: 650 var(--text-md)/1 var(--font-sans); }
+  .shell-room-switcher-sheet__bar button { display: grid; place-items: center; width: 44px; min-width: 44px; height: 44px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--paper-dim); font-size: 1.3rem; cursor: pointer; }
+  .shell-room-switcher-sheet__bar button:hover, .shell-room-switcher-sheet__bar button:focus-visible { background: color-mix(in oklab, var(--lapis) 16%, transparent); color: var(--paper); outline: none; }
   /* The open class lives on the wrapper; flip the fixed child's transform.
      (A transform on the wrapper itself would make the fixed child a containing
      block and break the slide — so only the child is transformed.) */
@@ -6198,6 +6335,10 @@
 
   .shell-conversation {
     grid-column: 1;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
     min-width: 0;
     /* Preserve the selected Onyx backdrop instead of burying it under a nearly
        opaque black sheet. The wash protects text while letting mineral color
@@ -6208,6 +6349,9 @@
       color-mix(in oklab, var(--ink) 82%, transparent)
     );
   }
+
+  .shell-context-rail,
+  .shell-room-current__context { display: none; }
 
   .shell-conversation::before {
     top: 42px;
@@ -6594,6 +6738,35 @@
     box-shadow: none;
     pointer-events: none;
   }
+
+  .shell-mobile-more-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 96;
+    background: color-mix(in oklab, var(--ink) 60%, transparent);
+  }
+  .shell-mobile-more-sheet {
+    position: fixed;
+    right: max(10px, env(safe-area-inset-right, 0px));
+    bottom: calc(var(--mnav-h) + env(safe-area-inset-bottom, 0px) + 10px);
+    z-index: 97;
+    display: none;
+    width: min(420px, calc(100vw - 20px));
+    min-width: 176px;
+    max-height: min(76svh, 680px);
+    overflow: auto;
+    padding: var(--space-2);
+    border: 1px solid var(--seam);
+    border-radius: var(--r-lg);
+    background: var(--surface-raised);
+    box-shadow: var(--elev-3);
+  }
+  .shell-mobile-more-sheet--open { display: grid; gap: 4px; }
+  .shell-mobile-more-sheet__title { margin: 4px 8px 6px; color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+  .shell-mobile-more-sheet__room-tools { display: grid; gap: var(--space-2); padding-block: var(--space-2); border-block: 1px solid var(--seam-faint); }
+  .shell-mobile-more-sheet button { min-height: 44px; padding: 8px 10px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--paper); font: 650 var(--text-md)/1 var(--font-sans); text-align: left; cursor: pointer; }
+  .shell-mobile-more-sheet button:hover, .shell-mobile-more-sheet button:focus-visible { background: color-mix(in oklab, var(--lapis) 16%, transparent); outline: none; }
 
   .shell-topic-filter {
     gap: 6px;
@@ -6996,6 +7169,23 @@
   .shell,
   .shell-mobile-nav {
     --mnav-h: 56px;
+  }
+
+  /* At extreme text zoom the fixed chrome can consume the conversation's
+     entire flex height and collapse Home to a zero-height box. Let the whole
+     Home surface own vertical scrolling so its primary actions remain
+     reachable without shrinking or hiding zoomed text and controls. */
+  .shell-conversation:has(> .home) {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .shell-conversation:has(> .home) > .home {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .shell-ribbon {

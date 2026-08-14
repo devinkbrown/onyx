@@ -14,6 +14,8 @@ import type { CallState } from '@/lib/cadence-media/types';
 import type { RememberedIdentityAccess } from '@/lib/credentials';
 import {
   selectGroupControlLifecycle,
+  selectGroupControlActivation,
+  selectGroupControlRoom,
   selectGroupControlRoomStatus,
   type GroupControlProjection,
 } from '@/lib/e2ee/groupControlSelectors';
@@ -202,9 +204,21 @@ function projectGroupControl(input: SessionTruthInput): SessionTruthFact {
   }
 }
 
-function projectGroupMessageProtection(): SessionTruthFact {
+function projectGroupMessageProtection(input: SessionTruthInput): SessionTruthFact {
+  const room = input.room?.trim() ?? '';
+  const roomState = /^[#&]/u.test(room)
+    ? selectGroupControlRoom(input.groupControl, room)
+    : null;
+  if (
+    selectGroupControlActivation(input.groupControl) === 'active'
+    && roomState?.status === 'control-applied'
+    && roomState.provisioned
+  ) {
+    return fact('group-message-protection', 'messages', 'Group message protection', 'Protection ready',
+      'This device can seal and open supported encrypted room messages. Room policy enforcement is reported separately.', 'positive');
+  }
   return fact('group-message-protection', 'messages', 'Group message protection', 'Not active',
-    'Room controls do not currently protect group messages.', 'caution');
+    'This room does not currently have an active message-protection session on this device.', 'caution');
 }
 
 function projectDmProtection(state: DmProtectionState): SessionTruthFact {
@@ -283,7 +297,7 @@ export function projectSessionTruth(input: SessionTruthInput): SessionTruthProje
       projectIdentity(input.authenticatedAccount),
       projectSessionContinuity(input),
       projectGroupControl(input),
-      projectGroupMessageProtection(),
+      projectGroupMessageProtection(input),
       projectDmProtection(input.dmProtection),
       projectCallEstablishment(input.callState, input.callStartedAt),
       projectCallMediaProtection(input),

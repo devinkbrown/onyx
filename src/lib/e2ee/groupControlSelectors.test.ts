@@ -67,4 +67,10 @@ describe('group-control safe selectors', () => {
     expect(selectGroupControlQueueDepth(undefined)).toBe(0);
     expect(selectGroupControlSessionCount(undefined)).toBe(0);
   });
+
+  it('projects an explicitly active runtime without inferring from counters', () => {
+    const active = { ...projection, activation: 'active' as const };
+    expect(selectGroupControlActivation(active)).toBe('active');
+    expect(selectGroupControlActivationHeld(active)).toBe(false);
+  });
 });
