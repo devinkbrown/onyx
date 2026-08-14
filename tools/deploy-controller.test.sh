@@ -373,13 +373,16 @@ echo "-- active-client asset compatibility (retain hashed assets, delete stale n
 # Live has a prior immutable hashed asset + a stale non-asset root file.
 # Staged ships a new asset + updated shared asset + good SPA shell.
 mkdir -p "${TMP}/live-compat/out/assets" "${TMP}/live-compat/out/app" \
-  "${TMP}/staged-compat/assets" "${TMP}/staged-compat/app"
+  "${TMP}/live-compat/out/onyxOS" \
+  "${TMP}/staged-compat/assets" "${TMP}/staged-compat/app" \
+  "${TMP}/staged-compat/onyxOS"
 echo "LEGACY-HASH-ASSET" >"${TMP}/live-compat/out/assets/old-chunk-aaaaaaaa.js"
 echo "SHARED-OLD" >"${TMP}/live-compat/out/assets/shared-bbbbbbbb.js"
 echo "STALE-NON-ASSET" >"${TMP}/live-compat/out/stale-page.html"
 echo "old-compat-index" >"${TMP}/live-compat/out/index.html"
 echo "old-compat-app" >"${TMP}/live-compat/out/app/index.html"
 echo "const CACHE_NAME = 'onyx-shell-oldcompat';" >"${TMP}/live-compat/out/sw.js"
+echo 'LIVE-RUNTIME-STATUS' >"${TMP}/live-compat/out/onyxOS/status.json"
 
 cat >"${TMP}/staged-compat/index.html" <<'HTML'
 <title>Onyx — a room for your people</title>
@@ -392,6 +395,7 @@ HTML
 echo "const CACHE_NAME = 'onyx-shell-compat-v';" >"${TMP}/staged-compat/sw.js"
 echo "NEW-HASH-ASSET" >"${TMP}/staged-compat/assets/new-chunk-cccccccc.js"
 echo "SHARED-NEW" >"${TMP}/staged-compat/assets/shared-bbbbbbbb.js"
+echo 'STALE-STAGED-STATUS' >"${TMP}/staged-compat/onyxOS/status.json"
 
 backup_live_out "${TMP}/live-compat/out" "compat-v"
 assert_ok "compat success path sync" \
@@ -413,6 +417,8 @@ assert_eq "current staged asset updated byte-identical" "SHARED-NEW" \
 assert_eq "compat root index is staged content" \
   "$(cat "${TMP}/staged-compat/index.html")" \
   "$(cat "${TMP}/live-compat/out/index.html")"
+assert_eq "runtime-owned status feed survives cutover" "LIVE-RUNTIME-STATUS" \
+  "$(cat "${TMP}/live-compat/out/onyxOS/status.json")"
 assert_ok "verify_staged_in_live accepts extras under assets" \
   verify_staged_in_live "${TMP}/staged-compat" "${TMP}/live-compat/out"
 

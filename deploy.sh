@@ -100,6 +100,23 @@ SPA_OWNED_BLOCKLIST=(
   codecs
 )
 
+# Runtime-owned public feeds. Their producers update the live file atomically
+# and may run during a site cutover, so deployment must preserve their current
+# bytes instead of racing a staged snapshot. A missing live feed is seeded once
+# from staging; subsequent deploys exclude it from rsync and byte comparison.
+RUNTIME_MUTABLE_RELATIVE_PATHS=(
+  onyxOS/status.json
+)
+
+is_runtime_mutable_path() {
+  local candidate="$1"
+  local mutable
+  for mutable in "${RUNTIME_MUTABLE_RELATIVE_PATHS[@]}"; do
+    [[ "${candidate}" == "${mutable}" ]] && return 0
+  done
+  return 1
+}
+
 # ---------------------------------------------------------------------------
 # Pure helpers (also exercised by tools/deploy-controller.test.sh)
 # ---------------------------------------------------------------------------
@@ -434,6 +451,9 @@ verify_staged_in_live() {
 
   while IFS= read -r -d '' f; do
     rel="${f#"${staged}/"}"
+    if is_runtime_mutable_path "${rel}"; then
+      continue
+    fi
     live_f="${live_out}/${rel}"
     if [[ ! -f "${live_f}" ]]; then
       echo "FAIL: staged file missing from live after sync: ${rel}" >&2
@@ -577,13 +597,25 @@ sync_live_with_rollback() {
 
   mkdir -p "${live_out}"
 
+  # Seed runtime-owned feeds only when absent. Their producers retain authority
+  # over existing live bytes and may update them while this deploy is running.
+  local mutable staged_mutable live_mutable
+  for mutable in "${RUNTIME_MUTABLE_RELATIVE_PATHS[@]}"; do
+    staged_mutable="${staged}/${mutable}"
+    live_mutable="${live_out}/${mutable}"
+    if [[ ! -e "${live_mutable}" && -f "${staged_mutable}" ]]; then
+      mkdir -p "$(dirname "${live_mutable}")"
+      cp --no-clobber "${staged_mutable}" "${live_mutable}"
+    fi
+  done
+
   # Phase 1 — root tree: delete stale non-assets; leave live/assets alone.
   # --exclude='/assets/' is path-relative to the transfer root. Never pass
   # delete-excluded (that would purge retained hashed assets).
   # --checksum: after hard-link snapshot, size+mtime can match while content
   # differs; content identity is required for a correct live cutover.
-  echo "==> syncing root (exclude /assets/, --delete) ${staged}/ -> ${live_out}/"
-  if ! rsync --archive --checksum --delete --exclude='/assets/' "${staged}/" "${live_out}/"; then
+  echo "==> syncing root (exclude /assets/ and runtime feeds, --delete) ${staged}/ -> ${live_out}/"
+  if ! rsync --archive --checksum --delete --exclude='/assets/' --exclude='/onyxOS/status.json' "${staged}/" "${live_out}/"; then
     sync_rc=1
     reason="rsync_root_failed"
     echo "FAIL: rsync root --archive --checksum --delete (exclude /assets/) failed: ${staged}/ -> ${live_out}/" >&2
@@ -646,7 +678,8 @@ sync_live_with_rollback() {
 print_would_sync() {
   local staged="$1"
   local live_out="$2"
-  echo "==> DRY RUN: would rsync --archive --checksum --delete --exclude=/assets/ ${staged}/ -> ${live_out}/"
+  echo "==> DRY RUN: would preserve runtime feed /onyxOS/status.json (seed from staging only if absent)"
+  echo "==> DRY RUN: would rsync --archive --checksum --delete --exclude=/assets/ --exclude=/onyxOS/status.json ${staged}/ -> ${live_out}/"
   if [[ -d "${staged}/assets" ]]; then
     echo "==> DRY RUN: would mkdir -p ${live_out}/assets"
     echo "==> DRY RUN: would rsync --archive --checksum (no --delete) ${staged}/assets/ -> ${live_out}/assets/"
