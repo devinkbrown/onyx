@@ -389,6 +389,65 @@
   color: var(--paper-mute);
 }
 
+/* Phone message actions are direct-manipulation controls, not miniature
+   desktop chrome. Keep every quick action and every action inside the sheets
+   at a reliable 44px target on narrow or coarse-pointer devices. The toolbar
+   still fits five real quick actions at 320px and scrolls only as a defensive
+   fallback when platform text sizing makes it wider. */
+@media (max-width: 42rem), (hover: none), (pointer: coarse) {
+  .msg-menu {
+    top: 4px;
+    right: 4px;
+    max-width: calc(100% - 8px);
+  }
+
+  .msg-menu-bar {
+    max-width: calc(100vw - 8px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+
+  .msg-menu-btn,
+  .msg-menu .onyx-popover__trigger {
+    flex: none;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .msg-menu-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .msg-menu-item,
+  .msg-menu-delete-confirm__cancel,
+  .msg-menu-delete-confirm__delete,
+  .msg-menu-translation-action,
+  .msg-menu-emoji-search,
+  .msg-menu-emoji-choice {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .msg-menu-emoji-search {
+    font-size: 16px;
+  }
+
+  .msg-menu-emoji-grid {
+    grid-template-columns: repeat(5, minmax(44px, 1fr));
+  }
+
+  .msg-menu-emoji-choice {
+    min-width: 44px;
+    font-size: 1.35rem;
+  }
+}
+
 /* Honour reduced-motion: drop the lift/scale, keep instant reveal. */
 @media (prefers-reduced-motion: reduce) {
   .msg-menu-bar,
