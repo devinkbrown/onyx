@@ -22,6 +22,11 @@ import {
   type SceneMotion,
 } from '@/lib/prefs/sceneMotion';
 import { ThemeImportDialog } from './ThemeImportDialog';
+import { getBackgroundMeta } from '@/backgrounds/catalogue';
+import { deriveBackgroundPolicy } from '@/backgrounds/backgroundPolicy';
+import { makeMediaSignal } from '@/lib/a11y/mediaPrefs';
+import { makeReducedDataSignal } from '@/lib/a11y/reducedData';
+import { preferences } from '@/lib/prefs/preferences';
 import './AppearancePanel.css';
 
 type ThemeEntry = { id: string; label: string; title: string; swatch: string[]; custom: boolean };
@@ -40,6 +45,8 @@ export function AppearancePanel(): JSX.Element {
   const open = useStore((s) => s.showAppearance);
   const backgroundId = useStore((s) => s.backgroundId);
   const [themeDialogOpen, setThemeDialogOpen] = createSignal(false);
+  const systemReducedMotion = makeMediaSignal('(prefers-reduced-motion: reduce)');
+  const reducedData = makeReducedDataSignal();
   function chooseBackground(id: string): void {
     // Wallpaper and motion are independent preferences. In particular, never
     // turn an explicit accessibility/battery-saving Off choice back on.
@@ -75,11 +82,48 @@ export function AppearancePanel(): JSX.Element {
     const active = theme.themeId();
     return getCustomTheme(active);
   });
+  const backgroundLabel = createMemo(() => backgroundId() === 'auto'
+    ? 'Match my theme'
+    : (getBackgroundMeta(backgroundId())?.label ?? 'Match my theme'));
+  const effectiveMotion = createMemo(() => deriveBackgroundPolicy({
+    sceneMotion: sceneMotion(),
+    reducedMotion: systemReducedMotion() || preferences().reduceMotion,
+    reducedData: reducedData(),
+    viewportWidth: 1024,
+    coarsePointer: false,
+    devicePixelRatio: 1,
+  }));
+  const effectiveMotionLabel = createMemo(() => {
+    const policy = effectiveMotion();
+    if (policy.mode === 'off') return policy.reason === 'reduced-data' ? 'Off · Data Saver' : 'Background off';
+    if (policy.mode === 'still') return policy.reason === 'reduced-motion' ? 'Still · Reduced motion' : 'Still frame';
+    return 'Animated';
+  });
 
   function importTheme(imported: CustomTheme): void {
     const id = theme.saveCustom(imported.name, imported.base, imported.overrides);
     theme.setTheme(id);
   }
+
+  const movePanelRadio = (event: KeyboardEvent): void => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    const current = event.currentTarget as HTMLButtonElement | null;
+    if (!current) return;
+    const group = current.closest<HTMLElement>('[role="radiogroup"]');
+    const radios = group ? [...group.querySelectorAll<HTMLButtonElement>('[role="radio"]')] : [];
+    const index = radios.indexOf(current);
+    if (index < 0) return;
+    event.preventDefault();
+    const targetIndex =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? radios.length - 1
+          : (index + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1) + radios.length) % radios.length;
+    const target = radios[targetIndex];
+    target?.focus();
+    target?.click();
+  };
 
   return (
     <>
@@ -116,7 +160,9 @@ export function AppearancePanel(): JSX.Element {
                       aria-checked={active()}
                       aria-label={`${entry.label} theme`}
                       title={entry.title}
+                      tabIndex={active() ? 0 : -1}
                       style={{ 'min-height': '44px', 'touch-action': 'manipulation' }}
+                      onKeyDown={movePanelRadio}
                       onClick={() => theme.setTheme(entry.id)}
                     >
                       <span class="ap-theme-swatch" aria-hidden="true">
@@ -135,20 +181,22 @@ export function AppearancePanel(): JSX.Element {
             <div class="ap-panel-heading-row">
               <h3 class="ap-panel-label">Background</h3>
               <span class="ap-panel-current" aria-live="polite">
-                {sceneMotion() === 'off' ? 'Saved · background off' : 'Applied live'}
+                {effectiveMotionLabel()}
               </span>
             </div>
             <div class="ap-motion-control">
               <span class="ap-motion-label">Motion</span>
               <div class="ap-motion-options" role="radiogroup" aria-label="Background motion">
                 <For each={SCENE_MOTIONS}>
-                  {(value) => (
+                {(value) => (
                     <button
                       type="button"
                       class="ap-motion-option"
                       classList={{ 'ap-motion-option--on': sceneMotion() === value }}
                       role="radio"
                       aria-checked={sceneMotion() === value}
+                      tabIndex={sceneMotion() === value ? 0 : -1}
+                      onKeyDown={movePanelRadio}
                       onClick={() => setSceneMotion(value)}
                     >
                       {motionLabel[value]}
@@ -157,7 +205,15 @@ export function AppearancePanel(): JSX.Element {
                 </For>
               </div>
             </div>
-            <BackgroundPicker value={backgroundId} onSelect={chooseBackground} label="Background" immediate />
+            <details class="ap-panel-background-browser">
+              <summary>
+                <span>Choose background</span>
+                <b>{backgroundLabel()}</b>
+              </summary>
+              <div class="ap-panel-background-browser__body">
+                <BackgroundPicker value={backgroundId} onSelect={chooseBackground} label="Background" immediate />
+              </div>
+            </details>
           </section>
 
           {/* ── Deep customization ── */}

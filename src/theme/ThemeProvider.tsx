@@ -37,10 +37,17 @@ import {
   type CustomTheme,
 } from './customThemes';
 import { parseThemeParam } from '@/lib/theme/themeShare';
-import { normalizeThemeId, persistThemeId, readThemeId, THEME_STORAGE_KEY } from './themeStorage';
+import {
+  normalizeThemeId,
+  persistThemeId,
+  readThemeId,
+  THEME_CHANGE_EVENT,
+  THEME_STORAGE_KEY,
+} from './themeStorage';
 import { highContrastOverrides } from './highContrastTheme';
 import { prefersMoreContrast } from '@/lib/a11y/mediaPrefs';
 import { preferences } from '@/lib/prefs/preferences';
+import { semanticThemeTokens } from './semanticTokens';
 
 type ThemeContextValue = {
   /** The currently active theme ID (a built-in ThemeId or a `custom:` id). */
@@ -200,13 +207,20 @@ export function applyThemeToDom(id: string, highContrast: boolean = prefersMoreC
   // defensive guard against a broken theme registry.
   if (!resolved) return;
 
-  const tokens = highContrast
+  const palette = highContrast
     ? { ...resolved.tokens, ...highContrastOverrides(resolved.tokens) }
     : resolved.tokens;
 
   const root = document.documentElement;
+  // Custom tokens may safely reference another palette token via var() or
+  // color-mix(). Commit the incoming palette first so browser colour
+  // resolution observes *this* theme, never stale values from the previous
+  // theme, then add the derived semantic inks in the same synchronous turn.
+  commitTokens(root, palette);
+  const tokens = { ...palette, ...semanticThemeTokens(palette) };
   commitTokens(root, tokens);
   root.setAttribute('data-theme', resolved.dataTheme);
+  root.dataset.themeScheme = resolved.scheme;
   root.style.setProperty('color-scheme', resolved.scheme);
 }
 
@@ -300,10 +314,10 @@ export function ThemeProvider(props: ThemeProviderProps) {
       setInnerThemeId(normalizeThemeId(id) ?? DEFAULT_THEME_ID);
     };
     window.addEventListener('storage', handleStorage);
-    window.addEventListener('onyx:theme-change', handleThemeChange);
+    window.addEventListener(THEME_CHANGE_EVENT, handleThemeChange);
     onCleanup(() => {
       window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('onyx:theme-change', handleThemeChange);
+      window.removeEventListener(THEME_CHANGE_EVENT, handleThemeChange);
     });
   });
 
@@ -325,6 +339,7 @@ export function ThemeProvider(props: ThemeProviderProps) {
     for (const prop of appliedTokenProps) root.style.removeProperty(prop);
     root.style.removeProperty('color-scheme');
     root.removeAttribute('data-theme');
+    delete root.dataset.themeScheme;
     appliedTokenProps = [];
   });
 

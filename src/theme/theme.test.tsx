@@ -57,6 +57,7 @@ beforeEach(() => {
   // Strip any inline style vars from a previous test.
   document.documentElement.removeAttribute('style');
   document.documentElement.removeAttribute('data-theme');
+  delete document.documentElement.dataset.themeScheme;
 });
 
 afterEach(() => {
@@ -86,15 +87,46 @@ describe('applyThemeToDom', () => {
   it('sets color-scheme to the theme scheme value', () => {
     applyThemeToDom('pearl');
     expect(getVar('color-scheme')).toBe('light');
+    expect(document.documentElement.dataset.themeScheme).toBe('light');
 
     applyThemeToDom('onyx');
     expect(getVar('color-scheme')).toBe('dark');
+    expect(document.documentElement.dataset.themeScheme).toBe('dark');
   });
 
   it('applies every defined token for all themes without throwing', () => {
     for (const id of THEME_IDS) {
       expect(() => applyThemeToDom(id)).not.toThrow();
       expect(document.documentElement.getAttribute('data-theme')).toBe(id);
+    }
+  });
+
+  it('derives readable semantic inks and an accent alias for every theme', () => {
+    for (const id of THEME_IDS) {
+      applyThemeToDom(id);
+      expect(getVar('--accent')).toBe(getVar('--lapis'));
+
+      const onAccent = parseHex(getVar('--on-accent'));
+      const onSecondary = parseHex(getVar('--on-secondary'));
+      const onDanger = parseHex(getVar('--on-danger'));
+      const lapis = parseHex(getVar('--lapis'));
+      const lapisBright = parseHex(getVar('--lapis-bright'));
+      const danger = parseHex(getVar('--danger')) ?? parseHex(getVar('--shu'));
+      const shu = parseHex(getVar('--shu'));
+      const goldBright = parseHex(getVar('--gold-bright'));
+      expect(onAccent, `${id} --on-accent`).not.toBeNull();
+      expect(onSecondary, `${id} --on-secondary`).not.toBeNull();
+      expect(onDanger, `${id} --on-danger`).not.toBeNull();
+      expect(lapis, `${id} --lapis`).not.toBeNull();
+      expect(lapisBright, `${id} --lapis-bright`).not.toBeNull();
+      expect(danger, `${id} --danger`).not.toBeNull();
+      expect(shu, `${id} --shu`).not.toBeNull();
+      expect(goldBright, `${id} --gold-bright`).not.toBeNull();
+      expect(contrastRatio(onAccent!, lapis!), `${id} on lapis`).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(onAccent!, lapisBright!), `${id} on lapis-bright`).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(onSecondary!, goldBright!), `${id} on gold-bright`).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(onDanger!, danger!), `${id} on danger`).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(onDanger!, shu!), `${id} on shu`).toBeGreaterThanOrEqual(4.5);
     }
   });
 
@@ -287,11 +319,51 @@ describe('ThemeProvider', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('shu');
   });
 
+  it('synchronizes when any non-component entry point persists a theme', async () => {
+    const { persistThemeId } = await import('./themeStorage');
+    render(() => <ThemeProvider><ThemeIdDisplay /></ThemeProvider>);
+
+    persistThemeId('pearl');
+
+    expect(screen.getByTestId('theme-id').textContent).toBe('pearl');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('pearl');
+    expect(document.documentElement.dataset.themeScheme).toBe('light');
+  });
+
+  it('derives semantic inks from incoming custom var references, not the previous DOM', () => {
+    // Start from a bright Ocean palette, then switch to a custom palette whose
+    // semantic fills reference a very dark incoming --gold token. Resolving
+    // against stale DOM would select dark text; the two-phase apply must select
+    // white from the new palette instead.
+    applyThemeToDom('ocean');
+    localStorage.setItem('onyx:custom-themes', JSON.stringify([{
+      id: 'custom:var-reference',
+      name: 'Var reference',
+      base: 'pearl',
+      overrides: {
+        '--gold': '#003000',
+        '--lapis': 'var(--gold)',
+        '--lapis-bright': 'var(--gold)',
+        '--danger': 'var(--gold)',
+        '--shu': 'var(--gold)',
+      },
+    }]));
+
+    applyThemeToDom('custom:var-reference');
+
+    const fill = parseHex(getVar('--gold'))!;
+    const onAccent = parseHex(getVar('--on-accent'))!;
+    const onDanger = parseHex(getVar('--on-danger'))!;
+    expect(contrastRatio(onAccent, fill)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(onDanger, fill)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('removes provider-owned theme mutations on unmount', () => {
     const view = render(() => <ThemeProvider><ThemeIdDisplay /></ThemeProvider>);
     expect(getVar('--ink')).toBeTruthy();
     view.unmount();
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
+    expect(document.documentElement.dataset.themeScheme).toBeUndefined();
     expect(getVar('--ink')).toBe('');
     expect(getVar('color-scheme')).toBe('');
   });

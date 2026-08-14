@@ -988,13 +988,9 @@ function navigateTo(path: string): void {
 }
 
 function applyTheme(id: ThemeId): void {
-  // ThemeProvider owns the document palette. The command owns only the
-  // persisted state and tells that reactive owner about this non-component
-  // selection path.
+  // persistThemeId emits the canonical same-tab event from the store action,
+  // so every non-component entry point reaches the mounted palette owner.
   getState().setTheme(id);
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('onyx:theme-change', { detail: { id } }));
-  }
 }
 
 function applyBackground(id: BackgroundId): void {

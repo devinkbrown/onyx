@@ -191,7 +191,32 @@
 .ap-lede-hint { color: var(--lapis); }
 .ap-lede-hint b { font-family: var(--font-mono); font-weight: 600; }
 
-.ap-studio { margin-top: clamp(34px, 5vw, 64px); }
+.ap-studio {
+  margin-top: clamp(34px, 5vw, 64px);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--surface-face, var(--stone)) 54%, transparent);
+  overflow: clip;
+}
+.ap-studio > summary {
+  display: grid;
+  gap: 5px;
+  min-height: 64px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style-position: inside;
+  color: var(--paper);
+}
+.ap-studio > summary::marker { color: var(--lapis); }
+.ap-studio > summary span {
+  color: var(--lapis-bright);
+  font: 0.66rem var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ap-studio > summary b { font: 600 0.92rem var(--font-sans); }
+.ap-studio[open] > summary { border-bottom: 1px solid var(--seam-faint); }
+.ap-studio__body { min-width: 0; }
 
 .ap-background-stage__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .ap-background-stage__heading > span { color: var(--lapis-bright); font: .66rem var(--font-mono); letter-spacing: .1em; text-transform: uppercase; }

@@ -117,7 +117,7 @@
    not tinted red: the alarm is the banner chrome, not the button. */
 .dm-keychange__accept {
   border: 1px solid var(--lapis-bright);
-  background: linear-gradient(135deg, var(--lapis-deep), var(--lapis) 60%, var(--lapis-bright));
+  background: var(--lapis);
   color: var(--on-accent);
 }
 

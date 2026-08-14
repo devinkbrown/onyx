@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store } from './store';
+import { BACKGROUND_STORAGE_KEY, store } from './store';
 
 const initialState = store.getInitialState();
 
@@ -82,6 +82,23 @@ describe('vanilla store', () => {
     expect(store.getState().activeTheme).toBe('ocean');
     expect(store.getState().theme).toBe('ocean');
     expect(localStorage.getItem('onyx:theme')).toBe('ocean');
+  });
+
+  it('synchronizes background changes made in another tab', () => {
+    localStorage.setItem(BACKGROUND_STORAGE_KEY, 'starfield');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: BACKGROUND_STORAGE_KEY,
+      newValue: 'starfield',
+    }));
+
+    expect(store.getState().backgroundId).toBe('starfield');
+
+    localStorage.setItem(BACKGROUND_STORAGE_KEY, 'removed-background');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: BACKGROUND_STORAGE_KEY,
+      newValue: 'removed-background',
+    }));
+    expect(store.getState().backgroundId).toBe('auto');
   });
 
   it('notifies selector subscribers when selected state changes', () => {

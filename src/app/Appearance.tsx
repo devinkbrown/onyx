@@ -70,10 +70,13 @@ export default function Appearance() {
     <header class="ap-bar"><a class="ap-back" href="/app/">← back to app</a><span class="ap-tag">◆ · appearance</span><a class="ap-home" href="/">home</a></header>
     <section class="ap-wrap">
       <p class="ap-kicker">customization</p><h1 class="ap-h1">Set the <span class="gold">atmosphere</span></h1>
-      <p class="ap-lede">Choose a background, let it settle in behind the page, then apply it when it feels right. <Show when={preview()}><span class="ap-lede-hint">Previewing now</span></Show></p>
+      <p class="ap-lede">Choose a theme and background. Background selections stay in preview until you apply them. <Show when={preview()}><span class="ap-lede-hint">Previewing now</span></Show></p>
       <section class="ap-group"><h2 class="ap-glabel">Theme</h2><div class="ap-chips" role="radiogroup" aria-label="Theme"><For each={themes()}>{(item) => <button type="button" class="ap-chip ap-chip--theme" classList={{ on: theme.themeId() === item.id }} role="radio" aria-checked={theme.themeId() === item.id} tabIndex={theme.themeId() === item.id ? 0 : -1} onKeyDown={moveThemeRadio} onClick={() => theme.setTheme(item.id)}><span class="ap-swatch" aria-hidden="true"><For each={item.swatch}>{(color) => <span style={{ background: color }} />}</For></span>{item.label}</button>}</For></div></section>
-      <section class="ap-group ap-background-stage"><div class="ap-background-stage__heading"><h2 class="ap-glabel">Background</h2><span>{dirty() ? 'Not applied' : 'Applied'}</span></div><p class="ap-ghint">Hover or focus for a short live preview. On touch, choose a card then apply.</p><BackgroundPicker value={candidate} onSelect={setCandidate} onPreview={setPreview} /><div class="ap-background-actions"><button type="button" class="ap-action ap-action--quiet" disabled={!dirty()} onClick={cancel}>Cancel</button><button type="button" class="ap-action ap-action--apply" disabled={!dirty()} onClick={apply}>Apply background</button></div></section>
-      <div class="ap-studio"><ThemeStudio /></div>
+      <section class="ap-group ap-background-stage"><div class="ap-background-stage__heading"><h2 class="ap-glabel">Background</h2><span>{dirty() ? 'Preview only' : 'Saved'}</span></div><p class="ap-ghint">Focus or hover previews a background. Selection is staged until you apply.</p><BackgroundPicker value={candidate} onSelect={setCandidate} onPreview={setPreview} /><div class="ap-background-actions"><button type="button" class="ap-action ap-action--quiet" disabled={!dirty()} onClick={cancel}>Cancel preview</button><button type="button" class="ap-action ap-action--apply" disabled={!dirty()} onClick={apply}>Apply background</button></div></section>
+      <details class="ap-studio">
+        <summary><span>Advanced mode</span><b>Build and audit a custom theme</b></summary>
+        <div class="ap-studio__body"><ThemeStudio /></div>
+      </details>
     </section>
   </main>;
 }

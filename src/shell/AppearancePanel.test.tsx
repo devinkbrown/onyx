@@ -18,6 +18,7 @@ import {
   resetSceneMotion,
   sceneMotion,
   setSceneMotion,
+  SCENE_MOTIONS,
 } from '@/lib/prefs/sceneMotion';
 
 const initialState = store.getInitialState();
@@ -103,7 +104,7 @@ describe('AppearancePanel', () => {
     expect(store.getState().backgroundId).toBe('starfield');
     expect(sceneMotion()).toBe('off');
     expect(localStorage.getItem('onyx:scene-motion')).toBe('off');
-    expect(screen.getByText('Saved · background off')).toBeInTheDocument();
+    expect(screen.getByText('Background off')).toBeInTheDocument();
   });
 
   it('exposes background motion controls beside the mobile-safe picker', () => {
@@ -116,6 +117,61 @@ describe('AppearancePanel', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: 'Animated' }));
     expect(sceneMotion()).toBe('animated');
+  });
+
+  it('collapses the long background catalogue behind a named browser', () => {
+    store.setState({ backgroundId: 'starfield' });
+    store.getState().openAppearance();
+    render(() => <AppearancePanel />);
+
+    const summary = screen.getByText('Choose background').closest('summary');
+    expect(summary).toBeInTheDocument();
+    expect(summary).toHaveTextContent('Starfield');
+    expect(summary?.parentElement).not.toHaveAttribute('open');
+  });
+
+  it('moves theme selection with Arrow keys while preserving single-tab stop semantics', () => {
+    store.getState().openAppearance();
+    render(() => <AppearancePanel />);
+
+    const allThemeRadios = screen.getAllByRole('radio', { name: /theme$/ });
+    const oceanRadio = screen.getByRole('radio', { name: 'Ocean theme' });
+
+    fireEvent.click(oceanRadio);
+    expect(oceanRadio).toHaveAttribute('tabIndex', '0');
+
+    const oceanIndex = allThemeRadios.indexOf(oceanRadio);
+    const nextIndex = (oceanIndex + 1) % allThemeRadios.length;
+    const nextTheme = allThemeRadios[nextIndex]!;
+
+    fireEvent.keyDown(oceanRadio, { key: 'ArrowRight', code: 'ArrowRight' });
+
+    expect(nextTheme).toHaveFocus();
+    expect(nextTheme).toHaveAttribute('aria-checked', 'true');
+    expect(oceanRadio).toHaveAttribute('tabIndex', '-1');
+    expect(nextTheme).toHaveAttribute('tabIndex', '0');
+  });
+
+  it('supports Home/End navigation on motion radios', () => {
+    store.getState().openAppearance();
+    render(() => <AppearancePanel />);
+
+    const offRadio = screen.getByRole('radio', { name: 'Off' });
+    fireEvent.click(offRadio);
+    const animatedRadio = screen.getByRole('radio', { name: 'Animated' });
+    const offRadioAfterHome = screen.getByRole('radio', { name: 'Off' });
+
+    fireEvent.keyDown(offRadio, { key: 'Home', code: 'Home' });
+
+    expect(animatedRadio).toHaveFocus();
+    expect(animatedRadio).toHaveAttribute('aria-checked', 'true');
+    expect(animatedRadio).toHaveAttribute('tabIndex', '0');
+
+    fireEvent.keyDown(animatedRadio, { key: 'End', code: 'End' });
+    expect(offRadioAfterHome).toHaveFocus();
+    expect(offRadioAfterHome).toHaveAttribute('aria-checked', 'true');
+    expect(offRadioAfterHome).toHaveAttribute('tabIndex', '0');
+    expect(SCENE_MOTIONS.indexOf('off')).not.toBe(-1);
   });
 
   it('imports a shared theme code from the appearance panel', () => {

@@ -244,8 +244,8 @@ function decideMode(input: BackgroundPolicyInput): {
   mode: BackgroundMode;
   reason: BackgroundPolicyReason;
 } {
-  if (input.reducedData) return { mode: 'off', reason: 'reduced-data' };
   if (input.sceneMotion === 'off') return { mode: 'off', reason: 'user' };
+  if (input.reducedData) return { mode: 'off', reason: 'reduced-data' };
   if (input.reducedMotion) return { mode: 'still', reason: 'reduced-motion' };
   if (input.sceneMotion === 'still') return { mode: 'still', reason: 'user' };
   return { mode: 'animated', reason: 'user' };

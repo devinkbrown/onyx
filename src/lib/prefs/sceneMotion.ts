@@ -14,7 +14,7 @@ export type SceneMotion = (typeof SCENE_MOTIONS)[number];
 
 export const DEFAULT_SCENE_MOTION: SceneMotion = 'animated';
 
-const STORAGE_KEY = 'onyx:scene-motion';
+export const SCENE_MOTION_STORAGE_KEY = 'onyx:scene-motion';
 
 function hasStorage(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
@@ -32,7 +32,7 @@ export function loadSceneMotion(): SceneMotion {
   if (!hasStorage()) return DEFAULT_SCENE_MOTION;
 
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(SCENE_MOTION_STORAGE_KEY);
     return isSceneMotion(stored) ? stored : DEFAULT_SCENE_MOTION;
   } catch {
     return DEFAULT_SCENE_MOTION;
@@ -43,7 +43,7 @@ function persistSceneMotion(value: SceneMotion): void {
   if (!hasStorage()) return;
 
   try {
-    localStorage.setItem(STORAGE_KEY, value);
+    localStorage.setItem(SCENE_MOTION_STORAGE_KEY, value);
   } catch {
     /* storage unavailable / quota - non-fatal */
   }
@@ -70,4 +70,19 @@ export function setSceneMotion(value: SceneMotion): void {
 
 export function resetSceneMotion(): void {
   setSceneMotion(DEFAULT_SCENE_MOTION);
+}
+
+// Initialize every route, including the standalone Appearance route, before an
+// AppShell exists. Also converge motion changes made in another browser tab;
+// the storage event never fires in the tab that performed the write, whose
+// setSceneMotion call has already updated the signal synchronously.
+if (typeof window !== 'undefined') {
+  applySceneMotion(sceneMotion());
+  window.addEventListener('storage', (event: StorageEvent) => {
+    if (event.key !== SCENE_MOTION_STORAGE_KEY && event.key !== null) return;
+    if (event.storageArea && event.storageArea !== localStorage) return;
+    const next = loadSceneMotion();
+    setSceneMotionSignal(next);
+    applySceneMotion(next);
+  });
 }

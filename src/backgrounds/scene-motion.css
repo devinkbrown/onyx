@@ -8,14 +8,10 @@
 /* Background.tsx renders both canvas and DOM scene hosts with
    `data-background-canvas="true"`; SceneShell.tsx renders DOM scenes as
    `.onyx-scene` inside that host. */
-:root[data-scene-motion='still'] [data-background-canvas='true'],
-:root[data-scene-motion='still'] [data-background-canvas='true'] *,
-:root[data-scene-motion='still'] [data-background-canvas='true'] *::before,
-:root[data-scene-motion='still'] [data-background-canvas='true'] *::after {
+[data-background-canvas='true'][data-background-mode='still'],
+[data-background-canvas='true'][data-background-mode='still'] *,
+[data-background-canvas='true'][data-background-mode='still'] *::before,
+[data-background-canvas='true'][data-background-mode='still'] *::after {
   animation-play-state: paused !important;
   transition: none !important;
-}
-
-:root[data-scene-motion='off'] [data-background-canvas='true'] {
-  display: none !important;
 }

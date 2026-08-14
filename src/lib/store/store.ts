@@ -259,6 +259,8 @@ import {
 import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from '@/theme/themes';
 import { normalizeThemeId, persistThemeId, readThemeId } from '@/theme/themeStorage';
 
+export const BACKGROUND_STORAGE_KEY = 'onyx:bg';
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type ChannelEventType = 'join' | 'part' | 'quit' | 'kick' | 'mode' | 'nick';
@@ -17446,21 +17448,20 @@ function _loadMessageMaxWidth(): 680 | 860 | 0 { const v = typeof window !== 'un
 function _loadGlassSidebar(): boolean { return typeof window !== 'undefined' && localStorage.getItem('onyx:glass-sidebar') === '1'; }
 
 // ── Background persistence (shared with the Appearance route, key 'onyx:bg') ──
-// NB: literals are inlined (not module-level consts) because _loadBackground is
-// invoked while the store's initial state is built — earlier in module eval
-// than any const declared down here would be initialized (TDZ).
+// The key is declared with imports, before store initialization, because this
+// loader runs while the store's initial state is being built.
 function _loadBackground(): string {
   // Default 'auto' → the background follows the active theme's signature scene
   // (see src/shell/themeBackground.ts). Legacy stored ids still pin a scene.
   if (typeof window === 'undefined') return 'auto';
   try {
-    const stored = localStorage.getItem('onyx:bg');
+    const stored = localStorage.getItem(BACKGROUND_STORAGE_KEY);
     return stored === 'auto' ? 'auto' : (resolveCatalogueBackgroundId(stored) ?? 'auto');
   } catch { return 'auto'; }
 }
 function _saveBackground(id: string): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem('onyx:bg', id); } catch {}
+  try { localStorage.setItem(BACKGROUND_STORAGE_KEY, id); } catch {}
 }
 
 // ── High contrast mode persistence ───────────────────────────────────────────
@@ -17498,6 +17499,11 @@ function _loadDisplayFontSize(): number {
 // synchronous WS frame usually flushes during unload. This module only loads on
 // the /app route, so the listener never affects the landing page.
 if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key !== BACKGROUND_STORAGE_KEY && event.key !== null) return;
+    if (event.storageArea && event.storageArea !== localStorage) return;
+    store.setState({ backgroundId: _loadBackground() });
+  });
   window.addEventListener('pagehide', (event) => {
     if (event.persisted) return;
     try {

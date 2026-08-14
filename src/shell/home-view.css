@@ -2104,13 +2104,13 @@
   cursor: pointer;
 }
 .home-recap-card__open {
-  color: var(--on-accent);
+  color: var(--on-secondary);
   background: var(--gold-bright);
   border: 1px solid transparent;
 }
 .home-recap-card__review {
-  color: var(--on-accent);
-  background: color-mix(in oklab, var(--lapis-bright) 82%, var(--gold-bright));
+  color: var(--on-secondary);
+  background: var(--gold-bright);
   border: 1px solid transparent;
 }
 .home-recap-card__spotlight {

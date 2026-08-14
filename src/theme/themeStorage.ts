@@ -3,6 +3,8 @@ import { DEFAULT_THEME_ID, THEMES, type ThemeId } from './themes';
 import { getCustomTheme, isCustomThemeId } from './customThemes';
 
 export const THEME_STORAGE_KEY = 'onyx:theme';
+/** Same-tab bridge used by store/command entry points that cannot reach context. */
+export const THEME_CHANGE_EVENT = 'onyx:theme-change';
 
 /** English-only theme id remaps for retired English aliases (no Japanese brands). */
 const LEGACY_THEME_MAP: Record<string, ThemeId> = {
@@ -36,9 +38,15 @@ export function readThemeId(): string {
 }
 
 export function persistThemeId(id: string): void {
+  const valid = normalizeThemeId(id) ?? DEFAULT_THEME_ID;
   try {
-    localStorage.setItem(THEME_STORAGE_KEY, normalizeThemeId(id) ?? DEFAULT_THEME_ID);
+    localStorage.setItem(THEME_STORAGE_KEY, valid);
   } catch {
     // Ignore write failures.
+  }
+  // `storage` only fires in *other* browsing contexts. Notify this document as
+  // well so store/command entry points and ThemeProvider cannot drift.
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { id: valid } }));
   }
 }

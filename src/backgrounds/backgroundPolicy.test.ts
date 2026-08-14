@@ -84,10 +84,10 @@ describe('deriveBackgroundPolicy — mode precedence', () => {
     expect(policy.reason).toBe('user');
   });
 
-  it('prefers reduced-data over explicit Off when both apply', () => {
+  it('preserves explicit Off over reduced-data so no placeholder is painted', () => {
     const policy = deriveBackgroundPolicy(input({ sceneMotion: 'off', reducedData: true }));
     expect(policy.mode).toBe('off');
-    expect(policy.reason).toBe('reduced-data');
+    expect(policy.reason).toBe('user');
   });
 
   it('freezes for OS or in-app reduced motion instead of swapping the scene off', () => {
