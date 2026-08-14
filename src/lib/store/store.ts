@@ -31,6 +31,7 @@ import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric
 import {
   isSessionListEnd,
   parseSessionDropOk,
+  isSessionDropSuccess,
   parseSessionListLine,
   type AccountSessionRow,
 } from '@/lib/irc/sessionList';
@@ -873,8 +874,8 @@ export interface OnyxState {
   /** `SESSION LIST` — refresh the account session roster from the server. */
   refreshAccountSessions(): void;
   /**
-   * `SESSION DROP #<n>` — revoke another attachment. Refuses the current
-   * connection (server-side CANNOT_DROP_CURRENT); UI also disables that row.
+   * Revoke another attachment by its current-server physical SID, falling back
+   * to the legacy LIST ordinal. The current connection is always refused.
    */
   dropAccountSession(index: number): void;
   /**
@@ -8054,7 +8055,7 @@ export const store = createStore<OnyxState>()(
         return;
       }
       set({ accountSessionsPending: true, accountSessionsError: null });
-      client.sendRaw('SESSION', 'DROP', `#${Math.trunc(index)}`);
+      client.sendRaw('SESSION', 'DROP', row?.sid ? `sid=${row.sid}` : `#${Math.trunc(index)}`);
     },
 
     accountSet(field, value, password) {
@@ -11452,9 +11453,11 @@ export const store = createStore<OnyxState>()(
               break;
             }
             const dropped = parseSessionDropOk(text);
-            if (dropped !== null) {
+            if (dropped !== null || isSessionDropSuccess(text)) {
               set((st) => ({
-                accountSessions: st.accountSessions.filter((r) => r.index !== dropped),
+                accountSessions: dropped === null
+                  ? st.accountSessions
+                  : st.accountSessions.filter((r) => r.index !== dropped),
                 accountSessionsPending: false,
                 accountSessionsError: null,
               }));
