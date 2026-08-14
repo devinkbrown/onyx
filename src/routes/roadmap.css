@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
 .roadmap-page {
+  --roadmap-current: var(--public-current);
+  --roadmap-current-strong: var(--public-signal-strong);
+  --roadmap-warm: var(--public-ember);
   min-height: 100svh;
   overflow: clip;
 }
@@ -11,6 +14,10 @@
 
 .roadmap-hero h1 {
   max-width: 12ch;
+}
+
+.roadmap-hero h1 .roadmap-title-accent {
+  color: var(--roadmap-current-strong);
 }
 
 .roadmap-legend {
@@ -44,16 +51,16 @@
 
 .roadmap-legend span[data-state='active'],
 .roadmap-card[data-state='active'] .roadmap-state {
-  color: var(--lapis-bright);
-  border-color: color-mix(in oklab, var(--lapis) 48%, var(--seam-faint));
-  background: color-mix(in oklab, var(--lapis) 14%, transparent);
+  color: var(--roadmap-current-strong);
+  border-color: color-mix(in oklab, var(--roadmap-current) 48%, var(--seam-faint));
+  background: color-mix(in oklab, var(--roadmap-current) 14%, transparent);
 }
 
 .roadmap-legend span[data-state='next'],
 .roadmap-card[data-state='next'] .roadmap-state {
-  color: var(--gold-bright, var(--paper));
-  border-color: color-mix(in oklab, var(--gold, var(--paper-mute)) 38%, var(--seam-faint));
-  background: color-mix(in oklab, var(--gold, var(--paper-mute)) 10%, transparent);
+  color: var(--roadmap-warm);
+  border-color: color-mix(in oklab, var(--roadmap-warm) 38%, var(--seam-faint));
+  background: color-mix(in oklab, var(--roadmap-warm) 10%, transparent);
 }
 
 .roadmap-legend span[data-state='gated'],
@@ -83,11 +90,11 @@
 }
 
 .roadmap-card[data-state='active']::before {
-  background: var(--lapis-bright);
+  background: var(--roadmap-current-strong);
 }
 
 .roadmap-card[data-state='next']::before {
-  background: var(--gold-bright, var(--paper));
+  background: var(--roadmap-warm);
 }
 
 .roadmap-card-head {
@@ -135,7 +142,7 @@
 
 .roadmap-principle .data-card {
   background:
-    linear-gradient(120deg, color-mix(in oklab, var(--lapis) 13%, transparent), transparent 58%),
+    linear-gradient(120deg, color-mix(in oklab, var(--roadmap-current) 13%, transparent), transparent 58%),
     color-mix(in oklab, var(--stone-2) 42%, var(--ink));
 }
 
@@ -184,6 +191,10 @@
 }
 
 @media (forced-colors: active) {
+  .roadmap-hero h1 .roadmap-title-accent {
+    color: LinkText;
+  }
+
   .roadmap-legend span,
   .roadmap-state,
   .roadmap-card::before {

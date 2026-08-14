@@ -1,7 +1,6 @@
-/* Onyx /about — deep-water dark-luxury: depth, azure currents, bioluminescence.
-   Banished: purple, glassmorphism/backdrop-blur cards, neon glow, AI gradient text, Inter.
-   Present: abyssal depth gradients, flowing azure current seams, sea-foam text,
-   champagne gold as a sparing second accent, fluid radii, calm human voice. */
+/* Onyx /about — Room Current technical essay.
+   Banished: purple, glassmorphism/backdrop-blur cards, neon glow, gold shouting, Inter.
+   Present: void/surface/seam tokens, current for proof, ember for caution. */
 
 /* ───────── Inherit atmosphere from landing ───────── */
 /* .r-ground, .r-flecks, .r-veins, .r-grain, .r-divider, .r-status, .r-footer
@@ -10,8 +9,11 @@
    into bioluminescent azure currents without touching landing.css. */
 
 .ab-ocean {
+  --ab-current: var(--public-current);
+  --ab-current-strong: var(--public-signal-strong);
+  --ab-ember: var(--public-ember);
   min-width: 0;
-  color: var(--paper);
+  color: var(--public-text);
 }
 
 .ab-ocean .r-wrap,
@@ -22,15 +24,15 @@
 }
 
 /* Re-tint the shared gold atmosphere to azure bioluminescence (scoped to /about) */
-.ab-ocean .r-veins path { stroke: var(--lapis); }
-.ab-ocean .r-veins .node { fill: var(--lapis-bright); }
+.ab-ocean .r-veins path { stroke: var(--ab-current); }
+.ab-ocean .r-veins .node { fill: var(--ab-current-strong); }
 .ab-ocean .r-flecks {
   background-image:
     radial-gradient(1.4px 1.4px at 12% 22%, var(--lapis-bright) 50%, transparent 52%),
     radial-gradient(1px 1px at 78% 16%, var(--lapis) 50%, transparent 52%),
     radial-gradient(1.5px 1.5px at 64% 60%, var(--lapis-bright) 50%, transparent 52%),
     radial-gradient(1px 1px at 30% 78%, var(--lapis) 50%, transparent 52%),
-    radial-gradient(1px 1px at 88% 72%, var(--gold-bright) 50%, transparent 52%),
+    radial-gradient(1px 1px at 88% 72%, var(--ab-current) 50%, transparent 52%),
     radial-gradient(1.4px 1.4px at 44% 34%, var(--lapis) 50%, transparent 52%),
     radial-gradient(1px 1px at 22% 52%, var(--lapis-bright) 50%, transparent 52%),
     radial-gradient(1px 1px at 56% 88%, var(--lapis) 50%, transparent 52%);
@@ -58,7 +60,7 @@
   font-size: 13px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--lapis);
+  color: var(--ab-current);
 }
 
 .ab-hero .r-kicker::before {
@@ -78,22 +80,8 @@
   text-wrap: balance;
 }
 
-/* Hero accent — bioluminescent azure crest cresting over deep water */
-.ab-hero h1 .gold {
-  background: linear-gradient(
-    98deg,
-    var(--lapis-deep) 0%,
-    var(--lapis) 24%,
-    var(--lapis-bright) 46%,
-    #e8fbff 52%,
-    var(--lapis-bright) 60%,
-    var(--lapis) 80%,
-    var(--lapis-deep) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 0 18px color-mix(in oklab, var(--lapis) 40%, transparent));
+.ab-hero h1 .ab-thesis-accent {
+  color: var(--ab-current-strong);
 }
 
 .ab-hero .serif-pull {
@@ -108,7 +96,7 @@
 }
 
 .ab-hero .serif-pull em {
-  color: var(--lapis-bright);
+  color: var(--ab-current-strong);
   font-style: italic;
 }
 
@@ -863,17 +851,16 @@
   border-top-color: var(--lapis);
 }
 
-/* jewel = Onyx client — champagne gold, the sparing second accent */
 .ab-myth.jewel {
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, var(--gold-deep) 16%, var(--ink)),
+    color-mix(in oklab, var(--ab-ember) 16%, var(--ink)),
     var(--ink)
   );
 }
 
 .ab-myth.jewel:hover {
-  border-top-color: var(--gold-bright);
+  border-top-color: var(--ab-ember);
 }
 
 .ab-myth .ideograph {
@@ -898,7 +885,7 @@
 }
 
 .ab-myth.jewel .ideograph {
-  color: var(--gold-bright);
+  color: var(--ab-ember);
 }
 
 .ab-myth .name {
@@ -909,9 +896,8 @@
   color: var(--paper);
 }
 
-/* the Onyx client card carries the sparing champagne second accent */
 .ab-myth.jewel .name {
-  color: var(--gold);
+  color: var(--ab-current-strong);
 }
 
 .ab-myth p {
@@ -1251,6 +1237,11 @@
 }
 
 @media (forced-colors: active) {
+  .ab-hero h1 .ab-thesis-accent,
+  .ab-myth.jewel .name {
+    color: LinkText;
+  }
+
   .ab-feed,
   .ab-topics a {
     border-color: CanvasText;

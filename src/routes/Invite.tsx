@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './data-pages.css';
+import './invite.css';
 import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { buildInviteCard, inviteDescription, inviteTitle } from '@/lib/invite/inviteCard';
@@ -81,7 +82,17 @@ export default function InviteRoute() {
   }
 
   return (
-    <PublicFrame currentPath="/invite/" mainLabel="Onyx invite">
+    <PublicFrame
+      currentPath="/invite/"
+      mainLabel="Onyx invite"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Threshold</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Invite</span>
+        </p>
+      )}
+    >
       <div class="ui-root r data-page invite-page">
       <div class="r-ground" aria-hidden="true" />
       <div class="r-flecks" aria-hidden="true" />
@@ -95,11 +106,25 @@ export default function InviteRoute() {
       <section class="r-wrap data-hero" aria-labelledby="invite-heading">
         <p class="r-kicker">invite</p>
         <h1 id="invite-heading">
-          <Show when={card().channel} fallback={<>Join<br /><span class="gold">{NETWORK_NAME}</span></>}>
-            {(channel) => <>Join<br /><span class="gold">{channel()}</span></>}
+          <Show when={card().channel} fallback={<>Join<br /><span class="invite-title-accent">{NETWORK_NAME}</span></>}>
+            {(channel) => <>Join<br /><span class="invite-title-accent">{channel()}</span></>}
           </Show>
         </h1>
         <p class="sub">{description()}</p>
+        <dl class="invite-safety-receipt" aria-label="Invite handoff receipt">
+          <div>
+            <dt>Source</dt>
+            <dd>This invite URL</dd>
+          </div>
+          <div>
+            <dt>Destination</dt>
+            <dd>{card().channel ?? 'Onyx room directory'}</dd>
+          </div>
+          <div>
+            <dt>Handoff</dt>
+            <dd>Only supported fields move into Onyx when you choose Open invite.</dd>
+          </div>
+        </dl>
         <div class="r-cta">
           <a class="r-btn primary" href={appHref()}>Open invite in Onyx</a>
           <button
@@ -111,7 +136,7 @@ export default function InviteRoute() {
           >
             {copyButtonLabel()}
           </button>
-          <a class="r-btn ghost" href="/guides/">Read the quick guides</a>
+          <a class="r-btn ghost" href="/about/">How Onyx works</a>
         </div>
         <Show when={copyState() === 'copied'}>
           <p class="invite-copy-status" role="status">Invite link copied to clipboard.</p>

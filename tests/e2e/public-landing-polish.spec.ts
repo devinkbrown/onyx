@@ -8,18 +8,23 @@ for (const viewport of [
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/');
 
-    const primary = page.locator('main .home-cta-primary');
+    const primary = page.locator('.public-frame__open');
     const aperture = page.locator('[data-home-aperture]');
     const current = page.locator('[data-home-current]');
+    const evidence = page.locator('[data-home-evidence]');
     await expect(primary).toBeVisible();
     await expect(aperture).toBeVisible();
+    await expect(aperture.getByText('Preview').first()).toBeVisible();
+    await expect(evidence).toBeVisible();
     await expect(current.locator('li')).toHaveCount(4);
 
     const geometry = await page.evaluate(() => {
-      const cta = document.querySelector<HTMLElement>('main .home-cta-primary')!;
+      const cta = document.querySelector<HTMLElement>('.public-frame__open')!;
       const aperture = document.querySelector<HTMLElement>('[data-home-aperture]')!;
+      const evidence = document.querySelector<HTMLElement>('[data-home-evidence]')!;
       const ctaRect = cta.getBoundingClientRect();
       const apertureRect = aperture.getBoundingClientRect();
+      const evidenceRect = evidence.getBoundingClientRect();
       return {
         clientWidth: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth,
@@ -28,6 +33,8 @@ for (const viewport of [
         ctaHeight: ctaRect.height,
         apertureLeft: apertureRect.left,
         apertureRight: apertureRect.right,
+        evidenceLeft: evidenceRect.left,
+        evidenceRight: evidenceRect.right,
       };
     });
 
@@ -37,6 +44,8 @@ for (const viewport of [
     expect(geometry.ctaHeight).toBeGreaterThanOrEqual(44);
     expect(geometry.apertureLeft).toBeGreaterThanOrEqual(0);
     expect(geometry.apertureRight).toBeLessThanOrEqual(viewport.width);
+    expect(geometry.evidenceLeft).toBeGreaterThanOrEqual(0);
+    expect(geometry.evidenceRight).toBeLessThanOrEqual(viewport.width);
   });
 }
 

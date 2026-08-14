@@ -1,0 +1,43 @@
+/* Supporting public routes use the same Room Current threshold as the
+   narrative pages while keeping their short, contractual copy intact. */
+.public-info-page {
+  --info-current: var(--public-current);
+  --info-paper: var(--public-text);
+  --info-muted: var(--public-muted);
+}
+
+.public-info-page .data-hero {
+  position: relative;
+  padding-block-end: clamp(2rem, 5vw, 4rem);
+  border-bottom: 1px solid var(--public-line);
+}
+
+.public-info-page .data-hero::after {
+  content: '';
+  position: absolute;
+  inset: auto auto -1px 0;
+  width: min(8rem, 30%);
+  height: 2px;
+  background: var(--info-current);
+}
+
+.public-info-page .data-hero .r-kicker,
+.public-info-page .public-info-card .label {
+  color: var(--info-current);
+}
+
+.public-info-page .public-info-card {
+  border-color: color-mix(in oklab, var(--info-current) 32%, var(--public-line));
+  background:
+    linear-gradient(120deg, color-mix(in oklab, var(--info-current) 10%, transparent), transparent 52%),
+    var(--public-raised);
+}
+
+.public-info-page .public-info-card h2 { color: var(--info-paper); }
+.public-info-page .public-info-card p { color: var(--info-muted); }
+
+@media (forced-colors: active) {
+  .public-info-page .data-hero,
+  .public-info-page .public-info-card { border-color: CanvasText; background: Canvas; }
+  .public-info-page .data-hero::after { background: Highlight; }
+}

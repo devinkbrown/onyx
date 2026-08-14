@@ -9,10 +9,11 @@ import { publicFeedFreshness, type PublicFeedFreshness } from '@/lib/stats/feedB
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
 
-type StatsFeedState = PublicFeedFreshness | 'partial' | 'unavailable';
+type StatsFeedState = PublicFeedFreshness | 'partial' | 'loading' | 'unavailable';
 
 function feedStateLabel(state: StatsFeedState): string {
   switch (state) {
+    case 'loading': return 'stats checking';
     case 'current': return 'stats current';
     case 'stale': return 'stats stale';
     case 'future': return 'stats time mismatch';
@@ -20,6 +21,22 @@ function feedStateLabel(state: StatsFeedState): string {
     case 'partial': return 'stats incomplete';
     default: return 'stats unavailable';
   }
+}
+
+function feedLedgerPhrase(state: StatsFeedState): string {
+  switch (state) {
+    case 'current': return 'export current';
+    case 'partial': return 'export incomplete';
+    case 'stale': return 'export stale';
+    case 'future': return 'export time mismatch';
+    case 'unknown': return 'export undated';
+    case 'loading': return 'export pending';
+    default: return 'export unavailable';
+  }
+}
+
+function presenceFromExport(state: StatsFeedState, whenCurrent: string, otherwise: string): string {
+  return state === 'current' ? whenCurrent : otherwise;
 }
 
 function barHeight(day: NetworkDay, max: number): string {
@@ -246,9 +263,9 @@ export default function StatsRoute() {
     });
   });
   const heatmapMax = createMemo(() => Math.max(0, ...(matchingChannelDetail()?.heatmap.flat() ?? [])));
-  const feedState = createMemo<PublicFeedFreshness | 'partial' | 'unavailable'>(() => {
+  const feedState = createMemo<StatsFeedState>(() => {
     const data = stats.latest;
-    if (!data) return 'unavailable';
+    if (!data) return stats.loading ? 'loading' : 'unavailable';
     const freshness = publicFeedFreshness(data.generated_at, nowMs());
     return freshness === 'current' && (!data.channels_complete || !data.network_days_complete)
       ? 'partial'
@@ -256,7 +273,17 @@ export default function StatsRoute() {
   });
 
   return (
-    <PublicFrame currentPath="/stats/" mainLabel="Onyx network stats">
+    <PublicFrame
+      currentPath="/stats/"
+      mainLabel="Onyx network stats"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Signal</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Stats</span>
+        </p>
+      )}
+    >
       <div class="ui-root r data-page stats-page">
         <div class="r-ground" aria-hidden="true" />
         <div class="r-flecks" aria-hidden="true" />
@@ -270,8 +297,8 @@ export default function StatsRoute() {
         <div class="r-grain" aria-hidden="true" />
 
         <section class="r-wrap data-hero stats-hero" aria-labelledby="stats-heading">
-        <p class="r-kicker">live network · public rooms</p>
-        <h1 id="stats-heading">The rooms <br /><span class="gold">in motion</span></h1>
+        <p class="r-kicker">public network · room activity</p>
+        <h1 id="stats-heading">The rooms <br /><span class="stats-title-accent">in motion</span></h1>
         <p class="sub">
           See where people are talking, follow the network’s rhythm, and step
           directly into a public conversation. No member rankings. No message text.
@@ -286,12 +313,21 @@ export default function StatsRoute() {
           <span class="stats-observation__marker" aria-hidden="true" />
           {feedStateLabel(feedState())}
         </div>
-        <Show when={stats.latest} fallback={<div class="data-empty">Stats are waiting for the next exported feed.</div>}>
+        <Show
+          when={stats.latest}
+          fallback={(
+            <div class="data-empty">
+              {feedState() === 'loading'
+                ? 'Stats are waiting for the next exported feed.'
+                : 'No public stats export is available.'}
+            </div>
+          )}
+        >
           {(data) => (
             <>
               <div class="stats-ledger" aria-label="Live feed ledger">
                 <span class="stats-ledger-mark" data-state={feedState()} aria-hidden="true" />
-                <p><strong>{data().network || 'Onyx'} activity ledger</strong> · conversation current · {data().node || 'network export'} · updated {relTime(data().generated_at, nowMs())}</p>
+                <p><strong>{data().network || 'Onyx'} activity ledger</strong> · {feedLedgerPhrase(feedState())} · {data().node || 'network export'} · updated {relTime(data().generated_at, nowMs())}</p>
                 <button
                   type="button"
                   class="stats-refresh"
@@ -307,12 +343,12 @@ export default function StatsRoute() {
                 <div class="data-metric stats-primary-metric" data-tone="presence">
                   <span class="label">people online</span>
                   <span class="value">{formatCount(data().users_online)}</span>
-                  <span class="note"><i aria-hidden="true" /> live network presence</span>
+                  <span class="note"><i aria-hidden="true" /> {presenceFromExport(feedState(), 'live network presence', 'presence from this export')}</span>
                 </div>
                 <div class="data-metric" data-tone="rooms">
                   <span class="label">rooms moving</span>
                   <span class="value">{formatCount(activeRooms())}</span>
-                  <span class="note">{formatCount(roomsWithPeople())} live right now</span>
+                  <span class="note">{formatCount(roomsWithPeople())} {presenceFromExport(feedState(), 'live right now', 'present in this export')}</span>
                 </div>
                 <div class="data-metric" data-tone="messages">
                   <span class="label">messages observed</span>
@@ -412,7 +448,7 @@ export default function StatsRoute() {
                   <div class="data-metric" data-tone="presence">
                     <span class="label">present</span>
                     <span class="value">{(room().present || room().active_users).toLocaleString('en-US')}</span>
-                    <span class="note">right now</span>
+                    <span class="note">{presenceFromExport(feedState(), 'right now', 'in this export')}</span>
                   </div>
                 </div>
                 <div class="r-cta">
@@ -435,7 +471,7 @@ export default function StatsRoute() {
             <span class="r-eyebrow">room signal</span>
             <h2 class="r-title" id="inspector-heading">
               <Show when={inspectedChannel()} fallback="Choose a room">
-                {(channel) => <>Inside <span class="gold">{channel()}</span></>}
+                {(channel) => <>Inside <span class="stats-title-accent">{channel()}</span></>}
               </Show>
             </h2>
           </div>

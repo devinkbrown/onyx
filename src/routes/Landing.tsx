@@ -23,9 +23,9 @@ const LANDING_SHELF_ITEMS = [
 ] as const;
 
 /**
- * Onyx public homepage — mineral-night front door with a live-room aperture.
+ * Onyx public homepage — Room Current threshold.
  * Contract: docs/PUBLIC_COMPANY_SITE.md
- * Proof order: browser entry → aperture preview → compact telemetry →
+ * Proof order: browser entry → labeled Room Aperture → evidence rail →
  * capability current → operator shelf. One primary Open Onyx CTA.
  * Native artifacts remain a secondary, platform-neutral link at /download/.
  */
@@ -82,12 +82,36 @@ export default function Landing() {
       case 'stale': return 'stale';
       case 'future': return 'time mismatch';
       case 'unknown': return 'undated';
-      default: return 'listening';
+      case 'loading': return 'listening';
+      default: return 'unavailable';
     }
+  });
+  const peopleHint = createMemo(() => {
+    if (stats.latest) return 'reported';
+    return stats.loading ? 'waiting for stats' : 'no stats export';
+  });
+  const roomsHint = createMemo(() => {
+    if (stats.latest) return stats.latest.channels_complete ? 'tracked' : 'partial';
+    return stats.loading ? 'waiting' : 'no export';
+  });
+  const busyHint = createMemo(() => {
+    const report = status.latest;
+    if (report) return `up ${formatDuration(report.uptime_seconds)}`;
+    return status.loading ? 'no status yet' : 'no status export';
   });
 
   return (
-    <PublicFrame currentPath="/" mainLabel="Onyx home">
+    <PublicFrame
+      currentPath="/"
+      mainLabel="Onyx home"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Threshold</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Home</span>
+        </p>
+      )}
+    >
       <div class="ui-root r r-landing home">
       {/* Thin mineral atmosphere — motion stacks gated in home.css reduced-motion */}
       <div class="r-ground home-ground" aria-hidden="true" />
@@ -124,76 +148,22 @@ export default function Landing() {
             <div
               class="home-aperture-shell"
               role="img"
-              aria-label="Preview of an Onyx room with a call stage, chat, local continuity, and protection state — not live content"
+              aria-label="Preview of an Onyx room doorway with rooms, messages, calls, local continuity, and shown protection — not live content"
             >
-              <div class="home-aperture-chrome">
-                <span class="home-aperture-dots" aria-hidden="true"><i /><i /><i /></span>
-                <span class="home-aperture-title">#root · living room</span>
-                <span class="home-aperture-chip">Preview</span>
-              </div>
-
-              <div class="home-aperture-body">
-                {/* Miniature room rail — product silhouette, not a live list */}
-                <div class="home-aperture-rail" aria-hidden="true">
-                  <span class="home-aperture-rail-k">Rooms</span>
-                  <span class="home-aperture-rail-item is-active">
-                    <i class="mark mark-msg" />#root
-                  </span>
-                  <span class="home-aperture-rail-item">
-                    <i class="mark mark-call" />#stage
-                  </span>
-                  <span class="home-aperture-rail-item mute">
-                    <i class="mark mark-cont" />#ops
-                  </span>
-                </div>
-
-                <div class="home-aperture-main">
-                  <div class="home-aperture-stage">
-                    <div class="home-aperture-stage-meta">
-                      <span class="mark mark-call" aria-hidden="true" />
-                      <span>Call · share</span>
-                    </div>
-                    <div class="home-aperture-tiles" aria-hidden="true">
-                      <span class="home-aperture-tile is-you">you</span>
-                      <span class="home-aperture-tile">mira</span>
-                      <span class="home-aperture-tile is-idle">+</span>
-                    </div>
-                    <p class="home-aperture-stage-title">Voice when you need it</p>
-                    <p class="home-aperture-stage-sub">Camera optional · share when ready</p>
-                    <span class="home-aperture-protect">
-                      <span class="mark mark-protect" aria-hidden="true" />
-                      Protection shown, not assumed
-                    </span>
-                  </div>
-
-                  <div class="home-aperture-chat">
-                    <div class="home-aperture-line">
-                      <span class="who">mira</span>
-                      <span class="msg">Room is open — drop a message when you land.</span>
-                    </div>
-                    <div class="home-aperture-line">
-                      <span class="who mute">you</span>
-                      <span class="msg">History stays on this device.</span>
-                    </div>
-                    <div class="home-aperture-continuity" aria-hidden="true">
-                      <span class="mark mark-cont" />
-                      <span>Local continuity · resume when you return</span>
-                    </div>
-                    <div class="home-aperture-composer" aria-hidden="true">
-                      <span>Message #root</span>
-                      <span class="send">Send</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Category-spectrum current under the miniature */}
-              <div class="home-aperture-spectrum" aria-hidden="true">
-                <span class="home-spectrum-seg is-msg">message</span>
-                <span class="home-spectrum-seg is-call">call</span>
-                <span class="home-spectrum-seg is-cont">continuity</span>
-                <span class="home-spectrum-seg is-protect">protection</span>
-              </div>
+              <svg class="home-aperture-door" viewBox="0 0 320 220" aria-hidden="true">
+                <rect class="home-aperture-wall" x="10" y="14" width="300" height="192" rx="3" />
+                <rect class="home-aperture-jamb" x="98" y="36" width="124" height="170" />
+                <rect class="home-aperture-void" x="106" y="44" width="108" height="162" />
+                <path class="home-aperture-sill" d="M98 206 H222" />
+                <circle class="home-aperture-current" cx="160" cy="206" r="3.2" />
+              </svg>
+              <ul class="home-aperture-marks">
+                <li class="is-msg">Rooms</li>
+                <li class="is-msg">Messages</li>
+                <li class="is-call">Calls</li>
+                <li class="is-cont">Continuity</li>
+                <li class="is-protect">Protection shown</li>
+              </ul>
             </div>
           </aside>
         </div>
@@ -210,6 +180,26 @@ export default function Landing() {
           evidenceType="Public status feed"
           ariaLabel="Public mesh report evidence"
         />
+        <dl class="home-evidence-rail" data-home-evidence data-feed-state={feedState()}>
+          <div class="home-evidence-item">
+            <dt>Source</dt>
+            <dd>Public status feed</dd>
+          </div>
+          <div class="home-evidence-item">
+            <dt>State</dt>
+            <dd><strong data-state={meshState()}>{meshState()}</strong></dd>
+          </div>
+          <div class="home-evidence-item home-evidence-scope">
+            <dt>Scope</dt>
+            <dd>{proofDetail()}</dd>
+          </div>
+          <div class="home-evidence-item home-evidence-action">
+            <dt>Ledger</dt>
+            <dd>
+              <a class="home-telemetry-link" href={PUBLIC_ROUTE_MANIFEST[4]!.href}>Status</a>
+            </dd>
+          </div>
+        </dl>
         <div class="home-telemetry-strip" data-feed-state={feedState()}>
           <span class="home-telemetry-item">
             <span class="k">network</span>
@@ -223,11 +213,7 @@ export default function Landing() {
                 {(data) => data().users_online.toLocaleString('en-US')}
               </Show>
             </strong>
-            <span class="hint">
-              <Show when={stats.latest} fallback="waiting for stats">
-                online
-              </Show>
-            </span>
+            <span class="hint">{peopleHint()}</span>
           </span>
           <span class="home-telemetry-sep" aria-hidden="true">·</span>
           <span class="home-telemetry-item">
@@ -237,11 +223,7 @@ export default function Landing() {
                 {(data) => data().channels.length.toLocaleString('en-US')}
               </Show>
             </strong>
-            <span class="hint">
-              {stats.latest
-                ? (stats.latest.channels_complete ? 'tracked' : 'partial')
-                : 'waiting'}
-            </span>
+            <span class="hint">{roomsHint()}</span>
           </span>
           <span class="home-telemetry-sep" aria-hidden="true">·</span>
           <span class="home-telemetry-item">
@@ -251,13 +233,8 @@ export default function Landing() {
                 {(room) => room().channel}
               </Show>
             </strong>
-            <span class="hint">
-              <Show when={status.latest} fallback="no status yet">
-                {(s) => `up ${formatDuration(s().uptime_seconds)}`}
-              </Show>
-            </span>
+            <span class="hint">{busyHint()}</span>
           </span>
-          <a class="home-telemetry-link" href={PUBLIC_ROUTE_MANIFEST[4]!.href}>Status</a>
         </div>
       </section>
 

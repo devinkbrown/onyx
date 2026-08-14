@@ -18,6 +18,50 @@
 
 .dl-hero h1 {
   max-width: 14ch;
+  font-family: var(--public-serif, var(--font-serif));
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  text-transform: none;
+}
+
+.dl-title-accent {
+  color: var(--public-current, var(--lapis-bright));
+}
+
+.dl-catalog-receipt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 62rem;
+  margin-top: 1.5rem;
+  padding-block: 0.85rem;
+  border-block: 1px solid var(--seam-faint);
+  color: var(--paper-dim);
+  font: 500 0.82rem/1.5 var(--font-mono);
+}
+
+.dl-catalog-receipt__marker {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--paper-mute);
+}
+
+.dl-catalog-receipt[data-catalog-state='loading'] .dl-catalog-receipt__marker {
+  color: var(--public-current, var(--lapis-bright));
+  border-style: dashed;
+}
+
+.dl-catalog-receipt[data-catalog-state='ready'] .dl-catalog-receipt__marker {
+  color: var(--public-current, var(--lapis-bright));
+  background: currentColor;
+}
+
+.dl-catalog-receipt[data-catalog-state='errored'] .dl-catalog-receipt__marker {
+  color: var(--public-ember, var(--warn));
+  border-style: double;
 }
 
 .dl-page .dl-card h3 {
@@ -69,6 +113,7 @@
   .dl-page,
   .dl-page .r-wrap,
   .dl-page .dl-hero,
+  .dl-page .dl-catalog-receipt,
   .dl-page .dl-grid,
   .dl-page .dl-card,
   .dl-page .dl-honesty,
@@ -103,6 +148,7 @@
   }
 
   .dl-page .data-hero .sub,
+  .dl-page .dl-catalog-receipt,
   .dl-page .dl-honesty li,
   .dl-page .dl-facts li,
   .dl-page .dl-note,
@@ -157,6 +203,26 @@
 }
 
 @media (forced-colors: active) {
+  .dl-page .dl-title-accent {
+    color: LinkText;
+  }
+
+  .dl-page .dl-catalog-receipt {
+    border-color: CanvasText;
+    color: CanvasText;
+  }
+
+  .dl-page .dl-catalog-receipt__marker,
+  .dl-page .dl-catalog-receipt[data-catalog-state] .dl-catalog-receipt__marker {
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .dl-page .dl-catalog-receipt[data-catalog-state='ready'] .dl-catalog-receipt__marker {
+    color: Highlight;
+    background: Highlight;
+  }
+
   .dl-page .dl-card,
   .dl-page .dl-honesty,
   .dl-page .dl-verify,

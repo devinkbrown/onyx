@@ -7,16 +7,26 @@ import { setPageMeta } from './pageMeta';
 
 export function RoadmapBridge() {
   return (
-    <PublicFrame currentPath="/roadmap/" mainLabel="Onyx product roadmap">
+    <PublicFrame
+      currentPath="/roadmap/"
+      mainLabel="Onyx product roadmap"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Planning</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Proof before promise</span>
+        </p>
+      )}
+    >
       <div class="ui-root r data-page roadmap-page">
         <div class="r-ground" aria-hidden="true" />
         <div class="r-flecks" aria-hidden="true" />
         <div class="r-grain" aria-hidden="true" />
 
         <section class="r-wrap r-section roadmap-hero" aria-labelledby="roadmap-bridge-title">
-          <p class="r-kicker">what we are building</p>
+          <p class="r-kicker">what we are building · current room</p>
           <h1 id="roadmap-bridge-title" class="r-title">
-            A place for your people<br /><span class="gold">that you can trust</span>
+            A place for your people<br /><span class="roadmap-title-accent">that you can trust</span>
           </h1>
           <p class="r-lede">
             Onyx is becoming a dependable public communication product: easy

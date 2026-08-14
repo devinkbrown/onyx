@@ -56,11 +56,21 @@ export default function StatusRoute() {
   const topology = createMemo(() => topologyPresentation(feedState()));
 
   return (
-    <PublicFrame currentPath="/status/" mainLabel="Onyx network status">
+    <PublicFrame
+      currentPath="/status/"
+      mainLabel="Onyx network status"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Ledger</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Status</span>
+        </p>
+      )}
+    >
       <div class="ui-root r data-page status-route">
         <section class="r-wrap data-hero status-hero" aria-labelledby="status-heading">
           <p class="r-kicker">network status</p>
-          <h1 id="status-heading">Mesh health,<br /><span class="gold">in public</span></h1>
+          <h1 id="status-heading">Mesh health,<br /><span class="status-title-accent">in public</span></h1>
           <p class="sub">
             Node uptime, quorum, peer links, and latency from the exported public
             observation — including when that observation cannot support a health claim.

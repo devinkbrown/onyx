@@ -87,7 +87,10 @@ describe('About page — source structure', () => {
 
   it('uses PublicFrame with an About-labelled main and a deep-water content root', () => {
     expect(srcContains('import { PublicFrame }')).toBe(true);
-    expect(srcContains('<PublicFrame currentPath="/about/" mainLabel="About Onyx">')).toBe(true);
+    expect(srcContains('currentPath="/about/"')).toBe(true);
+    expect(srcContains('mainLabel="About Onyx"')).toBe(true);
+    expect(srcContains('Protocol, media, and mesh')).toBe(true);
+    expect(srcContains('aria-hidden="true">·</span>')).toBe(true);
     expect(srcContains('class="ui-root r ab-ocean"')).toBe(true);
   });
 
@@ -100,7 +103,9 @@ describe('About page — source structure', () => {
   it('derives the mesh badge from bounded public feed state', () => {
     expect(srcContains('publicMeshFeedState')).toBe(true);
     expect(srcContains('publicMeshFeedLabel')).toBe(true);
+    expect(srcContains('aboutFeedDetail')).toBe(true);
     expect(srcContains('data-feed-state={feedState()}')).toBe(true);
+    expect(srcContains('The public mesh report is still being requested.')).toBe(true);
     expect(src).not.toMatch(/>mesh online<\/span>/);
   });
 
@@ -189,6 +194,11 @@ describe('About page — source structure', () => {
   it('calls out Mooring as the server-to-server secure channel', () => {
     expect(srcContains('Mooring')).toBe(true);
     expect(srcContains('server-to-server mesh')).toBe(true);
+  });
+
+  it('does not present static node addresses as a live mesh observation', () => {
+    expect(srcContains('Live mesh nodes')).toBe(false);
+    expect(srcContains('Published mesh entrances')).toBe(true);
   });
 
   it('includes eshmaki.me node address with port 8080', () => {
@@ -378,10 +388,13 @@ describe('About page — CSS source', () => {
     expect(css.includes('.ab-dev-grid')).toBe(true);
   });
 
-  it('uses design tokens (var(--gold), var(--lapis), var(--shu))', () => {
-    expect(css.includes('var(--gold)')).toBe(true);
-    expect(css.includes('var(--lapis')).toBe(true);
-    expect(css.includes('var(--shu)')).toBe(true);
+  it('uses Room Current and existing mineral tokens, not gold shouting', () => {
+    const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(cssNoComments.includes('var(--ab-current')).toBe(true);
+    expect(cssNoComments.includes('var(--lapis')).toBe(true);
+    expect(cssNoComments.includes('var(--shu)')).toBe(true);
+    expect(cssNoComments.includes('var(--gold)')).toBe(false);
+    expect(cssNoComments.includes('var(--gold-bright)')).toBe(false);
   });
 
   it('uses font tokens (var(--font-mono), var(--font-display), var(--font-serif))', () => {
@@ -450,6 +463,7 @@ describe('About page — DOM rendering', () => {
     const { cleanup } = renderAbout!();
     expect(document.querySelectorAll('header.public-frame__header')).toHaveLength(1);
     expect(document.querySelector('a[href="/about/"][aria-current="page"]')).not.toBeNull();
+    expect(document.querySelector('.public-frame__context')?.textContent).toMatch(/System\s*·\s*Protocol, media, and mesh/);
     cleanup();
   });
 
@@ -467,7 +481,13 @@ describe('About page — DOM rendering', () => {
     const report = document.querySelector<HTMLElement>('.ab-feed[role="status"]');
     expect(report).not.toBeNull();
     expect(report?.dataset.feedState).toMatch(/loading|unavailable/u);
-    expect(report?.textContent).toContain('does not establish current network availability');
+    if (report?.dataset.feedState === 'loading') {
+      expect(report?.textContent).toContain('still being requested');
+      expect(report?.textContent).not.toContain('does not establish current network availability');
+    } else {
+      expect(report?.textContent).toContain('does not establish current network availability');
+      expect(report?.textContent).not.toContain('still being requested');
+    }
     cleanup();
   });
 

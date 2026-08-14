@@ -35,9 +35,11 @@ describe('Landing', () => {
     expect(getByRole('main', { name: 'Onyx home' })).toHaveAttribute('id', 'public-main');
     expect(getByRole('contentinfo')).toBeInTheDocument();
     expect(getByText('Skip to content')).toHaveAttribute('href', '#public-main');
+    expect(getByRole('link', { name: 'Onyx home' })).toHaveAttribute('aria-current', 'page');
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.home')).toBeTruthy();
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Threshold\s*·\s*Home/);
   });
 
   it('keeps exactly one primary Open Onyx CTA in the shared public frame', () => {
@@ -77,6 +79,19 @@ describe('Landing', () => {
     expect(getByText(/Not live content/i)).toBeInTheDocument();
     expect(container.querySelector('[data-home-aperture]')).toBeTruthy();
     expect(container.querySelector('[data-home-aperture] [role="img"]')).toHaveAccessibleName(/not live content/i);
+    expect(container.querySelector('[data-home-aperture]')!.textContent).not.toMatch(/mira|Room is open/i);
+  });
+
+  it('labels the evidence rail with source, state, scope, and a Status ledger link', () => {
+    const { container } = render(() => <Landing />);
+    const rail = container.querySelector('[data-home-evidence]');
+    expect(rail).toBeTruthy();
+    expect(rail).toHaveTextContent('Source');
+    expect(rail).toHaveTextContent('Public status feed');
+    expect(rail).toHaveTextContent('State');
+    expect(rail).toHaveTextContent('Scope');
+    expect(rail).toHaveTextContent('Ledger');
+    expect(container.querySelector('.home-telemetry-link')).toHaveAttribute('href', '/status/');
   });
 
   it('maps a complete current public mesh observation to a text and glyph verified receipt', async () => {
@@ -130,6 +145,46 @@ describe('Landing', () => {
     const status = unavailable.getByRole('status');
     expect(status).toHaveTextContent('Unavailable');
     expect(unavailable.container.querySelector('[data-ui="proof-receipt"]')).toHaveAttribute('data-ui-truth', 'unavailable');
+  });
+
+  it('keeps the evidence rail state distinct across report outcomes', async () => {
+    const cases = [
+      { source: meshStatus(), feed: 'current', state: 'operational' },
+      { source: meshStatus({ mesh: { quorum: false, partitioned: true, components: 2 } }), feed: 'degraded', state: 'degraded' },
+      { source: meshStatus({ generated_at: NOW - 10 * 60 }), feed: 'stale', state: 'stale' },
+      { source: meshStatus({ generated_at: NOW + 10 * 60 }), feed: 'future', state: 'time mismatch' },
+      { source: meshStatus({ generated_at: 0 }), feed: 'unknown', state: 'undated' },
+    ] as const;
+
+    for (const entry of cases) {
+      vi.stubGlobal('fetch', vi.fn(statusResponse(entry.source)));
+      const view = render(() => <Landing />);
+      await waitFor(() => expect(view.container.querySelector('[data-home-evidence]')).toHaveAttribute('data-feed-state', entry.feed));
+      const railState = view.container.querySelector('[data-home-evidence] [data-state]');
+      expect(railState).toHaveTextContent(entry.state);
+      view.unmount();
+      vi.unstubAllGlobals();
+    }
+
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+    const loading = render(() => <Landing />);
+    expect(loading.container.querySelector('[data-home-evidence]')).toHaveAttribute('data-feed-state', 'loading');
+    expect(loading.container.querySelector('[data-home-evidence] [data-state]')).toHaveTextContent('listening');
+    expect(loading.container.textContent).toMatch(/waiting for stats/i);
+    expect(loading.container.textContent).toMatch(/no status yet/i);
+    expect(loading.container.textContent).not.toMatch(/no stats export/i);
+    expect(loading.container.textContent).not.toMatch(/no status export/i);
+    loading.unmount();
+    vi.unstubAllGlobals();
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 503 })));
+    const unavailable = render(() => <Landing />);
+    await waitFor(() => expect(unavailable.container.querySelector('[data-home-evidence]')).toHaveAttribute('data-feed-state', 'unavailable'));
+    expect(unavailable.container.querySelector('[data-home-evidence] [data-state]')).toHaveTextContent('unavailable');
+    expect(unavailable.container.textContent).toMatch(/no stats export/i);
+    expect(unavailable.container.textContent).toMatch(/no status export/i);
+    expect(unavailable.container.textContent).not.toMatch(/waiting for stats/i);
+    expect(unavailable.container.textContent).not.toMatch(/no status yet/i);
   });
 
   it('keeps mobile navigation as a semantic, keyboard-operable disclosure', () => {

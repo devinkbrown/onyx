@@ -20,7 +20,8 @@ describe('InviteRoute', () => {
     const { container } = render(() => <InviteRoute />);
 
     expect(src).toContain("import { PublicFrame } from '@/ui/public'");
-    expect(src).toContain('<PublicFrame currentPath="/invite/" mainLabel="Onyx invite">');
+    expect(src).toContain('currentPath="/invite/"');
+    expect(src).toContain('mainLabel="Onyx invite"');
     expect(src).toContain('class="ui-root r data-page invite-page"');
     expect(src).toContain("function appHrefFromInvite(url: string): string {");
     expect(src).toContain("return '/app/';");
@@ -35,6 +36,7 @@ describe('InviteRoute', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.invite-page')).toBeTruthy();
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Threshold.*Invite/);
     expect(container.querySelector('.r-ground')).toBeTruthy();
     expect(container.querySelector('.r-flecks')).toBeTruthy();
     expect(container.querySelector('.r-veins')).toBeTruthy();
@@ -46,6 +48,8 @@ describe('InviteRoute', () => {
       .filter((link) => link.classList.contains('public-frame__open'));
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');
+    expect(screen.getByRole('link', { name: 'How Onyx works' })).toHaveAttribute('href', '/about/');
+    expect(container.querySelector('a[href="/guides/"]')).toBeNull();
   });
 
   it('keeps the canonical mobile disclosure keyboard operable', () => {
@@ -73,6 +77,8 @@ describe('InviteRoute', () => {
     expect(screen.getByRole('heading', { name: /what onyx keeps from this link/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /copy invite link/i })).toBeInTheDocument();
     expect(screen.getAllByText('yuki').length).toBeGreaterThan(0);
+    const receipt = screen.getByLabelText('Invite handoff receipt');
+    expect(receipt).toHaveTextContent('#general');
     expect(screen.getByRole('link', { name: /open invite in onyx/i })).toHaveAttribute(
       'href',
       '/app/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki',

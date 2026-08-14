@@ -11,7 +11,7 @@ export function PublicFooter(): JSX.Element {
       <div class="public-frame__footer-inner">
         <div>
           <a class="public-frame__footer-brand" href={publicRouteById('home').href}>Onyx</a>
-          <p>An open communication network with local-first continuity and shown security states.</p>
+          <p>A durable room for communities and technically curious people, with local-first continuity and shown security states.</p>
         </div>
         <nav aria-label="Footer navigation">
           <For each={FOOTER_ROUTES}>

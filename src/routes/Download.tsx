@@ -330,7 +330,7 @@ function MacosComingSoonCard(): JSX.Element {
       </ul>
       <div class="dl-actions">
         <a
-          class="r-btn primary"
+          class="r-btn ghost"
           data-testid="dl-macos-open-app"
           href="/app/"
         >
@@ -370,9 +370,26 @@ export default function Download(): JSX.Element {
     if (catalog.state === 'ready') return 'ready';
     return 'loading';
   };
+  const catalogReceipt = () => {
+    switch (catalogState()) {
+      case 'ready': return 'Catalog read. Each lane still has to report a published artifact before controls appear.';
+      case 'errored': return 'Catalog unavailable. Archive, notice, and checksum controls are withheld.';
+      default: return 'Checking the staged catalog. Download controls remain withheld.';
+    }
+  };
 
   return (
-    <PublicFrame currentPath="/download/" mainLabel="Onyx downloads">
+    <PublicFrame
+      currentPath="/download/"
+      mainLabel="Onyx downloads"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Artifacts</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Downloads</span>
+        </p>
+      )}
+    >
       <div class="ui-root r data-page dl-page" data-testid="download-page">
         <div class="r-ground" aria-hidden="true" />
         <div class="r-flecks" aria-hidden="true" />
@@ -385,7 +402,7 @@ export default function Download(): JSX.Element {
           <h1 id="download-heading">
             {installGuide
               ? 'Install Onyx'
-              : <>Windows, Linux, <br /><span class="gold">FreeBSD & OpenBSD</span></>}
+              : <>Windows, Linux, <br /><span class="dl-title-accent">FreeBSD & OpenBSD</span></>}
           </h1>
           <p class="sub">
             Operator packages now: Windows zip, Linux tar.gz, and FreeBSD/OpenBSD hosts with
@@ -407,6 +424,17 @@ export default function Download(): JSX.Element {
             {' '}
             (built on real Macs only — never fabricated here). Until then, use the browser or PWA.
           </p>
+          <div
+            class="dl-catalog-receipt"
+            data-catalog-state={catalogState()}
+            role="status"
+            aria-label="Download catalog status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <span class="dl-catalog-receipt__marker" aria-hidden="true" />
+            <span>{catalogReceipt()}</span>
+          </div>
         </section>
 
         <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>

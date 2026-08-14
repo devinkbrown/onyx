@@ -119,7 +119,17 @@ export default function OnyxOS() {
   };
 
   return (
-    <PublicFrame currentPath="/onyxos/" mainLabel="OnyxOS and Onyx">
+    <PublicFrame
+      currentPath="/onyxos/"
+      mainLabel="OnyxOS and Onyx"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Native work</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Evidence-led system engineering</span>
+        </p>
+      )}
+    >
       <div class="onyxos-page">
         <div class="onyxos-grid" aria-hidden="true" />
 
@@ -135,7 +145,7 @@ export default function OnyxOS() {
           <h1 id="onyxos-title">Communication,<br /><em>at home in the system.</em></h1>
           <p class="onyxos-lede">Onyx is being designed as a first-class native experience in OnyxOS—identity, notifications, protected local history, calls, and accessibility working with the operating system instead of sitting on top of it.</p>
           <div class="onyxos-hero__actions">
-            <a class="onyxos-button onyxos-button--primary" href="/app/">Open Onyx now <span aria-hidden="true">→</span></a>
+            <a class="onyxos-button" href="/app/">Use Onyx in browser <span aria-hidden="true">→</span></a>
             <a class="onyxos-button" href="#onyx-native">See the native plan</a>
           </div>
           <p class="onyxos-proof" role="note"><span aria-hidden="true">◆</span> Onyx stays cross-platform. OnyxOS makes it exceptional.</p>

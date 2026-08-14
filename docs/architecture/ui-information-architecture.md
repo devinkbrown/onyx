@@ -25,6 +25,16 @@ keeps supporting routes out of the shared header. `navigationOrder` preserves
 the current About, OnyxOS, Roadmap, Status, Downloads order independently from
 the manifest's product/trust/resources grouping.
 
+`PublicFrame` remains the only public document frame: one banner, one main, one
+footer, a skip link, and manifest-derived current-path navigation. An optional
+`context` current-line may sit between header and main when a route supplies
+it; existing route calls omit the slot and must keep working. Home uses that
+slot as `Threshold · Home`. The frame does not invent routes, slash aliases,
+or a second primary CTA. Home composition is thesis/entry beside a labeled
+static Room Aperture, then a source/state/scope/Status evidence rail, then
+the existing capability prose and operator shelf. This is a no-cut lock:
+public destinations and Home telemetry states stay in place.
+
 ## Shell navigation invariants
 
 - Desktop and mobile expose the same five destinations in the same order.

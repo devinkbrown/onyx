@@ -4,14 +4,15 @@ type HealthScenario = {
   path: '/' | '/about/';
   state: 'current' | 'degraded' | 'stale' | 'future' | 'unavailable';
   label: string;
+  selector: string;
 };
 
 const scenarios: HealthScenario[] = [
-  { path: '/', state: 'current', label: 'mesh online' },
-  { path: '/', state: 'degraded', label: 'mesh degraded' },
-  { path: '/', state: 'stale', label: 'status stale' },
-  { path: '/about/', state: 'future', label: 'status time mismatch' },
-  { path: '/about/', state: 'unavailable', label: 'status unavailable' },
+  { path: '/', state: 'current', label: 'operational', selector: '[data-home-evidence]' },
+  { path: '/', state: 'degraded', label: 'degraded', selector: '[data-home-evidence]' },
+  { path: '/', state: 'stale', label: 'stale', selector: '[data-home-evidence]' },
+  { path: '/about/', state: 'future', label: 'status time mismatch', selector: '.ab-feed' },
+  { path: '/about/', state: 'unavailable', label: 'status unavailable', selector: '.ab-feed' },
 ];
 
 async function mockPublicStatus(page: Page, state: HealthScenario['state']): Promise<void> {
@@ -46,11 +47,12 @@ test.describe('public mesh health badge', () => {
       await mockPublicStatus(page, scenario.state);
       await page.goto(scenario.path);
 
-      const badge = page.locator('.r-status .live');
+      const badge = page.locator(scenario.selector);
       await expect(badge).toHaveAttribute('data-feed-state', scenario.state);
       await expect(badge).toContainText(scenario.label);
       if (scenario.state !== 'current') {
         await expect(badge).not.toContainText('online');
+        await expect(badge).not.toContainText('operational');
       }
     });
   }

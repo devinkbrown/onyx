@@ -99,8 +99,14 @@ describe.each(PAGES)('PublicInfo /$page/', (route) => {
     expect(screen.getByRole('heading', { level: 1, name: route.title })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: route.title })).toBeInTheDocument();
     expect(screen.getByText('public contract')).toBeInTheDocument();
+    expect(screen.getAllByText('Public contract')).toHaveLength(1);
+    expect(screen.getByText('Onyx · public statement')).toBeInTheDocument();
+    expect(screen.queryByText(/verified public statement/i)).not.toBeInTheDocument();
     expect(screen.getByText(route.lede)).toBeInTheDocument();
     expect(screen.getByText(route.body)).toBeInTheDocument();
+    expect(document.querySelector('.public-frame__context')).toHaveTextContent(
+      new RegExp(`Public contract\\s*·\\s*${route.title}`),
+    );
   });
 
   it('stamps canonical metadata for its own path', () => {

@@ -67,6 +67,15 @@ describe('PublicFrame', () => {
     }
   });
 
+  it('marks the brand as the current route only on Home', () => {
+    const home = render(() => <PublicFrame currentPath="/">Content</PublicFrame>);
+    expect(screen.getByRole('link', { name: 'Onyx home' })).toHaveAttribute('aria-current', 'page');
+    home.unmount();
+
+    render(() => <PublicFrame currentPath="/status/">Content</PublicFrame>);
+    expect(screen.getByRole('link', { name: 'Onyx home' })).not.toHaveAttribute('aria-current');
+  });
+
   it('opens the mobile disclosure, moves focus, traps its endpoints, and restores focus on Escape', async () => {
     render(() => <PublicFrame>Content</PublicFrame>);
     const primary = screen.getByRole('navigation', { name: 'Primary navigation' });
@@ -93,6 +102,27 @@ describe('PublicFrame', () => {
     await Promise.resolve();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(document.activeElement).toBe(toggle);
+  });
+
+  it('omits the current-line slot unless a route supplies context', () => {
+    const { container } = render(() => <PublicFrame>Content</PublicFrame>);
+    expect(container.querySelector('.public-frame__context')).toBeNull();
+  });
+
+  it('places optional route context between header and main without extra landmarks', () => {
+    const { container } = render(() => (
+      <PublicFrame currentPath="/" context={<p class="public-frame__current-line">Threshold · Home</p>}>
+        Content
+      </PublicFrame>
+    ));
+    const context = container.querySelector('.public-frame__context');
+    expect(context).toHaveTextContent('Threshold · Home');
+    expect(container.querySelector('header')!.nextElementSibling).toBe(context);
+    expect(context!.nextElementSibling).toBe(container.querySelector('main'));
+    expect(container.querySelectorAll('header')).toHaveLength(1);
+    expect(container.querySelectorAll('main')).toHaveLength(1);
+    expect(container.querySelectorAll('footer')).toHaveLength(1);
+    expect(screen.getAllByRole('navigation', { name: /navigation/i })).toHaveLength(2);
   });
 
   it('closes and disarms the mobile disclosure when the desktop breakpoint takes over', async () => {

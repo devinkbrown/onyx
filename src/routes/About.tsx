@@ -3,15 +3,19 @@ import './landing.css';
 import './about.css';
 import { createMemo, createResource, createSignal, onCleanup } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
-import { fetchNetworkStatus, publicMeshFeedLabel, publicMeshFeedState } from '@/lib/stats/status';
+import {
+  fetchNetworkStatus,
+  publicMeshFeedLabel,
+  publicMeshFeedState,
+  type PublicMeshFeedState,
+} from '@/lib/stats/status';
 import { AccessibilityStatement } from '@/shell/AccessibilityStatement';
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
 
 /**
- * Onyx /about — full editorial deep-dive.
- * Deep-water dark-luxury identity; depth, azure currents,
- * bioluminescent crests. Continuous with landing.
+ * Onyx /about — protocol, media, and mesh essay.
+ * Room Current identity; continuous with the shared public frame.
  *
  * Technical claims grounded in:
  *   docs/planning/20-media-interop.md
@@ -20,6 +24,12 @@ import { setPageMeta } from './pageMeta';
  *   docs/planning/09-s2s-protocol.md
  *   docs/architecture/00-overview.md
  */
+function aboutFeedDetail(state: PublicMeshFeedState): string {
+  if (state === 'loading') return 'The public mesh report is still being requested.';
+  if (state === 'current') return 'A current public mesh observation is available.';
+  return 'This report state does not establish current network availability.';
+}
+
 export default function About() {
   setPageMeta(
     'About Onyx — open protocol, sovereign mesh',
@@ -37,7 +47,17 @@ export default function About() {
     status.loading ? 'loading' : publicMeshFeedState(status.latest, nowMs())
   ));
   return (
-    <PublicFrame currentPath="/about/" mainLabel="About Onyx">
+    <PublicFrame
+      currentPath="/about/"
+      mainLabel="About Onyx"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">System</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Protocol, media, and mesh</span>
+        </p>
+      )}
+    >
       <div class="ui-root r ab-ocean">
       {/* ── Living atmosphere (shared with landing, blue-tinted here) ── */}
       <div class="r-ground" aria-hidden="true" />
@@ -62,7 +82,7 @@ export default function About() {
         <p class="r-kicker">how onyx works</p>
         <h1 id="about-hero-heading">
           Open wire,<br />
-          <span class="gold">no ceilings</span>
+          <span class="ab-thesis-accent">no ceilings</span>
         </h1>
         <p class="serif-pull">
           A protocol you can read.<br />
@@ -85,11 +105,7 @@ export default function About() {
         >
           <span class="ab-feed__mark" aria-hidden="true" />
           <span>{publicMeshFeedLabel(feedState())}</span>
-          <span class="ab-feed__detail">
-            {feedState() === 'current'
-              ? 'A current public mesh observation is available.'
-              : 'This report state does not establish current network availability.'}
-          </span>
+          <span class="ab-feed__detail">{aboutFeedDetail(feedState())}</span>
         </div>
         <nav class="ab-topics" aria-label="About topics">
           <a href="#protocol">Protocol</a>
@@ -494,7 +510,7 @@ export default function About() {
               relay cannot forge it.
             </p>
 
-            <div class="ab-node-row" aria-label="Live mesh nodes">
+            <div class="ab-node-row" aria-label="Published mesh entrances">
               <div class="ab-node esh">
                 <span class="dot" aria-hidden="true" />
                 <span class="meta">

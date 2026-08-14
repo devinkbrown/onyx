@@ -39,7 +39,8 @@ describe('StatsRoute', () => {
     const { container } = render(() => <StatsRoute />);
 
     expect(src).toContain("import { PublicFrame } from '@/ui/public'");
-    expect(src).toContain('<PublicFrame currentPath="/stats/" mainLabel="Onyx network stats">');
+    expect(src).toContain('currentPath="/stats/"');
+    expect(src).toContain('mainLabel="Onyx network stats"');
     expect(src).not.toContain('<PageChrome');
     expect(src).not.toContain('<PublicFooter');
     expect(src).not.toContain('<header');
@@ -51,6 +52,7 @@ describe('StatsRoute', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.stats-page')).toBeTruthy();
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Signal.*Stats/);
     expect(container.querySelector('.r-ground')).toBeTruthy();
     expect(container.querySelector('.r-flecks')).toBeTruthy();
     expect(container.querySelector('.r-grain')).toBeTruthy();
@@ -63,9 +65,11 @@ describe('StatsRoute', () => {
       .filter((link) => link.classList.contains('public-frame__open'));
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');
+    expect(container.querySelector('.stats-title-accent')).toHaveTextContent('in motion');
   });
 
-  it('relocates the six-state live pill into exactly one hero observation', () => {
+  it('relocates the seven-state live pill into exactly one hero observation', () => {
+    expect(src).toContain("case 'loading': return 'stats checking'");
     expect(src).toContain("case 'current': return 'stats current'");
     expect(src).toContain("case 'stale': return 'stats stale'");
     expect(src).toContain("case 'future': return 'stats time mismatch'");
@@ -95,7 +99,7 @@ describe('StatsRoute', () => {
     render(() => <StatsRoute />);
 
     expect(screen.getByRole('heading', { name: /the rooms in motion/i })).toBeInTheDocument();
-    expect(await screen.findByText(/stats are waiting/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no public stats export is available/i)).toBeInTheDocument();
     const observation = document.querySelector('.stats-observation');
     expect(observation).toHaveAttribute('data-feed-state', 'unavailable');
     expect(observation).toHaveAttribute('role', 'status');
@@ -103,6 +107,7 @@ describe('StatsRoute', () => {
     expect(observation).toHaveAttribute('aria-atomic', 'true');
     expect(observation).toHaveTextContent('stats unavailable');
     expect(screen.getByText('stats unavailable')).toHaveAttribute('data-feed-state', 'unavailable');
+    expect(screen.queryByText(/stats are waiting/i)).not.toBeInTheDocument();
   });
 
   it('includes the recent activity graph surface for room rows', async () => {
@@ -137,6 +142,7 @@ describe('StatsRoute', () => {
     expect(screen.getByLabelText(/#root recent activity/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /refresh data/i })).toBeInTheDocument();
     expect(screen.getByText(/activity ledger/i)).toBeInTheDocument();
+    expect(screen.getByText(/export current/i)).toBeInTheDocument();
     expect(screen.getByText('14-day pulse')).toBeInTheDocument();
     expect(document.querySelector('.ui-root.stats-page')).not.toBeNull();
     expect(document.querySelector('main.stats-page')).toBeNull();
@@ -193,6 +199,8 @@ describe('StatsRoute', () => {
       const view = render(() => <StatsRoute />);
       expect(await view.findByText(entry.label)).toHaveAttribute('data-feed-state', entry.state);
       expect(view.container.querySelector('.stats-observation')).toHaveAttribute('data-feed-state', entry.state);
+      expect(view.container.textContent).toMatch(/export stale|export time mismatch|export undated/);
+      expect(view.container.textContent).not.toMatch(/export current/);
       view.unmount();
       vi.unstubAllGlobals();
     }
@@ -281,6 +289,12 @@ describe('StatsRoute', () => {
 
     expect(screen.getByRole('heading', { name: /the rooms in motion/i })).toBeInTheDocument();
     expect(screen.queryByTestId('stats-suspended')).not.toBeInTheDocument();
+    const observation = document.querySelector('.stats-observation');
+    expect(observation).toHaveAttribute('data-feed-state', 'loading');
+    expect(observation).toHaveTextContent('stats checking');
+    expect(screen.getByText(/stats are waiting for the next exported feed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/stats unavailable/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no public stats export is available/i)).not.toBeInTheDocument();
   });
 
   it('does not steal focus or scroll on initial load when the default room auto-inspects', async () => {

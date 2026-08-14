@@ -142,6 +142,7 @@ describe('Download page', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.dl-page')).toBeTruthy();
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Artifacts.*Downloads/);
     expect(within(screen.getByRole('navigation', { name: 'Primary navigation' }))
       .getByRole('link', { name: 'Downloads' })).toHaveAttribute('aria-current', 'page');
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' })
@@ -206,6 +207,8 @@ describe('Download page', () => {
     await waitFor(() => {
       expect(getByTestId('dl-status-windows')).toHaveAttribute('data-state', 'unknown');
     });
+    expect(getByRole('status', { name: 'Download catalog status' })).toHaveAttribute('data-catalog-state', 'errored');
+    expect(getByRole('status', { name: 'Download catalog status' })).toHaveTextContent(/controls are withheld/i);
     expect(queryByTestId('dl-download-windows')).not.toBeInTheDocument();
     expect(queryByTestId('dl-notice-windows')).not.toBeInTheDocument();
     expect(queryByTestId('dl-sha256-windows')).not.toBeInTheDocument();
@@ -233,6 +236,8 @@ describe('Download page', () => {
     expect(getByTestId('dl-macos-arch-x86_64')).toBeInTheDocument();
     expect(getByTestId('dl-macos-arch-arm64')).toBeInTheDocument();
     expect(getByTestId('dl-macos-open-app').getAttribute('href')).toBe('/app/');
+    expect(getByTestId('dl-macos-open-app')).toHaveClass('r-btn', 'ghost');
+    expect(getByTestId('dl-macos-open-app')).not.toHaveClass('primary');
     expect(queryByTestId('dl-macos-pwa-hint')).not.toBeInTheDocument();
     expect(getByTestId('dl-macos-honesty').textContent).toMatch(/PWA|browser/i);
     expect(getByTestId('download-page').textContent).toMatch(/coming soon/i);
@@ -304,6 +309,8 @@ describe('Download page', () => {
 
     const { findByTestId, getByTestId } = render(() => <Download />);
     const hashEl = await findByTestId('dl-hash-freebsd');
+    expect(screen.getByRole('status', { name: 'Download catalog status' })).toHaveAttribute('data-catalog-state', 'ready');
+    expect(screen.getByRole('status', { name: 'Download catalog status' })).toHaveTextContent(/each lane still has to report/i);
     expect(hashEl.textContent).toBe(hash);
     expect(getByTestId('dl-download-freebsd').getAttribute('href')).toBe(
       '/downloads/v0.1.3/onyx-0.1.3-freebsd-x86_64-ReleaseFast-unsigned.tar.gz',
@@ -358,7 +365,8 @@ describe('Download page — source structure', () => {
 
   it('uses PublicFrame without duplicating document chrome', () => {
     expect(src).toContain('import { PublicFrame }');
-    expect(src).toContain('<PublicFrame currentPath="/download/" mainLabel="Onyx downloads">');
+    expect(src).toContain('currentPath="/download/"');
+    expect(src).toContain('mainLabel="Onyx downloads"');
     expect(src).not.toContain('<main');
     expect(src).not.toContain('<header');
     expect(src).not.toContain('<PublicFooter');

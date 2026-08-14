@@ -5,13 +5,13 @@
    which resolve --ink/--line at the frame element; a route-scoped redefinition
    of those names silently repaints any shared descendant. */
 .onyxos-page {
-  --onyxos-void: #101516;
-  --onyxos-ink: #e9ede6;
-  --onyxos-muted: #a8b2aa;
-  --onyxos-panel: #151b1c;
-  --onyxos-line: #344044;
-  --onyxos-acid: #d0ff4f;
-  --onyxos-ember: #ff7659;
+  --onyxos-void: var(--public-void);
+  --onyxos-ink: var(--public-text);
+  --onyxos-muted: var(--public-muted);
+  --onyxos-panel: var(--public-raised);
+  --onyxos-line: var(--public-seam);
+  --onyxos-acid: var(--public-current);
+  --onyxos-ember: var(--public-ember);
   --onyxos-quiet: #748077;
   --onyxos-target: var(--target-min, 44px);
   position: relative;

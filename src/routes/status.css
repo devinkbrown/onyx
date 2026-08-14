@@ -23,6 +23,20 @@
   position: relative;
 }
 
+.status-route .status-hero h1 {
+  max-width: 12ch;
+  font-family: var(--public-serif, var(--font-serif));
+  font-size: clamp(2.75rem, 1.35rem + 6vw, 6.5rem);
+  font-weight: 500;
+  line-height: 0.94;
+  letter-spacing: -0.035em;
+  text-transform: none;
+}
+
+.status-route .status-title-accent {
+  color: var(--public-current, var(--lapis-bright));
+}
+
 /* Signature element: a quiet mesh-observation seam. The marker and ruled line
    encode the state of the exported observation; they are not ornamental uptime
    lights and never imply more than the adjacent text says. */
@@ -161,6 +175,13 @@
 }
 
 @media (max-width: 42rem) and (max-height: 30rem) {
+  .status-route .status-hero h1 {
+    max-width: none;
+    font-size: 48px;
+    line-height: 1;
+    overflow-wrap: anywhere;
+  }
+
   .status-observation {
     grid-template-columns: 12px minmax(0, 1fr);
     gap: 8px 12px;
@@ -197,6 +218,10 @@
 }
 
 @media (forced-colors: active) {
+  .status-route .status-title-accent {
+    color: LinkText;
+  }
+
   .status-observation {
     border-color: CanvasText;
   }

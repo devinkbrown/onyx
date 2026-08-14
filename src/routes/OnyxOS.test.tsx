@@ -32,6 +32,7 @@ describe('OnyxOS route', () => {
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
     expect(screen.getByRole('main', { name: 'OnyxOS and Onyx' })).toHaveAttribute('id', 'public-main');
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Native work\s*·\s*Evidence-led system engineering/);
     expect(container.querySelectorAll('main#public-main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
 
@@ -87,11 +88,11 @@ describe('OnyxOS route', () => {
       expect(document.querySelector(`${link.getAttribute('href')}`)).toBeTruthy();
     }
 
-    // The frame owns the single Open Onyx affordance; the route keeps only its hero CTA.
+    // The frame owns the single primary Open Onyx affordance; route actions stay descriptive.
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' });
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]?.closest('.onyxos-page')).toBeNull();
-    expect(screen.getByRole('link', { name: /open Onyx now/i })).toHaveAttribute('href', '/app/');
+    expect(screen.getByRole('link', { name: /use Onyx in browser/i })).toHaveAttribute('href', '/app/');
   });
 
   it('positions Onyx as a first-class cross-platform part of OnyxOS', () => {
@@ -100,7 +101,7 @@ describe('OnyxOS route', () => {
     expect(getByRole('heading', { name: /communication,\s*at home in the system/i })).toBeInTheDocument();
     expect(getByText(/first-class native experience in OnyxOS/i)).toBeInTheDocument();
     expect(getByText(/Onyx stays cross-platform/i)).toBeInTheDocument();
-    expect(getByRole('link', { name: /open Onyx now/i })).toHaveAttribute('href', '/app/');
+    expect(getByRole('link', { name: /use Onyx in browser/i })).toHaveAttribute('href', '/app/');
     expect(getByRole('link', { name: /see the native plan/i })).toHaveAttribute('href', '#onyx-native');
     expect(getByRole('link', { name: /see the product roadmap/i })).toHaveAttribute('href', '/roadmap/');
   });

@@ -45,6 +45,7 @@ describe('StatusRoute', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.status-route')).toBeTruthy();
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Ledger.*Status/);
     expect(within(screen.getByRole('navigation', { name: 'Primary navigation' }))
       .getByRole('link', { name: 'Status' })).toHaveAttribute('aria-current', 'page');
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' });
@@ -57,6 +58,7 @@ describe('StatusRoute', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveAttribute('data-feed-state', 'unavailable'));
     expect(screen.getByRole('status')).toHaveTextContent('status unavailable');
     expect(screen.getByRole('status')).toHaveTextContent('No health claim is being made');
+    expect(container.querySelector('.status-title-accent')).toHaveTextContent('in public');
   });
 
   it('keeps the frame visible and makes no health claim while public feeds are pending', () => {

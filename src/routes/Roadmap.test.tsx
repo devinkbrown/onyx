@@ -15,6 +15,7 @@ describe('RoadmapRoute', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.roadmap-page')).toBeTruthy();
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Planning\s*·\s*Proof before promise/);
     expect(within(screen.getByRole('navigation', { name: 'Primary navigation' }))
       .getByRole('link', { name: 'Roadmap' })).toHaveAttribute('aria-current', 'page');
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' });
@@ -22,6 +23,8 @@ describe('RoadmapRoute', () => {
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');
     expect(screen.getByRole('heading', { name: /a place for your people\s*that you can trust/i })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Roadmap state legend' })).toBeInTheDocument();
+    expect(screen.getByText('Planning')).toBeInTheDocument();
+    expect(screen.getAllByText('Proof before promise')).toHaveLength(2);
     expect(screen.getByText(/first-class native experience inside OnyxOS/i)).toBeInTheDocument();
   });
 

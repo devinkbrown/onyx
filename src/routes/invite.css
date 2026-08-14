@@ -1,0 +1,103 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Invite is a guarded threshold into the app, not a second application shell. */
+.invite-page {
+  min-width: 0;
+  color: var(--paper);
+}
+
+.invite-page .r-wrap {
+  min-width: 0;
+}
+
+.invite-page .data-hero h1 {
+  max-width: 13ch;
+  font-family: var(--public-serif, var(--font-serif));
+  font-size: clamp(2.75rem, 1.35rem + 6vw, 6.5rem);
+  font-weight: 500;
+  line-height: 0.94;
+  letter-spacing: -0.035em;
+  text-transform: none;
+}
+
+.invite-title-accent {
+  color: var(--public-current, var(--lapis-bright));
+}
+
+.invite-safety-receipt {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.8fr);
+  gap: 0.75rem 1.5rem;
+  max-width: 68rem;
+  margin: 1.5rem 0 0;
+  padding: 0.9rem 0;
+  border-block: 1px solid var(--seam-faint);
+}
+
+.invite-safety-receipt div,
+.invite-safety-receipt dt,
+.invite-safety-receipt dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.invite-safety-receipt dt {
+  color: var(--paper-mute);
+  font: 600 0.66rem/1.4 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.invite-safety-receipt dd {
+  margin-top: 0.35rem;
+  color: var(--paper);
+  font: 500 0.86rem/1.5 var(--font-sans);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .invite-safety-receipt {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .invite-page,
+  .invite-page .r-wrap,
+  .invite-page .invite-safety-receipt,
+  .invite-page .invite-safety-receipt > * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .invite-page .data-hero h1 {
+    max-width: none;
+    font-size: 48px;
+    line-height: 1;
+  }
+
+  .invite-safety-receipt dt {
+    font-size: 11px;
+  }
+
+  .invite-safety-receipt dd {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invite-page .r-btn {
+    transition: none;
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .invite-title-accent {
+    color: LinkText;
+  }
+
+  .invite-safety-receipt {
+    border-color: CanvasText;
+  }
+}

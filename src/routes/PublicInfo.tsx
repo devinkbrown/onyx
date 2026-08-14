@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './data-pages.css';
+import './public-info.css';
 import { createEffect, createMemo, Show } from 'solid-js';
 import { useLocation } from '@solidjs/router';
 import { PublicFrame } from '@/ui/public';
@@ -50,8 +51,18 @@ export function PublicInfo(props: { page: PublicInfoPage }) {
     setPageMeta(`Onyx — ${item()[0]}`, item()[1], `/${props.page}/`);
   });
   return (
-    <PublicFrame currentPath={`/${props.page}/`} mainLabel={mainLabels[props.page]}>
-      <div class="ui-root r data-page">
+    <PublicFrame
+      currentPath={`/${props.page}/`}
+      mainLabel={mainLabels[props.page]}
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Public contract</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">{item()[0]}</span>
+        </p>
+      )}
+    >
+      <div class={`ui-root r data-page public-info-page public-info-page--${props.page}`}>
         <div class="r-ground" aria-hidden="true" />
         <div class="r-flecks" aria-hidden="true" />
         <section class="r-wrap data-hero">
@@ -60,8 +71,8 @@ export function PublicInfo(props: { page: PublicInfoPage }) {
           <p class="sub">{item()[1]}</p>
         </section>
         <section class="r-wrap r-section">
-          <article class="data-card">
-            <div class="label">Onyx</div>
+          <article class="data-card public-info-card">
+            <div class="label">Onyx · public statement</div>
             <h2>{item()[0]}</h2>
             <p>{item()[2]}</p>
           </article>
