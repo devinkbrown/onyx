@@ -61,6 +61,18 @@ describe('untrusted BATCH transport bounds', () => {
     expect(messages.at(-1)?.text).toBe(`message ${HISTORY_BATCH_MESSAGE_MAX - 1}`);
   });
 
+  it('keeps only the first row when one history batch repeats a msgid', () => {
+    feed('BATCH +history chathistory #root');
+    feed(historyMessage('history', 'same-id', 'first accepted copy'));
+    feed(historyMessage('history', 'same-id', 'duplicated transport copy'));
+    feed('BATCH -history');
+
+    const messages = store.getState().channels.get('#root')?.messages ?? [];
+    expect(messages.map((message) => [message.id, message.text])).toEqual([
+      ['same-id', 'first accepted copy'],
+    ]);
+  });
+
   it('drops content tagged for an unknown or rejected batch', () => {
     feed(historyMessage('missing', 'unknown', 'must not become live'));
     const oversizedRef = 'r'.repeat(129);

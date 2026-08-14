@@ -2592,6 +2592,13 @@ function _collectHistoryMessage(collector: BatchCollector, message: ChatMessage)
   const timeMs = message.time.getTime();
   if (!Number.isFinite(timeMs)) return;
   const id = message.id.slice(0, SERVER_SEARCH_ID_MAX);
+  const seenIds = collector.seenIds ?? new Set<string>();
+  collector.seenIds = seenIds;
+  if (seenIds.has(id)) {
+    collector.duplicateDropped = true;
+    return;
+  }
+  seenIds.add(id);
   const from = message.from.slice(0, SERVER_SEARCH_FROM_MAX);
   let text = message.text.slice(0, HISTORY_BATCH_TEXT_MAX);
   const finalCodeUnit = text.charCodeAt(text.length - 1);
