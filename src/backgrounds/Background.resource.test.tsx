@@ -73,14 +73,22 @@ describe('Background lazy resource gating', () => {
     });
     const scene = host?.querySelector('.onyx-scene');
     expect(host?.getAttribute('data-background-kind')).toBe('scene');
+    expect(host?.getAttribute('data-background-mode')).toBe('animated');
+    // CSS/SMIL scenes are display-driven; the policy FPS is advisory and must
+    // not be reported as an enforced canvas cap.
+    expect(host?.hasAttribute('data-background-fps')).toBe(false);
+    expect(host?.getAttribute('data-background-policy-fps')).toBeTruthy();
+    expect(host?.getAttribute('data-background-cadence')).toBe('display-driven');
 
     window.dispatchEvent(new Event('blur'));
     expect(scene?.getAttribute('data-scene-runtime-paused')).toBe('true');
+    expect(host?.getAttribute('data-background-paused')).toBe('true');
     // Runtime lifecycle pausing is not a user-selected static mode.
     expect(host?.getAttribute('data-background-kind')).toBe('scene');
 
     window.dispatchEvent(new Event('focus'));
     expect(scene?.hasAttribute('data-scene-runtime-paused')).toBe(false);
+    expect(host?.hasAttribute('data-background-paused')).toBe(false);
   });
 
   it('keeps a static branded frame and skips the render chunk under Data Saver', async () => {
@@ -97,6 +105,8 @@ describe('Background lazy resource gating', () => {
     const placeholder = container.querySelector('[data-background-placeholder="true"]');
     expect(placeholder).toHaveAttribute('data-background-kind', 'solid');
     expect(placeholder).toHaveAttribute('data-background-reduced-data', 'true');
+    expect(placeholder).toHaveAttribute('data-background-mode', 'off');
+    expect(placeholder).toHaveAttribute('data-background-reason', 'reduced-data');
   });
 
   it('replaces a loaded scene when Data Saver turns on', async () => {

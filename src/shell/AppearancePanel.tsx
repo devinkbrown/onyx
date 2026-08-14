@@ -14,15 +14,15 @@ import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { useStore, getState } from '@/lib/store';
 import { useThemeOptional, THEMES, THEME_IDS, customThemeTokens, getCustomTheme, type CustomTheme } from '@/theme';
-import { backgroundOptions } from '@/backgrounds';
+import { BackgroundPicker } from '@/backgrounds/picker/BackgroundPicker';
 import {
   SCENE_MOTIONS,
   sceneMotion,
   setSceneMotion,
   type SceneMotion,
 } from '@/lib/prefs/sceneMotion';
-import { AUTO_BACKGROUND_ID } from './themeBackground';
 import { ThemeImportDialog } from './ThemeImportDialog';
+import './AppearancePanel.css';
 
 type ThemeEntry = { id: string; label: string; title: string; swatch: string[]; custom: boolean };
 
@@ -40,11 +40,6 @@ export function AppearancePanel(): JSX.Element {
   const open = useStore((s) => s.showAppearance);
   const backgroundId = useStore((s) => s.backgroundId);
   const [themeDialogOpen, setThemeDialogOpen] = createSignal(false);
-  const selectedBackground = createMemo(() => {
-    if (backgroundId() === AUTO_BACKGROUND_ID) return 'Auto · matches theme';
-    return backgroundOptions.find((option) => option.id === backgroundId())?.label ?? 'Custom background';
-  });
-
   function chooseBackground(id: string): void {
     // A new wallpaper selection is explicit intent to see it. Do not let an
     // old hidden "Off" setting make every mobile tap appear broken.
@@ -140,7 +135,9 @@ export function AppearancePanel(): JSX.Element {
           <section class="ap-panel-group">
             <div class="ap-panel-heading-row">
               <h3 class="ap-panel-label">Background</h3>
-              <span class="ap-panel-current" aria-live="polite">{selectedBackground()}</span>
+              <span class="ap-panel-current" aria-live="polite">
+                {sceneMotion() === 'off' ? 'Off' : 'Applied live'}
+              </span>
             </div>
             <div class="ap-motion-control">
               <span class="ap-motion-label">Motion</span>
@@ -161,40 +158,7 @@ export function AppearancePanel(): JSX.Element {
                 </For>
               </div>
             </div>
-            <div class="ap-panel-bgs" role="radiogroup" aria-label="Background" style={{ 'touch-action': 'manipulation' }}>
-              <button
-                type="button"
-                class="ap-bg-chip"
-                classList={{ 'ap-bg-chip--on': backgroundId() === AUTO_BACKGROUND_ID }}
-                role="radio"
-                aria-checked={backgroundId() === AUTO_BACKGROUND_ID}
-                aria-label="Auto — theme-matched background"
-                style={{ 'min-height': '44px', 'touch-action': 'manipulation' }}
-                onClick={() => chooseBackground(AUTO_BACKGROUND_ID)}
-              >
-                <span class="ap-bg-name">Auto</span>
-                <span class="ap-bg-kind" data-kind="animated">match theme</span>
-              </button>
-              <For each={backgroundOptions}>
-                {(opt) => {
-                  const active = () => backgroundId() === opt.id;
-                  return (
-                    <button
-                      type="button"
-                      class="ap-bg-chip"
-                      classList={{ 'ap-bg-chip--on': active() }}
-                      role="radio"
-                      aria-checked={active()}
-                      style={{ 'min-height': '44px', 'touch-action': 'manipulation' }}
-                      onClick={() => chooseBackground(opt.id)}
-                    >
-                      <span class="ap-bg-name">{opt.label}</span>
-                      <span class="ap-bg-kind" data-kind={opt.kind}>{opt.kind}</span>
-                    </button>
-                  );
-                }}
-              </For>
-            </div>
+            <BackgroundPicker value={backgroundId} onSelect={chooseBackground} label="Background" immediate />
           </section>
 
           {/* ── Deep customization ── */}

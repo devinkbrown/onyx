@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { For, Show } from 'solid-js';
+import { createMemo, For, Show } from 'solid-js';
 import type { SceneProps, SceneVariant } from '../engine';
 import { SceneShell, seededRand } from './SceneShell';
+import { useScenePolicy } from './scenePolicy';
 
 /* ── Phoenix: majestic flaming phoenix rising from an inferno — layered SVG
    bird with beating wings, sweeping tail plumes, crown flames, rising embers,
@@ -116,22 +117,45 @@ const MAGMA_POOLS = [18, 48, 80].map((x, i) => ({
 }));
 
 function PhoenixScene(props: SceneProps) {
+  const policy = useScenePolicy();
+  const detail = createMemo(() => props.sceneDetail ?? policy().sceneDetail);
+  const visibleVeins = createMemo(() => FIRE_VEINS.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 6 : FIRE_VEINS.length));
+  const visibleSmoke = createMemo(() => smoke.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 6 : smoke.length));
+  const visibleVortex = createMemo(() => vortex.slice(0, detail() === 'sparse' ? 6 : detail() === 'balanced' ? 10 : vortex.length));
+  const visibleFeathers = createMemo(() => feathers.slice(0, detail() === 'sparse' ? 2 : detail() === 'balanced' ? 5 : feathers.length));
+  const visibleSparks = createMemo(() => sparks.slice(0, detail() === 'sparse' ? 5 : detail() === 'balanced' ? 10 : sparks.length));
+  const visibleEmbersSmall = createMemo(() => embersSmall.slice(0, detail() === 'sparse' ? 8 : detail() === 'balanced' ? 18 : embersSmall.length));
+  const visibleEmbersMed = createMemo(() => embersMed.slice(0, detail() === 'sparse' ? 5 : detail() === 'balanced' ? 12 : embersMed.length));
+  const visibleEmbersLarge = createMemo(() => embersLarge.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 7 : embersLarge.length));
+  const visiblePools = createMemo(() => MAGMA_POOLS.slice(0, detail() === 'sparse' ? 1 : detail() === 'balanced' ? 2 : MAGMA_POOLS.length));
+
   return (
-    <SceneShell reducedMotion={props.reducedMotion} base="linear-gradient(180deg, #140705 0%, #1f0b05 55%, #0c0402 100%)">
+    <SceneShell
+      reducedMotion={props.reducedMotion}
+      sceneDetail={detail()}
+      paused={props.paused}
+      onRuntimePaused={props.onRuntimePaused}
+      base="linear-gradient(180deg, #140705 0%, #1f0b05 55%, #0c0402 100%)"
+    >
       {/* Intense fire base — 5 layers of blazing gradient */}
-      <div class="absolute bottom-0 left-0 right-0 h-[65%]"
+      <div data-scene-layer="heat" class="absolute bottom-0 left-0 right-0 h-[65%]"
         style={{ background: 'linear-gradient(to top, rgba(180,60,10,0.5), rgba(239,68,68,0.3) 35%, rgba(245,158,11,0.12) 65%, transparent)', animation: 'ph-heat 3s ease-in-out infinite' }} />
-      <div class="absolute bottom-0 left-[5%] right-[5%] h-[55%]"
-        style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(251,191,36,0.45), rgba(249,115,22,0.25) 45%, transparent 70%)', animation: 'ph-heat 4.5s ease-in-out 1s infinite' }} />
-      <div class="absolute bottom-0 left-[15%] right-[15%] h-[45%]"
-        style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(239,68,68,0.35), rgba(180,60,10,0.2) 55%, transparent)', animation: 'ph-heat 3.8s ease-in-out 1.8s infinite' }} />
-      <div class="absolute bottom-0 left-[25%] right-[25%] h-[35%]"
-        style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(255,200,60,0.5), transparent 65%)', animation: 'ph-heat 4s ease-in-out 0.5s infinite' }} />
-      <div class="absolute bottom-0 left-[35%] right-[35%] h-[25%]"
-        style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(255,240,100,0.55), transparent 70%)', animation: 'ph-heat 2.8s ease-in-out 2s infinite' }} />
+      <Show when={detail() !== 'sparse'}>
+        <div class="absolute bottom-0 left-[5%] right-[5%] h-[55%]"
+          style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(251,191,36,0.45), rgba(249,115,22,0.25) 45%, transparent 70%)', animation: 'ph-heat 4.5s ease-in-out 1s infinite' }} />
+        <div class="absolute bottom-0 left-[15%] right-[15%] h-[45%]"
+          style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(239,68,68,0.35), rgba(180,60,10,0.2) 55%, transparent)', animation: 'ph-heat 3.8s ease-in-out 1.8s infinite' }} />
+        <div class="absolute bottom-0 left-[25%] right-[25%] h-[35%]"
+          style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(255,200,60,0.5), transparent 65%)', animation: 'ph-heat 4s ease-in-out 0.5s infinite' }} />
+        <Show when={detail() === 'full'}>
+          <div class="absolute bottom-0 left-[35%] right-[35%] h-[25%]"
+            style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(255,240,100,0.55), transparent 70%)', animation: 'ph-heat 2.8s ease-in-out 2s infinite' }} />
+        </Show>
+      </Show>
 
       {/* Fire veins rising from below */}
-      <For each={FIRE_VEINS}>
+      <div data-scene-layer="veins">
+      <For each={visibleVeins()}>
         {(v) => (
           <div class="absolute bottom-0"
             style={{ left: `${v.x}%`, width: `${v.w}px`, height: `${v.h}%`,
@@ -141,13 +165,15 @@ function PhoenixScene(props: SceneProps) {
               animation: `ph-vein ${v.dur}s ease-in-out ${v.delay}s infinite` }} />
         )}
       </For>
+      </div>
 
       {/* Heat shimmer */}
       <div class="absolute bottom-0 left-0 right-0 h-[40%]"
         style={{ background: 'linear-gradient(to top, rgba(255,180,60,0.18), rgba(255,140,40,0.08) 50%, transparent)', filter: 'blur(3px)', animation: 'ph-shimmer 1.6s ease-in-out infinite' }} />
 
       {/* Dense smoke columns */}
-      <For each={smoke}>
+      <div data-scene-layer="smoke">
+      <For each={visibleSmoke()}>
         {(s) => (
           <div class="absolute bottom-[2%]"
             style={{ left: `${s.x}%`, width: `${s.w}px`, height: '70%',
@@ -155,17 +181,22 @@ function PhoenixScene(props: SceneProps) {
               filter: 'blur(14px)', animation: `ph-smoke ${s.dur}s ease-in-out ${s.delay}s infinite` }} />
         )}
       </For>
+      </div>
 
       {/* Central phoenix glow — multi-layer radiance */}
-      <div class="absolute top-[18%] left-[50%] -translate-x-1/2 w-[min(700px,55vw)] h-[min(600px,50vh)] rounded-full"
+      <div data-scene-layer="core" class="absolute top-[18%] left-[50%] -translate-x-1/2 w-[min(700px,55vw)] h-[min(600px,50vh)] rounded-full"
         style={{ background: 'radial-gradient(ellipse, rgba(245,158,11,0.18) 0%, rgba(239,68,68,0.08) 40%, transparent 65%)', animation: 'ph-core 5s ease-in-out infinite', filter: 'blur(35px)' }} />
-      <div class="absolute top-[22%] left-[50%] -translate-x-1/2 w-[min(450px,38vw)] h-[min(400px,36vh)] rounded-full"
-        style={{ background: 'radial-gradient(ellipse, rgba(251,191,36,0.2) 0%, rgba(245,158,11,0.08) 45%, transparent 70%)', animation: 'ph-core 5s ease-in-out 2.5s infinite', filter: 'blur(25px)' }} />
-      <div class="absolute top-[28%] left-[50%] -translate-x-1/2 w-[min(250px,22vw)] h-[min(220px,20vh)] rounded-full"
-        style={{ background: 'radial-gradient(ellipse, rgba(254,243,199,0.15) 0%, rgba(251,191,36,0.06) 50%, transparent 70%)', animation: 'ph-core 4s ease-in-out 1s infinite', filter: 'blur(18px)' }} />
+      <Show when={detail() !== 'sparse'}>
+        <div class="absolute top-[22%] left-[50%] -translate-x-1/2 w-[min(450px,38vw)] h-[min(400px,36vh)] rounded-full"
+          style={{ background: 'radial-gradient(ellipse, rgba(251,191,36,0.2) 0%, rgba(245,158,11,0.08) 45%, transparent 70%)', animation: 'ph-core 5s ease-in-out 2.5s infinite', filter: 'blur(25px)' }} />
+        <Show when={detail() === 'full'}>
+          <div class="absolute top-[28%] left-[50%] -translate-x-1/2 w-[min(250px,22vw)] h-[min(220px,20vh)] rounded-full"
+            style={{ background: 'radial-gradient(ellipse, rgba(254,243,199,0.15) 0%, rgba(251,191,36,0.06) 50%, transparent 70%)', animation: 'ph-core 4s ease-in-out 1s infinite', filter: 'blur(18px)' }} />
+        </Show>
+      </Show>
 
       {/* Phoenix SVG — detailed majestic bird with layered flames */}
-      <svg class="absolute inset-0 w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
+      <svg data-scene-layer="phoenix" class="absolute inset-0 w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
         <defs>
           <linearGradient id="ph-fg" x1="0.5" y1="1" x2="0.5" y2="0">
             <stop offset="0%" stop-color="#dc2626" stop-opacity="0.7" />
@@ -281,8 +312,8 @@ function PhoenixScene(props: SceneProps) {
       </svg>
 
       {/* Fire vortex swirl around phoenix center */}
-      <div class="absolute" style={{ left: '50%', top: '42%', width: '0', height: '0' }}>
-        <For each={vortex}>
+      <div class="absolute" data-scene-layer="vortex" style={{ left: '50%', top: '42%', width: '0', height: '0' }}>
+        <For each={visibleVortex()}>
           {(v) => (
             <div class="absolute rounded-full"
               style={{ left: `${v.px}px`, top: `${v.py}px`, width: `${v.size}px`, height: `${v.size}px`,
@@ -294,7 +325,9 @@ function PhoenixScene(props: SceneProps) {
       </div>
 
       {/* Floating fire feather shapes */}
-      <For each={feathers}>
+      <Show when={detail() !== 'sparse'}>
+      <div data-scene-layer="feathers">
+      <For each={visibleFeathers()}>
         {(f) => (
           <div class="absolute"
             style={{
@@ -311,9 +344,12 @@ function PhoenixScene(props: SceneProps) {
             }} />
         )}
       </For>
+      </div>
+      </Show>
 
       {/* Spark bursts radiating from phoenix */}
-      <For each={sparks}>
+      <div data-scene-layer="sparks">
+      <For each={visibleSparks()}>
         {(s) => (
           <div class="absolute rounded-full"
             style={{
@@ -328,9 +364,11 @@ function PhoenixScene(props: SceneProps) {
             }} />
         )}
       </For>
+      </div>
 
       {/* Three tiers of rising embers */}
-      <For each={embersSmall}>
+      <div data-scene-layer="embers">
+      <For each={visibleEmbersSmall()}>
         {(e) => (
           <div class="absolute rounded-full"
             style={{ left: `${e.x}%`, bottom: '0', width: `${e.size}px`, height: `${e.size}px`,
@@ -340,7 +378,7 @@ function PhoenixScene(props: SceneProps) {
               ['--dr' as string]: `${e.drift}px` }} />
         )}
       </For>
-      <For each={embersMed}>
+      <For each={visibleEmbersMed()}>
         {(e) => (
           <div class="absolute rounded-full"
             style={{ left: `${e.x}%`, bottom: '0', width: `${e.size}px`, height: `${e.size}px`,
@@ -350,7 +388,7 @@ function PhoenixScene(props: SceneProps) {
               ['--dr' as string]: `${e.drift}px` }} />
         )}
       </For>
-      <For each={embersLarge}>
+      <For each={visibleEmbersLarge()}>
         {(e) => (
           <div class="absolute rounded-full"
             style={{ left: `${e.x}%`, bottom: '0', width: `${e.size}px`, height: `${e.size}px`,
@@ -360,9 +398,11 @@ function PhoenixScene(props: SceneProps) {
               ['--dr' as string]: `${e.drift}px` }} />
         )}
       </For>
+      </div>
 
       {/* Magma pools at base */}
-      <For each={MAGMA_POOLS}>
+      <div data-scene-layer="pools">
+      <For each={visiblePools()}>
         {(p) => (
           <div class="absolute bottom-0"
             style={{ left: `${p.left}%`, width: '20%', height: '8%',
@@ -372,10 +412,13 @@ function PhoenixScene(props: SceneProps) {
               animation: `ph-pool ${p.dur}s ease-in-out ${p.delay}s infinite` }} />
         )}
       </For>
+      </div>
 
       {/* Flickering ambient light on the whole scene */}
-      <div class="absolute inset-0"
-        style={{ animation: 'ph-flicker 0.15s step-end infinite', background: 'rgba(245,158,11,0.02)' }} />
+      <Show when={detail() === 'full'}>
+        <div class="absolute inset-0" data-scene-layer="flicker"
+          style={{ animation: 'ph-flicker 0.15s step-end infinite', background: 'rgba(245,158,11,0.02)' }} />
+      </Show>
 
       <style>{`
         @keyframes ph-heat { 0%,100%{opacity:1} 50%{opacity:0.75} }

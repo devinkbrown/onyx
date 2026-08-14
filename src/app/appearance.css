@@ -193,6 +193,12 @@
 
 .ap-studio { margin-top: clamp(34px, 5vw, 64px); }
 
+.ap-background-stage__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ap-background-stage__heading > span { color: var(--lapis-bright); font: .66rem var(--font-mono); letter-spacing: .1em; text-transform: uppercase; }
+.ap-background-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.ap-action { min-height: 44px; padding: 9px 14px; border: 1px solid var(--seam); border-radius: var(--r-sm); cursor: pointer; font: .74rem var(--font-mono); letter-spacing: .05em; }.ap-action:focus-visible { outline: var(--focus-ring, 2px solid var(--lapis)); outline-offset: 3px; }.ap-action:disabled { cursor: default; opacity: .55; }.ap-action--quiet { color: var(--paper-dim); background: color-mix(in oklab, var(--stone-2) 32%, transparent); }.ap-action--apply { color: var(--on-accent, var(--ink)); border-color: var(--lapis); background: var(--lapis); }
+.ap-background-fallback { position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(120% 120% at 50% 0%, color-mix(in oklab, var(--lapis) 22%, var(--ink)) 0%, var(--ink) 60%); }
+
 /* Touch / coarse primary pointers: 44px targets, no hover-lift that steals taps,
    no sticky :hover transform after a finger leaves the chip. */
 @media (hover: none), (pointer: coarse) {

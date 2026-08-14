@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { JSX } from 'solid-js';
+import type { SceneDetail } from './backgroundPolicy';
 import { bumpThemeEpoch } from './theme-epoch';
 
 export type BackgroundQuality = 'low' | 'med' | 'high';
+export type { SceneDetail };
 
 /** Kinds rendered by the canvas engine (init/frame/dispose loop). */
 export type CanvasBackgroundKind = 'animated' | 'solid';
@@ -33,6 +35,12 @@ export interface BackgroundVariant {
 export interface SceneProps {
   /** True when the user prefers reduced motion — scenes freeze their CSS animations. */
   reducedMotion: boolean;
+  /** Policy detail ladder — omit expensive layers when `sparse`. */
+  sceneDetail?: SceneDetail;
+  /** Combined still + runtime pause hook. SceneShell also owns visibility/focus. */
+  paused?: boolean;
+  /** SceneShell reports hidden/blurred/idle holds to the host telemetry. */
+  onRuntimePaused?: (paused: boolean) => void;
 }
 
 /**
@@ -72,6 +80,25 @@ export interface BackgroundEngineOptions {
    * theme's own scene (frozen), instead of swapping to a generic solid.
    */
   staticMode?: boolean;
+  /**
+   * Backing-store device-pixel ceiling. Policy owns the number (mobile 1.5,
+   * desktop 2, preview 1); quality profiles are only the fallback.
+   */
+  dprCap?: number;
+  /**
+   * Live wallpaper surfaces (not picker previews) claim a process-wide lease
+   * so two canvas engines never animate at once.
+   */
+  live?: boolean;
+  /** Fired when the FPS guard steps quality down. */
+  onQualityChange?: (quality: BackgroundQuality) => void;
+}
+
+export interface BackgroundPresentation {
+  quality: BackgroundQuality;
+  frameCapFps: number;
+  dprCap: number;
+  staticMode: boolean;
 }
 
 /** Default animation render-cadence ceiling — a calm 30fps, not 60. */
@@ -127,20 +154,67 @@ export function deceleratedFrameCap(baseFps: number, idleMs: number, options: De
 
 const QUALITY_ORDER: BackgroundQuality[] = ['low', 'med', 'high'];
 
-const QUALITY_PROFILES: Record<BackgroundQuality, { maxDpr: number; scale: number }> = {
+export const QUALITY_PROFILES: Record<BackgroundQuality, { maxDpr: number; scale: number }> = {
   low: { maxDpr: 1, scale: 0.52 },
   med: { maxDpr: 1.5, scale: 0.76 },
   high: { maxDpr: 2, scale: 1 },
 };
+
+export function qualityScaleFor(quality: BackgroundQuality): number {
+  return QUALITY_PROFILES[quality].scale;
+}
+
+/** At most one live (non-preview) canvas engine may hold the animation lease. */
+let liveCanvasEngine: BackgroundEngine | null = null;
+/**
+ * Keep the displaced engines in order so replacing a wallpaper can resume the
+ * previous runnable surface when the replacement unmounts. A single pointer
+ * loses A when the sequence is A → B → C and B is removed before C.
+ */
+const liveCanvasLeaseStack: BackgroundEngine[] = [];
+
+function claimLiveCanvasEngine(engine: BackgroundEngine): void {
+  const existingIndex = liveCanvasLeaseStack.indexOf(engine);
+  if (existingIndex >= 0) liveCanvasLeaseStack.splice(existingIndex, 1);
+  if (liveCanvasEngine && liveCanvasEngine !== engine) {
+    liveCanvasEngine.setSuppressed(true);
+  }
+  liveCanvasLeaseStack.push(engine);
+  liveCanvasEngine = engine;
+  engine.setSuppressed(false);
+}
+
+function releaseLiveCanvasEngine(engine: BackgroundEngine): void {
+  const index = liveCanvasLeaseStack.indexOf(engine);
+  if (index < 0) return;
+  liveCanvasLeaseStack.splice(index, 1);
+  if (liveCanvasEngine !== engine) return;
+
+  let previous: BackgroundEngine | undefined;
+  for (let i = liveCanvasLeaseStack.length - 1; i >= 0; i -= 1) {
+    const candidate = liveCanvasLeaseStack[i];
+    if (candidate?.canResumeLiveLease()) {
+      previous = candidate;
+      break;
+    }
+  }
+  liveCanvasEngine = previous ?? null;
+  previous?.setSuppressed(false);
+}
 
 function nextLowerQuality(quality: BackgroundQuality): BackgroundQuality {
   const index = QUALITY_ORDER.indexOf(quality);
   return QUALITY_ORDER[Math.max(0, index - 1)] ?? 'low';
 }
 
-function getDevicePixelRatio(quality: BackgroundQuality): number {
-  const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
-  return Math.max(1, Math.min(dpr, QUALITY_PROFILES[quality].maxDpr));
+function readRawDevicePixelRatio(): number {
+  if (typeof window === 'undefined') return 1;
+  const dpr = window.devicePixelRatio;
+  return Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+}
+
+function capDevicePixelRatio(dprCap: number): number {
+  return Math.max(1, Math.min(readRawDevicePixelRatio(), dprCap));
 }
 
 function isDocumentHidden(): boolean {
@@ -173,10 +247,13 @@ export function rendersSingleFrame(staticMode: boolean, kind: CanvasBackgroundKi
 export class BackgroundEngine {
   readonly canvas: HTMLCanvasElement;
   readonly variant: BackgroundVariant;
-  readonly targetFps: number;
+  targetFps: number;
   readonly fpsGuardFrames: number;
-  readonly frameCapFps: number;
-  readonly staticMode: boolean;
+  frameCapFps: number;
+  staticMode: boolean;
+  dprCap: number;
+  readonly live: boolean;
+  private readonly onQualityChange?: (quality: BackgroundQuality) => void;
 
   private context: CanvasRenderingContext2D | null = null;
   private frameContext: BackgroundFrameContext | null = null;
@@ -198,7 +275,14 @@ export class BackgroundEngine {
   private throttled = false;
   /** True after prolonged inactivity has stopped the rAF loop entirely. */
   private idleHeld = false;
+  /** External lease / host asked this engine not to animate. */
+  private suppressed = false;
   private resizeObserver: ResizeObserver | null = null;
+  private resizeScheduled = false;
+  private resizeRafId: number | null = null;
+  /** Resolution media queries are the only reliable notification when page
+   * zoom or a cross-display move changes DPR without changing CSS bounds. */
+  private dprMediaQuery: MediaQueryList | null = null;
   private themeObserver: MutationObserver | null = null;
   private pendingStaticRefresh = false;
   private listenersAttached = false;
@@ -211,15 +295,23 @@ export class BackgroundEngine {
     this.variant = options.variant;
     this.currentQuality = options.quality ?? 'high';
     this.frameCapFps = options.frameCapFps ?? DEFAULT_FRAME_CAP_FPS;
+    this.dprCap = options.dprCap ?? QUALITY_PROFILES[this.currentQuality].maxDpr;
     // Guard threshold sits below the cap so a healthy capped loop never trips
     // it, while genuine starvation (rendering well under the cap) still does.
     this.targetFps = options.targetFps ?? Math.round(this.frameCapFps * GUARD_FPS_RATIO);
     this.fpsGuardFrames = options.fpsGuardFrames ?? 42;
     this.staticMode = options.staticMode ?? false;
+    this.live = options.live ?? false;
+    this.onQualityChange = options.onQualityChange;
   }
 
   get quality(): BackgroundQuality {
     return this.currentQuality;
+  }
+
+  /** Internal lease guard: only a live, context-ready engine can be restored. */
+  canResumeLiveLease(): boolean {
+    return this.running && this.initialized;
   }
 
   start(): void {
@@ -233,19 +325,27 @@ export class BackgroundEngine {
       return;
     }
 
+    // Do not displace an already-running wallpaper until this canvas has a
+    // usable 2D context and its first frame can be painted. A failed context
+    // init therefore leaves the prior live engine untouched.
+    this.claimLiveLease();
+
     const now = animationNow();
     this.restoreActiveCadence(now);
     this.renderFrame(now);
     // Seed the cadence clocks off the first painted frame so the cap and idle
     // deceleration are measured from an active start.
     this.lastRenderAt = now;
+    this.syncPausedAttribute();
     this.scheduleNextFrame();
   }
 
   stop(): void {
     this.running = false;
     this.cancelFrame();
+    this.cancelScheduledResize();
     this.detachListeners();
+    this.releaseLiveLease();
     this.lastFrameAt = null;
     this.lastRenderAt = null;
     this.activeSince = null;
@@ -271,7 +371,67 @@ export class BackgroundEngine {
     if (quality === this.currentQuality) return;
 
     this.currentQuality = quality;
+    this.dprCap = Math.min(this.dprCap, QUALITY_PROFILES[quality].maxDpr);
     this.resize();
+  }
+
+  setFrameCapFps(frameCapFps: number): void {
+    const next = Math.max(1, frameCapFps);
+    if (next === this.frameCapFps) return;
+    this.frameCapFps = next;
+    this.targetFps = Math.round(this.frameCapFps * GUARD_FPS_RATIO);
+  }
+
+  setDprCap(dprCap: number): void {
+    const next = Math.max(1, dprCap);
+    if (next === this.dprCap) return;
+    this.dprCap = next;
+    this.resize();
+  }
+
+  setStaticMode(staticMode: boolean): void {
+    if (this.staticMode === staticMode) return;
+    this.staticMode = staticMode;
+    this.syncPausedAttribute();
+    if (staticMode) {
+      this.cancelFrame();
+      this.refreshStaticFrame();
+      return;
+    }
+    this.restoreActiveCadence(animationNow());
+    this.scheduleNextFrame();
+  }
+
+  setSuppressed(suppressed: boolean): void {
+    if (this.suppressed === suppressed) return;
+    this.suppressed = suppressed;
+    this.syncPausedAttribute();
+    if (suppressed) {
+      this.cancelFrame();
+      this.lastFrameAt = null;
+      this.lastRenderAt = null;
+      this.lowFpsFrames = 0;
+      this.throttled = false;
+      return;
+    }
+    if (!this.running || isDocumentHidden() || this.windowBlurred) return;
+    this.restoreActiveCadence(animationNow());
+    this.scheduleNextFrame();
+  }
+
+  applyPresentation(next: BackgroundPresentation): void {
+    const qualityChanged = next.quality !== this.currentQuality;
+    const dprChanged = next.dprCap !== this.dprCap;
+    this.setFrameCapFps(next.frameCapFps);
+    if (qualityChanged) this.currentQuality = next.quality;
+    if (dprChanged) this.dprCap = Math.max(1, next.dprCap);
+    if (qualityChanged || dprChanged) this.resize();
+    this.setStaticMode(next.staticMode);
+    this.syncPolicyDataset();
+    // A policy update can run while the document is hidden/blurred. Re-sync
+    // after the presentation write so host telemetry cannot clear a truthful
+    // pause flag from the lifecycle listeners.
+    this.syncPausedAttribute();
   }
 
   resize(): void {
@@ -282,7 +442,7 @@ export class BackgroundEngine {
     const fallbackHeight = typeof window === 'undefined' ? this.canvas.height : window.innerHeight;
     const width = Math.max(1, Math.floor(bounds.width || this.canvas.clientWidth || fallbackWidth || 1));
     const height = Math.max(1, Math.floor(bounds.height || this.canvas.clientHeight || fallbackHeight || 1));
-    const dpr = getDevicePixelRatio(this.currentQuality);
+    const dpr = capDevicePixelRatio(this.dprCap);
     const pixelWidth = Math.max(1, Math.floor(width * dpr));
     const pixelHeight = Math.max(1, Math.floor(height * dpr));
     const previous = this.frameContext;
@@ -304,7 +464,7 @@ export class BackgroundEngine {
       height,
       dpr,
       quality: this.currentQuality,
-      qualityScale: QUALITY_PROFILES[this.currentQuality].scale,
+      qualityScale: qualityScaleFor(this.currentQuality),
     };
 
     // ResizeObserver delivers an initial callback after mount even when the
@@ -378,7 +538,11 @@ export class BackgroundEngine {
     if (this.lowFpsFrames < this.fpsGuardFrames || this.currentQuality === 'low') return;
 
     this.currentQuality = nextLowerQuality(this.currentQuality);
+    this.dprCap = Math.min(this.dprCap, QUALITY_PROFILES[this.currentQuality].maxDpr);
     this.lowFpsFrames = 0;
+    this.canvas.dataset.backgroundQuality = this.currentQuality;
+    this.canvas.dataset.backgroundReason = 'runtime-pressure';
+    this.onQualityChange?.(this.currentQuality);
     this.resize();
   }
 
@@ -388,7 +552,8 @@ export class BackgroundEngine {
       this.staticMode ||
       this.variant.kind === 'solid' ||
       isDocumentHidden() ||
-      this.windowBlurred
+      this.windowBlurred ||
+      this.suppressed
     ) return;
     if (this.rafId !== null) return;
     if (typeof requestAnimationFrame === 'undefined') return;
@@ -403,6 +568,7 @@ export class BackgroundEngine {
         this.lastRenderAt = time;
         this.renderFrame(time);
         this.idleHeld = true;
+        this.syncPausedAttribute();
         return;
       }
       // rAF fires at vsync (~60fps); only actually paint when the cadence cap's
@@ -469,6 +635,7 @@ export class BackgroundEngine {
       this.resizeObserver.observe(this.canvas);
       if (this.canvas.parentElement) this.resizeObserver.observe(this.canvas.parentElement);
     }
+    this.attachDprWatcher();
 
     // Watch documentElement for theme switches. Every kind needs this: animated
     // loops read a theme cached against the shared epoch (so they no longer pay
@@ -503,11 +670,13 @@ export class BackgroundEngine {
     }
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.detachDprWatcher();
     this.themeObserver?.disconnect();
     this.themeObserver = null;
     this.pendingStaticRefresh = false;
     this.windowBlurred = false;
     this.idleHeld = false;
+    this.cancelScheduledResize();
   }
 
   /**
@@ -540,14 +709,110 @@ export class BackgroundEngine {
     if (this.lastActivityAt !== null && now - this.lastActivityAt < ACTIVITY_THROTTLE_MS) return;
     this.lastActivityAt = now;
     this.restoreActiveCadence(now);
+    this.syncPausedAttribute();
     this.scheduleNextFrame();
   };
 
   private readonly handleResize = (): void => {
-    // A resize is user activity — restore full cadence and paint promptly.
+    // Cadence reset stays synchronous so FPS-guard evidence is discarded even
+    // when backing-store work is coalesced to the next animation frame.
+    this.restoreActiveCadence(animationNow());
+    this.scheduleCoalescedResize();
+    this.scheduleNextFrame();
+  };
+
+  private scheduleCoalescedResize(): void {
+    if (this.resizeScheduled) return;
+    this.resizeScheduled = true;
+    if (typeof requestAnimationFrame === 'undefined') {
+      this.resizeScheduled = false;
+      this.resize();
+      return;
+    }
+    this.resizeRafId = requestAnimationFrame(() => {
+      this.resizeRafId = null;
+      this.resizeScheduled = false;
+      this.resize();
+    });
+  }
+
+  private cancelScheduledResize(): void {
+    if (this.resizeRafId !== null && typeof cancelAnimationFrame !== 'undefined') {
+      cancelAnimationFrame(this.resizeRafId);
+    }
+    this.resizeRafId = null;
+    this.resizeScheduled = false;
+  }
+
+  private claimLiveLease(): void {
+    if (!this.live) return;
+    claimLiveCanvasEngine(this);
+  }
+
+  private releaseLiveLease(): void {
+    releaseLiveCanvasEngine(this);
+  }
+
+  private isVisuallyPaused(): boolean {
+    return this.staticMode
+      || this.suppressed
+      || this.windowBlurred
+      || this.idleHeld
+      || isDocumentHidden();
+  }
+
+  private syncPausedAttribute(): void {
+    if (this.isVisuallyPaused()) this.canvas.dataset.backgroundPaused = 'true';
+    else delete this.canvas.dataset.backgroundPaused;
+  }
+
+  private syncPolicyDataset(): void {
+    this.canvas.dataset.backgroundQuality = this.currentQuality;
+    this.canvas.dataset.backgroundFps = String(this.frameCapFps);
+    this.canvas.dataset.backgroundDprCap = String(this.dprCap);
+    if (this.staticMode) this.canvas.dataset.backgroundKind = 'solid';
+  }
+
+  /**
+   * A fixed-resolution media query changes when the browser's DPR moves away
+   * from the value it was created for. Re-arm after each change so subsequent
+   * zoom/display transitions remain observable. This complements rather than
+   * replaces ResizeObserver: CSS bounds can stay identical while the backing
+   * store needs to grow or shrink.
+   */
+  private attachDprWatcher(): void {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    this.detachDprWatcher();
+    const rawDpr = Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
+      ? window.devicePixelRatio
+      : 1;
+    try {
+      const query = window.matchMedia(`(resolution: ${rawDpr}dppx)`);
+      query.addEventListener('change', this.handleDprChange);
+      this.dprMediaQuery = query;
+    } catch {
+      // Resolution observation is an optimization. A partial matchMedia
+      // implementation must not prevent the selected background from mounting.
+      this.dprMediaQuery = null;
+    }
+  }
+
+  private detachDprWatcher(): void {
+    const query = this.dprMediaQuery;
+    this.dprMediaQuery = null;
+    try {
+      query?.removeEventListener('change', this.handleDprChange);
+    } catch {
+      // Listener cleanup is best-effort for partial/legacy matchMedia shims.
+    }
+  }
+
+  private readonly handleDprChange = (): void => {
+    this.detachDprWatcher();
     this.restoreActiveCadence(animationNow());
     this.resize();
     this.scheduleNextFrame();
+    if (this.listenersAttached) this.attachDprWatcher();
   };
 
   private readonly handleThemeMutation = (records: MutationRecord[]): void => {
@@ -569,13 +834,15 @@ export class BackgroundEngine {
     this.lastRenderAt = null;
     this.lowFpsFrames = 0;
     this.throttled = false;
+    this.syncPausedAttribute();
   };
 
   /** Focus is fresh activity: discard stale FPS evidence, restore the 30fps
    * active cap, and schedule one new frame unless the document is still hidden. */
   private readonly handleWindowFocus = (): void => {
     this.windowBlurred = false;
-    if (isDocumentHidden()) return;
+    this.syncPausedAttribute();
+    if (isDocumentHidden() || this.suppressed) return;
     this.restoreActiveCadence(animationNow());
     this.scheduleNextFrame();
   };
@@ -587,17 +854,19 @@ export class BackgroundEngine {
       this.lastRenderAt = null;
       this.lowFpsFrames = 0;
       this.throttled = false;
+      this.syncPausedAttribute();
       return;
     }
 
     // Returning to the tab is activity — reset the idle window to full cadence.
     this.restoreActiveCadence(animationNow());
+    this.syncPausedAttribute();
 
     if (this.pendingStaticRefresh) {
       this.pendingStaticRefresh = false;
       this.refreshStaticFrame();
     }
 
-    this.scheduleNextFrame();
+    if (!this.suppressed) this.scheduleNextFrame();
   };
 }

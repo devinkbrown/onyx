@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SceneShell } from './SceneShell';
 import { SCENE_IDLE_HOLD_MS } from './sceneRuntime';
+import { ScenePolicyProvider } from './scenePolicy';
 
 const hiddenDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
 const hasFocusDescriptor = Object.getOwnPropertyDescriptor(document, 'hasFocus');
@@ -35,6 +36,21 @@ describe('SceneShell signature finishing layers', () => {
     expect(root?.getAttribute('data-scene-signature')).toBe('true');
     expect(root?.querySelector('[data-scene-layer="grain"]')).not.toBeNull();
     expect(root?.querySelector('[data-scene-layer="vignette"]')).not.toBeNull();
+    expect(root?.getAttribute('data-scene-detail')).toBe('full');
+  });
+
+  it('omits the grain finishing layer when policy detail is sparse', () => {
+    const { container } = render(() => (
+      <ScenePolicyProvider value={() => ({ sceneDetail: 'sparse', reducedMotion: false, paused: false })}>
+        <SceneShell reducedMotion={false} base="#05070b">
+          <div data-testid="ink-layer" />
+        </SceneShell>
+      </ScenePolicyProvider>
+    ));
+    const root = container.querySelector('.onyx-scene');
+    expect(root?.getAttribute('data-scene-detail')).toBe('sparse');
+    expect(root?.querySelector('[data-scene-layer="grain"]')).toBeNull();
+    expect(root?.querySelector('[data-scene-layer="vignette"]')).not.toBeNull();
   });
 });
 
@@ -56,10 +72,12 @@ describe('SceneShell SVG timeline lifecycle', () => {
     window.dispatchEvent(new Event('blur'));
     expect(timeline.pauseAnimations).toHaveBeenCalledTimes(1);
     expect(root?.getAttribute('data-scene-runtime-paused')).toBe('true');
+    expect(root?.getAttribute('data-scene-paused')).toBe('true');
 
     window.dispatchEvent(new Event('focus'));
     expect(timeline.unpauseAnimations).toHaveBeenCalledTimes(1);
     expect(root?.hasAttribute('data-scene-runtime-paused')).toBe(false);
+    expect(root?.hasAttribute('data-scene-paused')).toBe(false);
 
     setDocumentHidden(true);
     document.dispatchEvent(new Event('visibilitychange'));
