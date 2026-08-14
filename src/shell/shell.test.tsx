@@ -1886,7 +1886,7 @@ describe('AppShell', () => {
 
       const desk = screen.getByRole('dialog', { name: 'Room controls for #general' });
       expect(within(desk).getByTestId('oper-event-console')).toBeInTheDocument();
-      expect(within(desk).getByRole('button', { name: 'EVENT REPLAY JSON' })).toBeInTheDocument();
+      expect(within(desk).getByRole('button', { name: 'Refresh events' })).toBeInTheDocument();
     });
 
     it('opens direct messages as their own mobile collection', async () => {

@@ -201,6 +201,33 @@
   margin-top: 1rem;
 }
 
+.oper-event-console__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0.5rem 0 0;
+}
+
+.oper-event-console__filters select,
+.oper-event-console__filters input {
+  min-height: 40px;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line, var(--seam-faint));
+  border-radius: var(--r-sm);
+  background: var(--surface-void);
+  color: var(--paper);
+  font: var(--text-sm) var(--font-sans);
+}
+
+@media (max-width: 320px) {
+  .oper-event-console__filters,
+  .oper-event-console__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .oper-event-console__list {
   list-style: none;
   margin: 0.5rem 0 0;

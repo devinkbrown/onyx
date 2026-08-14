@@ -6,9 +6,10 @@
  * offers a bounded EVENT REPLAY JSON request so operators can pull a structured
  * history feed without scraping prose notices.
  */
-import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
+import { createMemo, createSignal, createUniqueId, For, Show, type JSX } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import { formatEventReplayEvent } from '@/lib/irc/eventReplayJson';
+import { filterEventReplayRows, normalizeEventFilter } from '@/lib/moderation/eventFilters';
 import './stage-panel.css';
 
 const SPINE_HINT =
@@ -17,6 +18,11 @@ const SPINE_HINT =
 const REPLAY_LIMITS = [25, 50, 100] as const;
 
 export function OperEventConsole(): JSX.Element {
+  const instanceId = createUniqueId();
+  const titleId = `oper-event-console-title-${instanceId}`;
+  const categoryId = `oper-event-filter-category-${instanceId}`;
+  const severityId = `oper-event-filter-severity-${instanceId}`;
+  const textId = `oper-event-filter-text-${instanceId}`;
   const isOper = useStore((s) => s.isOper);
   const notices = useStore((s) => s.serviceNotices);
   const client = useStore((s) => s.client);
@@ -24,6 +30,9 @@ export function OperEventConsole(): JSX.Element {
   const operEventReplay = useStore((s) => s.operEventReplay);
   const [limit, setLimit] = createSignal<(typeof REPLAY_LIMITS)[number]>(50);
   const [lastRequest, setLastRequest] = createSignal<string | null>(null);
+  const [category, setCategory] = createSignal('');
+  const [severity, setSeverity] = createSignal('');
+  const [text, setText] = createSignal('');
 
   const rows = createMemo(() => {
     const list = notices() ?? [];
@@ -34,7 +43,25 @@ export function OperEventConsole(): JSX.Element {
   });
 
   const feed = createMemo(() => operEventReplay());
-  const structuredRows = createMemo(() => feed().events);
+  const structuredRows = createMemo(() => filterEventReplayRows(feed().events, {
+    category: category(),
+    severity: severity(),
+    text: text(),
+  }));
+  const categories = createMemo(() => {
+    const seen = new Set<string>();
+    for (const event of feed().events) {
+      if (event.categoryCode) seen.add(event.categoryCode);
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b));
+  });
+  const severities = createMemo(() => {
+    const seen = new Set<string>();
+    for (const event of feed().events) {
+      if (event.severity) seen.add(event.severity);
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b));
+  });
 
   const canReplay = createMemo(
     () => connectionStatus() === 'connected' && !!client(),
@@ -54,19 +81,19 @@ export function OperEventConsole(): JSX.Element {
       <section
         class="oper-event-console"
         data-testid="oper-event-console"
-        aria-labelledby="oper-event-console-title"
+        aria-labelledby={titleId}
       >
-        <h3 id="oper-event-console-title" class="acct-section-title">
+        <h3 id={titleId} class="acct-section-title">
           Event Spine
         </h3>
         <p class="acct-section-hint">
           Operator-visible notices that match Event Spine traffic, plus a bounded
-          JSON REPLAY request against the live daemon.
+          refresh of the structured history feed.
         </p>
 
         <div class="oper-event-console__toolbar" data-testid="oper-event-replay-toolbar">
           <label class="oper-event-console__limit">
-            <span class="sr-only">REPLAY limit</span>
+            <span class="sr-only">Number of events to refresh</span>
             <select
               data-testid="oper-event-replay-limit"
               value={String(limit())}
@@ -89,7 +116,7 @@ export function OperEventConsole(): JSX.Element {
             disabled={!canReplay()}
             onClick={() => requestReplay()}
           >
-            EVENT REPLAY JSON
+            Refresh events
           </button>
         </div>
         <Show when={lastRequest()}>
@@ -110,10 +137,54 @@ export function OperEventConsole(): JSX.Element {
           )}
         </Show>
 
+        <Show when={feed().events.length > 0}>
+          <div class="oper-event-console__filters" data-testid="oper-event-filters">
+            <label for={categoryId}>
+              <span class="sr-only">Filter by category</span>
+              <select
+                id={categoryId}
+                data-testid="oper-event-filter-category"
+                value={category()}
+                onChange={(event) => setCategory(normalizeEventFilter(event.currentTarget.value, 32))}
+              >
+                <option value="">All categories</option>
+                <For each={categories()}>
+                  {(value) => <option value={value}>{value}</option>}
+                </For>
+              </select>
+            </label>
+            <label for={severityId}>
+              <span class="sr-only">Filter by severity</span>
+              <select
+                id={severityId}
+                data-testid="oper-event-filter-severity"
+                value={severity()}
+                onChange={(event) => setSeverity(normalizeEventFilter(event.currentTarget.value, 24))}
+              >
+                <option value="">All severities</option>
+                <For each={severities()}>
+                  {(value) => <option value={value}>{value}</option>}
+                </For>
+              </select>
+            </label>
+            <label for={textId}>
+              <span class="sr-only">Filter events by text</span>
+              <input
+                id={textId}
+                data-testid="oper-event-filter-text"
+                type="search"
+                value={text()}
+                placeholder="Filter text"
+                onInput={(event) => setText(normalizeEventFilter(event.currentTarget.value))}
+              />
+            </label>
+          </div>
+        </Show>
+
         <Show when={structuredRows().length > 0}>
           <ul
             class="oper-event-console__list oper-event-console__list--json"
-            aria-label="Structured EVENT REPLAY JSON feed"
+            aria-label="Structured event feed"
             data-testid="oper-event-json-list"
           >
             <For each={structuredRows()}>
@@ -133,11 +204,16 @@ export function OperEventConsole(): JSX.Element {
             </For>
           </ul>
         </Show>
+        <Show when={feed().events.length > 0 && structuredRows().length === 0}>
+          <p class="acct-session-placeholder-body" data-testid="oper-event-filter-empty" role="status">
+            No events match these local filters.
+          </p>
+        </Show>
 
         <Show
           when={rows().length > 0}
           fallback={
-            <Show when={structuredRows().length === 0}>
+            <Show when={structuredRows().length === 0 && feed().events.length === 0}>
               <p class="acct-session-placeholder-body" data-testid="oper-event-empty" role="status">
                 No recent spine-tagged notices yet.
               </p>
@@ -155,6 +231,12 @@ export function OperEventConsole(): JSX.Element {
             </For>
           </ul>
         </Show>
+
+        <details class="moderation-cockpit__protocol">
+          <summary>IRC details</summary>
+          <p>Raw command used to refresh the structured feed. This does not send extra server commands when you filter locally.</p>
+          <code data-testid="oper-event-replay-wire">EVENT REPLAY JSON ALL {limit()}</code>
+        </details>
       </section>
     </Show>
   );

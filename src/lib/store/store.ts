@@ -41,6 +41,13 @@ import {
   type EventReplayFeed,
 } from '@/lib/irc/eventReplayJson';
 import {
+  describeBanListView,
+  EMPTY_BAN_LIST_META,
+  type BanListEntry as BanListViewEntry,
+  type BanListMeta,
+  type BanListView,
+} from '@/lib/moderation/banListView';
+import {
   isRecoveryCodesCleared,
   isRecoveryCodesGenerated,
   isRecoveryCodesLoginOk,
@@ -1662,6 +1669,7 @@ export interface OnyxState {
   moderationLog: Array<{ timestamp: number; action: string; target: string; by: string; channel: string }>;
   addModerationEntry: (entry: { action: string; target: string; by: string; channel: string }) => void;
   banList: Map<string, Array<{ mask: string; setBy?: string; setAt?: number }>>;
+  banListMeta: Map<string, BanListMeta>;
   setBanList: (channel: string, bans: Array<{ mask: string; setBy?: string; setAt?: number }>) => void;
   fetchBanList: (channel: string) => void;
   tempBan: (channel: string, mask: string, minutes: number) => void;
@@ -3635,6 +3643,8 @@ const MAX_BAN_CHANNEL_LENGTH = 256;
 const MAX_BAN_MASK_LENGTH = 512;
 const MAX_BAN_SETTER_LENGTH = 128;
 const _banBuffer = new Map<string, BanListEntry[]>();
+/** Invalidates in-flight MODE +b replies after disconnect or account change. */
+let _banListEpoch = 0;
 
 function _normalizeBanChannel(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -3680,6 +3690,7 @@ function _normalizeBanList(values: readonly BanListEntry[]): BanListEntry[] {
 
 function _clearBanListTransport(): void {
   _banBuffer.clear();
+  _banListEpoch += 1;
 }
 
 /** Isolate module-level protocol state between focused store tests. */
@@ -3819,6 +3830,40 @@ function _clearReconnectCountdown() {
 
 type SetFn = (partial: Partial<OnyxState> | ((s: OnyxState) => Partial<OnyxState>)) => void;
 type GetFn = () => OnyxState;
+
+function _writeBanListMeta(
+  map: Map<string, BanListMeta>,
+  key: string,
+  patch: Partial<BanListMeta>,
+): Map<string, BanListMeta> {
+  const next = new Map(map);
+  const previous = next.get(key) ?? EMPTY_BAN_LIST_META;
+  next.set(key, { ...previous, ...patch });
+  return next;
+}
+
+function _ownedBanListRequest(state: OnyxState, key: string): BanListMeta | null {
+  const meta = state.banListMeta.get(key);
+  if (!meta || meta.status !== 'loading' || meta.epoch !== _banListEpoch) return null;
+  return meta;
+}
+
+function _settlePendingBanLists(
+  set: SetFn,
+  status: 'error' | 'unavailable',
+  error: string,
+): void {
+  set((s) => {
+    let changed = false;
+    const banListMeta = new Map(s.banListMeta);
+    for (const [key, meta] of banListMeta) {
+      if (meta.status !== 'loading') continue;
+      banListMeta.set(key, { ...meta, status, error });
+      changed = true;
+    }
+    return changed ? { banListMeta } : {};
+  });
+}
 
 function _requestHistoryTargetDiscovery(get: GetFn): void {
   const client = get().client;
@@ -4112,6 +4157,7 @@ function _resetAccountBoundState(
       ctcpTimeEnabled: DEFAULT_CTCP_CONFIG.timeEnabled,
       invisibleMode: false,
       banList: new Map(),
+      banListMeta: new Map(),
       channelAccess: new Map(),
       channelAccessLoading: new Set(),
       mutedDMs: new Set(),
@@ -6121,6 +6167,7 @@ export const store = createStore<OnyxState>()(
           _stopLatencyPing();
           _clearBanListTransport();
           _clearAccessListTransport();
+          _settlePendingBanLists(set, 'unavailable', 'Reconnect to refresh the block list.');
           _typingLastSent.clear();
           _pendingTravel = null;
           _pendingPinnedMessages.clear();
@@ -12357,6 +12404,9 @@ export const store = createStore<OnyxState>()(
           if (isChan(target)) {
             const modeStr = params[1] ?? '';
             const modeArgs = params.slice(2);
+            // A delayed or unsolicited MODE for a room outside this live
+            // session must not seed audit/moderation/ban-list state.
+            if (!get().channels.has(key)) break;
             set(s => {
               const channels = new Map(s.channels);
               const c = channels.get(key);
@@ -12371,7 +12421,9 @@ export const store = createStore<OnyxState>()(
               for (const ch of modeStr) {
                 if (ch === '+') { adding = true; continue; }
                 if (ch === '-') { adding = false; continue; }
-                const consumesArg = modeConsumesArg(ch, adding, chanmodes, prefixModes);
+                // Ban masks always consume an argument even before ISUPPORT's
+                // CHANMODES tuple has arrived.
+                const consumesArg = ch === 'b' || modeConsumesArg(ch, adding, chanmodes, prefixModes);
                 const modeArg = consumesArg ? modeArgs[argIdx++] : undefined;
                 if (!prefixModes.has(ch) || !modeArg) continue;
                 const userKey = modeArg.toLowerCase();
@@ -12403,7 +12455,7 @@ export const store = createStore<OnyxState>()(
             for (const ch of modeStr) {
               if (ch === '+') { adding = true; continue; }
               if (ch === '-') { adding = false; continue; }
-              const consumesArg = modeConsumesArg(ch, adding, chanmodes, prefixModes);
+              const consumesArg = ch === 'b' || modeConsumesArg(ch, adding, chanmodes, prefixModes);
               const modeArg = consumesArg ? modeArgs[argIdx++] : undefined;
               if (ch === 'b') {
                 sawBan = true;
@@ -12422,14 +12474,27 @@ export const store = createStore<OnyxState>()(
                 });
                 if (modeArg) {
                   set(s => {
+                    if (!s.channels.has(key)) return {};
+                    const normalized = _normalizeBanEntry({
+                      mask: modeArg,
+                      setBy: nick ?? 'server',
+                      setAt: Math.floor(Date.now() / 1000),
+                    });
+                    if (!normalized) return {};
                     const banList = new Map(s.banList);
                     const existing = banList.get(key) ?? [];
+                    banList.delete(key);
                     banList.set(
                       key,
                       adding
-                        ? [...existing.filter(b => b.mask !== modeArg), { mask: modeArg, setBy: nick ?? 'server', setAt: Math.floor(Date.now() / 1000) }]
-                        : existing.filter(b => b.mask !== modeArg),
+                        ? _normalizeBanList([...existing.filter(b => b.mask !== normalized.mask), normalized])
+                        : existing.filter(b => b.mask !== normalized.mask),
                     );
+                    while (banList.size > MAX_BAN_LIST_CHANNELS) {
+                      const oldest = banList.keys().next().value;
+                      if (oldest === undefined) break;
+                      banList.delete(oldest);
+                    }
                     return { banList };
                   });
                 }
@@ -14069,8 +14134,11 @@ export const store = createStore<OnyxState>()(
           const key367 = _normalizeBanChannel(ch367);
           // MODE +b replies are meaningful only for a channel this session is
           // actually in. Ignore unsolicited numerics instead of letting a
-          // hostile server allocate arbitrary channel buckets.
+          // hostile server allocate arbitrary channel buckets. A pending fetch
+          // from a previous epoch (disconnect / account change) is also stale.
           if (!key367 || !get().channels.has(key367)) break;
+          const pending367 = get().banListMeta.get(key367);
+          if (pending367?.status === 'loading' && pending367.epoch !== _banListEpoch) break;
           let bans367 = _banBuffer.get(key367);
           if (!bans367) {
             if (_banBuffer.size >= MAX_BAN_LIST_CHANNELS) break;
@@ -14088,6 +14156,11 @@ export const store = createStore<OnyxState>()(
           const ch368 = params[1] ?? '';
           const key368 = _normalizeBanChannel(ch368);
           if (!key368) break;
+          const pending368 = get().banListMeta.get(key368);
+          if (pending368?.status === 'loading' && pending368.epoch !== _banListEpoch) {
+            _banBuffer.delete(key368);
+            break;
+          }
           const bans368 = _banBuffer.get(key368) ?? [];
           _banBuffer.delete(key368);
           if (!get().channels.has(key368)) break;
@@ -14252,6 +14325,18 @@ export const store = createStore<OnyxState>()(
         case '482': { // ERR_CHANOPRIVSNEEDED
           const channel482 = params[1] ?? '';
           get().addNotification({ type: 'error', text: `You need operator privileges in ${channel482}` });
+          const key482 = _normalizeBanChannel(channel482);
+          if (key482) {
+            set((s) => {
+              if (!_ownedBanListRequest(s, key482)) return {};
+              return {
+                banListMeta: _writeBanListMeta(s.banListMeta, key482, {
+                  status: 'error',
+                  error: 'You need moderator permission to view this list.',
+                }),
+              };
+            });
+          }
           break;
         }
 
@@ -14926,6 +15011,7 @@ export const store = createStore<OnyxState>()(
       moderationLog: [{ ...entry, timestamp: Date.now() }, ...s.moderationLog].slice(0, 200),
     })),
     banList: new Map(),
+    banListMeta: new Map(),
     setBanList: (channel, bans) => set(s => {
       const key = _normalizeBanChannel(channel);
       if (!key) return {};
@@ -14939,14 +15025,72 @@ export const store = createStore<OnyxState>()(
         if (oldest === undefined) break;
         banList.delete(oldest);
       }
-      return { banList };
+      const prev = s.banListMeta.get(key);
+      const ready = prev
+        && prev.status === 'loading'
+        && prev.epoch === _banListEpoch
+        && s.connectionStatus === 'connected';
+      return {
+        banList,
+        ...(ready
+          ? {
+              banListMeta: _writeBanListMeta(s.banListMeta, key, {
+                status: 'ready',
+                updatedAt: Date.now(),
+                error: null,
+              }),
+            }
+          : {}),
+      };
     }),
     // IRCX ACCESS roles — also exposed as top-level actions near channel
     // management; initial empty maps live here so getInitialState() seeds them.
     channelAccess: new Map(),
     channelAccessLoading: new Set(),
     fetchBanList: (channel) => {
-      get().client?.sendRaw('MODE', channel, '+b');
+      const key = _normalizeBanChannel(channel);
+      const state = get();
+      if (!key) return;
+      if (
+        !state.client
+        || state.connectionStatus !== 'connected'
+        || !state.server?.connected
+        || !state.channels.has(key)
+      ) {
+        set((s) => ({
+          banListMeta: _writeBanListMeta(s.banListMeta, key, {
+            status: 'unavailable',
+            error: state.connectionStatus === 'connected'
+              ? 'Join this room before loading its block list.'
+              : 'Reconnect to refresh the block list.',
+          }),
+        }));
+        return;
+      }
+      _banBuffer.delete(key);
+      const generation = (state.banListMeta.get(key)?.generation ?? 0) + 1;
+      const epoch = _banListEpoch;
+      set((s) => ({
+        banListMeta: _writeBanListMeta(s.banListMeta, key, {
+          status: 'loading',
+          error: null,
+          generation,
+          epoch,
+        }),
+      }));
+      const sent = state.client.sendRaw('MODE', key, '+b');
+      if (sent === false) {
+        set((s) => {
+          const meta = s.banListMeta.get(key);
+          if (!meta || meta.generation !== generation || meta.epoch !== epoch) return {};
+          return {
+            banListMeta: _writeBanListMeta(s.banListMeta, key, {
+              status: 'error',
+              error: 'Could not request the block list.',
+            }),
+          };
+        });
+      }
     },
     tempBan: (channel, mask, minutes) => {
       const state = get();
@@ -16947,6 +17091,44 @@ export const selectChannelEncryptionPolicy = (channel: string) => (s: OnyxState)
 export const selectChannelHistoryPolicy = (channel: string) => (s: OnyxState): HistoryPolicy => {
   const props = s.channelProps.get(channel.toLowerCase());
   return parseHistoryPolicy(props?.[HISTORY_POLICY_PROP]);
+};
+
+export const selectBanList = (channel: string) => (s: OnyxState): BanListViewEntry[] | undefined => {
+  const key = channel.trim().toLowerCase();
+  return key ? s.banList.get(key) : undefined;
+};
+
+export const selectBanListMeta = (channel: string) => (s: OnyxState): BanListMeta => {
+  const key = channel.trim().toLowerCase();
+  return (key ? s.banListMeta.get(key) : undefined) ?? EMPTY_BAN_LIST_META;
+};
+
+export const selectBanListView = (channel: string) => (s: OnyxState): BanListView => {
+  const key = channel.trim().toLowerCase();
+  return describeBanListView({
+    entries: key ? s.banList.get(key) : undefined,
+    meta: key ? s.banListMeta.get(key) : undefined,
+    connected: s.connectionStatus === 'connected' && !!s.server?.connected,
+  });
+};
+
+export const selectRoomModerationLog = (channel: string) => (s: OnyxState) => {
+  const key = channel.trim().toLowerCase();
+  if (!key) return [];
+  return s.moderationLog.filter((entry) => entry.channel.toLowerCase() === key).slice(0, 12);
+};
+
+export const selectLastRoomUpdateAt = (channel: string) => (s: OnyxState): number | null => {
+  const key = channel.trim().toLowerCase();
+  if (!key) return null;
+  const fromList = s.banListMeta.get(key)?.updatedAt ?? null;
+  let fromLog: number | null = null;
+  for (const entry of s.moderationLog) {
+    if (entry.channel.toLowerCase() !== key) continue;
+    if (fromLog === null || entry.timestamp > fromLog) fromLog = entry.timestamp;
+  }
+  if (fromList !== null && fromLog !== null) return Math.max(fromList, fromLog);
+  return fromList ?? fromLog;
 };
 
 export const selectIsChannelOp = (channel: string) => (s: OnyxState): boolean => {

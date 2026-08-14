@@ -6277,21 +6277,32 @@
     pointer-events: auto;
   }
   .shell-room-switcher-sheet__bar {
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: 0;
+    z-index: 92;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-2);
+    box-sizing: border-box;
+    width: min(300px, 88vw);
+    max-width: 320px;
+    gap: 4px;
     min-height: 48px;
-    padding: 0 var(--space-2) 0 var(--space-3);
+    padding: 0 4px 0 max(8px, env(safe-area-inset-left, 0px));
     border-bottom: 1px solid var(--seam-faint);
+    background: color-mix(in oklab, var(--ink) 96%, var(--stone));
   }
-  .shell-room-switcher-sheet__bar p { margin: 0; color: var(--paper); font: 650 var(--text-md)/1 var(--font-sans); }
+  .shell-room-switcher-sheet__bar p { min-width: 0; margin: 0; overflow: hidden; color: var(--paper); font: 650 var(--text-md)/1 var(--font-sans); text-overflow: ellipsis; white-space: nowrap; }
   .shell-room-switcher-sheet__bar button { display: grid; place-items: center; width: 44px; min-width: 44px; height: 44px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--paper-dim); font-size: 1.3rem; cursor: pointer; }
   .shell-room-switcher-sheet__bar button:hover, .shell-room-switcher-sheet__bar button:focus-visible { background: color-mix(in oklab, var(--lapis) 16%, transparent); color: var(--paper); outline: none; }
   /* The open class lives on the wrapper; flip the fixed child's transform.
      (A transform on the wrapper itself would make the fixed child a containing
      block and break the slide — so only the child is transformed.) */
   .shell-sidebar--mobile-open .shell-sidebar { transform: translateX(0); }
+  .shell-sidebar--mobile-open .shell-sidebar {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 48px);
+  }
 
   .shell-sidebar-backdrop,
   .shell-members-backdrop {
@@ -7139,6 +7150,7 @@
   .shell-mobile-nav,
   .shell-ribbon,
   .shell-composer,
+  .shell-room-switcher-sheet__bar,
   .shell-sidebar,
   .shell-members {
     background: Canvas;

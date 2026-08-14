@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
+import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { MemberList } from './MemberList';
 import { PresenceRibbon } from './PresenceRibbon';
 
@@ -79,6 +80,7 @@ function seedChannel(opts: { ourNick: string; users: ChannelUser[]; modes?: stri
 beforeEach(() => {
   store.setState(initialState, true);
   localStorage.clear();
+  resetPreferences();
 });
 
 afterEach(() => {
@@ -128,6 +130,7 @@ describe('MemberList moderation', () => {
 
   it('shows Kick/Ban controls to an op when targeting another member', () => {
     // Arrange — we are op, bob is a plain member
+    setPreference('experienceMode', 'advanced');
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
 
     // Act — open bob's popover card
@@ -140,10 +143,28 @@ describe('MemberList moderation', () => {
     expect(screen.getByRole('group', { name: 'Moderate bob' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Kick bob from #general' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ban bob from #general' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Give op to bob' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Give voice to bob' })).toBeNull();
+  });
+
+  it('hides room moderation controls in Standard even when the member is an op', () => {
+    setPreference('experienceMode', 'standard');
+    seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
+
+    const { getAllByRole } = render(() => <MemberList />);
+    fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('bob'))!);
+
+    expect(screen.getByRole('button', { name: 'Send DM to bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View profile of bob' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Moderate bob' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Kick bob from #general' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ban bob from #general' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Give op to bob' })).toBeNull();
   });
 
   it('hides moderation controls from a non-op', () => {
     // Arrange — we are a plain member
+    setPreference('experienceMode', 'advanced');
     seedChannel({ ourNick: 'me', users: [makeUser('me', []), makeUser('bob')] });
 
     // Act
@@ -157,6 +178,7 @@ describe('MemberList moderation', () => {
 
   it('does not show moderation controls against yourself', () => {
     // Arrange — we are op; open our own card
+    setPreference('experienceMode', 'advanced');
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
     // Act
@@ -170,18 +192,22 @@ describe('MemberList moderation', () => {
 
   it('clicking Kick dispatches KICK through the client', () => {
     // Arrange
+    setPreference('experienceMode', 'advanced');
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
 
     // Act
     const { getAllByRole } = render(() => <MemberList />);
     fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('bob'))!);
     fireEvent.click(screen.getByRole('button', { name: 'Kick bob from #general' }));
+    expect(client.sendRaw).not.toHaveBeenCalledWith('KICK', '#general', 'bob');
+    fireEvent.click(screen.getByTestId('moderation-review-confirm'));
 
     // Assert
     expect(client.sendRaw).toHaveBeenCalledWith('KICK', '#general', 'bob');
   });
 
   it('keeps focus in the roster when a kicked member row is removed', () => {
+    setPreference('experienceMode', 'advanced');
     seedChannel({
       ourNick: 'me',
       users: [makeUser('me', ['o']), makeUser('bob'), makeUser('carol')],
@@ -190,6 +216,7 @@ describe('MemberList moderation', () => {
     render(() => <MemberList />);
     fireEvent.click(screen.getByRole('button', { name: /Open member details for bob/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Kick bob from #general' }));
+    fireEvent.click(screen.getByTestId('moderation-review-confirm'));
     store.getState()._handleMessage(parseIRCMessage(':me!user@host KICK #general bob :Removed'));
 
     expect(screen.queryByRole('button', { name: /Open member details for bob/ })).toBeNull();
@@ -198,15 +225,30 @@ describe('MemberList moderation', () => {
 
   it('clicking Op dispatches MODE +o through the client', () => {
     // Arrange
+    setPreference('experienceMode', 'irc-ops');
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
 
     // Act
     const { getAllByRole } = render(() => <MemberList />);
     fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('bob'))!);
     fireEvent.click(screen.getByRole('button', { name: 'Give op to bob' }));
+    expect(client.sendRaw).not.toHaveBeenCalledWith('MODE', '#general', '+o', 'bob');
+    fireEvent.click(screen.getByTestId('moderation-review-confirm'));
 
     // Assert
     expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#general', '+o', 'bob');
+  });
+
+  it('shows role controls only in IRC Ops', () => {
+    setPreference('experienceMode', 'irc-ops');
+    seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
+
+    const { getAllByRole } = render(() => <MemberList />);
+    fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('bob'))!);
+
+    expect(screen.getByRole('button', { name: 'Give op to bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Give voice to bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kick bob from #general' })).toBeInTheDocument();
   });
 });
 

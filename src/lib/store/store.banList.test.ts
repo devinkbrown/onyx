@@ -105,6 +105,20 @@ describe('RPL_BANLIST transport bounds', () => {
     expect(store.getState().banList.has('#ghost')).toBe(false);
   });
 
+  it('ignores stale MODE ban echoes outside joined rooms and bounds live echoes', () => {
+    connect('#room');
+    feed(':oper!u@h MODE #ghost +b stale!*@*');
+    expect(store.getState().banList.has('#ghost')).toBe(false);
+    expect(store.getState().moderationLog.some((entry) => entry.channel === '#ghost')).toBe(false);
+
+    feed(`:oper!u@h MODE #room +b ${'x'.repeat(900)}`);
+    expect(store.getState().banList.get('#room')).toEqual([
+      expect.objectContaining({ mask: 'x'.repeat(512), setBy: 'oper' }),
+    ]);
+    feed(`:oper!u@h MODE #room -b ${'x'.repeat(900)}`);
+    expect(store.getState().banList.get('#room')).toEqual([]);
+  });
+
   it('drops an incomplete numeric burst before a replacement session', () => {
     connect();
     feed(':ban.test 367 me #room stale!*@* old-oper 123');
@@ -135,6 +149,108 @@ describe('RPL_BANLIST transport bounds', () => {
     const bans = store.getState().banList.get('#room');
     expect(bans).toHaveLength(MAX_BAN_LIST_ENTRIES);
     expect(bans?.[0]).toEqual({ mask: 'mask0!*@*' });
+  });
+});
+
+describe('fetchBanList request metadata', () => {
+  it('marks a requested list loading, then ready when 368 completes', () => {
+    const client = connect();
+    store.getState().fetchBanList('#room');
+    expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#room', '+b');
+    expect(store.getState().banListMeta.get('#room')?.status).toBe('loading');
+
+    client.sendRaw.mockClear();
+    store.getState().fetchBanList(' #Room ');
+    expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#room', '+b');
+
+    feed(':ban.test 367 me #room bad!*@* oper 123');
+    feed(':ban.test 368 me #room :End of channel ban list');
+
+    expect(store.getState().banList.get('#room')).toEqual([
+      { mask: 'bad!*@*', setBy: 'oper', setAt: 123 },
+    ]);
+    expect(store.getState().banListMeta.get('#room')?.status).toBe('ready');
+    expect(store.getState().banListMeta.get('#room')?.updatedAt).toEqual(expect.any(Number));
+  });
+
+  it('settles an empty authoritative list as ready', () => {
+    connect();
+    store.getState().fetchBanList('#room');
+    feed(':ban.test 368 me #room :End of channel ban list');
+    expect(store.getState().banList.get('#room')).toEqual([]);
+    expect(store.getState().banListMeta.get('#room')?.status).toBe('ready');
+  });
+
+  it('records a send failure and a 482 permission error', () => {
+    const client = connect();
+    client.sendRaw.mockReturnValueOnce(false);
+    store.getState().fetchBanList('#room');
+    expect(store.getState().banListMeta.get('#room')).toMatchObject({
+      status: 'error',
+      error: 'Could not request the block list.',
+    });
+
+    client.sendRaw.mockReturnValue(true);
+    store.getState().fetchBanList('#room');
+    feed(':ban.test 482 me #room :You need operator privileges');
+    expect(store.getState().banListMeta.get('#room')).toMatchObject({
+      status: 'error',
+      error: 'You need moderator permission to view this list.',
+    });
+  });
+
+  it('settles a pending request on disconnect and ignores a stale 368 for readiness', () => {
+    connect();
+    store.getState().fetchBanList('#room');
+    expect(store.getState().banListMeta.get('#room')?.status).toBe('loading');
+
+    store.getState().disconnect();
+    expect(store.getState().banListMeta.size).toBe(0);
+
+    connect();
+    feed(':ban.test 368 me #room :End of channel ban list');
+    expect(store.getState().banList.get('#room')).toEqual([]);
+    expect(store.getState().banListMeta.get('#room')?.status).not.toBe('loading');
+    expect(store.getState().banListMeta.get('#room')?.status).not.toBe('ready');
+  });
+
+  it('clears list metadata when the authenticated account changes', () => {
+    connect();
+    store.getState().fetchBanList('#room');
+    feed(':ban.test 368 me #room :End of channel ban list');
+    expect(store.getState().banListMeta.get('#room')?.status).toBe('ready');
+
+    feed(':me!user@host ACCOUNT bob');
+    expect(store.getState().banListMeta.size).toBe(0);
+  });
+
+  it('does not complete an in-flight request from a stale 367/368 after the epoch advances', () => {
+    connect();
+    store.getState().fetchBanList('#room');
+    expect(store.getState().banListMeta.get('#room')?.status).toBe('loading');
+
+    _resetBanListTransportForTests();
+    feed(':ban.test 367 me #room stale!*@* oper 9');
+    feed(':ban.test 368 me #room :End of channel ban list');
+
+    expect(store.getState().banList.has('#room')).toBe(false);
+    expect(store.getState().banListMeta.get('#room')?.status).toBe('loading');
+  });
+
+  it('applies 482 only to the owned pending ban-list request', () => {
+    connect();
+    feed(':ban.test 482 me #room :You need operator privileges');
+    expect(store.getState().banListMeta.get('#room')).toBeUndefined();
+
+    store.getState().fetchBanList('#room');
+    feed(':ban.test 482 me #other :You need operator privileges');
+    expect(store.getState().banListMeta.get('#room')?.status).toBe('loading');
+
+    feed(':ban.test 482 me #room :You need operator privileges');
+    expect(store.getState().banListMeta.get('#room')).toMatchObject({
+      status: 'error',
+      error: 'You need moderator permission to view this list.',
+    });
   });
 });
 

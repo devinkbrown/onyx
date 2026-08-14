@@ -158,6 +158,16 @@ test('keeps the Advanced room control desk reachable at 400% short reflow', asyn
     document.documentElement.style.fontSize = '64px';
     store.setState({
       connectionStatus: 'connected',
+      server: {
+        id: 'ui-qa',
+        name: 'UI QA',
+        network: 'UI QA',
+        url: 'wss://ui-qa.invalid',
+        icon: '',
+        nick: 'ui-qa',
+        account: 'ui-qa',
+        connected: true,
+      },
       ourNick: 'ui-qa',
       activeView: { kind: 'channel', channel: '#access' },
       channels: new Map([['#access', {
@@ -201,7 +211,7 @@ test('keeps the Advanced room control desk reachable at 400% short reflow', asyn
   await review.focus();
   await expect(review).toBeFocused();
   await page.keyboard.press('Enter');
-  const confirmation = desk.getByRole('button', { name: 'Confirm block' });
+  const confirmation = page.getByRole('button', { name: 'Block from room' });
   await confirmation.scrollIntoViewIfNeeded();
   await confirmation.focus();
   await expect(confirmation).toBeFocused();
@@ -235,6 +245,8 @@ test('keeps the Advanced room control desk reachable at 400% short reflow', asyn
   expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight);
   expect(geometry.documentScrollWidth).toBe(geometry.documentClientWidth);
 
+  await page.keyboard.press('Escape');
+  await expect(review).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(desk).toHaveCount(0);
   await expect(moreTrigger).toBeFocused();
