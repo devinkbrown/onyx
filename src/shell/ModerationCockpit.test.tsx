@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
@@ -50,5 +50,25 @@ describe('ModerationCockpit', () => {
     render(() => <ModerationCockpit channel="#garden" />);
     expect(screen.getByText(/only room moderators can change/i)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Room safeguards' })).toBeNull();
+  });
+
+  it('keeps form and heading relationships unique across concurrent cockpit surfaces', () => {
+    seed();
+    render(() => (
+      <>
+        <ModerationCockpit channel="#garden" />
+        <ModerationCockpit channel="#garden" />
+      </>
+    ));
+
+    const cockpits = screen.getAllByTestId('moderation-cockpit');
+    expect(cockpits).toHaveLength(2);
+    const inviteIds = cockpits.map((cockpit) => within(cockpit).getByLabelText('Invite someone').id);
+    const banIds = cockpits.map((cockpit) => within(cockpit).getByLabelText('Block a matching address').id);
+    expect(new Set(inviteIds).size).toBe(2);
+    expect(new Set(banIds).size).toBe(2);
+    expect(cockpits.map((cockpit) => cockpit.getAttribute('aria-labelledby'))[0]).not.toBe(
+      cockpits.map((cockpit) => cockpit.getAttribute('aria-labelledby'))[1],
+    );
   });
 });

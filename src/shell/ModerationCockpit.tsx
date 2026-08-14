@@ -4,7 +4,7 @@
  * surface: it dispatches existing store actions and waits for server echoes;
  * nothing here pretends a mode, ban, or invitation completed optimistically.
  */
-import { createMemo, createSignal, For, Show, splitProps, type JSX } from 'solid-js';
+import { createMemo, createSignal, createUniqueId, For, Show, splitProps, type JSX } from 'solid-js';
 import { getState, selectChannelModeState, selectIsChannelOp, useStore } from '@/lib/store';
 
 export type ModerationCockpitProps = { channel: string };
@@ -17,6 +17,10 @@ const QUICK_MODES = [
 
 export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
   const [local] = splitProps(props, ['channel']);
+  const instanceId = createUniqueId();
+  const titleId = `moderation-cockpit-title-${instanceId}`;
+  const inviteId = `moderation-invite-nick-${instanceId}`;
+  const banId = `moderation-ban-mask-${instanceId}`;
   const canModerate = useStore((s) => selectIsChannelOp(local.channel)(s));
   const connectionStatus = useStore((s) => s.connectionStatus);
   const modeState = useStore((s) => selectChannelModeState(local.channel)(s));
@@ -56,11 +60,11 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
   }
 
   return (
-    <section class="moderation-cockpit" aria-labelledby="moderation-cockpit-title" data-testid="moderation-cockpit">
+    <section class="moderation-cockpit" aria-labelledby={titleId} data-testid="moderation-cockpit">
       <div class="moderation-cockpit__head">
         <div>
           <p class="moderation-cockpit__eyebrow">Room controls</p>
-          <h3 id="moderation-cockpit-title">Moderation</h3>
+          <h3 id={titleId}>Moderation</h3>
         </div>
         <span class={`moderation-cockpit__state${connected() ? '' : ' moderation-cockpit__state--offline'}`} role="status">
           {connected() ? 'Live changes' : 'Reconnect to make changes'}
@@ -85,9 +89,9 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
         </div>
 
         <form class="moderation-cockpit__form" onSubmit={sendInvite}>
-          <label for="moderation-invite-nick">Invite someone</label>
+          <label for={inviteId}>Invite someone</label>
           <div>
-            <input id="moderation-invite-nick" value={inviteNick()} onInput={(event) => setInviteNick(event.currentTarget.value)} placeholder="Nickname" autocomplete="off" />
+            <input id={inviteId} value={inviteNick()} onInput={(event) => setInviteNick(event.currentTarget.value)} placeholder="Nickname" autocomplete="off" />
             <button type="submit" disabled={!connected() || !inviteNick().trim()}>Send invite</button>
           </div>
           <Show when={candidates().length > 0}>
@@ -96,9 +100,9 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
         </form>
 
         <form class="moderation-cockpit__form moderation-cockpit__form--danger" onSubmit={prepareBan}>
-          <label for="moderation-ban-mask">Block a matching address</label>
+          <label for={banId}>Block a matching address</label>
           <div>
-            <input id="moderation-ban-mask" value={banMask()} onInput={(event) => { setBanMask(event.currentTarget.value); setConfirmBan(false); }} placeholder="nick!*@*" autocomplete="off" />
+            <input id={banId} value={banMask()} onInput={(event) => { setBanMask(event.currentTarget.value); setConfirmBan(false); }} placeholder="nick!*@*" autocomplete="off" />
             <button type="submit" disabled={!connected() || !banMask().trim()}>Review block</button>
           </div>
           <p class="moderation-cockpit__hint">This sends a server-side ban. It cannot be undone here because this view does not receive a ban list.</p>

@@ -1818,6 +1818,77 @@ describe('AppShell', () => {
       expect(within(more).getByRole('button', { name: 'You' })).toBeInTheDocument();
     });
 
+    it('opens Advanced room tools as a dedicated mobile control desk and restores its launcher', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+      setPreference('experienceMode', 'advanced');
+
+      render(() => <AppShell />);
+      const moreTrigger = screen.getByRole('button', { name: 'Open More' });
+      moreTrigger.focus();
+      fireEvent.click(moreTrigger);
+
+      const more = screen.getByRole('dialog', { name: 'More destinations' });
+      const launcher = within(more).getByRole('button', { name: /Room control desk.*#general/i });
+      expect(launcher).toBeInTheDocument();
+      expect(within(more).queryByTestId('moderation-cockpit')).toBeNull();
+
+      fireEvent.click(launcher);
+      const desk = screen.getByRole('dialog', { name: 'Room controls for #general' });
+      expect(screen.queryByRole('dialog', { name: 'More destinations' })).toBeNull();
+      expect(within(desk).getByRole('heading', { name: '#general' })).toBeInTheDocument();
+      expect(within(desk).getByTestId('moderation-cockpit')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(within(desk).getByRole('button', { name: 'Back' })).toHaveFocus();
+      });
+
+      fireEvent.click(within(desk).getByRole('button', { name: 'Back' }));
+      const restoredMore = screen.getByRole('dialog', { name: 'More destinations' });
+      await waitFor(() => {
+        expect(within(restoredMore).getByRole('button', { name: /Room control desk.*#general/i })).toHaveFocus();
+      });
+    });
+
+    it('closes the mobile room control desk when global navigation leaves its room', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+      setPreference('experienceMode', 'advanced');
+
+      render(() => <AppShell />);
+      const moreTrigger = screen.getByRole('button', { name: 'Open More' });
+      moreTrigger.focus();
+      fireEvent.click(moreTrigger);
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'More destinations' })).getByRole('button', { name: /Room control desk.*#general/i }));
+      expect(screen.getByRole('dialog', { name: 'Room controls for #general' })).toBeInTheDocument();
+
+      store.setState({ activeView: { kind: 'home' } });
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: /Room controls for/i })).toBeNull();
+      });
+      expect(screen.getByRole('button', { name: 'Open More' })).toHaveFocus();
+    });
+
+    it('gates the mobile room control desk by workspace level and operator authority', () => {
+      stubMobileViewport();
+      seedStore('#general');
+
+      const { unmount } = render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open More' }));
+      expect(within(screen.getByRole('dialog', { name: 'More destinations' })).queryByRole('button', { name: /Room control desk/i })).toBeNull();
+      unmount();
+
+      setPreference('experienceMode', 'irc-ops');
+      store.setState({ isOper: true });
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open More' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'More destinations' })).getByRole('button', { name: /Room control desk.*#general/i }));
+
+      const desk = screen.getByRole('dialog', { name: 'Room controls for #general' });
+      expect(within(desk).getByTestId('oper-event-console')).toBeInTheDocument();
+      expect(within(desk).getByRole('button', { name: 'EVENT REPLAY JSON' })).toBeInTheDocument();
+    });
+
     it('opens direct messages as their own mobile collection', async () => {
       stubMobileViewport();
       seedStore('#general');

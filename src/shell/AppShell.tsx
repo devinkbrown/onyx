@@ -58,6 +58,7 @@ import { Composer } from './Composer';
 import { ContextRail } from './ContextRail';
 import { ModerationCockpit } from './ModerationCockpit';
 import { OperEventConsole } from './OperEventConsole';
+import { RoomInsightsStrip } from './RoomInsightsStrip';
 import { RoomSwitcherSheet } from './RoomSwitcherSheet';
 type MediaModule = Pick<typeof import('@/media/useCadenceMedia'), 'mountMedia'>;
 const defaultMediaModuleLoader = (): Promise<MediaModule> => import('@/media/useCadenceMedia');
@@ -584,10 +585,14 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const [isMobile, setIsMobile] = createSignal(false);
   const [mobileMembersOpen, setMobileMembersOpen] = createSignal(false);
   const [mobileMoreOpen, setMobileMoreOpen] = createSignal(false);
+  const [mobileMoreView, setMobileMoreView] = createSignal<'destinations' | 'room-controls'>('destinations');
   let mobileMembersTarget: string | null = null;
+  let mobileRoomControlsTarget: string | null = null;
   let sidebarDrawerRef: HTMLDivElement | undefined;
   let mobileRoomsButtonRef: HTMLButtonElement | undefined;
   let mobileMoreRef: HTMLDivElement | undefined;
+  let mobileRoomControlsLauncherRef: HTMLButtonElement | undefined;
+  let mobileRoomControlsBackRef: HTMLButtonElement | undefined;
   let contextTriggerRef: HTMLButtonElement | undefined;
   let mobileDrawerRestoreTarget: HTMLElement | null = null;
 
@@ -600,9 +605,15 @@ export function AppShell(props: AppShellProps): JSX.Element {
   function restoreMobileDrawerFocus(): void {
     const target = mobileDrawerRestoreTarget;
     mobileDrawerRestoreTarget = null;
-    if (target?.isConnected) {
-      queueMicrotask(() => target.focus());
-    }
+    queueMicrotask(() => {
+      const targetLabel = target?.getAttribute('aria-label');
+      const fallback = targetLabel
+        ? Array.from(document.querySelectorAll<HTMLElement>('[data-primary-navigation-variant="mobile"] [aria-label]'))
+          .find((candidate) => candidate.getAttribute('aria-label') === targetLabel)
+        : null;
+      const destination = target?.isConnected ? target : fallback;
+      destination?.focus();
+    });
   }
 
   function membersDrawerElement(): HTMLElement | null {
@@ -842,13 +853,28 @@ export function AppShell(props: AppShellProps): JSX.Element {
     rememberMobileDrawerTrigger();
     getState().closeMobileSidebar();
     setMobileMembersOpen(false);
+    setMobileMoreView('destinations');
     setMobileMoreOpen(true);
     queueMicrotask(() => focusFirstInMobileDrawer(mobileMoreRef));
   }
 
   function closeMobileMore(): void {
     setMobileMoreOpen(false);
+    setMobileMoreView('destinations');
+    mobileRoomControlsTarget = null;
     restoreMobileDrawerFocus();
+  }
+
+  function openMobileRoomControls(): void {
+    const view = activeView();
+    if (view.kind !== 'channel') return;
+    mobileRoomControlsTarget = view.channel.toLowerCase();
+    setMobileMoreView('room-controls');
+  }
+
+  function returnToMobileMore(): void {
+    setMobileMoreView('destinations');
+    queueMicrotask(() => mobileRoomControlsLauncherRef?.focus({ preventScroll: true }));
   }
 
   function closeContextRail(): void {
@@ -863,6 +889,31 @@ export function AppShell(props: AppShellProps): JSX.Element {
     if (destination === 'calls') openCalls();
     else openYou();
   }
+
+  function mobileMoreDialogLabel(): string {
+    const view = activeView();
+    return mobileMoreView() === 'room-controls' && view.kind === 'channel'
+      ? `Room controls for ${view.channel}`
+      : 'More destinations';
+  }
+
+  // The room-controls transition removes the focused launcher. Move focus only
+  // after the replacement subtree (and its Back ref) exists, so browsers never
+  // collapse focus to <body> between the two views.
+  createEffect(() => {
+    if (!mobileMoreOpen() || mobileMoreView() !== 'room-controls') return;
+    queueMicrotask(() => mobileRoomControlsBackRef?.focus({ preventScroll: true }));
+  });
+
+  // The control desk is scoped to the room from which it was opened. Global
+  // navigation can replace activeView without using the desk's own controls;
+  // close instead of leaving an empty or stale modal over the new destination.
+  createEffect(() => {
+    const view = activeView();
+    if (!mobileMoreOpen() || mobileMoreView() !== 'room-controls') return;
+    const nextTarget = view.kind === 'channel' ? view.channel.toLowerCase() : null;
+    if (nextTarget === null || nextTarget !== mobileRoomControlsTarget) closeMobileMore();
+  });
 
   function openRoomsFromCalls(): void {
     if (isMobile()) {
@@ -1167,24 +1218,60 @@ export function AppShell(props: AppShellProps): JSX.Element {
       </Show>
       <div
         ref={(element) => { mobileMoreRef = element; }}
-        class={`shell-mobile-more-sheet${mobileMoreOpen() ? ' shell-mobile-more-sheet--open' : ''}`}
+        class={`shell-mobile-more-sheet${mobileMoreOpen() ? ' shell-mobile-more-sheet--open' : ''}${mobileMoreView() === 'room-controls' ? ' shell-mobile-more-sheet--room-controls' : ''}`}
         role={mobileMoreOpen() ? 'dialog' : undefined}
         aria-modal={mobileMoreOpen() ? 'true' : undefined}
-        aria-label={mobileMoreOpen() ? 'More destinations' : undefined}
+        aria-label={mobileMoreOpen() ? mobileMoreDialogLabel() : undefined}
         tabindex={mobileMoreOpen() ? -1 : undefined}
       >
-        <p class="shell-mobile-more-sheet__title">More</p>
-        <button type="button" onClick={() => selectMobileMore('calls')}>Calls</button>
-        <button type="button" onClick={() => selectMobileMore('you')}>You</button>
-        <Show when={activeView().kind === 'channel' && preferences().experienceMode !== 'standard'}>
-          <section class="shell-mobile-more-sheet__room-tools" aria-label="Room tools">
-            <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
-            <Show when={preferences().experienceMode === 'irc-ops' && isOper()}>
-              <OperEventConsole />
+        <Show
+          when={mobileMoreView() === 'destinations'}
+          fallback={(
+            <Show when={activeView().kind === 'channel'}>
+              <section class="shell-mobile-more-sheet__room-tools" aria-label="Room control desk">
+                <header class="shell-mobile-more-sheet__room-head">
+                  <button
+                    ref={(element) => { mobileRoomControlsBackRef = element; }}
+                    type="button"
+                    class="shell-mobile-more-sheet__back"
+                    onClick={returnToMobileMore}
+                  >Back</button>
+                  <div>
+                    <p class="shell-mobile-more-sheet__title">Room control desk</p>
+                    <h2>{(activeView() as { channel: string }).channel}</h2>
+                  </div>
+                  <button type="button" class="shell-mobile-more-sheet__close" onClick={closeMobileMore}>Close</button>
+                </header>
+                <RoomInsightsStrip />
+                <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
+                <Show when={preferences().experienceMode === 'irc-ops' && isOper()}>
+                  <OperEventConsole />
+                </Show>
+                <Show when={preferences().experienceMode === 'irc-ops' && !isOper()}>
+                  <p class="shell-context-rail__empty" role="status">IRC Ops tools appear here after this account is granted operator access.</p>
+                </Show>
+              </section>
             </Show>
-          </section>
+          )}
+        >
+          <p class="shell-mobile-more-sheet__title">More</p>
+          <Show when={activeView().kind === 'channel' && preferences().experienceMode !== 'standard'}>
+            <button
+              ref={(element) => { mobileRoomControlsLauncherRef = element; }}
+              type="button"
+              class="shell-mobile-more-sheet__room-launcher"
+              onClick={openMobileRoomControls}
+            >
+              <span aria-hidden="true">#</span>
+              <span>Room control desk</span>
+              <small>{(activeView() as { channel: string }).channel}</small>
+            </button>
+          </Show>
+          <p class="shell-mobile-more-sheet__group-label">Workspace</p>
+          <button type="button" onClick={() => selectMobileMore('calls')}>Calls</button>
+          <button type="button" onClick={() => selectMobileMore('you')}>You</button>
+          <button type="button" onClick={closeMobileMore}>Close</button>
         </Show>
-        <button type="button" onClick={closeMobileMore}>Close</button>
       </div>
 
       {/* Account management panel — portal modal, gated on store.showAccount */}

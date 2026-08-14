@@ -6749,7 +6749,7 @@
   .shell-mobile-more-sheet {
     position: fixed;
     right: max(10px, env(safe-area-inset-right, 0px));
-    bottom: calc(var(--mnav-h) + env(safe-area-inset-bottom, 0px) + 10px);
+    bottom: calc(var(--mnav-h, 56px) + env(safe-area-inset-bottom, 0px) + 10px);
     z-index: 97;
     display: none;
     width: min(420px, calc(100vw - 20px));
@@ -6763,10 +6763,51 @@
     box-shadow: var(--elev-3);
   }
   .shell-mobile-more-sheet--open { display: grid; gap: 4px; }
+  .shell-mobile-more-sheet--room-controls {
+    right: max(6px, env(safe-area-inset-right, 0px));
+    left: max(6px, env(safe-area-inset-left, 0px));
+    width: auto;
+    max-height: min(84svh, 760px);
+    padding: 0;
+  }
   .shell-mobile-more-sheet__title { margin: 4px 8px 6px; color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
-  .shell-mobile-more-sheet__room-tools { display: grid; gap: var(--space-2); padding-block: var(--space-2); border-block: 1px solid var(--seam-faint); }
-  .shell-mobile-more-sheet button { min-height: 44px; padding: 8px 10px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--paper); font: 650 var(--text-md)/1 var(--font-sans); text-align: left; cursor: pointer; }
-  .shell-mobile-more-sheet button:hover, .shell-mobile-more-sheet button:focus-visible { background: color-mix(in oklab, var(--lapis) 16%, transparent); outline: none; }
+  .shell-mobile-more-sheet__group-label { margin: 10px 8px 2px; color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+  .shell-mobile-more-sheet__room-tools { display: grid; gap: var(--space-3); min-width: 0; padding: var(--space-3); }
+  .shell-mobile-more-sheet__room-head {
+    position: sticky;
+    top: calc(-1 * var(--space-3));
+    z-index: 2;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2);
+    margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) 0;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--seam-faint);
+    background: color-mix(in oklab, var(--surface-raised) 96%, var(--ink));
+  }
+  .shell-mobile-more-sheet__room-head .shell-mobile-more-sheet__title { margin: 0; }
+  .shell-mobile-more-sheet__room-head h2 { margin: 2px 0 0; overflow: hidden; color: var(--paper); font: 700 var(--text-md)/1.2 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+  .shell-mobile-more-sheet > button,
+  .shell-mobile-more-sheet__room-head > button { min-height: 44px; padding: 8px 10px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--paper); font: 650 var(--text-md)/1 var(--font-sans); text-align: left; cursor: pointer; }
+  .shell-mobile-more-sheet > button:hover,
+  .shell-mobile-more-sheet > button:focus-visible,
+  .shell-mobile-more-sheet__room-head > button:hover,
+  .shell-mobile-more-sheet__room-head > button:focus-visible { background: color-mix(in oklab, var(--lapis) 16%, transparent); outline: none; }
+  .shell-mobile-more-sheet__room-launcher {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid color-mix(in oklab, var(--room-accent, var(--lapis)) 44%, var(--seam)) !important;
+    background: color-mix(in oklab, var(--room-accent, var(--lapis)) 10%, transparent) !important;
+  }
+  .shell-mobile-more-sheet__room-launcher > span:first-child { color: var(--room-accent, var(--lapis-bright)); font-family: var(--font-mono); }
+  .shell-mobile-more-sheet__room-launcher small { overflow: hidden; color: var(--paper-mute); font: 600 var(--text-xs)/1 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+  .shell-mobile-more-sheet__back,
+  .shell-mobile-more-sheet__close { font-size: var(--text-sm) !important; }
+  .shell-mobile-more-sheet__close { text-align: right !important; }
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit { margin-top: 0; }
 
   .shell-topic-filter {
     gap: 6px;
@@ -7699,6 +7740,96 @@
   .shell-composer-tools-item,
   .shell-composer-tools-action {
     min-height: 44px;
+  }
+
+  /* The control desk is deliberately a scroll surface at 400% zoom. Keep its
+     navigation header compact and pinned while the enlarged moderation forms
+     retain their natural height below it. */
+  .shell-mobile-more-sheet--room-controls {
+    top: max(6px, env(safe-area-inset-top, 0px));
+    bottom: calc(var(--mnav-h, 56px) + env(safe-area-inset-bottom, 0px) + 6px);
+    height: calc(
+      100svh
+      - var(--mnav-h, 56px)
+      - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-bottom, 0px)
+      - 12px
+    );
+    min-height: 0;
+    max-height: calc(
+      100svh
+      - var(--mnav-h, 56px)
+      - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-bottom, 0px)
+      - 12px
+    );
+    scroll-padding-block: 64px 12px;
+  }
+
+  .shell-mobile-more-sheet__room-tools {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .shell-mobile-more-sheet__room-head {
+    top: -8px;
+    gap: 4px;
+    margin: -8px -8px 0;
+    padding: 4px 8px;
+  }
+
+  .shell-mobile-more-sheet__room-head > button {
+    min-width: 52px;
+    min-height: 44px;
+    padding: 4px;
+    font-size: 14px !important;
+  }
+
+  .shell-mobile-more-sheet__room-head .shell-mobile-more-sheet__title {
+    font-size: 11px;
+  }
+
+  .shell-mobile-more-sheet__room-head h2 {
+    font-size: 16px;
+  }
+
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__head h3,
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__form label,
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__hint,
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__empty,
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__protocol,
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__confirm p {
+    font-size: 16px;
+  }
+
+  .shell-mobile-more-sheet__room-tools .room-insights__title,
+  .shell-mobile-more-sheet__room-tools .room-insights__link,
+  .shell-mobile-more-sheet__room-tools .room-insights__empty,
+  .shell-mobile-more-sheet__room-tools .room-insights__metrics li,
+  .shell-mobile-more-sheet__room-tools .room-insights__metrics strong {
+    font-size: 16px;
+  }
+
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__eyebrow,
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__state,
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__mode small {
+    font-size: 12px;
+  }
+
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__mode,
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__form input,
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__form button {
+    min-height: 44px;
+    font-size: 16px;
+    scroll-margin-block: 64px 12px;
+  }
+
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__form > div {
+    flex-wrap: wrap;
+  }
+
+  .shell-mobile-more-sheet__room-tools .moderation-cockpit__form input {
+    flex-basis: 100%;
   }
 }
 

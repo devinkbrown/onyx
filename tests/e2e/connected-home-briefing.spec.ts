@@ -255,10 +255,21 @@ test('connected Current Ledger covers busy, caught-up, offline, and failed-outbo
       }, 'highZoom' in viewport && viewport.highZoom);
       await expect(home).toBeVisible();
       if ('highZoom' in viewport && viewport.highZoom) {
+        const guestClaim = page.getByTestId('guest-claim');
+        await expect(guestClaim).toBeVisible();
         const box = await home.boundingBox();
         expect(box?.height ?? 0).toBeGreaterThan(0);
         const browse = home.getByRole('button', { name: 'Browse rooms' });
         const search = home.getByRole('button', { name: 'Search messages' });
+        await browse.scrollIntoViewIfNeeded();
+        await expect(browse).toBeVisible();
+        await search.scrollIntoViewIfNeeded();
+        await expect(search).toBeVisible();
+
+        await page.getByTestId('guest-claim-dismiss').click();
+        await expect(guestClaim).toHaveCount(0);
+        const boxWithoutGuestClaim = await home.boundingBox();
+        expect(boxWithoutGuestClaim?.height ?? 0).toBeGreaterThan(0);
         await browse.scrollIntoViewIfNeeded();
         await expect(browse).toBeVisible();
         await search.scrollIntoViewIfNeeded();
