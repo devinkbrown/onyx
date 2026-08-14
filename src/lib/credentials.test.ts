@@ -25,6 +25,8 @@ import {
 const CREDENTIALS_KEY = 'onyx:credentials';
 const SAVED_NICK_KEY = 'onyx:saved-nick';
 const NOW = new Date('2026-07-10T12:00:00.000Z');
+const SRM2_LOCAL = 'srm2l.00112233445566778899aabbccddeeff.aabbccddeeff00112233445566778899';
+const SRM2_MESH = `srm2m.${'deadc0de'.repeat(8)}.bbccddeeff00112233445566778899aa`;
 
 interface StoredCredentials {
   version: 2;
@@ -209,6 +211,39 @@ describe('credentials persistence', () => {
       password: 'pw',
       sessionToken: 'session-token',
       meshToken: 'mesh-token',
+      meshTokenExpiry: '2027-01-15T08:00:00.000Z',
+    });
+  });
+
+  it('persists attachment-scoped credentials byte-exact and expires only the mesh bearer', () => {
+    saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
+    storeSessionToken(SRM2_LOCAL);
+    storeMeshToken(SRM2_MESH, 1_800_000_000);
+
+    expect(loadCredentials()).toMatchObject({
+      sessionToken: SRM2_LOCAL,
+      meshToken: SRM2_MESH,
+      meshTokenExpiry: '2027-01-15T08:00:00.000Z',
+    });
+
+    vi.setSystemTime(new Date('2027-02-01T00:00:00.000Z'));
+    const expired = loadCredentials();
+    expect(expired?.sessionToken).toBe(SRM2_LOCAL);
+    expect(expired?.meshToken).toBeUndefined();
+    expect(expired?.meshTokenExpiry).toBeUndefined();
+  });
+
+  it('overwrites legacy bare bearers with attachment-scoped credentials', () => {
+    saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
+    storeSessionToken('legacy-local');
+    storeMeshToken('legacy-mesh', 1_700_000_000);
+
+    storeSessionToken(SRM2_LOCAL);
+    storeMeshToken(SRM2_MESH, 1_800_000_000);
+
+    expect(loadCredentials()).toMatchObject({
+      sessionToken: SRM2_LOCAL,
+      meshToken: SRM2_MESH,
       meshTokenExpiry: '2027-01-15T08:00:00.000Z',
     });
   });

@@ -16,6 +16,8 @@ import {
 } from './store';
 
 const initialState = store.getInitialState();
+const SRM2_LOCAL = 'srm2l.00112233445566778899aabbccddeeff.aabbccddeeff00112233445566778899';
+const SRM2_MESH = `srm2m.${'deadc0de'.repeat(8)}.bbccddeeff00112233445566778899aa`;
 
 class FakeWebSocket {
   static readonly OPEN = 1;
@@ -583,6 +585,38 @@ describe('remembered session roster restoration', () => {
     // Mesh token is preferred over the local session token on resume.
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME mesh-fresh\r\n');
     expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME local-fresh\r\n');
+  });
+
+  it('overwrites legacy bearers and reconnects with the composite mesh credential byte-exact', () => {
+    saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+    storeSessionToken('legacy-local');
+    storeMeshToken('legacy-mesh');
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to Onyx');
+
+    receive(`:example.test NOTICE kain :SESSION TOKEN ${SRM2_LOCAL}`);
+    receive(`:example.test NOTICE kain :SESSION MTOKEN ${SRM2_MESH} expires=1800000000`);
+
+    expect(loadCredentials('wss://example.test', 'kain')).toMatchObject({
+      sessionToken: SRM2_LOCAL,
+      meshToken: SRM2_MESH,
+      meshTokenExpiry: '2027-01-15T08:00:00.000Z',
+    });
+
+    FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+    store.getState().reconnectNow();
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 001 kain :Welcome back');
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith(`SESSION RESUME ${SRM2_MESH}\r\n`);
+    expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME legacy-mesh\r\n');
   });
 
   it('rejects an oversized SESSION TOKEN note without persisting or arming resume', () => {

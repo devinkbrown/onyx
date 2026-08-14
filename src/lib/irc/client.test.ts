@@ -7,6 +7,8 @@ import { _resetDeviceSigningForTests } from '../e2ee/deviceSign';
 import type { IRCMessage } from './types';
 
 const MIB = 1024 * 1024;
+const SRM2_LOCAL = 'srm2l.00112233445566778899aabbccddeeff.aabbccddeeff00112233445566778899';
+const SRM2_MESH = `srm2m.${'deadc0de'.repeat(8)}.bbccddeeff00112233445566778899aa`;
 
 interface TestSocket {
   readyState: number;
@@ -642,12 +644,24 @@ describe('IRCClient session-resume token lifecycle', () => {
     expect(sent.filter(line => line === 'SESSION TOKEN\r\n')).toHaveLength(1);
   });
 
+  it('replays an attachment-scoped mesh credential byte-exact after account proof', () => {
+    const { sent, feed001, feed900 } = makeSessionClient({
+      sessionToken: SRM2_LOCAL,
+      meshToken: SRM2_MESH,
+    });
+    feed001();
+    feed900();
+
+    expect(sent).toContain(`SESSION RESUME ${SRM2_MESH}\r\n`);
+    expect(sent).not.toContain(`SESSION RESUME ${SRM2_LOCAL}\r\n`);
+  });
+
   it('starts a token-only SESSION generation after switching accounts', () => {
-    const { client, sent, feed001, feed900 } = makeSessionClient({ meshToken: 'old-account-token' });
+    const { client, sent, feed001, feed900 } = makeSessionClient({ meshToken: SRM2_MESH });
     const priv = client as unknown as { _onMessage(ev: { data: string }): void };
     feed001();
     feed900();
-    expect(sent).toContain('SESSION RESUME old-account-token\r\n');
+    expect(sent).toContain(`SESSION RESUME ${SRM2_MESH}\r\n`);
 
     priv._onMessage({
       data: ':eshmaki.me 900 onyx onyx!web@example second :You are now logged in as second',
@@ -655,7 +669,7 @@ describe('IRCClient session-resume token lifecycle', () => {
 
     expect(sent.filter(line => line === 'SESSION TOKEN\r\n')).toHaveLength(2);
     expect(sent.filter(line => line.startsWith('SESSION RESUME '))).toEqual([
-      'SESSION RESUME old-account-token\r\n',
+      `SESSION RESUME ${SRM2_MESH}\r\n`,
     ]);
   });
 
