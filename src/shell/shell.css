@@ -2984,6 +2984,57 @@
     );
 }
 
+/* A quiet, data-bearing orientation seam. It is intentionally not a second
+   toolbar: target, topic, and read state remain visible while history pages,
+   loading skeletons, and the virtualised log change beneath it. */
+.shell-conversation-brief {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px var(--space-5) 6px;
+  border-bottom: 1px solid color-mix(in oklab, var(--seam-faint) 88%, transparent);
+  background: color-mix(in oklab, var(--ink) 24%, transparent);
+  color: var(--paper-mute);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.035em;
+}
+.shell-conversation-brief-kicker {
+  flex: none;
+  color: var(--lapis-bright);
+  font-size: 0.57rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.shell-conversation-brief-target,
+.shell-conversation-brief-topic {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-conversation-brief-target { color: var(--paper); font-weight: 700; }
+.shell-conversation-brief-topic {
+  flex: 0 1 auto;
+  padding: 0.14rem 0.38rem;
+  border: 1px solid color-mix(in oklab, var(--lapis) 34%, transparent);
+  border-radius: var(--r-pill);
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+.shell-conversation-brief-detail {
+  flex: none;
+  margin-left: auto;
+  color: var(--paper-mute);
+  white-space: nowrap;
+}
+.shell-conversation-brief[data-conversation-kind='status'] .shell-conversation-brief-target {
+  color: var(--paper-dim);
+}
+
 .shell-feed {
   flex: 1;
   overflow-y: auto;
@@ -4324,6 +4375,34 @@
 .shell-composer-measure {
   max-width: var(--shell-measure);
   margin-inline: auto;
+}
+
+/* A concise destination receipt keeps reply/edit/offline transitions obvious
+   without turning the composer into another toolbar. */
+.shell-composer-brief {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0 2px var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.035em;
+}
+.shell-composer-brief-destination {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--paper-dim);
+  font-weight: 800;
+}
+.shell-composer-brief-state {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--paper-mute);
 }
 
 .shell-composer--drag {
@@ -6349,6 +6428,11 @@
   .shell-composer-measure {
     max-width: none;
   }
+  .shell-composer-brief {
+    min-height: 18px;
+    margin-bottom: 6px;
+    font-size: 0.62rem;
+  }
   .shell-composer-context,
   .shell-composer-topic {
     max-width: 100%;
@@ -6582,6 +6666,18 @@
   .shell-feed {
     padding-top: 6px;
     padding-bottom: 4px;
+  }
+
+  .shell-conversation-brief {
+    min-height: 36px;
+    padding: 7px 10px 6px;
+    gap: 0.35rem;
+  }
+
+  .shell-conversation-brief-detail {
+    max-width: 10.5ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .shell-msg-group {

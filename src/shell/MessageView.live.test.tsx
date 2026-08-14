@@ -97,6 +97,19 @@ describe('MessageView live-log topic-switch suppression (SC 4.1.3)', () => {
     resetPreferences();
   });
 
+  it('keeps the visible room receipt aligned with the active target, topic, and unread store state', () => {
+    seedTwoTopicChannel();
+    const channel = store.getState().channels.get('#general')!;
+    store.setState({
+      channels: new Map([['#general', { ...channel, unread: 3 }]]),
+    });
+    store.getState().setActiveChannelTopic('#general', 'roadmap');
+
+    render(() => <MessageView />);
+
+    expect(screen.getByLabelText('Current conversation: #general, topic roadmap, 3 unread in room')).toBeInTheDocument();
+  });
+
   it('mutes the message log when switching between two topic filters, then restores to polite', async () => {
     // Arrange — a channel filtered to one small topic.
     seedTwoTopicChannel();

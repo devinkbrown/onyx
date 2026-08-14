@@ -1004,6 +1004,28 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     return viewUnreadDividerId().get(t.toLowerCase()) ?? null;
   });
 
+  // This stays accurate while the bounded list pages, filters, or hydrates:
+  // every value comes from the active store target rather than mounted rows.
+  const conversationBrief = createMemo(() => {
+    const view = activeView();
+    const target = activeTarget();
+    const topic = activeTopic();
+    const unread = view.kind === 'channel'
+      ? channels().get(view.channel)?.unread ?? 0
+      : view.kind === 'dm'
+        ? dms().get(view.nick.toLowerCase())?.unread ?? dms().get(view.nick)?.unread ?? 0
+        : 0;
+    const label = view.kind === 'status' ? 'Network activity' : target;
+    const detail = isLoadingHistory()
+      ? 'Loading history'
+      : unread > 0
+        ? `${unread} unread${topic ? ' in room' : ''}`
+        : unreadDividerId()
+          ? 'Unread boundary saved'
+          : 'Caught up';
+    return { label, topic, detail, kind: view.kind };
+  });
+
   const topicUnreadCounts = createMemo((): ReadonlyMap<string, number> => {
     const all = allMessages();
     const view = activeView();
@@ -1687,6 +1709,18 @@ export function MessageView(props: MessageViewProps): JSX.Element {
 
   return (
     <main class="shell-messages" aria-label="Messages">
+      <section
+        class="shell-conversation-brief"
+        aria-label={`Current conversation: ${conversationBrief().label}${conversationBrief().topic ? `, topic ${conversationBrief().topic}` : ''}, ${conversationBrief().detail}`}
+        data-conversation-kind={conversationBrief().kind}
+      >
+        <span class="shell-conversation-brief-kicker">Current</span>
+        <span class="shell-conversation-brief-target">{conversationBrief().label}</span>
+        <Show when={conversationBrief().topic}>
+          {(topic) => <span class="shell-conversation-brief-topic">#{topic()}</span>}
+        </Show>
+        <span class="shell-conversation-brief-detail">{conversationBrief().detail}</span>
+      </section>
       <Show when={activeView().kind === 'channel' && preferences().topicTools}>
         <div class="shell-topic-filter">
           <Show when={availableTopics().length > 0}>

@@ -80,6 +80,7 @@ describe('Composer accessibility', () => {
     expect(queryByRole('button', { name: 'Jump to date in conversation history' })).toBeNull();
     expect(queryByRole('button', { name: 'Schedule message to send later' })).toBeNull();
     expect(queryByRole('button', { name: /export|format/i })).toBeNull();
+    expect(screen.getByRole('note', { name: 'Current compose context' })).toHaveTextContent('To #roomReady to send');
   });
 
   it('locks Standard primary control order: attach, message, emoji, more, send', () => {

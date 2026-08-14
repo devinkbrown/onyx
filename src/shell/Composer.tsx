@@ -272,6 +272,21 @@ export function Composer(props: ComposerProps): JSX.Element {
     return 'Message';
   });
 
+  // Keep the destination and the current composition state visible above the
+  // field. This uses the same target-scoped signals as send, so a reply or edit
+  // from another room cannot leak into the current compose context.
+  const composerBrief = createMemo(() => {
+    const t = target();
+    if (!t) return { destination: 'No conversation selected', state: 'Choose a room or person to begin.' };
+    if (activeEditing()) return { destination: `Editing in ${t}`, state: 'Save or cancel this edit before changing context.' };
+    const reply = activeReply();
+    if (reply) return { destination: `Replying in ${t}`, state: `Reply to ${reply.from}` };
+    if (isOffline()) return { destination: `To ${t}`, state: 'Offline — plain messages queue on this device.' };
+    const topic = activeTopic();
+    if (topic) return { destination: `To ${t}`, state: 'Writing in the current topic' };
+    return { destination: `To ${t}`, state: 'Ready to send' };
+  });
+
   const emojiMatches = createMemo(() => searchEmojis(emojiQuery(), 36));
   const slashCommands = createMemo(() => getSlashCommandSuggestions(text(), 8));
   const slashVisible = createMemo(() => !slashDismissed() && slashCommands().length > 0);
@@ -1021,6 +1036,10 @@ export function Composer(props: ComposerProps): JSX.Element {
       onDrop={handleDrop}
     >
       <div class="shell-composer-measure">
+        <div class="shell-composer-brief" role="note" aria-label="Current compose context">
+          <span class="shell-composer-brief-destination">{composerBrief().destination}</span>
+          <span class="shell-composer-brief-state">{composerBrief().state}</span>
+        </div>
       <Show when={outboxChrome()}>
         {(chrome) => (
           <div
@@ -1046,9 +1065,14 @@ export function Composer(props: ComposerProps): JSX.Element {
 
       <Show when={activeTopic()}>
         {(topic) => (
-          <div class="shell-composer-topic" role="status" aria-live="polite">
-            <span class="shell-composer-topic-label">topic</span>
-            <span class="shell-composer-topic-name">#{topic()}</span>
+          <div
+            class="shell-composer-topic"
+            role="status"
+            aria-live="polite"
+            aria-label={`Writing in topic ${topic()}`}
+          >
+            <span class="shell-composer-topic-label">topic mode</span>
+            <span class="shell-composer-topic-name">Writing in the current topic</span>
             <button type="button" class="shell-composer-topic-clear" aria-label={`Clear topic ${topic()}`} onClick={clearTopic}>
               ×
             </button>
