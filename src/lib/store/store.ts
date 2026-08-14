@@ -3423,6 +3423,8 @@ type NamesBurst = {
   at: number;
   /** Live removals/renames that a stale later 353 must not resurrect. */
   excludedNicks: Set<string>;
+  /** Exact modes reported for each wire spelling in this bounded burst. */
+  modeProvenance: Map<string, Set<string>>;
 };
 const _namesBursts = new Map<string, NamesBurst>();
 /** A burst older than this (its 366 was lost) is treated as finished. */
@@ -3451,6 +3453,7 @@ function _beginNamesBurst(key: string): void {
     phase: 'expect',
     at: _now(),
     excludedNicks: existing?.excludedNicks ?? new Set(),
+    modeProvenance: new Map(),
   });
 }
 
@@ -4292,6 +4295,79 @@ function _isSessionRestoreIdentity(get: GetFn, identity: string): boolean {
   return Boolean(identity && _currentSessionRestore(get)?.identities.has(identity.toLowerCase()));
 }
 
+interface SelfIdentityContext {
+  canonicalNick: string;
+  transportNick: string;
+  identities: Set<string>;
+}
+
+/**
+ * Equivalent self spellings owned by this live authenticated connection.
+ *
+ * The restore context admits early replay, but its timer is not the identity
+ * lifetime: while registration is still using a 433 alias, canonical account
+ * and transport alias remain equivalent until NICK reclaim succeeds.
+ */
+function _selfIdentityContext(get: GetFn): SelfIdentityContext | null {
+  const state = get();
+  const canonicalNick = _saslAccount || state.server?.account || _connectNick || state.ourNick;
+  const transportNick = state.ourNick;
+  const identities = new Set(_currentSessionRestore(get)?.identities ?? []);
+  if (
+    state.currentNickIsAlias
+    && canonicalNick
+    && transportNick
+    && canonicalNick.toLowerCase() !== transportNick.toLowerCase()
+    && Boolean(_saslAccount || state.server?.account)
+  ) {
+    identities.add(canonicalNick.toLowerCase());
+    identities.add(transportNick.toLowerCase());
+    if (_connectNick) identities.add(_connectNick.toLowerCase());
+  }
+  return identities.size > 0 ? { canonicalNick, transportNick, identities } : null;
+}
+
+/** A PART/QUIT for either resumed self spelling removes every equivalent row. */
+function _equivalentRemovalKeys(get: GetFn, identity: string): Set<string> {
+  const key = identity.toLowerCase();
+  const context = _selfIdentityContext(get);
+  return context?.identities.has(key) ? new Set(context.identities) : new Set([key]);
+}
+
+function _isEquivalentSelfIdentity(get: GetFn, identity: string): boolean {
+  return Boolean(identity && _selfIdentityContext(get)?.identities.has(identity.toLowerCase()));
+}
+
+function _removeEquivalentRosterRows(
+  source: Map<string, ChannelUser>,
+  removalKeys: Set<string>,
+  preserveTransport?: { nick: string; modes: Set<string> },
+): { users: Map<string, ChannelUser>; removed: boolean } {
+  const users = new Map(source);
+  let removed = false;
+  let retained: ChannelUser | undefined;
+  for (const removalKey of removalKeys) {
+    const row = users.get(removalKey);
+    if (!row) continue;
+    removed = true;
+    retained ??= row;
+    users.delete(removalKey);
+  }
+  if (removed && preserveTransport) {
+    const transportKey = preserveTransport.nick.toLowerCase();
+    users.set(transportKey, {
+      ...retained,
+      nick: preserveTransport.nick,
+      // Never inherit the departed equivalent spelling's privileges. Exact
+      // per-spelling NAMES provenance is bounded to this burst; absent that,
+      // fail closed to an unprivileged row until the next authoritative sync.
+      modes: new Set(preserveTransport.modes),
+      away: retained?.away ?? false,
+    });
+  }
+  return { users, removed };
+}
+
 function _armSessionRestoreReplay(get: GetFn, set: SetFn): void {
   const restore = _currentSessionRestore(get);
   if (!restore) return;
@@ -4646,6 +4722,8 @@ function _startReconnectCountdown(get: GetFn, set: SetFn) {
   }
 
   const delaySecs = _reconnectDelay(_reconnectAttempts);
+  const scheduledClient = get().client;
+  const scheduledGeneration = scheduledClient?.socketGeneration;
   set({ connectionStatus: "reconnecting", reconnectIn: delaySecs });
 
   let remaining = delaySecs;
@@ -4659,6 +4737,10 @@ function _startReconnectCountdown(get: GetFn, set: SetFn) {
 
   _reconnectScheduleTimer = setTimeout(() => {
     _clearReconnectCountdown();
+    if (
+      get().client !== scheduledClient
+      || scheduledClient?.socketGeneration !== scheduledGeneration
+    ) return;
     _reconnectAttempts++;
     if (!get().autoReconnect) {
       set({ connectionStatus: "disconnected", reconnectIn: 0 });
@@ -4667,6 +4749,8 @@ function _startReconnectCountdown(get: GetFn, set: SetFn) {
     set({ connectionStatus: "connecting", reconnectIn: 0 });
     const { client } = get();
     if (client) {
+      _namesBursts.clear();
+      _lastRosterRefresh.clear();
       _beginSessionRestore(
         get,
         set,
@@ -5837,6 +5921,11 @@ export const store = createStore<OnyxState>()(
       _reconnectAttempts = 0;
       const { client } = get();
       if (client) {
+        // An appending burst belongs to the old socket. If it survives, the
+        // replacement socket's first authoritative 353 only appends and stale
+        // users can never be removed.
+        _namesBursts.clear();
+        _lastRosterRefresh.clear();
         _beginSessionRestore(
           get,
           set,
@@ -5981,8 +6070,10 @@ export const store = createStore<OnyxState>()(
           // suppressed. Skipped on the first connect either way (its JOINs
           // already pull fresh NAMES).
           if (hasRegistered) {
+            const reconnectGeneration = client.socketGeneration;
             setTimeout(() => {
               if (get().client !== client) return;
+              if (client.socketGeneration !== reconnectGeneration) return;
               if (get().connectionStatus !== 'connected') return;
               // Server-driven reclaim owns the channel list when session-sync
               // is active; re-check after the delay in case CAP settled late.
@@ -10324,6 +10415,12 @@ export const store = createStore<OnyxState>()(
         // ── Registration ──────────────────────────────────────────────────
         case '001': { // RPL_WELCOME
           const registrationClient = get().client;
+          const registrationGeneration = registrationClient?.socketGeneration;
+          const registrationStillCurrent = () => Boolean(
+            registrationClient
+            && get().client === registrationClient
+            && registrationClient.socketGeneration === registrationGeneration,
+          );
           const groupControl = registrationClient ? _groupControlFor(registrationClient) : null;
           groupControl?.onRegistered(msg);
           _addSessionRestoreIdentity(get, params[0]);
@@ -10378,11 +10475,15 @@ export const store = createStore<OnyxState>()(
               // (after the session-sync join replay, so channel sends land).
               _outboxRetries = 0;
               if (get().outboxDeliveryFailed) set({ outboxDeliveryFailed: false });
-              setTimeout(() => get().flushOutbox(), 2500);
+              setTimeout(() => {
+                if (registrationStillCurrent()) get().flushOutbox();
+              }, 2500);
               // Flush any scheduled messages that came due while the app was
               // closed or offline — once, promptly, right after the session
               // settles (so channel sends land after the join replay).
-              setTimeout(() => get()._dispatchScheduledMessages(), 2600);
+              setTimeout(() => {
+                if (registrationStillCurrent()) get()._dispatchScheduledMessages();
+              }, 2600);
             }
             {
               const pendingJoin = get().pendingDeepLinkJoin;
@@ -10390,7 +10491,8 @@ export const store = createStore<OnyxState>()(
               const pendingTopic = get().pendingDeepLinkTopic;
               if (pendingJoin) {
                 setTimeout(() => {
-                  get().client?.sendRaw('JOIN', pendingJoin);
+                  if (!registrationStillCurrent()) return;
+                  registrationClient?.sendRaw('JOIN', pendingJoin);
                   if (pendingTopic) {
                     // Keep the requested label pending until the server's PROP
                     // registry or replayed history can prove it exists. The
@@ -10404,7 +10506,9 @@ export const store = createStore<OnyxState>()(
                     // ?at= time travel: fetch AROUND the moment once the join
                     // replay has had a beat to land (the sorted merge tolerates
                     // either order; the delay just keeps one batch in flight).
-                    setTimeout(() => get().travelTo(pendingJoin, pendingAt), 2400);
+                    setTimeout(() => {
+                      if (registrationStillCurrent()) get().travelTo(pendingJoin, pendingAt);
+                    }, 2400);
                   }
                 }, 1600);
               }
@@ -10543,7 +10647,7 @@ export const store = createStore<OnyxState>()(
           }
           const restore = _currentSessionRestore(get);
           const isSelf = joiner.toLowerCase() === ourNick.toLowerCase()
-            || _isSessionRestoreIdentity(get, joiner);
+            || _isEquivalentSelfIdentity(get, joiner);
           if (isSelf && _recentNamesBurst(key)?.phase === 'settled') {
             // A new self-JOIN is a new membership generation. Let its explicit
             // reconcile replace the completed generation and its tombstones.
@@ -10729,21 +10833,34 @@ export const store = createStore<OnyxState>()(
             const partClient = get().client;
             if (partClient) _groupControlFor(partClient)?.onRoomPart(ch);
           } else {
-            _excludeNickFromNames(key, parter);
+            const identityContext = _selfIdentityContext(get);
+            const removalKeys = _equivalentRemovalKeys(get, parter);
+            const preserveTransportNick = identityContext?.identities.has(parter.toLowerCase())
+              && parter.toLowerCase() !== ourNick.toLowerCase()
+              ? ourNick
+              : undefined;
+            const preserveTransport = preserveTransportNick
+              ? {
+                  nick: preserveTransportNick,
+                  modes: new Set(
+                    _recentNamesBurst(key)?.modeProvenance.get(preserveTransportNick.toLowerCase()) ?? [],
+                  ),
+                }
+              : undefined;
+            for (const removalKey of removalKeys) _excludeNickFromNames(key, removalKey);
             let removed = false;
             set(s => {
               const channels = new Map(s.channels);
               const c = channels.get(key);
-              if (c?.users.has(parter.toLowerCase())) {
-                const users = new Map(c.users);
-                users.delete(parter.toLowerCase());
+              if (c && [...removalKeys].some(removalKey => c.users.has(removalKey))) {
+                const result = _removeEquivalentRosterRows(c.users, removalKeys, preserveTransport);
                 const reasonSuffix = partReason ? ` (${partReason})` : '';
                 const msgs = _appendBoundedChannelMessage(
                   c.messages,
                   sysMsg(`${parter} left${reasonSuffix}`, ch, eventTime(tags)),
                 );
-                channels.set(key, { ...c, users, messages: msgs } as Channel);
-                removed = true;
+                channels.set(key, { ...c, users: result.users, messages: msgs } as Channel);
+                removed = result.removed;
               }
               return { channels };
             });
@@ -10770,24 +10887,37 @@ export const store = createStore<OnyxState>()(
             _pushReplayEvent(tags, null, `${quitter} quit${quitReason ? `: ${quitReason}` : ''}`);
             break;
           }
+          const identityContext = _selfIdentityContext(get);
+          const removalKeys = _equivalentRemovalKeys(get, quitter);
+          const preserveTransportNick = identityContext?.identities.has(quitter.toLowerCase())
+            && quitter.toLowerCase() !== get().ourNick.toLowerCase()
+            ? get().ourNick
+            : undefined;
           for (const [channelKey, channel] of get().channels) {
-            if (channel.users.has(quitter.toLowerCase())) {
-              _excludeNickFromNames(channelKey, quitter);
+            if ([...removalKeys].some(removalKey => channel.users.has(removalKey))) {
+              for (const removalKey of removalKeys) _excludeNickFromNames(channelKey, removalKey);
             }
           }
           const quitChannels: string[] = [];
           set(s => {
             const channels = new Map(s.channels);
             for (const [chanKey, ch] of channels) {
-              if (ch.users.has(quitter.toLowerCase())) {
-                const users = new Map(ch.users);
-                users.delete(quitter.toLowerCase());
+              if ([...removalKeys].some(removalKey => ch.users.has(removalKey))) {
+                const preserveTransport = preserveTransportNick
+                  ? {
+                      nick: preserveTransportNick,
+                      modes: new Set(
+                        _recentNamesBurst(chanKey)?.modeProvenance.get(preserveTransportNick.toLowerCase()) ?? [],
+                      ),
+                    }
+                  : undefined;
+                const result = _removeEquivalentRosterRows(ch.users, removalKeys, preserveTransport);
                 const quitText = quitReason ? `${quitter} quit: ${quitReason}` : `${quitter} quit`;
                 const msgs = _appendBoundedChannelMessage(
                   ch.messages,
                   sysMsg(quitText, ch.name, eventTime(tags)),
                 );
-                channels.set(chanKey, { ...ch, users, messages: msgs } as Channel);
+                channels.set(chanKey, { ...ch, users: result.users, messages: msgs } as Channel);
                 quitChannels.push(ch.name);
               }
             }
@@ -11026,6 +11156,9 @@ export const store = createStore<OnyxState>()(
           const names = _boundedNamesTokens(namesStr ?? '');
           const recipient = params[0] ?? '';
           const restore = _currentSessionRestore(get);
+          const identityContext = _selfIdentityContext(get);
+          const canonicalSelfNick = identityContext?.canonicalNick ?? '';
+          const canonicalSelfKey = canonicalSelfNick.toLowerCase();
           const namesContainRestoringSelf = names.some(name => {
             const parsed = parseNamesPrefix(name, client?.prefixToMode ?? DEFAULT_PREFIX_TO_MODE);
             return _isSessionRestoreIdentity(get, parsed.nick);
@@ -11073,15 +11206,37 @@ export const store = createStore<OnyxState>()(
                 || n.includes(',')
                 || burst?.excludedNicks.has(n.toLowerCase())
               ) continue;
-              const userKey = n.toLowerCase();
+              const incomingKey = n.toLowerCase();
+              const isEquivalentSelf = Boolean(identityContext?.identities.has(incomingKey));
+              // Provenance is consumed only when one equivalent self spelling
+              // departs. Never retain arbitrary roster tokens here: a channel
+              // may send many capped 353 lines in one burst.
+              if (isEquivalentSelf) burst?.modeProvenance.set(incomingKey, new Set(modes));
+              const userKey = isEquivalentSelf ? canonicalSelfKey : incomingKey;
+              const combinedModes = new Set(modes);
+              let existing = users.get(userKey) ?? c.users.get(userKey);
+              if (isEquivalentSelf) {
+                // A resume replay may contain both the authenticated account
+                // and its temporary 433 alias, possibly split across 353 lines.
+                // Collapse them to one canonical row and union their status
+                // modes so neither line order nor casing loses privilege bits.
+                for (const identityKey of identityContext!.identities) {
+                  const equivalent = users.get(identityKey);
+                  if (equivalent) {
+                    existing ??= equivalent;
+                    for (const mode of equivalent.modes) combinedModes.add(mode);
+                  }
+                  users.delete(identityKey);
+                  existing ??= c.users.get(identityKey);
+                }
+              }
               if (!users.has(userKey) && users.size >= MAX_LIVE_CHANNEL_USERS) continue;
-              const existing = c.users.get(userKey);
               users.set(userKey, {
                 ...existing,
                 // NAMES owns membership, canonical casing, and status modes;
                 // it does not carry WHO/AWAY or extended-JOIN account data.
-                nick: n,
-                modes: new Set(modes),
+                nick: isEquivalentSelf ? canonicalSelfNick : n,
+                modes: combinedModes,
                 away: existing?.away ?? false,
               });
             }

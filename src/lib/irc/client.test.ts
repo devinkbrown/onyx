@@ -81,6 +81,7 @@ describe('IRCClient WebSocket subprotocol', () => {
       });
 
       expect(client.connect()).toBe(true);
+      expect(client.socketGeneration).toBe(1);
       expect(constructions).toEqual([{
         url: 'wss://ircx.us:8080/',
         protocols: ['onyx.irc-media.v1', 'text.ircv3.net'],
@@ -95,6 +96,7 @@ describe('IRCClient WebSocket subprotocol', () => {
       // The store's reconnect path reuses the same client and calls connect();
       // connect itself closes and detaches the prior socket before replacing it.
       expect(client.connect()).toBe(true);
+      expect(client.socketGeneration).toBe(2);
       expect(constructions).toHaveLength(2);
       expect(constructions[1]).toEqual(constructions[0]);
       sockets[1]?.onopen?.(new Event('open'));

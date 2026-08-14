@@ -8,7 +8,12 @@ import { emptyIdentityProfileMemory, saveIdentityProfileMemory } from '@/lib/ide
 import { saveUserNotes } from '@/lib/userNotes';
 import { saveBookmarks } from '@/lib/bookmarks';
 import { saveNickAliases } from '@/lib/nickAliases';
-import { _resetSessionRestoreForTests, store } from './store';
+import {
+  _beginNamesBurstForTests,
+  _resetSessionRestoreForTests,
+  MAX_LIVE_CHANNEL_USERS,
+  store,
+} from './store';
 
 const initialState = store.getInitialState();
 
@@ -182,6 +187,163 @@ describe('remembered session roster restoration', () => {
     const root = store.getState().channels.get('#root');
     expect(root).toBeDefined();
     expect([...root!.users.values()].map(user => user.nick).sort()).toEqual(['alice', 'kain', 'trev']);
+  });
+
+  it('folds canonical and collision-alias self rows, unions modes, and PART removes the equivalence', () => {
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'Kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+
+    receive(':example.test 433 * Kain :Nickname is already in use');
+    receive(':example.test 900 Kain_ Kain_!webchat@example Kain :You are now logged in as Kain');
+    receive(':example.test 001 Kain_ :Welcome to Onyx');
+    receive(':Kain!webchat@example JOIN #root');
+    receive(':example.test 353 Kain_ = #root :@kain +Kain_ alice');
+    receive(':example.test 366 Kain_ #root :End of NAMES list');
+
+    const restored = store.getState().channels.get('#root');
+    expect([...restored!.users.keys()].sort()).toEqual(['alice', 'kain']);
+    expect(restored!.users.get('kain')).toMatchObject({ nick: 'Kain' });
+    expect(restored!.users.get('kain')?.modes).toEqual(new Set(['o', 'v']));
+
+    // The canonical PART belongs to the equivalent resumed identity, not the
+    // current Kain_ transport nick. It must remove every equivalent roster row
+    // without treating the live alias socket as having left the channel.
+    receive(':kain!webchat@example PART #root :old session closed');
+    const afterPart = store.getState().channels.get('#root');
+    expect(afterPart).toBeDefined();
+    expect([...afterPart!.users.keys()].sort()).toEqual(['alice', 'kain_']);
+    expect(afterPart!.users.get('kain_')).toMatchObject({ nick: 'Kain_' });
+    expect(afterPart!.users.get('kain_')?.modes).toEqual(new Set(['v']));
+    expect(afterPart!.users.get('kain_')?.modes.has('o')).toBe(false);
+
+    // Late lines from the completed burst cannot resurrect the canonical twin.
+    receive(':example.test 353 Kain_ = #root :@kain +Kain_');
+    expect([...store.getState().channels.get('#root')!.users.keys()].sort())
+      .toEqual(['alice', 'kain_']);
+
+    // An actual PART from the current transport identity still means we left.
+    receive(':Kain_!webchat@example PART #root :leaving');
+    expect(store.getState().channels.has('#root')).toBe(false);
+  });
+
+  it('QUIT of either restored self spelling cannot leave an equivalent twin stale', () => {
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 433 * kain :Nickname is already in use');
+    receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain_ :Welcome to Onyx');
+    receive(':kain!webchat@example JOIN #root');
+    receive(':example.test 353 kain_ = #root :@kain +kain_ alice');
+    receive(':example.test 366 kain_ #root :End of NAMES list');
+
+    receive(':kain!webchat@example QUIT :ghost closed');
+
+    const root = store.getState().channels.get('#root');
+    expect([...root!.users.keys()].sort()).toEqual(['alice', 'kain_']);
+    expect(root!.users.get('kain_')).toMatchObject({ nick: 'kain_' });
+    expect(root!.users.get('kain_')?.modes).toEqual(new Set(['v']));
+    expect(root!.users.get('kain_')?.modes.has('o')).toBe(false);
+
+    receive(':example.test 353 kain_ = #root :@kain +kain_');
+    expect([...store.getState().channels.get('#root')!.users.keys()].sort())
+      .toEqual(['alice', 'kain_']);
+  });
+
+  it('bounds multi-line NAMES while retaining only self-spelling mode provenance', () => {
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'Kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 433 * Kain :Nickname is already in use');
+    receive(':example.test 900 Kain_ Kain_!webchat@example Kain :You are now logged in as Kain');
+    receive(':example.test 001 Kain_ :Welcome to Onyx');
+    receive(':Kain!webchat@example JOIN #root');
+
+    const first = Array.from({ length: 3_000 }, (_, index) => `user${index}`);
+    const second = Array.from({ length: 3_000 }, (_, index) => `user${index + 3_000}`);
+    receive(`:example.test 353 Kain_ = #root :@kain +Kain_ ${first.join(' ')}`);
+    receive(`:example.test 353 Kain_ = #root :${second.join(' ')}`);
+    receive(':example.test 366 Kain_ #root :End of NAMES list');
+
+    expect(store.getState().channels.get('#root')!.users.size).toBe(MAX_LIVE_CHANNEL_USERS);
+
+    // Flooded peer tokens cannot consume/contaminate the tiny self-only mode
+    // provenance used to reconstruct the still-live transport spelling.
+    receive(':kain!webchat@example PART #root :ghost closed');
+    const root = store.getState().channels.get('#root')!;
+    expect(root.users.size).toBe(MAX_LIVE_CHANNEL_USERS);
+    expect(root.users.get('kain_')?.modes).toEqual(new Set(['v']));
+    expect(root.users.get('kain_')?.modes.has('o')).toBe(false);
+  });
+
+  it('keeps alias equivalence for authoritative NAMES after the restore timers expire', () => {
+    vi.useFakeTimers();
+    try {
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'Kain',
+        password: 'remembered-secret',
+      });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 433 * Kain :Nickname is already in use');
+      receive(':example.test 900 Kain_ Kain_!webchat@example Kain :You are now logged in as Kain');
+      receive(':example.test 001 Kain_ :Welcome to Onyx');
+      receive(':Kain!webchat@example JOIN #root');
+      receive(':example.test 353 Kain_ = #root :Kain_ stale-user');
+      receive(':example.test 366 Kain_ #root :End of NAMES list');
+
+      vi.advanceTimersByTime(46_000);
+      _beginNamesBurstForTests('#root');
+      receive(':example.test 353 Kain_ = #root :@kain +Kain_ fresh-user');
+      receive(':example.test 366 Kain_ #root :End of NAMES list');
+
+      const root = store.getState().channels.get('#root')!;
+      expect([...root.users.keys()].sort()).toEqual(['fresh-user', 'kain']);
+      expect(root.users.get('kain')).toMatchObject({ nick: 'Kain' });
+      expect(root.users.get('kain')?.modes).toEqual(new Set(['o', 'v']));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts a fresh authoritative NAMES generation after reconnect', () => {
+    vi.useFakeTimers();
+    try {
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'kain',
+        password: 'remembered-secret',
+      });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+      receive(':example.test 001 kain :Welcome to Onyx');
+      receive(':kain!webchat@example JOIN #root');
+      // Deliberately omit 366: this leaves the old socket's burst appending.
+      receive(':example.test 353 kain = #root :kain stale-user');
+
+      FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 001 kain :Welcome back');
+      vi.advanceTimersByTime(600);
+      receive(':example.test 353 kain = #root :kain fresh-user');
+      receive(':example.test 366 kain #root :End of NAMES list');
+
+      expect([...store.getState().channels.get('#root')!.users.keys()].sort())
+        .toEqual(['fresh-user', 'kain']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not let a stray NAMES reply create a channel outside a restore generation', () => {
@@ -609,6 +771,73 @@ describe('remembered session roster restoration', () => {
       // a node that only has classic IRC) does not keep a ghost channel UI.
       expect(send).toHaveBeenCalledWith('JOIN #root\r\n');
       expect(send).toHaveBeenCalledWith('NAMES #root\r\n');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not run socket A delayed rejoin work on socket B of the same client', () => {
+    vi.useFakeTimers();
+    try {
+      store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 001 kain :Welcome to Onyx');
+      receive(':kain!webchat@example JOIN #root');
+      receive(':example.test 353 kain = #root :kain alice');
+      receive(':example.test 366 kain #root :End of NAMES list');
+
+      // Socket A reconnect registers and schedules its 600 ms roster work.
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 001 kain :Welcome on socket A');
+
+      // Before A's timer fires, the same IRCClient is reused for socket B.
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      const socketBSend = FakeWebSocket.latest!.send;
+      socketBSend.mockClear();
+      receive(':example.test 001 kain :Welcome on socket B');
+      vi.advanceTimersByTime(600);
+
+      expect(socketBSend.mock.calls.filter(([line]) => line === 'JOIN #root\r\n')).toHaveLength(1);
+      expect(socketBSend.mock.calls.filter(([line]) => line === 'NAMES #root\r\n')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('runs delayed 001 outbox, schedule, deep-link, and travel work exactly once for the current socket', () => {
+    vi.useFakeTimers();
+    try {
+      const flushOutbox = vi.fn(async () => {});
+      const dispatchScheduled = vi.fn();
+      const travelTo = vi.fn();
+      store.setState({
+        flushOutbox,
+        _dispatchScheduledMessages: dispatchScheduled,
+        travelTo,
+        pendingDeepLinkJoin: '#root',
+        pendingDeepLinkAt: new Date('2026-08-14T08:00:00.000Z'),
+      });
+
+      store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 001 kain :Welcome on socket A');
+
+      // Reuse the IRCClient before any socket-A delayed callback is due.
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      const socketBSend = FakeWebSocket.latest!.send;
+      socketBSend.mockClear();
+      receive(':example.test 001 kain :Welcome on socket B');
+
+      vi.advanceTimersByTime(4_000);
+
+      expect(flushOutbox).toHaveBeenCalledTimes(1);
+      expect(dispatchScheduled).toHaveBeenCalledTimes(1);
+      expect(socketBSend.mock.calls.filter(([line]) => line === 'JOIN #root\r\n')).toHaveLength(1);
+      expect(travelTo).toHaveBeenCalledTimes(1);
+      expect(travelTo).toHaveBeenCalledWith('#root', new Date('2026-08-14T08:00:00.000Z'));
     } finally {
       vi.useRealTimers();
     }

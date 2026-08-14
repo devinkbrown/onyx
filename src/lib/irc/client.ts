@@ -239,6 +239,8 @@ export class IRCClient {
   private _authNick: string;
   private reconnectDelay = RECONNECT_BASE;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Monotonic owner for delayed work tied to one concrete WebSocket. */
+  private _socketGeneration = 0;
   private pingTimer: ReturnType<typeof setTimeout> | null = null;
   private pongTimeout: ReturnType<typeof setTimeout> | null = null;
   private _destroyed = false;
@@ -362,6 +364,10 @@ export class IRCClient {
 
   connect(): boolean {
     if (this._destroyed) return false;
+    // The IRCClient instance is deliberately reused by the store on reconnect.
+    // Advance the owner before tearing down the old socket so delayed work can
+    // distinguish socket A from its replacement socket B.
+    this._socketGeneration++;
     // Never run two sockets in parallel. Tear down any prior socket first, and
     // detach its handlers so its close event can't trigger another reconnect.
     if (this.ws) {
@@ -527,6 +533,11 @@ export class IRCClient {
   /** The effective current nick (registration nick, or the post-433 alias). */
   get currentNick(): string {
     return this.opts.nick;
+  }
+
+  /** Current concrete WebSocket generation (increments on every connect call). */
+  get socketGeneration(): number {
+    return this._socketGeneration;
   }
 
   /**
