@@ -3400,6 +3400,10 @@ function AppearanceLauncher(): JSX.Element {
 
 export function PreferencesPanel(): JSX.Element {
   const [activeCategory, setActiveCategory] = createSignal<PreferenceCategory>('display');
+  const activeCategoryMeta = createMemo(() =>
+    PREFERENCE_CATEGORIES.find((category) => category.id === activeCategory())
+      ?? PREFERENCE_CATEGORIES[0],
+  );
   let panelRef: HTMLDivElement | undefined;
 
   function revealFocusedPreference(event: FocusEvent): void {
@@ -3470,6 +3474,10 @@ export function PreferencesPanel(): JSX.Element {
         data-testid="preferences-panel"
         onFocusIn={revealFocusedPreference}
       >
+        <p class="pref-context-cue" role="note">
+          <span>{activeCategoryMeta().label}</span>
+          {activeCategoryMeta().summary} · changes apply on this device immediately.
+        </p>
         <PreferenceCategoryNavigation active={activeCategory} onSelect={selectCategory} />
 
         <div class="pref-category-content">

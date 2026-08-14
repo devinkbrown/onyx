@@ -14,6 +14,31 @@
   gap: var(--gap-section);
 }
 
+/* Shared sheet cue: explains the immediate task without competing with the
+   panel title or claiming that account security enables message encryption. */
+.acct-context-cue {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid color-mix(in oklab, var(--lapis) 72%, var(--seam));
+  background: color-mix(in oklab, var(--lapis) 7%, transparent);
+  color: var(--paper-dim);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.acct-context-cue > span {
+  flex: none;
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 /* ── Guest state ─────────────────────────────────────────────────────────── */
 
 .acct-guest {

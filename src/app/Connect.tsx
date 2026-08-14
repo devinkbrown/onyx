@@ -1115,6 +1115,15 @@ export function Connect(props: ConnectProps): JSX.Element {
     if (entered) return entered.startsWith('#') ? entered : `#${entered}`;
     return 'Home';
   });
+  const primaryStep = createMemo(() => {
+  if (inVerifyStep()) return 'Use the code we sent to finish creating your account.';
+    if (mode() === 'signin' && passkeySupported() && !passwordPathOpen()) {
+      return 'Use your passkey to sign in, or choose a password or recovery code below.';
+    }
+    if (mode() === 'register') return 'Create the account, then verify it before entering Home.';
+    if (mode() === 'signin') return 'Sign in with the account password for this nick.';
+    return 'Choose a guest nick, then continue to Home or the optional room above.';
+  });
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -1300,6 +1309,11 @@ export function Connect(props: ConnectProps): JSX.Element {
                   </Show>
                 </p>
               </section>
+
+              <p class="conn-primary-cue" role="note">
+                <span>Next</span>
+                {primaryStep()}
+              </p>
 
               {/* ── Verify step (register only) ── */}
               <Show when={inVerifyStep()}>

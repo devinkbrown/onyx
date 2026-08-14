@@ -454,6 +454,30 @@
   padding: 0;
 }
 
+/* One stable cue between the arrival summary and the adaptive form. It makes
+   the next decision explicit without adding another competing primary button. */
+.conn-primary-cue {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: calc(-1 * var(--gap-row, 0.75rem)) 0 0;
+  padding: 0 2px;
+  color: var(--paper-dim);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.conn-primary-cue > span {
+  flex: none;
+  margin-top: 0.12rem;
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 /* ── Remembered identity switcher ── */
 .conn-identities {
   display: flex;

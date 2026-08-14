@@ -514,6 +514,15 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
       closeLabel="Close account panel"
     >
       <div class="acct" data-testid="account-panel" data-guest={isGuest() ? 'true' : 'false'}>
+        <p class="acct-context-cue" role="note">
+          <span>Next</span>
+          <Show
+            when={isGuest()}
+            fallback="Review account protection and recovery on this device. Device keys remain separate from sign-in safeguards."
+          >
+            Keep this nick if you want to protect it without disconnecting.
+          </Show>
+        </p>
         {/* ── Guest state ── */}
         <Show when={isGuest()}>
           <div class="acct-guest" data-testid="account-guest">

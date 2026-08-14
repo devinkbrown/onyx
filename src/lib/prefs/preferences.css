@@ -316,6 +316,31 @@
   min-width: 0;
 }
 
+/* Keep the current category and persistence scope visible while the sheet's
+   many controls progressively disclose their own detail. */
+.pref-context-cue {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid color-mix(in oklab, var(--lapis) 72%, var(--seam));
+  background: color-mix(in oklab, var(--lapis) 7%, transparent);
+  color: var(--paper-mute);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.pref-context-cue > span {
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .pref-category-panel {
   display: flex;
   flex-direction: column;
