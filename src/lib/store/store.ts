@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { resolveBackgroundId as resolveCatalogueBackgroundId } from '@/backgrounds/catalogue';
 import '@/lib/customCssRemoval';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
 import {
@@ -256,7 +257,7 @@ import {
   isPasskeySupported,
 } from '@/lib/webauthn/passkey';
 import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from '@/theme/themes';
-import { persistThemeId, readThemeId } from '@/theme/themeStorage';
+import { normalizeThemeId, persistThemeId, readThemeId } from '@/theme/themeStorage';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -8093,8 +8094,9 @@ export const store = createStore<OnyxState>()(
       set({ showAppearance: false });
     },
     setBackground(id) {
-      _saveBackground(id);
-      set({ backgroundId: id });
+      const valid = id === 'auto' ? 'auto' : (resolveCatalogueBackgroundId(id) ?? 'auto');
+      _saveBackground(valid);
+      set({ backgroundId: valid });
     },
 
     // ── markRead ─────────────────────────────────────────────────────────
@@ -9336,10 +9338,11 @@ export const store = createStore<OnyxState>()(
 
     // ── Theme ─────────────────────────────────────────────────────────────
     setTheme(theme) {
-      persistThemeId(theme);
+      const valid = normalizeThemeId(theme) ?? DEFAULT_THEME_ID;
+      persistThemeId(valid);
       set({
-        activeTheme: theme,
-        ...(isThemeId(theme) ? { theme } : {}),
+        activeTheme: valid,
+        ...(isThemeId(valid) ? { theme: valid } : {}),
       });
     },
 
@@ -17450,7 +17453,10 @@ function _loadBackground(): string {
   // Default 'auto' → the background follows the active theme's signature scene
   // (see src/shell/themeBackground.ts). Legacy stored ids still pin a scene.
   if (typeof window === 'undefined') return 'auto';
-  try { return localStorage.getItem('onyx:bg') || 'auto'; } catch { return 'auto'; }
+  try {
+    const stored = localStorage.getItem('onyx:bg');
+    return stored === 'auto' ? 'auto' : (resolveCatalogueBackgroundId(stored) ?? 'auto');
+  } catch { return 'auto'; }
 }
 function _saveBackground(id: string): void {
   if (typeof window === 'undefined') return;

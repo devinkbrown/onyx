@@ -41,9 +41,8 @@ export function AppearancePanel(): JSX.Element {
   const backgroundId = useStore((s) => s.backgroundId);
   const [themeDialogOpen, setThemeDialogOpen] = createSignal(false);
   function chooseBackground(id: string): void {
-    // A new wallpaper selection is explicit intent to see it. Do not let an
-    // old hidden "Off" setting make every mobile tap appear broken.
-    if (sceneMotion() === 'off') setSceneMotion('animated');
+    // Wallpaper and motion are independent preferences. In particular, never
+    // turn an explicit accessibility/battery-saving Off choice back on.
     getState().setBackground(id);
   }
 
@@ -136,7 +135,7 @@ export function AppearancePanel(): JSX.Element {
             <div class="ap-panel-heading-row">
               <h3 class="ap-panel-label">Background</h3>
               <span class="ap-panel-current" aria-live="polite">
-                {sceneMotion() === 'off' ? 'Off' : 'Applied live'}
+                {sceneMotion() === 'off' ? 'Saved · background off' : 'Applied live'}
               </span>
             </div>
             <div class="ap-motion-control">

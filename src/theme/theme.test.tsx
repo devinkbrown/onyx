@@ -35,7 +35,7 @@ function ThemeIdDisplay() {
   return <span data-testid="theme-id">{themeId()}</span>;
 }
 
-function ThemeSetterButton(props: { id: ThemeId }) {
+function ThemeSetterButton(props: { id: string }) {
   const { setTheme } = useTheme();
   return (
     <button
@@ -179,6 +179,19 @@ describe('ThemeProvider', () => {
     expect(screen.getByTestId('theme-id').textContent).toBe(DEFAULT_THEME_ID);
   });
 
+  it('rejects prototype-chain names from corrupted theme storage', () => {
+    localStorage.setItem('onyx:theme', '__proto__');
+
+    expect(() => render(() => (
+      <ThemeProvider>
+        <ThemeIdDisplay />
+      </ThemeProvider>
+    ))).not.toThrow();
+
+    expect(screen.getByTestId('theme-id').textContent).toBe(DEFAULT_THEME_ID);
+    expect(document.documentElement.getAttribute('data-theme')).toBe(DEFAULT_THEME_ID);
+  });
+
   it('setTheme writes the new theme to localStorage', () => {
     render(() => (
       <ThemeProvider>
@@ -203,6 +216,84 @@ describe('ThemeProvider', () => {
 
     expect(screen.getByTestId('theme-id').textContent).toBe('shu');
     expect(document.documentElement.getAttribute('data-theme')).toBe('shu');
+  });
+
+  it('falls back atomically when setTheme receives an invalid or deleted id', () => {
+    render(() => (
+      <ThemeProvider>
+        <ThemeSetterButton id="custom:missing" />
+        <ThemeIdDisplay />
+      </ThemeProvider>
+    ));
+
+    fireEvent.click(screen.getByTestId('set-theme-btn'));
+
+    expect(screen.getByTestId('theme-id').textContent).toBe(DEFAULT_THEME_ID);
+    expect(localStorage.getItem('onyx:theme')).toBe(DEFAULT_THEME_ID);
+    expect(document.documentElement.getAttribute('data-theme')).toBe(DEFAULT_THEME_ID);
+  });
+
+  it('synchronizes theme changes made in another tab', () => {
+    render(() => (
+      <ThemeProvider>
+        <ThemeIdDisplay />
+      </ThemeProvider>
+    ));
+
+    localStorage.setItem('onyx:theme', 'pearl');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'onyx:theme',
+      newValue: 'pearl',
+    }));
+
+    expect(screen.getByTestId('theme-id').textContent).toBe('pearl');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('pearl');
+  });
+
+  it('does not overwrite a newer cross-tab fallback while a custom deletion converges', () => {
+    localStorage.setItem('onyx:custom-themes', JSON.stringify([{
+      id: 'custom:shared',
+      name: 'Shared',
+      base: 'pearl',
+      overrides: { '--gold': '#aa7700' },
+    }]));
+    localStorage.setItem('onyx:theme', 'custom:shared');
+    render(() => <ThemeProvider><ThemeIdDisplay /></ThemeProvider>);
+    expect(screen.getByTestId('theme-id').textContent).toBe('custom:shared');
+
+    localStorage.removeItem('onyx:custom-themes');
+    localStorage.setItem('onyx:theme', 'pearl');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'onyx:custom-themes', newValue: null }));
+    expect(screen.getByTestId('theme-id').textContent).toBe('pearl');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('pearl');
+    expect(localStorage.getItem('onyx:theme')).toBe('pearl');
+
+    window.dispatchEvent(new StorageEvent('storage', { key: 'onyx:theme', newValue: 'pearl' }));
+    expect(screen.getByTestId('theme-id').textContent).toBe('pearl');
+    expect(localStorage.getItem('onyx:theme')).toBe('pearl');
+  });
+
+  it('synchronizes a non-component theme command through the canonical event bridge', () => {
+    render(() => (
+      <ThemeProvider>
+        <ThemeIdDisplay />
+      </ThemeProvider>
+    ));
+
+    localStorage.setItem('onyx:theme', 'shu');
+    window.dispatchEvent(new CustomEvent('onyx:theme-change', { detail: { id: 'shu' } }));
+
+    expect(screen.getByTestId('theme-id').textContent).toBe('shu');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('shu');
+  });
+
+  it('removes provider-owned theme mutations on unmount', () => {
+    const view = render(() => <ThemeProvider><ThemeIdDisplay /></ThemeProvider>);
+    expect(getVar('--ink')).toBeTruthy();
+    view.unmount();
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
+    expect(getVar('--ink')).toBe('');
+    expect(getVar('color-scheme')).toBe('');
   });
 
   it('respects a controlled value prop', () => {

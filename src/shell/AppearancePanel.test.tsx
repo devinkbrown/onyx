@@ -93,7 +93,7 @@ describe('AppearancePanel', () => {
     expect(screen.getByRole('radio', { name: /starfield/i })).toHaveAttribute('aria-checked', 'true');
   });
 
-  it('recovers a wallpaper selection from a persisted Off motion state', () => {
+  it('preserves an explicit Off motion state when selecting a wallpaper', () => {
     setSceneMotion('off');
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
@@ -101,8 +101,9 @@ describe('AppearancePanel', () => {
     fireEvent.click(screen.getByRole('radio', { name: /starfield/i }));
 
     expect(store.getState().backgroundId).toBe('starfield');
-    expect(sceneMotion()).toBe('animated');
-    expect(localStorage.getItem('onyx:scene-motion')).toBe('animated');
+    expect(sceneMotion()).toBe('off');
+    expect(localStorage.getItem('onyx:scene-motion')).toBe('off');
+    expect(screen.getByText('Saved · background off')).toBeInTheDocument();
   });
 
   it('exposes background motion controls beside the mobile-safe picker', () => {

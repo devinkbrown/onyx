@@ -22,7 +22,7 @@ const LEGACY_THEME_MAP: Record<string, ThemeId> = {
 export function normalizeThemeId(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const mapped = LEGACY_THEME_MAP[raw] ?? raw;
-  if (mapped in THEMES) return mapped;
+  if (Object.hasOwn(THEMES, mapped)) return mapped;
   if (isCustomThemeId(mapped) && getCustomTheme(mapped)) return mapped;
   return null;
 }
@@ -37,7 +37,7 @@ export function readThemeId(): string {
 
 export function persistThemeId(id: string): void {
   try {
-    localStorage.setItem(THEME_STORAGE_KEY, id);
+    localStorage.setItem(THEME_STORAGE_KEY, normalizeThemeId(id) ?? DEFAULT_THEME_ID);
   } catch {
     // Ignore write failures.
   }

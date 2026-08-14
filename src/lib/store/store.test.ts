@@ -76,6 +76,14 @@ describe('vanilla store', () => {
     expect(localStorage.getItem('onyx:display-theme')).toBeNull();
   });
 
+  it('keeps theme store and persistence aligned for an invalid request', () => {
+    store.getState().setTheme('custom:missing');
+
+    expect(store.getState().activeTheme).toBe('ocean');
+    expect(store.getState().theme).toBe('ocean');
+    expect(localStorage.getItem('onyx:theme')).toBe('ocean');
+  });
+
   it('notifies selector subscribers when selected state changes', () => {
     const listener = vi.fn();
     const unsubscribe = store.subscribe(

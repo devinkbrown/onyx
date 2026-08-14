@@ -21,7 +21,7 @@ export type CustomTheme = {
   overrides: TokenMap;
 };
 
-const STORAGE_KEY = 'onyx:custom-themes';
+export const CUSTOM_THEME_STORAGE_KEY = 'onyx:custom-themes';
 const CUSTOM_PREFIX = 'custom:';
 const MAX_CUSTOM_THEME_STORAGE_BYTES = 256 * 1024;
 const MAX_CUSTOM_THEMES = 32;
@@ -214,7 +214,7 @@ export function isCustomThemeId(id: string): boolean {
 export function loadCustomThemes(): CustomTheme[] {
   if (typeof window === 'undefined') return [];
   try {
-    const serialized = localStorage.getItem(STORAGE_KEY);
+    const serialized = localStorage.getItem(CUSTOM_THEME_STORAGE_KEY);
     if (!serialized || serialized.length > MAX_CUSTOM_THEME_STORAGE_BYTES) return [];
     const raw: unknown = JSON.parse(serialized);
     if (!Array.isArray(raw)) return [];
@@ -236,7 +236,7 @@ export function loadCustomThemes(): CustomTheme[] {
 function persist(list: CustomTheme[]): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, JSON.stringify(list));
   } catch {
     // storage unavailable — keep going with the in-memory list
   }

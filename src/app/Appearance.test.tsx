@@ -60,18 +60,27 @@ describe('Appearance', () => {
     expect(getState().backgroundId).toBe('obsidian');
   });
 
-  it('temporarily previews from Motion Off without changing it before Apply', () => {
+  it('previews a still frame from Motion Off without changing it before Apply', () => {
     setSceneMotion('off');
     const { container, getByTestId, getByRole } = renderAppearance();
     expect(getByTestId('background-preview')).not.toHaveAttribute('data-motion-override');
 
     fireEvent.pointerEnter(card(container, 'Phoenix'), { pointerType: 'mouse' });
     vi.advanceTimersByTime(BACKGROUND_PREVIEW_DELAY_MS);
-    expect(getByTestId('background-preview')).toHaveAttribute('data-motion-override', 'animated');
+    expect(getByTestId('background-preview')).toHaveAttribute('data-motion-override', 'still');
 
     fireEvent.pointerLeave(card(container, 'Phoenix'));
     expect(getByTestId('background-preview')).not.toHaveAttribute('data-motion-override');
     expect(getByRole('button', { name: 'Apply background' })).toBeDisabled();
+  });
+
+  it('keeps Motion Off after applying a staged wallpaper', () => {
+    setSceneMotion('off');
+    const { container, getByRole } = renderAppearance();
+    fireEvent.click(card(container, 'Phoenix'));
+    fireEvent.click(getByRole('button', { name: 'Apply background' }));
+    expect(localStorage.getItem('onyx:scene-motion')).toBe('off');
+    expect(getState().backgroundId).toBe('phoenix');
   });
 
   it('presents all five picker groups with radio semantics', () => {

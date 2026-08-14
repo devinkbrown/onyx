@@ -9,6 +9,7 @@
 
 import { THEMES, DEFAULT_THEME_ID, type ThemeId } from '@/theme/themes';
 import { getCustomTheme, isCustomThemeId } from '@/theme/customThemes';
+import { resolveBackgroundId as resolveCatalogueBackgroundId } from '@/backgrounds/catalogue';
 
 /** Sentinel background id meaning "follow the active theme's signature". */
 export const AUTO_BACKGROUND_ID = 'auto';
@@ -22,7 +23,10 @@ const FALLBACK_BACKGROUND_ID = 'deep-current';
  * the theme's `signatureBg`; a pinned id passes through unchanged.
  */
 export function resolveBackgroundId(preference: string | null | undefined, themeId: string): string {
-  if (preference && preference !== AUTO_BACKGROUND_ID) return preference;
+  if (preference && preference !== AUTO_BACKGROUND_ID) {
+    const valid = resolveCatalogueBackgroundId(preference);
+    if (valid) return valid;
+  }
 
   // Custom themes inherit their base theme's signature background.
   const baseId: string = isCustomThemeId(themeId)

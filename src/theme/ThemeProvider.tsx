@@ -20,12 +20,14 @@ import {
   createRoot,
   createSignal,
   onCleanup,
+  onMount,
   useContext,
   type ParentProps,
 } from 'solid-js';
 import { DEFAULT_THEME_ID, THEMES, type ThemeId, type TokenMap } from './themes';
 import {
   addCustomTheme,
+  CUSTOM_THEME_STORAGE_KEY,
   customThemeScheme,
   customThemeTokens,
   getCustomTheme,
@@ -35,7 +37,7 @@ import {
   type CustomTheme,
 } from './customThemes';
 import { parseThemeParam } from '@/lib/theme/themeShare';
-import { persistThemeId, readThemeId } from './themeStorage';
+import { normalizeThemeId, persistThemeId, readThemeId, THEME_STORAGE_KEY } from './themeStorage';
 import { highContrastOverrides } from './highContrastTheme';
 import { prefersMoreContrast } from '@/lib/a11y/mediaPrefs';
 import { preferences } from '@/lib/prefs/preferences';
@@ -80,9 +82,10 @@ function fallbackThemeController(): ThemeContextValue {
     const [id, setId] = createSignal<string>(readThemeId());
     const [custom, setCustom] = createSignal<CustomTheme[]>(loadCustomThemes());
     const setTheme = (next: string): void => {
-      setId(next);
-      persistThemeId(next);
-      if (typeof document !== 'undefined') applyThemeToDom(next);
+      const valid = normalizeThemeId(next) ?? DEFAULT_THEME_ID;
+      setId(valid);
+      persistThemeId(valid);
+      if (typeof document !== 'undefined') applyThemeToDom(valid);
     };
     const saveCustom = (name: string, base: ThemeId, overrides: TokenMap): string => {
       const created = addCustomTheme(name, base, overrides);
@@ -192,7 +195,9 @@ function resolveTheme(id: string): ResolvedTheme | null {
  * values on the next apply. Inline vars win over any [data-theme] CSS.
  */
 export function applyThemeToDom(id: string, highContrast: boolean = prefersMoreContrast()): void {
-  const resolved = resolveTheme(id);
+  const resolved = resolveTheme(normalizeThemeId(id) ?? DEFAULT_THEME_ID);
+  // DEFAULT_THEME_ID is a compile-time member of THEMES, so this is only a
+  // defensive guard against a broken theme registry.
   if (!resolved) return;
 
   const tokens = highContrast
@@ -214,18 +219,19 @@ export type ThemeProviderProps = ParentProps<{
    * Controlled value.  If provided the provider will follow this value instead
    * of its internal signal. Useful for account-synced preferences.
    */
-  value?: ThemeId;
+  value?: string;
 }>;
 
 export function ThemeProvider(props: ThemeProviderProps) {
   const [innerThemeId, setInnerThemeId] = createSignal<string>(readThemeId());
   const [customThemes, setCustomThemes] = createSignal<CustomTheme[]>(loadCustomThemes());
 
-  const themeId = (): string => props.value ?? innerThemeId();
+  const themeId = (): string => normalizeThemeId(props.value ?? innerThemeId()) ?? DEFAULT_THEME_ID;
 
   const setTheme = (id: string): void => {
-    setInnerThemeId(id);
-    persistThemeId(id);
+    const valid = normalizeThemeId(id) ?? DEFAULT_THEME_ID;
+    setInnerThemeId(valid);
+    persistThemeId(valid);
   };
 
   const saveCustom = (name: string, base: ThemeId, overrides: TokenMap): string => {
@@ -266,6 +272,41 @@ export function ThemeProvider(props: ThemeProviderProps) {
 
   importSharedThemeFromUrl();
 
+  // Keep multiple Onyx tabs coherent. A custom-theme deletion can invalidate
+  // the active id even when the theme preference itself did not change, so
+  // both storage keys refresh the controller and force a palette re-apply.
+  onMount(() => {
+    const handleStorage = (event: StorageEvent): void => {
+      if (event.storageArea && event.storageArea !== localStorage) return;
+      if (event.key === THEME_STORAGE_KEY || event.key === null) {
+        setInnerThemeId(readThemeId());
+      }
+      if (event.key === CUSTOM_THEME_STORAGE_KEY || event.key === null) {
+        setCustomThemes(loadCustomThemes());
+        // Storage tasks run after the origin tab's synchronous delete + base
+        // selection. Read that final persisted value so receivers never flash
+        // through the default palette between the two ordered events.
+        setInnerThemeId(readThemeId());
+      }
+    };
+    const handleThemeChange = (event: Event): void => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (typeof detail !== 'object' || detail === null || !('id' in detail)) return;
+      const { id } = detail as { id?: unknown };
+      if (typeof id !== 'string') return;
+      // Spotlight and other non-component entry points have no access to the
+      // context setter. They persist through the store, then notify the one
+      // palette owner so its reactive signal and DOM tokens stay aligned.
+      setInnerThemeId(normalizeThemeId(id) ?? DEFAULT_THEME_ID);
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('onyx:theme-change', handleThemeChange);
+    onCleanup(() => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('onyx:theme-change', handleThemeChange);
+    });
+  });
+
   // Apply CSS variables whenever the active theme (or its custom overrides)
   // change, the OS `prefers-contrast: more` signal flips, or the explicit
   // Preferences accessibility toggle changes. Both accessibility paths drive
@@ -276,9 +317,15 @@ export function ThemeProvider(props: ThemeProviderProps) {
     applyThemeToDom(themeId(), prefersMoreContrast() || preferences().highContrast);
   });
 
-  // On unmount, remove the data-theme attribute so tests stay isolated.
+  // Remove every DOM mutation owned by the provider. Leaving inline tokens or
+  // color-scheme behind makes a later mount with damaged storage inherit a
+  // visually unrelated palette.
   onCleanup(() => {
-    document.documentElement.removeAttribute('data-theme');
+    const root = document.documentElement;
+    for (const prop of appliedTokenProps) root.style.removeProperty(prop);
+    root.style.removeProperty('color-scheme');
+    root.removeAttribute('data-theme');
+    appliedTokenProps = [];
   });
 
   const context: ThemeContextValue = { themeId, setTheme, customThemes, saveCustom, deleteCustom };

@@ -5,7 +5,7 @@ import { BackgroundPicker } from '@/backgrounds/picker/BackgroundPicker';
 import { useTheme, THEMES, THEME_IDS, type ThemeId } from '@/theme';
 import { ThemeStudio } from '@/theme/ThemeStudio';
 import { useStore, getState } from '@/lib/store';
-import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
+import { sceneMotion } from '@/lib/prefs/sceneMotion';
 import { resolveBackgroundId } from '@/shell/themeBackground';
 import './appearance.css';
 
@@ -31,13 +31,12 @@ export default function Appearance() {
   const renderedBackground = createMemo(() => resolveBackgroundId(preview() ?? candidate(), theme.themeId()) as BackgroundId);
   const dirty = createMemo(() => candidate() !== storedBackground());
   const previewMotion = createMemo(() => (
-    sceneMotion() === 'off' && (preview() !== null || dirty()) ? 'animated' : undefined
+    sceneMotion() === 'off' && (preview() !== null || dirty()) ? 'still' : undefined
   ));
   let failedId: BackgroundId | undefined;
   let resetBoundary: (() => void) | undefined;
   createEffect(() => { if (failedId && renderedBackground() !== failedId) { failedId = undefined; resetBoundary?.(); resetBoundary = undefined; } });
   const apply = () => {
-    if (sceneMotion() === 'off') setSceneMotion('animated');
     getState().setBackground(candidate());
   };
   const cancel = () => { setPreview(null); setCandidate(storedBackground()); };

@@ -5,6 +5,7 @@ import type { Channel } from '@/lib/irc/types';
 import { recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import { setState } from '@/lib/store';
 import { store } from '@/lib/store/store';
+import { ThemeProvider } from '@/theme';
 import { Spotlight, SpotlightProvider } from './index';
 
 const initialState = store.getInitialState();
@@ -27,10 +28,12 @@ function channel(name: string): Channel {
 
 function renderSpotlight() {
   return render(() => (
-    <SpotlightProvider>
-      <button type="button">Before palette</button>
-      <Spotlight />
-    </SpotlightProvider>
+    <ThemeProvider>
+      <SpotlightProvider>
+        <button type="button">Before palette</button>
+        <Spotlight />
+      </SpotlightProvider>
+    </ThemeProvider>
   ));
 }
 

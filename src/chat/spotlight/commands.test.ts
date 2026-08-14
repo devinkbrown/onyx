@@ -699,7 +699,6 @@ describe('buildCommands', () => {
     const command = buildCommands(getState()).find((entry) => entry.id === 'theme:shu');
     command?.run();
 
-    expect(document.documentElement.getAttribute('data-theme')).toBe('shu');
     expect(store.getState().activeTheme).toBe('shu');
     expect(store.getState().theme).toBe('shu');
     expect(localStorage.getItem('onyx:theme')).toBe('shu');
@@ -709,7 +708,7 @@ describe('buildCommands', () => {
     const command = buildCommands(getState()).find((entry) => entry.id === 'background:obsidian');
     command?.run();
 
-    expect(document.documentElement.dataset.onyxBackground).toBe('obsidian');
+    expect(store.getState().backgroundId).toBe('obsidian');
     expect(localStorage.getItem('onyx:bg')).toBe('obsidian');
   });
 

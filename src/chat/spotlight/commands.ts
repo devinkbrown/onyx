@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, onCleanup, onMount, type Access
 import { backgroundOptions, type BackgroundId } from '@/backgrounds';
 import { getState, selectDeviceMemoryOwner, useStore } from '@/lib/store';
 import type { State } from '@/lib/store/store';
-import { applyThemeToDom, THEME_IDS, THEMES, type ThemeId } from '@/theme';
+import { THEME_IDS, THEMES, type ThemeId } from '@/theme';
 import { saveRecent, type RecentTarget } from '@/lib/commands/registry';
 import {
   openPreferences,
@@ -57,7 +57,6 @@ export type SpotlightCommand = {
 
 type CommandState = Pick<State, 'channels' | 'dms' | 'server' | 'ourNick' | 'networkName' | 'activeView' | 'showMemberList' | 'voice'>;
 
-const BACKGROUND_STORAGE_KEY = 'onyx:bg';
 const SPOTLIGHT_INPUT_ID = 'onyx-spotlight-input';
 
 const JUMP_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -989,7 +988,9 @@ function navigateTo(path: string): void {
 }
 
 function applyTheme(id: ThemeId): void {
-  applyThemeToDom(id);
+  // ThemeProvider owns the document palette. The command owns only the
+  // persisted state and tells that reactive owner about this non-component
+  // selection path.
   getState().setTheme(id);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('onyx:theme-change', { detail: { id } }));
@@ -997,19 +998,9 @@ function applyTheme(id: ThemeId): void {
 }
 
 function applyBackground(id: BackgroundId): void {
-  try {
-    localStorage.setItem(BACKGROUND_STORAGE_KEY, id);
-  } catch {
-    /* storage unavailable */
-  }
-
-  if (typeof document !== 'undefined') {
-    document.documentElement.dataset.onyxBackground = id;
-  }
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('onyx:background-change', { detail: { id } }));
-  }
+  // The shell background is store-owned. Writing localStorage directly here
+  // left the mounted AppShell on its previous scene until a reload.
+  getState().setBackground(id);
 }
 
 /**
