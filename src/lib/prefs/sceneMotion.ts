@@ -9,10 +9,10 @@
 
 import { createSignal, type Accessor } from 'solid-js';
 
-export const SCENE_MOTIONS = ['animated', 'still', 'off'] as const;
+export const SCENE_MOTIONS = ['adaptive', 'animated', 'still', 'off'] as const;
 export type SceneMotion = (typeof SCENE_MOTIONS)[number];
 
-export const DEFAULT_SCENE_MOTION: SceneMotion = 'animated';
+export const DEFAULT_SCENE_MOTION: SceneMotion = 'adaptive';
 
 export const SCENE_MOTION_STORAGE_KEY = 'onyx:scene-motion';
 

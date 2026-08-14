@@ -1798,7 +1798,7 @@ describe('AppShell', () => {
       expect(screen.getByRole('button', { name: 'Open Home' })).toHaveAttribute('aria-current', 'page');
     });
 
-    it('keeps mobile navigation focused and exposes Calls and You through More', () => {
+    it('keeps mobile navigation focused and exposes workspace destinations through Menu', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
@@ -1808,14 +1808,66 @@ describe('AppShell', () => {
         '⌂Home',
         '#Rooms',
         '@Inbox',
-        '•••More',
+        '•••Menu',
       ]);
       expect(within(nav).queryByRole('button', { name: /Calls|You/ })).toBeNull();
 
-      fireEvent.click(within(nav).getByRole('button', { name: 'Open More' }));
-      const more = screen.getByRole('dialog', { name: 'More destinations' });
+      fireEvent.click(within(nav).getByRole('button', { name: 'Open Menu' }));
+      const more = screen.getByRole('dialog', { name: 'Workspace menu' });
       expect(within(more).getByRole('button', { name: 'Calls' })).toBeInTheDocument();
       expect(within(more).getByRole('button', { name: 'You' })).toBeInTheDocument();
+      expect(within(more).getByRole('button', { name: 'Appearance' })).toBeInTheDocument();
+      expect(within(more).getByRole('button', { name: 'Preferences' })).toBeInTheDocument();
+    });
+
+    it('returns focus to the persistent Menu trigger after closing Appearance', async () => {
+      seedStore('#general');
+      render(() => <AppShell />);
+
+      const menuTrigger = screen.getByRole('button', { name: 'Open Menu' });
+      menuTrigger.focus();
+      fireEvent.click(menuTrigger);
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Workspace menu' }))
+        .getByRole('button', { name: 'Appearance' }));
+
+      expect(store.getState().showAppearance).toBe(true);
+      expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).toBeNull();
+      store.getState().closeAppearance();
+      await waitFor(() => expect(menuTrigger).toHaveFocus());
+    });
+
+    it('returns focus to the persistent Menu trigger after closing Preferences', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+      render(() => <AppShell />);
+
+      const menuTrigger = screen.getByRole('button', { name: 'Open Menu' });
+      menuTrigger.focus();
+      fireEvent.click(menuTrigger);
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Workspace menu' }))
+        .getByRole('button', { name: 'Preferences' }));
+
+      expect(isPreferencesOpen()).toBe(true);
+      expect(await screen.findByRole('dialog', { name: 'Preferences' })).toBeInTheDocument();
+      closePreferences();
+      await waitFor(() => expect(menuTrigger).toHaveFocus());
+    });
+
+    it('returns Menu-launched focus to the desktop current destination after a resize', async () => {
+      const resize = stubResizableViewport(true);
+      seedStore('#general');
+      render(() => <AppShell />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Workspace menu' }))
+        .getByRole('button', { name: 'Preferences' }));
+      expect(await screen.findByRole('dialog', { name: 'Preferences' })).toBeInTheDocument();
+      resize(false);
+      closePreferences();
+
+      const desktopRooms = within(screen.getByRole('navigation', { name: 'Primary' }))
+        .getByRole('button', { name: 'Rooms' });
+      await waitFor(() => expect(desktopRooms).toHaveFocus());
     });
 
     it('opens Advanced room tools as a dedicated mobile control desk and restores its launcher', async () => {
@@ -1824,18 +1876,18 @@ describe('AppShell', () => {
       setPreference('experienceMode', 'advanced');
 
       render(() => <AppShell />);
-      const moreTrigger = screen.getByRole('button', { name: 'Open More' });
+      const moreTrigger = screen.getByRole('button', { name: 'Open Menu' });
       moreTrigger.focus();
       fireEvent.click(moreTrigger);
 
-      const more = screen.getByRole('dialog', { name: 'More destinations' });
+      const more = screen.getByRole('dialog', { name: 'Workspace menu' });
       const launcher = within(more).getByRole('button', { name: /Room control desk.*#general/i });
       expect(launcher).toBeInTheDocument();
       expect(within(more).queryByTestId('moderation-cockpit')).toBeNull();
 
       fireEvent.click(launcher);
       const desk = screen.getByRole('dialog', { name: 'Room controls for #general' });
-      expect(screen.queryByRole('dialog', { name: 'More destinations' })).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).toBeNull();
       expect(within(desk).getByRole('heading', { name: '#general' })).toBeInTheDocument();
       expect(within(desk).getByTestId('moderation-cockpit')).toBeInTheDocument();
       await waitFor(() => {
@@ -1843,7 +1895,7 @@ describe('AppShell', () => {
       });
 
       fireEvent.click(within(desk).getByRole('button', { name: 'Back' }));
-      const restoredMore = screen.getByRole('dialog', { name: 'More destinations' });
+      const restoredMore = screen.getByRole('dialog', { name: 'Workspace menu' });
       await waitFor(() => {
         expect(within(restoredMore).getByRole('button', { name: /Room control desk.*#general/i })).toHaveFocus();
       });
@@ -1855,10 +1907,10 @@ describe('AppShell', () => {
       setPreference('experienceMode', 'advanced');
 
       render(() => <AppShell />);
-      const moreTrigger = screen.getByRole('button', { name: 'Open More' });
+      const moreTrigger = screen.getByRole('button', { name: 'Open Menu' });
       moreTrigger.focus();
       fireEvent.click(moreTrigger);
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'More destinations' })).getByRole('button', { name: /Room control desk.*#general/i }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Workspace menu' })).getByRole('button', { name: /Room control desk.*#general/i }));
       expect(screen.getByRole('dialog', { name: 'Room controls for #general' })).toBeInTheDocument();
 
       store.setState({ activeView: { kind: 'home' } });
@@ -1866,7 +1918,7 @@ describe('AppShell', () => {
       await waitFor(() => {
         expect(screen.queryByRole('dialog', { name: /Room controls for/i })).toBeNull();
       });
-      expect(screen.getByRole('button', { name: 'Open More' })).toHaveFocus();
+      expect(screen.getByRole('button', { name: 'Open Menu' })).toHaveFocus();
     });
 
     it('gates the mobile room control desk by workspace level and operator authority', () => {
@@ -1874,15 +1926,15 @@ describe('AppShell', () => {
       seedStore('#general');
 
       const { unmount } = render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Open More' }));
-      expect(within(screen.getByRole('dialog', { name: 'More destinations' })).queryByRole('button', { name: /Room control desk/i })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));
+      expect(within(screen.getByRole('dialog', { name: 'Workspace menu' })).queryByRole('button', { name: /Room control desk/i })).toBeNull();
       unmount();
 
       setPreference('experienceMode', 'irc-ops');
       store.setState({ isOper: true });
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Open More' }));
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'More destinations' })).getByRole('button', { name: /Room control desk.*#general/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Workspace menu' })).getByRole('button', { name: /Room control desk.*#general/i }));
 
       const desk = screen.getByRole('dialog', { name: 'Room controls for #general' });
       expect(within(desk).getByTestId('oper-event-console')).toBeInTheDocument();
@@ -1908,13 +1960,13 @@ describe('AppShell', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Open More' }));
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'More destinations' })).getByRole('button', { name: 'Calls' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Workspace menu' })).getByRole('button', { name: 'Calls' }));
 
       expect(screen.getByRole('heading', { name: 'Talk where the conversation already lives.' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Choose a room' })).toBeInTheDocument();
       expect(store.getState().voice.callState).toBe('idle');
-      expect(screen.queryByRole('dialog', { name: 'More destinations' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).not.toBeInTheDocument();
       expect(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: 'Calls' })).toHaveAttribute('aria-current', 'page');
     });
 
@@ -1922,11 +1974,11 @@ describe('AppShell', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Open More' }));
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'More destinations' })).getByRole('button', { name: 'You' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Workspace menu' })).getByRole('button', { name: 'You' }));
 
       expect(store.getState().showAccount).toBe(true);
-      expect(screen.queryByRole('dialog', { name: 'More destinations' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).not.toBeInTheDocument();
       const primary = screen.getByRole('navigation', { name: 'Primary' });
       const desktopYou = within(primary).getByRole('button', { name: 'You' });
       expect(desktopYou).not.toHaveAttribute('aria-current');

@@ -23,10 +23,7 @@ import {
 } from '@/lib/prefs/sceneMotion';
 import { ThemeImportDialog } from './ThemeImportDialog';
 import { getBackgroundMeta } from '@/backgrounds/catalogue';
-import { deriveBackgroundPolicy } from '@/backgrounds/backgroundPolicy';
-import { makeMediaSignal } from '@/lib/a11y/mediaPrefs';
-import { makeReducedDataSignal } from '@/lib/a11y/reducedData';
-import { preferences } from '@/lib/prefs/preferences';
+import { createAppearanceRuntime } from '@/backgrounds/appearanceRuntime';
 import './AppearancePanel.css';
 
 type ThemeEntry = { id: string; label: string; title: string; swatch: string[]; custom: boolean };
@@ -45,8 +42,7 @@ export function AppearancePanel(): JSX.Element {
   const open = useStore((s) => s.showAppearance);
   const backgroundId = useStore((s) => s.backgroundId);
   const [themeDialogOpen, setThemeDialogOpen] = createSignal(false);
-  const systemReducedMotion = makeMediaSignal('(prefers-reduced-motion: reduce)');
-  const reducedData = makeReducedDataSignal();
+  const appearance = createAppearanceRuntime();
   function chooseBackground(id: string): void {
     // Wallpaper and motion are independent preferences. In particular, never
     // turn an explicit accessibility/battery-saving Off choice back on.
@@ -54,6 +50,7 @@ export function AppearancePanel(): JSX.Element {
   }
 
   const motionLabel: Record<SceneMotion, string> = {
+    adaptive: 'Adaptive',
     animated: 'Animated',
     still: 'Still',
     off: 'Off',
@@ -85,19 +82,15 @@ export function AppearancePanel(): JSX.Element {
   const backgroundLabel = createMemo(() => backgroundId() === 'auto'
     ? 'Match my theme'
     : (getBackgroundMeta(backgroundId())?.label ?? 'Match my theme'));
-  const effectiveMotion = createMemo(() => deriveBackgroundPolicy({
-    sceneMotion: sceneMotion(),
-    reducedMotion: systemReducedMotion() || preferences().reduceMotion,
-    reducedData: reducedData(),
-    viewportWidth: 1024,
-    coarsePointer: false,
-    devicePixelRatio: 1,
-  }));
   const effectiveMotionLabel = createMemo(() => {
-    const policy = effectiveMotion();
+    const policy = appearance.policy();
     if (policy.mode === 'off') return policy.reason === 'reduced-data' ? 'Off · Data Saver' : 'Background off';
-    if (policy.mode === 'still') return policy.reason === 'reduced-motion' ? 'Still · Reduced motion' : 'Still frame';
-    return 'Animated';
+    if (policy.mode === 'still') {
+      if (policy.reason === 'reduced-motion') return 'Still · Reduced motion';
+      if (policy.reason === 'adaptive') return 'Still · This device';
+      return 'Still frame';
+    }
+    return policy.reason === 'adaptive' ? 'Animated · This device' : 'Animated';
   });
 
   function importTheme(imported: CustomTheme): void {

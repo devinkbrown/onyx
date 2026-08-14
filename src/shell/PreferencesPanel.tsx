@@ -191,6 +191,7 @@ const REACTION_DENSITY_LABELS: Record<ReactionDensityPref, string> = {
   hidden: 'Hidden',
 };
 const SCENE_MOTION_LABELS: Record<SceneMotion, string> = {
+  adaptive: 'Adaptive',
   animated: 'Animated',
   still: 'Still',
   off: 'Off',

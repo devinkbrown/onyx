@@ -111,7 +111,46 @@ describe('deriveBackgroundPolicy — mode precedence', () => {
   });
 });
 
-describe('deriveBackgroundPolicy — mobile stays animated', () => {
+describe('deriveBackgroundPolicy — Adaptive follows the actual surface', () => {
+  it.each([
+    { label: '320 CSS px phone', viewportWidth: 320, coarsePointer: false },
+    { label: '390 CSS px phone', viewportWidth: 390, coarsePointer: false },
+    { label: 'wide coarse-pointer device', viewportWidth: 1024, coarsePointer: true },
+  ])('freezes $label without disabling its background', ({ viewportWidth, coarsePointer }) => {
+    const policy = deriveBackgroundPolicy(input({
+      sceneMotion: 'adaptive',
+      viewportWidth,
+      coarsePointer,
+      devicePixelRatio: 3,
+    }));
+    expect(policy.mode).toBe('still');
+    expect(policy.reason).toBe('adaptive');
+    expect(policy.quality).toBe('med');
+    expect(policy.sceneDetail).toBe('balanced');
+    expect(backgroundPolicyAllowsRenderer(policy)).toBe(true);
+  });
+
+  it('animates Adaptive on a desktop and keeps existing caps', () => {
+    const policy = deriveBackgroundPolicy(input({ sceneMotion: 'adaptive' }));
+    expect(policy.mode).toBe('animated');
+    expect(policy.reason).toBe('adaptive');
+    expect(policy.frameCapFps).toBe(DESKTOP_FRAME_CAP_FPS);
+    expect(policy.dprCap).toBe(DESKTOP_DPR_CAP);
+  });
+
+  it('keeps reduced-data and reduced-motion ahead of Adaptive', () => {
+    expect(deriveBackgroundPolicy(input({ sceneMotion: 'adaptive', reducedData: true }))).toMatchObject({
+      mode: 'off',
+      reason: 'reduced-data',
+    });
+    expect(deriveBackgroundPolicy(input({ sceneMotion: 'adaptive', reducedMotion: true }))).toMatchObject({
+      mode: 'still',
+      reason: 'reduced-motion',
+    });
+  });
+});
+
+describe('deriveBackgroundPolicy — explicit Animated keeps its mobile caps', () => {
   it.each([
     { label: '320 CSS px at DPR 3', viewportWidth: 320, devicePixelRatio: 3 },
     { label: '390 CSS px at DPR 3', viewportWidth: 390, devicePixelRatio: 3 },

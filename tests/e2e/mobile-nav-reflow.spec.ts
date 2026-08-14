@@ -94,7 +94,7 @@ test('contains enlarged mobile navigation in a safe-area-aware horizontal rail',
     expect(button.scrollHeight).toBeLessThanOrEqual(button.clientHeight);
   }
 
-  const finalAction = page.getByRole('button', { name: 'Open More' });
+  const finalAction = page.getByRole('button', { name: 'Open Menu' });
   await finalAction.focus();
   await expect(finalAction).toBeFocused();
   const focusedGeometry = await nav.evaluate((element) => {
@@ -188,10 +188,16 @@ test('keeps the Advanced room control desk reachable at 400% short reflow', asyn
     });
   });
 
-  const moreTrigger = page.getByRole('button', { name: 'Open More' });
+  const moreTrigger = page.getByRole('button', { name: 'Open Menu' });
   await moreTrigger.focus();
   await moreTrigger.click();
-  const more = page.getByRole('dialog', { name: 'More destinations' });
+  const more = page.getByRole('dialog', { name: 'Workspace menu' });
+  const appearance = more.getByRole('button', { name: 'Appearance' });
+  const preferences = more.getByRole('button', { name: 'Preferences' });
+  await expect(appearance).toBeVisible();
+  await expect(preferences).toBeVisible();
+  expect((await appearance.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect((await preferences.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
   const launcher = more.getByRole('button', { name: /Room control desk.*#access/i });
   await expect(launcher).toBeVisible();
   await launcher.click();

@@ -119,6 +119,20 @@ describe('AppearancePanel', () => {
     expect(sceneMotion()).toBe('animated');
   });
 
+  it('uses the shared Adaptive runtime for the current mobile surface', () => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    store.getState().openAppearance();
+    render(() => <AppearancePanel />);
+    window.dispatchEvent(new Event('resize'));
+
+    expect(screen.getByRole('radio', { name: 'Adaptive' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('Still · This device')).toBeInTheDocument();
+
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: previousWidth });
+    window.dispatchEvent(new Event('resize'));
+  });
+
   it('collapses the long background catalogue behind a named browser', () => {
     store.setState({ backgroundId: 'starfield' });
     store.getState().openAppearance();
@@ -158,16 +172,16 @@ describe('AppearancePanel', () => {
 
     const offRadio = screen.getByRole('radio', { name: 'Off' });
     fireEvent.click(offRadio);
-    const animatedRadio = screen.getByRole('radio', { name: 'Animated' });
+    const adaptiveRadio = screen.getByRole('radio', { name: 'Adaptive' });
     const offRadioAfterHome = screen.getByRole('radio', { name: 'Off' });
 
     fireEvent.keyDown(offRadio, { key: 'Home', code: 'Home' });
 
-    expect(animatedRadio).toHaveFocus();
-    expect(animatedRadio).toHaveAttribute('aria-checked', 'true');
-    expect(animatedRadio).toHaveAttribute('tabIndex', '0');
+    expect(adaptiveRadio).toHaveFocus();
+    expect(adaptiveRadio).toHaveAttribute('aria-checked', 'true');
+    expect(adaptiveRadio).toHaveAttribute('tabIndex', '0');
 
-    fireEvent.keyDown(animatedRadio, { key: 'End', code: 'End' });
+    fireEvent.keyDown(adaptiveRadio, { key: 'End', code: 'End' });
     expect(offRadioAfterHome).toHaveFocus();
     expect(offRadioAfterHome).toHaveAttribute('aria-checked', 'true');
     expect(offRadioAfterHome).toHaveAttribute('tabIndex', '0');

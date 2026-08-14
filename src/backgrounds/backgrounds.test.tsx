@@ -929,9 +929,10 @@ describe('Background policy application', () => {
   it.each([
     { width: 320, dpr: 3 },
     { width: 390, dpr: 3 },
-  ])('keeps a $width CSS-px DPR$dpr phone animated at med/balanced', async ({ width, dpr }) => {
+  ])('keeps explicit Animated on a $width CSS-px DPR$dpr phone at med/balanced', async ({ width, dpr }) => {
     stubDesktopMedia();
     setViewport(width, dpr);
+    setSceneMotion('animated');
 
     const { container } = render(() => <Background id="deep-current" quality="high" />);
     const canvas = await waitFor(() => {

@@ -99,7 +99,7 @@ const PreferencesPanel = lazy(() => import('./PreferencesPanel').then((m) => ({ 
 const PinnedMessages = lazy(() => import('./PinnedMessages').then((m) => ({ default: m.PinnedMessages })));
 const ScheduledMessagesSheet = lazy(() => import('./ScheduledMessagesSheet').then((m) => ({ default: m.ScheduledMessagesSheet })));
 const JumpToDateSheet = lazy(() => import('./JumpToDateSheet').then((m) => ({ default: m.JumpToDateSheet })));
-import { applyPreferences, closePreferences, isPreferencesOpen, preferences } from '@/lib/prefs/preferences';
+import { applyPreferences, closePreferences, isPreferencesOpen, openPreferences, preferences } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
 const ShortcutsOverlay = lazy(() => import('./ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })));
@@ -586,10 +586,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const [mobileMembersOpen, setMobileMembersOpen] = createSignal(false);
   const [mobileMoreOpen, setMobileMoreOpen] = createSignal(false);
   const [mobileMoreView, setMobileMoreView] = createSignal<'destinations' | 'room-controls'>('destinations');
+  const [mobileMenuReturnSurface, setMobileMenuReturnSurface] = createSignal<'appearance' | 'preferences' | null>(null);
   let mobileMembersTarget: string | null = null;
   let mobileRoomControlsTarget: string | null = null;
   let sidebarDrawerRef: HTMLDivElement | undefined;
   let mobileRoomsButtonRef: HTMLButtonElement | undefined;
+  let mobileMenuButtonRef: HTMLButtonElement | undefined;
   let mobileMoreRef: HTMLDivElement | undefined;
   let mobileRoomControlsLauncherRef: HTMLButtonElement | undefined;
   let mobileRoomControlsBackRef: HTMLButtonElement | undefined;
@@ -865,6 +867,15 @@ export function AppShell(props: AppShellProps): JSX.Element {
     restoreMobileDrawerFocus();
   }
 
+  function closeMobileMoreForSurface(): void {
+    setMobileMoreOpen(false);
+    setMobileMoreView('destinations');
+    mobileRoomControlsTarget = null;
+    // The destination Sheet now owns keyboard focus. Its close transition
+    // restores focus to the persistent Menu trigger below.
+    mobileDrawerRestoreTarget = null;
+  }
+
   function openMobileRoomControls(): void {
     const view = activeView();
     if (view.kind !== 'channel') return;
@@ -884,7 +895,17 @@ export function AppShell(props: AppShellProps): JSX.Element {
     });
   }
 
-  function selectMobileMore(destination: 'calls' | 'you'): void {
+  function selectMobileMore(destination: 'calls' | 'you' | 'appearance' | 'preferences'): void {
+    if (destination === 'appearance' || destination === 'preferences') {
+      closeMobileMoreForSurface();
+      if (destination === 'appearance') getState().openAppearance();
+      else openPreferences();
+      // Arm focus return only after the destination is observably open. If it
+      // is armed first, the lifecycle effect can mistake the pre-open state for
+      // an immediate close and discard the return target.
+      setMobileMenuReturnSurface(destination);
+      return;
+    }
     closeMobileMore();
     if (destination === 'calls') openCalls();
     else openYou();
@@ -894,8 +915,37 @@ export function AppShell(props: AppShellProps): JSX.Element {
     const view = activeView();
     return mobileMoreView() === 'room-controls' && view.kind === 'channel'
       ? `Room controls for ${view.channel}`
-      : 'More destinations';
+      : 'Workspace menu';
   }
+
+  // Appearance and Preferences are portaled Sheets. Observe their shared
+  // state rather than relying on one close button so Escape, backdrop clicks,
+  // and nested panel transitions all return focus through the same contract.
+  createEffect(() => {
+    const appearanceOpen = showAppearance();
+    const preferencesOpen = isPreferencesOpen();
+    const returnSurface = mobileMenuReturnSurface();
+    if (!returnSurface) return;
+    if ((returnSurface === 'appearance' && appearanceOpen)
+      || (returnSurface === 'preferences' && preferencesOpen)) return;
+    const returnToMobile = isMobile();
+    setMobileMenuReturnSurface(null);
+    queueMicrotask(() => {
+      const mobileFallback = document.querySelector<HTMLElement>(
+        '[data-primary-navigation-variant="mobile"] [aria-label="Open Menu"]',
+      );
+      const desktopNav = document.querySelector<HTMLElement>(
+        '[data-primary-navigation-variant="desktop"]',
+      );
+      const desktopFallback = desktopNav?.querySelector<HTMLElement>('[aria-current="page"]')
+        ?? desktopNav?.querySelector<HTMLElement>('button');
+      const mobileTarget = mobileMenuButtonRef?.isConnected
+        ? mobileMenuButtonRef
+        : mobileFallback?.isConnected ? mobileFallback : null;
+      const target = returnToMobile ? mobileTarget : desktopFallback;
+      target?.focus({ preventScroll: true });
+    });
+  });
 
   // The room-controls transition removes the focused launcher. Move focus only
   // after the replacement subtree (and its Back ref) exists, so browsers never
@@ -1085,6 +1135,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
           {/* Presence ribbon */}
           <PresenceRibbon
             selfNick={displayNick()}
+            contextActionsOnly={isMobile()}
             onToggleMembers={handleToggleMembers}
             membersOpen={membersVisible()}
             showJoinVoice={canJoinVoice()}
@@ -1211,6 +1262,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
         moreOpen={mobileMoreOpen()}
         onOpenMore={openMobileMore}
         mobileRoomsButtonRef={(element) => { mobileRoomsButtonRef = element; }}
+        mobileMenuButtonRef={(element) => { mobileMenuButtonRef = element; }}
         onSelect={handlePrimaryNavigation}
       />
       <Show when={mobileMoreOpen()}>
@@ -1254,7 +1306,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
             </Show>
           )}
         >
-          <p class="shell-mobile-more-sheet__title">More</p>
+          <p class="shell-mobile-more-sheet__title">Menu</p>
           <Show when={activeView().kind === 'channel' && preferences().experienceMode !== 'standard'}>
             <button
               ref={(element) => { mobileRoomControlsLauncherRef = element; }}
@@ -1270,6 +1322,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
           <p class="shell-mobile-more-sheet__group-label">Workspace</p>
           <button type="button" onClick={() => selectMobileMore('calls')}>Calls</button>
           <button type="button" onClick={() => selectMobileMore('you')}>You</button>
+          <p class="shell-mobile-more-sheet__group-label">Personalize</p>
+          <button type="button" onClick={() => selectMobileMore('appearance')}>Appearance</button>
+          <button type="button" onClick={() => selectMobileMore('preferences')}>Preferences</button>
           <button type="button" onClick={closeMobileMore}>Close</button>
         </Show>
       </div>

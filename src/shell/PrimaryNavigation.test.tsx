@@ -53,7 +53,7 @@ describe('PrimaryNavigation', () => {
     expect(within(mobileNav).getByRole('button', { name: 'Open Rooms' })).toHaveAttribute('title', 'Open Rooms');
     expect(mobileNav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
     expect(within(mobileNav).getByRole('button', { name: 'Open Inbox' })).toBeInTheDocument();
-    expect(within(mobileNav).getByRole('button', { name: 'Open More' })).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(within(mobileNav).getByRole('button', { name: 'Open Menu' })).toHaveAttribute('aria-haspopup', 'dialog');
   });
 
   it('keeps current location separate from selected and expanded collections', () => {

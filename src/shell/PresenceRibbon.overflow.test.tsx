@@ -114,6 +114,58 @@ describe('PresenceRibbon commercial room header', () => {
     expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
   });
 
+  it('uses a room-specific mobile overflow while the persistent Menu owns workspace settings', () => {
+    seedChannel();
+    render(() => <PresenceRibbon contextActionsOnly />);
+
+    expect(screen.getByRole('button', { name: 'Room actions' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Room actions' }));
+    expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-appearance')).toBeNull();
+    expect(screen.queryByTestId('ribbon-preferences')).toBeNull();
+    expect(screen.queryByTestId('ribbon-account-chip')).toBeNull();
+  });
+
+  it.each([
+    { label: 'Home', activeView: { kind: 'home' as const } },
+    { label: 'Status', activeView: { kind: 'status' as const } },
+    { label: 'a stale resumed channel', activeView: { kind: 'channel' as const, channel: '#missing' } },
+  ])('hides context-only actions on $label when no live conversation context exists', ({ activeView }) => {
+    store.setState({
+      ...initialState,
+      connectionStatus: 'connected',
+      activeView,
+      channels: new Map(),
+      dms: new Map(),
+    });
+    render(() => <PresenceRibbon contextActionsOnly />);
+
+    expect(screen.queryByTestId('ribbon-more')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Room actions|Conversation actions/ })).toBeNull();
+  });
+
+  it('keeps a healthy mobile DM context operable and correctly labelled', () => {
+    store.setState({
+      ...initialState,
+      connectionStatus: 'connected',
+      activeView: { kind: 'dm', nick: 'alice' },
+      dms: new Map([['alice', {
+        nick: 'alice',
+        account: null,
+        unread: 0,
+        highlights: 0,
+        messages: [],
+      }]]),
+    });
+    render(() => <PresenceRibbon contextActionsOnly />);
+
+    const trigger = screen.getByRole('button', { name: 'Conversation actions' });
+    fireEvent.click(trigger);
+    expect(screen.getByText('Conversation')).toBeInTheDocument();
+    expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
+    expect(screen.queryByText('Workspace')).toBeNull();
+  });
+
   it('shows People at zero members with accessible count and aria-pressed false', () => {
     seedChannel('#empty', new Map());
     render(() => <PresenceRibbon />);

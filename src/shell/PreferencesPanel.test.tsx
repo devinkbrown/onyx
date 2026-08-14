@@ -3301,8 +3301,8 @@ describe('PreferencesPanel', () => {
     reset.focus();
     fireEvent.click(reset);
 
-    expect(sceneMotion()).toBe('animated');
-    expect(document.documentElement.dataset.sceneMotion).toBe('animated');
+    expect(sceneMotion()).toBe('adaptive');
+    expect(document.documentElement.dataset.sceneMotion).toBe('adaptive');
     await waitFor(() => expect(announcements).toHaveLength(1));
     expect(status).toHaveTextContent('Preferences reset to defaults.');
     expect(reset).toHaveFocus();
@@ -3310,7 +3310,7 @@ describe('PreferencesPanel', () => {
     setSceneMotion('off');
     fireEvent.click(reset);
 
-    expect(sceneMotion()).toBe('animated');
+    expect(sceneMotion()).toBe('adaptive');
     await waitFor(() => expect(announcements).toHaveLength(2));
     expect(reset).toHaveFocus();
     observer.disconnect();

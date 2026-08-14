@@ -92,7 +92,7 @@ describe('createShellNavigationModel', () => {
     }
   });
 
-  it('keeps mobile focused on Home, Rooms, Inbox, and More while preserving Calls and You behind More', () => {
+  it('keeps mobile focused on Home, Rooms, Inbox, and Menu while preserving Calls and You in Menu', () => {
     const onOpenMore = vi.fn();
     const rendered = render(() => createComponent(PrimaryNavigation, {
       variant: 'mobile',
@@ -109,10 +109,10 @@ describe('createShellNavigationModel', () => {
       '⌂Home',
       '#Rooms',
       '@Inbox',
-      '•••More',
+      '•••Menu',
     ]);
     expect(within(nav).queryByRole('button', { name: /Calls|You/ })).toBeNull();
-    const more = within(nav).getByRole('button', { name: 'Open More' });
+    const more = within(nav).getByRole('button', { name: 'Open Menu' });
     expect(more).toHaveAttribute('aria-haspopup', 'dialog');
     expect(more).toHaveAttribute('aria-expanded', 'true');
     fireEvent.click(more);

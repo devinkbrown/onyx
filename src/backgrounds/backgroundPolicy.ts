@@ -6,8 +6,9 @@
  * is allowed to be, and *why*. Hosts (Background, canvas engine, SceneShell)
  * consume the result — they do not re-derive mobile/off/still rules locally.
  *
- * Narrow/mobile stays animated by default. Automatic Off is reserved for
- * reduced-data / explicit Off, never for viewport width or a coarse pointer.
+ * Adaptive freezes narrow/coarse surfaces while explicit Animated retains its
+ * capped live renderer. Automatic Off is reserved for reduced-data / explicit
+ * Off, never for viewport width or a coarse pointer.
  */
 import type { BackgroundQuality } from './engine';
 import type { SceneMotion } from '@/lib/prefs/sceneMotion';
@@ -16,6 +17,7 @@ export type BackgroundMode = 'animated' | 'still' | 'off';
 export type SceneDetail = 'sparse' | 'balanced' | 'full';
 export type BackgroundPolicyReason =
   | 'user'
+  | 'adaptive'
   | 'reduced-motion'
   | 'reduced-data'
   | 'runtime-pressure';
@@ -169,7 +171,7 @@ export function deriveBackgroundPolicy(input: BackgroundPolicyInput): Background
     dprCap = Math.min(dprCap, quality === 'low' ? PREVIEW_DPR_CAP : MOBILE_DPR_CAP);
   }
 
-  const modeDecision = decideMode(input);
+  const modeDecision = decideMode(input, narrow);
   const reason = resolveReason(modeDecision.reason, pressureApplied, modeDecision.mode);
 
   return {
@@ -240,7 +242,7 @@ export function readCoarsePointer(): boolean {
   }
 }
 
-function decideMode(input: BackgroundPolicyInput): {
+function decideMode(input: BackgroundPolicyInput, narrow: boolean): {
   mode: BackgroundMode;
   reason: BackgroundPolicyReason;
 } {
@@ -248,6 +250,9 @@ function decideMode(input: BackgroundPolicyInput): {
   if (input.reducedData) return { mode: 'off', reason: 'reduced-data' };
   if (input.reducedMotion) return { mode: 'still', reason: 'reduced-motion' };
   if (input.sceneMotion === 'still') return { mode: 'still', reason: 'user' };
+  if (input.sceneMotion === 'adaptive') {
+    return { mode: narrow ? 'still' : 'animated', reason: 'adaptive' };
+  }
   return { mode: 'animated', reason: 'user' };
 }
 
@@ -256,8 +261,9 @@ function resolveReason(
   pressure: boolean,
   mode: BackgroundMode,
 ): BackgroundPolicyReason {
-  if (modeReason !== 'user') return modeReason;
-  if (pressure && mode === 'animated') return 'runtime-pressure';
+  if (pressure && mode === 'animated' && (modeReason === 'user' || modeReason === 'adaptive')) {
+    return 'runtime-pressure';
+  }
   return modeReason;
 }
 

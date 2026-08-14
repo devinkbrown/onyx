@@ -39,11 +39,20 @@ describe('scene motion store', () => {
   });
 
   it('parses only known scene motion values', () => {
+    expect(parseSceneMotion('adaptive')).toBe('adaptive');
     expect(parseSceneMotion('animated')).toBe('animated');
     expect(parseSceneMotion('still')).toBe('still');
     expect(parseSceneMotion('off')).toBe('off');
     expect(parseSceneMotion('')).toBeNull();
     expect(parseSceneMotion({ value: 'off' })).toBeNull();
+  });
+
+  it('defaults missing or invalid storage to Adaptive without replacing an explicit Animated choice', () => {
+    expect(DEFAULT_SCENE_MOTION).toBe('adaptive');
+    expect(loadSceneMotion()).toBe('adaptive');
+
+    localStorage.setItem(SCENE_MOTION_STORAGE_KEY, 'animated');
+    expect(loadSceneMotion()).toBe('animated');
   });
 
   it('roundtrips through localStorage and updates the signal', () => {
@@ -87,7 +96,7 @@ describe('scene motion store', () => {
     expect(css).not.toContain("data-scene-motion='off'");
   });
 
-  it('resets scene motion to animated in storage, signal, and DOM', () => {
+  it('resets scene motion to Adaptive in storage, signal, and DOM', () => {
     setSceneMotion('off');
     resetSceneMotion();
 

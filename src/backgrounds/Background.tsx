@@ -10,19 +10,13 @@ import {
 } from './engine';
 import { resolveBackgroundId, type BackgroundId } from './catalogue';
 import { loadBackgroundVariant } from './loader';
-import { preferences } from '@/lib/prefs/preferences';
 import { sceneMotion, type SceneMotion } from '@/lib/prefs/sceneMotion';
-import { makeMediaSignal } from '@/lib/a11y/mediaPrefs';
-import { makeReducedDataSignal } from '@/lib/a11y/reducedData';
 import {
   applyBackgroundPolicyDataset,
   applyBackgroundRuntime,
-  deriveBackgroundPolicy,
-  readCoarsePointer,
-  readDevicePixelRatio,
-  readViewportWidth,
   type BackgroundPolicy,
 } from './backgroundPolicy';
+import { createAppearanceRuntime } from './appearanceRuntime';
 import { ScenePolicyProvider, type ScenePolicyView } from './scenes/scenePolicy';
 
 export interface BackgroundProps {
@@ -37,7 +31,6 @@ export interface BackgroundProps {
 
 export const DEFAULT_BACKGROUND_ID: BackgroundId = 'gold-veins';
 export const REDUCED_MOTION_BACKGROUND_ID: BackgroundId = 'lapis-gradient';
-const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 /**
  * Resolve the id of the background to render. Reduced motion NO LONGER swaps to
@@ -52,28 +45,19 @@ export function selectBackgroundId(id: string | undefined, _reducedMotion: boole
 }
 
 export function Background(props: BackgroundProps) {
-  const reducedMotion = makeMediaSignal(REDUCED_MOTION_QUERY);
-  const reducedData = makeReducedDataSignal();
   const motion = createMemo(() => props.motionOverride ?? sceneMotion());
-  const viewportWidth = makeViewportWidthSignal();
-  const coarsePointer = makeCoarsePointerSignal();
-  const devicePixelRatio = makeDevicePixelRatioSignal();
   // Keep the FPS guard's actual tier so policy can converge to the renderer's
   // current quality. A boolean would lose whether the engine is at med or low
   // after multiple pressure steps.
   const [runtimeQuality, setRuntimeQuality] = createSignal<BackgroundQuality | undefined>();
 
-  const policy = createMemo(() => deriveBackgroundPolicy({
-    sceneMotion: motion(),
-    reducedMotion: reducedMotion() || preferences().reduceMotion,
-    reducedData: reducedData(),
-    viewportWidth: viewportWidth(),
-    coarsePointer: coarsePointer(),
-    devicePixelRatio: devicePixelRatio(),
-    preview: props.preview === true,
-    runtimeQuality: runtimeQuality(),
-    qualityCeiling: props.quality,
-  }));
+  const appearance = createAppearanceRuntime({
+    motion,
+    preview: () => props.preview === true,
+    runtimeQuality,
+    qualityCeiling: () => props.quality,
+  });
+  const policy = appearance.policy;
 
   // Metadata (id + kind) resolves synchronously from the catalogue; the heavy
   // render module is fetched on demand so only the ACTIVE variant's chunk loads.
@@ -411,47 +395,4 @@ function SceneBackground(props: {
       </ScenePolicyProvider>
     </div>
   );
-}
-
-function makeViewportWidthSignal() {
-  const [width, setWidth] = createSignal(readViewportWidth());
-  if (typeof window === 'undefined') return width;
-  const sync = (): void => {
-    setWidth(readViewportWidth());
-  };
-  window.addEventListener('resize', sync);
-  onCleanup(() => window.removeEventListener('resize', sync));
-  return width;
-}
-
-function makeCoarsePointerSignal() {
-  const [coarse, setCoarse] = createSignal(readCoarsePointer());
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return coarse;
-  let query: MediaQueryList;
-  try {
-    query = window.matchMedia('(pointer: coarse)');
-  } catch {
-    return coarse;
-  }
-  const sync = (): void => {
-    setCoarse(query.matches);
-  };
-  try {
-    query.addEventListener('change', sync);
-    onCleanup(() => query.removeEventListener('change', sync));
-  } catch {
-    /* advisory */
-  }
-  return coarse;
-}
-
-function makeDevicePixelRatioSignal() {
-  const [dpr, setDpr] = createSignal(readDevicePixelRatio());
-  if (typeof window === 'undefined') return dpr;
-  const sync = (): void => {
-    setDpr(readDevicePixelRatio());
-  };
-  window.addEventListener('resize', sync);
-  onCleanup(() => window.removeEventListener('resize', sync));
-  return dpr;
 }

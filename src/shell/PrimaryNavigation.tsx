@@ -27,7 +27,9 @@ export type PrimaryNavigationProps = {
   youDialogOpen?: boolean;
   /** Focus return target for the mobile Rooms drawer trigger. */
   mobileRoomsButtonRef?: (element: HTMLButtonElement) => void;
-  /** Mobile keeps Calls and You in the More sheet without losing either destination. */
+  /** Focus return target for the canonical mobile workspace Menu. */
+  mobileMenuButtonRef?: (element: HTMLButtonElement) => void;
+  /** Mobile keeps secondary destinations in the Menu without crowding the core rail. */
   moreOpen?: boolean;
   onOpenMore?: () => void;
   onSelect: (section: PrimarySection) => void;
@@ -65,6 +67,7 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
     'expandedCollection',
     'youDialogOpen',
     'mobileRoomsButtonRef',
+    'mobileMenuButtonRef',
     'moreOpen',
     'onOpenMore',
     'onSelect',
@@ -122,17 +125,18 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
   const renderMore = (): JSX.Element => (
     <button
       type="button"
+      ref={local.mobileMenuButtonRef}
       class={`shell-mobile-nav-btn${local.moreOpen ? ' shell-mobile-nav-btn--dialog-open' : ''}`}
       data-primary-nav-item
       data-section="more"
-      aria-label="Open More"
+      aria-label="Open Menu"
       aria-expanded={local.moreOpen}
       aria-haspopup="dialog"
-      title="Open More"
+      title="Open Menu"
       onClick={() => local.onOpenMore?.()}
     >
       <span class="shell-mobile-nav-icon" aria-hidden="true">•••</span>
-      More
+      Menu
     </button>
   );
 

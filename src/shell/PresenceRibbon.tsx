@@ -48,6 +48,8 @@ export type PresenceRibbonProps = {
   membersOpen?: boolean;
   showJoinVoice?: boolean;
   onJoinVoice?: (withVideo: boolean) => void;
+  /** Mobile uses the persistent Menu for workspace settings; keep this overflow contextual. */
+  contextActionsOnly?: boolean;
 };
 
 export type VoiceRoomStatusInput = {
@@ -134,11 +136,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     'membersOpen',
     'showJoinVoice',
     'onJoinVoice',
+    'contextActionsOnly',
   ]);
 
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const channels = useStore((s) => s.channels);
+  const dms = useStore((s) => s.dms);
   // Fallback only when AppShell does not pass membersOpen (unit hosts).
   const showMemberList = useStore((s) => s.showMemberList);
   // selectChannelEvent parses the prop into a fresh object each call; without a
@@ -153,6 +157,9 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   // identity tuple, and cryptographic material remain outside the UI store.
   const groupControlRuntime = useStore((s) => s.groupControlRuntime);
   const voice = useStore((s) => s.voice);
+  const contextActionsLabel = createMemo(() => (
+    activeView().kind === 'channel' ? 'Room actions' : 'Conversation actions'
+  ));
   const voiceChannelParticipants = useStore((s) => s.voiceChannelParticipants);
   const speakingNicks = useStore((s) => s.speakingNicks);
   const mutedNicks = useStore((s) => s.mutedNicks);
@@ -178,6 +185,12 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     const view = activeView();
     if (view.kind !== 'channel') return null;
     return channels().get(view.channel) ?? null;
+  });
+  const hasContextActions = createMemo(() => {
+    const view = activeView();
+    if (view.kind === 'channel') return activeChannel() !== null;
+    if (view.kind === 'dm') return dms().has(view.nick.toLowerCase());
+    return false;
   });
 
   const channelHasUnread = createMemo(
@@ -251,6 +264,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [moreOpen, setMoreOpen] = createSignal(false);
   let moreMenuRef: HTMLDivElement | undefined;
+
+  createEffect(() => {
+    if (local.contextActionsOnly && !hasContextActions()) setMoreOpen(false);
+  });
 
   const connLabel = createMemo(() => {
     const s = connectionStatus();
@@ -708,14 +725,18 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
         <div class="shell-ribbon-group" role="group" aria-label="Inbox">
           <NotificationCenter />
         </div>
-        <span class="shell-ribbon-divider" aria-hidden="true" />
-
-        <div class="shell-ribbon-group" role="group" aria-label="More">
-          <Popover
+        <Show when={!local.contextActionsOnly || hasContextActions()}>
+          <span class="shell-ribbon-divider" aria-hidden="true" />
+          <div
+            class="shell-ribbon-group"
+            role="group"
+            aria-label={local.contextActionsOnly ? contextActionsLabel() : 'More'}
+          >
+            <Popover
             open={moreOpen()}
             onOpenChange={setMoreOpen}
             placement="bottom"
-            panelLabel="More channel and workspace actions"
+            panelLabel={local.contextActionsOnly ? contextActionsLabel() : 'More channel and workspace actions'}
             trigger={
               <span
                 class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-more-trigger"
@@ -727,8 +748,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                   <circle cx="12" cy="12" r="1.6" />
                   <circle cx="19" cy="12" r="1.6" />
                 </svg>
-                <span class="sr-only">More actions</span>
-                <span class="shell-ribbon-action-label" aria-hidden="true">More</span>
+                <span class="sr-only">{local.contextActionsOnly ? contextActionsLabel() : 'More actions'}</span>
+                <span class="shell-ribbon-action-label" aria-hidden="true">
+                  {local.contextActionsOnly ? 'Actions' : 'More'}
+                </span>
               </span>
             }
           >
@@ -974,11 +997,12 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               </Show>
 
               {/* Workspace — appearance / prefs / account */}
-              <div
-                class="shell-ribbon-more-section"
-                role="group"
-                aria-labelledby="ribbon-more-workspace-label"
-              >
+              <Show when={!local.contextActionsOnly}>
+                <div
+                  class="shell-ribbon-more-section"
+                  role="group"
+                  aria-labelledby="ribbon-more-workspace-label"
+                >
                 <p id="ribbon-more-workspace-label" class="shell-ribbon-more-label">
                   Workspace
                 </p>
@@ -1059,10 +1083,12 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                     </span>
                   </button>
                 </div>
-              </div>
+                </div>
+              </Show>
             </div>
-          </Popover>
-        </div>
+            </Popover>
+          </div>
+        </Show>
 
         <span class="shell-ribbon-divider" aria-hidden="true" />
 
