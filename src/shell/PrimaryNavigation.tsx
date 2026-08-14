@@ -95,6 +95,7 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
         aria-pressed={isCollection(item.section) ? itemSelected() : undefined}
         aria-expanded={isCollection(item.section) ? itemExpanded() : item.section === 'you' ? local.youDialogOpen : undefined}
         aria-haspopup={item.section === 'you' ? 'dialog' : undefined}
+        title={isMobile() ? `Open ${item.label}` : `Quick switch to ${item.label}`}
         onClick={() => local.onSelect(item.section)}
       >
         {isMobile() ? (
@@ -114,6 +115,7 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
       data-primary-navigation
       data-primary-navigation-variant={local.variant}
     >
+      {!isMobile() && <span class="shell-primary-nav-context">Quick switch</span>}
       <For each={NAVIGATION_ITEMS}>{renderItem}</For>
     </nav>
   );

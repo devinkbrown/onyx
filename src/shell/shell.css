@@ -314,6 +314,14 @@
   border-bottom: 1px solid var(--seam-faint);
 }
 
+.shell-primary-nav-context {
+  padding: 2px 9px 5px;
+  color: var(--paper-mute);
+  font: 700 0.6rem/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .shell-primary-nav-btn {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
@@ -1061,6 +1069,44 @@
       color-mix(in oklab, var(--ink) 58%, transparent) 100%
     );
   overflow: hidden;
+}
+
+/* A true, compact orientation seam: target and unread state already owned by
+   the store, placed below the ribbon so it never competes with room controls. */
+.shell-room-current {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+  min-width: 0;
+  min-height: 28px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--seam-faint);
+  box-shadow: inset 2px 0 0 var(--lapis);
+  color: var(--paper-mute);
+  font: 600 0.68rem/1.25 var(--font-mono);
+  letter-spacing: 0.035em;
+}
+.shell-room-current__kicker {
+  flex: 0 0 auto;
+  color: var(--lapis-bright);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.shell-room-current__label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--paper);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-room-current__detail {
+  flex: 0 0 auto;
+  color: var(--paper-mute);
+}
+.shell-room-current[data-shell-current-kind='status'] .shell-room-current__detail,
+.shell-room-current[data-shell-current-kind='calls'] .shell-room-current__detail {
+  color: var(--paper-dim);
 }
 
 /* Native View Transitions progressively enhance sidebar conversation changes.
@@ -5998,6 +6044,11 @@
      Repeating them inside the room drawer wastes most of a zoomed viewport. */
   .shell-sidebar .shell-primary-nav { display: none; }
 
+  .shell-room-current {
+    min-height: 30px;
+    padding-inline: 10px;
+  }
+
   /* Channel drawer — slides in from the left, stops above the tab bar */
   .shell-sidebar {
     position: fixed;
@@ -6630,6 +6681,26 @@
   .shell-channel-item {
     min-height: 44px;
   }
+}
+
+@media (max-width: 420px) {
+  .shell-room-current {
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
+  .shell-room-current__label { flex: 1 1 12ch; }
+  .shell-room-current__detail { flex: 0 0 auto; }
+}
+
+@media (forced-colors: active) {
+  .shell-room-current {
+    border-bottom-color: CanvasText;
+    box-shadow: inset 2px 0 0 Highlight;
+    color: CanvasText;
+  }
+  .shell-room-current__kicker { color: Highlight; }
+  .shell-room-current__label,
+  .shell-room-current__detail { color: CanvasText; }
 }
 
 @media (min-width: 901px) {

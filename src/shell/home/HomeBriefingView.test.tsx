@@ -187,6 +187,9 @@ describe('HomeBriefingView — presentation contract', () => {
     expect(within(main).getByRole('heading', { name: 'Continue' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Browse rooms' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Search messages' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Browse rooms' })).toHaveClass('home-cta');
+    expect(screen.getByRole('button', { name: 'Search messages' })).toHaveClass('home-action--supporting');
+    expect(screen.getByRole('button', { name: 'Search messages' })).not.toHaveClass('home-action--primary');
   });
 
   it('keeps mobile reading order: needs, continue, live, explore', () => {

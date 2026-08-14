@@ -31,6 +31,8 @@ describe('PrimaryNavigation', () => {
       '◇You',
     ]);
     expect(desktopNav.querySelectorAll('[data-primary-nav-item]')).toHaveLength(5);
+    expect(desktopNav).toHaveTextContent('Quick switch');
+    expect(within(desktopNav).getByRole('button', { name: 'Home' })).toHaveAttribute('title', 'Quick switch to Home');
     expect(desktopNav.querySelector('.shell-primary-nav-icon')).toBeInTheDocument();
     expect(desktopNav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
     desktop.unmount();
@@ -48,6 +50,7 @@ describe('PrimaryNavigation', () => {
     expect(within(mobileNav).getAllByRole('button')).toHaveLength(5);
     expect(mobileNav.querySelector('.shell-mobile-nav-icon')).toBeInTheDocument();
     expect(within(mobileNav).getByRole('button', { name: 'Open Rooms' })).toHaveAttribute('aria-current', 'page');
+    expect(within(mobileNav).getByRole('button', { name: 'Open Rooms' })).toHaveAttribute('title', 'Open Rooms');
     expect(mobileNav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
   });
 

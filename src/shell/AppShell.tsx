@@ -202,6 +202,19 @@ function roomIdentityStyle(identity: RoomIdentity | null): JSX.CSSProperties {
   } as JSX.CSSProperties;
 }
 
+type ShellCurrent = {
+  kind: 'home' | 'room' | 'message' | 'status' | 'calls';
+  label: string;
+  detail: string;
+};
+
+function unreadDetail(unread: number, highlights: number): string {
+  if (highlights > 0) {
+    return `${unread} unread · ${highlights} ${highlights === 1 ? 'mention' : 'mentions'}`;
+  }
+  return unread > 0 ? `${unread} unread` : 'caught up';
+}
+
 // ── AppShell ─────────────────────────────────────────────────────────────────
 
 export function AppShell(props: AppShellProps): JSX.Element {
@@ -211,6 +224,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   // ── store reads ──
   const activeView = useStore((s) => s.activeView);
+  const channels = useStore((s) => s.channels);
+  const dms = useStore((s) => s.dms);
   const showMemberList = useStore((s) => s.showMemberList);
   const mobileSidebarOpen = useStore((s) => s.mobileSidebarOpen);
   const ourNick = useStore((s) => s.ourNick);
@@ -862,6 +877,41 @@ export function AppShell(props: AppShellProps): JSX.Element {
     return 'rooms';
   });
 
+  // This is orientation, not a new source of truth: it only projects the
+  // selected store target and its existing unread counters. It deliberately
+  // says nothing about transport, E2EE, or call protection.
+  const roomCurrent = createMemo<ShellCurrent>(() => {
+    if (primarySurface() === 'calls') {
+      return { kind: 'calls', label: 'Calls', detail: voice().callChannel ?? 'Call directory' };
+    }
+
+    const view = activeView();
+    if (view.kind === 'channel') {
+      const channel = channels().get(view.channel.toLowerCase());
+      return {
+        kind: 'room',
+        label: channel?.name ?? view.channel,
+        detail: unreadDetail(channel?.unread ?? 0, channel?.highlights ?? 0),
+      };
+    }
+    if (view.kind === 'dm') {
+      const dm = dms().get(view.nick.toLowerCase());
+      return {
+        kind: 'message',
+        label: `Message · ${dm?.nick ?? view.nick}`,
+        detail: unreadDetail(dm?.unread ?? 0, dm?.highlights ?? 0),
+      };
+    }
+    if (view.kind === 'status') {
+      return { kind: 'status', label: 'Network status', detail: 'read-only ledger' };
+    }
+
+    const items = [...channels().values(), ...dms().values()];
+    const unread = items.reduce((total, item) => total + item.unread, 0);
+    const highlights = items.reduce((total, item) => total + item.highlights, 0);
+    return { kind: 'home', label: 'Home', detail: unreadDetail(unread, highlights) };
+  });
+
   function handlePrimaryNavigation(section: PrimarySection): void {
     switch (section) {
       case 'home':
@@ -959,6 +1009,16 @@ export function AppShell(props: AppShellProps): JSX.Element {
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
           />
+          <div
+            class="shell-room-current"
+            data-shell-current-kind={roomCurrent().kind}
+            role="note"
+            aria-label={`Room current: ${roomCurrent().label}, ${roomCurrent().detail}`}
+          >
+            <span class="shell-room-current__kicker">Room current</span>
+            <span class="shell-room-current__label">{roomCurrent().label}</span>
+            <span class="shell-room-current__detail">{roomCurrent().detail}</span>
+          </div>
           <Show
             when={primarySurface() === 'calls'}
             fallback={(

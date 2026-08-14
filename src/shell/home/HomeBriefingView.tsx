@@ -380,7 +380,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
             </button>
             <button
               type="button"
-              class="home-action home-action--primary"
+              class="home-action home-action--supporting"
               onClick={() => props.actions.openSearchMessages()}
             >
               Search messages

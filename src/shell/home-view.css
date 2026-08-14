@@ -547,6 +547,10 @@
   border-color: color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
   color: var(--paper);
 }
+.home-action--supporting {
+  border-color: color-mix(in oklab, var(--lapis) 28%, var(--line));
+  color: var(--paper-dim);
+}
 .home-action--quiet {
   border-color: transparent;
   color: var(--paper-mute);
