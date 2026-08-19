@@ -23,6 +23,38 @@
   color: var(--public-current, var(--lapis-bright));
 }
 
+.invite-title-ledger {
+  text-decoration: none;
+}
+
+.invite-title-ledger:hover,
+.invite-title-ledger:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.invite-room-detail {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.65rem 1rem;
+}
+
+.invite-room-ledger {
+  font: 600 0.72rem/1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+  text-decoration: none;
+}
+
+.invite-room-ledger:hover,
+.invite-room-ledger:focus-visible {
+  color: var(--paper);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
 .invite-safety-receipt {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.8fr);
@@ -93,7 +125,9 @@
 }
 
 @media (forced-colors: active) {
-  .invite-title-accent {
+  .invite-title-accent,
+  .invite-title-ledger,
+  .invite-room-ledger {
     color: LinkText;
   }
 

@@ -83,6 +83,9 @@ describe('InviteRoute', () => {
       'href',
       '/app/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki',
     );
+    expect(screen.getByTestId('invite-hero-ledger')).toHaveAttribute('href', '/stats/?room=%23general');
+    expect(screen.getByTestId('invite-cta-ledger')).toHaveAttribute('href', '/stats/?room=%23general');
+    expect(screen.getByTestId('invite-room-ledger')).toHaveAttribute('href', '/stats/?room=%23general');
   });
 
   it('renders a bare invite as a network-only preview and hands off without a phantom room', () => {
@@ -93,6 +96,8 @@ describe('InviteRoute', () => {
     expect(screen.getByRole('heading', { name: /join\s+onyx/i })).toBeInTheDocument();
     expect(screen.getByText('Choose a room from Home')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open invite in onyx/i })).toHaveAttribute('href', '/app/');
+    expect(screen.queryByTestId('invite-hero-ledger')).toBeNull();
+    expect(screen.queryByTestId('invite-cta-ledger')).toBeNull();
   });
 
   it('rejects an invalid join token instead of reflecting it', () => {

@@ -12,6 +12,7 @@
  */
 import { For, Show } from 'solid-js';
 import { getState, selectOwnedScheduledMessages, useStore } from '@/lib/store';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Sheet } from '@/primitives/Sheet';
 import { RelativeTime } from '@/components/RelativeTime';
 
@@ -46,14 +47,26 @@ export function ScheduledMessagesSheet() {
                   <RelativeTime timestamp={entry.sendAt} />
                 </div>
                 <p class="shell-scheduled-text">{entry.text}</p>
-                <button
-                  type="button"
-                  class="shell-scheduled-cancel"
-                  aria-label={`Cancel scheduled message to ${entry.channel}: ${entry.text.slice(0, 40)}`}
-                  onClick={() => getState().cancelScheduledMessage(entry.id)}
-                >
-                  Cancel
-                </button>
+                <div class="shell-scheduled-actions">
+                  <Show when={/^[#&]/.test(entry.channel.trim())}>
+                    <a
+                      class="shell-scheduled-ledger shell-ribbon-stats"
+                      href={statsRoomHref(entry.channel)}
+                      aria-label={`Channel ledger for ${entry.channel}`}
+                      data-testid="scheduled-channel-ledger"
+                    >
+                      Channel ledger
+                    </a>
+                  </Show>
+                  <button
+                    type="button"
+                    class="shell-scheduled-cancel"
+                    aria-label={`Cancel scheduled message to ${entry.channel}: ${entry.text.slice(0, 40)}`}
+                    onClick={() => getState().cancelScheduledMessage(entry.id)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </li>
             )}
           </For>
