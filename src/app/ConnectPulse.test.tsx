@@ -98,4 +98,24 @@ describe('ConnectPulse node probes', () => {
       '/stats/?room=%23root',
     );
   });
+
+  it('links a join deep-link target to the public room ledger', () => {
+    render(() => <ConnectPulse deepLink="#lobby" />);
+
+    expect(screen.getByTestId('pulse-deeplink-ledger')).toHaveAttribute(
+      'href',
+      '/stats/?room=%23lobby',
+    );
+    expect(screen.getByTestId('pulse-deeplink-ledger')).toHaveAttribute(
+      'aria-label',
+      'Channel ledger for #lobby',
+    );
+  });
+
+  it('keeps non-channel deep link targets as plain text', () => {
+    render(() => <ConnectPulse deepLink="alice" />);
+
+    expect(screen.queryByTestId('pulse-deeplink-ledger')).toBeNull();
+    expect(screen.getByText('alice')).toBeInTheDocument();
+  });
 });

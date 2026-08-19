@@ -122,7 +122,19 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
         {(target) => (
           <div class="cpulse-deeplink" data-testid="pulse-deeplink">
             <span class="cpulse-deeplink-label">you're headed to</span>
-            <span class="cpulse-deeplink-chan">{target()}</span>
+            <Show
+              when={/^[#&]/.test(target().trim())}
+              fallback={<span class="cpulse-deeplink-chan">{target()}</span>}
+            >
+              <a
+                class="cpulse-deeplink-chan"
+                href={statsRoomHref(target())}
+                aria-label={`Channel ledger for ${target()}`}
+                data-testid="pulse-deeplink-ledger"
+              >
+                {target()}
+              </a>
+            </Show>
           </div>
         )}
       </Show>

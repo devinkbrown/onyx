@@ -1539,16 +1539,20 @@ describe('Node name is never shown', () => {
 });
 
 describe('optional room to join (no autojoin)', () => {
+  function roomField() {
+    return screen.getByRole('textbox', { name: 'Channel' });
+  }
+
   it('renders the optional Channel field in guest mode', () => {
     render(() => <Connect />);
-    expect(screen.getByLabelText(/channel/i)).toBeInTheDocument();
+    expect(roomField()).toBeInTheDocument();
   });
 
   it('a filled room normalizes (# added) and queues the pending join on submit', () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
     fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
-    fireEvent.input(screen.getByLabelText(/channel/i), { target: { value: 'lounge' } });
+    fireEvent.input(roomField(), { target: { value: 'lounge' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(store.getState().pendingDeepLinkJoin).toBe('#lounge');
     connectSpy.mockRestore();
@@ -1562,7 +1566,7 @@ describe('optional room to join (no autojoin)', () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
     fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
-    fireEvent.input(screen.getByLabelText(/channel/i), { target: { value: entered } });
+    fireEvent.input(roomField(), { target: { value: entered } });
 
     const summary = screen.getByRole('region', { name: /arrive without an account/i });
     expect(within(summary).getByText(expected)).toBeInTheDocument();
@@ -1584,7 +1588,7 @@ describe('optional room to join (no autojoin)', () => {
   it('a malformed room blocks submit with an error', () => {
     render(() => <Connect />);
     fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
-    fireEvent.input(screen.getByLabelText(/channel/i), { target: { value: '#bad channel' } });
+    fireEvent.input(roomField(), { target: { value: '#bad channel' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(screen.getByText(/no spaces or commas/i)).toBeInTheDocument();
   });
@@ -1596,7 +1600,7 @@ describe('optional room to join (no autojoin)', () => {
 
     expect(screen.getByRole('note', { name: /invite preview/i })).toHaveTextContent('Join #general');
     expect(screen.getByLabelText(/nick/i)).toHaveValue('yuki');
-    expect(screen.getByLabelText(/channel/i)).toHaveValue('#general');
+    expect(roomField()).toHaveValue('#general');
   });
 
   it('queues the invite room when connecting with the suggested guest nick', async () => {
@@ -1619,7 +1623,7 @@ describe('optional room to join (no autojoin)', () => {
 
     render(() => <Connect />);
     expect(screen.getByRole('note', { name: /invite preview/i })).toHaveTextContent('Join &ops');
-    expect(screen.getByLabelText(/channel/i)).toHaveValue('&ops');
+    expect(roomField()).toHaveValue('&ops');
     fireEvent.click(screen.getByTestId('conn-submit'));
 
     await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
@@ -1649,6 +1653,6 @@ describe('optional room to join (no autojoin)', () => {
     render(() => <Connect />);
 
     expect(screen.getByLabelText(/nick/i)).toHaveValue('');
-    expect(screen.getByLabelText(/channel/i)).toHaveValue('#general');
+    expect(roomField()).toHaveValue('#general');
   });
 });
