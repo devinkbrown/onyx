@@ -5,7 +5,8 @@
  * This is a control-plane lifecycle/orchestration seam. It never mints a
  * placeholder GroupSession, persists room keys, encrypts messages, or exposes
  * control payloads. Authenticated genesis bootstrap may privately register a
- * session created from a verified commit+welcome pair; activation stays HOLD.
+ * session created from a verified commit+welcome pair; activation becomes
+ * `active` once lifecycle is `ready` and a room is control-applied + provisioned.
  */
 
 import type { IRCMessage } from '@/lib/irc/types';
@@ -783,7 +784,18 @@ function buildRuntime(
     sessions.set(room, session);
     reanchorRequests.delete(room);
     setRoom(room, 'control-applied', Number(session.epoch));
+    if (lifecycle === 'recovery-required') {
+      lifecycle = 'ready';
+      replayRetries();
+      notify();
+    }
     return true;
+  }
+
+  function roomAwaitingRecovery(): boolean {
+    return [...rooms.values()].some((entry) => (
+      !(entry.status === 'control-applied' && entry.provisioned)
+    ));
   }
 
   function createAdapter(boundSession: GroupSession | null, ticket?: BootstrapTicket): GroupControlSessionAdapter | null {
@@ -1722,9 +1734,14 @@ function buildRuntime(
       entry.status === 'control-applied' && entry.provisioned
     ));
     if (!hasAppliedSession) {
-      lifecycle = 'recovery-required';
+      if (roomAwaitingRecovery()) {
+        lifecycle = 'recovery-required';
+        notify();
+        return false;
+      }
+      lifecycle = 'ready';
       notify();
-      return false;
+      return true;
     }
     lifecycle = 'ready';
     replayRetries();

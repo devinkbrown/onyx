@@ -3,7 +3,7 @@
  * Store-owned lifecycle bridge for inbound group-control observation.
  *
  * The mutable integration never enters Zustand.  This owner publishes only the
- * runtime's safe metadata snapshot and deliberately keeps activation held.
+ * runtime's safe metadata snapshot, including truthful activation state.
  */
 
 import type { IRCMessage } from '@/lib/irc/types';

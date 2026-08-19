@@ -1,8 +1,9 @@
 # Group E2EE (Era 3 C1) — control payload
 
-**Status:** revision-3 control lifecycle and required-room message seal/open are
-product-wired; persistent recovery and production dual-node acceptance remain
-on activation hold.
+**Status:** revision-3 control lifecycle, required-room message seal/open, and
+truthful activation (`hold` → `active` after verified genesis bootstrap) are
+product-wired; persistent higher-epoch recovery and production dual-node
+acceptance remain incomplete.
 
 This document defines the current **versioned client payload** that rides the
 opaque `E2EEGROUP` trailing parameter. It is an Onyx in-house control format.

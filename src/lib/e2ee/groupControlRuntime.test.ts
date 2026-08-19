@@ -383,6 +383,20 @@ describe('Packet-B group-control runtime', () => {
     await runtime.destroy();
   });
 
+  it('stays ready through connect recovery and activates after genesis bootstrap', async () => {
+    const value = await fixture();
+    const runtime = runtimeFor(value);
+    expect(runtime.state.lifecycle).toBe('ready');
+    expect(runtime.markRecovered()).toBe(true);
+    expect(runtime.state.lifecycle).toBe('ready');
+    await completeGenesis(runtime, value);
+    await waitGenesisApplied(runtime);
+    expect(runtime.state.activation).toBe('active');
+    const sealed = await runtime.sealRoomMessage('#room', 'live after connect');
+    expect(sealed).toMatchObject({ ok: true, status: 'sealed', room: '#room' });
+    await runtime.destroy();
+  });
+
   it('applies a genesis pair exactly once and does not double-apply on the same session', async () => {
     const value = await fixture();
     let directoryCalls = 0;
@@ -780,8 +794,8 @@ describe('Packet-B group-control runtime', () => {
     expect(reconnecting.state.lifecycle).toBe('recovery-required');
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(reconnecting.state.lifecycle).toBe('recovery-required');
-    expect(reconnecting.markRecovered()).toBe(false);
-    expect(reconnecting.state.lifecycle).toBe('recovery-required');
+    expect(reconnecting.markRecovered()).toBe(true);
+    expect(reconnecting.state.lifecycle).toBe('ready');
     await reconnecting.destroy();
   });
 
