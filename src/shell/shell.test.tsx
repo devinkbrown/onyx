@@ -1889,6 +1889,10 @@ describe('AppShell', () => {
       const desk = screen.getByRole('dialog', { name: 'Room controls for #general' });
       expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).toBeNull();
       expect(within(desk).getByRole('heading', { name: '#general' })).toBeInTheDocument();
+      expect(within(desk).getByTestId('mobile-room-ledger')).toHaveAttribute(
+        'href',
+        '/stats/?room=%23general',
+      );
       expect(within(desk).getByTestId('moderation-cockpit')).toBeInTheDocument();
       await waitFor(() => {
         expect(within(desk).getByRole('button', { name: 'Back' })).toHaveFocus();

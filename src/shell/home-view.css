@@ -370,6 +370,30 @@
   display: grid;
   gap: 8px;
 }
+.home-event-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+.home-event-ledger {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+.home-event-ledger:hover,
+.home-event-ledger:focus-visible {
+  color: var(--paper);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
 .home-event {
   width: 100%;
   min-height: 68px;

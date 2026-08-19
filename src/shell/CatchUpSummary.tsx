@@ -20,6 +20,7 @@ import './catch-up-summary.css';
 import { createMemo, createSignal, For, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 
 import { getState, useStore } from '@/lib/store';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { formatRelative } from '@/lib/time/relativeTime';
 import {
   catchUpTotals,
@@ -137,6 +138,16 @@ export function CatchUpSummary(props: CatchUpSummaryProps): JSX.Element {
                         </span>
                       </span>
                     </button>
+                    <Show when={row.kind === 'channel' && /^[#&]/.test(row.target.trim())}>
+                      <a
+                        class="catchup-ledger shell-ribbon-stats"
+                        href={statsRoomHref(row.target)}
+                        aria-label={`Channel ledger for ${row.target}`}
+                        data-testid="catchup-channel-ledger"
+                      >
+                        Ledger
+                      </a>
+                    </Show>
                   </li>
                 );
               }}

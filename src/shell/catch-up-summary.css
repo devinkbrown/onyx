@@ -47,6 +47,15 @@
 
 .catchup-item {
   margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1);
+  align-items: stretch;
+}
+
+.catchup-ledger {
+  align-self: center;
+  white-space: nowrap;
 }
 
 .catchup-row {

@@ -385,6 +385,24 @@ describe('HomeBriefingView — presentation contract', () => {
     expect(screen.getByRole('link', { name: 'Channel ledger' })).toHaveAttribute('href', '/stats/');
   });
 
+  it('links live scheduled events to the public channel ledger', () => {
+    renderView({
+      briefing: briefing({
+        liveCall: null,
+        scheduledEvents: [{
+          channel: '#standup',
+          at: Math.floor(NOW / 1000),
+          title: 'Daily standup',
+          live: true,
+        }],
+      }),
+    });
+    expect(screen.getByTestId('home-event-ledger')).toHaveAttribute(
+      'href',
+      '/stats/?room=%23standup',
+    );
+  });
+
   it('links the network pulse to the public channel ledger', () => {
     renderView({
       more: more({

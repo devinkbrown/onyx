@@ -107,6 +107,7 @@ import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { MessageSearch } from './search/MessageSearch';
 import { closeMessageSearch, openMessageSearch } from './search/useMessageSearch';
 import { channelIdentityTarget, roomIdentityForTarget, type RoomIdentity } from './roomIdentity';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import {
   forcedColors,
   prefersMoreContrast,
@@ -1344,7 +1345,19 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                   >Back</button>
                   <div>
                     <p class="shell-mobile-more-sheet__title">Room control desk</p>
-                    <h2>{(activeView() as { channel: string }).channel}</h2>
+                    <div class="shell-mobile-more-sheet__room-title">
+                      <h2>{(activeView() as { channel: string }).channel}</h2>
+                      <Show when={/^[#&]/.test((activeView() as { channel: string }).channel.trim())}>
+                        <a
+                          class="shell-mobile-more-sheet__ledger shell-ribbon-stats"
+                          href={statsRoomHref((activeView() as { channel: string }).channel)}
+                          aria-label={`Channel ledger for ${(activeView() as { channel: string }).channel}`}
+                          data-testid="mobile-room-ledger"
+                        >
+                          Ledger
+                        </a>
+                      </Show>
+                    </div>
                   </div>
                   <button type="button" class="shell-mobile-more-sheet__close" onClick={closeMobileMore}>Close</button>
                 </header>

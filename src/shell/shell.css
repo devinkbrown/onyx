@@ -6646,7 +6646,16 @@
     background: color-mix(in oklab, var(--surface-raised) 96%, var(--ink));
   }
   .shell-mobile-more-sheet__room-head .shell-mobile-more-sheet__title { margin: 0; }
+  .shell-mobile-more-sheet__room-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .shell-mobile-more-sheet__room-title h2,
   .shell-mobile-more-sheet__room-head h2 { margin: 2px 0 0; overflow: hidden; color: var(--paper); font: 700 var(--text-md)/1.2 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+  .shell-mobile-more-sheet__ledger { align-self: center; white-space: nowrap; }
   .shell-mobile-more-sheet > button,
   .shell-mobile-more-sheet__room-head > button { min-height: 44px; padding: 8px 10px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--paper); font: 650 var(--text-md)/1 var(--font-sans); text-align: left; cursor: pointer; }
   .shell-mobile-more-sheet > button:hover,

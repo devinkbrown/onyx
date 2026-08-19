@@ -222,22 +222,34 @@ function LiveSlotButton(props: {
       }
     >
       {(event) => (
-        <button
-          type="button"
-          class={`home-event${event().live ? ' is-live' : ''}`}
-          onClick={() => props.onEvent(event())}
-          aria-label={`Open ${event().channel} for ${event().title}, ${eventCountdown(event(), props.nowMs)}`}
-        >
-          <span class="home-event-time">
-            <span class="home-event-state">{event().live ? 'live' : eventCountdown(event(), props.nowMs)}</span>
-            <span>{eventWhenLabel(event())}</span>
-          </span>
-          <span class="home-event-main">
-            <span class="home-event-title">{event().title}</span>
-            <span class="home-event-channel">{event().channel}</span>
-          </span>
-          <span class="home-event-open" aria-hidden="true">Open →</span>
-        </button>
+        <div class="home-event-row">
+          <button
+            type="button"
+            class={`home-event${event().live ? ' is-live' : ''}`}
+            onClick={() => props.onEvent(event())}
+            aria-label={`Open ${event().channel} for ${event().title}, ${eventCountdown(event(), props.nowMs)}`}
+          >
+            <span class="home-event-time">
+              <span class="home-event-state">{event().live ? 'live' : eventCountdown(event(), props.nowMs)}</span>
+              <span>{eventWhenLabel(event())}</span>
+            </span>
+            <span class="home-event-main">
+              <span class="home-event-title">{event().title}</span>
+              <span class="home-event-channel">{event().channel}</span>
+            </span>
+            <span class="home-event-open" aria-hidden="true">Open →</span>
+          </button>
+          <Show when={/^[#&]/.test(event().channel.trim())}>
+            <a
+              class="home-event-ledger"
+              href={statsRoomHref(event().channel)}
+              aria-label={`Channel ledger for ${event().channel}`}
+              data-testid="home-event-ledger"
+            >
+              Ledger
+            </a>
+          </Show>
+        </div>
       )}
     </Show>
   );
