@@ -67,9 +67,29 @@ describe('PinnedMessages accessibility', () => {
 
     expect(screen.getByRole('dialog', { name: 'Pinned messages' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Pinned messages in #room' })).toBeInTheDocument();
+    expect(screen.getByTestId('pins-channel-ledger')).toHaveAttribute(
+      'href',
+      '/stats/?room=%23room',
+    );
+    expect(screen.getByRole('link', { name: 'Channel ledger for #room' })).toHaveTextContent(
+      'Channel ledger',
+    );
     expect(screen.getByRole('button', {
       name: 'Jump to pinned message from alice: Keep this near the top.',
     })).toBeInTheDocument();
+  });
+
+  it('omits the channel ledger link outside hash/ampersand channels', () => {
+    store.setState({
+      ...initialState,
+      showPinnedMessages: true,
+      activeView: { kind: 'channel', channel: 'general' },
+      channels: new Map([['general', channel([])]]),
+    }, true);
+
+    render(() => <PinnedMessages />);
+
+    expect(screen.queryByTestId('pins-channel-ledger')).toBeNull();
   });
 
   it('exposes a real target-specific unpin action for ops', () => {

@@ -18,6 +18,7 @@ import {
 } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import { PinIcon } from '@/shell/message/icons';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import './pinned-messages.css';
 
 /** Stable empty fallbacks so useStore equality does not thrash when there is
@@ -55,6 +56,12 @@ export function PinnedMessages(): JSX.Element {
   const channel = createMemo(() => {
     const v = activeView();
     return v.kind === 'channel' ? v.channel : null;
+  });
+
+  const channelLedger = createMemo(() => {
+    const ch = channel();
+    if (!ch || !/^[#&]/.test(ch.trim())) return null;
+    return { channel: ch, href: statsRoomHref(ch) };
   });
 
   const canManage = useStore((s) => {
@@ -129,6 +136,18 @@ export function PinnedMessages(): JSX.Element {
       closeLabel="Close pinned messages"
     >
       <div class="pins-panel" data-testid="pinned-messages">
+        <Show when={channelLedger()}>
+          {(ledger) => (
+            <a
+              class="pins-ledger shell-ribbon-stats"
+              href={ledger().href}
+              aria-label={`Channel ledger for ${ledger().channel}`}
+              data-testid="pins-channel-ledger"
+            >
+              Channel ledger
+            </a>
+          )}
+        </Show>
         <Show
           when={pinIds().length > 0}
           fallback={
