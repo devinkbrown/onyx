@@ -9,6 +9,7 @@
  */
 import { createMemo, For, Show, splitProps, type JSX } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Avatar, Sheet } from '@/primitives';
 import './whois-sheet.css';
 
@@ -157,7 +158,24 @@ export function WhoisSheet(props: WhoisSheetProps): JSX.Element {
             <Show when={(info()?.channels?.length ?? 0) > 0}>
               <WhoisField label="Channels">
                 <ul class="shell-whois-channels" aria-label={`Channels shared with ${nick() ?? 'member'}`}>
-                  <For each={info()?.channels ?? []}>{(channel) => <li>{channel}</li>}</For>
+                  <For each={info()?.channels ?? []}>
+                    {(channel) => (
+                      <li>
+                        <Show
+                          when={/^[#&]/.test(channel.trim())}
+                          fallback={channel}
+                        >
+                          <a
+                            href={statsRoomHref(channel)}
+                            aria-label={`Channel ledger for ${channel}`}
+                            data-testid="whois-channel-ledger"
+                          >
+                            {channel}
+                          </a>
+                        </Show>
+                      </li>
+                    )}
+                  </For>
                 </ul>
               </WhoisField>
             </Show>
