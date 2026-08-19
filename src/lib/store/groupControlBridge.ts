@@ -65,6 +65,7 @@ export type GroupControlBridge = Readonly<{
   setAuthenticatedAccount(account: string | null): Promise<boolean>;
   onRoomPart(room: string): void;
   onRoomKick(room: string): void;
+  requestCurrentEpochWelcome(room: string, payload: string): Promise<{ ok: true; room: string; epoch: number } | { ok: false; reason: string }>;
   sealRoomMessage(room: string, plaintext: string): Promise<GroupControlRuntimeSealResult>;
   openRoomMessage(room: string, envelope: string): Promise<GroupControlRuntimeOpenResult>;
   destroy(): Promise<void>;
@@ -261,6 +262,10 @@ export function createGroupControlBridge(options: GroupControlBridgeOptions): Gr
     },
     onRoomKick(room) {
       if (!destroyed && options.isCurrent()) integration.onRoomKick(room);
+    },
+    requestCurrentEpochWelcome(room, payload) {
+      if (destroyed || !options.isCurrent()) return Promise.resolve({ ok: false, reason: 'runtime-inactive' });
+      return integration.requestCurrentEpochWelcome(room, payload);
     },
     async sealRoomMessage(room, plaintext) {
       if (destroyed || !options.isCurrent()) return { ok: false, status: 'locked', reason: 'runtime-inactive' };

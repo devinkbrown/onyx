@@ -92,6 +92,10 @@ export type GroupSessionBootstrapInput = {
   signal?: AbortSignal;
 };
 
+export type GroupSessionBootstrapEpochInput = GroupSessionBootstrapInput & {
+  expectedEpoch: bigint | number;
+};
+
 export type GroupSessionBootstrapResult =
   | { ok: true; session: GroupSession; epoch: bigint; commitHash: Uint8Array; commitId: Uint8Array }
   | { ok: false; reason: GroupSessionApplyFailure };
@@ -351,6 +355,178 @@ export class GroupSession {
         ok: true,
         session,
         epoch: 1n,
+        commitHash: copy(hash),
+        commitId: copy(record.commitId),
+      };
+    } finally {
+      commitContext?.fill(0);
+      welcomeContext?.fill(0);
+      resolutionBodyDigest?.fill(0);
+      expectedCommitment?.fill(0);
+      hash?.fill(0);
+      snapshot.commitId.fill(0);
+      snapshot.membershipDigest.fill(0);
+      snapshot.epochKey.fill(0);
+      snapshot.context.fill(0);
+      snapshot.bodyDigest.fill(0);
+    }
+  }
+
+  /**
+   * Authenticated re-anchor factory for a caller-selected epoch.
+   *
+   * This is fail-closed and accepts only one verified, commitment-bound
+   * commit/welcome pair whose epoch exactly matches `expectedEpoch`.
+   */
+  static async bootstrapVerifiedEpoch(
+    input: GroupSessionBootstrapEpochInput,
+  ): Promise<GroupSessionBootstrapResult> {
+    const snapshot = consumeOpenedGroupWelcome(input.opened);
+    if (!snapshot) return { ok: false, reason: 'invalid-welcome' };
+    const expectedEpoch = asU64(input.expectedEpoch);
+    if (expectedEpoch === null || expectedEpoch < 1n) {
+      snapshot.commitId.fill(0);
+      snapshot.membershipDigest.fill(0);
+      snapshot.epochKey.fill(0);
+      snapshot.context.fill(0);
+      snapshot.bodyDigest.fill(0);
+      return { ok: false, reason: 'welcome-epoch-mismatch' };
+    }
+    let commitContext: Uint8Array | null = null;
+    let welcomeContext: Uint8Array | null = null;
+    let resolutionBodyDigest: Uint8Array | null = null;
+    let expectedCommitment: Uint8Array | null = null;
+    let hash: Uint8Array | null = null;
+    try {
+      if (input.signal?.aborted) return { ok: false, reason: 'destroyed' };
+      const room = normalizeGroupRoom(input.room);
+      const account = canonicalAccount(input.account);
+      if (!room || !account || !validDevice(input.deviceId)) {
+        return { ok: false, reason: 'welcome-target-mismatch' };
+      }
+
+      const welcomeResolution = input.welcomeResolution;
+      if (welcomeResolution.status !== 'verified') {
+        return { ok: false, reason: welcomeResolution.reason === 'legacy-ogc1' ? 'legacy-ogc1' : 'unverified-control' };
+      }
+      if (welcomeResolution.parts.version !== 2 || welcomeResolution.parts.diagnosticOnly
+        || welcomeResolution.parts.kind !== 'welcome') {
+        return { ok: false, reason: welcomeResolution.parts.version !== 2 || welcomeResolution.parts.diagnosticOnly ? 'legacy-ogc1' : 'unverified-control' };
+      }
+      const welcomeRoute = normalizeGroupControlRouting(input.welcomeRouting);
+      if (!welcomeRoute || welcomeRoute.kind !== 'welcome') return { ok: false, reason: 'invalid-welcome' };
+      if (welcomeRoute.channel !== room
+        || welcomeRoute.toAccount?.trim().toLowerCase() !== account
+        || welcomeRoute.toDevice !== input.deviceId) {
+        return { ok: false, reason: 'welcome-target-mismatch' };
+      }
+      if (welcomeResolution.account !== welcomeRoute.fromAccount
+        || welcomeResolution.deviceId !== welcomeRoute.fromDevice) {
+        return { ok: false, reason: 'committer-mismatch' };
+      }
+      if (snapshot.epoch < 1n || snapshot.commitId.byteLength !== 32 || !nonZero(snapshot.commitId)
+        || snapshot.membershipDigest.byteLength !== 32 || !nonZero(snapshot.membershipDigest)
+        || snapshot.epochKey.byteLength !== GROUP_SESSION_KEY_BYTES || !nonZero(snapshot.epochKey)
+        || snapshot.bodyDigest.byteLength !== 32 || !nonZero(snapshot.bodyDigest)) {
+        return { ok: false, reason: 'welcome-target-mismatch' };
+      }
+      resolutionBodyDigest = await hashGroupWelcomeBody(welcomeResolution.parts.body);
+      if (!resolutionBodyDigest || !equalBytes(snapshot.bodyDigest, resolutionBodyDigest)) {
+        return { ok: false, reason: 'welcome-target-mismatch' };
+      }
+      if (input.signal?.aborted) return { ok: false, reason: 'destroyed' };
+      welcomeContext = buildGroupWelcomeContext({
+        room,
+        fromAccount: welcomeRoute.fromAccount,
+        fromDevice: welcomeRoute.fromDevice,
+        toAccount: welcomeRoute.toAccount!,
+        toDevice: welcomeRoute.toDevice!,
+        epoch: snapshot.epoch,
+        commitId: snapshot.commitId,
+      });
+      if (!welcomeContext || !equalBytes(welcomeContext, snapshot.context)) {
+        return { ok: false, reason: 'welcome-target-mismatch' };
+      }
+      if (BigInt(welcomeResolution.parts.epoch) !== snapshot.epoch || snapshot.epoch !== expectedEpoch) {
+        return { ok: false, reason: 'welcome-epoch-mismatch' };
+      }
+
+      const commitResolution = input.commitResolution;
+      if (commitResolution.status !== 'verified') {
+        return { ok: false, reason: commitResolution.reason === 'legacy-ogc1' ? 'legacy-ogc1' : 'unverified-control' };
+      }
+      if (commitResolution.parts.version !== 2 || commitResolution.parts.diagnosticOnly
+        || commitResolution.parts.kind !== 'commit') {
+        return { ok: false, reason: commitResolution.parts.version !== 2 || commitResolution.parts.diagnosticOnly ? 'legacy-ogc1' : 'unverified-control' };
+      }
+      const commitRoute = normalizeGroupControlRouting(input.commitRouting);
+      if (!commitRoute || commitRoute.kind !== 'commit') return { ok: false, reason: 'invalid-commit' };
+      if (commitRoute.channel !== room) return { ok: false, reason: 'room-mismatch' };
+      if (commitResolution.account !== commitRoute.fromAccount
+        || commitResolution.deviceId !== commitRoute.fromDevice) {
+        return { ok: false, reason: 'committer-mismatch' };
+      }
+      if (commitRoute.fromAccount !== welcomeRoute.fromAccount
+        || commitRoute.fromDevice !== welcomeRoute.fromDevice) {
+        return { ok: false, reason: 'welcome-target-mismatch' };
+      }
+
+      const rawBody = commitResolution.parts.body;
+      const record = decodeGroupCommit(rawBody) ?? decodeGroupCommit(new TextDecoder().decode(rawBody));
+      if (!record) return { ok: false, reason: 'invalid-commit' };
+      if (BigInt(commitResolution.parts.epoch) !== record.nextEpoch) return { ok: false, reason: 'invalid-commit' };
+      if (record.nextEpoch !== snapshot.epoch || record.nextEpoch !== expectedEpoch
+        || !equalBytes(record.commitId, snapshot.commitId)
+        || !equalBytes(record.membershipDigest, snapshot.membershipDigest)) {
+        return { ok: false, reason: 'stale-epoch' };
+      }
+      if (record.priorEpoch + 1n !== expectedEpoch) return { ok: false, reason: 'epoch-gap' };
+      if (expectedEpoch === 1n) {
+        if (record.priorEpoch !== 0n) return { ok: false, reason: 'epoch-gap' };
+        if (nonZero(record.priorCommitHash)) return { ok: false, reason: 'prior-hash-mismatch' };
+      } else if (!nonZero(record.priorCommitHash)) {
+        return { ok: false, reason: 'prior-hash-mismatch' };
+      }
+
+      commitContext = buildGroupCommitContext({
+        room,
+        fromAccount: commitRoute.fromAccount,
+        fromDevice: commitRoute.fromDevice,
+        priorEpoch: record.priorEpoch,
+        nextEpoch: record.nextEpoch,
+        commitId: record.commitId,
+      });
+      if (!commitContext) return { ok: false, reason: 'invalid-commit' };
+      hash = await hashGroupCommit(record, commitContext);
+      if (!hash) return { ok: false, reason: 'invalid-commit' };
+      if (input.signal?.aborted) return { ok: false, reason: 'destroyed' };
+
+      expectedCommitment = await computeGroupEpochKeyCommitment({
+        room,
+        nextEpoch: record.nextEpoch,
+        commitId: record.commitId,
+        membershipDigest: record.membershipDigest,
+        epochKey: snapshot.epochKey,
+      });
+      if (!expectedCommitment || !equalBytes(expectedCommitment, record.newEpochKeyCommitment)) {
+        return { ok: false, reason: 'welcome-mismatch' };
+      }
+      if (input.signal?.aborted) return { ok: false, reason: 'destroyed' };
+
+      const session = new GroupSession({
+        room,
+        account,
+        deviceId: input.deviceId,
+        epoch: expectedEpoch,
+        epochKey: snapshot.epochKey,
+        membershipDigest: record.membershipDigest,
+        commitHash: hash,
+      });
+      session.rememberCommit(record, hash);
+      return {
+        ok: true,
+        session,
+        epoch: expectedEpoch,
         commitHash: copy(hash),
         commitId: copy(record.commitId),
       };

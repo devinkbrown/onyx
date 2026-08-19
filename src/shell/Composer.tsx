@@ -26,6 +26,7 @@ import {
 import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import { useStore, getState, setState, selectDeviceMemoryOwner, selectOwnedScheduledMessageCount } from '@/lib/store';
 import { searchEmojis } from '@/lib/emoji/emoji';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import {
   completeSlashCommand,
   expandSlashTextCommand,
@@ -1450,7 +1451,7 @@ export function Composer(props: ComposerProps): JSX.Element {
             aria-label="More tools"
             aria-haspopup="dialog"
             aria-expanded={toolsOpen()}
-            aria-controls="shell-composer-tools"
+            aria-controls={toolsOpen() ? 'shell-composer-tools' : undefined}
             title="More tools"
             onClick={() => toggleTools()}
           >
@@ -1529,6 +1530,23 @@ export function Composer(props: ComposerProps): JSX.Element {
                   Open the conversation at a day you choose.
                 </span>
               </button>
+
+              <Show when={activeView().kind === 'channel' && target()}>
+                {(channel) => (
+                  <a
+                    class="shell-composer-tools-item shell-composer-tools-ledger"
+                    href={statsRoomHref(channel())}
+                    aria-label={`Channel ledger for ${channel()}`}
+                    data-testid="composer-channel-ledger"
+                    onClick={() => setToolsOpen(false)}
+                  >
+                    <span class="shell-composer-tools-item-title">Channel ledger</span>
+                    <span class="shell-composer-tools-item-desc">
+                      Public room pulse for {channel()}.
+                    </span>
+                  </a>
+                )}
+              </Show>
 
               <div class="shell-composer-tools-tip" role="note">
                 <p class="shell-composer-tools-item-title">Slash commands</p>

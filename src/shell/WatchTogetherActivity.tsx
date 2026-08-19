@@ -792,7 +792,7 @@ export function WatchTogetherActivity(): JSX.Element {
             class="shell-watch-start__launcher"
             aria-label="Start watch activity"
             aria-expanded={startEditorOpen()}
-            aria-controls="watch-start-editor"
+            aria-controls={startEditorOpen() ? 'watch-start-editor' : undefined}
             onClick={() => startEditorOpen() ? onCloseStartEditor() : onOpenStartEditor()}
           >
             <span class="shell-watch-start__cue" aria-hidden="true">▶</span>
@@ -999,7 +999,7 @@ export function WatchTogetherActivity(): JSX.Element {
             class="shell-watch-together__ctl"
             aria-label={rosterButtonLabel()}
             aria-expanded={rosterOpen()}
-            aria-controls="watch-participant-roster"
+            aria-controls={rosterOpen() ? 'watch-participant-roster' : undefined}
             onClick={() => setRosterOpen((open) => !open)}
             onKeyDown={onRosterKeyDown}
             data-testid="watch-roster-toggle"

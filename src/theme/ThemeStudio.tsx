@@ -1841,27 +1841,21 @@ const STUDIO_CSS = `
   color: var(--lapis-bright);
   border-color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis-deep) 32%, var(--stone));
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
-    0 0 22px -14px var(--lapis-bright);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent);
   transform: none;
   animation: ts-seed-copied-flash var(--dur) var(--ease);
 }
 @keyframes ts-seed-copied-flash {
   0% {
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
-      0 0 0 0 color-mix(in oklab, var(--lapis-bright) 55%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent);
   }
   60% {
     box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
+      inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent),
       0 0 0 4px color-mix(in oklab, var(--lapis-bright) 20%, transparent);
   }
   100% {
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
-      0 0 22px -14px var(--lapis-bright);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent);
   }
 }
 @media (prefers-reduced-motion: reduce) {

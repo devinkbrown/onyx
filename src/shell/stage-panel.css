@@ -166,9 +166,8 @@
   line-height: var(--leading-body, 1.55);
   color: var(--paper-mute, var(--muted, #9aa3b2));
   border: 1px solid var(--seam-faint, var(--line));
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 36%, transparent);
-  border-left: 2px solid color-mix(in oklab, var(--lapis) 36%, var(--stone-line, transparent));
+  border-radius: 2px;
+  background: transparent;
 }
 
 .room-insights__metrics {

@@ -370,4 +370,38 @@ describe('HomeBriefingView — presentation contract', () => {
     }));
     expect(markAllCaughtUp).toHaveBeenCalledOnce();
   });
+
+  it('links quiet rooms to the public channel ledger', () => {
+    renderView({
+      more: more({
+        hasContent: true,
+        quietActivity: [{ name: '#quiet', topic: 'still here', lastActivity: NOW - 60_000 }],
+      }),
+    });
+    expect(screen.getByRole('link', { name: 'Channel ledger for #quiet' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23quiet',
+    );
+    expect(screen.getByRole('link', { name: 'Channel ledger' })).toHaveAttribute('href', '/stats/');
+  });
+
+  it('links the network pulse to the public channel ledger', () => {
+    renderView({
+      more: more({
+        hasContent: true,
+        totalMessages: 12,
+        stats: {
+          generated_at: Math.floor(NOW / 1000),
+          network: 'Onyx',
+          node: 'test',
+          users_online: 4,
+          network_days: [],
+          channels: [],
+          network_days_complete: true,
+          channels_complete: true,
+        },
+      }),
+    });
+    expect(screen.getByRole('link', { name: 'Channel ledger' })).toHaveAttribute('href', '/stats/');
+  });
 });

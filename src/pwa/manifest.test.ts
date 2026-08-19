@@ -414,6 +414,125 @@ describe('PWA manifest', () => {
     expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('TSUMUGI1');
     expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('ciphertext');
 
+    // Era 3 C2 multi-device DM envelopes must redact exactly like ONYXDM1.
+    pushWork = undefined;
+    showNotification.mockClear();
+    push!({
+      data: {
+        json: () => ({
+          type: 'dm',
+          from: 'Bob',
+          text: 'ONYXDMN1 multi_device_ciphertext_must_not_leak',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith('Message from Bob', expect.objectContaining({
+      body: 'New encrypted message',
+    }));
+    expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('ciphertext');
+
+    // Leading whitespace must not defeat ONYXDMN1 redaction either.
+    pushWork = undefined;
+    showNotification.mockClear();
+    push!({
+      data: {
+        json: () => ({
+          type: 'dm',
+          from: 'Bob',
+          text: '\n  ONYXDMN1 padded_multi_device_ciphertext_must_not_leak',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith('Message from Bob', expect.objectContaining({
+      body: 'New encrypted message',
+    }));
+    expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('ciphertext');
+
+    // Room envelopes can arrive in mention payloads and must fail closed.
+    pushWork = undefined;
+    showNotification.mockClear();
+    push!({
+      data: {
+        json: () => ({
+          type: 'mention',
+          from: 'Carol',
+          channel: '#root',
+          text: 'ONYXROOM1 room_ciphertext_must_not_leak',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith(
+      'Carol mentioned you in #root',
+      expect.objectContaining({ body: 'New encrypted message' }),
+    );
+    expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('ciphertext');
+
+    // Leading whitespace must not defeat ONYXROOM1 mention redaction.
+    pushWork = undefined;
+    showNotification.mockClear();
+    push!({
+      data: {
+        json: () => ({
+          type: 'mention',
+          from: 'Carol',
+          channel: '#root',
+          text: ' \tONYXROOM1 padded_room_ciphertext_must_not_leak',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith(
+      'Carol mentioned you in #root',
+      expect.objectContaining({ body: 'New encrypted message' }),
+    );
+    expect(JSON.stringify(showNotification.mock.calls.at(-1))).not.toContain('ciphertext');
+
+    // Near-prefix and malformed non-envelopes must stay plaintext on the SW path.
+    for (const [from, text] of [
+      ['Eve', 'ONYXDM1'],
+      ['Eve', 'ONYXDMN1'],
+      ['Eve', 'ONYXROOM1'],
+      ['Eve', 'talking about ONYXDM1 offline'],
+      ['Eve', 'talking about ONYXDMN1 offline'],
+      ['Eve', 'talking about ONYXROOM1 offline'],
+      ['Eve', 'onyxdm1 ciphertext_must_remain_visible_when_not_an_envelope'],
+      ['Eve', 'ONYXDM1X not-an-envelope'],
+    ] as const) {
+      pushWork = undefined;
+      showNotification.mockClear();
+      push!({
+        data: {
+          json: () => ({
+            type: 'dm',
+            from,
+            text,
+          }),
+        },
+        waitUntil: (work: Promise<unknown>) => {
+          pushWork = work;
+        },
+      });
+      await pushWork;
+      expect(showNotification).toHaveBeenLastCalledWith(`Message from ${from}`, expect.objectContaining({
+        body: text,
+      }));
+    }
+
     // Era 3 C3: mention + call push types
     pushWork = undefined;
     showNotification.mockClear();

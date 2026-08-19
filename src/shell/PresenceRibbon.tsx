@@ -23,6 +23,7 @@ import { openPreferences } from '@/lib/prefs/preferences';
 import { channelNotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Popover } from '@/primitives/index';
 import { ChannelSettings } from './ChannelSettings';
 import { ChannelNotifyControl } from './ChannelNotifyControl';
@@ -234,12 +235,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   });
 
   /**
-   * People `aria-pressed` tracks the *actual* open surface (desktop column or
-   * mobile drawer). AppShell passes `membersVisible()` via membersOpen.
-   * Invariant: empty roster can never show pressed, even if membersOpen is true.
+   * People `aria-expanded` tracks the *actual* open surface (desktop column or
+   * mobile drawer). AppShell passes `membersVisible()` via membersOpen. This
+   * must mirror the real surface state regardless of roster size — a channel
+   * whose roster hasn't landed yet (JOIN before the 353 NAMES burst) can still
+   * open the member drawer, and the trigger must not lie about that.
    */
-  const membersPressed = createMemo(() => {
-    if (memberCount() === 0) return false;
+  const membersExpanded = createMemo(() => {
     if (local.membersOpen !== undefined) return !!local.membersOpen;
     return !!showMemberList();
   });
@@ -448,10 +450,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     action();
   }
 
-  function moreMenuItems(): HTMLButtonElement[] {
+  function moreMenuItems(): HTMLElement[] {
     if (!moreMenuRef) return [];
     // Multiple section menus share one roving set across the More panel.
-    return Array.from(moreMenuRef.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    return Array.from(moreMenuRef.querySelectorAll<HTMLElement>('[role="menuitem"]'));
   }
 
   function focusMoreMenuItem(index: number): void {
@@ -464,7 +466,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   function onMoreMenuKeyDown(event: KeyboardEvent): void {
     const items = moreMenuItems();
     if (items.length === 0) return;
-    const current = items.indexOf(event.currentTarget as HTMLButtonElement);
+    const current = items.indexOf(event.currentTarget as HTMLElement);
     if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
       event.preventDefault();
       focusMoreMenuItem(current < 0 ? 0 : current + 1);
@@ -703,8 +705,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               type="button"
               class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-members"
               aria-label={`${memberCount()} members — toggle member list`}
-              aria-pressed={membersPressed()}
-              aria-expanded={membersPressed()}
+              aria-expanded={membersExpanded()}
               data-testid="ribbon-members"
               onClick={handleMembersClick}
             >
@@ -822,6 +823,25 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       </svg>
                       <span>Channel settings</span>
                     </button>
+                    <a
+                      class="shell-ribbon-more-item"
+                      role="menuitem"
+                      href={statsRoomHref(settingsChannel()!)}
+                      aria-label={`Channel ledger for ${settingsChannel()}`}
+                      data-testid="ribbon-channel-ledger"
+                      onClick={() => setMoreOpen(false)}
+                      onKeyDown={onMoreMenuKeyDown}
+                    >
+                      <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19V5" />
+                        <path d="M4 19h16" />
+                        <path d="M8 15v-4" />
+                        <path d="M12 15V7" />
+                        <path d="M16 15v-6" />
+                      </svg>
+                      <span>Channel ledger</span>
+                    </a>
                     <button
                       type="button"
                       class="shell-ribbon-more-item"

@@ -494,16 +494,20 @@ describe('WatchTogetherActivity accessibility', () => {
 
     const launcher = screen.getByRole('button', { name: 'Start watch activity' });
     expect(launcher).toHaveAttribute('aria-expanded', 'false');
-    expect(launcher).toHaveAttribute('aria-controls', 'watch-start-editor');
+    // #watch-start-editor is not mounted while collapsed — the IDREF must not dangle.
+    expect(launcher).not.toHaveAttribute('aria-controls');
     expect(screen.queryByRole('form', { name: 'Start watch activity' })).not.toBeInTheDocument();
 
     fireEvent.click(launcher);
 
     expect(launcher).toHaveAttribute('aria-expanded', 'true');
+    expect(launcher).toHaveAttribute('aria-controls', 'watch-start-editor');
     const dialog = screen.getByRole('dialog', { name: 'Start watch activity' });
     const form = screen.getByRole('form', { name: 'Start watch activity' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(launcher.closest('.shell-watch-start')).not.toContainElement(form);
+    // The referenced id must actually resolve to a mounted element.
+    expect(document.getElementById('watch-start-editor')).toBeInstanceOf(HTMLElement);
     await waitFor(() => {
       expect(screen.getByRole('textbox', { name: 'Activity title' })).toHaveFocus();
     });
@@ -512,6 +516,7 @@ describe('WatchTogetherActivity accessibility', () => {
 
     expect(screen.queryByRole('form', { name: 'Start watch activity' })).not.toBeInTheDocument();
     expect(launcher).toHaveAttribute('aria-expanded', 'false');
+    expect(launcher).not.toHaveAttribute('aria-controls');
     await waitFor(() => expect(launcher).toHaveFocus());
   });
 
@@ -892,17 +897,22 @@ describe('WatchTogetherActivity accessibility', () => {
     const toggle = screen.getByRole('button', { name: 'Show participants (1)' });
     expect(toggle.tagName).toBe('BUTTON');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveAttribute('aria-controls', 'watch-participant-roster');
+    // #watch-participant-roster is not mounted while collapsed — the IDREF must not dangle.
+    expect(toggle).not.toHaveAttribute('aria-controls');
     toggle.focus();
     fireEvent.keyDown(toggle, { key: 'Enter' });
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-controls', 'watch-participant-roster');
     expect(toggle).toHaveAccessibleName('Hide participants (1)');
     expect(screen.getByRole('region', { name: 'Watch participants (1)' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Participant roster' })).toBeInTheDocument();
+    // The referenced id must actually resolve to a mounted element.
+    expect(document.getElementById('watch-participant-roster')).toBeInstanceOf(HTMLElement);
 
     fireEvent.keyDown(toggle, { key: ' ' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).not.toHaveAttribute('aria-controls');
     expect(screen.queryByRole('region', { name: /Watch participants/ })).not.toBeInTheDocument();
   });
 

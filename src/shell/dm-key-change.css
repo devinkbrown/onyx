@@ -15,9 +15,7 @@
   border-radius: var(--r-md);
   /* Depth from light + translucency over the live canvas, not an opaque veil:
      a faint vermillion top glow fades into the deep-water body. */
-  background:
-    radial-gradient(120% 90% at 0% 0%, color-mix(in oklab, var(--shu) 14%, transparent), transparent 60%),
-    color-mix(in oklab, var(--stone) 88%, transparent);
+  background: color-mix(in oklab, var(--stone) 88%, transparent);
   overflow: hidden;
   /* Reveal communicates arrival; collapses to 0ms under reduced-motion via --dur. */
   animation: dm-keychange-in var(--dur) var(--ease);
@@ -34,7 +32,7 @@
   position: absolute;
   inset: 0 auto 0 0;
   width: 3px;
-  background: linear-gradient(180deg, var(--shu-bright), var(--shu));
+  background: var(--shu);
   border-radius: var(--r-pill);
 }
 
@@ -123,12 +121,7 @@
 
 .dm-keychange__accept:hover,
 .dm-keychange__accept:focus-visible {
-  transform: translateY(-1px);
-  box-shadow: 0 0 24px -14px var(--lapis-bright);
-}
-
-.dm-keychange__accept:active {
-  transform: translateY(0);
+  box-shadow: none;
 }
 
 /* Dismiss is the calm escape — a ghost that keeps us fail-closed. */

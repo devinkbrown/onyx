@@ -22,7 +22,7 @@
   justify-content: center;
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: 2px;
   color: var(--paper-dim);
   cursor: pointer;
   transition: color var(--dur, 200ms) var(--ease), background var(--dur, 200ms) var(--ease);
@@ -65,6 +65,20 @@
   text-transform: uppercase;
   color: var(--paper-mute);
 }
+.notif-center__ledger {
+  margin-left: auto;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.notif-center__ledger:hover { text-decoration: underline; color: var(--paper); }
+.notif-center__ledger:focus-visible {
+  outline: 1px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
 .notif-center__action {
   margin-left: auto;
   font: inherit;
@@ -74,6 +88,9 @@
   border: 0;
   padding: 0;
   cursor: pointer;
+}
+.notif-center__head:has(.notif-center__action) .notif-center__ledger {
+  margin-left: 0;
 }
 .notif-center__action:hover { color: var(--paper); }
 .notif-center__close {
@@ -111,7 +128,7 @@
   display: flex;
   align-items: flex-start;
   gap: 2px;
-  border-radius: 8px;
+  border-radius: 2px;
 }
 .notif-center__row[data-unread='true'] { background: color-mix(in oklab, var(--lapis) 7%, transparent); }
 .notif-center__row + .notif-center__row { margin-top: 2px; }
@@ -127,7 +144,7 @@
   background: none;
   border: 0;
   padding: 8px 6px 8px 8px;
-  border-radius: 8px;
+  border-radius: 2px;
   cursor: pointer;
   min-width: 0;
 }
@@ -180,6 +197,25 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
+}
+
+.notif-center__room-ledger {
+  flex: none;
+  align-self: center;
+  min-height: var(--target-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+  text-decoration: none;
+}
+.notif-center__room-ledger:hover { text-decoration: underline; color: var(--paper); }
+.notif-center__room-ledger:focus-visible {
+  outline: 1px solid var(--lapis-bright);
+  outline-offset: 2px;
 }
 
 .notif-center__dismiss {

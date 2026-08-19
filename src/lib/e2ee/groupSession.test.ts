@@ -468,4 +468,99 @@ describe('pure GroupSession state machine', () => {
       .toEqual({ ok: false, reason: 'destroyed' });
     expect(consumeOpenedGroupWelcome(aborted.welcome.opened)).toBeNull();
   });
+
+  it('re-anchors a verified higher epoch and resumes seal/open without persisting keys', async () => {
+    const pair = await genesisPair({
+      priorEpoch: 1,
+      nextEpoch: 2,
+      priorCommitHash: bytes(11),
+      epochKey: bytes(9),
+      membershipDigest: bytes(10),
+      commitId: bytes(12),
+    });
+    const result = await GroupSession.bootstrapVerifiedEpoch({
+      ...bootstrapArgs(pair),
+      expectedEpoch: 2,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.epoch).toBe(2n);
+    expect(result.session.epoch).toBe(2n);
+    const sealed = await result.session.sealRoomMessage('#room', 'epoch-2 plaintext');
+    expect(sealed).toMatchObject({ ok: true, room: '#room', epoch: 2 });
+    if (sealed.ok) {
+      await expect(result.session.openRoomMessage('#room', sealed.envelope)).resolves.toMatchObject({
+        ok: true,
+        plaintext: 'epoch-2 plaintext',
+      });
+    }
+    expect(result).not.toHaveProperty('epochKey');
+    expect(JSON.stringify({ epoch: Number(result.epoch), room: result.session.room })).not.toContain('epochKey');
+    result.session.destroy();
+  });
+
+  it('fails closed for consumed welcome, stale expected epoch, wrong signer/commitment, and duplicate welcome', async () => {
+    const pair = await genesisPair({
+      priorEpoch: 1,
+      nextEpoch: 2,
+      priorCommitHash: bytes(11),
+      epochKey: bytes(9),
+      membershipDigest: bytes(10),
+      commitId: bytes(12),
+    });
+    const consumed = await GroupSession.bootstrapVerifiedEpoch({
+      ...bootstrapArgs(pair),
+      expectedEpoch: 2,
+    });
+    expect(consumed.ok).toBe(true);
+    expect(await GroupSession.bootstrapVerifiedEpoch({
+      ...bootstrapArgs(pair),
+      expectedEpoch: 2,
+    })).toEqual({ ok: false, reason: 'invalid-welcome' });
+
+    const staleEpoch = await genesisPair({
+      priorEpoch: 1,
+      nextEpoch: 2,
+      priorCommitHash: bytes(11),
+    });
+    expect(await GroupSession.bootstrapVerifiedEpoch({
+      ...bootstrapArgs(staleEpoch),
+      expectedEpoch: 3,
+    })).toEqual({ ok: false, reason: 'welcome-epoch-mismatch' });
+
+    const wrongSigner = await genesisPair({
+      priorEpoch: 1,
+      nextEpoch: 2,
+      priorCommitHash: bytes(11),
+    });
+    expect(await GroupSession.bootstrapVerifiedEpoch({
+      ...bootstrapArgs(wrongSigner),
+      expectedEpoch: 2,
+      commitResolution: verified(wrongSigner.prepared.body, 'commit', 'mallory', wrongSigner.commitRouting.fromDevice, 2),
+    })).toEqual({ ok: false, reason: 'committer-mismatch' });
+
+    const wrongCommitment = await genesisPair({
+      priorEpoch: 1,
+      nextEpoch: 2,
+      priorCommitHash: bytes(11),
+      epochKey: bytes(5),
+    });
+    const wrongKeyWelcome = await openedWelcome({
+      epochKey: bytes(6),
+      membershipDigest: wrongCommitment.welcome.opened.membershipDigest,
+      commitId: wrongCommitment.welcome.opened.commitId,
+      room: '#room',
+      fromAccount: 'alice',
+      fromDevice: 'sender',
+      toAccount: 'alice',
+      toDevice: 'phone',
+      epoch: 2,
+    });
+    expect(await GroupSession.bootstrapVerifiedEpoch({
+      ...bootstrapArgs(wrongCommitment),
+      expectedEpoch: 2,
+      opened: wrongKeyWelcome.opened,
+      welcomeResolution: wrongKeyWelcome.resolution,
+    })).toEqual({ ok: false, reason: 'welcome-mismatch' });
+  });
 });

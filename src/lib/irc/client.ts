@@ -11,6 +11,7 @@ import {
   splitWireFrame,
   type SaslMechanism,
 } from './parser';
+import { activitySubscribeArgs } from './activitySubscribe';
 import type { IRCMessage, ISupport } from './types';
 import { AccountAttribution } from './attribution';
 import { serializeWatchTogetherProp } from '../media/watchTogetherController';
@@ -519,6 +520,20 @@ export class IRCClient {
   }
 
   /**
+   * Emit a narrow recovery control asking peers to re-issue current-epoch
+   * welcome material for this device.
+   */
+  sendCurrentEpochWelcomeRequest(
+    room: string,
+    _epoch: number,
+    _account: string,
+    deviceId: string,
+    payload: string,
+  ): boolean {
+    return this.sendRaw('E2EEGROUP', room, 'key-package', deviceId, payload);
+  }
+
+  /**
    * Force-close the socket through the NORMAL close path, so onDisconnected
    * fires and the store's reconnect machinery takes over. Used when the OS
    * reports the network gone (window 'offline') — the TCP stack can take
@@ -585,6 +600,16 @@ export class IRCClient {
 
   join(channel: string, key?: string) {
     this.sendRaw('JOIN', channel, ...(key ? [key] : []));
+  }
+
+  activitySubscribe(channel: string): boolean {
+    const args = activitySubscribeArgs(channel, 'SUBSCRIBE');
+    return args ? this.sendRaw(...args) : false;
+  }
+
+  activityUnsubscribe(channel: string): boolean {
+    const args = activitySubscribeArgs(channel, 'UNSUBSCRIBE');
+    return args ? this.sendRaw(...args) : false;
   }
 
   tagmsg(target: string, tags: Record<string, string>) {

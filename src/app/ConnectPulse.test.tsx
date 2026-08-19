@@ -5,8 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConnectPulse, roomPresenceLabel } from './ConnectPulse';
 import { NODES, pingNode } from './nodes';
 
-vi.mock('@/lib/stats/networkIndex', () => ({
+const { fetchStatsIndex } = vi.hoisted(() => ({
   fetchStatsIndex: vi.fn(() => new Promise(() => {})),
+}));
+
+vi.mock('@/lib/stats/networkIndex', () => ({
+  fetchStatsIndex,
   relTime: vi.fn(() => 'now'),
 }));
 
@@ -67,5 +71,31 @@ describe('ConnectPulse node probes', () => {
     view.unmount();
 
     expect(signals.every((signal) => signal?.aborted)).toBe(true);
+  });
+
+  it('links live rooms and the aggregate index to the public channel ledger', async () => {
+    fetchStatsIndex.mockResolvedValueOnce({
+      generated_at: 1,
+      channels_complete: true,
+      channels: [
+        {
+          channel: '#root',
+          messages: 908,
+          active_users: 16,
+          present: 7,
+          last_active: 1,
+          topic: 'welcome',
+          spark: [],
+        },
+      ],
+    });
+
+    render(() => <ConnectPulse />);
+
+    expect(await screen.findByRole('link', { name: 'Channel ledger' })).toHaveAttribute('href', '/stats/');
+    expect(screen.getByRole('link', { name: 'Channel ledger for #root' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23root',
+    );
   });
 });

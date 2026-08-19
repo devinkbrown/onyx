@@ -14,13 +14,32 @@
      width independently at the max-width:900px breakpoint. */
   --shell-rail-w: 72px;
   --shell-sidebar-w: 304px;
-  --shell-members-w: 0px;
+  /* Column 4 is a single-occupant slot: exactly one of the member roster or
+     the Context rail may claim it at a time. `data-shell-aside` on this root
+     ("members" | "context" | "none" — see AppShell.tsx's asideOccupant memo)
+     is the only thing that widens --shell-aside-w below; it defaults CLOSED
+     (0px), so "both the roster and the rail claim grid-column:4" cannot be
+     expressed in CSS or JS. --shell-context-col-w is split out from
+     --shell-aside-open-w so the tablet breakpoint can widen the roster's
+     open width without also turning the rail into a column occupant there
+     (it becomes a fixed edge sheet instead — see the >=901px block below). */
+  --shell-aside-open-w: 288px;
+  --shell-context-col-w: var(--shell-aside-open-w);
+  --shell-aside-w: 0px;
   display: grid;
+  /* Track list is declared ONCE, here, driven entirely by the custom
+     properties above — no var() fallback, since all three are always
+     DEFINED at this level (a fallback could only mislead: it would never
+     actually run). Every state selector below (.shell--no-rail,
+     .shell[data-shell-aside=...]) must ONLY ever set these custom
+     properties — never re-declare grid-template-columns — so two state
+     selectors on the same element can never fight over a literal track
+     list. */
   grid-template-columns:
-    var(--shell-rail-w, 72px)
-    var(--shell-sidebar-w, 304px)
+    var(--shell-rail-w)
+    var(--shell-sidebar-w)
     1fr
-    var(--shell-members-w, 0px);
+    var(--shell-aside-w);
   /* minmax(0, 1fr): plain `1fr` is minmax(auto, 1fr), so a dense nicklist (or
      long sidebar/feed) could inflate the row past 100svh and clip under
      overflow:hidden instead of scrolling inside its column. */
@@ -31,14 +50,7 @@
   color: var(--paper);
   /* Quiet legibility wash — let the Background canvas (page layer 0) read through
      without a top glow spectacle. Soft bottom fade only. */
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--ink) 18%, transparent) 0%,
-      transparent 28%,
-      transparent 70%,
-      color-mix(in oklab, var(--ink) 28%, transparent) 100%
-    );
+  background: color-mix(in oklab, var(--ink) 22%, transparent);
 }
 
 .shell > * {
@@ -70,28 +82,18 @@
 
 .shell--no-rail {
   --shell-rail-w: 0px;
-  grid-template-columns:
-    0px
-    var(--shell-sidebar-w, 272px)
-    1fr
-    var(--shell-members-w, 220px);
 }
 
-.shell--members-hidden {
-  --shell-members-w: 0px;
-  grid-template-columns:
-    var(--shell-rail-w, 54px)
-    var(--shell-sidebar-w, 272px)
-    1fr
-    0px;
+/* Single-occupant column-4 slot. Exactly one of these can match at a time
+   (data-shell-aside is a tri-state attribute set by AppShell.tsx's
+   asideOccupant memo), so the member roster and the Context rail can never
+   both widen the track — see the --shell-aside-w comment above. */
+.shell[data-shell-aside='members'] {
+  --shell-aside-w: var(--shell-aside-open-w);
 }
 
-.shell--context-open {
-  --shell-members-w: 288px;
-}
-
-.shell--no-rail.shell--members-hidden {
-  grid-template-columns: 0px var(--shell-sidebar-w, 272px) 1fr 0px;
+.shell[data-shell-aside='context'] {
+  --shell-aside-w: var(--shell-context-col-w);
 }
 
 .shell[data-room-identity] {
@@ -110,19 +112,10 @@
   align-items: center;
   gap: 6px;
   padding: 10px 0 12px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--stone) 34%, var(--ink)) 0%,
-      color-mix(in oklab, var(--ink) 88%, var(--stone)) 100%
-    );
+  background: color-mix(in oklab, var(--stone) 28%, var(--ink));
   border-right: 1px solid var(--seam-faint);
   overflow: hidden;
   width: var(--shell-rail-w, 72px);
-}
-
-.shell-rail--hidden {
-  display: none;
 }
 
 .shell-rail-sep {
@@ -268,9 +261,7 @@
   min-width: 16px;
   height: 16px;
   background: var(--lapis-bright);
-  box-shadow:
-    0 0 0 2px var(--ink),
-    0 0 12px color-mix(in oklab, var(--lapis-bright) 58%, transparent);
+  box-shadow: 0 0 0 2px var(--ink);
 }
 
 .shell-rail-bottom {
@@ -293,12 +284,7 @@
   grid-column: 2;
   display: flex;
   flex-direction: column;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--ink) 60%, transparent) 0%,
-      color-mix(in oklab, var(--ink) 70%, transparent) 100%
-    );
+  background: color-mix(in oklab, var(--ink) 64%, transparent);
   border-right: 1px solid var(--seam-faint);
   overflow: hidden;
   overflow: clip;
@@ -512,6 +498,38 @@
   font-size: 0.85rem;
   color: var(--paper-dim);
   line-height: 1.4;
+}
+
+.shell-sidebar-ledger-row {
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.shell-sidebar-ledger {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min, 44px);
+  padding: 0 2px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.shell-sidebar-ledger:hover {
+  color: var(--paper);
+  text-decoration: underline;
+}
+
+.shell-sidebar-ledger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .shell-sidebar-empty {
@@ -881,6 +899,8 @@
   align-items: center;
   gap: var(--space-2);
   width: 100%;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 40px;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--r-md);
   border: 1px solid transparent;
@@ -906,12 +926,7 @@
 
 .shell-channel-item--active {
   color: var(--paper);
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--lapis-deep) 26%, transparent) 0%,
-      color-mix(in oklab, var(--stone-2) 38%, transparent) 100%
-    );
+  background: color-mix(in oklab, var(--lapis-deep) 22%, var(--stone-2));
   border-color: var(--seam);
 }
 
@@ -925,7 +940,6 @@
   width: 2px;
   border-radius: 999px;
   background: var(--lapis-bright);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--lapis-bright) 64%, transparent);
 }
 
 .shell-channel-item--active .shell-channel-sigil {
@@ -947,15 +961,9 @@
 .shell-channel-item--highlight .shell-channel-badge {
   /* A MENTION is the one hot moment in the sidebar — coral, not another blue,
      so it can't be mistaken for ordinary unread. */
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--shu-bright) 80%, transparent) 0%,
-    var(--shu) 100%
-  );
+  background: var(--shu);
   color: var(--ink);
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--shu-bright) 40%, transparent),
-    0 0 12px color-mix(in oklab, var(--shu-bright) 40%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--shu-bright) 40%, transparent);
 }
 
 .shell-channel-item--highlight:not(.shell-channel-item--active) {
@@ -1066,9 +1074,8 @@
 
 .shell-join-btn:hover:not(:disabled) {
   color: var(--ink);
-  border-color: transparent;
-  background: linear-gradient(180deg, var(--lapis-bright) 0%, var(--lapis) 100%);
-  box-shadow: 0 0 16px -3px color-mix(in oklab, var(--lapis-bright) 56%, transparent);
+  border-color: var(--lapis-bright);
+  background: var(--lapis-bright);
 }
 
 /* When the input has focus, the join control adopts the same azure edge so the
@@ -1095,12 +1102,7 @@
   border: 1px solid color-mix(in oklab, var(--paper) 8%, var(--seam-faint));
   border-radius: var(--r-lg);
   box-shadow: var(--elev-2);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--ink) 46%, transparent) 0%,
-      color-mix(in oklab, var(--ink) 58%, transparent) 100%
-    );
+  background: color-mix(in oklab, var(--ink) 52%, transparent);
   overflow: hidden;
 }
 
@@ -1128,10 +1130,22 @@
   background: color-mix(in oklab, var(--surface-face) 92%, var(--ink));
   border-left: 1px solid var(--seam-faint);
 }
-.shell--context-open .shell-context-rail { display: block; }
+/* Breakpoint-scoped, not just attribute-gated: a bare `.shell[data-shell-aside=
+   'context'] .shell-context-rail { display: block }` rule has higher
+   specificity (0-2-0) than the unconditional <=900px hide rule below
+   (`.shell-context-rail { display: none }`, 0-1-0) and would out-specify it
+   regardless of source order — so a desktop→phone resize with Context open
+   would still paint a grid-column:4 rail onto the single-column mobile grid.
+   Scoping the reveal to >=901px means it simply does not participate once the
+   viewport crosses into the mobile breakpoint, leaving the hide rule in sole
+   control there. */
+@media (min-width: 901px) {
+  .shell[data-shell-aside='context'] .shell-context-rail { display: block; }
+}
 .shell-context-rail__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); padding-bottom: var(--space-4); border-bottom: 1px solid var(--seam-faint); }
 .shell-context-rail__head h2, .shell-context-rail__eyebrow, .shell-context-rail__empty { margin: 0; }
 .shell-context-rail__head h2 { color: var(--paper); font-size: var(--text-lg); overflow-wrap: anywhere; }
+.shell-context-rail__ledger { display: inline-block; margin-top: var(--space-1); }
 .shell-context-rail__eyebrow { color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
 .shell-context-rail__close { display: grid; place-items: center; min-width: 32px; min-height: 32px; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: transparent; color: var(--paper-dim); cursor: pointer; }
 .shell-context-rail__empty { padding-top: var(--space-5); color: var(--paper-mute); font-size: var(--text-sm); line-height: var(--leading-body); }
@@ -1146,7 +1160,16 @@
    conversation. Present Context as an opt-in edge sheet until the canvas has
    enough room for a persistent rail. */
 @media (min-width: 901px) and (max-width: 1279px) {
-  .shell--context-open { --shell-members-w: 0px; }
+  /* MUST stay declared after the base .shell rule above (source order
+     matters for the cascade): this narrows the roster's open width and
+     zeroes the rail's column width for every .shell at this breakpoint,
+     regardless of which data-shell-aside slot is active. That keeps the rail
+     from ever becoming a column occupant here — it is always the fixed edge
+     sheet declared just below instead. */
+  .shell {
+    --shell-aside-open-w: 220px;
+    --shell-context-col-w: 0px;
+  }
   .shell-context-rail {
     position: fixed;
     inset: 0 0 0 auto;
@@ -1154,7 +1177,7 @@
     width: min(360px, 42vw);
     max-width: 100%;
     grid-column: unset;
-    box-shadow: -18px 0 48px -28px color-mix(in oklab, var(--ink) 88%, transparent);
+    box-shadow: none;
   }
 }
 
@@ -1315,7 +1338,7 @@
   color: var(--ink);
   border-radius: 50%;
   background: var(--lapis-bright);
-  box-shadow: 0 0 16px color-mix(in oklab, var(--lapis-bright) 30%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent);
   font-size: 9px;
   line-height: 1;
 }
@@ -1466,7 +1489,8 @@
 
 .shell-watch-start__primary:hover,
 .shell-watch-start__primary:focus-visible {
-  filter: brightness(1.12);
+  background: var(--lapis);
+  border-color: var(--lapis);
 }
 
 .shell-watch-start__secondary:hover,
@@ -1514,9 +1538,7 @@
   min-height: 44px;
   padding: 7px clamp(12px, 2vw, 20px);
   border-bottom: 1px solid var(--seam-faint);
-  background:
-    linear-gradient(90deg, color-mix(in oklab, var(--lapis) 15%, transparent), transparent 42%),
-    color-mix(in oklab, var(--stone) 52%, transparent);
+  background: color-mix(in oklab, var(--stone) 52%, transparent);
   font-family: var(--font-mono);
 }
 
@@ -1526,18 +1548,18 @@
   flex: none;
   border-radius: 999px;
   background: var(--lapis-bright);
-  box-shadow: 0 0 14px color-mix(in oklab, var(--lapis-bright) 60%, transparent);
+  box-shadow: none;
 }
 
 .shell-watch-together[data-state='paused'] .shell-watch-together__pulse {
   background: var(--gold-bright);
-  box-shadow: 0 0 14px color-mix(in oklab, var(--gold-bright) 52%, transparent);
+  box-shadow: none;
 }
 
 .shell-watch-together[data-state='handoff'] .shell-watch-together__pulse,
 .shell-watch-together[data-state='seeking'] .shell-watch-together__pulse {
   background: var(--shu);
-  box-shadow: 0 0 14px color-mix(in oklab, var(--shu) 46%, transparent);
+  box-shadow: none;
 }
 
 .shell-watch-together__main {
@@ -1767,7 +1789,6 @@
 
 .shell[data-room-identity] .shell-ribbon-sigil {
   color: var(--room-accent-strong);
-  text-shadow: 0 0 12px color-mix(in oklab, var(--room-accent) 36%, transparent);
 }
 
 .shell-ribbon-sigil--dm {
@@ -1858,12 +1879,10 @@
   height: 14px;
   flex: none;
   background: var(--gold-bright);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--gold-bright) 48%, transparent);
 }
 
 .shell-ribbon-event-chip--live .shell-ribbon-event-mark {
   background: var(--shu);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--shu) 52%, transparent);
 }
 
 .shell-ribbon-event-text {
@@ -1935,7 +1954,6 @@
   height: 14px;
   flex: none;
   background: var(--lapis);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--lapis) 52%, transparent);
 }
 
 .shell-ribbon-voice-text {
@@ -2610,14 +2628,12 @@
   text-align: left;
   transition:
     border-color var(--dur) var(--ease),
-    background var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+    background var(--dur) var(--ease);
 }
 
 .ap-theme-chip:hover {
   border-color: var(--seam);
   background: color-mix(in oklab, var(--lapis-deep) 12%, transparent);
-  transform: translateY(-1px);
 }
 
 .ap-theme-chip--on {
@@ -3091,12 +3107,7 @@
   position: relative;
   /* No opaque base — the translucent .shell-conversation veil behind this is the
      legibility layer, so the feed lets the background canvas read through. */
-  background:
-    radial-gradient(
-      ellipse at 50% 0%,
-      color-mix(in oklab, var(--lapis-deep) 8%, transparent) 0%,
-      transparent 42%
-    );
+  background: transparent;
 }
 
 /* A quiet, data-bearing orientation seam. It is intentionally not a second
@@ -3177,7 +3188,7 @@
   min-height: 2rem;
   padding: 0 var(--space-3);
   border: 1px solid var(--seam);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   appearance: none;
   background: color-mix(in oklab, var(--stone) 70%, transparent);
   color: var(--paper-dim);
@@ -3216,7 +3227,7 @@
   min-height: 2rem;
   padding: 0 var(--space-3);
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   appearance: none;
   background: transparent;
   color: var(--paper-mute);
@@ -3439,6 +3450,9 @@
   background: color-mix(in oklab, var(--stone-2) 55%, transparent);
   color: color-mix(in oklab, var(--ink) 80%, var(--paper-mute));
 }
+.shell-feed-empty-ledger {
+  margin-top: var(--space-2);
+}
 
 /* Loading skeleton — shown while CHATHISTORY is in flight so the feed never
    flashes the "say the first thing" empty state before history lands. Mirrors
@@ -3567,11 +3581,7 @@
 .shell-msg-group:focus-visible,
 .shell-msg-cont:hover,
 .shell-msg-cont:focus-visible {
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--lapis-deep) 11%, transparent) 0%,
-    color-mix(in oklab, var(--lapis-deep) 5%, transparent) 100%
-  );
+  background: color-mix(in oklab, var(--lapis-deep) 8%, transparent);
 }
 
 .shell-msg-group:focus-visible,
@@ -3667,7 +3677,7 @@
   border-radius: var(--radius-sm, 4px);
   background: color-mix(in srgb, var(--ink) 92%, var(--paper) 8%);
   border: 1px solid color-mix(in srgb, var(--paper-mute) 35%, transparent);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--ink) 45%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--paper) 6%, transparent);
   z-index: 6;
 }
 
@@ -3836,7 +3846,6 @@
   height: 5px;
   border-radius: 999px;
   background: color-mix(in oklab, var(--lapis) 40%, transparent);
-  box-shadow: 0 0 6px color-mix(in oklab, var(--lapis) 30%, transparent);
 }
 
 .shell-unread-divider {
@@ -4174,7 +4183,7 @@
   min-height: 28px;
   padding: 4px 10px;
   border: 1px solid color-mix(in oklab, var(--seam) 68%, transparent);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   background: color-mix(in oklab, var(--ink) 18%, transparent);
   color: var(--paper-dim);
   font-family: var(--font-mono);
@@ -4204,13 +4213,7 @@
    alarm-coral: it should feel like being gently called to, not warned. */
 .shell-msg-group--highlight,
 .shell-msg-cont--highlight {
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--lapis) 14%, transparent) 0%,
-      color-mix(in oklab, var(--lapis-deep) 6%, transparent) 42%,
-      transparent 100%
-    ) !important;
+  background: color-mix(in oklab, var(--lapis) 10%, transparent) !important;
   box-shadow: inset 2px 0 0 var(--lapis-bright);
 }
 
@@ -4285,7 +4288,6 @@
   color: var(--lapis-bright);
   border-color: var(--seam);
   background: color-mix(in oklab, var(--lapis-deep) 22%, transparent);
-  box-shadow: 0 0 18px -4px color-mix(in oklab, var(--lapis) 30%, transparent);
 }
 
 /* Reactions */
@@ -4330,11 +4332,6 @@
   border-color: var(--seam);
   background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
   color: var(--paper);
-  transform: translateY(-1px);
-}
-
-.shell-reaction:active {
-  transform: translateY(0);
 }
 
 /* A reaction you've already given glows azure — your mark on the message. */
@@ -4430,40 +4427,29 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--lapis-bright);
-  background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  background: var(--ink);
   border: 1px solid var(--seam);
-  border-radius: var(--r-pill);
+  border-radius: 2px;
   cursor: pointer;
-  box-shadow:
-    0 8px 28px -16px color-mix(in oklab, var(--ink) 96%, transparent),
-    0 0 0 1px color-mix(in oklab, var(--lapis) 12%, transparent);
+  box-shadow: none;
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 
 .shell-jump-latest:hover {
-  transform: translateX(-50%) translateY(-2px);
-  box-shadow:
-    0 12px 36px -18px color-mix(in oklab, var(--ink) 96%, transparent),
-    0 0 22px color-mix(in oklab, var(--lapis) 18%, transparent);
+  transform: translateX(-50%);
+  box-shadow: none;
 }
 
-/* New messages waiting below — accent the pill and badge the count so it reads
-   as a call to action rather than a passive control. */
+/* New messages waiting below — flat mineral fill, not a glow pill. */
 .shell-jump-latest--unread {
-  color: var(--ink);
-  background: linear-gradient(135deg, var(--lapis), var(--lapis-bright));
-  border-color: color-mix(in oklab, var(--lapis-bright) 76%, var(--seam));
-  box-shadow:
-    0 10px 30px -16px color-mix(in oklab, var(--ink) 96%, transparent),
-    0 0 24px -6px color-mix(in oklab, var(--lapis-bright) 40%, transparent);
+  color: var(--on-accent);
+  background: var(--lapis);
+  border-color: var(--lapis);
+  box-shadow: none;
 }
 
 .shell-jump-latest--unread:hover {
-  box-shadow:
-    0 14px 38px -18px color-mix(in oklab, var(--ink) 96%, transparent),
-    0 0 30px -4px color-mix(in oklab, var(--lapis-bright) 52%, transparent);
+  box-shadow: none;
 }
 
 .shell-jump-latest-count {
@@ -4476,12 +4462,7 @@
   position: relative;
   flex: none;
   padding: var(--space-3) var(--space-4) var(--space-4);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--stone) 16%, var(--ink)) 0%,
-      color-mix(in oklab, var(--ink) 82%, var(--stone)) 100%
-    );
+  background: color-mix(in oklab, var(--ink) 82%, var(--stone));
   border-top: 1px solid var(--seam-faint);
 }
 
@@ -4521,12 +4502,7 @@
 }
 
 .shell-composer--drag {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--lapis-deep) 22%, var(--ink)) 0%,
-      color-mix(in oklab, var(--ink) 78%, var(--stone)) 100%
-    );
+  background: color-mix(in oklab, var(--lapis-deep) 14%, var(--ink));
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 38%, transparent);
 }
 
@@ -4846,7 +4822,7 @@
   border: 1px solid var(--seam);
   border-radius: var(--r-md);
   background: color-mix(in oklab, var(--stone-2) 86%, var(--ink));
-  box-shadow: 0 16px 44px -24px color-mix(in oklab, var(--ink) 96%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent);
 }
 
 .shell-schedule-heading {
@@ -5042,15 +5018,11 @@
   border-color: var(--seam);
 }
 
-/* Focus brings the surface toward the light and lifts an azure glow around the
-   input — the single most inviting affordance in the app. */
+/* Focus ring stays inset — no outer bloom around the composer field. */
 .shell-composer-inner:focus-within {
   border-color: var(--lapis);
   background: color-mix(in oklab, var(--ink) 62%, var(--stone-2));
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--lapis) 40%, transparent),
-    0 0 0 4px color-mix(in oklab, var(--lapis) 14%, transparent),
-    0 0 28px -4px color-mix(in oklab, var(--lapis-bright) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis) 40%, transparent);
 }
 
 .shell-composer-textarea {
@@ -5157,11 +5129,9 @@
   width: min(280px, calc(100vw - 24px));
   padding: 8px;
   border: 1px solid var(--seam);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--stone-2) 90%, var(--ink));
-  box-shadow:
-    0 16px 44px -24px color-mix(in oklab, var(--ink) 96%, transparent),
-    inset 0 0 0 1px color-mix(in oklab, var(--lapis) 10%, transparent);
+  border-radius: 2px;
+  background: var(--ink);
+  box-shadow: none;
 }
 
 .shell-composer-tools-item,
@@ -5172,11 +5142,12 @@
   min-height: 44px;
   padding: 8px 10px;
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-sm);
+  border-radius: 2px;
   cursor: pointer;
   text-align: left;
   color: var(--paper);
   background: color-mix(in oklab, var(--ink) 42%, var(--stone-2));
+  text-decoration: none;
 }
 
 .shell-composer-tools-item:hover:not(:disabled),
@@ -5273,23 +5244,20 @@
 
 /* Armed: there is text to send. Fills with current, glows, invites the tap. */
 .shell-composer-send:not(:disabled) {
-  color: var(--ink);
+  color: var(--on-accent);
   border-color: transparent;
-  background: linear-gradient(
-    180deg,
-    var(--lapis-bright) 0%,
-    var(--lapis) 100%
-  );
-  box-shadow: 0 0 16px -4px color-mix(in oklab, var(--lapis-bright) 60%, transparent);
+  background: var(--lapis);
+  box-shadow: none;
 }
 
 .shell-composer-send:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 0 22px -3px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+  background: var(--lapis-bright);
+  color: var(--ink);
+  box-shadow: none;
 }
 
 .shell-composer-send:active:not(:disabled) {
-  transform: translateY(0);
+  background: color-mix(in oklab, var(--lapis) 88%, var(--ink));
 }
 
 .shell-composer-send:disabled {
@@ -5404,23 +5372,15 @@
   /* Allow the grid item to shrink below content height so .shell-members-scroll
      owns overflow for dense rosters (grid default min-height:auto prevents it). */
   min-height: 0;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--ink) 60%, transparent) 0%,
-      color-mix(in oklab, var(--ink) 70%, transparent) 100%
-    );
+  background: color-mix(in oklab, var(--ink) 65%, transparent);
   border-left: 1px solid var(--seam-faint);
   overflow: hidden;
   overflow: clip;
-  /* Fill the reserved grid track (column 4). The open/close is driven by the
-     grid track collapsing (`--shell-members-w` on `.shell`), so this column need
-     not animate its own width — animating `width` here reflowed the 1fr message
-     column. Motion stays compositor-only: `transform` slides the panel within
-     its reserved track (the mobile drawer rule below reuses the same property). */
-  width: var(--shell-members-w, 220px);
-  transform: translateX(0);
-  transition: transform var(--dur) var(--ease);
+  /* No explicit width: a grid item stretches to fill its track by default,
+     and the open/close width now lives on `.shell`'s --shell-aside-w (see the
+     data-shell-aside attribute selectors above .shell-context-rail). The
+     mobile drawer below re-declares its own width, transform, and transition
+     independently — this column stops being a grid occupant there. */
 }
 
 .shell-members--hidden {
@@ -5531,6 +5491,16 @@
   scrollbar-width: thin;
   scrollbar-color: var(--seam-faint) transparent;
   padding: var(--space-2) 0;
+}
+
+.shell-members-window-pad {
+  width: 100%;
+  pointer-events: none;
+}
+
+.shell-members-group-list > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 36px;
 }
 
 .shell-collapse-banner {
@@ -5646,11 +5616,7 @@
 }
 
 .shell-member-row:hover {
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--lapis-deep) 16%, transparent) 0%,
-    color-mix(in oklab, var(--lapis-deep) 7%, transparent) 100%
-  );
+  background: color-mix(in oklab, var(--lapis-deep) 12%, transparent);
   border-color: var(--seam);
 }
 
@@ -5671,9 +5637,7 @@
   height: 9px;
   border-radius: 999px;
   background: var(--ok);
-  box-shadow:
-    0 0 0 2px color-mix(in oklab, var(--stone-2) 80%, var(--ink)),
-    0 0 6px color-mix(in oklab, var(--ok) 50%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--stone-2) 80%, var(--ink));
 }
 
 .shell-member-presence--away {
@@ -5766,7 +5730,7 @@
   transition: box-shadow var(--dur) var(--ease);
 }
 
-.shell-member-row:hover .shell-role-badge { box-shadow: 0 0 10px -2px currentColor; }
+.shell-member-row:hover .shell-role-badge { box-shadow: inset 0 0 0 1px currentColor; }
 
 /* Founder — brightest champagne, the steward of the room. */
 .shell-role-badge--founder {
@@ -5815,7 +5779,6 @@
   color: var(--lapis-bright);
   border-color: var(--lapis);
   background: color-mix(in oklab, var(--lapis) 18%, transparent);
-  box-shadow: 0 0 10px -3px color-mix(in oklab, var(--lapis-bright) 60%, transparent);
 }
 
 /* Member popover card */
@@ -5924,106 +5887,6 @@
   }
 }
 
-/* ── Calls hub ── */
-.shell-calls-hub {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding: clamp(28px, 6vw, 84px);
-  color: var(--paper);
-  background:
-    radial-gradient(circle at 82% 18%, color-mix(in oklab, var(--lapis) 17%, transparent), transparent 32%),
-    linear-gradient(150deg, color-mix(in oklab, var(--ink) 78%, transparent), color-mix(in oklab, var(--stone) 46%, transparent));
-}
-
-.shell-calls-kicker {
-  width: fit-content;
-  margin-bottom: 18px;
-  padding: 6px 10px;
-  border: 1px solid color-mix(in oklab, var(--lapis) 44%, var(--seam-faint));
-  border-radius: var(--r-pill);
-  color: var(--lapis-bright);
-  font: 700 0.68rem/1 var(--font-mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.shell-calls-hub h1 {
-  max-width: 760px;
-  margin: 0;
-  color: var(--paper);
-  font: 400 clamp(2.2rem, 5vw, 4.8rem)/0.98 var(--font-display);
-  letter-spacing: -0.035em;
-}
-
-.shell-calls-intro {
-  max-width: 650px;
-  margin: 24px 0 0;
-  color: var(--paper-dim);
-  font: 400 clamp(1rem, 1.7vw, 1.25rem)/1.58 var(--font-sans);
-}
-
-.shell-calls-primary {
-  min-height: 44px;
-  margin-top: 28px;
-  padding: 11px 18px;
-  border: 1px solid color-mix(in oklab, var(--lapis-bright) 55%, transparent);
-  border-radius: var(--r-pill);
-  background: var(--lapis-bright);
-  color: var(--ink);
-  font: 700 0.86rem/1 var(--font-sans);
-  cursor: pointer;
-}
-
-.shell-calls-primary:hover {
-  background: var(--paper);
-}
-
-.shell-calls-proof {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  max-width: 880px;
-  margin-top: clamp(48px, 8vw, 96px);
-}
-
-.shell-calls-proof article {
-  min-width: 0;
-  padding: 20px;
-  border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--stone-2) 38%, transparent);
-}
-
-.shell-calls-proof article > span {
-  color: var(--lapis-bright);
-  font: 700 0.62rem/1 var(--font-mono);
-  letter-spacing: 0.12em;
-}
-
-.shell-calls-proof h2 {
-  margin: 18px 0 8px;
-  color: var(--paper);
-  font: 600 1rem/1.2 var(--font-sans);
-}
-
-.shell-calls-proof p {
-  margin: 0;
-  color: var(--paper-mute);
-  font: 400 0.86rem/1.48 var(--font-sans);
-}
-
-@media (max-width: 680px) {
-  .shell-calls-hub {
-    padding: 28px 18px calc(var(--mnav-h, 58px) + env(safe-area-inset-bottom, 0px) + 24px);
-  }
-
-  .shell-calls-proof {
-    grid-template-columns: 1fr;
-    margin-top: 40px;
-  }
-}
-
 /* ── Home / empty state ── */
 .shell-home {
   flex: 1;
@@ -6032,12 +5895,7 @@
   color: var(--paper-mute);
   text-align: center;
   padding: var(--space-7);
-  background:
-    radial-gradient(
-      ellipse at 50% 42%,
-      color-mix(in oklab, var(--lapis-deep) 12%, transparent) 0%,
-      transparent 56%
-    );
+  background: color-mix(in oklab, var(--stone) 42%, var(--ink));
 }
 
 .shell-home-title {
@@ -6049,7 +5907,6 @@
   color: var(--lapis-bright);
   margin: 0 0 0.6rem;
   line-height: 1;
-  text-shadow: 0 0 28px color-mix(in oklab, var(--lapis-bright) 22%, transparent);
 }
 
 .shell-home-sub {
@@ -6075,20 +5932,21 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink);
-  background: linear-gradient(180deg, var(--lapis-bright), var(--lapis));
+  background: var(--lapis-bright);
   border: 1px solid var(--lapis-bright);
   border-radius: var(--r-md);
   padding: 0.7rem 1.3rem;
   cursor: pointer;
   font-weight: 600;
-  box-shadow: 0 6px 22px -10px color-mix(in oklab, var(--lapis) 70%, transparent);
-  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
-    filter var(--dur) var(--ease);
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
 }
 .shell-home-cta:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.06);
-  box-shadow: 0 10px 30px -10px color-mix(in oklab, var(--lapis-bright) 80%, transparent);
+  border-color: var(--lapis);
+  background: var(--lapis);
+  color: var(--paper);
 }
 .shell-home-cta:focus-visible {
   outline: 2px solid var(--lapis-bright);
@@ -6096,7 +5954,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .shell-home-cta { transition: none; }
-  .shell-home-cta:hover { transform: none; }
 }
 
 .shell-home-inner {
@@ -6165,7 +6022,7 @@
   color: var(--paper-dim);
   background: color-mix(in oklab, var(--stone-2) 20%, transparent);
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   padding: 0.32rem 0.8rem;
   cursor: pointer;
   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
@@ -6207,21 +6064,12 @@
 
 /* ── Mobile layout ── */
 @media (max-width: 900px) {
-  /* Force a single column even for the --no-rail / --members-hidden modifier
-     combinations, whose two-class selectors otherwise outrank a bare `.shell`
-     and leave the conversation in a 0px track (blank home view on mobile). */
-  .shell,
-  .shell--no-rail,
-  .shell--members-hidden,
-  .shell--no-rail.shell--members-hidden {
-    grid-template-columns: 1fr;
-  }
   .shell {
     /* Keep the rail compact at ordinary sizes, but let enlarged text grow its
        content box instead of clipping icons and labels into a fixed row. */
     --mnav-h: max(56px, 2.25rem);
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
+    grid-template-rows: minmax(0, 1fr);
     /* Sit above the fixed bottom tab bar; clear the notch up top. */
     height: calc(
       100svh
@@ -6264,7 +6112,7 @@
     border-right: 1px solid var(--seam);
     border-radius: 0 var(--r-lg) var(--r-lg) 0;
     background: color-mix(in oklab, var(--ink) 96%, var(--stone));
-    box-shadow: 18px 0 48px -28px color-mix(in oklab, var(--ink) 88%, transparent);
+    box-shadow: none;
   }
   /* Off-canvas is not enough for keyboard/AT: remove the closed drawer from
      focus and accessibility navigation until its wrapper is opened. */
@@ -6310,7 +6158,6 @@
     inset: 0;
     z-index: 89;
     background: color-mix(in oklab, var(--ink) 58%, transparent);
-    backdrop-filter: blur(2px);
   }
 
   /* Member list — a right-hand drawer instead of a column */
@@ -6334,7 +6181,7 @@
     border-left: 1px solid var(--seam);
     border-radius: var(--r-lg) 0 0 var(--r-lg);
     background: color-mix(in oklab, var(--ink) 96%, var(--stone));
-    box-shadow: -18px 0 48px -28px color-mix(in oklab, var(--ink) 88%, transparent);
+    box-shadow: none;
   }
   /* Override desktop display:none so the drawer can animate off-screen instead */
   .shell-members--hidden {
@@ -6351,14 +6198,8 @@
     border-radius: 0;
     box-shadow: none;
     min-width: 0;
-    /* Preserve the selected Onyx backdrop instead of burying it under a nearly
-       opaque black sheet. The wash protects text while letting mineral color
-       and motion remain part of the product identity. */
-    background: linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--ink) 70%, transparent),
-      color-mix(in oklab, var(--ink) 82%, transparent)
-    );
+    /* Preserve the selected Onyx backdrop instead of burying it under opaque ink. */
+    background: color-mix(in oklab, var(--ink) 76%, transparent);
   }
 
   .shell-context-rail,
@@ -8070,7 +7911,6 @@
 
 .shell-msg-media-img:hover {
   opacity: 0.9;
-  transform: scale(1.01);
 }
 
 .shell-msg-media-video,
@@ -8175,7 +8015,7 @@
   min-height: 30px;
   padding: 5px 10px;
   border: 1px solid var(--line);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   background: color-mix(in oklab, var(--lapis) 13%, var(--stone));
   color: var(--paper);
   font: 700 0.74rem var(--font-mono);
@@ -8267,7 +8107,7 @@
   min-height: 36px;
   padding: 7px 13px;
   border: 1px solid var(--line);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   background: var(--stone-2);
   color: var(--paper);
   font: 700 0.76rem var(--font-mono);
@@ -8529,11 +8369,9 @@
   font-size: 1.6rem;
   color: var(--lapis-bright);
   border-radius: 16px;
-  background:
-    radial-gradient(circle at 30% 20%, color-mix(in oklab, var(--lapis-deep) 55%, transparent), transparent 70%),
-    color-mix(in oklab, var(--stone-2) 80%, transparent);
+  background: color-mix(in oklab, var(--stone-2) 80%, transparent);
   border: 1px solid color-mix(in oklab, var(--lapis) 30%, var(--line));
-  box-shadow: 0 0 24px -8px color-mix(in oklab, var(--lapis-bright) 35%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-deep) 16%, transparent);
 }
 .shell-channel-intro-title {
   margin: 0 0 var(--space-1);
@@ -8549,6 +8387,10 @@
   font-size: 0.9rem;
   color: var(--paper-mute);
 }
+.shell-channel-intro-ledger {
+  display: inline-block;
+  margin-top: var(--space-2);
+}
 
 
 /* ── Polish pass: event-tinted system bullets, micro reactor stacks,
@@ -8556,7 +8398,6 @@
 /* Joins arrive azure; departures fade out muted; kicks/quits read warm-muted. */
 .shell-msg-system[data-event='join']::before {
   background: var(--lapis);
-  box-shadow: 0 0 6px color-mix(in oklab, var(--lapis) 55%, transparent);
 }
 .shell-msg-system[data-event='part']::before,
 .shell-msg-system[data-event='quit']::before {
@@ -8577,9 +8418,7 @@
 
 /* The author's nick-tint rings their avatar — name and face share a hue. */
 .shell-msg-avatar .onyx-avatar {
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--nick-tint, var(--lapis)) 45%, transparent),
-    0 0 10px -2px color-mix(in oklab, var(--nick-tint, var(--lapis)) 30%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--nick-tint, var(--lapis)) 45%, transparent);
 }
 
 /* Thread indicator: a quiet ghost link, not a boxy chip. */
@@ -8637,15 +8476,40 @@
 }
 
 /* ── Presence heatline — live 24h activity rhythm in the channel ribbon ──── */
+.shell-ribbon-heatline-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-left: 0.6rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid var(--seam, color-mix(in oklab, var(--paper, #cde) 12%, transparent));
+  flex: none;
+}
 .shell-ribbon-heatline {
   display: inline-flex;
   align-items: flex-end;
   gap: 1px;
   height: 16px;
-  margin-left: 0.6rem;
-  padding-left: 0.6rem;
-  border-left: 1px solid var(--seam, color-mix(in oklab, var(--paper, #cde) 12%, transparent));
-  flex: none;
+}
+.shell-ribbon-present {
+  color: var(--paper-mute, inherit);
+  font: 650 0.68rem/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.shell-ribbon-stats {
+  color: var(--paper-dim, inherit);
+  font: 650 0.68rem/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.shell-ribbon-stats:hover,
+.shell-ribbon-stats:focus-visible {
+  color: var(--lapis-bright, #6fc3e8);
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
 }
 /* Fixed track height + scaleY (compositor-only) instead of animating `height`
    (layout thrash on every stats tick). Origin bottom so bars grow up from the
@@ -8668,10 +8532,9 @@
 /* The current UTC hour is marked with the hot accent so "now" reads at a glance. */
 .shell-heat-bar--now {
   background: var(--shu, #ff6f61);
-  box-shadow: 0 0 5px color-mix(in oklab, var(--shu, #ff6f61) 60%, transparent);
 }
 @media (max-width: 720px) {
-  /* Reclaim ribbon width on phones — the count/topic matter more there. */
+  /* Reclaim ribbon width on phones — keep the stats jump, hide the 24 bars. */
   .shell-ribbon-heatline { display: none; }
 }
 
@@ -8721,12 +8584,14 @@
   color: var(--ink, #04121c);
   background: var(--shu, #ff6f61);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-md);
   padding: 0.28rem 0.7rem;
   cursor: pointer;
   transition: filter 150ms ease;
 }
-.shell-event-join:hover { filter: brightness(1.08); }
+.shell-event-join:hover {
+  background: color-mix(in oklab, var(--shu) 88%, var(--ink));
+}
 .shell-event-clear {
   width: 1.4rem;
   height: 1.4rem;

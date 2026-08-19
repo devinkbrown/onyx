@@ -5,22 +5,23 @@
  */
 
 .r-landing.home {
-  --mn-void: var(--public-void, #05070a);
-  --mn-face: var(--public-surface, #0c1016);
-  --mn-edge: var(--public-seam, #1a222c);
-  --mn-text: var(--public-paper, #e6e8ec);
-  --mn-mute: #8b939e;
-  --mn-signal: var(--public-current, #5ba3c9);
-  --mn-on-signal: #061018;
-  --mn-msg: var(--public-current, #5ba3c9);
-  --mn-call: var(--public-current, #5ba3c9);
-  --mn-cont: var(--mn-mute);
-  --mn-protect: var(--public-ember, #c97b6b);
-  --mn-ok: #5bc78e;
-  --mn-warn: var(--public-ember, #c97b6b);
-  --mn-serif: var(--public-serif, var(--font-serif, 'Fraunces Variable', Georgia, serif));
-  --mn-sans: var(--public-sans, var(--font-sans, 'Instrument Sans Variable', system-ui, sans-serif));
-  --mn-mono: var(--public-mono, var(--font-mono, 'JetBrains Mono Variable', ui-monospace, monospace));
+  --mn-void: var(--public-void);
+  --mn-face: var(--public-surface);
+  --mn-edge: var(--public-seam);
+  --mn-text: var(--public-paper);
+  --mn-paper: var(--public-paper);
+  --mn-mute: var(--public-muted);
+  --mn-signal: var(--public-current);
+  --mn-on-signal: var(--public-on-signal);
+  --mn-msg: var(--public-signal);
+  --mn-call: var(--public-signal);
+  --mn-cont: var(--public-muted);
+  --mn-protect: var(--public-ember);
+  --mn-ok: var(--public-ok);
+  --mn-warn: var(--public-ember);
+  --mn-serif: var(--public-serif);
+  --mn-sans: var(--public-sans);
+  --mn-mono: var(--public-mono);
 
   color: var(--mn-text);
   background: var(--mn-void);
@@ -29,33 +30,16 @@
 
 .r-landing.home .home-ground,
 .r-landing.home .r-ground.home-ground {
-  background:
-    radial-gradient(70% 36% at 12% 0%, color-mix(in oklab, var(--mn-signal) 8%, transparent), transparent 62%),
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--mn-face) 78%, var(--mn-void)) 0%,
-      var(--mn-void) 58%,
-      #030508 100%
-    );
+  background: var(--mn-void);
 }
 .r-landing.home .home-ground::before,
 .r-landing.home .home-ground::after,
 .r-landing.home .r-ground.home-ground::before,
 .r-landing.home .r-ground.home-ground::after {
+  content: none;
   animation: none !important;
-  opacity: 0.14;
-  background-image: none;
-  background:
-    linear-gradient(var(--mn-edge) 1px, transparent 1px),
-    linear-gradient(90deg, var(--mn-edge) 1px, transparent 1px);
-  background-size: 88px 88px;
-  mask-image: radial-gradient(120% 80% at 50% 0%, #000 10%, transparent 72%);
-}
-.r-landing.home .home-ground::after,
-.r-landing.home .r-ground.home-ground::after {
-  background: radial-gradient(48% 28% at 78% 0%, color-mix(in oklab, var(--mn-signal) 7%, transparent), transparent 72%);
-  opacity: 0.45;
-  mask-image: none;
+  background: none;
+  opacity: 0;
 }
 .r-landing.home .home-grain { opacity: 0.03; }
 
@@ -107,9 +91,9 @@
 
 .r-landing.home .home-h1 {
   margin: 0 0 16px;
-  font-family: var(--mn-serif);
+  font-family: var(--mn-sans);
   font-size: clamp(2.1rem, 4.6vw, 3.25rem);
-  font-weight: 500;
+  font-weight: 650;
   line-height: var(--leading-tight, 1.12);
   letter-spacing: var(--tracking-title, -0.022em);
   text-transform: none;
@@ -160,14 +144,14 @@
   min-height: var(--target-min, 44px);
   padding: 0.65rem 1rem;
   border: 1px solid var(--mn-signal);
-  border-radius: var(--r-md);
+  border-radius: 2px;
   background: var(--mn-signal);
   color: var(--mn-on-signal);
   font: 750 var(--text-md, .9375rem)/1 var(--mn-sans);
   text-decoration: none;
 }
 .r-landing.home .home-cta-primary:hover { background: color-mix(in oklab, var(--mn-signal) 78%, white); }
-.r-landing.home .product-preview { min-width: 0; padding: clamp(16px, 2.5vw, 24px); border: 1px solid var(--mn-edge); border-radius: var(--r-lg); background: color-mix(in oklab, var(--mn-face) 92%, var(--mn-void)); box-shadow: var(--elev-2); }
+.r-landing.home .product-preview { min-width: 0; padding: clamp(16px, 2.5vw, 24px); border: 1px solid var(--mn-edge); border-radius: 2px; background: var(--mn-face); box-shadow: none; }
 .r-landing.home .product-preview__head h2, .r-landing.home .product-preview__head p { margin: 0; }
 .r-landing.home .product-preview__eyebrow { color: var(--mn-signal); font: 700 var(--text-2xs)/1 var(--mn-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
 .r-landing.home .product-preview__head h2 { margin-top: 8px; color: var(--mn-text); font: 650 clamp(1.1rem, 2vw, 1.35rem)/1.2 var(--mn-sans); }
@@ -185,7 +169,7 @@
 .r-landing.home .product-preview__content { display: grid; align-content: center; gap: 12px; padding: 14px; }
 .r-landing.home .product-preview__content b:nth-child(1) { width: 78%; }.r-landing.home .product-preview__content b:nth-child(2) { width: 58%; }.r-landing.home .product-preview__content b:nth-child(3) { width: 68%; }
 .r-landing.home .product-preview__copy h3, .r-landing.home .product-preview__copy p { margin: 0; }.r-landing.home .product-preview__copy h3 { color: var(--mn-text); font-size: var(--text-md); line-height: 1.3; }.r-landing.home .product-preview__copy p { margin-top: 7px; color: var(--mn-mute); font-size: var(--text-sm); line-height: 1.45; }.r-landing.home .product-preview__copy ul { display: grid; gap: 5px; padding: 0; margin: 12px 0 0; list-style: none; color: var(--mn-paper); font-size: var(--text-sm); }.r-landing.home .product-preview__copy li::before { content: '•'; margin-right: 7px; color: var(--mn-signal); }
-.r-landing.home .home-capability-chapters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }.r-landing.home .home-capability-chapters a { display: grid; gap: 5px; min-height: 88px; padding: 14px; border: 1px solid var(--mn-edge); border-radius: var(--r-md); color: var(--mn-text); text-decoration: none; background: color-mix(in oklab, var(--mn-face) 70%, transparent); }.r-landing.home .home-capability-chapters a:hover { border-color: color-mix(in oklab, var(--mn-signal) 55%, var(--mn-edge)); }.r-landing.home .home-capability-chapters span { color: var(--mn-mute); font-size: var(--text-sm); line-height: 1.35; }
+.r-landing.home .home-capability-chapters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }.r-landing.home .home-capability-chapters a { display: grid; gap: 5px; min-height: 88px; padding: 14px; border: 1px solid var(--mn-edge); border-radius: 2px; color: var(--mn-text); text-decoration: none; background: var(--mn-face); }.r-landing.home .home-capability-chapters a:hover { border-color: color-mix(in oklab, var(--mn-signal) 55%, var(--mn-edge)); }.r-landing.home .home-capability-chapters span { color: var(--mn-mute); font-size: var(--text-sm); line-height: 1.35; }
 
 @media (max-width: 700px) { .r-landing.home .home-hero-grid, .r-landing.home .product-preview__canvas { grid-template-columns: 1fr; }.r-landing.home .home-capability-chapters { grid-template-columns: 1fr; }.r-landing.home .product-preview__canvas-label { grid-column: auto; } }
 @media (max-width: 320px) { .r-landing.home .home-cta-row { align-items: stretch; }.r-landing.home .home-cta-primary, .r-landing.home .home-secondary-link { width: 100%; justify-content: center; }.r-landing.home .product-preview { padding: 12px; }.r-landing.home .product-preview__tabs { gap: 2px; }.r-landing.home .product-preview__tabs button { font-size: .65rem; } }
@@ -301,8 +285,8 @@
   padding: 12px 14px;
   border: 1px solid var(--mn-edge);
   border-inline-start: 2px solid var(--mn-signal);
-  border-radius: var(--r-md, 8px);
-  background: color-mix(in oklab, var(--mn-face) 92%, transparent);
+  border-radius: 2px;
+  background: var(--mn-face);
 }
 
 .r-landing.home .home-evidence-item {
@@ -336,8 +320,8 @@
   gap: 8px 12px;
   padding: 12px 14px;
   border: 1px solid var(--mn-edge);
-  border-radius: var(--r-md, 8px);
-  background: color-mix(in oklab, var(--mn-face) 92%, transparent);
+  border-radius: 2px;
+  background: var(--mn-face);
   font-family: var(--mn-mono);
   font-size: var(--text-sm, 0.8125rem);
   color: var(--mn-mute);
@@ -363,6 +347,13 @@
 .r-landing.home .home-telemetry-item strong[data-state='operational'] { color: var(--mn-ok); }
 .r-landing.home .home-telemetry-item strong[data-state='degraded'] { color: var(--mn-warn); }
 .r-landing.home .home-telemetry-item .hint { color: var(--mn-mute); font-size: 0.72rem; }
+.r-landing.home .home-busy-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+  text-decoration-color: color-mix(in oklab, var(--mn-signal) 55%, transparent);
+}
+.r-landing.home .home-busy-link:hover { color: var(--mn-signal); }
 .r-landing.home .home-telemetry-sep { color: var(--mn-edge); user-select: none; }
 
 .r-landing.home .home-telemetry-link,

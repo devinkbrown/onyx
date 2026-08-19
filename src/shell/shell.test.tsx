@@ -2462,10 +2462,120 @@ describe('AppShell', () => {
 
       const { container } = render(() => <AppShell />);
 
-      expect(container.querySelector('[data-testid="app-shell"]')).toHaveClass('shell--members-hidden');
+      expect(container.querySelector('[data-testid="app-shell"]')).toHaveAttribute('data-shell-aside', 'none');
       expect(container.querySelector('aside.shell-members')).toHaveAttribute('inert');
       expect(screen.queryByRole('region', { name: /Channel members/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /members — toggle member list/i })).not.toBeInTheDocument();
+    });
+
+    it('models the column-4 slot as a single tri-state attribute (members ↔ context)', async () => {
+      // Arrange — desktop viewport, an active channel so the member roster
+      // owns the slot by default (Context must REPLACE it, per asideOccupant
+      // in AppShell.tsx — never both at once).
+      stubMobileViewport(false);
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const shellEl = container.querySelector('[data-testid="app-shell"]')!;
+      const trigger = screen.getByRole('button', { name: 'Context' });
+      const rail = container.querySelector('#shell-context-rail')!;
+      const roster = container.querySelector('aside.shell-members')!;
+      // Query by selector, not role: the rail starts [inert], and dom-testing-
+      // library excludes inert subtrees from the accessible role tree, so
+      // getByRole would fail to find it before Context ever opens.
+      const closeRail = rail.querySelector<HTMLButtonElement>('.shell-context-rail__close')!;
+
+      // Assert — closed by default: roster owns the slot, Context is inert.
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'members');
+      expect(roster).not.toHaveAttribute('inert');
+      expect(rail).toHaveAttribute('inert');
+      expect(rail).toHaveAttribute('data-open', 'false');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+      // Act — open Context.
+      fireEvent.click(trigger);
+
+      // Assert — Context now owns the slot: roster goes inert, rail does not.
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'context');
+      expect(roster).toHaveAttribute('inert');
+      expect(roster).toHaveAttribute('aria-hidden', 'true');
+      expect(rail).not.toHaveAttribute('inert');
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      await waitFor(() => expect(closeRail).toHaveFocus());
+
+      // Act — close Context via its own Close control.
+      fireEvent.click(closeRail);
+
+      // Assert — roster reclaims the slot; focus returns to the trigger.
+      await waitFor(() => {
+        expect(shellEl).toHaveAttribute('data-shell-aside', 'members');
+        expect(trigger).toHaveFocus();
+      });
+      expect(rail).toHaveAttribute('inert');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('gives the People button priority over an open Context rail without yanking focus', () => {
+      stubMobileViewport(false);
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const shellEl = container.querySelector('[data-testid="app-shell"]')!;
+      fireEvent.click(screen.getByRole('button', { name: 'Context' }));
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'context');
+
+      const peopleButton = screen.getByRole('button', { name: /members — toggle member list/i });
+      peopleButton.focus();
+      fireEvent.click(peopleButton);
+
+      // People wins the slot back, and — unlike the Context Close control —
+      // never queues focus onto the Context trigger (WCAG SC 3.2.1 On Focus).
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'members');
+      expect(peopleButton).toHaveFocus();
+    });
+
+    it('never grants Context the column-4 slot after a resize to mobile', () => {
+      const resize = stubResizableViewport(false);
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const shellEl = container.querySelector('[data-testid="app-shell"]')!;
+      fireEvent.click(screen.getByRole('button', { name: 'Context' }));
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'context');
+
+      resize(true);
+
+      expect(shellEl).not.toHaveAttribute('data-shell-aside', 'context');
+    });
+
+    it('keeps WHOIS focus restoration valid when Context claims the slot while it is open', async () => {
+      stubMobileViewport(false);
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+        } as never,
+      });
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
+      fireEvent.click(memberTrigger);
+      fireEvent.click(screen.getByRole('button', { name: 'View profile of alice' }));
+      await screen.findByRole('dialog', { name: 'Profile: alice' });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Context' }));
+      await waitFor(() => expect(container.querySelector('[data-testid="app-shell"]'))
+        .toHaveAttribute('data-shell-aside', 'context'));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close member profile' }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Profile: alice' })).toBeNull();
+        expect(document.activeElement).not.toBe(document.body);
+      });
     });
 
     it('summarizes unread home recaps and hands them to Spotlight', async () => {

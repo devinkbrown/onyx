@@ -3,7 +3,7 @@
  * PresenceRibbon.overflow.test.tsx — commercial room-header slice.
  *
  * 4-zone place header: Call · People · More; pins + Jump to date in More;
- * People visible at 0 with truthful aria-pressed; conn always present;
+ * People visible at 0 with truthful aria-expanded; conn always present;
  * call lifecycle truth table; More section headings + valid menus.
  */
 import { readFileSync } from 'node:fs';
@@ -166,35 +166,44 @@ describe('PresenceRibbon commercial room header', () => {
     expect(screen.queryByText('Workspace')).toBeNull();
   });
 
-  it('shows People at zero members with accessible count and aria-pressed false', () => {
+  it('shows People at zero members with accessible count and no aria-pressed', () => {
     seedChannel('#empty', new Map());
-    render(() => <PresenceRibbon />);
+    // Drive the surface explicitly (rather than relying on the store's default
+    // showMemberList fallback) so the closed-state assertion is deterministic.
+    render(() => <PresenceRibbon membersOpen={false} />);
 
     const people = screen.getByTestId('ribbon-members');
     expect(people).toBeInTheDocument();
     expect(people).toHaveAttribute('aria-label', '0 members — toggle member list');
-    // Empty roster cannot open a member surface.
-    expect(people).toHaveAttribute('aria-pressed', 'false');
+    // The trigger is a disclosure, not a toggle button — aria-expanded is the
+    // correct state property; aria-pressed must not be present at all.
+    expect(people).toHaveAttribute('aria-expanded', 'false');
+    expect(people).not.toHaveAttribute('aria-pressed');
     expect(people.querySelector('.shell-ribbon-count')).toHaveTextContent('0');
   });
 
-  it('uses membersOpen for People aria-pressed (AppShell membersVisible wiring)', () => {
+  it('uses membersOpen for People aria-expanded (AppShell membersVisible wiring)', () => {
     seedChannel();
     const { unmount } = render(() => <PresenceRibbon membersOpen={false} />);
-    expect(screen.getByTestId('ribbon-members')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('ribbon-members')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('ribbon-members')).not.toHaveAttribute('aria-pressed');
     unmount();
 
     render(() => <PresenceRibbon membersOpen={true} />);
-    expect(screen.getByTestId('ribbon-members')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('ribbon-members')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('ribbon-members')).not.toHaveAttribute('aria-pressed');
   });
 
-  it('forces membersPressed false when memberCount is zero even if membersOpen=true', () => {
+  it('mirrors the real open surface even with an empty roster (membersOpen=true)', () => {
+    // The 353 NAMES burst has not landed yet, but the member drawer is a real
+    // role="dialog" surface — the trigger must not lie about it being closed.
     seedChannel('#empty', new Map());
     render(() => <PresenceRibbon membersOpen={true} />);
 
     const people = screen.getByTestId('ribbon-members');
     expect(people).toHaveAttribute('aria-label', '0 members — toggle member list');
-    expect(people).toHaveAttribute('aria-pressed', 'false');
+    expect(people).toHaveAttribute('aria-expanded', 'true');
+    expect(people).not.toHaveAttribute('aria-pressed');
   });
 
   it('keeps connection status present with a11y text (narrow-safe structure)', () => {
@@ -334,13 +343,19 @@ describe('PresenceRibbon commercial room header', () => {
     const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
     const labels = items.map((el) => el.textContent ?? '');
     const settingsIdx = labels.findIndex((t) => t.includes('Channel settings'));
+    const ledgerIdx = labels.findIndex((t) => t.includes('Channel ledger'));
     const pinsIdx = labels.findIndex((t) => t.includes('Pinned messages'));
     const jumpIdx = labels.findIndex((t) => t.includes('Jump to date'));
     const appearanceIdx = labels.findIndex((t) => t.includes('Appearance'));
     expect(settingsIdx).toBeGreaterThanOrEqual(0);
-    expect(pinsIdx).toBeGreaterThan(settingsIdx);
+    expect(ledgerIdx).toBeGreaterThan(settingsIdx);
+    expect(pinsIdx).toBeGreaterThan(ledgerIdx);
     expect(jumpIdx).toBeGreaterThan(pinsIdx);
     expect(appearanceIdx).toBeGreaterThan(jumpIdx);
+    expect(screen.getByTestId('ribbon-channel-ledger')).toHaveAttribute(
+      'href',
+      '/stats/?room=%23general',
+    );
 
     const pins = screen.getByTestId('ribbon-pins');
     expect(pins).toBeInTheDocument();

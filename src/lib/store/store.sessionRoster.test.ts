@@ -191,6 +191,57 @@ describe('remembered session roster restoration', () => {
     expect([...root!.users.values()].map(user => user.nick).sort()).toEqual(['alice', 'kain', 'trev']);
   });
 
+  it('appends (never replaces) a late 353 that outlives the settled burst TTL, even for a still-privileged restore identity', () => {
+    // Hypothesis this guards: _NAMES_BURST_TTL_MS (15s) is shorter than
+    // _SESSION_RESTORE_CONNECT_MS (45s), so a settled burst's late-line
+    // protection could expire while `canCreateFromResume` is still true,
+    // letting the inbound-353 auto-arm path (`canCreateFromResume &&
+    // !_recentNamesBurst(key)`) re-arm 'expect' and let a late/cross-node
+    // partial 353 REPLACE the roster (the "#root collapses" class).
+    //
+    // REFUTED: `_armSessionRestoreReplay` (called on 001, store.ts ~10503)
+    // re-pins the restore's `expiresAt` to `_now() + _SESSION_RESTORE_REPLAY_MS`
+    // (also 15s) the instant registration completes — the same clock the
+    // burst TTL uses — and a burst's `at` can only start ticking from a 353
+    // that itself arrives after 001 on the same ordered socket. So the
+    // restore window can never outlive a channel's own burst window; by the
+    // time a burst goes stale, `canCreateFromResume` has already gone false
+    // too. Kept as a regression guard: if `_armSessionRestoreReplay` (or its
+    // 15s constant) ever drifts out of sync with `_NAMES_BURST_TTL_MS`, this
+    // test starts failing (roster would collapse to ['bob', 'kain']).
+    vi.useFakeTimers();
+    try {
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'kain',
+        password: 'remembered-secret',
+      });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+
+      receive(':example.test 433 * kain :Nickname is already in use');
+      receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
+      store.getState().client?.updateResumeTokens({ sessionToken: 'resume-token' });
+      receive(':example.test 001 kain_ :Welcome to Onyx');
+
+      receive(':example.test 353 kain_ = #root :@kain trev alice');
+      receive(':example.test 366 kain_ #root :End of NAMES list');
+
+      const beforeLate = store.getState().channels.get('#root');
+      expect([...beforeLate!.users.values()].map(user => user.nick).sort())
+        .toEqual(['alice', 'kain', 'trev']);
+
+      // Past the burst's 15s settled-TTL, still inside the 45s restore window.
+      vi.advanceTimersByTime(16_000);
+      receive(':example.test 353 kain_ = #root :@kain bob');
+
+      const root = store.getState().channels.get('#root')!;
+      expect([...root.users.values()].map(user => user.nick).sort())
+        .toEqual(['alice', 'bob', 'kain', 'trev']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('folds canonical and collision-alias self rows, unions modes, and PART removes the equivalence', () => {
     store.getState().connect({
       url: 'wss://example.test',

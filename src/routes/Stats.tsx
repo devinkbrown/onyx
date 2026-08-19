@@ -3,7 +3,15 @@ import './landing.css';
 import './data-pages.css';
 import './stats.css';
 import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
-import { fetchChannelDetail, type ChannelDetail } from '@/lib/stats/channelDetail';
+import {
+  fetchChannelDetail,
+  netMembershipFlow,
+  parseStatsRoomQuery,
+  peakHourShare,
+  roomShareOfNetwork,
+  statsRoomHref,
+  type ChannelDetail,
+} from '@/lib/stats/channelDetail';
 import { fetchStatsIndex, relTime, type NetworkDay, type StatsChannel } from '@/lib/stats/networkIndex';
 import { publicFeedFreshness, type PublicFeedFreshness } from '@/lib/stats/feedBounds';
 import { PublicFrame } from '@/ui/public';
@@ -181,6 +189,7 @@ function ChannelRow(props: {
             Inspect
           </button>
           <a class="data-action" href={roomDeepLink(c().channel, c().last_active)}>Open room</a>
+          <a class="data-action data-action--ledger" href={statsRoomHref(c().channel)}>Channel ledger</a>
         </div>
       </div>
     </article>
@@ -198,7 +207,9 @@ export default function StatsRoute() {
   const [roomSort, setRoomSort] = createSignal<RoomSort>('messages');
   const [roomScope, setRoomScope] = createSignal<RoomScope>('all');
   const [roomQuery, setRoomQuery] = createSignal('');
-  const [inspectedRoom, setInspectedRoom] = createSignal('');
+  const [inspectedRoom, setInspectedRoom] = createSignal(
+    typeof window === 'undefined' ? '' : parseStatsRoomQuery(window.location.search),
+  );
   const timer = setInterval(() => {
     setNowMs(Date.now());
     void refetchStats();
@@ -238,6 +249,13 @@ export default function StatsRoute() {
   });
   const inspectRoom = (channel: string) => {
     setInspectedRoom(channel);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('room', channel);
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // jsdom / sandboxed documents may reject URL mutation
+    }
     // Defer until after Solid commits selected state so scroll/focus target the current inspector.
     queueMicrotask(() => revealStatsInspector());
   };
@@ -512,7 +530,22 @@ export default function StatsRoute() {
                 <div data-tone="people"><span>contributors</span><strong>{formatCount(detail().totals.activeUsers)}</strong><small>distinct recorded authors</small></div>
                 <div data-tone="words"><span>words / message</span><strong>{averageWords(detail())}</strong><small>aggregate average</small></div>
                 <div data-tone="momentum"><span>busiest day</span><strong>{formatCount(detail().busiestDay?.messages ?? 0)}</strong><small>{detail().busiestDay?.date ?? 'not enough history'}</small></div>
-                <div data-tone="time"><span>peak hour</span><strong>{formatHour(detail().peakHour)}</strong><small>all recorded activity</small></div>
+                <div data-tone="time"><span>peak hour</span><strong>{formatHour(detail().peakHour)}</strong><small>{peakHourShare(detail().hours).toFixed(0)}% of the daily rhythm</small></div>
+                <div data-tone="share">
+                  <span>network share</span>
+                  <strong>
+                    {(() => {
+                      const share = roomShareOfNetwork(detail().totals.messages, totalMessages());
+                      return share === null ? '—' : `${share.toFixed(share >= 10 ? 0 : 1)}%`;
+                    })()}
+                  </strong>
+                  <small>of observed public messages</small>
+                </div>
+                <div data-tone="flow">
+                  <span>net joins</span>
+                  <strong>{netMembershipFlow(detail().totals).toLocaleString('en-US')}</strong>
+                  <small>joins minus parts, quits, and kicks</small>
+                </div>
               </div>
 
               <div class="stats-inspector-grid">
@@ -539,6 +572,44 @@ export default function StatsRoute() {
                       {(messages, hour) => <li>{String(hour()).padStart(2, '0')}:00 UTC: {formatCount(messages)} messages</li>}
                     </For>
                   </ol>
+                </article>
+
+                <article class="data-card stats-days-card">
+                  <div class="stats-card-heading">
+                    <span class="label">recent days</span>
+                    <span class="stats-card-quiet">{detail().days.length} exported days</span>
+                  </div>
+                  <h3>How the room moved</h3>
+                  <Show when={detail().days.length > 0} fallback={<p>No per-room daily series has been exported yet.</p>}>
+                    <figure class="data-chart stats-room-days" aria-labelledby="room-days-caption">
+                      <div class="data-bars" aria-hidden="true">
+                        <For each={detail().days}>
+                          {(day) => {
+                            const peak = Math.max(1, ...detail().days.map((entry) => entry.messages));
+                            return (
+                              <span
+                                class="data-bar"
+                                title={`${day.date}: ${formatCount(day.messages)} messages`}
+                                style={{ '--h': String(Math.max(3, Math.round((day.messages / peak) * 100))) }}
+                              />
+                            );
+                          }}
+                        </For>
+                      </div>
+                      <figcaption id="room-days-caption" class="sr-only">
+                        Daily message totals for {detail().channel}, oldest to newest.
+                      </figcaption>
+                      <ol class="sr-only" aria-label={`${detail().channel} messages by day`}>
+                        <For each={detail().days}>
+                          {(day) => (
+                            <li>
+                              <time datetime={day.date}>{day.date}</time>: {formatCount(day.messages)} messages
+                            </li>
+                          )}
+                        </For>
+                      </ol>
+                    </figure>
+                  </Show>
                 </article>
 
                 <article class="data-card stats-flow-card">

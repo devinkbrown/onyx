@@ -16,6 +16,37 @@ import type { NotifyLevel } from '@/lib/notifications/channelNotifyMode';
 import { readChannelTopicDraft, saveChannelTopicDraft } from '@/lib/channel/topicDrafts';
 import { ChannelSettings } from './ChannelSettings';
 
+vi.mock('@/lib/stats/channelDetail', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/stats/channelDetail')>();
+  return {
+    ...actual,
+    fetchChannelDetail: vi.fn(async () => ({
+      channel: '#general',
+      generatedAt: 1,
+      firstSeen: 1,
+      lastActive: Math.floor(Date.now() / 1000) - 60,
+      present: 8,
+      lastSpeaker: 'alice',
+      totals: {
+        messages: 500,
+        words: 1200,
+        activeUsers: 8,
+        joins: 2,
+        parts: 1,
+        quits: 0,
+        kicks: 0,
+        topicChanges: 0,
+      },
+      hours: Array.from({ length: 24 }, () => 0),
+      days: [],
+      heatmap: Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0)),
+      busiestDay: { date: '2026-07-01', messages: 50 },
+      peakHour: 12,
+      complete: true,
+    })),
+  };
+});
+
 const initialState = store.getInitialState();
 const ALICE_OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
 const BOB_OWNER = { serverUrl: 'wss://example.test', identity: 'bob' } as const;
@@ -101,6 +132,19 @@ afterEach(() => {
   vi.restoreAllMocks();
   Reflect.deleteProperty(navigator, 'share');
   Reflect.deleteProperty(navigator, 'canShare');
+});
+
+describe('ChannelSettings — Public insights', () => {
+  it('deep-links the embedded room insights strip to the channel ledger', async () => {
+    seed();
+    renderPanel();
+
+    expect(await screen.findByTestId('room-insights-open-stats')).toHaveAttribute(
+      'href',
+      '/stats/?room=%23general',
+    );
+    expect(screen.getByTestId('room-insights-open-stats')).toHaveTextContent('Channel ledger');
+  });
 });
 
 describe('ChannelSettings — Notifications', () => {

@@ -73,3 +73,20 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+.jump-to-date__ledger {
+  margin-left: auto;
+  min-height: var(--target-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+  text-decoration: none;
+}
+.jump-to-date__ledger:hover { text-decoration: underline; }
+.jump-to-date__ledger:focus-visible {
+  outline: 1px solid var(--lapis-bright);
+  outline-offset: 2px;
+}

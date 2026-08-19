@@ -20,11 +20,15 @@ import {
   type NormalizedModerationAction,
 } from '@/lib/moderation/actionModel';
 import { preferences } from '@/lib/prefs/preferences';
+import type { ChannelUser } from '@/lib/irc/types';
 import { BanListPanel } from './moderation/BanListPanel';
 import { ModerationActionReview } from './moderation/ModerationActionReview';
 import './moderation/moderation-desk.css';
 
 export type ModerationCockpitProps = { channel: string };
+
+/** Stable empty map so useStore equality does not thrash when the channel is absent. */
+const EMPTY_CHANNEL_USERS: ReadonlyMap<string, ChannelUser> = new Map();
 
 const QUICK_MODES = [
   { letter: 'm', label: 'Moderated', help: 'Only voiced members and moderators can speak.' },
@@ -54,7 +58,7 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
   const connectionStatus = useStore((s) => s.connectionStatus);
   const serverConnected = useStore((s) => !!s.server?.connected);
   const modeState = useStore((s) => selectChannelModeState(local.channel)(s));
-  const members = useStore((s) => s.channels.get(local.channel.toLowerCase())?.users ?? new Map());
+  const members = useStore((s) => s.channels.get(local.channel.toLowerCase())?.users ?? EMPTY_CHANNEL_USERS);
   const rawModes = useStore((s) => s.channels.get(local.channel.toLowerCase())?.modes ?? '');
   const ourNick = useStore((s) => s.ourNick);
   const lastUpdate = useStore((s) => selectLastRoomUpdateAt(local.channel)(s));

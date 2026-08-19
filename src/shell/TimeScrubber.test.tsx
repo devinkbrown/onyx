@@ -143,6 +143,10 @@ describe('TimeScrubber accessibility', () => {
     const hour = await screen.findByRole('button', { name: /05:00 UTC, 9 messages/i });
     expect(screen.getByLabelText('Jump to date at 12:00 UTC')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy moment link for #root' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Channel ledger for #root' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23root',
+    );
 
     fireEvent.input(screen.getByLabelText('Jump to date at 12:00 UTC'), {
       target: { value: '2026-07-09' },

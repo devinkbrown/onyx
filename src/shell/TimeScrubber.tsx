@@ -14,6 +14,7 @@ import {
 import { useStore } from '@/lib/store';
 import { buildMomentLink } from '@/lib/deeplink';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { fetchChannelPulse } from '@/lib/stats/channelStats';
 
 type TimeScrubberBar = {
@@ -259,6 +260,13 @@ export function TimeScrubber(): JSX.Element {
               <div class="time-scrubber__head">
                 <span class="time-scrubber__label">24h UTC</span>
                 <span id="time-scrubber-status" class="time-scrubber__status" aria-live="polite">{status()}</span>
+                <a
+                  class="time-scrubber__ledger"
+                  href={statsRoomHref(channel())}
+                  aria-label={`Channel ledger for ${channel()}`}
+                >
+                  Ledger
+                </a>
               </div>
               <div
                 class="time-scrubber__track"

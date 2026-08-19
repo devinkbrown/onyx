@@ -107,7 +107,8 @@ import {
 } from '@/lib/e2ee/replyPrivacy';
 import { activeReplyForTarget } from '@/lib/composer/messageContext';
 import { mergeComposerInsert } from '@/lib/composer/composerInject';
-import { removeMessageReactor, toggleMessageReactions } from '@/lib/reactions/toggleReaction';
+import { addMessageReactor, removeMessageReactor, toggleMessageReactions } from '@/lib/reactions/toggleReaction';
+import { activitySubscribeArgs, parseActivityStream } from '@/lib/irc/activitySubscribe';
 import { openDmTrusted, peerSafetyNumber, pinnedPeerKey, pinPeerKey, safetyNumber, sealDmTrustedToDevices } from '@/lib/e2ee/keyPinning';
 import {
   ENCRYPTION_POLICY_PROP,
@@ -3768,6 +3769,9 @@ export function _resetTempBanTimersForTests(): void {
 
 // ── Reconnect countdown (module-level) ────────────────────────────────────────
 let _reconnectAttempts = 0;
+const _RECONNECT_DELAY_CAP_SECONDS = 60;
+const _RECONNECT_JITTER_RATIO = 0.2;
+let _reconnectRandom: () => number = Math.random;
 
 // ── Nick alias try index (module-level) ──────────────────────────────────────
 /** How many aliases have been tried for the current connection attempt */
@@ -3821,12 +3825,33 @@ function _startNickReclaim(desiredNick: string) {
 }
 
 function _reconnectDelay(attempt: number): number {
-  return Math.min(5 * Math.pow(2, attempt), 60);
+  const baseDelay = Math.min(5 * Math.pow(2, attempt), _RECONNECT_DELAY_CAP_SECONDS);
+  const jitterWindow = Math.max(1, Math.floor(baseDelay * _RECONNECT_JITTER_RATIO));
+  const randomUnit = Math.min(1, Math.max(0, _reconnectRandom()));
+  const jitterOffset = Math.round((randomUnit * 2 - 1) * jitterWindow);
+  return Math.max(1, Math.min(_RECONNECT_DELAY_CAP_SECONDS, baseDelay + jitterOffset));
+}
+
+/** Deterministic probe for reconnect-delay tests. */
+export function _reconnectDelayForTests(attempt: number): number {
+  return _reconnectDelay(attempt);
 }
 
 function _clearReconnectCountdown() {
   if (_reconnectCountdownTimer) { clearInterval(_reconnectCountdownTimer); _reconnectCountdownTimer = null; }
   if (_reconnectScheduleTimer) { clearTimeout(_reconnectScheduleTimer); _reconnectScheduleTimer = null; }
+}
+
+/** Test seam for deterministic reconnect jitter assertions. */
+export function _setReconnectRandomForTests(randomFn: () => number): void {
+  _reconnectRandom = randomFn;
+}
+
+/** Reset reconnect randomness + attempt/timer state between focused tests. */
+export function _resetReconnectBackoffForTests(): void {
+  _reconnectRandom = Math.random;
+  _reconnectAttempts = 0;
+  _clearReconnectCountdown();
 }
 
 type SetFn = (partial: Partial<OnyxState> | ((s: OnyxState) => Partial<OnyxState>)) => void;
@@ -4208,9 +4233,25 @@ function _resetAccountPrivateMessageState(set: SetFn): void {
         highlights: 0,
       });
     }
+    // scheduleMessage/_persistScheduledMessages write a queued row's body to
+    // localStorage in the clear (defense-in-depth guards keep newly-scheduled
+    // E2EE-designated DMs out of the queue, but legacy pre-guard rows may
+    // still be sitting there). The array intentionally survives an account
+    // switch for OTHER identities — selectOwnedScheduledMessages and
+    // _dispatchScheduledMessages already scope visibility/dispatch by owner,
+    // so a user can hold scheduled sends under multiple accounts on one
+    // device — but the identity that is actually logging out here must not
+    // leave its plaintext bodies sitting in localStorage indefinitely.
+    const outgoingOwner = _scheduledMessageOwner(s);
+    const filteredScheduledMessages = outgoingOwner
+      ? s.scheduledMessages.filter((message) => !_sameScheduledMessageOwner(message.owner, outgoingOwner))
+      : s.scheduledMessages;
+    const scheduledMessagesChanged = filteredScheduledMessages.length !== s.scheduledMessages.length;
+    if (scheduledMessagesChanged) _persistScheduledMessages(filteredScheduledMessages);
     return {
       channels,
       dms: new Map(),
+      scheduledMessages: scheduledMessagesChanged ? filteredScheduledMessages : s.scheduledMessages,
       activeView: s.activeView.kind === 'dm' ? { kind: 'home' as const } : s.activeView,
       timeTravelLandingId: null,
       historyLoading: new Map(),
@@ -4631,6 +4672,16 @@ function _tryPendingDeepLinkTopicResolution(
  * rapid focus switching can't spam the server. No-op when disconnected or not a
  * member. Safe to call freely: NAMES rebuilds the roster and is idempotent.
  */
+function _requestActivitySubscription(
+  get: GetFn,
+  channel: string,
+  op: 'SUBSCRIBE' | 'UNSUBSCRIBE',
+): void {
+  const args = activitySubscribeArgs(channel, op);
+  if (!args) return;
+  get().client?.sendRaw(...args);
+}
+
 function _refreshChannelRoster(get: GetFn, channel: string): void {
   const key = channel.toLowerCase();
   const st = get();
@@ -5578,6 +5629,22 @@ function deliverChatMessage(
       // Only consume the armed reply when this send actually used it.
       if (activeReply) set({ replyingTo: null });
       return true;
+    }).catch(() => {
+      // A rejection here (vs. a resolved non-'sealed' outcome above) still
+      // fails closed — nothing reaches the wire and the draft survives — but
+      // silently swallowing it left the user staring at a message that just
+      // vanished with zero feedback. Surface the same toast/notification the
+      // resolved seal-failure path already shows.
+      get().addToast({
+        variant: 'error',
+        title: 'Encryption unavailable',
+        description: `Your message to ${target} was NOT sent — the encrypted DM could not be sealed. Try again.`,
+      });
+      get().addNotification({
+        type: 'error',
+        text: `Encryption unavailable — message to ${target} was not sent (the encrypted DM could not be sealed).`,
+      });
+      return false;
     });
   }
 
@@ -5675,10 +5742,6 @@ function _openGroupRoomMessage(
       || bridge !== _groupControlBridge
       || client !== get().client
     ) return;
-    // A history collector may still own this object. Mutating the transient
-    // field lets its later immutable merge carry the opened view; the set below
-    // separately notifies an already-live row.
-    message.plaintext = outcome.plaintext;
     set((state) => {
       const channel = state.channels.get(roomKey);
       if (!channel) return {};
@@ -5697,6 +5760,12 @@ function _openGroupRoomMessage(
       channels.set(roomKey, { ...channel, messages });
       return { channels };
     });
+    // A history collector may still hold this exact (now-superseded) object
+    // reference. Mutate the transient field AFTER the immutable set above so
+    // the set's own `plaintext !== undefined` guard sees the pre-update value
+    // and genuinely swaps the row (new channels Map, new message object) —
+    // that reference swap is what makes `useStore(s => s.channels)` notify.
+    message.plaintext = outcome.plaintext;
   }).catch(() => undefined).finally(() => {
     _groupRoomOpenInFlight.delete(flightKey);
   });
@@ -7427,12 +7496,17 @@ export const store = createStore<OnyxState>()(
             title: "Can't queue encrypted DM",
             description: "Encrypted DMs aren't stored while offline — reconnect to send this message.",
           });
-          return;
+          // `false` (not a bare `return`) — Composer.tsx checks `admitted ===
+          // false` to keep the draft/textarea intact on refusal. A bare
+          // `return` resolves to `undefined`, which !== false, so the
+          // composer fell through to its normal post-send draft-clear path
+          // and silently destroyed the unsent message.
+          return false;
         }
         const owner = _outboxOwner(get());
         if (!owner) {
           get().addToast({ variant: 'error', title: 'Offline', description: 'Reconnect before queueing a message for this identity.' });
-          return;
+          return false;
         }
         void queueOutbox(target, text, owner).then((entry) => {
           if (!_sameOutboxOwner(owner, _outboxOwner(get()))) return;
@@ -10750,6 +10824,9 @@ export const store = createStore<OnyxState>()(
             }
             // Fetch WHO data for away status
             get().client?.sendRaw('WHO', ch);
+            // Opt into the server activity stream (#33) so typing/react
+            // events arrive as ACTIVITY even when TAGMSG caps differ.
+            _requestActivitySubscription(get, ch, 'SUBSCRIBE');
             // Roster: a traditional JOIN gets automatic 353/366, but a client
             // that negotiated no-implicit-names must request the authoritative
             // roster itself. Arm before sending so even an immediate reply can
@@ -10831,6 +10908,7 @@ export const store = createStore<OnyxState>()(
           const isSelf = parter.toLowerCase() === ourNick.toLowerCase();
 
           if (isSelf) {
+            _requestActivitySubscription(get, ch, 'UNSUBSCRIBE');
             // A pending/late NAMES reply is not proof that we are still joined.
             _namesBursts.delete(key);
             _lastRosterRefresh.delete(key);
@@ -12661,6 +12739,39 @@ export const store = createStore<OnyxState>()(
           if (setnameNick && newRealname) {
             get().setUserProfile(setnameNick, { realname: newRealname });
           }
+          break;
+        }
+
+        // ── ACTIVITY SUBSCRIBE stream (#33 typing/react) ───────────────────
+        case 'ACTIVITY': {
+          const parsed = parseActivityStream(msg);
+          if (!parsed) break;
+          if (_isHistoryReplay(tags, parsed.channel)) break;
+          if (parsed.kind === 'typing') {
+            if (parsed.nick.toLowerCase() === ourNick.toLowerCase()) break;
+            get().setTyping(parsed.channel, parsed.nick, parsed.active);
+            break;
+          }
+          const reactKey = parsed.channel.toLowerCase();
+          set(s => {
+            const apply = (messages: ChatMessage[]): ChatMessage[] =>
+              messages.map((m) => {
+                if (m.id !== parsed.msgid) return m;
+                return {
+                  ...m,
+                  reactions: parsed.op === 'remove'
+                    ? removeMessageReactor(m.reactions, parsed.reaction, parsed.nick)
+                    : addMessageReactor(m.reactions, parsed.reaction, parsed.nick),
+                };
+              });
+            const channels = new Map(s.channels);
+            const chState = channels.get(reactKey);
+            if (chState) {
+              channels.set(reactKey, { ...chState, messages: apply(chState.messages) });
+              return { channels };
+            }
+            return {};
+          });
           break;
         }
 
@@ -14756,6 +14867,22 @@ export const store = createStore<OnyxState>()(
         });
         return false;
       }
+      // SECURITY: selectChannelEncryptionPolicy only reads channelProps, which a
+      // DM peer never has an entry in — it always resolves to 'off' for a DM, so
+      // the required-room guard above never fires here. `_persistScheduledMessages`
+      // writes the body to localStorage as plaintext, so a designated-E2EE DM must
+      // be refused the same way the offline outbox already refuses it (:7424) —
+      // never write ciphertext-only content to disk in the clear.
+      const chantypes = get().client?.isupport.CHANTYPES ?? '#&';
+      const isDm = channel.length > 0 && !chantypes.includes(channel[0]!);
+      if (isDm && isDmE2eeDesignated(get(), channel)) {
+        get().addToast({
+          variant: 'error',
+          title: "Encrypted DMs can't be scheduled",
+          description: 'Encrypted DMs must be sealed by the live session at send time, so plaintext is never saved for later.',
+        });
+        return false;
+      }
       // Defense-in-depth: pure createScheduledSend / enqueueScheduled own the
       // shape checks; owner is required so rows never dispatch under a peer.
       const owner = _scheduledMessageOwner(get());
@@ -14789,15 +14916,22 @@ export const store = createStore<OnyxState>()(
       if (!owner) return;
       const owned = s.scheduledMessages.filter((message) => _sameScheduledMessageOwner(message.owner, owner));
       const held = s.scheduledMessages.filter((message) => !_sameScheduledMessageOwner(message.owner, owner));
+      // channelPropsSynced (819 RPL_PROPEND) is only ever recorded for CHANNEL
+      // targets — a DM nick can never appear in it. Gate the prop-sync wait on
+      // channel targets only, or every scheduled DM on an IRCX node (isIRCX is
+      // true for every Onyx node) would sit "protected" forever and never
+      // dispatch.
+      const chantypes = s.client?.isupport.CHANTYPES ?? '#&';
+      const isChannelTarget = (target: string) => target.length > 0 && chantypes.includes(target[0]!);
       // Legacy rows may predate the protected-room scheduling guard. Never
       // dispatch their persisted plaintext through an encryption-required
       // room; keep them visible for explicit user cancellation/recovery.
       const protectedHeld = owned.filter(
-        (message) => (s.isIRCX && !s.channelPropsSynced.has(message.channel.toLowerCase()))
+        (message) => (s.isIRCX && isChannelTarget(message.channel) && !s.channelPropsSynced.has(message.channel.toLowerCase()))
           || selectChannelEncryptionPolicy(message.channel)(s) === 'required',
       );
       const dispatchable = owned.filter(
-        (message) => (!s.isIRCX || s.channelPropsSynced.has(message.channel.toLowerCase()))
+        (message) => (!s.isIRCX || !isChannelTarget(message.channel) || s.channelPropsSynced.has(message.channel.toLowerCase()))
           && selectChannelEncryptionPolicy(message.channel)(s) !== 'required',
       );
       const { due, pending: ownedPending } = selectDueMessages(dispatchable, Date.now(), connected);

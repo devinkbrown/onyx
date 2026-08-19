@@ -25,12 +25,7 @@
   padding: 3px;
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--stone-3) 78%, var(--ink)),
-      color-mix(in oklab, var(--stone-2) 70%, var(--ink))
-    );
+  background: color-mix(in oklab, var(--stone-3) 74%, var(--ink));
   box-shadow:
     0 12px 30px -20px color-mix(in oklab, var(--ink) 94%, transparent),
     inset 0 0 0 1px color-mix(in oklab, var(--lapis) 8%, transparent);
@@ -170,6 +165,11 @@
     color var(--dur) var(--ease),
     border-color var(--dur) var(--ease),
     background var(--dur) var(--ease);
+}
+
+a.msg-menu-item {
+  text-decoration: none;
+  font: inherit;
 }
 
 .msg-menu-item:hover,

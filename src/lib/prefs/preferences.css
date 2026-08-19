@@ -292,13 +292,11 @@
 
 .pref-category-tab[aria-selected='true'] {
   color: var(--paper);
-  background:
-    linear-gradient(90deg, color-mix(in oklab, var(--lapis) 19%, transparent), transparent 92%);
+  background: color-mix(in oklab, var(--lapis) 19%, transparent);
 }
 
 .pref-category-tab[aria-selected='true']::before {
   background: var(--lapis-bright);
-  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 46%, transparent);
 }
 
 .pref-category-tab__label {
@@ -365,9 +363,7 @@
   padding: var(--space-2);
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 22%, var(--line));
   border-radius: var(--r-md);
-  background:
-    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 8%, transparent), transparent 46%),
-    color-mix(in oklab, var(--ink) 36%, transparent);
+  background: color-mix(in oklab, var(--ink) 40%, transparent);
 }
 
 .pref-transfer-tools {
@@ -429,12 +425,11 @@
 
 .pref-transfer-tool[aria-expanded='true'] {
   color: var(--paper);
-  background: linear-gradient(90deg, color-mix(in oklab, var(--lapis) 20%, transparent), transparent);
+  background: color-mix(in oklab, var(--lapis) 20%, transparent);
 }
 
 .pref-transfer-tool[aria-expanded='true']::before {
   background: var(--lapis-bright);
-  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 44%, transparent);
 }
 
 .pref-transfer-tool__label {
@@ -593,9 +588,7 @@
     align-items: center;
     margin-inline: calc(-1 * var(--space-1));
     padding: var(--space-1);
-    background: color-mix(in oklab, var(--ink) 94%, transparent);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
+    background: color-mix(in oklab, var(--ink) 98%, transparent);
   }
 
   .pref-category-nav__eyebrow {
@@ -809,9 +802,7 @@
   padding: var(--space-3);
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, var(--line));
   border-radius: var(--r-md);
-  background:
-    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 14%, transparent), transparent 70%),
-    color-mix(in oklab, var(--ink) 45%, transparent);
+  background: color-mix(in oklab, var(--ink) 48%, transparent);
   color: var(--paper);
   cursor: pointer;
   font: inherit;
@@ -821,9 +812,7 @@
 
 .pref-action-card:hover {
   border-color: color-mix(in oklab, var(--lapis-bright) 58%, var(--line));
-  background:
-    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 20%, transparent), transparent 70%),
-    color-mix(in oklab, var(--ink) 52%, transparent);
+  background: color-mix(in oklab, var(--ink) 54%, transparent);
 }
 
 .pref-action-card:focus-visible {
@@ -1147,9 +1136,7 @@
   padding: var(--space-3);
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 24%, var(--line));
   border-radius: var(--r-md);
-  background:
-    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 9%, transparent), transparent 58%),
-    color-mix(in oklab, var(--ink) 32%, transparent);
+  background: color-mix(in oklab, var(--ink) 36%, transparent);
 }
 
 .pref-vault-retention__scope {

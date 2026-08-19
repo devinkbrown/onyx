@@ -8,11 +8,11 @@
 import { createMemo, For, Show, type JSX } from 'solid-js';
 import { eventCountdown, type ScheduledEventItem } from '@/lib/notifications/scheduledEvents';
 import { outboxEntryStatusLabel } from '@/lib/vault/outboxStatus';
-import { relTime } from '@/lib/stats/networkIndex';
+import { relTime, type StatsChannel } from '@/lib/stats/networkIndex';
 import type { CatchUpItem } from '@/lib/notifications/catchUp';
 import type { ResumePoint } from '@/lib/catchup/resumePoints';
 import type { HomeMemoryItem } from '@/lib/notifications/homeMemory';
-import type { StatsChannel } from '@/lib/stats/networkIndex';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import type { CaughtUpPlan } from '@/lib/catchup/markCaughtUp';
 import { HomeMarkCaughtUp } from './HomeMarkCaughtUp';
 import type { HomeBriefing, HomeLiveSlot, HomeOverflow } from './homeBriefingModel';
@@ -267,14 +267,23 @@ function DirectoryCard(props: {
         <span class="home-card-msgs">
           {props.channel.messages.toLocaleString('en-US')} messages tracked
         </span>
-        <button
-          type="button"
-          class="home-card-join"
-          aria-label={props.joined ? `Open ${props.channel.channel}` : `Join ${props.channel.channel}`}
-          onClick={() => props.onOpen(props.channel.channel)}
-        >
-          {props.joined ? 'Open →' : 'Join →'}
-        </button>
+        <div class="home-card-actions">
+          <a
+            class="home-card-ledger"
+            href={statsRoomHref(props.channel.channel)}
+            aria-label={`Channel ledger for ${props.channel.channel}`}
+          >
+            Ledger
+          </a>
+          <button
+            type="button"
+            class="home-card-join"
+            aria-label={props.joined ? `Open ${props.channel.channel}` : `Join ${props.channel.channel}`}
+            onClick={() => props.onOpen(props.channel.channel)}
+          >
+            {props.joined ? 'Open →' : 'Join →'}
+          </button>
+        </div>
       </footer>
     </article>
   );
@@ -908,24 +917,30 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
 
               <Show when={props.more().stats}>
                 {(data) => (
-                  <div class="home-pulse" aria-label="Live network figures">
-                    <div class="home-pulse-tile">
-                      <span class="home-pulse-num">{data().channels.length}</span>
-                      <span class="home-pulse-label">channels</span>
+                  <section class="home-pulse-block" aria-label="Live network figures">
+                    <div class="home-pulse-head">
+                      <span class="home-section-label">Network pulse</span>
+                      <a class="home-pulse-ledger" href="/stats/">Channel ledger</a>
                     </div>
-                    <div class="home-pulse-tile">
-                      <span class="home-pulse-num">{props.more().totalMessages.toLocaleString('en-US')}</span>
-                      <span class="home-pulse-label">messages tracked</span>
+                    <div class="home-pulse">
+                      <div class="home-pulse-tile">
+                        <span class="home-pulse-num">{data().channels.length}</span>
+                        <span class="home-pulse-label">channels</span>
+                      </div>
+                      <div class="home-pulse-tile">
+                        <span class="home-pulse-num">{props.more().totalMessages.toLocaleString('en-US')}</span>
+                        <span class="home-pulse-label">messages tracked</span>
+                      </div>
+                      <div class="home-pulse-tile">
+                        <span class="home-pulse-num">{data().users_online.toLocaleString('en-US')}</span>
+                        <span class="home-pulse-label">people online</span>
+                      </div>
+                      <div class="home-pulse-tile">
+                        <span class="home-pulse-num">{relTime(data().generated_at, props.nowMs())}</span>
+                        <span class="home-pulse-label">stats updated</span>
+                      </div>
                     </div>
-                    <div class="home-pulse-tile">
-                      <span class="home-pulse-num">{data().users_online.toLocaleString('en-US')}</span>
-                      <span class="home-pulse-label">people online</span>
-                    </div>
-                    <div class="home-pulse-tile">
-                      <span class="home-pulse-num">{relTime(data().generated_at, props.nowMs())}</span>
-                      <span class="home-pulse-label">stats updated</span>
-                    </div>
-                  </div>
+                  </section>
                 )}
               </Show>
 
@@ -933,7 +948,10 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                 <section class="home-rhythm" aria-label="Room rhythm">
                   <div class="home-rhythm-head">
                     <h2 class="home-section-label">Room rhythm</h2>
-                    <span class="home-rhythm-summary">joined rooms</span>
+                    <div class="home-rhythm-meta">
+                      <span class="home-rhythm-summary">joined rooms</span>
+                      <a class="home-rhythm-ledger" href="/stats/">Channel ledger</a>
+                    </div>
                   </div>
                   <div class="home-rhythm-list">
                     <For each={props.more().roomRhythm}>
@@ -1030,27 +1048,39 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                 <section class="home-quiet" aria-label="Quiet room activity">
                   <div class="home-quiet-head">
                     <h2 class="home-section-label">Quiet rooms</h2>
-                    <span class="home-quiet-summary">already read</span>
+                    <div class="home-quiet-meta">
+                      <span class="home-quiet-summary">already read</span>
+                      <a class="home-quiet-ledger" href="/stats/">Channel ledger</a>
+                    </div>
                   </div>
                   <div class="home-quiet-list">
                     <For each={props.more().quietActivity}>
                       {(item) => (
-                        <button
-                          type="button"
-                          class="home-quiet-item"
-                          onClick={() => props.actions.openQuietActivity(item)}
-                          aria-label={`Open ${item.name}, active ${relTime(Math.floor(item.lastActivity / 1000), props.nowMs())}`}
-                        >
-                          <span class="home-quiet-main">
-                            <span class="home-quiet-room">{item.name}</span>
-                            <span class={`home-quiet-topic${item.topic ? '' : ' is-empty'}`}>
-                              {item.topic || 'No topic set'}
+                        <div class="home-quiet-row">
+                          <button
+                            type="button"
+                            class="home-quiet-item"
+                            onClick={() => props.actions.openQuietActivity(item)}
+                            aria-label={`Open ${item.name}, active ${relTime(Math.floor(item.lastActivity / 1000), props.nowMs())}`}
+                          >
+                            <span class="home-quiet-main">
+                              <span class="home-quiet-room">{item.name}</span>
+                              <span class={`home-quiet-topic${item.topic ? '' : ' is-empty'}`}>
+                                {item.topic || 'No topic set'}
+                              </span>
                             </span>
-                          </span>
-                          <span class="home-quiet-when">
-                            {relTime(Math.floor(item.lastActivity / 1000), props.nowMs())}
-                          </span>
-                        </button>
+                            <span class="home-quiet-when">
+                              {relTime(Math.floor(item.lastActivity / 1000), props.nowMs())}
+                            </span>
+                          </button>
+                          <a
+                            class="home-quiet-room-ledger"
+                            href={statsRoomHref(item.name)}
+                            aria-label={`Channel ledger for ${item.name}`}
+                          >
+                            Ledger
+                          </a>
+                        </div>
                       )}
                     </For>
                   </div>

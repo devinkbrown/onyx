@@ -23,6 +23,7 @@ import {
   relTime,
   type StatsChannel,
 } from '@/lib/stats/networkIndex';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { NODES, pingNode } from './nodes';
 
 type NodePing = { host: string; ms: number };
@@ -104,6 +105,8 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
                 <span class="cpulse-wire-sep">·</span>
                 <b>{totalMessages().toLocaleString('en-US')}</b> messages
                 <span class="cpulse-wire-sep">·</span>
+                <a class="cpulse-wire-ledger" href="/stats/">Channel ledger</a>
+                <span class="cpulse-wire-sep">·</span>
                 updated {relTime(data().generated_at, nowMs())}
                 <Show when={!data().channels_complete}>
                   <span class="cpulse-wire-sep">·</span>
@@ -130,7 +133,14 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
             {(room) => (
               <li class="cpulse-room">
                 <div class="cpulse-room-head">
-                  <span class="cpulse-room-name">{room.channel}</span>
+                  <a
+                    class="cpulse-room-name"
+                    href={statsRoomHref(room.channel)}
+                    aria-label={`Channel ledger for ${room.channel}`}
+                    data-testid="pulse-room-ledger"
+                  >
+                    {room.channel}
+                  </a>
                   <span class="cpulse-room-meta">
                     {roomPresenceLabel(room, nowMs())}
                   </span>

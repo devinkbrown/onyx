@@ -134,6 +134,11 @@ describe('HomeView — Active rooms open-or-join', () => {
     expect(directory).toHaveTextContent('7 people here now');
     expect(directory).toHaveTextContent('908 messages tracked');
     expect(directory).not.toHaveTextContent('16 chatting');
+    expect(screen.getByRole('link', { name: 'Channel ledger for #root' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23root',
+    );
+    expect(screen.getByRole('link', { name: 'Channel ledger' })).toHaveAttribute('href', '/stats/');
   });
 
   it('joins an unjoined room without navigating away from Home', async () => {

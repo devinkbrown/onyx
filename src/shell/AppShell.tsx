@@ -656,12 +656,20 @@ export function AppShell(props: AppShellProps): JSX.Element {
     });
   });
 
-  function focusFirstInMobileDrawer(root: HTMLElement | null | undefined): void {
-    queueMicrotask(() => {
-      const first = focusableIn(root)[0];
-      (first ?? root)?.focus();
-    });
-  }
+function focusFirstInMobileDrawer(root: HTMLElement | null | undefined): void {
+  queueMicrotask(() => {
+    const first = focusableIn(root)[0];
+    (first ?? root)?.focus();
+  });
+}
+
+function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
+  queueMicrotask(() => {
+    const close = root?.querySelector<HTMLElement>('.shell-members-close');
+    const first = focusableIn(root)[0];
+    (close ?? first ?? root)?.focus();
+  });
+}
 
   function trapMobileDrawerTab(event: KeyboardEvent, root: HTMLElement): void {
     const focusables = focusableIn(root);
@@ -722,6 +730,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
         mobileDrawerRestoreTarget ||= document.querySelector<HTMLElement>('[data-testid="ribbon-members"]');
         setMobileMembersOpen(true);
       }
+      // Context never owns the column-4 slot on mobile (it is a fixed edge
+      // sheet there instead — see the >=901px CSS gate). Close it on the
+      // transition so asideOccupant() cannot keep reporting 'context' after
+      // the viewport can no longer render it as a column occupant.
+      if (e.matches) setContextRailOpen(false);
       setIsMobile(e.matches);
       keyboardOverlay?.setMobile(e.matches);
       if (!e.matches) {
@@ -786,8 +799,17 @@ export function AppShell(props: AppShellProps): JSX.Element {
       getState().closeMobileSidebar();
       setMobileMoreOpen(false);
       setMobileMembersOpen(true);
-      queueMicrotask(() => focusFirstInMobileDrawer(membersDrawerElement()));
+      queueMicrotask(() => focusMobileMembersDrawer(membersDrawerElement()));
     } else {
+      // People wins the column-4 slot over an open Context rail. Flip the
+      // signal directly (never route through closeContextRail — that queues
+      // focus onto the Context trigger and would yank focus off the People
+      // button the user just pressed, violating WCAG SC 3.2.1 On Focus).
+      if (contextRailOpen()) {
+        setContextRailOpen(false);
+        if (!showMemberList()) getState().toggleMemberList();
+        return;
+      }
       getState().toggleMemberList();
     }
   }
@@ -1007,6 +1029,36 @@ export function AppShell(props: AppShellProps): JSX.Element {
     hasMemberRoster() && (isMobile() ? mobileMembersOpen() : showMemberList()),
   );
 
+  // ── single-occupant column-4 slot ──
+  // Column 4 can hold the member roster, the Context rail, or nothing — never
+  // both the roster and the rail at once. This is what makes "both claim
+  // grid-column:4" unrepresentable: exactly one branch below can be true, and
+  // AppShell threads the result through a single tri-state DOM attribute
+  // (`data-shell-aside`) that both MemberList and ContextRail read off of,
+  // instead of two independently-computed booleans that could drift apart.
+  // Context never takes the column on mobile — it stays a fixed edge sheet
+  // there (see the >=901px CSS gate), so mobile always falls through to the
+  // member drawer/column state.
+  type ShellAside = 'members' | 'context' | 'none';
+  const asideOccupant = createMemo<ShellAside>(() => {
+    if (!isMobile() && contextRailOpen()) return 'context';
+    if (membersVisible()) return 'members';
+    return 'none';
+  });
+
+  // A11y: openMemberWhois above captures `.shell-members` as the WHOIS
+  // return-focus fallback. If Context then claims column 4, that fallback
+  // goes [inert] the instant asideOccupant() moves off 'members' —
+  // focusTrap.ts's canRestoreDialogFocus rejects [inert]/[aria-hidden="true"]
+  // targets, so closing WHOIS would strand focus on <body> (WCAG SC 2.4.3).
+  // Re-point the fallback to a control that stays interactive for as long as
+  // Context owns the slot.
+  createEffect(() => {
+    if (asideOccupant() === 'members' || !showWhois()) return;
+    const ribbonMembers = document.querySelector<HTMLElement>('[data-testid="ribbon-members"]');
+    setWhoisReturnFocusFallback(ribbonMembers ?? contextTriggerRef ?? null);
+  });
+
   const activeSection = createMemo<PrimaryCurrentSection>(() => {
     if (primarySurface() === 'calls') return 'calls';
     const view = activeView();
@@ -1073,11 +1125,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
   }
 
   // ── shell class ──
+  // Column-4 occupancy is no longer a class concern — it lives entirely on
+  // the data-shell-aside attribute (asideOccupant above), which CSS reads via
+  // .shell[data-shell-aside=...] attribute selectors.
   const shellClass = createMemo(() => {
     const classes = ['shell'];
     if (!showRail()) classes.push('shell--no-rail');
-    if (!showMemberList() || !hasMemberRoster() || contextRailOpen()) classes.push('shell--members-hidden');
-    if (contextRailOpen()) classes.push('shell--context-open');
     return classes.join(' ');
   });
 
@@ -1094,6 +1147,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
         class={shellClass()}
         data-testid="app-shell"
         data-room-identity={roomIdentity()?.target}
+        data-shell-aside={asideOccupant()}
         style={roomIdentityVars()}
       >
         {/* ── Server Rail — hidden when < 3 servers ── */}
@@ -1137,7 +1191,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
             selfNick={displayNick()}
             contextActionsOnly={isMobile()}
             onToggleMembers={handleToggleMembers}
-            membersOpen={membersVisible()}
+            membersOpen={asideOccupant() === 'members'}
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
           />
@@ -1241,13 +1295,13 @@ export function AppShell(props: AppShellProps): JSX.Element {
           />
         </Show>
         <MemberList
-          hidden={!membersVisible()}
+          hidden={asideOccupant() !== 'members'}
           modal={isMobile()}
           onClose={closeMobileMembers}
           onOpenDm={openMemberDm}
           onOpenWhois={openMemberWhois}
         />
-        <ContextRail open={contextRailOpen()} onClose={closeContextRail} />
+        <ContextRail open={asideOccupant() === 'context'} onClose={closeContextRail} />
       </div>
 
       {/* Mobile bottom tab bar — the same product-frame navigation as the

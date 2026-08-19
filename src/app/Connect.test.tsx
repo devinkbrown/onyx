@@ -1554,6 +1554,24 @@ describe('optional room to join (no autojoin)', () => {
     connectSpy.mockRestore();
   });
 
+  it.each([
+    { entered: '&ops', expected: '&ops' },
+    { entered: '#ops', expected: '#ops' },
+    { entered: 'ops', expected: '#ops' },
+  ])('normalizes room "$entered" to "$expected" in destination and pending join', ({ entered, expected }) => {
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+    render(() => <Connect />);
+    fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByLabelText(/channel/i), { target: { value: entered } });
+
+    const summary = screen.getByRole('region', { name: /arrive without an account/i });
+    expect(within(summary).getByText(expected)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('conn-submit'));
+    expect(store.getState().pendingDeepLinkJoin).toBe(expected);
+    connectSpy.mockRestore();
+  });
+
   it('an empty room leaves no pending join — landing on Home is the default', () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
@@ -1591,6 +1609,21 @@ describe('optional room to join (no autojoin)', () => {
     await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
     expect(connectSpy.mock.calls[0]![0].nick).toBe('yuki');
     expect(store.getState().pendingDeepLinkJoin).toBe('#general');
+
+    connectSpy.mockRestore();
+  });
+
+  it('retains local-channel deep links with the & prefix', async () => {
+    window.history.pushState({}, '', '/app?join=%26ops&as=yuki');
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+
+    render(() => <Connect />);
+    expect(screen.getByRole('note', { name: /invite preview/i })).toHaveTextContent('Join &ops');
+    expect(screen.getByLabelText(/channel/i)).toHaveValue('&ops');
+    fireEvent.click(screen.getByTestId('conn-submit'));
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(store.getState().pendingDeepLinkJoin).toBe('&ops');
 
     connectSpy.mockRestore();
   });

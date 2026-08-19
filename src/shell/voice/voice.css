@@ -18,15 +18,10 @@
   overflow: hidden;
   flex-shrink: 0;
   z-index: 4; /* above guest-claim / scrubber siblings if they reappear */
-  background:
-    radial-gradient(circle at 50% -12%, color-mix(in oklab, var(--lapis-deep) 26%, transparent), transparent 42%),
-    radial-gradient(circle at 12% 18%, color-mix(in oklab, var(--lapis) 12%, transparent), transparent 30%),
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 72%, var(--ink)), var(--stone) 42%, var(--ink));
+  background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent),
-    inset 0 -28px 80px color-mix(in oklab, var(--ink) 72%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent);
   padding: clamp(10px, 1.3vw, 16px);
   gap: clamp(8px, 1vw, 12px);
   box-sizing: border-box;
@@ -349,22 +344,16 @@
   aspect-ratio: 16 / 9;
   border-radius: var(--r-md);
   overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--lapis-deep) 20%, transparent), transparent 48%),
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 64%, transparent), color-mix(in oklab, var(--stone) 86%, var(--ink)));
+  background: color-mix(in oklab, var(--stone-2) 64%, var(--ink));
   border: 1px solid var(--seam-faint);
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent),
-    0 18px 48px -34px color-mix(in oklab, var(--ink) 92%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(18px);
   transition:
     border-color var(--dur) var(--ease),
-    box-shadow var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+    box-shadow var(--dur) var(--ease);
 }
 
 .voice-tile::before,
@@ -378,10 +367,8 @@
 
 /* Decorative wash only when there is no video — never dim a live feed. */
 .voice-tile:not(:has(.voice-tile__video))::before {
-  background:
-    linear-gradient(125deg, transparent 0 42%, color-mix(in oklab, var(--lapis-bright) 12%, transparent) 48%, transparent 56%),
-    radial-gradient(circle at 20% 14%, color-mix(in oklab, var(--paper) 8%, transparent), transparent 24%);
-  opacity: 0.28;
+  background: color-mix(in oklab, var(--lapis-deep) 8%, transparent);
+  opacity: 0.22;
 }
 
 .voice-tile:has(.voice-tile__video)::before {
@@ -397,11 +384,7 @@
 /* Active speaker — bioluminescent azure current glow */
 .voice-tile--speaking {
   border-color: color-mix(in oklab, var(--lapis-bright) 86%, var(--paper));
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 86%, transparent),
-    0 0 28px color-mix(in oklab, var(--lapis-bright) 34%, transparent),
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 12%, transparent);
-  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 86%, transparent);
 }
 
 .voice-tile--self {
@@ -410,10 +393,7 @@
 
 .voice-tile--self.voice-tile--speaking {
   border-color: color-mix(in oklab, var(--lapis-bright) 86%, var(--paper));
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 86%, transparent),
-    0 0 28px color-mix(in oklab, var(--lapis-bright) 34%, transparent),
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 86%, transparent);
 }
 
 /* Video feed — letterbox inside the 16:9 tile (contain), never stretch the
@@ -469,14 +449,12 @@
   align-items: center;
   gap: 6px;
   padding: 4px 9px 7px;
-  background:
-    linear-gradient(to top, color-mix(in oklab, var(--ink) 88%, transparent), color-mix(in oklab, var(--stone) 26%, transparent) 68%, transparent);
+  background: color-mix(in oklab, var(--ink) 86%, transparent);
   border-top: 1px solid var(--seam-faint);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--paper);
   letter-spacing: 0.04em;
-  backdrop-filter: blur(14px);
 }
 
 .voice-tile__nick {
@@ -555,7 +533,6 @@
   height: 100%;
   border-radius: var(--r-pill);
   background: var(--lapis-bright);
-  box-shadow: 0 0 8px color-mix(in oklab, var(--lapis-bright) 52%, transparent);
   transform-origin: bottom;
   /* Animate scaleY (compositor-only) instead of height (layout) so the
      per-participant equalizer never triggers layout/paint. transform-origin
@@ -605,7 +582,7 @@
   padding: 3px 7px;
   border: 1px solid var(--seam);
   border-radius: var(--r-pill);
-  box-shadow: 0 0 14px color-mix(in oklab, var(--lapis-bright) 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 28%, transparent);
 }
 
 /* Camera-off hint under the avatar fallback */
@@ -641,7 +618,7 @@
   border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--gold) 26%, var(--ink));
   border: 1px solid color-mix(in oklab, var(--gold-bright) 56%, transparent);
-  box-shadow: 0 0 14px color-mix(in oklab, var(--gold-bright) 30%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--gold-bright) 40%, transparent);
   animation: vtile-hand 1.8s var(--ease) infinite;
 }
 
@@ -700,10 +677,8 @@
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-pill);
   opacity: 0;
-  transform: translateY(-2px);
   transition:
     opacity var(--dur) var(--ease),
-    transform var(--dur) var(--ease),
     color var(--dur) var(--ease),
     background var(--dur) var(--ease),
     border-color var(--dur) var(--ease);
@@ -718,7 +693,6 @@
 .voice-tile__pin[aria-pressed="true"],
 .voice-tile__pip[aria-pressed="true"] {
   opacity: 1;
-  transform: translateY(0);
 }
 
 .voice-tile__pin:hover,
@@ -739,7 +713,7 @@
   color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis-deep) 32%, var(--ink));
   border-color: color-mix(in oklab, var(--lapis-bright) 60%, var(--seam));
-  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 26%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent);
 }
 
 .voice-tile__pip:disabled {
@@ -750,9 +724,7 @@
 /* Pinned tile — persistent azure frame so it reads as the focus */
 .voice-tile--pinned {
   border-color: color-mix(in oklab, var(--lapis-bright) 60%, var(--seam));
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent),
-    0 0 22px color-mix(in oklab, var(--lapis-bright) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent);
 }
 
 /* Camera-off badge in the bottom bar */
@@ -767,13 +739,9 @@
   gap: 8px;
   min-height: 56px;
   padding: 6px 12px;
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone) 74%, transparent), color-mix(in oklab, var(--ink) 94%, var(--stone))),
-    linear-gradient(90deg, transparent, color-mix(in oklab, var(--lapis) 9%, transparent) 48%, transparent);
+  background: color-mix(in oklab, var(--stone) 74%, var(--ink));
   border-top: 1px solid var(--seam-faint);
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent),
-    0 -18px 48px -34px color-mix(in oklab, var(--lapis-deep) 70%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent);
   font-family: var(--font-mono);
   flex-shrink: 0;
   z-index: 10;
@@ -867,26 +835,19 @@
   color: var(--paper-dim);
   border-radius: var(--r-pill);
   border: 1px solid var(--seam-faint);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 42%, transparent), color-mix(in oklab, var(--ink) 70%, transparent));
+  background: color-mix(in oklab, var(--stone-2) 42%, var(--ink));
   box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 7%, transparent);
   cursor: pointer;
   transition:
     color var(--dur) var(--ease),
     background var(--dur) var(--ease),
-    border-color var(--dur) var(--ease),
-    box-shadow var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+    border-color var(--dur) var(--ease);
 }
 
 .voice-bar__group .onyx-popover__trigger:hover {
   color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis) 12%, var(--stone));
   border-color: var(--seam);
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 12%, transparent),
-    0 0 18px color-mix(in oklab, var(--lapis-bright) 18%, transparent);
-  transform: translateY(-1px);
 }
 
 .voice-bar__group .onyx-popover__trigger:focus-visible {
@@ -897,11 +858,8 @@
 .voice-bar__group .onyx-popover__trigger[aria-expanded="true"] {
   color: var(--paper);
   border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--seam));
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--lapis) 30%, var(--stone)), color-mix(in oklab, var(--lapis-deep) 32%, var(--ink)));
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent),
-    0 0 22px color-mix(in oklab, var(--lapis-bright) 22%, transparent);
+  background: color-mix(in oklab, var(--lapis) 24%, var(--stone));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -940,7 +898,6 @@
 .voice-bar__reaction:hover {
   background: color-mix(in oklab, var(--lapis) 14%, var(--stone));
   border-color: var(--seam);
-  transform: translateY(-1px) scale(1.08);
 }
 
 .voice-bar__reaction:focus-visible {
@@ -968,8 +925,7 @@
 .voice-bar .onyx-icon-button {
   border-radius: var(--r-pill);
   color: var(--paper-dim);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 42%, transparent), color-mix(in oklab, var(--ink) 70%, transparent));
+  background: color-mix(in oklab, var(--stone-2) 42%, var(--ink));
   border-color: var(--seam-faint);
   box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 7%, transparent);
 }
@@ -978,10 +934,6 @@
   color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis) 12%, var(--stone));
   border-color: var(--seam);
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 12%, transparent),
-    0 0 18px color-mix(in oklab, var(--lapis-bright) 18%, transparent);
-  transform: translateY(-1px);
 }
 
 .voice-bar .onyx-icon-button:disabled {
@@ -997,20 +949,16 @@
   outline: 2px solid var(--lapis-bright);
   outline-offset: 3px;
   box-shadow:
-    0 0 0 4px color-mix(in oklab, var(--lapis-bright) 16%, transparent),
+    0 0 0 3px color-mix(in oklab, var(--lapis-bright) 16%, transparent),
     inset 0 1px 0 color-mix(in oklab, var(--paper) 12%, transparent);
 }
 
-/* Pressed / active state — azure bioluminescent tint */
+/* Pressed / active state */
 .voice-bar .onyx-icon-button[aria-pressed="true"] {
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--lapis) 30%, var(--stone)), color-mix(in oklab, var(--lapis-deep) 32%, var(--ink)));
+  background: color-mix(in oklab, var(--lapis) 24%, var(--stone));
   color: var(--paper);
   border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--seam));
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent),
-    0 0 22px color-mix(in oklab, var(--lapis-bright) 22%, transparent),
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent);
 }
 
 /* Muted microphone — coral danger accent */
@@ -1025,21 +973,17 @@
   background: color-mix(in oklab, var(--shu) 22%, var(--ink));
   color: var(--paper);
   border: 1px solid color-mix(in oklab, var(--shu) 48%, transparent);
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--shu) 28%, transparent),
-    0 0 18px color-mix(in oklab, var(--shu) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--shu) 40%, transparent);
 }
 
 /* Leave button — coral, restrained */
 .voice-bar__leave.onyx-icon-button {
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--shu) 74%, var(--stone)), color-mix(in oklab, var(--shu) 58%, var(--ink)));
+  background: color-mix(in oklab, var(--shu) 68%, var(--stone));
   color: var(--paper);
   border: 1px solid color-mix(in oklab, var(--shu) 64%, var(--paper));
   font-weight: 700;
   border-radius: var(--r-pill);
   min-width: 44px;
-  box-shadow: 0 10px 28px -22px color-mix(in oklab, var(--shu) 88%, transparent);
 }
 
 .voice-bar__leave.onyx-icon-button:hover,

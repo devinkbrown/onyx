@@ -8,7 +8,7 @@
  * this is the same contract proven in onyx-stats/src/lib/slug.ts.
  */
 
-import { boundedFeedInteger, PUBLIC_FEED_COUNT_MAX } from './feedBounds';
+import { boundedFeedInteger, boundedUnixSeconds, PUBLIC_FEED_COUNT_MAX } from './feedBounds';
 import { fetchPublicJson } from './fetchPublicJson';
 
 const MAX_SLUG_BYTES = 128;
@@ -46,6 +46,10 @@ export type ChannelPulse = {
   hours: number[];
   /** All-time total messages recorded for the channel. */
   total: number;
+  /** Live roster count when the export includes it. */
+  present: number;
+  /** Unix seconds of last recorded public activity, or 0. */
+  lastActive: number;
 };
 
 function normalizeHours(raw: unknown): number[] | null {
@@ -74,7 +78,12 @@ export async function fetchChannelPulse(channel: string): Promise<ChannelPulse |
     const total = typeof reportedTotal === 'number' && Number.isFinite(reportedTotal) && reportedTotal >= 0
       ? boundedFeedInteger(reportedTotal)
       : Math.min(hours.reduce((a, b) => a + b, 0), PUBLIC_FEED_COUNT_MAX);
-    return { hours, total };
+    return {
+      hours,
+      total,
+      present: boundedFeedInteger(raw['present']),
+      lastActive: boundedUnixSeconds(raw['last_active']),
+    };
   } catch {
     return null;
   }

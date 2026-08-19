@@ -20,6 +20,7 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
+import { prefersReducedMotionForInteraction } from '@/lib/a11y/reducedMotion';
 import { useStore, getState, selectDeviceMemoryOwner } from '@/lib/store';
 import type { Channel } from '@/lib/irc/types';
 import type { ActiveView, ChannelFolder, DMConversation } from '@/lib/store/store';
@@ -27,6 +28,8 @@ import {
   filterSidebarNames,
   matchesSidebarQuery,
 } from '@/lib/channel/sidebarFilter';
+import { normalizeRoomTarget } from './roomIdentity';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { NotificationControls } from './NotificationControls';
 import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
 
@@ -54,8 +57,6 @@ type NavigationViewTransition = {
 type ViewTransitionDocument = Document & {
   startViewTransition?: (update: () => void) => NavigationViewTransition;
 };
-
-const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 function publicNetworkName(networkName: string): string {
   const trimmed = networkName.trim();
@@ -171,15 +172,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
       ? null
       : document as ViewTransitionDocument;
     const startViewTransition = transitionDocument?.startViewTransition;
-    const reduceMotion = (() => {
-      try {
-        return typeof window !== 'undefined' &&
-          typeof window.matchMedia === 'function' &&
-          window.matchMedia(REDUCED_MOTION_QUERY).matches;
-      } catch {
-        return true;
-      }
-    })();
+    const reduceMotion = prefersReducedMotionForInteraction();
 
     if (sameTarget || !transitionDocument || typeof startViewTransition !== 'function' || reduceMotion) {
       update();
@@ -255,9 +248,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   // ── join input ──
   const [joinInput, setJoinInput] = createSignal('');
   const joinTarget = createMemo(() => {
-    const raw = joinInput().trim();
-    if (!raw) return '';
-    return raw.startsWith('#') ? raw : `#${raw}`;
+    return normalizeRoomTarget(joinInput()) ?? '';
   });
 
   // ── sidebar filter (channels + DMs) ──
@@ -433,6 +424,14 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   }
 
   // ── status dot modifier ──
+  const activeChannelLedger = createMemo(() => {
+    const view = activeView();
+    if (view.kind !== 'channel') return null;
+    const label = normalizeRoomTarget(view.channel) ?? view.channel.trim();
+    if (!/^[#&]/.test(label)) return null;
+    return { channel: label, href: statsRoomHref(label) };
+  });
+
   const statusMod = createMemo(() => {
     const s = connectionStatus();
     if (s === 'connected') return '--connected';
@@ -491,6 +490,12 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   }
 
   function renderChannelRow(ch: Channel): JSX.Element {
+    const channelLabel = createMemo(() => normalizeRoomTarget(ch.name) ?? ch.name.trim());
+    const channelSigil = createMemo(() => channelLabel().charAt(0) || '#');
+    const channelName = createMemo(() => {
+      const label = channelLabel();
+      return label.startsWith('#') || label.startsWith('&') ? label.slice(1) : label;
+    });
     const active = createMemo(() => isChannelActive(activeView(), ch));
     const hasUnread = createMemo(() => ch.unread > 0);
     const hasHighlight = createMemo(() => ch.highlights > 0);
@@ -513,11 +518,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
               hasHighlight() ? 'shell-channel-item--highlight' : '',
             ].filter(Boolean).join(' ')}
             aria-current={active() ? 'location' : undefined}
-            aria-label={`${ch.name}${unreadLabel(ch.unread, ch.highlights)}${starred() ? ', favorite' : ''}`}
+            aria-label={`${channelLabel()}${unreadLabel(ch.unread, ch.highlights)}${starred() ? ', favorite' : ''}`}
             onClick={() => handleChannelClick(ch)}
           >
-            <span class="shell-channel-sigil" aria-hidden="true">#</span>
-            <span class="shell-channel-name">{ch.name.replace(/^#/, '')}</span>
+            <span class="shell-channel-sigil" aria-hidden="true">{channelSigil()}</span>
+            <span class="shell-channel-name">{channelName()}</span>
             <Show when={activityStamp(ch.name) && ch.unread === 0 && ch.highlights === 0}>
               <span class="shell-channel-time" aria-hidden="true">
                 {activityStamp(ch.name)}
@@ -627,6 +632,19 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
           </button>
         </Show>
       </div>
+
+      <Show when={showRooms() && activeChannelLedger()}>
+        <div class="shell-sidebar-ledger-row">
+          <a
+            class="shell-sidebar-ledger"
+            href={activeChannelLedger()!.href}
+            aria-label={`Channel ledger for ${activeChannelLedger()!.channel}`}
+            data-testid="sidebar-channel-ledger"
+          >
+            Ledger · {activeChannelLedger()!.channel}
+          </a>
+        </div>
+      </Show>
 
       {/* Scrollable list */}
       <div

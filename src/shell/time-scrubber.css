@@ -42,6 +42,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+.time-scrubber__ledger {
+  margin-left: auto;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+  text-decoration: none;
+}
+.time-scrubber__ledger:hover { text-decoration: underline; }
+.time-scrubber__ledger:focus-visible {
+  outline: 1px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
 .time-scrubber__track {
   min-height: 34px;
   padding: 5px;
@@ -70,7 +84,6 @@
 .time-scrubber__bar:hover,
 .time-scrubber__bar:focus-visible {
   opacity: 1;
-  transform: translateY(-1px);
 }
 
 .time-scrubber__bar:focus-visible {

@@ -75,6 +75,7 @@ function harness(options: { current?: boolean; account?: string | null } = {}) {
       onDisconnected,
       reconnect: vi.fn(),
       markRecovered: vi.fn(() => false),
+      requestCurrentEpochWelcome: vi.fn(async () => ({ ok: false as const, reason: 'runtime-inactive' })),
       accept,
       acceptControl: accept,
       ingest: accept,

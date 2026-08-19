@@ -17,10 +17,10 @@
 }
 
 .dl-hero h1 {
-  max-width: 14ch;
-  font-family: var(--public-serif, var(--font-serif));
-  font-weight: 500;
-  letter-spacing: -0.035em;
+  max-width: 18ch;
+  font-family: var(--font-sans);
+  font-weight: 650;
+  letter-spacing: -0.03em;
   text-transform: none;
 }
 

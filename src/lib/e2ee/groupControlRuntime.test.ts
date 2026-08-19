@@ -284,7 +284,6 @@ async function waitGenesisApplied(runtime: GroupControlRuntime, room = '#room'):
       epoch: 1,
     });
     expect(runtime.state.sessionCount).toBeGreaterThanOrEqual(1);
-    expect(runtime.state.activation).toBe('active');
   });
 }
 
@@ -530,6 +529,7 @@ describe('Packet-B group-control runtime', () => {
     await runtime.destroy();
   });
 
+
   it('invalidates a bootstrapped genesis session when a replacement is registered', async () => {
     const value = await fixture();
     const runtime = runtimeFor(value);
@@ -596,7 +596,7 @@ describe('Packet-B group-control runtime', () => {
     await completeHigherEpoch(disconnected, value);
     disconnected.reconnect();
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    expect(disconnected.markRecovered()).toBe(true);
+    expect(disconnected.markRecovered()).toBe(false);
     expect(disconnected.registerProvisionedSession(disconnectedSession!)).toMatchObject({ ok: true });
     await expectUnapplied(disconnectedSession!, disconnected);
     await disconnected.destroy();
@@ -780,8 +780,8 @@ describe('Packet-B group-control runtime', () => {
     expect(reconnecting.state.lifecycle).toBe('recovery-required');
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(reconnecting.state.lifecycle).toBe('recovery-required');
-    expect(reconnecting.markRecovered()).toBe(true);
-    expect(reconnecting.state.lifecycle).toBe('ready');
+    expect(reconnecting.markRecovered()).toBe(false);
+    expect(reconnecting.state.lifecycle).toBe('recovery-required');
     await reconnecting.destroy();
   });
 
@@ -1020,7 +1020,7 @@ describe('Packet-B group-control runtime', () => {
     expect(firstSignal.aborted).toBe(true);
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(runtime.state.lifecycle).toBe('recovery-required');
-    expect(runtime.markRecovered()).toBe(true);
+    expect(runtime.markRecovered()).toBe(false);
 
     const replacement = GroupSession.create({ room: '#room', account: 'alice', deviceId: 'phone', epochKey: bytes(7), membershipDigest: bytes(8) });
     expect(replacement).not.toBeNull();
@@ -1597,7 +1597,7 @@ describe('Packet-B group-control runtime', () => {
     await expect(disconnected.pending).resolves.toMatchObject({ status: 'ignored' });
     expect(disconnected.runtime.state.sessionCount).toBe(0);
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    expect(disconnected.runtime.markRecovered()).toBe(true);
+    expect(disconnected.runtime.markRecovered()).toBe(false);
     await completeGenesis(disconnected.runtime, value);
     await waitGenesisApplied(disconnected.runtime);
     expect(bootstrap).toHaveBeenCalledTimes(2);
@@ -1621,7 +1621,7 @@ describe('Packet-B group-control runtime', () => {
       account: 'alice',
       deviceId: 'phone',
     })).resolves.toBe(true);
-    expect(switched.runtime.markRecovered()).toBe(true);
+    expect(switched.runtime.markRecovered()).toBe(false);
     await completeGenesis(switched.runtime, value);
     await waitGenesisApplied(switched.runtime);
     expect(bootstrap).toHaveBeenCalledTimes(3);

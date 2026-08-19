@@ -28,9 +28,7 @@
 
 .public-info-page .public-info-card {
   border-color: color-mix(in oklab, var(--info-current) 32%, var(--public-line));
-  background:
-    linear-gradient(120deg, color-mix(in oklab, var(--info-current) 10%, transparent), transparent 52%),
-    var(--public-raised);
+  background: color-mix(in oklab, var(--info-current) 6%, var(--public-raised));
 }
 
 .public-info-page .public-info-card h2 { color: var(--info-paper); }

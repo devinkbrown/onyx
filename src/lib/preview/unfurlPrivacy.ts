@@ -64,6 +64,19 @@ export function unfurlPrivacyFromPrefs(input: {
   });
 }
 
+/**
+ * Lowercase a hostname and strip a trailing DNS root label ("."). `URL`
+ * preserves that dot verbatim in `.hostname` (`new URL('https://x.internal./p')
+ * .hostname === 'x.internal.'`), while `sanitizeBlockedHost` (preferences.ts)
+ * strips it from stored blocklist entries — so without this normalization every
+ * suffix/exact-match host check below silently misses a root-labeled host and
+ * a trailing-dot URL defeats the user's blocklist and the internal-host
+ * denylist outright (`https://wiki.intranet.corp./page` unfurled anyway).
+ */
+function normalizeHost(host: string): string {
+  return host.toLowerCase().replace(/\.+$/, '');
+}
+
 export function mayUnfurlUrl(url: string, prefs: UnfurlPrivacyPrefs = DEFAULT_UNFURL_PRIVACY): boolean {
   if (!prefs.linkPreviews) return false;
   let parsed: URL;
@@ -76,13 +89,19 @@ export function mayUnfurlUrl(url: string, prefs: UnfurlPrivacyPrefs = DEFAULT_UN
   if (prefs.httpsOnly && parsed.protocol !== 'https:') return false;
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
 
-  const host = parsed.hostname.toLowerCase();
+  const host = normalizeHost(parsed.hostname);
   if (
     host === 'localhost'
     || host.endsWith('.localhost')
     || host.endsWith('.local')
     || host === '127.0.0.1'
-    || host === '::1'
+    // `URL.hostname` keeps the brackets on an IPv6 literal (`[::1]`), so the
+    // unbracketed form here was always dead. This gate is defense-in-depth
+    // only — every real fetch path revalidates through `isPreviewableUrl`
+    // (linkPreview.ts), whose `isPrivateIPv6` covers loopback/ULA/link-local
+    // properly; kept in sync here so a future direct `mayUnfurlUrl` caller
+    // isn't silently exposed to a dead check.
+    || host === '[::1]'
     || host.endsWith('.internal')
   ) {
     return false;

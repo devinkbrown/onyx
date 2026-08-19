@@ -3,6 +3,7 @@ import './landing.css';
 import './home.css';
 import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
 import { fetchStatsIndex } from '@/lib/stats/networkIndex';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import {
   fetchNetworkStatus,
   formatDuration,
@@ -32,8 +33,8 @@ const LANDING_SHELF_ITEMS = [
  */
 export default function Landing() {
   setPageMeta(
-    'Onyx — a room for your people',
-    'Open Onyx in your browser for rooms, messages, calls, and continuity on your device. Use the same client across desktop and mobile, or choose a native download.',
+    'Onyx — live rooms, messages, and calls',
+    'Open the Onyx service in your browser: rooms, DMs, and calls on your device. Inspect the public room pulse, then join. Native downloads are optional.',
     '/',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
@@ -121,10 +122,11 @@ export default function Landing() {
       <section class="r-wrap home-hero" aria-labelledby="hero-heading">
         <div class="home-hero-grid">
           <div class="home-hero-copy">
-            <p class="home-kicker">Public communication · powered by Onyx Server</p>
-            <h1 id="hero-heading" class="home-h1">Make room for the conversations that matter.</h1>
+            <p class="home-kicker">Live service · rooms · messages · calls</p>
+            <h1 id="hero-heading" class="home-h1">Onyx is on. Open a room.</h1>
             <p class="home-lede">
-              Onyx gives your group a clear place to talk, call, and return to on your own device.
+              The same client for chat, DMs, and calls — in the browser now, or as a native install.
+              Public rooms keep a live pulse you can inspect before you join.
             </p>
             <div class="home-cta-row">
               <a class="home-cta-primary" href="/app/">Open Onyx</a>
@@ -201,7 +203,11 @@ export default function Landing() {
             <span class="k">busy</span>
             <strong>
               <Show when={busiest()} fallback="--">
-                {(room) => room().channel}
+                {(room) => (
+                  <a class="home-busy-link" href={statsRoomHref(room().channel)}>
+                    {room().channel}
+                  </a>
+                )}
               </Show>
             </strong>
             <span class="hint">{busyHint()}</span>

@@ -167,3 +167,48 @@ export async function fetchChannelDetail(channel: string): Promise<ChannelDetail
     return null;
   }
 }
+
+/** Share of network messages this room accounts for, 0–100, or null when the index is empty. */
+export function roomShareOfNetwork(roomMessages: number, networkMessages: number): number | null {
+  if (!Number.isFinite(roomMessages) || !Number.isFinite(networkMessages) || networkMessages <= 0) {
+    return null;
+  }
+  return Math.min(100, Math.max(0, (Math.max(0, roomMessages) / networkMessages) * 100));
+}
+
+/** Peak hour's share of the 24-hour histogram. */
+export function peakHourShare(hours: readonly number[]): number {
+  if (hours.length === 0) return 0;
+  const peak = Math.max(0, ...hours);
+  const total = hours.reduce((sum, value) => sum + Math.max(0, value), 0);
+  if (total <= 0) return 0;
+  return (peak / total) * 100;
+}
+
+/** Joins minus departures (parts + quits + kicks). Negative means the room is shedding. */
+export function netMembershipFlow(totals: ChannelDetailTotals): number {
+  return totals.joins - totals.parts - totals.quits - totals.kicks;
+}
+
+/** Canonical public inspector URL for a room. */
+export function statsRoomHref(channel: string): string {
+  return `/stats/?room=${encodeURIComponent(channel)}`;
+}
+
+/**
+ * Reads `?room=` from a query string. Accepts `#root`, `&ops`, or a bare `root`
+ * (treated as `#root`). Rejects injection characters.
+ */
+export function parseStatsRoomQuery(search: string): string {
+  const query = search.startsWith('?') ? search.slice(1) : search;
+  let raw = '';
+  try {
+    raw = (new URLSearchParams(query).get('room') ?? '').trim();
+  } catch {
+    return '';
+  }
+  if (!raw || raw.length > MAX_DETAIL_TEXT) return '';
+  if (/^(?:#|&)[^\u0000\r\n\t ,]+$/u.test(raw)) return raw;
+  if (/^[^\u0000\r\n\t ,#&]+$/u.test(raw)) return `#${raw}`;
+  return '';
+}

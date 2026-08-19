@@ -306,6 +306,45 @@ describe('store group-control lifecycle ownership', () => {
     expect(bridge.openRoomMessage).toHaveBeenCalledWith('#secure', 'ONYXROOM1 old');
   });
 
+  it('notifies a live s.channels subscriber when a room envelope opens (reactive read, not just state)', async () => {
+    // _openGroupRoomMessage used to mutate `message.plaintext` on the live
+    // object BEFORE the immutable `set(...)` that follows it. That mutation
+    // made the set's own `current.plaintext !== undefined` guard see the
+    // already-updated value, so `changed` stayed false, `set` returned `{}`,
+    // and `s.channels` kept its old reference — a `useStore(s => s.channels)`
+    // subscriber (e.g. MessageView) never fired and the row stayed on the
+    // locked placeholder until an unrelated update rebuilt the array. Reading
+    // state after the fact (`store.getState()`) cannot catch this — it must
+    // assert the subscriber itself fires.
+    store.getState().connect({ url: 'wss://example.test/irc', nick: 'alice' });
+    receive(':example.test 001 alice :Welcome');
+    const bridge = currentBridge();
+    bridge.openRoomMessage.mockResolvedValueOnce({ ok: true, status: 'opened', room: '#secure', epoch: 1, plaintext: 'reactive plaintext' });
+    store.setState({ channels: new Map([['#secure', { name: '#secure', topic: '', topicSetBy: '', topicSetAt: null, modes: '', users: new Map(), unread: 0, highlights: 0, createdAt: null, messages: [] }]]) });
+
+    const spy = vi.fn();
+    const unsubscribe = store.subscribe((s) => s.channels, spy);
+    try {
+      // The synchronous PRIVMSG handling adds the ciphertext row (a
+      // legitimate, expected notification) before the async decrypt even
+      // starts. Snapshot the call count AFTER that settles so the assertion
+      // below isolates the notification the async `.then()` must produce —
+      // asserting `toHaveBeenCalled()` on the raw spy would trivially pass
+      // off that first, unrelated notification even with the bug present.
+      receive('@msgid=live;+onyx/e2ee=mls :bob!u@h PRIVMSG #secure :ONYXROOM1 live');
+      const callsBeforeDecrypt = spy.mock.calls.length;
+      expect(callsBeforeDecrypt).toBeGreaterThan(0);
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(spy.mock.calls.length).toBeGreaterThan(callsBeforeDecrypt);
+      const message = store.getState().channels.get('#secure')?.messages.at(-1);
+      expect(message).toMatchObject({ id: 'live', plaintext: 'reactive plaintext' });
+    } finally {
+      unsubscribe();
+    }
+  });
+
   it('keeps failed and stale room opens ciphertext-only', async () => {
     store.getState().connect({ url: 'wss://example.test/irc', nick: 'alice' });
     receive(':example.test 001 alice :Welcome');

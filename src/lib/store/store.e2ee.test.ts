@@ -11,6 +11,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { isDmE2eeDesignated, store } from './store';
+import * as keyPinning from '@/lib/e2ee/keyPinning';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import type { Channel } from '@/lib/irc/types';
 import { setPreference } from '@/lib/prefs/preferences';
@@ -305,6 +306,41 @@ describe('E2EE DMs', () => {
 
     // And no plaintext echo leaked into the local DM buffer either.
     expect(dmMsgs('trev')).toHaveLength(0);
+  });
+
+  it('warns loudly (not silently) when the DM seal promise itself rejects', async () => {
+    // sealDmTrustedToDevices normally resolves with a non-'sealed' status on
+    // failure (covered above); this exercises an actual promise REJECTION
+    // (e.g. a racing IndexedDB/pin-store error). The room-message seal path
+    // has a `.catch(() => false)`; the DM path historically had none, so the
+    // rejection escaped through `void sendMessage()` with zero user feedback
+    // — fail-closed (nothing hits the wire) but silent.
+    const mine = await deviceKeys();
+    const peer = await makePeer(mine!.publicB64);
+    const send = vi.fn((_line: string) => true);
+    store.setState({ connectionStatus: 'connected', client: mockClient() });
+    store.getState().client!.send = send;
+    const sendRaw = store.getState().client!.sendRaw as ReturnType<typeof vi.fn>;
+    store.setState({ peerDmKeys: new Map([['trev', peer.publicB64]]) });
+
+    vi.spyOn(keyPinning, 'sealDmTrustedToDevices')
+      .mockRejectedValueOnce(new Error('pin store torn down mid-seal'));
+
+    const admitted = await store.getState().sendMessage('trev', 'never vanish silently');
+
+    expect(admitted).toBe(false);
+    // Fail closed either way: nothing reaches the wire.
+    expect(send).not.toHaveBeenCalled();
+    expect(sendRaw).not.toHaveBeenCalledWith('PRIVMSG', 'trev', 'never vanish silently');
+    expect(dmMsgs('trev')).toHaveLength(0);
+
+    // But the user must be told, the same way a resolved seal failure tells them.
+    const toast = store.getState().toasts.at(-1)!;
+    expect(toast.variant).toBe('error');
+    expect(toast.title).toBe('Encryption unavailable');
+    const note = store.getState().notifications.at(-1)!;
+    expect(note.type).toBe('error');
+    expect(note.text).toContain('Encryption unavailable');
   });
 
   it('drops a sealed result when the peer key changes before socket admission', async () => {

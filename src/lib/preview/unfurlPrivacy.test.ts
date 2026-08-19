@@ -56,6 +56,33 @@ describe('unfurlPrivacy', () => {
     });
   });
 
+  it('strips a trailing DNS root label before every host check (defeats the blocklist otherwise)', () => {
+    const privacy = {
+      linkPreviews: true,
+      httpsOnly: true,
+      blockedHosts: ['intranet.corp'],
+    };
+    // Control: the bare (no-dot) host is already correctly blocked.
+    expect(mayUnfurlUrl('https://wiki.intranet.corp/page', privacy)).toBe(false);
+    // Root-labeled forms of the same host must be blocked identically.
+    expect(mayUnfurlUrl('https://wiki.intranet.corp./page', privacy)).toBe(false);
+    expect(mayUnfurlUrl('https://printer.intranet.local./p.png', {
+      linkPreviews: true,
+      httpsOnly: true,
+      blockedHosts: [],
+    })).toBe(false);
+    expect(mayUnfurlUrl('https://api.svc.internal./x', {
+      linkPreviews: true,
+      httpsOnly: true,
+      blockedHosts: [],
+    })).toBe(false);
+    expect(mayUnfurlUrl('https://localhost./x.png', {
+      linkPreviews: true,
+      httpsOnly: true,
+      blockedHosts: [],
+    })).toBe(false);
+  });
+
   it('maps full display prefs including https-only and blocked hosts', () => {
     const privacy = unfurlPrivacyFromPrefs({
       linkPreviews: true,

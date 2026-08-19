@@ -24,6 +24,7 @@ import {
 import { getState, useStore } from '@/lib/store';
 import { buildMomentLink } from '@/lib/deeplink';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Button, FormField, Sheet } from '@/primitives';
 
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -313,6 +314,15 @@ export function JumpToDateSheet(): JSX.Element {
                       ? 'Copy failed'
                       : 'Copy moment link'}
                 </Button>
+                <Show when={activeView().kind === 'channel'}>
+                  <a
+                    class="jump-to-date__ledger"
+                    href={statsRoomHref(channel())}
+                    aria-label={`Channel ledger for ${channel()}`}
+                  >
+                    Channel ledger
+                  </a>
+                </Show>
               </div>
               <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
                 {copyState() === 'copied'

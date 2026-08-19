@@ -9,6 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from './store';
+import { parseIRCMessage } from '@/lib/irc/parser';
 import {
   MAX_SCHEDULED_CHANNEL_LENGTH,
   MAX_SCHEDULED_MESSAGES,
@@ -107,6 +108,55 @@ describe('scheduleMessage', () => {
     expect(localStorage.getItem('onyx:scheduled')).toBeNull();
   });
 
+  it('refuses a designated-E2EE DM without persisting its plaintext', () => {
+    // selectChannelEncryptionPolicy only reads channelProps, which a DM peer
+    // never has an entry in, so the required-room guard above never catches
+    // this. A DM must be checked against isDmE2eeDesignated the same way the
+    // offline outbox already refuses it (sendMessage's isDm + isDmE2eeDesignated
+    // gate) — never write ciphertext-only content to localStorage in the clear.
+    store.setState({ peerDmKeys: new Map([['bob', 'device-key-a']]) });
+
+    expect(store.getState().scheduleMessage('bob', 'never at rest', 5_000)).toBe(false);
+    expect(store.getState().scheduledMessages).toEqual([]);
+    expect(localStorage.getItem('onyx:scheduled')).toBeNull();
+  });
+
+  it('still queues an ordinary (non-designated) DM', () => {
+    expect(store.getState().scheduleMessage('bob', 'plain dm', 5_000)).toBe(true);
+    expect(store.getState().scheduledMessages).toHaveLength(1);
+    expect(store.getState().scheduledMessages[0]?.channel).toBe('bob');
+  });
+
+  it('purges only the outgoing account identity scheduled rows on an account switch', () => {
+    // _resetAccountPrivateMessageState fires on every account-owner change
+    // (ACCOUNT, self NICK across owners, 900 RPL_LOGGEDIN). A scheduled row's
+    // plaintext body sits in localStorage; the identity that is actually
+    // logging out here must not leave it there indefinitely. A different,
+    // currently-inactive owner's row is intentionally NOT touched —
+    // selectOwnedScheduledMessages / _dispatchScheduledMessages already scope
+    // visibility and dispatch by owner, so multiple accounts may legitimately
+    // hold their own scheduled sends on one device at once.
+    store.setState({ server: server('alice'), ourNick: 'alice' });
+    store.getState().scheduleMessage('#root', 'alice pending', 60_000);
+
+    store.setState({ server: server('carol'), ourNick: 'carol' });
+    store.getState().scheduleMessage('#root', 'carol pending', 60_000);
+
+    store.setState({ server: server('alice'), ourNick: 'alice' });
+    expect(store.getState().scheduledMessages.map((m) => m.text).sort())
+      .toEqual(['alice pending', 'carol pending']);
+
+    // 900 RPL_LOGGEDIN establishing a different account on this connection is
+    // the account-switch path that fires _resetAccountPrivateMessageState.
+    store.getState()._handleMessage(
+      parseIRCMessage(':example.test 900 bob bob!webchat@example bob :You are now logged in as bob'),
+    );
+
+    expect(store.getState().scheduledMessages.map((m) => m.text)).toEqual(['carol pending']);
+    const persisted = JSON.parse(localStorage.getItem('onyx:scheduled') || '[]') as Array<{ text: string }>;
+    expect(persisted.map((m) => m.text)).toEqual(['carol pending']);
+  });
+
   it('caps the live queue before persisting another row', () => {
     for (let index = 0; index < MAX_SCHEDULED_MESSAGES + 1; index += 1) {
       store.getState().scheduleMessage('#root', `message ${index}`, index + 1);
@@ -168,6 +218,22 @@ describe('_dispatchScheduledMessages', () => {
     store.getState()._dispatchScheduledMessages();
     expect(client.sendRaw).not.toHaveBeenCalledWith('PRIVMSG', '#root', 'legacy pending');
     expect(store.getState().scheduledMessages).toHaveLength(1);
+  });
+
+  it('dispatches a scheduled DM on an IRCX node even though channelPropsSynced never tracks DM peers', () => {
+    // channelPropsSynced is written only by the 819 RPL_PROPEND handler,
+    // itself gated on isChan(propTarget) — a DM nick can never appear in it.
+    // isIRCX is true on every Onyx node, so the prop-sync wait must be scoped
+    // to CHANNEL targets only, or a scheduled DM sits "protected" forever.
+    const client = connect();
+    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    store.getState().scheduleMessage('bob', 'dm due', 5_000);
+    store.setState({ isIRCX: true, channelPropsSynced: new Set() });
+
+    store.getState()._dispatchScheduledMessages();
+
+    expect(client.sendRaw).toHaveBeenCalledWith('PRIVMSG', 'bob', 'dm due');
+    expect(store.getState().scheduledMessages).toEqual([]);
   });
 
   it('is idempotent — a second tick never re-sends', () => {

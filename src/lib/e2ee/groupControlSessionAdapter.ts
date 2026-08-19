@@ -527,17 +527,32 @@ export function createGroupControlSessionAdapter(
     if (destroyed) return outcome('ignored', 'destroyed', pair);
     let bootstrapped: GroupSessionBootstrapResult;
     try {
-      bootstrapped = await GroupSession.bootstrapVerifiedGenesis({
-        opened,
-        welcomeResolution: welcome.resolution,
-        welcomeRouting: welcome.routing,
-        commitResolution: commit.resolution,
-        commitRouting: commit.routing,
-        room: pair.room,
-        account: localAccount,
-        deviceId: localDevice,
-        signal: abortController.signal,
-      });
+      if (pair.epoch === 1) {
+        bootstrapped = await GroupSession.bootstrapVerifiedGenesis({
+          opened,
+          welcomeResolution: welcome.resolution,
+          welcomeRouting: welcome.routing,
+          commitResolution: commit.resolution,
+          commitRouting: commit.routing,
+          room: pair.room,
+          account: localAccount,
+          deviceId: localDevice,
+          signal: abortController.signal,
+        });
+      } else {
+        bootstrapped = await GroupSession.bootstrapVerifiedEpoch({
+          opened,
+          welcomeResolution: welcome.resolution,
+          welcomeRouting: welcome.routing,
+          commitResolution: commit.resolution,
+          commitRouting: commit.routing,
+          room: pair.room,
+          account: localAccount,
+          deviceId: localDevice,
+          expectedEpoch: pair.epoch,
+          signal: abortController.signal,
+        });
+      }
     } catch {
       return destroyed
         ? outcome('ignored', 'destroyed', pair)

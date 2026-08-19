@@ -36,6 +36,13 @@ import type { TrustedGroupSignerStore } from './trustedGroupSigner';
 export type GroupControlIntegrationClient = {
   extraMessageHandlers: Set<IRCEventHandler>;
   sendRaw: (command: string, ...params: string[]) => boolean;
+  sendCurrentEpochWelcomeRequest?: (
+    room: string,
+    epoch: number,
+    account: string,
+    deviceId: string,
+    payload: string,
+  ) => boolean;
 };
 
 export type GroupControlIntegrationIdentity = Readonly<{
@@ -105,6 +112,7 @@ export type GroupControlIntegration = {
   onDisconnected(): void;
   reconnect(): void;
   markRecovered(): boolean;
+  requestCurrentEpochWelcome(room: string, payload: string): Promise<{ ok: true; room: string; epoch: number } | { ok: false; reason: string }>;
   accept(message: IRCMessage | string): Promise<GroupControlRuntimeOutcome>;
   acceptControl(message: IRCMessage | string): Promise<GroupControlRuntimeOutcome>;
   ingest(message: IRCMessage | string): Promise<GroupControlRuntimeOutcome>;
@@ -146,6 +154,10 @@ function createClientId(): string {
 
 function isChannelTarget(value: string | undefined): boolean {
   return typeof value === 'string' && /^[#&]/u.test(value);
+}
+
+function isCanonicalPayload(value: string): boolean {
+  return /^[A-Za-z0-9_-]{16,8192}$/u.test(value);
 }
 
 function isPureServerDirectoryNotice(message: IRCMessage): boolean {
@@ -412,6 +424,21 @@ export function createGroupControlIntegration(
           const result = await directoryRequest(account, signal);
           return result.ok ? result.snapshot : null;
         },
+        requestCurrentEpochWelcome: async (room, epoch, account, deviceId, payload) => {
+          if (!isCanonicalPayload(payload)) return false;
+          if (typeof client.sendCurrentEpochWelcomeRequest === 'function') {
+            try {
+              return client.sendCurrentEpochWelcomeRequest(room, epoch, account, deviceId, payload) === true;
+            } catch {
+              return false;
+            }
+          }
+          try {
+            return client.sendRaw('E2EEGROUP', room, 'key-package', deviceId, payload) === true;
+          } catch {
+            return false;
+          }
+        },
       },
     });
     runtimeUnsubscribe?.();
@@ -674,6 +701,17 @@ export function createGroupControlIntegration(
     return result;
   }
 
+  async function requestCurrentEpochWelcome(
+    room: string,
+    payload: string,
+  ): Promise<{ ok: true; room: string; epoch: number } | { ok: false; reason: string }> {
+    if (destroyed || !runtimeValue) return { ok: false, reason: 'runtime-inactive' };
+    if (!isCanonicalPayload(payload)) return { ok: false, reason: 'payload-invalid' };
+    const result = await runtimeValue.requestCurrentEpochWelcome(room, payload);
+    emit();
+    return result;
+  }
+
   async function accept(message: IRCMessage | string): Promise<GroupControlRuntimeOutcome> {
     const runtime = runtimeValue;
     const token = generation;
@@ -778,6 +816,7 @@ export function createGroupControlIntegration(
     onDisconnected,
     reconnect,
     markRecovered,
+    requestCurrentEpochWelcome,
     accept,
     acceptControl: accept,
     ingest: accept,

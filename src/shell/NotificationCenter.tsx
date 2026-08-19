@@ -15,6 +15,7 @@ import './notification-center.css';
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import type { Notification } from '@/lib/store/store';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Popover } from '@/primitives/index';
 import { relTime } from './HomeView';
 
@@ -90,18 +91,33 @@ export function NotificationCenter(): JSX.Element {
     if (restoreFocus) focusTrigger();
   };
 
-  const focusableControls = (): HTMLButtonElement[] => (
-    centerRef ? Array.from(centerRef.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')) : []
-  );
+  const focusableControls = (): HTMLElement[] => {
+    if (!centerRef) return [];
+    // jsdom returns comma-selector matches grouped by selector (all buttons, then
+    // all links) instead of document order — sort so Tab wrap uses tree order.
+    return Array.from(
+      centerRef.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]'),
+    ).sort((a, b) => {
+      const position = a.compareDocumentPosition(b);
+      if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+      if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+      return 0;
+    });
+  };
 
   createEffect(() => {
     if (!inboxOpen()) return;
     // Keep this effect subscribed to row membership as well as open state.
     // A synchronized dismissal can remove the focused control without going
     // through dismissNotification(), which otherwise leaves focus on <body>.
-    ordered();
+    const empty = ordered().length === 0;
     queueMicrotask(() => {
       if (!untrack(inboxOpen) || !centerRef || centerRef.contains(document.activeElement)) return;
+      // Empty inbox: land on Close (not the always-present ledger link).
+      if (empty) {
+        closeRef?.focus();
+        return;
+      }
       focusableControls()[0]?.focus();
     });
   });
@@ -171,7 +187,12 @@ export function NotificationCenter(): JSX.Element {
 
     const controls = focusableControls();
     if (controls.length === 0) return;
-    const activeIndex = controls.indexOf(document.activeElement as HTMLButtonElement);
+    // Prefer activeElement over event.target: jsdom/Solid keydown can retarget,
+    // and a focused control may contain the event target (e.g. glyph text).
+    const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const activeIndex = active
+      ? controls.findIndex((control) => control === active || control.contains(active))
+      : -1;
     const atStart = activeIndex <= 0;
     const atEnd = activeIndex === controls.length - 1;
     if (event.shiftKey ? atStart : atEnd || activeIndex < 0) {
@@ -220,6 +241,9 @@ export function NotificationCenter(): JSX.Element {
                 Mark all read
               </button>
             </Show>
+            <a class="notif-center__ledger" href="/stats/" aria-label="Open public channel ledger">
+              Channel ledger
+            </a>
             <button
               ref={closeRef}
               type="button"
@@ -266,6 +290,16 @@ export function NotificationCenter(): JSX.Element {
                           <span class="notif-center__preview">{n.text}</span>
                         </span>
                       </button>
+                      <Show when={n.channel && /^[#&]/.test(n.channel)}>
+                        <a
+                          class="notif-center__room-ledger"
+                          href={statsRoomHref(n.channel!)}
+                          aria-label={`Channel ledger for ${n.channel}`}
+                          onClick={() => closeInbox()}
+                        >
+                          Ledger
+                        </a>
+                      </Show>
                       <button
                         type="button"
                         class="notif-center__dismiss"

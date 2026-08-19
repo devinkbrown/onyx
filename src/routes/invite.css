@@ -10,12 +10,12 @@
 }
 
 .invite-page .data-hero h1 {
-  max-width: 13ch;
-  font-family: var(--public-serif, var(--font-serif));
-  font-size: clamp(2.75rem, 1.35rem + 6vw, 6.5rem);
-  font-weight: 500;
-  line-height: 0.94;
-  letter-spacing: -0.035em;
+  max-width: 16ch;
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 1.2rem + 3.2vw, 3.4rem);
+  font-weight: 650;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
   text-transform: none;
 }
 

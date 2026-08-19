@@ -74,6 +74,7 @@ export type GroupControlRuntimeReason =
   | 'duplicate-session'
   | 'activation-held'
   | 'transport-unavailable'
+  | 'epoch-unavailable'
   | 'stale';
 
 export type GroupControlRuntimeOutcome = {
@@ -131,6 +132,14 @@ export type GroupControlRuntimeTransport = {
     account: string,
     signal: AbortSignal,
   ) => GroupControlDirectory | null | undefined | Promise<GroupControlDirectory | null | undefined>;
+  requestCurrentEpochWelcome?: (
+    room: string,
+    epoch: number,
+    account: string,
+    deviceId: string,
+    payload: string,
+    signal: AbortSignal,
+  ) => boolean | Promise<boolean>;
 };
 
 export type GroupControlRuntimeOptions = {
@@ -184,6 +193,14 @@ export type GroupControlRuntime = {
   expire(): void;
   reconnect(): void;
   onReconnect(): void;
+  requestCurrentEpochWelcome(room: string, payload: string): Promise<{
+    ok: true;
+    room: string;
+    epoch: number;
+  } | {
+    ok: false;
+    reason: GroupControlRuntimeReason;
+  }>;
   markRecovered(): boolean;
   detach(): Promise<void>;
   destroy(): Promise<void>;
@@ -205,6 +222,7 @@ type BootstrapTicket = {
   roomIncarnation: number;
   account: string;
   deviceId: string;
+  expectedEpoch: number;
 };
 
 type QueuedJob = {
@@ -473,6 +491,7 @@ function buildRuntime(
   let retrySequence = 0;
   const sessions = new Map<string, GroupSession>();
   const rooms = new Map<string, GroupControlRoomProjection>();
+  const reanchorRequests = new Map<string, number>();
   const roomIncarnations = new Map<string, number>();
   const activeRoomJobs = new Map<string, number>();
   const activeRoomDeferreds = new Map<string, Set<Deferred>>();
@@ -562,6 +581,16 @@ function buildRuntime(
         : prior.epoch !== undefined ? { epoch: prior.epoch } : {}),
     });
     notify();
+  }
+
+  function armReanchor(room: string, epoch: number): void {
+    reanchorRequests.delete(room);
+    reanchorRequests.set(room, epoch);
+    while (reanchorRequests.size > GROUP_CONTROL_RUNTIME_MAX_ROOMS) {
+      const oldest = reanchorRequests.keys().next().value;
+      if (oldest === undefined) break;
+      reanchorRequests.delete(oldest);
+    }
   }
 
   function cleanupRoomMetadata(room: string): void {
@@ -711,8 +740,8 @@ function buildRuntime(
     return source ? abortable(source, signal) : Promise.reject(new Error('directory-unavailable'));
   }
 
-  function adoptGenesisSession(session: GroupSession, ticket: BootstrapTicket): boolean {
-    if (destroyedForever || detached || lifecycle === 'recovery-required' || lifecycle === 'inactive') {
+  function adoptBootstrappedSession(session: GroupSession, ticket: BootstrapTicket): boolean {
+    if (destroyedForever || detached || lifecycle === 'inactive') {
       session.destroy();
       return false;
     }
@@ -726,6 +755,10 @@ function buildRuntime(
       return false;
     }
     if (session.account !== identity.account || session.deviceId !== identity.deviceId) {
+      session.destroy();
+      return false;
+    }
+    if (session.epoch !== BigInt(ticket.expectedEpoch)) {
       session.destroy();
       return false;
     }
@@ -748,6 +781,7 @@ function buildRuntime(
       return false;
     }
     sessions.set(room, session);
+    reanchorRequests.delete(room);
     setRoom(room, 'control-applied', Number(session.epoch));
     return true;
   }
@@ -765,7 +799,7 @@ function buildRuntime(
         recipientPrivateKeyFor: options.recipientPrivateKeyFor,
         localIdentity: { account: identity.account, deviceId: identity.deviceId },
         adoptBootstrappedSession: ticket
-          ? (session) => adoptGenesisSession(session, ticket)
+          ? (session) => adoptBootstrappedSession(session, ticket)
           : undefined,
       });
       allAdapters.add(adapter);
@@ -1131,8 +1165,8 @@ function buildRuntime(
     const canonicalMessage = immutableControl(message);
     const parsed = routeFor(canonicalMessage);
     const parsedRoom = parsed ? roomKey(parsed.channel) : null;
-    if (blocked) {
-      if (parsedRoom && rooms.has(parsedRoom)) setRoom(parsedRoom, blocked.reason === 'recovery-required' ? 'recovery-required' : 'locked');
+    if (blocked && blocked.reason !== 'recovery-required') {
+      if (parsedRoom && rooms.has(parsedRoom)) setRoom(parsedRoom, 'locked');
       return { ...blocked, ...(parsedRoom ? { room: parsedRoom } : {}) };
     }
     if (!parsed) {
@@ -1249,18 +1283,64 @@ function buildRuntime(
     if (!boundSession) {
       const epoch = parsed.payloadParts?.epoch ?? 0;
       if (epoch !== 1) {
+        const armedEpoch = reanchorRequests.get(parsedRoom);
+        if (armedEpoch !== epoch) {
+          bump('accepted');
+          bump('queued');
+          setRoom(parsedRoom, 'recovery-required', epoch);
+          return {
+            status: 'locked',
+            reason: 'recovery-required',
+            room: parsedRoom,
+            fromAccount: canonicalAccount(parsed.fromAccount) ?? parsed.fromAccount,
+            fromDevice: parsed.fromDevice,
+            epoch,
+            generation,
+          };
+        }
         bump('accepted');
         bump('queued');
-        setRoom(parsedRoom, 'recovery-required', epoch);
-        return {
-          status: 'locked',
-          reason: 'recovery-required',
-          room: parsedRoom,
-          fromAccount: canonicalAccount(parsed.fromAccount) ?? parsed.fromAccount,
-          fromDevice: parsed.fromDevice,
-          epoch,
+        reanchorRequests.delete(parsedRoom);
+        if (!identity?.account || !identity.deviceId) {
+          setRoom(parsedRoom, 'recovery-required', epoch);
+          return runtimeOutcome('locked', generation, 'identity-pending', parsedRoom);
+        }
+        const ticket: BootstrapTicket = {
           generation,
+          room: parsedRoom,
+          roomIncarnation: roomIncarnation(parsedRoom),
+          account: identity.account,
+          deviceId: identity.deviceId,
+          expectedEpoch: epoch,
         };
+        const commitMessage = pair.commit;
+        const welcomeMessage = pair.welcome;
+        const bootstrapFingerprint: CompletedFingerprint = {
+          key,
+          room: parsedRoom,
+          commitFingerprint: pair.commitFingerprint!,
+          welcomeFingerprint: pair.welcomeFingerprint!,
+          seenAt: now(),
+          generation,
+          epoch,
+        };
+        clearHalfPair(pair);
+        let resolveBootstrap!: (result: GroupControlRuntimeOutcome) => void;
+        const bootstrapPromise = new Promise<GroupControlRuntimeOutcome>((r) => { resolveBootstrap = r; });
+        if (!enqueue(
+          [commitMessage!, welcomeMessage!],
+          parsedRoom,
+          null,
+          ticket.roomIncarnation,
+          { resolve: resolveBootstrap },
+          bootstrapFingerprint,
+          ticket,
+        )) {
+          bump('evicted');
+          setRoom(parsedRoom, 'rejected', epoch);
+          return runtimeOutcome('ignored', generation, 'queue-full', parsedRoom);
+        }
+        return bootstrapPromise;
       }
       if (!identity?.account || !identity.deviceId) {
         bump('accepted');
@@ -1274,6 +1354,7 @@ function buildRuntime(
         roomIncarnation: roomIncarnation(parsedRoom),
         account: identity.account,
         deviceId: identity.deviceId,
+        expectedEpoch: 1,
       };
       const commitMessage = pair.commit;
       const welcomeMessage = pair.welcome;
@@ -1358,10 +1439,12 @@ function buildRuntime(
       releaseRoomPairs(room);
       dropQueuedRoomJobs(room);
       sessions.set(room, session);
+      reanchorRequests.delete(room);
       setRoom(room, lifecycle === 'recovery-required' ? 'recovery-required' : 'locked');
       return { ok: true, room, replaced: true };
     }
     sessions.set(room, session);
+    reanchorRequests.delete(room);
     replayCompletePairsForRoom(room, session);
     replayRetries(room);
     return { ok: true, room, replaced: false };
@@ -1405,6 +1488,7 @@ function buildRuntime(
     dropQueuedRoomJobs(normalized);
     sessions.get(normalized)?.destroy();
     sessions.delete(normalized);
+    reanchorRequests.delete(normalized);
     rooms.delete(normalized);
     cleanupRoomMetadata(normalized);
     notify();
@@ -1435,6 +1519,7 @@ function buildRuntime(
       }
       for (const session of sessions.values()) session.destroy();
       sessions.clear();
+      reanchorRequests.clear();
       releaseAllPairs();
       rooms.clear();
       roomIncarnations.clear();
@@ -1447,6 +1532,7 @@ function buildRuntime(
       releaseAllPairs();
       for (const session of sessions.values()) session.destroy();
       sessions.clear();
+      reanchorRequests.clear();
       for (const projection of rooms.values()) {
         projection.status = nextLifecycle === 'recovery-required' ? 'recovery-required' : 'locked';
         projection.provisioned = false;
@@ -1591,9 +1677,51 @@ function buildRuntime(
     return setIdentity(next);
   }
 
+  async function requestCurrentEpochWelcome(
+    room: string,
+    payload: string,
+  ): Promise<{ ok: true; room: string; epoch: number } | { ok: false; reason: GroupControlRuntimeReason }> {
+    const normalized = roomKey(room);
+    if (!normalized) return { ok: false, reason: 'room-removed' };
+    if (destroyedForever || detached || lifecycle === 'inactive') return { ok: false, reason: 'runtime-inactive' };
+    if (!identity?.account || !identity.deviceId) return { ok: false, reason: 'identity-pending' };
+    const account = identity.account;
+    const deviceId = identity.deviceId;
+    if (!runtimeAdapter) return { ok: false, reason: 'trust-path-unreachable' };
+    const epoch = rooms.get(normalized)?.epoch;
+    if (!Number.isSafeInteger(epoch) || epoch === undefined || epoch < 1) {
+      return { ok: false, reason: 'epoch-unavailable' };
+    }
+    const send = options.transport?.requestCurrentEpochWelcome;
+    if (!send) return { ok: false, reason: 'transport-unavailable' };
+    armReanchor(normalized, epoch);
+    let delivered: boolean;
+    try {
+      delivered = await Promise.resolve(
+        send(normalized, epoch, account, deviceId, payload, generationAbortController.signal),
+      ) === true;
+    } catch {
+      delivered = false;
+    }
+    if (!delivered) {
+      reanchorRequests.delete(normalized);
+      return { ok: false, reason: 'transport-unavailable' };
+    }
+    setRoom(normalized, 'recovery-required', epoch);
+    return { ok: true, room: normalized, epoch };
+  }
+
   function markRecovered(): boolean {
     if (destroyedForever || detached || !runtimeAdapter || !identity?.account || !identity.deviceId) return false;
     if (options.transport?.isConnected && !options.transport.isConnected()) {
+      lifecycle = 'recovery-required';
+      notify();
+      return false;
+    }
+    const hasAppliedSession = [...rooms.values()].some((entry) => (
+      entry.status === 'control-applied' && entry.provisioned
+    ));
+    if (!hasAppliedSession) {
       lifecycle = 'recovery-required';
       notify();
       return false;
@@ -1632,6 +1760,7 @@ function buildRuntime(
     expire: expireHalfPairs,
     reconnect,
     onReconnect: reconnect,
+    requestCurrentEpochWelcome,
     markRecovered,
     detach,
     destroy,

@@ -17,7 +17,7 @@
   --stats-panel: color-mix(in oklab, var(--stone-2) 74%, transparent);
   --stats-panel-strong: color-mix(in oklab, var(--stone) 88%, var(--ink));
   --stats-border: color-mix(in oklab, var(--lapis-bright) 18%, var(--seam-faint));
-  --stats-radius: clamp(16px, 1.5vw, 24px);
+  --stats-radius: 2px;
   min-width: 0;
   overflow-x: clip;
 }
@@ -32,29 +32,15 @@
 }
 
 .stats-page .r-ground {
-  background:
-    radial-gradient(70% 55% at 88% 5%, color-mix(in oklab, var(--stats-blue) 13%, transparent), transparent 68%),
-    radial-gradient(55% 46% at 8% 16%, color-mix(in oklab, var(--stats-coral) 5%, transparent), transparent 70%),
-    linear-gradient(160deg, #07131d 0%, var(--ink) 42%, #071019 100%);
+  background: var(--ink);
 }
 
-.stats-page .r-ground::before {
-  background-image:
-    linear-gradient(color-mix(in oklab, var(--lapis) 7%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in oklab, var(--lapis) 7%, transparent) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: linear-gradient(#000 0%, transparent 72%);
-  opacity: 0.46;
-}
-
-.stats-page .r-ground::after {
-  background:
-    radial-gradient(circle at 76% 12%, color-mix(in oklab, var(--lapis-bright) 15%, transparent), transparent 24%),
-    radial-gradient(circle at 18% 24%, color-mix(in oklab, var(--shu) 8%, transparent), transparent 22%);
-}
-
-.stats-page .r-veins {
-  opacity: 0.22;
+.stats-page .r-ground::before,
+.stats-page .r-ground::after,
+.stats-page .r-flecks,
+.stats-page .r-veins,
+.stats-page .r-grain {
+  display: none;
 }
 
 .stats-page .r-wrap {
@@ -91,11 +77,11 @@
   max-width: 760px;
   margin: clamp(18px, 3vw, 42px) 0 0;
   color: var(--paper);
-  font-family: var(--public-serif, var(--font-serif));
-  font-size: clamp(42px, 6vw, 78px);
-  font-weight: 500;
-  line-height: 0.94;
-  letter-spacing: -0.055em;
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 4.4vw, 3.4rem);
+  font-weight: 650;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
   text-transform: none;
 }
 
@@ -186,9 +172,7 @@
 
 .stats-page .stats-ledger-mark[data-state='current'] {
   background: var(--stats-green);
-  box-shadow:
-    0 0 0 3px color-mix(in oklab, var(--stats-green) 12%, transparent),
-    0 0 14px color-mix(in oklab, var(--stats-green) 44%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--stats-green) 12%, transparent);
 }
 
 .stats-page .stats-ledger-mark[data-state='partial'],
@@ -255,12 +239,9 @@
   overflow: hidden;
   padding: 18px;
   border-color: color-mix(in oklab, var(--metric-accent) 24%, var(--stats-border));
-  border-radius: 18px;
-  background:
-    linear-gradient(145deg, color-mix(in oklab, var(--metric-accent) 11%, transparent), transparent 54%),
-    var(--stats-panel);
-  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 5%, transparent);
-  backdrop-filter: blur(18px) saturate(115%);
+  border-radius: 2px;
+  background: var(--stats-panel);
+  box-shadow: none;
 }
 
 .stats-page .data-metric[data-tone='presence'] { --metric-accent: var(--stats-green); }
@@ -275,7 +256,7 @@
   right: 0;
   width: 42%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--metric-accent));
+  background: var(--metric-accent);
   opacity: 0.85;
 }
 
@@ -304,7 +285,7 @@
   margin-right: 5px;
   border-radius: 50%;
   background: var(--stats-green);
-  box-shadow: 0 0 8px color-mix(in oklab, var(--stats-green) 62%, transparent);
+  box-shadow: none;
 }
 
 /* A compact jump rail mirrors the app's top-level room tabs. */
@@ -315,8 +296,7 @@
   padding-block: 0;
   border-top: 1px solid var(--stats-border);
   border-bottom: 1px solid var(--stats-border);
-  background: color-mix(in oklab, var(--ink) 50%, transparent);
-  backdrop-filter: blur(12px);
+  background: var(--ink);
 }
 
 .stats-page .stats-view-nav a {
@@ -360,13 +340,8 @@
 .stats-page .data-card {
   border-color: var(--stats-border);
   border-radius: var(--stats-radius);
-  background:
-    linear-gradient(150deg, color-mix(in oklab, var(--paper) 3%, transparent), transparent 48%),
-    var(--stats-panel);
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 5%, transparent),
-    0 24px 70px -52px color-mix(in oklab, var(--stats-blue) 48%, transparent);
-  backdrop-filter: blur(20px) saturate(112%);
+  background: var(--stats-panel);
+  box-shadow: none;
 }
 
 .stats-page .stats-overview > .data-card:first-child {
@@ -376,12 +351,8 @@
 }
 
 .stats-page .stats-overview > .data-card:first-child::after {
-  content: '';
-  position: absolute;
-  inset: auto -10% -45% 30%;
-  height: 70%;
-  background: radial-gradient(circle, color-mix(in oklab, var(--stats-blue) 12%, transparent), transparent 68%);
-  pointer-events: none;
+  content: none;
+  display: none;
 }
 
 .stats-page .data-card h2,
@@ -423,22 +394,18 @@
   position: relative;
   min-height: 4px;
   border-radius: 7px 7px 2px 2px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--stats-cyan) 86%, white),
-    color-mix(in oklab, var(--stats-blue) 88%, var(--stats-violet))
-  );
-  box-shadow: 0 0 18px -8px color-mix(in oklab, var(--stats-cyan) 75%, transparent);
+  background: var(--stats-cyan);
+  box-shadow: none;
   transform-origin: bottom;
   animation: stats-bar-rise 620ms var(--ease) both;
 }
 
 .stats-page .data-bar:nth-child(3n) {
-  background: linear-gradient(180deg, var(--stats-violet), var(--stats-blue));
+  background: var(--stats-violet);
 }
 
 .stats-page .data-bar:nth-child(4n) {
-  background: linear-gradient(180deg, color-mix(in oklab, var(--stats-green) 75%, white), var(--stats-blue));
+  background: var(--stats-green);
 }
 
 @keyframes stats-bar-rise {
@@ -463,10 +430,8 @@
   display: flex;
   flex-direction: column;
   padding: clamp(22px, 2.8vw, 34px);
-  border-color: color-mix(in oklab, var(--stats-violet) 30%, var(--stats-border));
-  background:
-    radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--stats-violet) 15%, transparent), transparent 38%),
-    var(--stats-panel);
+  border-color: var(--stats-border);
+  background: var(--stats-panel);
 }
 
 .stats-page .stats-busiest-card > h3 {
@@ -514,10 +479,10 @@
 }
 
 .stats-page .r-btn.primary {
-  border-color: color-mix(in oklab, var(--stats-blue) 72%, var(--seam));
-  background: linear-gradient(135deg, var(--stats-blue), color-mix(in oklab, var(--stats-blue) 62%, var(--stats-violet)));
-  color: white;
-  box-shadow: 0 12px 30px -20px color-mix(in oklab, var(--stats-cyan) 80%, transparent);
+  border-color: var(--lapis);
+  background: var(--lapis);
+  color: var(--on-accent);
+  box-shadow: none;
 }
 
 /* ── Room signal inspector ─────────────────────────────────────────────── */
@@ -526,15 +491,10 @@
   width: min(calc(100% - clamp(32px, 10vw, 112px)), 1268px);
   margin-block: 22px clamp(42px, 6vw, 86px);
   padding: clamp(24px, 4vw, 52px);
-  border: 1px solid color-mix(in oklab, var(--stats-cyan) 24%, var(--stats-border));
-  border-radius: calc(var(--stats-radius) + 4px);
-  background:
-    radial-gradient(70% 70% at 100% 0%, color-mix(in oklab, var(--stats-blue) 13%, transparent), transparent 64%),
-    linear-gradient(145deg, color-mix(in oklab, var(--paper) 3%, transparent), transparent 42%),
-    color-mix(in oklab, var(--stone) 82%, var(--ink));
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 6%, transparent),
-    0 42px 90px -72px var(--stats-cyan);
+  border: 1px solid var(--stats-border);
+  border-radius: var(--stats-radius);
+  background: var(--stats-panel);
+  box-shadow: none;
 }
 
 .stats-page .stats-inspector .r-eyebrow,
@@ -562,7 +522,7 @@
 .stats-page .stats-inspector-metrics {
   gap: 1px;
   border-color: var(--stats-border);
-  border-radius: 18px;
+  border-radius: 2px;
   background: var(--stats-border);
 }
 
@@ -570,9 +530,7 @@
   --metric-accent: var(--stats-blue);
   position: relative;
   border: 0;
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--metric-accent) 7%, transparent), transparent 68%),
-    color-mix(in oklab, var(--ink) 86%, var(--stone));
+  background: color-mix(in oklab, var(--ink) 86%, var(--stone));
 }
 
 .stats-page .stats-inspector-metrics > div[data-tone='presence'] { --metric-accent: var(--stats-green); }
@@ -581,13 +539,15 @@
 .stats-page .stats-inspector-metrics > div[data-tone='words'] { --metric-accent: var(--stats-coral); }
 .stats-page .stats-inspector-metrics > div[data-tone='momentum'] { --metric-accent: var(--stats-green); }
 .stats-page .stats-inspector-metrics > div[data-tone='time'] { --metric-accent: var(--stats-cyan); }
+.stats-page .stats-inspector-metrics > div[data-tone='share'] { --metric-accent: var(--stats-violet); }
+.stats-page .stats-inspector-metrics > div[data-tone='flow'] { --metric-accent: var(--stats-coral); }
 
 .stats-page .stats-inspector-metrics > div::before {
   content: '';
   position: absolute;
   inset: 0 auto 0 0;
   width: 2px;
-  background: linear-gradient(transparent, var(--metric-accent), transparent);
+  background: var(--metric-accent);
   opacity: 0.72;
 }
 
@@ -599,7 +559,11 @@
 }
 
 .stats-page .stats-inspector-grid {
-  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(240px, 0.72fr);
+}
+
+.stats-page .stats-days-card .data-bars {
+  min-height: 88px;
 }
 
 .stats-page .stats-hour-chart {
@@ -615,8 +579,7 @@
 
 .stats-page .stats-hour-chart i {
   border-radius: 5px 5px 1px 1px;
-  background: linear-gradient(180deg, var(--stats-cyan), var(--stats-blue));
-  box-shadow: 0 0 12px -6px var(--stats-cyan);
+  background: var(--stats-cyan);
 }
 
 .stats-page .stats-flow-list {
@@ -670,10 +633,9 @@
   margin-top: 28px;
   padding: 12px;
   border: 1px solid var(--stats-border);
-  border-radius: 18px;
-  background: color-mix(in oklab, var(--ink) 78%, transparent);
-  box-shadow: 0 18px 42px -36px black;
-  backdrop-filter: blur(18px) saturate(125%);
+  border-radius: 2px;
+  background: var(--ink);
+  box-shadow: none;
 }
 
 .stats-page .stats-room-search {
@@ -689,7 +651,7 @@
 .stats-page .stats-room-search input {
   min-height: var(--target-min, 44px);
   border-color: var(--stats-border);
-  border-radius: 13px;
+  border-radius: 2px;
   background: color-mix(in oklab, var(--stone) 72%, var(--ink));
 }
 
@@ -700,7 +662,7 @@
 .stats-page .stats-control-group button {
   min-height: var(--target-min, 44px);
   border-color: transparent;
-  border-radius: 11px;
+  border-radius: 2px;
 }
 
 .stats-page .stats-control-group button.is-active {
@@ -725,7 +687,7 @@
   min-height: 92px;
   padding: 14px 16px;
   border: 1px solid transparent;
-  border-radius: 16px;
+  border-radius: 2px;
   background: color-mix(in oklab, var(--stone-2) 34%, transparent);
   transition:
     border-color var(--dur-fast, 160ms) var(--ease),
@@ -742,8 +704,8 @@
   display: grid;
   place-items: center;
   border: 1px solid color-mix(in oklab, var(--stats-cyan) 24%, var(--stats-border));
-  border-radius: 12px;
-  background: linear-gradient(145deg, color-mix(in oklab, var(--stats-blue) 18%, var(--stone)), var(--stone));
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--stats-blue) 18%, var(--stone));
   color: var(--stats-cyan);
   font: 720 1rem/1 var(--font-mono);
 }
@@ -759,16 +721,13 @@
 .stats-page .data-room-row:hover {
   border-color: var(--stats-border);
   background: color-mix(in oklab, var(--stats-blue) 8%, var(--stats-panel));
-  transform: translateY(-1px);
 }
 
 .stats-page .data-room-row[data-selected='true'] {
   margin-inline: 0;
   padding-inline: 16px;
   border-color: color-mix(in oklab, var(--stats-cyan) 42%, var(--stats-border));
-  background:
-    linear-gradient(90deg, color-mix(in oklab, var(--stats-blue) 14%, transparent), transparent 72%),
-    var(--stats-panel);
+  background: color-mix(in oklab, var(--stats-blue) 10%, var(--stats-panel));
   box-shadow: inset 3px 0 0 var(--stats-cyan);
 }
 
@@ -789,12 +748,11 @@
   height: 7px;
   border-radius: 50%;
   background: currentColor;
-  box-shadow: 0 0 8px color-mix(in oklab, currentColor 55%, transparent);
 }
 
 .stats-page .channel-spark-bars i {
   border-radius: 3px 3px 1px 1px;
-  background: linear-gradient(180deg, var(--stats-cyan), var(--stats-blue));
+  background: var(--stats-cyan);
 }
 
 .stats-page .data-room-numbers dt {

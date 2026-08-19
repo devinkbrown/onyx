@@ -66,6 +66,7 @@ import {
   type RememberedIdentity,
   type SavedCredentials,
 } from '@/lib/credentials';
+import { normalizeRoomTarget } from '@/shell/roomIdentity';
 import { initialNode, NODES, selectBestNode, type IrcNode } from './nodes';
 import { installConnectPageLifecycle } from './connectPageLifecycle';
 
@@ -357,10 +358,9 @@ export function Connect(props: ConnectProps): JSX.Element {
 
   /** '#chan' | 'chan' → validated '#chan'; empty → null; garbage → undefined. */
   function normalizeRoom(raw: string): string | null | undefined {
-    const trimmed = raw.trim();
-    if (!trimmed) return null;
-    const withHash = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
-    return parseJoinParam(withHash) ?? undefined;
+    const normalized = normalizeRoomTarget(raw);
+    if (!normalized) return null;
+    return parseJoinParam(normalized) ?? undefined;
   }
 
   // ── Shared form state ──────────────────────────────────────────────────────
@@ -1111,8 +1111,8 @@ export function Connect(props: ConnectProps): JSX.Element {
   const inVerifyStep = createMemo(() => registerPhase() === 'verifying');
   const modeGuidance = createMemo(() => MODE_GUIDANCE[mode()]);
   const destinationLabel = createMemo(() => {
-    const entered = room().trim();
-    if (entered) return entered.startsWith('#') ? entered : `#${entered}`;
+    const normalized = normalizeRoomTarget(room());
+    if (normalized) return normalized;
     return 'Home';
   });
   const primaryStep = createMemo(() => {

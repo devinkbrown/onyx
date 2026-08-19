@@ -70,10 +70,29 @@ const MAX_FIELDS = 6;
 const MAX_ACTION_VALUE = 240;
 const MAX_TARGET = 80;
 
+// Reject the full C0 control range (not just \r\n) — a lone \x01 (SOH) is not
+// ECMAScript whitespace, so `.trim()` leaves it standing and the wire-layer
+// `stripWireControl` only strips [\r\n\x00], letting a control byte survive
+// into `PRIVMSG :\x01EDIT <id> <text>\x01` and forge an edit/delete/stage/
+// poll-vote CTCP against the *sender's own* prior message for every viewer.
+// Also reject the full bidi-override / invisible / formatting Unicode set:
+// SOFT HYPHEN, ARABIC LETTER MARK, ZWSP..RLM, WORD JOINER + the invisible
+// operators (INVISIBLE TIMES etc.), the LRE/RLE/PDF/LRO/RLO embed/override
+// block, the LRI/RLI/FSI/PDI isolates, the BOM/ZWNBSP, and the deprecated
+// language-tag plane (the classic invisible-text-smuggling block). All are
+// non-printing or reordering, so they cannot even be inspected in a
+// confirmation dialog's plaintext preview, and a bidi override can visually
+// reorder rendered title/text/label/field text.
+// Shared by every text field a block carries (title/text/label/field value
+// via `trimText`, and action/select values via `safeActionValue`) so one
+// guard closes both the CTCP-smuggling and the UI-spoofing vector.
+const UNSAFE_TEXT_CHARACTERS =
+  /[\x00-\x1f\x7f\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2028\u2029\u2060-\u2064\u2066-\u2069\ufeff\u{e0000}-\u{e007f}]/u;
+
 function trimText(value: unknown, max = MAX_TEXT): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  if (!trimmed) return null;
+  if (!trimmed || UNSAFE_TEXT_CHARACTERS.test(trimmed)) return null;
   return trimmed.slice(0, max);
 }
 
@@ -103,7 +122,7 @@ function safeActionValue(value: unknown): string | null {
   // Inspect the complete input before bounding it. Truncating first could hide a
   // CRLF payload placed just beyond MAX_ACTION_VALUE from the confirmation-time
   // revalidation pass.
-  if (/[\r\n]/.test(normalized) || normalized.startsWith('/')) return null;
+  if (UNSAFE_TEXT_CHARACTERS.test(normalized) || normalized.startsWith('/')) return null;
   const text = normalized.slice(0, MAX_ACTION_VALUE);
   if (!text) return null;
   return text;

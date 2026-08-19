@@ -449,15 +449,35 @@
   white-space: nowrap;
 }
 
+.home-pulse-block { margin-bottom: 20px; }
+.home-pulse-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.home-pulse-ledger,
+.home-rhythm-ledger {
+  font-size: 0.8rem;
+  color: var(--paper-mute);
+  text-decoration: none;
+}
+.home-pulse-ledger:hover,
+.home-rhythm-ledger:hover { text-decoration: underline; }
+.home-pulse-ledger:focus-visible,
+.home-rhythm-ledger:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
 .home-pulse {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 20px;
 }
 .home-pulse-tile {
   background: color-mix(in oklab, var(--stone) 82%, transparent);
@@ -620,12 +640,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--r-lg, 12px);
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--stone-2) 76%, transparent),
-      color-mix(in oklab, var(--stone) 52%, transparent)
-    );
+  background: color-mix(in oklab, var(--stone-2) 64%, transparent);
   box-shadow: var(--elev-1, none);
 }
 .home-first-room::before {
@@ -633,13 +648,7 @@
   position: absolute;
   inset: 0 auto 0 0;
   width: 3px;
-  background: linear-gradient(
-    180deg,
-    var(--lapis) 0 30%,
-    var(--ok) 30% 54%,
-    var(--shu) 54% 76%,
-    var(--gold) 76% 100%
-  );
+  background: var(--lapis);
 }
 .home-first-room__eyebrow {
   margin: 0 0 8px;
@@ -759,6 +768,11 @@
 }
 .home-rhythm-head .home-section-label {
   margin: 0;
+}
+.home-rhythm-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 .home-rhythm-summary {
   color: var(--paper-mute);
@@ -911,13 +925,7 @@
   text-align: left;
   border: 1px solid color-mix(in oklab, var(--line) 90%, var(--paper));
   border-radius: var(--r-md);
-  background:
-    linear-gradient(
-      160deg,
-      color-mix(in oklab, var(--paper) 4%, transparent),
-      transparent 48%
-    ),
-    color-mix(in oklab, var(--stone) 78%, transparent);
+  background: color-mix(in oklab, var(--stone) 78%, transparent);
   color: var(--paper);
   cursor: pointer;
   transition: border-color var(--dur, 200ms) var(--ease),
@@ -926,14 +934,7 @@
 }
 .home-memory-card:hover {
   border-color: color-mix(in oklab, var(--lapis) 28%, var(--line));
-  background:
-    linear-gradient(
-      160deg,
-      color-mix(in oklab, var(--paper) 6%, transparent),
-      transparent 50%
-    ),
-    color-mix(in oklab, var(--stone) 70%, transparent);
-  transform: translateY(-1px);
+  background: color-mix(in oklab, var(--stone) 70%, transparent);
 }
 .home-memory-card-head,
 .home-memory-foot {
@@ -1003,9 +1004,40 @@
   font-size: 12px;
   color: var(--paper-mute);
 }
+.home-quiet-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.home-quiet-ledger,
+.home-quiet-room-ledger {
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+  text-decoration: none;
+}
+.home-quiet-ledger:hover,
+.home-quiet-room-ledger:hover { text-decoration: underline; }
+.home-quiet-ledger:focus-visible,
+.home-quiet-room-ledger:focus-visible {
+  outline: 1px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
 .home-quiet-list {
   display: grid;
   gap: 6px;
+}
+.home-quiet-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+}
+.home-quiet-room-ledger {
+  min-height: var(--target-min, 44px);
+  display: inline-flex;
+  align-items: center;
 }
 .home-quiet-item {
   width: 100%;
@@ -1017,7 +1049,7 @@
   padding: 8px 12px;
   text-align: left;
   border: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
-  border-radius: var(--r-md);
+  border-radius: 2px;
   background: color-mix(in oklab, var(--stone) 64%, transparent);
   color: var(--paper-dim);
   cursor: pointer;
@@ -1201,8 +1233,7 @@
 }
 .home-card:hover {
   border-color: color-mix(in oklab, var(--lapis) 42%, var(--line));
-  transform: translateY(-1px);
-  box-shadow: var(--elev-2, none);
+  box-shadow: none;
 }
 .home-card:focus-within {
   border-color: color-mix(in oklab, var(--lapis) 48%, var(--line));
@@ -1248,6 +1279,7 @@
 .home-card-foot {
   display: flex;
   align-items: center;
+  gap: 0.75rem;
   margin-top: auto;
 }
 .home-card-msgs {
@@ -1256,8 +1288,24 @@
   font-size: 0.7rem;
   color: var(--paper-mute);
 }
-.home-card-join {
+.home-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   margin-left: auto;
+}
+.home-card-ledger {
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--paper-mute);
+  text-decoration: none;
+}
+.home-card-ledger:hover { text-decoration: underline; }
+.home-card-ledger:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
+.home-card-join {
   font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
@@ -1266,9 +1314,7 @@
   border: 0;
   padding: 2px 0;
   cursor: pointer;
-  transition: transform var(--dur, 200ms) var(--ease);
 }
-.home-card-join:hover { transform: translateX(2px); }
 
 /* Recent rooms */
 .home-recent-chips {
@@ -1282,7 +1328,7 @@
   color: var(--paper-dim);
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-md);
   padding: 6px 14px;
   cursor: pointer;
   transition: color var(--dur, 200ms) var(--ease), border-color var(--dur, 200ms) var(--ease);
@@ -2025,13 +2071,7 @@
   grid-template-rows: auto auto minmax(2.8em, 1fr) auto;
   gap: var(--space-2);
   padding: var(--space-3);
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in oklab, var(--gold) 5%, transparent),
-      transparent 42%
-    ),
-    color-mix(in oklab, var(--stone) 78%, transparent);
+  background: color-mix(in oklab, var(--stone) 78%, transparent);
   border: 1px solid color-mix(in oklab, var(--line) 88%, var(--gold));
   border-radius: var(--r-md);
   overflow: hidden;
@@ -2095,7 +2135,7 @@
 .home-recap-card__review,
 .home-recap-card__spotlight {
   min-height: 30px;
-  border-radius: 999px;
+  border-radius: var(--r-md);
   padding: 5px 11px;
   font: inherit;
   font-family: var(--font-mono);
@@ -2117,14 +2157,6 @@
   color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, transparent);
-}
-.home-recap-card__open:hover,
-.home-recap-card__review:hover,
-.home-recap-card__spotlight:hover,
-.home-recap-card__open:focus-visible,
-.home-recap-card__review:focus-visible,
-.home-recap-card__spotlight:focus-visible {
-  transform: translateY(-1px);
 }
 .home-review-history {
   margin: 0 0 28px;
@@ -2201,7 +2233,7 @@
 }
 .home-review-history__actions button {
   min-height: 30px;
-  border-radius: 999px;
+  border-radius: var(--r-md);
   padding: 5px 10px;
   color: var(--paper);
   background: color-mix(in oklab, var(--stone) 62%, transparent);
@@ -2218,7 +2250,6 @@
 .home-review-history__actions button:hover,
 .home-review-history__actions button:focus-visible {
   border-color: color-mix(in oklab, var(--lapis-bright) 48%, var(--line));
-  transform: translateY(-1px);
 }
 @media (prefers-reduced-motion: reduce) {
   .home-catchup-item,

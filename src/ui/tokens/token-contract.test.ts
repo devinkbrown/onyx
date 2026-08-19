@@ -397,3 +397,57 @@ describe('contract helpers', () => {
     expect(findThemeOwnedRedeclarations(':root { --ui-type-md: 1rem; }')).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 9. Public --public-* spine (redesign S1)
+// ---------------------------------------------------------------------------
+
+describe('public --public-* spine aliases canonical tokens.css', () => {
+  const publicFrame = read('src/ui/public/public-frame.css');
+  const home = read('src/routes/home.css');
+  const publicDeclarations = parseDeclarations(publicFrame);
+
+  const aliases: readonly [token: string, canonical: string][] = [
+    ['--public-void', '--ink'],
+    ['--public-surface', '--stone'],
+    ['--public-raised', '--stone-2'],
+    ['--public-seam', '--stone-3'],
+    ['--public-paper', '--paper'],
+    ['--public-muted', '--paper-dim'],
+    ['--public-current', '--lapis'],
+    ['--public-on-signal', '--on-accent'],
+    ['--public-ember', '--shu'],
+    ['--public-ok', '--ok'],
+    ['--public-line', '--line'],
+    ['--public-sans', '--font-sans'],
+    ['--public-serif', '--font-serif'],
+    ['--public-mono', '--font-mono'],
+  ];
+
+  it('carries no colour literal in public-frame.css', () => {
+    expect(findColorLiteralViolations(publicFrame, [])).toEqual([]);
+  });
+
+  for (const [token, canonical] of aliases) {
+    it(`${token} defers to ${canonical}`, () => {
+      const declaration = publicDeclarations.find((candidate) => candidate.property === token);
+      expect(declaration, `${token} is not declared`).toBeDefined();
+      expect(declaration!.value.trim()).toMatch(new RegExp(`^var\\(\\s*${canonical}\\s*[),]`));
+    });
+  }
+
+  it('home.css --mn-* aliases are hex-free', () => {
+    const homeRule = parseRules(home).find((rule) => rule.selector === '.r-landing.home');
+    expect(homeRule, '.r-landing.home token block is missing').toBeDefined();
+    const aliasesOnly = parseDeclarations(`x{${homeRule!.body}}`).filter((declaration) =>
+      declaration.property.startsWith('--mn-'),
+    );
+    expect(aliasesOnly.length).toBeGreaterThan(0);
+    expect(findColorLiteralViolations(`x{${aliasesOnly.map((d) => `${d.property}:${d.value};`).join('')}}`, [])).toEqual(
+      [],
+    );
+    for (const declaration of aliasesOnly) {
+      expect(declaration.value.trim()).toMatch(/^var\(\s*--public-/);
+    }
+  });
+});

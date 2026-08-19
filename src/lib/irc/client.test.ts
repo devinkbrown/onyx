@@ -484,6 +484,19 @@ describe('IRCClient bounded WebSocket sends', () => {
     expect(errors).toEqual([]);
   });
 
+  it('sends ACTIVITY subscribe/unsubscribe only for channel targets', () => {
+    const { client } = makeSendClient();
+    const { sent } = attachSocket(client);
+
+    expect(client.activitySubscribe('#ops')).toBe(true);
+    expect(client.activityUnsubscribe('&ops')).toBe(true);
+    expect(client.activitySubscribe('ops')).toBe(false);
+    expect(sent).toEqual([
+      'ACTIVITY SUBSCRIBE #ops\r\n',
+      'ACTIVITY UNSUBSCRIBE &ops\r\n',
+    ]);
+  });
+
   it('rejects a closed socket with an explicit error and no raw-log entry', () => {
     const { client, errors, raw } = makeSendClient();
     const { sent } = attachSocket(client, { readyState: WebSocket.CLOSED });

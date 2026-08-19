@@ -79,6 +79,33 @@ afterEach(() => {
 });
 
 describe('MemberList accessibility', () => {
+  it('links to the channel ledger for public room channels', () => {
+    seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
+
+    render(() => <MemberList />);
+
+    expect(screen.getByTestId('members-channel-ledger')).toHaveAttribute(
+      'href',
+      '/stats/?room=%23general',
+    );
+    expect(screen.getByRole('link', { name: 'Channel ledger for #general' })).toHaveTextContent('Ledger');
+  });
+
+  it('omits the channel ledger link outside # and & rooms', () => {
+    const client = makeClient();
+    store.setState({
+      ...initialState,
+      client: client as never,
+      ourNick: 'alice',
+      activeView: { kind: 'dm', nick: 'bob' },
+      connectionStatus: 'connected',
+    }, true);
+
+    render(() => <MemberList />);
+
+    expect(screen.queryByTestId('members-channel-ledger')).toBeNull();
+  });
+
   it('provides an operable close control only when the roster is an open modal', () => {
     seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
     const onClose = vi.fn();
@@ -322,6 +349,20 @@ describe('MemberList accessibility', () => {
 
     const opTrigger = await screen.findByRole('button', { name: /Open member details for bob, Op/ });
     await waitFor(() => expect(opTrigger).toHaveFocus());
+  });
+
+  it('windows a large roster instead of mounting every member row', () => {
+    const users = Array.from({ length: 220 }, (_, i) => (
+      i === 0 ? makeUser('me', ['o']) : makeUser(`nick${i}`)
+    ));
+    seedChannel(users);
+    render(() => <MemberList />);
+
+    const triggers = screen.getAllByRole('button', { name: /Open member details/ });
+    expect(triggers.length).toBeGreaterThan(20);
+    expect(triggers.length).toBeLessThan(160);
+    expect(screen.getByLabelText('220 members')).toHaveTextContent('220');
+    expect(screen.getByRole('heading', { name: /Members — 219/ })).toBeInTheDocument();
   });
 
   it('returns focus to the stable roster when the focused member leaves', async () => {

@@ -50,7 +50,7 @@
 .chb-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-areas: 'main join' 'topic join';
+  grid-template-areas: 'main actions' 'topic actions';
   gap: 2px 14px;
   align-items: center;
   padding: 10px 6px;
@@ -75,21 +75,49 @@
   text-overflow: ellipsis;
 }
 .chb-topic.is-empty { color: var(--paper-mute); font-style: italic; }
-.chb-join {
-  grid-area: join;
+.chb-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.chb-ledger {
   font: inherit;
   font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--gold-bright);
-  background: transparent;
-  border: 1px solid color-mix(in oklab, var(--gold) 35%, transparent);
-  border-radius: 999px;
-  padding: 5px 16px;
-  cursor: pointer;
-  transition: background 160ms var(--ease), color 160ms var(--ease);
+  color: var(--paper-mute);
+  text-decoration: none;
 }
-.chb-join:hover { background: color-mix(in oklab, var(--gold) 16%, transparent); color: var(--paper); }
-.chb-join:focus-visible { outline: 2px solid var(--lapis); outline-offset: 2px; }
+.chb-ledger:hover { text-decoration: underline; }
+.chb-ledger:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
+.chb-join {
+  align-self: center;
+  font: inherit;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--paper);
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
+  border-radius: var(--r-md);
+  min-height: var(--target-min, 44px);
+  min-width: var(--target-min, 44px);
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 160ms var(--ease), color 160ms var(--ease),
+    border-color 160ms var(--ease);
+}
+.chb-join:hover {
+  color: var(--paper);
+  border-color: color-mix(in oklab, var(--lapis-bright) 55%, var(--line));
+  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+}
+.chb-join:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .chb-join { transition: none; }

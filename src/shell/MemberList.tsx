@@ -33,6 +33,12 @@ import {
 import { useStore, getState, selectIsChannelOp } from '@/lib/store';
 import type { ChannelUser } from '@/lib/irc/types';
 import { createGroupReconciler, type ResolvedRole } from '@/lib/memberGroups';
+import {
+  computeMemberWindow,
+  flattenMemberRows,
+  memberPrefixHeight,
+  sectionMemberWindow,
+} from './memberWindow';
 import { formatMentionInsert } from '@/lib/composer/composerInject';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { preferences } from '@/lib/prefs/preferences';
@@ -43,6 +49,7 @@ import {
 } from '@/lib/moderation/actionModel';
 import { Avatar, Popover, Button, IconButton } from '@/primitives/index';
 import { ModerationActionReview } from './moderation/ModerationActionReview';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 
 // Role resolution, grouping, and identity-stable reconciliation live in
 // `@/lib/memberGroups` (unit-tested there). See that module for why entry/group
@@ -494,6 +501,7 @@ export type MemberListProps = {
 export function MemberList(props: MemberListProps): JSX.Element {
   const [local] = splitProps(props, ['hidden', 'modal', 'onClose', 'onOpenDm', 'onOpenWhois']);
   let memberListRef: HTMLElement | undefined;
+  let memberScrollRef: HTMLDivElement | undefined;
   const instanceId = createUniqueId();
   const filterId = `member-filter-input-${instanceId}`;
   const [memberFilter, setMemberFilter] = createSignal('');
@@ -584,6 +592,26 @@ export function MemberList(props: MemberListProps): JSX.Element {
     return visibleGroups().reduce((sum, g) => sum + g.members.length, 0);
   });
 
+  const [scrollTop, setScrollTop] = createSignal(0);
+  const flatRows = createMemo(() => flattenMemberRows(visibleGroups()));
+  const memberWindow = createMemo(() => computeMemberWindow(flatRows(), scrollTop()));
+  const windowedSections = createMemo(() => {
+    const win = memberWindow();
+    return sectionMemberWindow(flatRows(), win.start, win.end);
+  });
+  const padBefore = createMemo(() => memberPrefixHeight(flatRows(), memberWindow().start));
+  const padAfter = createMemo(() => {
+    const rows = flatRows();
+    return memberPrefixHeight(rows, rows.length) - memberPrefixHeight(rows, memberWindow().end);
+  });
+
+  createEffect(() => {
+    void activeChannel()?.name;
+    void memberFilter();
+    setScrollTop(0);
+    if (memberScrollRef) memberScrollRef.scrollTop = 0;
+  });
+
   const memberListLabel = createMemo(() => {
     const channel = activeChannel();
     return channel ? `Member list for ${channel.name}` : 'Member list';
@@ -592,6 +620,14 @@ export function MemberList(props: MemberListProps): JSX.Element {
   const rosterLabel = createMemo(() => {
     const channel = activeChannel();
     return channel ? `Channel members in ${channel.name}` : 'Channel members';
+  });
+
+  const channelLedger = createMemo(() => {
+    const ch = activeChannel();
+    if (!ch) return null;
+    const name = ch.name.trim();
+    if (!/^[#&]/.test(name)) return null;
+    return { channel: name, href: statsRoomHref(name) };
   });
 
   // Solid's DOM property table predates `HTMLElement.inert` in some supported
@@ -627,6 +663,18 @@ export function MemberList(props: MemberListProps): JSX.Element {
           changes are announced elsewhere — never by re-reading this number.
         */}
         <span class="shell-members-head-actions">
+          <Show when={channelLedger()}>
+            {(ledger) => (
+              <a
+                class="shell-members-ledger shell-ribbon-stats"
+                href={ledger().href}
+                aria-label={`Channel ledger for ${ledger().channel}`}
+                data-testid="members-channel-ledger"
+              >
+                Ledger
+              </a>
+            )}
+          </Show>
           <span class="shell-members-head-meta">
             <Show when={isRefreshingRoster() && groups().length > 0}>
               <span class="shell-members-refresh" role="status" aria-label="Refreshing members">sync</span>
@@ -679,7 +727,13 @@ export function MemberList(props: MemberListProps): JSX.Element {
         </div>
       </Show>
 
-      <div class="shell-members-scroll" role="region" aria-label={rosterLabel()}>
+      <div
+        class="shell-members-scroll"
+        role="region"
+        aria-label={rosterLabel()}
+        ref={memberScrollRef}
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      >
         <Show
           when={!isLoadingRoster() && groups().length > 0}
           fallback={
@@ -713,7 +767,8 @@ export function MemberList(props: MemberListProps): JSX.Element {
               </p>
             }
           >
-            <For each={visibleGroups()}>
+            <div class="shell-members-window-pad" style={{ height: `${padBefore()}px` }} aria-hidden="true" />
+            <For each={windowedSections()}>
               {(group) => {
                 const groupLabelId = `members-group-${instanceId}-${group.key}`;
                 return (
@@ -724,14 +779,14 @@ export function MemberList(props: MemberListProps): JSX.Element {
                       role="heading"
                       aria-level={3}
                     >
-                      {group.label} — {group.members.length}
+                      {group.label} — {group.count}
                     </p>
                     <ul class="shell-members-group-list" role="list" aria-labelledby={groupLabelId}>
                       <For each={group.members}>
-                        {({ user, role }) => (
+                        {(entry) => (
                           <MemberRow
-                            user={user}
-                            role={role}
+                            user={entry.user}
+                            role={entry.role}
                             channel={activeChannel()?.name ?? ''}
                             hidden={local.hidden}
                             onOpenDm={local.onOpenDm}
@@ -748,6 +803,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
                 );
               }}
             </For>
+            <div class="shell-members-window-pad" style={{ height: `${padAfter()}px` }} aria-hidden="true" />
           </Show>
         </Show>
       </div>

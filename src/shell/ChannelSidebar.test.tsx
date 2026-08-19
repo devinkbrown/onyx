@@ -15,6 +15,7 @@
 
 import { cleanup, fireEvent, render, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
 import type { DMConversation } from '@/lib/store/store';
@@ -99,6 +100,7 @@ function rows(container: HTMLElement): HTMLButtonElement[] {
 describe('ChannelSidebar accessibility', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+    resetPreferences();
   });
 
   afterEach(() => {
@@ -131,6 +133,24 @@ describe('ChannelSidebar accessibility', () => {
 
     expect(network).toHaveTextContent('Onyx');
     expect(network).not.toHaveTextContent('IRCXNet');
+  });
+
+  it('links the active channel to its public ledger in rooms mode', () => {
+    seed();
+
+    const { getByTestId } = render(() => <ChannelSidebar mode="rooms" />);
+
+    expect(getByTestId('sidebar-channel-ledger')).toHaveAttribute('href', '/stats/?room=%23bravo');
+    expect(getByTestId('sidebar-channel-ledger')).toHaveAttribute('aria-label', 'Channel ledger for #bravo');
+  });
+
+  it('hides the channel ledger when the active view is not a channel', () => {
+    seed();
+    store.setState({ activeView: { kind: 'dm', nick: 'dave' } });
+
+    const { queryByTestId } = render(() => <ChannelSidebar mode="rooms" />);
+
+    expect(queryByTestId('sidebar-channel-ledger')).toBeNull();
   });
 
   it('exposes the Conversations spine and singular collection heading', () => {
@@ -321,6 +341,43 @@ describe('ChannelSidebar accessibility', () => {
     expect(getByRole('button', { name: 'Join #harbor' })).toBeInTheDocument();
   });
 
+  it('preserves # and & prefixes for join labels', () => {
+    seed();
+
+    const { getByLabelText, getByRole } = render(() => <ChannelSidebar />);
+    const joinInput = getByLabelText('Channel name to join');
+
+    fireEvent.input(joinInput, { target: { value: '&ops' } });
+    expect(getByRole('button', { name: 'Join &ops' })).toBeInTheDocument();
+
+    fireEvent.input(joinInput, { target: { value: '#ops' } });
+    expect(getByRole('button', { name: 'Join #ops' })).toBeInTheDocument();
+
+    fireEvent.input(joinInput, { target: { value: 'ops' } });
+    expect(getByRole('button', { name: 'Join #ops' })).toBeInTheDocument();
+  });
+
+  it('renders local & channels without a synthetic # prefix', () => {
+    const channels = new Map<string, Channel>();
+    channels.set('&ops', makeChannel('&ops'));
+    store.setState({
+      ...initialState,
+      channels,
+      dms: new Map(),
+      activeView: { kind: 'channel', channel: '&ops' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+    }, true);
+
+    const { getByRole } = render(() => <ChannelSidebar />);
+    const ops = getByRole('button', { name: '&ops' });
+
+    expect(ops).toBeInTheDocument();
+    expect(ops.textContent).toContain('&ops');
+    expect(ops.textContent).not.toContain('#&ops');
+  });
+
   it('moves focus down with ArrowDown', () => {
     // Arrange — rows are: Status, #alpha, #bravo, #charlie, dave
     seed();
@@ -431,6 +488,19 @@ describe('ChannelSidebar accessibility', () => {
   it('uses the synchronous path when reduced motion is requested', () => {
     seed();
     const startViewTransition = installViewTransitions(() => pendingTransition(), true);
+    const navigateSpy = vi.spyOn(store.getState(), 'navigate');
+    const { getByRole } = render(() => <ChannelSidebar />);
+
+    fireEvent.click(getByRole('button', { name: '#alpha' }));
+
+    expect(startViewTransition).not.toHaveBeenCalled();
+    expect(navigateSpy).toHaveBeenCalledWith({ kind: 'channel', channel: '#alpha' });
+  });
+
+  it('uses the synchronous path when in-app reduce motion is enabled', () => {
+    seed();
+    setPreference('reduceMotion', true);
+    const startViewTransition = installViewTransitions(() => pendingTransition(), false);
     const navigateSpy = vi.spyOn(store.getState(), 'navigate');
     const { getByRole } = render(() => <ChannelSidebar />);
 

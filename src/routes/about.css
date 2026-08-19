@@ -27,15 +27,8 @@
 .ab-ocean .r-veins path { stroke: var(--ab-current); }
 .ab-ocean .r-veins .node { fill: var(--ab-current-strong); }
 .ab-ocean .r-flecks {
-  background-image:
-    radial-gradient(1.4px 1.4px at 12% 22%, var(--lapis-bright) 50%, transparent 52%),
-    radial-gradient(1px 1px at 78% 16%, var(--lapis) 50%, transparent 52%),
-    radial-gradient(1.5px 1.5px at 64% 60%, var(--lapis-bright) 50%, transparent 52%),
-    radial-gradient(1px 1px at 30% 78%, var(--lapis) 50%, transparent 52%),
-    radial-gradient(1px 1px at 88% 72%, var(--ab-current) 50%, transparent 52%),
-    radial-gradient(1.4px 1.4px at 44% 34%, var(--lapis) 50%, transparent 52%),
-    radial-gradient(1px 1px at 22% 52%, var(--lapis-bright) 50%, transparent 52%),
-    radial-gradient(1px 1px at 56% 88%, var(--lapis) 50%, transparent 52%);
+  display: none;
+  background-image: none;
 }
 
 /* Brand mark (Mascot) sits inline with the ONYX wordmark in nav + footer */
@@ -217,24 +210,17 @@
   position: relative;
   padding: clamp(26px, 3vw, 40px);
   border-radius: var(--r-md);
-  background: linear-gradient(
-    160deg,
-    color-mix(in oklab, var(--stone-2) 48%, var(--ink)),
-    color-mix(in oklab, var(--stone) 28%, var(--ink))
-  );
+  background: color-mix(in oklab, var(--stone-2) 38%, var(--ink));
   border: 1px solid var(--seam-faint);
   border-top: 2px solid var(--seam);
   display: flex;
   flex-direction: column;
   gap: 14px;
-  transition: border-top-color var(--dur) var(--ease), transform var(--dur) var(--ease),
-    box-shadow var(--dur) var(--ease);
+  transition: border-top-color var(--dur) var(--ease);
 }
 
 .ab-proto-item:hover {
-  transform: translateY(-3px);
   border-top-color: var(--lapis-bright);
-  box-shadow: 0 18px 40px -28px color-mix(in oklab, var(--lapis) 60%, transparent);
 }
 
 .ab-proto-item .label {
@@ -360,12 +346,7 @@
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
   border-radius: var(--r-md);
-  background: radial-gradient(
-    130% 130% at 50% -10%,
-    color-mix(in oklab, var(--lapis-deep) 22%, var(--ink)),
-    color-mix(in oklab, var(--stone-2) 40%, var(--ink)) 40%,
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--stone-2) 32%, var(--ink));
 }
 
 .ab-media-body {
@@ -411,14 +392,12 @@
   flex-direction: column;
   gap: 10px;
   background: color-mix(in oklab, var(--stone) 20%, transparent);
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
 .ab-transport:hover {
   border-color: var(--seam);
   background: color-mix(in oklab, var(--stone-2) 32%, transparent);
-  transform: translateY(-2px);
 }
 
 /* Primary = the preferred path, the live azure current */
@@ -546,12 +525,7 @@
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
   border-radius: var(--r-md);
-  background: radial-gradient(
-    100% 100% at 50% 0%,
-    color-mix(in oklab, var(--lapis-deep) 20%, var(--ink)),
-    color-mix(in oklab, var(--stone-2) 42%, var(--ink)) 42%,
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--stone-2) 34%, var(--ink));
 }
 
 /* ───────── Cadence mesh section ───────── */
@@ -576,12 +550,7 @@
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
   border-radius: var(--r-md);
-  background: radial-gradient(
-    120% 120% at 50% 0%,
-    color-mix(in oklab, var(--lapis-deep) 22%, var(--ink)),
-    color-mix(in oklab, var(--stone-2) 40%, var(--ink)) 42%,
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--stone-2) 32%, var(--ink));
 }
 
 .ab-mesh-text {
@@ -635,12 +604,12 @@
 
 .ab-node.esh .dot {
   background: var(--lapis);
-  box-shadow: 0 0 12px var(--lapis);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent);
 }
 
 .ab-node.ircx .dot {
   background: var(--lapis-bright);
-  box-shadow: 0 0 12px var(--lapis-bright);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--paper) 35%, transparent);
 }
 
 .ab-node .meta {
@@ -712,11 +681,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: linear-gradient(
-    160deg,
-    color-mix(in oklab, var(--stone-2) 40%, var(--ink)),
-    color-mix(in oklab, var(--stone) 22%, var(--ink))
-  );
+  background: color-mix(in oklab, var(--stone-2) 32%, var(--ink));
   position: relative;
   overflow: hidden;
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
@@ -731,8 +696,7 @@
 }
 
 .ab-svc:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 18px 40px -30px color-mix(in oklab, var(--lapis) 55%, transparent);
+  box-shadow: none;
 }
 
 .ab-svc .cmd {
@@ -818,20 +782,16 @@
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
   border-radius: var(--r-md);
-  transition: transform var(--dur) var(--ease), border-top-color var(--dur) var(--ease);
+  transition: border-top-color var(--dur) var(--ease);
 }
 
 .ab-myth:hover {
-  transform: translateY(-4px);
+  border-top-color: var(--lapis);
 }
 
 /* serpent = Onyx Server engine — the living azure current */
 .ab-myth.serpent {
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--lapis-deep) 26%, var(--ink)),
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--lapis-deep) 14%, var(--ink));
 }
 
 .ab-myth.serpent:hover {
@@ -840,11 +800,7 @@
 
 /* tide = the gate — the open water you pass through */
 .ab-myth.tide {
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--lapis) 14%, var(--ink)),
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--lapis) 10%, var(--ink));
 }
 
 .ab-myth.tide:hover {
@@ -852,11 +808,7 @@
 }
 
 .ab-myth.jewel {
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--ab-ember) 16%, var(--ink)),
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--ab-ember) 12%, var(--ink));
 }
 
 .ab-myth.jewel:hover {
@@ -957,7 +909,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--lapis-bright), transparent);
+  background: var(--seam);
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
 }
@@ -1065,14 +1017,7 @@
 .ab-seam {
   height: 2px;
   width: min(600px, 80vw);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--lapis) 8%,
-    var(--lapis-bright) 50%,
-    var(--lapis) 92%,
-    transparent
-  );
+  background: color-mix(in oklab, var(--lapis) 42%, var(--seam));
   /* a gentle wave crest rather than a jagged gold seam fracture */
   clip-path: polygon(
     0 50%,
@@ -1088,7 +1033,6 @@
   );
   opacity: 0.85;
   margin-top: 24px;
-  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--lapis) 50%, transparent));
 }
 
 @media (max-width: 42rem) and (max-height: 30rem) {

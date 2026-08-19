@@ -1,26 +1,27 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
-/* Public company-site identity. These six values are the locked Room Current
-   threshold palette — not theme overrides and not app-shell tokens. */
+/* Public company-site identity. The --public-* spine aliases canonical
+   src/styles/tokens.css values so public routes share one authority. */
 .public-frame {
-  --public-void: #05070a;
-  --public-surface: #0c1016;
-  --public-seam: #1a222c;
-  --public-paper: #e6e8ec;
-  --public-current: #5ba3c9;
-  --public-ember: #c97b6b;
-  --public-raised: #121820;
+  --public-void: var(--ink);
+  --public-surface: var(--stone);
+  --public-raised: var(--stone-2);
+  --public-seam: var(--stone-3);
+  --public-paper: var(--paper);
   --public-text: var(--public-paper);
-  --public-muted: #8b939e;
-  --public-line: color-mix(in oklab, var(--public-paper) 12%, transparent);
+  --public-muted: var(--paper-dim);
+  --public-current: var(--lapis);
   --public-signal: var(--public-current);
   --public-signal-strong: color-mix(in oklab, var(--public-current) 72%, var(--public-paper));
-  --public-on-signal: #061018;
-  --public-radius: var(--r-md, 8px);
+  --public-on-signal: var(--on-accent);
+  --public-ember: var(--shu);
+  --public-ok: var(--ok);
+  --public-line: var(--line);
+  --public-radius: 2px;
   --public-target: var(--target-min, 44px);
   --public-measure: min(100% - 2rem, 74rem);
-  --public-sans: var(--font-sans, 'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif);
-  --public-serif: var(--font-serif, 'Fraunces Variable', 'Fraunces', Georgia, serif);
-  --public-mono: var(--font-mono, 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace);
+  --public-sans: var(--font-sans);
+  --public-serif: var(--font-serif);
+  --public-mono: var(--font-mono);
   display: flex;
   flex-direction: column;
   min-height: 100svh;
@@ -60,9 +61,9 @@
   top: 0;
   z-index: 20;
   border-bottom: 1px solid var(--public-line);
-  background: color-mix(in oklab, var(--public-void) 94%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: var(--public-void);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 .public-frame__header-inner,
 .public-frame__footer-inner {
@@ -160,7 +161,7 @@
   color: var(--public-current);
 }
 .public-frame__current-label { color: var(--public-text); }
-.public-frame__main { width: var(--public-measure); margin-inline: auto; flex: 1 0 auto; min-width: 0; padding-block: clamp(2rem, 5vw, 5rem); }
+.public-frame__main { width: var(--public-measure); margin-inline: auto; flex: 1 0 auto; min-width: 0; padding-block: clamp(1rem, 2.4vw, 2rem); }
 .public-frame__footer { margin-top: auto; border-top: 1px solid var(--public-line); background: var(--public-surface); }
 .public-frame__footer-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem; padding-block: 2rem max(2rem, env(safe-area-inset-bottom)); }
 .public-frame__footer p { max-width: 48ch; margin: 0.65rem 0 0; color: var(--public-muted); font: 400 0.95rem/1.55 var(--public-sans); }

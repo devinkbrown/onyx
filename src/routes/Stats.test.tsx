@@ -432,6 +432,47 @@ describe('StatsRoute', () => {
     expect(screen.queryByLabelText('#root summary')).not.toBeInTheDocument();
   });
 
+  it('inspects a room from the public ?room= query and exposes its daily series', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const previous = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, '', '/stats/?room=%23quiet');
+
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/quiet.json')) {
+        return new Response(JSON.stringify(channelDetailPayload('#quiet', now, {
+          totals: { messages: 10, words: 20, active_users: 1, joins: 1, parts: 0, quits: 0, kicks: 0, topic_changes: 0 },
+          days: [{ date: '2026-07-20', messages: 4 }, { date: '2026-07-21', messages: 6 }],
+          records: { busiest_day: { date: '2026-07-21', messages: 6 }, peak_hour: 11 },
+        })));
+      }
+      if (url.endsWith('/root.json')) {
+        return new Response(JSON.stringify(channelDetailPayload('#root', now)));
+      }
+      return new Response(JSON.stringify({
+        generated_at: now,
+        users_online: 4,
+        network_days: [{ date: '2026-07-21', messages: 12 }],
+        channels: [
+          { channel: '#root', messages: 90, present: 3, last_active: now - 60, spark: [12] },
+          { channel: '#quiet', messages: 10, present: 0, last_active: now - 120, spark: [1] },
+        ],
+      }));
+    }));
+
+    try {
+      render(() => <StatsRoute />);
+      expect(await screen.findByLabelText('#quiet summary')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /inside #quiet/i })).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: '#quiet messages by day' })).toHaveTextContent('2026-07-20: 4 messages');
+      expect(screen.getByText(/network share/i)).toBeInTheDocument();
+      expect(screen.getByText(/net joins/i)).toBeInTheDocument();
+      expect(screen.queryByText('private-ranking')).not.toBeInTheDocument();
+    } finally {
+      window.history.replaceState(null, '', previous || '/');
+    }
+  });
+
   it('uses non-smooth scroll when prefers-reduced-motion is reduce', () => {
     const target = document.createElement('section');
     target.id = STATS_INSPECTOR_ID;

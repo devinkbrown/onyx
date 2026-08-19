@@ -141,9 +141,7 @@
 }
 
 .roadmap-principle .data-card {
-  background:
-    linear-gradient(120deg, color-mix(in oklab, var(--roadmap-current) 13%, transparent), transparent 58%),
-    color-mix(in oklab, var(--stone-2) 42%, var(--ink));
+  background: var(--stone-2);
 }
 
 .roadmap-principle p {

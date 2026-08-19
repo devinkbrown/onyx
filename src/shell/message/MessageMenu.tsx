@@ -43,6 +43,7 @@ import {
 } from '@/lib/intelligence/translateMessage';
 import { isValidTopicLabel } from '@/lib/topics/topics';
 import { openMessageSearchWithQuery } from '@/shell/search/useMessageSearch';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { hasEncryptedMessageBoundary } from '@/lib/e2ee/replyPrivacy';
 import { formatQuoteInsert } from '@/lib/composer/composerInject';
 import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
@@ -588,11 +589,16 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   // Implement it here (the shared Popover only owns Escape + dialog framing).
   let overflowMenuRef: HTMLDivElement | undefined;
 
-  const overflowItems = (): HTMLButtonElement[] => {
+  const overflowItems = (): HTMLElement[] => {
     if (!overflowMenuRef) return [];
     return Array.from(
-      overflowMenuRef.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
-    );
+      overflowMenuRef.querySelectorAll<HTMLElement>('button[role="menuitem"], a[role="menuitem"]'),
+    ).sort((a, b) => {
+      const position = a.compareDocumentPosition(b);
+      if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+      if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+      return 0;
+    });
   };
 
   // Roving tabindex: only the active item stays in the Tab sequence, so Tab
@@ -852,6 +858,18 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                 <CopyIcon class="msg-menu-item-icon" />
                 <span>Copy moment link</span>
               </button>
+            </Show>
+            <Show when={isChannelTarget()}>
+              <a
+                class="msg-menu-item"
+                role="menuitem"
+                href={statsRoomHref(local.target)}
+                aria-label={`Channel ledger for ${local.target}`}
+                onClick={() => local.onMenuOpenChange?.(false)}
+              >
+                <span class="msg-menu-item-icon" aria-hidden="true">⌁</span>
+                <span>Channel ledger</span>
+              </a>
             </Show>
             <Show when={caps().canSearchText}>
               <button

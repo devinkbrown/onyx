@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { store } from '@/lib/store/store';
-import { PinnedMessages } from './PinnedMessages';
+import { derivePinIds, PinnedMessages, sameStringArray } from './PinnedMessages';
 
 const initialState = store.getInitialState();
 
@@ -95,5 +95,52 @@ describe('PinnedMessages accessibility', () => {
 
     expect(request).toHaveBeenCalledWith('#room', 'missing-1');
     expect(store.getState().showPinnedMessages).toBe(true);
+  });
+});
+
+describe('PinnedMessages selector stability (perf)', () => {
+  beforeEach(() => {
+    store.setState(initialState, true);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('derivePinIds always reallocates, but sameStringArray treats an unchanged PINS prop as equal', () => {
+    seedPins();
+    const before = derivePinIds(store.getState());
+    // No pin-affecting change happened — an unrelated slice churns instead.
+    store.setState({ typingUsers: new Map([['#other', new Map([['someone', Date.now()]])]]) });
+    const after = derivePinIds(store.getState());
+
+    // The raw selector has no memoization of its own — it re-splits the PINS
+    // prop string every call, so it always hands back a fresh array...
+    expect(after).not.toBe(before);
+    expect(after).toEqual(before);
+    // ...which is exactly why the useStore(derivePinIds, sameStringArray)
+    // equality gate matters: it recognizes the content hasn't changed, so the
+    // signal `pinIds` observes keeps referring to its PREVIOUS array and
+    // never produces a new identity for this write.
+    expect(sameStringArray(before, after)).toBe(true);
+  });
+
+  it('keeps every pinned row DOM-node-identical across a store write that changes nothing pinned', () => {
+    seedPins();
+    render(() => <PinnedMessages />);
+
+    const before = screen.getAllByRole('listitem');
+    expect(before).toHaveLength(2);
+
+    // An unrelated store write (a typing indicator elsewhere) must not tear
+    // down and rebuild the pinned rows — <For> is now keyed by the stable
+    // pin id itself, not a freshly-allocated {id, msg} row object.
+    store.setState({ typingUsers: new Map([['#other', new Map([['someone', Date.now()]])]]) });
+
+    const after = screen.getAllByRole('listitem');
+    expect(after).toHaveLength(2);
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).toBe(before[1]);
   });
 });

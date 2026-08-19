@@ -9,6 +9,7 @@
 import './channel-browser.css';
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Sheet } from '@/primitives/Sheet';
 import { Spinner } from '@/primitives/Spinner';
 
@@ -127,14 +128,23 @@ export default function ChannelBrowser(): JSX.Element {
                     <p class={`chb-topic${row.topic ? '' : ' is-empty'}`}>
                       {row.topic || 'No topic set.'}
                     </p>
-                    <button
-                      type="button"
-                      class="chb-join"
-                      onClick={() => enter(row.name)}
-                      aria-label={`${joined().has(row.name.toLowerCase()) ? 'Open' : 'Join'} ${row.name}`}
-                    >
-                      {joined().has(row.name.toLowerCase()) ? 'Open' : 'Join'}
-                    </button>
+                    <div class="chb-actions">
+                      <a
+                        class="chb-ledger"
+                        href={statsRoomHref(row.name)}
+                        aria-label={`Channel ledger for ${row.name}`}
+                      >
+                        Ledger
+                      </a>
+                      <button
+                        type="button"
+                        class="chb-join"
+                        onClick={() => enter(row.name)}
+                        aria-label={`${joined().has(row.name.toLowerCase()) ? 'Open' : 'Join'} ${row.name}`}
+                      >
+                        {joined().has(row.name.toLowerCase()) ? 'Open' : 'Join'}
+                      </button>
+                    </div>
                   </li>
                 )}
               </For>

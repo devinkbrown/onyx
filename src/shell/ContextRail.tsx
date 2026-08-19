@@ -7,6 +7,7 @@
  */
 import { createEffect, createMemo, Show, splitProps, type JSX } from 'solid-js';
 import { useStore } from '@/lib/store';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { RoomInsightsStrip } from './RoomInsightsStrip';
 import { ModerationCockpit } from './ModerationCockpit';
 import { OperEventConsole } from './OperEventConsole';
@@ -29,9 +30,26 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
     if (view.kind === 'dm') return view.nick;
     return 'Workspace';
   });
+  const channelLedger = createMemo(() => {
+    const view = activeView();
+    if (view.kind !== 'channel') return null;
+    const name = view.channel.trim();
+    if (!/^[#&]/.test(name)) return null;
+    return { channel: name, href: statsRoomHref(name) };
+  });
   createEffect(() => {
     if (!local.open) return;
     queueMicrotask(() => railRef?.querySelector<HTMLElement>('.shell-context-rail__close')?.focus());
+  });
+
+  // Mirrors MemberList's inert-toggle precedent: Solid's DOM property table
+  // predates `HTMLElement.inert` in some supported runtimes, so assigning a
+  // boolean JSX property can become an inert expando instead of a real DOM
+  // attribute. toggleAttribute guarantees a real boolean attribute so every
+  // browser activates native inertness from it, while aria-hidden below
+  // covers assistive tech independently.
+  createEffect(() => {
+    railRef?.toggleAttribute('inert', !local.open);
   });
 
   return (
@@ -40,7 +58,7 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
       class="shell-context-rail"
       id="shell-context-rail"
       aria-label="Room context"
-      aria-hidden={!local.open}
+      aria-hidden={local.open ? undefined : 'true'}
       data-open={local.open ? 'true' : 'false'}
       onKeyDown={(event) => {
         if (event.key !== 'Escape') return;
@@ -52,6 +70,18 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
         <div>
           <p class="shell-context-rail__eyebrow">Context</p>
           <h2>{title()}</h2>
+          <Show when={channelLedger()}>
+            {(ledger) => (
+              <a
+                class="shell-context-rail__ledger shell-ribbon-stats"
+                href={ledger().href}
+                aria-label={`Channel ledger for ${ledger().channel}`}
+                data-testid="context-rail-channel-ledger"
+              >
+                Channel ledger
+              </a>
+            )}
+          </Show>
         </div>
         <button type="button" class="shell-context-rail__close" title="Close room context" onClick={() => local.onClose()}>
           <span aria-hidden="true">×</span><span class="sr-only">Close room context</span>

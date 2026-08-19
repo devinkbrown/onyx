@@ -50,7 +50,6 @@ button.topic-chip:hover {
   border-color: var(--seam);
   background: color-mix(in oklab, var(--lapis) 16%, var(--stone));
   color: var(--paper);
-  transform: translateY(-1px);
 }
 
 .topic-chip:focus-visible {

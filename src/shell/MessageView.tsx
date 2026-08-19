@@ -34,6 +34,7 @@ import {
   type ReviewHistoryEntry,
 } from '@/lib/notifications/reviewHistory';
 import { buildSinceDigest } from '@/lib/notifications/sinceDigest';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { aggregateMessageReactions } from '@/lib/reactions/quietBoosts';
 import {
   createEffect,
@@ -1641,6 +1642,49 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     return messages().slice(win.start, win.end);
   });
 
+  // Day-boundary flags for every row in the CURRENT window, computed in a
+  // single O(window) pass and returned POSITIONALLY (window-relative index),
+  // not keyed by message id.
+  //
+  // Previously each <For> row owned its own `prevMsg`/`dayBoundary`
+  // createMemo pair that re-read `messageWindow()` (a fresh object literal
+  // per call, messageWindow.ts:189-197) and `messages()` (a fresh array
+  // reference per append). Solid's default memo equality is `===`, so every
+  // inbound message invalidated both signals for EVERY rendered row — 2×
+  // rendered memo re-executions and 2× rendered `Date.toDateString()` calls
+  // per inbound message, recomputing the identical boundary for every row
+  // but at most one. Hoisting the pass here collapses 2N per-row memo nodes
+  // into this single one; each row's <Show> reads `dayBoundaryFlags()[index()]`
+  // instead of re-deriving the boundary.
+  //
+  // Positional, NOT id-keyed: a Map keyed by `msg.id` is last-write-wins on a
+  // duplicate id within one window, so two colliding rows would both read the
+  // LAST write and the transcript's earlier occurrence could silently lose
+  // its divider. `msg.id` is not guaranteed unique across window merges
+  // (CHATHISTORY/AROUND replay, a content-derived replayEventId collision,
+  // etc.), so an array indexed by window-relative position — exactly what the
+  // old `index()`-based derivation used — is collision-proof by construction
+  // and matches old semantics exactly.
+  //
+  // Row 0 in the window may have an out-of-window predecessor (win.start >
+  // 0) whose day still governs whether row 0 gets a divider — that
+  // predecessor is looked up once here instead of via a per-row memo.
+  const dayBoundaryFlags = createMemo((): boolean[] => {
+    const win = messageWindow();
+    const all = messages();
+    const windowed = windowedMessages();
+    const flags: boolean[] = [];
+    let prevDay: string | null = win.start > 0
+      ? all[win.start - 1]?.time.toDateString() ?? null
+      : null;
+    for (const msg of windowed) {
+      const day = msg.time.toDateString();
+      flags.push(prevDay === null || prevDay !== day);
+      prevDay = day;
+    }
+    return flags;
+  });
+
   // Persist a two-sided / start page so clearing a transient landing id
   // (focusMessage / time-travel) does not snap the feed back to the tail.
   createEffect(() => {
@@ -1888,6 +1932,25 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       {' '}<kbd class="shell-feed-empty-kbd">/share</kbd>,
                       or <kbd class="shell-feed-empty-kbd">/export</kbd>.
                     </p>
+                    <Show
+                      when={
+                        activeView().kind === 'channel'
+                        && /^[#&]/.test(
+                          (activeView() as { kind: 'channel'; channel: string }).channel.trim(),
+                        )
+                      }
+                    >
+                      <a
+                        class="shell-ribbon-stats shell-feed-empty-ledger"
+                        href={statsRoomHref(
+                          (activeView() as { kind: 'channel'; channel: string }).channel,
+                        )}
+                        data-testid="feed-empty-channel-ledger"
+                        aria-label={`Channel ledger for ${(activeView() as { kind: 'channel'; channel: string }).channel}`}
+                      >
+                        Channel ledger
+                      </a>
+                    </Show>
                   </Show>
                   <Show when={activeView().kind === 'dm'}>
                     <p class="shell-feed-empty-title">A private conversation</p>
@@ -1949,6 +2012,22 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               <p class="shell-channel-intro-note">
                 This is the very beginning of the conversation. Say something worth scrolling back to.
               </p>
+              <Show
+                when={/^[#&]/.test(
+                  (activeView() as { kind: 'channel'; channel: string }).channel.trim(),
+                )}
+              >
+                <a
+                  class="shell-ribbon-stats shell-channel-intro-ledger"
+                  href={statsRoomHref(
+                    (activeView() as { kind: 'channel'; channel: string }).channel,
+                  )}
+                  data-testid="channel-intro-ledger"
+                  aria-label={`Channel ledger for ${(activeView() as { kind: 'channel'; channel: string }).channel}`}
+                >
+                  Channel ledger
+                </a>
+              </Show>
               <ScheduledEventLine channel={(activeView() as { kind: 'channel'; channel: string }).channel} />
             </div>
           </Show>
@@ -1996,9 +2075,21 @@ export function MessageView(props: MessageViewProps): JSX.Element {
           <For each={windowedMessages()}>
             {(msg, index) => {
               // index() is window-relative; recover the absolute position so
-              // continuation/day-boundary grouping stays correct across the
-              // window's top edge (the row just above the first visible one may
-              // be hidden but still governs grouping).
+              // continuation grouping stays correct across the window's top
+              // edge (the row just above the first visible one may be hidden
+              // but still governs grouping).
+              //
+              // This memo DOES still re-execute once per rendered row per
+              // inbound message (messageWindow()/messages() are fresh
+              // references every append, same as before the day-boundary
+              // fix) — what changed is that its RESULT is `===`-stable
+              // across those re-executions, so the downstream `isContinuation`
+              // memo below does not re-fire and the DOM does not move. The
+              // day-boundary fix removed roughly half the per-row pure-
+              // computation churn (the dayBoundary half), not all of it.
+              // Folding this prevMsg/isContinuation pair into the same
+              // hoisted single-pass memo as dayBoundaryFlags is the next
+              // available win here, not yet done.
               const prevMsg = createMemo(() => {
                 const absIdx = messageWindow().start + index();
                 return absIdx > 0 ? messages()[absIdx - 1] ?? null : null;
@@ -2011,12 +2102,13 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               });
 
               // Elegant date boundary — a hairline with a floating day chip.
-              const dayBoundary = createMemo(() => {
-                const prev = prevMsg();
-                return !prev || prev.time.toDateString() !== msg.time.toDateString();
-              });
+              // O(1) positional lookup into the single-pass dayBoundaryFlags
+              // array (see above) instead of a per-row memo re-deriving it
+              // from prevMsg(). Indexed by window-relative `index()` — NOT
+              // by `msg.id` — so a duplicate id within one window cannot
+              // collapse two rows onto the same flag.
               const dayEl = (
-                <Show when={dayBoundary()}>
+                <Show when={dayBoundaryFlags()[index()]}>
                   <div class="shell-day-divider" role="separator" aria-label={dayLabel(msg.time)}>
                     <span class="shell-day-divider-label">{dayLabel(msg.time)}</span>
                   </div>
@@ -2079,16 +2171,83 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 setMenuOpen(true);
               };
 
-              // Continuation line (same author within 5 min). Branching on
-              // isContinuation() outside JSX is intentional: rows are keyed by
-              // message id and a message's continuation status is fixed at
-              // insert time — the row re-creates whenever the list changes.
-              // eslint-disable-next-line solid/reactivity
-              if (isContinuation()) {
-                return (
-                  <>
-                  {dayEl}
-                  {dividerEl}
+              // Continuation/full-header grouping is reactive so keyed rows
+              // update when prepend/delete changes their predecessor.
+              return (
+                <>
+                {dayEl}
+                {dividerEl}
+                <Show
+                  when={isContinuation()}
+                  fallback={
+                    <div
+                      class={[
+                        'shell-msg-group',
+                        isHighlight() ? 'shell-msg-group--highlight' : '',
+                        revealedId() === msg.id ? 'shell-msg-revealed' : '',
+                        activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
+                        msg.pending ? 'shell-msg-pending' : '',
+                      ].filter(Boolean).join(' ')}
+                      data-message-search-id={msg.id}
+                      role="article"
+                      tabIndex={0}
+                      aria-label={messageAccessibleLabel(msg)}
+                      onContextMenu={openMenuFromRow}
+                      onClick={(e) => toggleReveal(msg.id, e)}
+                      onKeyDown={(e) => toggleRevealFromKeyboard(msg.id, e)}
+                    >
+                      <MessageMenu
+                        msg={msg}
+                        target={activeTarget()}
+                        selfNick={selfNick()}
+                        canEdit={canEditMessages()}
+                        canRedact={canRedactMessages()}
+                        menuOpen={menuOpen()}
+                        onMenuOpenChange={setMenuOpen}
+                      />
+                      <div class="shell-msg-avatar" style={{ '--nick-tint': nickTint(msg.from) }} aria-hidden="true">
+                        <Avatar
+                          name={msg.from}
+                          size="sm"
+                          owner={msg.from === selfNick()}
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <div class="shell-msg-body">
+                        <div class="shell-msg-meta">
+                          <span class="shell-msg-author" style={{ color: nickTint(msg.from) }}>{msg.from}</span>
+                          <time
+                            class="shell-msg-ts"
+                            dateTime={msg.time.toISOString()}
+                            aria-hidden="true"
+                          >
+                            {fmtTime(msg.time)}
+                          </time>
+                          <Show when={msg.edited}>
+                            <EditedMarker messageId={msg.id} />
+                          </Show>
+                        </div>
+                        <Show when={msg.replyTo}>
+                          {(rt) => (
+                            <div class="shell-msg-reply" aria-label={`Replying to ${rt().from}`}>
+                              <span class="shell-msg-reply-from">{rt().from}</span>
+                              <span>{clippedReplyPreview(rt().text)}</span>
+                            </div>
+                          )}
+                        </Show>
+                        <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} origin={activeTarget()} />
+                        <Show when={hasBoosts()}>
+                          <div class="shell-boosts">
+                            <BoostBar boosts={boostGroups()} onBoost={toggleBoost} />
+                          </div>
+                        </Show>
+                        <Show when={hasThread()}>
+                          <ThreadIndicator messageId={msg.id} onOpenThread={openThread} />
+                        </Show>
+                      </div>
+                    </div>
+                  }
+                >
                   <div
                     class={[
                       'shell-msg-cont',
@@ -2137,81 +2296,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       </Show>
                     </div>
                   </div>
-                  </>
-                );
-              }
-
-              // Full group (avatar + meta)
-              return (
-                <>
-                {dayEl}
-                {dividerEl}
-                <div
-                  class={[
-                    'shell-msg-group',
-                    isHighlight() ? 'shell-msg-group--highlight' : '',
-                    revealedId() === msg.id ? 'shell-msg-revealed' : '',
-                    activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
-                    msg.pending ? 'shell-msg-pending' : '',
-                  ].filter(Boolean).join(' ')}
-                  data-message-search-id={msg.id}
-                  role="article"
-                  tabIndex={0}
-                  aria-label={messageAccessibleLabel(msg)}
-                  onContextMenu={openMenuFromRow}
-                  onClick={(e) => toggleReveal(msg.id, e)}
-                  onKeyDown={(e) => toggleRevealFromKeyboard(msg.id, e)}
-                >
-                  <MessageMenu
-                    msg={msg}
-                    target={activeTarget()}
-                    selfNick={selfNick()}
-                    canEdit={canEditMessages()}
-                    canRedact={canRedactMessages()}
-                    menuOpen={menuOpen()}
-                    onMenuOpenChange={setMenuOpen}
-                  />
-                  <div class="shell-msg-avatar" style={{ '--nick-tint': nickTint(msg.from) }} aria-hidden="true">
-                    <Avatar
-                      name={msg.from}
-                      size="sm"
-                      owner={msg.from === selfNick()}
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <div class="shell-msg-body">
-                    <div class="shell-msg-meta">
-                      <span class="shell-msg-author" style={{ color: nickTint(msg.from) }}>{msg.from}</span>
-                      <time
-                        class="shell-msg-ts"
-                        dateTime={msg.time.toISOString()}
-                        aria-hidden="true"
-                      >
-                        {fmtTime(msg.time)}
-                      </time>
-                      <Show when={msg.edited}>
-                        <EditedMarker messageId={msg.id} />
-                      </Show>
-                    </div>
-                    <Show when={msg.replyTo}>
-                      {(rt) => (
-                        <div class="shell-msg-reply" aria-label={`Replying to ${rt().from}`}>
-                          <span class="shell-msg-reply-from">{rt().from}</span>
-                          <span>{clippedReplyPreview(rt().text)}</span>
-                        </div>
-                      )}
-                    </Show>
-                    <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} origin={activeTarget()} />
-                    <Show when={hasBoosts()}>
-                      <div class="shell-boosts">
-                        <BoostBar boosts={boostGroups()} onBoost={toggleBoost} />
-                      </div>
-                    </Show>
-                    <Show when={hasThread()}>
-                      <ThreadIndicator messageId={msg.id} onOpenThread={openThread} />
-                    </Show>
-                  </div>
-                </div>
+                </Show>
                 </>
               );
             }}

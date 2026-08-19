@@ -100,16 +100,24 @@ describe('Composer accessibility', () => {
     const more = getByRole('button', { name: 'More tools' }) as HTMLButtonElement;
 
     expect(more.getAttribute('aria-expanded')).toBe('false');
-    expect(more.getAttribute('aria-controls')).toBe('shell-composer-tools');
+    // The panel is not mounted while collapsed — the IDREF must not dangle.
+    expect(more.hasAttribute('aria-controls')).toBe(false);
     fireEvent.click(more);
 
     const tray = getByTestId('composer-tools-tray');
     expect(tray.getAttribute('role')).toBe('dialog');
     expect(tray.getAttribute('aria-modal')).toBe('false');
     expect(more.getAttribute('aria-expanded')).toBe('true');
+    expect(more.getAttribute('aria-controls')).toBe('shell-composer-tools');
+    // The referenced id must actually resolve to a mounted element.
+    expect(document.getElementById('shell-composer-tools')).toBeInstanceOf(HTMLElement);
     // Advanced controls appear only after More.
     expect(getByRole('button', { name: 'Schedule message to send later' })).toBeDefined();
     expect(getByRole('button', { name: 'Jump to date in conversation history' })).toBeDefined();
+    expect(getByRole('link', { name: 'Channel ledger for #room' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23room',
+    );
     expect(getByRole('button', { name: 'Insert /' })).toBeDefined();
     // No invented formatting/export chrome.
     expect(queryByTestId('composer-tools-tray')!.textContent).not.toMatch(/\bExport\b|\bFormat\b/);
@@ -117,6 +125,7 @@ describe('Composer accessibility', () => {
     fireEvent.keyDown(tray, { key: 'Escape' });
     expect(queryByTestId('composer-tools-tray')).toBeNull();
     expect(more.getAttribute('aria-expanded')).toBe('false');
+    expect(more.hasAttribute('aria-controls')).toBe(false);
     await Promise.resolve();
     expect(document.activeElement).toBe(more);
   });

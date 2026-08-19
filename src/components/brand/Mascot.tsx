@@ -33,11 +33,10 @@ const MASCOT_CSS = `
 .mascot--full { width: clamp(96px, 18vw, 180px); height: auto; }
 
 .mascot .mascot-underglow { transform-origin: 32px 40px; animation: mascot-breathe 6.5s var(--ease, ease-in-out) infinite; }
-.mascot .mascot-dorsal { stroke-dasharray: 2.6 7; animation: mascot-current 7s linear infinite; filter: drop-shadow(0 0 2px var(--lapis-bright)); }
+.mascot .mascot-dorsal { stroke-dasharray: 2.6 7; animation: mascot-current 7s linear infinite; }
 .mascot .mascot-motes circle { animation: mascot-drift 5.5s var(--ease, ease-in-out) infinite; }
 .mascot .mascot-motes circle:nth-child(2) { animation-delay: 0.9s; }
 .mascot .mascot-motes circle:nth-child(3) { animation-delay: 1.8s; }
-.mascot .mascot-eye { filter: drop-shadow(0 0 1.4px var(--gold-bright)); }
 
 @keyframes mascot-breathe { 0%, 100% { opacity: 0.62; transform: scale(0.97); } 50% { opacity: 1; transform: scale(1.04); } }
 @keyframes mascot-current { to { stroke-dashoffset: -19.2; } }
