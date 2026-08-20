@@ -659,7 +659,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
           <a
             class="shell-sidebar-ledger"
             href={activeChannelLedger()!.href}
-            aria-label={`Channel ledger for ${activeChannelLedger()!.channel}`}
+            aria-label={`Room ledger for ${activeChannelLedger()!.channel}`}
             data-testid="sidebar-channel-ledger"
           >
             Ledger · {activeChannelLedger()!.channel}

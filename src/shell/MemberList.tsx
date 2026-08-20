@@ -668,7 +668,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
               <a
                 class="shell-members-ledger shell-ribbon-stats"
                 href={ledger().href}
-                aria-label={`Channel ledger for ${ledger().channel}`}
+                aria-label={`Room ledger for ${ledger().channel}`}
                 data-testid="members-channel-ledger"
               >
                 Ledger

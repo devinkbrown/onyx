@@ -75,10 +75,10 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
               <a
                 class="shell-context-rail__ledger shell-ribbon-stats"
                 href={ledger().href}
-                aria-label={`Channel ledger for ${ledger().channel}`}
+                aria-label={`Room ledger for ${ledger().channel}`}
                 data-testid="context-rail-channel-ledger"
               >
-                Channel ledger
+                Room ledger
               </a>
             )}
           </Show>

@@ -814,7 +814,7 @@ describe('<MessageMenu>', () => {
       <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
     ));
 
-    expect(screen.getByRole('menuitem', { name: 'Channel ledger for #general' })).toHaveAttribute(
+    expect(screen.getByRole('menuitem', { name: 'Room ledger for #general' })).toHaveAttribute(
       'href',
       '/stats/?room=%23general',
     );

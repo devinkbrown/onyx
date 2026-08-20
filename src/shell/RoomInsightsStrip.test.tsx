@@ -60,6 +60,6 @@ describe('RoomInsightsStrip', () => {
       'href',
       '/stats/?room=%23root',
     );
-    expect(screen.getByTestId('room-insights-open-stats')).toHaveTextContent('Channel ledger');
+    expect(screen.getByTestId('room-insights-open-stats')).toHaveTextContent('Room ledger');
   });
 });

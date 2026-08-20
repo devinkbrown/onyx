@@ -78,8 +78,8 @@ export function PresenceHeatline(props: PresenceHeatlineProps): JSX.Element {
         </Show>
         <Show when={props.channel()}>
           {(channel) => (
-            <a class="shell-ribbon-stats" href={statsRoomHref(channel())} aria-label={`Channel ledger for ${channel()}`}>
-              Channel ledger
+            <a class="shell-ribbon-stats" href={statsRoomHref(channel())} aria-label={`Room ledger for ${channel()}`}>
+              Room ledger
             </a>
           )}
         </Show>

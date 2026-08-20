@@ -63,7 +63,7 @@ export function RoomInsightsStrip(): JSX.Element {
               href={statsRoomHref(ch())}
               data-testid="room-insights-open-stats"
             >
-              Channel ledger
+              Room ledger
             </a>
           </div>
           <Show
@@ -77,7 +77,7 @@ export function RoomInsightsStrip(): JSX.Element {
                 {detail.loading
                   ? 'Loading public room stats…'
                   : detail.error
-                    ? 'Could not load room stats. Try Channel ledger or check back later.'
+                    ? 'Could not load room stats. Try Room ledger or check back later.'
                     : 'No public stats for this room yet.'}
               </p>
             }

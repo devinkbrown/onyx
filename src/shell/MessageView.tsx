@@ -1946,9 +1946,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                           (activeView() as { kind: 'channel'; channel: string }).channel,
                         )}
                         data-testid="feed-empty-channel-ledger"
-                        aria-label={`Channel ledger for ${(activeView() as { kind: 'channel'; channel: string }).channel}`}
+                        aria-label={`Room ledger for ${(activeView() as { kind: 'channel'; channel: string }).channel}`}
                       >
-                        Channel ledger
+                        Room ledger
                       </a>
                     </Show>
                   </Show>
@@ -2023,9 +2023,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     (activeView() as { kind: 'channel'; channel: string }).channel,
                   )}
                   data-testid="channel-intro-ledger"
-                  aria-label={`Channel ledger for ${(activeView() as { kind: 'channel'; channel: string }).channel}`}
+                  aria-label={`Room ledger for ${(activeView() as { kind: 'channel'; channel: string }).channel}`}
                 >
-                  Channel ledger
+                  Room ledger
                 </a>
               </Show>
               <ScheduledEventLine channel={(activeView() as { kind: 'channel'; channel: string }).channel} />

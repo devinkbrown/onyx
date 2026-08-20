@@ -167,7 +167,7 @@ export function WhoisSheet(props: WhoisSheetProps): JSX.Element {
                         >
                           <a
                             href={statsRoomHref(channel)}
-                            aria-label={`Channel ledger for ${channel}`}
+                            aria-label={`Room ledger for ${channel}`}
                             data-testid="whois-channel-ledger"
                           >
                             {channel}

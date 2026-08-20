@@ -96,17 +96,17 @@ describe('JumpToDateSheet', () => {
     expect(store.getState().showJumpToDate).toBe(false);
   });
 
-  it('links the active room to the public channel ledger', () => {
+  it('links the active room to the public room ledger', () => {
     seedChannel('#general');
     render(() => <JumpToDateSheet />);
 
-    expect(screen.getByRole('link', { name: 'Channel ledger for #general' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Room ledger for #general' })).toHaveAttribute(
       'href',
       '/stats/?room=%23general',
     );
   });
 
-  it('omits the channel ledger from a DM jump', () => {
+  it('omits the room ledger from a DM jump', () => {
     store.setState({
       ...initialState,
       activeView: { kind: 'dm', nick: 'alice' },
@@ -128,7 +128,7 @@ describe('JumpToDateSheet', () => {
     render(() => <JumpToDateSheet />);
 
     expect(screen.getByRole('heading', { name: 'Jump to date' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Channel ledger/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Room ledger/i })).not.toBeInTheDocument();
   });
 
   it('applies Today / Yesterday / 7 days ago presets', () => {

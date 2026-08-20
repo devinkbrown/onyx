@@ -827,7 +827,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       class="shell-ribbon-more-item"
                       role="menuitem"
                       href={statsRoomHref(settingsChannel()!)}
-                      aria-label={`Channel ledger for ${settingsChannel()}`}
+                      aria-label={`Room ledger for ${settingsChannel()}`}
                       data-testid="ribbon-channel-ledger"
                       onClick={() => setMoreOpen(false)}
                       onKeyDown={onMoreMenuKeyDown}
@@ -840,7 +840,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                         <path d="M12 15V7" />
                         <path d="M16 15v-6" />
                       </svg>
-                      <span>Channel ledger</span>
+                      <span>Room ledger</span>
                     </a>
                     <button
                       type="button"

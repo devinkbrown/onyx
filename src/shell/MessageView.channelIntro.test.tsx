@@ -77,8 +77,8 @@ describe('MessageView channel intro ledger', () => {
       'href',
       '/stats/?room=%23general',
     );
-    expect(screen.getByRole('link', { name: 'Channel ledger for #general' })).toHaveTextContent(
-      'Channel ledger',
+    expect(screen.getByRole('link', { name: 'Room ledger for #general' })).toHaveTextContent(
+      'Room ledger',
     );
   });
 

@@ -318,9 +318,9 @@ export function JumpToDateSheet(): JSX.Element {
                   <a
                     class="jump-to-date__ledger"
                     href={statsRoomHref(channel())}
-                    aria-label={`Channel ledger for ${channel()}`}
+                    aria-label={`Room ledger for ${channel()}`}
                   >
-                    Channel ledger
+                    Room ledger
                   </a>
                 </Show>
               </div>

@@ -243,7 +243,7 @@ function LiveSlotButton(props: {
             <a
               class="home-event-ledger"
               href={statsRoomHref(event().channel)}
-              aria-label={`Channel ledger for ${event().channel}`}
+              aria-label={`Room ledger for ${event().channel}`}
               data-testid="home-event-ledger"
             >
               Ledger
@@ -283,7 +283,7 @@ function DirectoryCard(props: {
           <a
             class="home-card-ledger"
             href={statsRoomHref(props.channel.channel)}
-            aria-label={`Channel ledger for ${props.channel.channel}`}
+            aria-label={`Room ledger for ${props.channel.channel}`}
           >
             Ledger
           </a>
@@ -932,7 +932,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                   <section class="home-pulse-block" aria-label="Live network figures">
                     <div class="home-pulse-head">
                       <span class="home-section-label">Network pulse</span>
-                      <a class="home-pulse-ledger" href="/stats/">Channel ledger</a>
+                      <a class="home-pulse-ledger" href="/stats/">Room ledger</a>
                     </div>
                     <div class="home-pulse">
                       <div class="home-pulse-tile">
@@ -962,7 +962,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                     <h2 class="home-section-label">Room rhythm</h2>
                     <div class="home-rhythm-meta">
                       <span class="home-rhythm-summary">joined rooms</span>
-                      <a class="home-rhythm-ledger" href="/stats/">Channel ledger</a>
+                      <a class="home-rhythm-ledger" href="/stats/">Room ledger</a>
                     </div>
                   </div>
                   <div class="home-rhythm-list">
@@ -1062,7 +1062,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                     <h2 class="home-section-label">Quiet rooms</h2>
                     <div class="home-quiet-meta">
                       <span class="home-quiet-summary">already read</span>
-                      <a class="home-quiet-ledger" href="/stats/">Channel ledger</a>
+                      <a class="home-quiet-ledger" href="/stats/">Room ledger</a>
                     </div>
                   </div>
                   <div class="home-quiet-list">
@@ -1088,7 +1088,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                           <a
                             class="home-quiet-room-ledger"
                             href={statsRoomHref(item.name)}
-                            aria-label={`Channel ledger for ${item.name}`}
+                            aria-label={`Room ledger for ${item.name}`}
                           >
                             Ledger
                           </a>

@@ -78,7 +78,7 @@ describe('<NotificationCenter>', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(trigger).toHaveAttribute('aria-controls', dialog.id);
     expect(getByText(/Nothing yet/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open public channel ledger' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open public room ledger' })).toHaveAttribute(
       'href',
       '/stats/',
     );
@@ -120,7 +120,7 @@ describe('<NotificationCenter>', () => {
     });
     render(() => <NotificationCenter />);
     fireEvent.click(screen.getByRole('button', { name: 'Inbox — 1 unread notification' }));
-    expect(screen.getByRole('link', { name: 'Channel ledger for #root' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
       'href',
       '/stats/?room=%23root',
     );

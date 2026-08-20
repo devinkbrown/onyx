@@ -29,8 +29,8 @@ export function SinceDigestCard(props: {
         <p class="since-digest-card__reader-note">{digestReaderNote(props.digest)}</p>
         <div class="since-digest-card__handoff">
           <p class="since-digest-card__since">since {formatSince(props.digest.since)}</p>
-          <a class="since-digest-card__ledger-index" href="/stats/" aria-label="Open public channel ledger">
-            Channel ledger
+          <a class="since-digest-card__ledger-index" href="/stats/" aria-label="Open public room ledger">
+            Room ledger
           </a>
           <Show when={props.digest.totalMessages > 0 ? props.onReviewUnread : undefined} keyed>
             {(onReviewUnread) => (
@@ -89,7 +89,7 @@ export function SinceDigestCard(props: {
                     <a
                       class="since-digest-card__ledger"
                       href={statsRoomHref(channelDigest.channel)}
-                      aria-label={`Channel ledger for ${channelDigest.channel}`}
+                      aria-label={`Room ledger for ${channelDigest.channel}`}
                     >
                       Ledger
                     </a>

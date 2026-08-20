@@ -45,13 +45,13 @@ describe('ScheduledMessagesSheet', () => {
     const list = screen.getByRole('list', { name: 'Pending scheduled messages' });
     expect(list.querySelectorAll('.shell-scheduled-item')).toHaveLength(2);
     expect(screen.getAllByTestId('scheduled-channel-ledger')).toHaveLength(2);
-    expect(screen.getByRole('link', { name: 'Channel ledger for #root' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
       'href',
       '/stats/?room=%23root',
     );
   });
 
-  it('omits the channel ledger link for non-public targets', () => {
+  it('omits the room ledger link for non-public targets', () => {
     store.getState().scheduleMessage('alice', 'dm later', Date.now() + 3_600_000);
 
     render(() => <ScheduledMessagesSheet />);

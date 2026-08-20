@@ -159,7 +159,7 @@ export default function ChannelBrowser(): JSX.Element {
                           <a
                             class="chb-ledger"
                             href={statsRoomHref(row.name)}
-                            aria-label={`Channel ledger for ${row.name}`}
+                            aria-label={`Room ledger for ${row.name}`}
                           >
                             Ledger
                           </a>

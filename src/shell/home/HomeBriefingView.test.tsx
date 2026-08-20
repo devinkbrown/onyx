@@ -371,21 +371,21 @@ describe('HomeBriefingView — presentation contract', () => {
     expect(markAllCaughtUp).toHaveBeenCalledOnce();
   });
 
-  it('links quiet rooms to the public channel ledger', () => {
+  it('links quiet rooms to the public room ledger', () => {
     renderView({
       more: more({
         hasContent: true,
         quietActivity: [{ name: '#quiet', topic: 'still here', lastActivity: NOW - 60_000 }],
       }),
     });
-    expect(screen.getByRole('link', { name: 'Channel ledger for #quiet' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Room ledger for #quiet' })).toHaveAttribute(
       'href',
       '/stats/?room=%23quiet',
     );
-    expect(screen.getByRole('link', { name: 'Channel ledger' })).toHaveAttribute('href', '/stats/');
+    expect(screen.getByRole('link', { name: 'Room ledger' })).toHaveAttribute('href', '/stats/');
   });
 
-  it('links live scheduled events to the public channel ledger', () => {
+  it('links live scheduled events to the public room ledger', () => {
     renderView({
       briefing: briefing({
         liveCall: null,
@@ -403,7 +403,7 @@ describe('HomeBriefingView — presentation contract', () => {
     );
   });
 
-  it('links the network pulse to the public channel ledger', () => {
+  it('links the network pulse to the public room ledger', () => {
     renderView({
       more: more({
         hasContent: true,
@@ -420,6 +420,6 @@ describe('HomeBriefingView — presentation contract', () => {
         },
       }),
     });
-    expect(screen.getByRole('link', { name: 'Channel ledger' })).toHaveAttribute('href', '/stats/');
+    expect(screen.getByRole('link', { name: 'Room ledger' })).toHaveAttribute('href', '/stats/');
   });
 });

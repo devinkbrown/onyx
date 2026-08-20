@@ -114,7 +114,7 @@ describe('Composer accessibility', () => {
     // Advanced controls appear only after More.
     expect(getByRole('button', { name: 'Schedule message to send later' })).toBeDefined();
     expect(getByRole('button', { name: 'Jump to date in conversation history' })).toBeDefined();
-    expect(getByRole('link', { name: 'Channel ledger for #room' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Room ledger for #room' })).toHaveAttribute(
       'href',
       '/stats/?room=%23room',
     );

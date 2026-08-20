@@ -122,7 +122,7 @@ export default function InviteRoute() {
                   <a
                     class="invite-title-accent invite-title-ledger"
                     href={statsRoomHref(channel())}
-                    aria-label={`Channel ledger for ${channel()}`}
+                    aria-label={`Room ledger for ${channel()}`}
                     data-testid="invite-hero-ledger"
                   >
                     {channel()}
@@ -154,10 +154,10 @@ export default function InviteRoute() {
               <a
                 class="r-btn ghost"
                 href={statsRoomHref(channel())}
-                aria-label={`Channel ledger for ${channel()}`}
+                aria-label={`Room ledger for ${channel()}`}
                 data-testid="invite-cta-ledger"
               >
-                Channel ledger
+                Room ledger
               </a>
             )}
           </Show>
@@ -206,10 +206,10 @@ export default function InviteRoute() {
                       <a
                         class="invite-room-ledger"
                         href={statsRoomHref(channel())}
-                        aria-label={`Channel ledger for ${channel()}`}
+                        aria-label={`Room ledger for ${channel()}`}
                         data-testid="invite-room-ledger"
                       >
-                        Channel ledger
+                        Room ledger
                       </a>
                     </span>
                   )}

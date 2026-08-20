@@ -138,7 +138,7 @@ describe('MessageSearch', () => {
     render(() => <MessageSearch />);
 
     expect(screen.getByRole('search', { name: 'Message search' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Channel ledger for #root' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
       'href',
       '/stats/?room=%23root',
     );
@@ -517,7 +517,7 @@ describe('MessageSearch', () => {
     render(() => <MessageSearch />);
 
     expect(screen.getByText(/Encrypted DM search stays on this device/i)).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Channel ledger/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Room ledger/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId('server-search')).not.toBeInTheDocument();
     expect(screen.getByText('1 of 1')).toBeInTheDocument();
     expect(screen.queryByText('e2ee:v1:cipher-envelope')).not.toBeInTheDocument();

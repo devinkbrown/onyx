@@ -1380,7 +1380,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                         <a
                           class="shell-mobile-more-sheet__ledger shell-ribbon-stats"
                           href={statsRoomHref((activeView() as { channel: string }).channel)}
-                          aria-label={`Channel ledger for ${(activeView() as { channel: string }).channel}`}
+                          aria-label={`Room ledger for ${(activeView() as { channel: string }).channel}`}
                           data-testid="mobile-room-ledger"
                         >
                           Ledger

@@ -1536,11 +1536,11 @@ export function Composer(props: ComposerProps): JSX.Element {
                   <a
                     class="shell-composer-tools-item shell-composer-tools-ledger"
                     href={statsRoomHref(channel())}
-                    aria-label={`Channel ledger for ${channel()}`}
+                    aria-label={`Room ledger for ${channel()}`}
                     data-testid="composer-channel-ledger"
                     onClick={() => setToolsOpen(false)}
                   >
-                    <span class="shell-composer-tools-item-title">Channel ledger</span>
+                    <span class="shell-composer-tools-item-title">Room ledger</span>
                     <span class="shell-composer-tools-item-desc">
                       Public room pulse for {channel()}.
                     </span>

@@ -135,7 +135,7 @@ afterEach(() => {
 });
 
 describe('ChannelSettings — Public insights', () => {
-  it('deep-links the embedded room insights strip to the channel ledger', async () => {
+  it('deep-links the embedded room insights strip to the room ledger', async () => {
     seed();
     renderPanel();
 
@@ -143,7 +143,7 @@ describe('ChannelSettings — Public insights', () => {
       'href',
       '/stats/?room=%23general',
     );
-    expect(screen.getByTestId('room-insights-open-stats')).toHaveTextContent('Channel ledger');
+    expect(screen.getByTestId('room-insights-open-stats')).toHaveTextContent('Room ledger');
   });
 });
 

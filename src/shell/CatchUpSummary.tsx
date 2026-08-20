@@ -142,7 +142,7 @@ export function CatchUpSummary(props: CatchUpSummaryProps): JSX.Element {
                       <a
                         class="catchup-ledger shell-ribbon-stats"
                         href={statsRoomHref(row.target)}
-                        aria-label={`Channel ledger for ${row.target}`}
+                        aria-label={`Room ledger for ${row.target}`}
                         data-testid="catchup-channel-ledger"
                       >
                         Ledger

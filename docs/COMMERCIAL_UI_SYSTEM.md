@@ -79,7 +79,7 @@ Shell-local surface state (`primarySurface`, `sidebarMode`, mobile bottom nav) a
 | Merge | Into |
 |-------|------|
 | Room tools (pins, notify, settings, export, topic edit) | Room sheet / **More → This room** (slice 1 uses More) |
-| Appearance + prefs + account entry | **You** hub (later); Workspace group until then |
+| Appearance + prefs + account entry | **You** hub (Account + Menu) |
 | Home digests | Needs you → Continue → Live now → Explore → More activity |
 | Composer attach/format/schedule | Standard primary: **+** · message · emoji · **More tools** · Send; schedule/jump in More (slice 4) |
 

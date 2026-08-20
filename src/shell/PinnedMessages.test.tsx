@@ -71,15 +71,15 @@ describe('PinnedMessages accessibility', () => {
       'href',
       '/stats/?room=%23room',
     );
-    expect(screen.getByRole('link', { name: 'Channel ledger for #room' })).toHaveTextContent(
-      'Channel ledger',
+    expect(screen.getByRole('link', { name: 'Room ledger for #room' })).toHaveTextContent(
+      'Room ledger',
     );
     expect(screen.getByRole('button', {
       name: 'Jump to pinned message from alice: Keep this near the top.',
     })).toBeInTheDocument();
   });
 
-  it('omits the channel ledger link outside hash/ampersand channels', () => {
+  it('omits the room ledger link outside hash/ampersand channels', () => {
     store.setState({
       ...initialState,
       showPinnedMessages: true,

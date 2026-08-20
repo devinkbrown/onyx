@@ -241,8 +241,8 @@ export function NotificationCenter(): JSX.Element {
                 Mark all read
               </button>
             </Show>
-            <a class="notif-center__ledger" href="/stats/" aria-label="Open public channel ledger">
-              Channel ledger
+            <a class="notif-center__ledger" href="/stats/" aria-label="Open public room ledger">
+              Room ledger
             </a>
             <button
               ref={closeRef}
@@ -294,7 +294,7 @@ export function NotificationCenter(): JSX.Element {
                         <a
                           class="notif-center__room-ledger"
                           href={statsRoomHref(n.channel!)}
-                          aria-label={`Channel ledger for ${n.channel}`}
+                          aria-label={`Room ledger for ${n.channel}`}
                           onClick={() => closeInbox()}
                         >
                           Ledger

@@ -73,7 +73,7 @@ describe('ConnectPulse node probes', () => {
     expect(signals.every((signal) => signal?.aborted)).toBe(true);
   });
 
-  it('links live rooms and the aggregate index to the public channel ledger', async () => {
+  it('links live rooms and the aggregate index to the public room ledger', async () => {
     fetchStatsIndex.mockResolvedValueOnce({
       generated_at: 1,
       channels_complete: true,

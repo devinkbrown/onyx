@@ -616,9 +616,9 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
           <a
             class="onyx-message-search__ledger"
             href={statsRoomHref(search.targetLabel())}
-            aria-label={`Channel ledger for ${search.targetLabel()}`}
+            aria-label={`Room ledger for ${search.targetLabel()}`}
           >
-            Channel ledger
+            Room ledger
           </a>
         </Show>
         <Show when={!search.hasConversation() && !search.localHistoryEnabled()}>

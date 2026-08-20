@@ -189,7 +189,7 @@ function ChannelRow(props: {
             Inspect
           </button>
           <a class="data-action" href={roomDeepLink(c().channel, c().last_active)}>Open room</a>
-          <a class="data-action data-action--ledger" href={statsRoomHref(c().channel)}>Channel ledger</a>
+          <a class="data-action data-action--ledger" href={statsRoomHref(c().channel)}>Room ledger</a>
         </div>
       </div>
     </article>

@@ -55,12 +55,12 @@ describe('ContextRail', () => {
       'href',
       '/stats/?room=%23general',
     );
-    expect(screen.getByRole('link', { name: 'Channel ledger for #general' })).toHaveTextContent(
-      'Channel ledger',
+    expect(screen.getByRole('link', { name: 'Room ledger for #general' })).toHaveTextContent(
+      'Room ledger',
     );
   });
 
-  it('omits the channel ledger outside # and & rooms', () => {
+  it('omits the room ledger outside # and & rooms', () => {
     store.setState({ activeView: { kind: 'dm', nick: 'bob' } });
 
     render(() => <ContextRail open={true} onClose={() => {}} />);

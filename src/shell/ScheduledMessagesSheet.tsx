@@ -52,10 +52,10 @@ export function ScheduledMessagesSheet() {
                     <a
                       class="shell-scheduled-ledger shell-ribbon-stats"
                       href={statsRoomHref(entry.channel)}
-                      aria-label={`Channel ledger for ${entry.channel}`}
+                      aria-label={`Room ledger for ${entry.channel}`}
                       data-testid="scheduled-channel-ledger"
                     >
-                      Channel ledger
+                      Room ledger
                     </a>
                   </Show>
                   <button

@@ -55,7 +55,7 @@ describe('PresenceHeatline current-hour marker', () => {
     expect(bars()[10]!.classList.contains('shell-heat-bar--now')).toBe(false);
     const ledger = container.querySelector('a.shell-ribbon-stats');
     expect(ledger).toHaveAttribute('href', '/stats/?room=%23root');
-    expect(ledger).toHaveTextContent('Channel ledger');
+    expect(ledger).toHaveTextContent('Room ledger');
     expect(container.querySelector('.shell-ribbon-present')).toHaveTextContent('7 present');
   });
 });

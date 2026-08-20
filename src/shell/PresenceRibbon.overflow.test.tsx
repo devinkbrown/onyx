@@ -341,7 +341,7 @@ describe('PresenceRibbon commercial room header', () => {
     const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
     const labels = items.map((el) => el.textContent ?? '');
     const settingsIdx = labels.findIndex((t) => t.includes('Channel settings'));
-    const ledgerIdx = labels.findIndex((t) => t.includes('Channel ledger'));
+    const ledgerIdx = labels.findIndex((t) => t.includes('Room ledger'));
     const pinsIdx = labels.findIndex((t) => t.includes('Pinned messages'));
     const jumpIdx = labels.findIndex((t) => t.includes('Jump to date'));
     const youIdx = labels.findIndex((t) => t.includes('You') || t.includes('Guest'));

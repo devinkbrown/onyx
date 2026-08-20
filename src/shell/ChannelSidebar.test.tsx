@@ -141,10 +141,10 @@ describe('ChannelSidebar accessibility', () => {
     const { getByTestId } = render(() => <ChannelSidebar mode="rooms" />);
 
     expect(getByTestId('sidebar-channel-ledger')).toHaveAttribute('href', '/stats/?room=%23bravo');
-    expect(getByTestId('sidebar-channel-ledger')).toHaveAttribute('aria-label', 'Channel ledger for #bravo');
+    expect(getByTestId('sidebar-channel-ledger')).toHaveAttribute('aria-label', 'Room ledger for #bravo');
   });
 
-  it('hides the channel ledger when the active view is not a channel', () => {
+  it('hides the room ledger when the active view is not a channel', () => {
     seed();
     store.setState({ activeView: { kind: 'dm', nick: 'dave' } });
 

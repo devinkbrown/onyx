@@ -79,7 +79,7 @@ afterEach(() => {
 });
 
 describe('MemberList accessibility', () => {
-  it('links to the channel ledger for public room channels', () => {
+  it('links to the room ledger for public room channels', () => {
     seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
 
     render(() => <MemberList />);
@@ -88,10 +88,10 @@ describe('MemberList accessibility', () => {
       'href',
       '/stats/?room=%23general',
     );
-    expect(screen.getByRole('link', { name: 'Channel ledger for #general' })).toHaveTextContent('Ledger');
+    expect(screen.getByRole('link', { name: 'Room ledger for #general' })).toHaveTextContent('Ledger');
   });
 
-  it('omits the channel ledger link outside # and & rooms', () => {
+  it('omits the room ledger link outside # and & rooms', () => {
     const client = makeClient();
     store.setState({
       ...initialState,

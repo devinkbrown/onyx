@@ -55,7 +55,7 @@ describe('ChannelBrowser', () => {
     expect(within(dialog).getByText('Launch room')).toBeInTheDocument();
     expect(within(dialog).getByText('#random')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Join #general' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('link', { name: 'Channel ledger for #general' })).toHaveAttribute(
+    expect(within(dialog).getByRole('link', { name: 'Room ledger for #general' })).toHaveAttribute(
       'href',
       '/stats/?room=%23general',
     );

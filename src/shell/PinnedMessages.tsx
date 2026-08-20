@@ -141,10 +141,10 @@ export function PinnedMessages(): JSX.Element {
             <a
               class="pins-ledger shell-ribbon-stats"
               href={ledger().href}
-              aria-label={`Channel ledger for ${ledger().channel}`}
+              aria-label={`Room ledger for ${ledger().channel}`}
               data-testid="pins-channel-ledger"
             >
-              Channel ledger
+              Room ledger
             </a>
           )}
         </Show>

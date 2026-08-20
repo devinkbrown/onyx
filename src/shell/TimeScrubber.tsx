@@ -263,7 +263,7 @@ export function TimeScrubber(): JSX.Element {
                 <a
                   class="time-scrubber__ledger"
                   href={statsRoomHref(channel())}
-                  aria-label={`Channel ledger for ${channel()}`}
+                  aria-label={`Room ledger for ${channel()}`}
                 >
                   Ledger
                 </a>

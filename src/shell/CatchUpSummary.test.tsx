@@ -94,11 +94,11 @@ describe('<CatchUpSummary>', () => {
     // read room is excluded
     expect(names).not.toContain('#read');
     expect(screen.getAllByTestId('catchup-channel-ledger')).toHaveLength(3);
-    expect(screen.getByRole('link', { name: 'Channel ledger for #high' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Room ledger for #high' })).toHaveAttribute(
       'href',
       '/stats/?room=%23high',
     );
-    expect(screen.queryByRole('link', { name: 'Channel ledger for trev' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Room ledger for trev' })).toBeNull();
   });
 
   it('summarises unread + mention totals', () => {

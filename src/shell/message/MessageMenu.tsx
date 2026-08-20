@@ -864,11 +864,11 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                 class="msg-menu-item"
                 role="menuitem"
                 href={statsRoomHref(local.target)}
-                aria-label={`Channel ledger for ${local.target}`}
+                aria-label={`Room ledger for ${local.target}`}
                 onClick={() => local.onMenuOpenChange?.(false)}
               >
                 <span class="msg-menu-item-icon" aria-hidden="true">⌁</span>
-                <span>Channel ledger</span>
+                <span>Room ledger</span>
               </a>
             </Show>
             <Show when={caps().canSearchText}>
