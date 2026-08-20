@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * NotificationCenter — the mentions inbox.
+ * NotificationCenter — the mentions / messages inbox.
  *
  * A bell in the presence ribbon with an unread badge; the popover lists
- * recent notifications (mentions, DMs, system, errors), newest first.
- * Clicking a mention/DM marks it read and jumps to the conversation.
+ * recent notifications (mentions, direct messages, system, errors), newest first.
+ * Clicking a mention or message marks it read and jumps to the conversation.
  *
  * The store slice (notifications / readNotificationIds / mark* actions)
  * predates this UI — this is the first consumer.
@@ -259,7 +259,7 @@ export function NotificationCenter(): JSX.Element {
             when={ordered().length > 0}
             fallback={
               <p class="notif-center__empty">
-                Nothing yet — mentions and direct messages land here.
+                Nothing yet — mentions and messages land here.
               </p>
             }
           >

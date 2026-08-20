@@ -256,8 +256,8 @@ disconnecting, without blocking the composer, and without false product claims.
 | **2** | Guest claim compact + sheet | `GuestClaimPrompt.*`, `guestClaimState.ts`, Account guest CTA, this doc | **This slice** |
 | **3** | Home Needs you / Continue hierarchy | `HomeView.*`, `home-view.css`, `HomeView*.test.tsx`, this doc | **This slice** |
 | **4** | Composer public default (+ tray) | `Composer.tsx`, `Composer.test.tsx`, composer CSS in `shell.css`, this doc | **Done** (denser More tools tray) |
-| **5** | You hub tiers | AppShell you surface, Preferences structure, Appearance, Account | **In progress** (You entry + Account hub; ops matrix off Status in Standard) |
-| **6** | Rooms/Messages collection polish | `ChannelSidebar.*`, sidebar CSS | **In progress** (Activity row + rooms/messages + Keep chip) |
+| **5** | You hub tiers | AppShell you surface, Preferences structure, Appearance, Account | **In progress** (You entry + Account hub; ops matrix off Activity in Standard) |
+| **6** | Rooms/Messages collection polish | `ChannelSidebar.*`, sidebar CSS | **In progress** (Activity + rooms/messages + Keep chip; Whois Rooms/Node; Inbox empty tone) |
 
 **Deferred beyond top 6:** transcript type density; default-off TimeScrubber/Watch; Connect copy; Landing claim alignment when packaging ledger green; **member-column persistence**.
 
