@@ -150,7 +150,7 @@ export function AccessibilityStatement(props: { class?: string }): JSX.Element {
             <h4 id="a11y-reporting-title">Reporting accessibility bugs</h4>
             <p>
               Onyx welcomes accessibility bug reports through your community&apos;s
-              admin or an <code>#accessibility</code> channel so issues can be
+              admin or an <code>#accessibility</code> room so issues can be
               reproduced and prioritized.
             </p>
           </section>

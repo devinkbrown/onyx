@@ -681,7 +681,7 @@ export function WatchTogetherActivity(): JSX.Element {
     if (!currentChannel || activity() || !publishingAvailable()) {
       setStartFeedback({
         kind: 'error',
-        message: 'This channel is not currently available for a new watch activity',
+        message: 'This room is not currently available for a new watch activity',
       });
       return;
     }

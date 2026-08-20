@@ -617,7 +617,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               <div class="shell-chset-readonly">
                 <p class="shell-chset-readonly-value">{serverTopic() || 'No topic set'}</p>
                 <p class="shell-chset-hint">
-                  This channel is topic-locked (+t). Only ops can change the topic.
+                  This room is topic-locked (+t). Only room hosts can change the topic.
                 </p>
               </div>
             }
@@ -801,12 +801,11 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
           </span>
         </section>
 
-        {/* ── Leave channel ── */}
+        {/* ── Leave room ── */}
         <section class="shell-chset-section" aria-labelledby="chset-leave-heading">
-          <h3 id="chset-leave-heading" class="shell-chset-heading">Leave channel</h3>
+          <h3 id="chset-leave-heading" class="shell-chset-heading">Leave room</h3>
           <p class="shell-chset-hint" id="chset-leave-hint">
-            Parts {channel()?.name ?? local.channel} on this connection. You can rejoin later with /join
-            or the channel browser. Local scrollback stays on this device.
+            Leaves {channel()?.name ?? local.channel} on this connection. You can rejoin later from Browse rooms. Local scrollback stays on this device.
           </p>
           <Show
             when={leaveConfirming()}
@@ -820,7 +819,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 disabled={!isConnected()}
                 onClick={() => setLeaveConfirming(true)}
               >
-                Leave channel
+                Leave room
               </Button>
             }
           >
@@ -881,7 +880,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               </For>
             </select>
             <p id="chset-notify-hint" class="shell-chset-hint">
-              Your own alerts for this channel on this device. All messages notify, Mentions only
+              Your own alerts for this room on this device. All messages notify, Mentions only
               alerts when someone @-mentions you, and Mute silences it.
             </p>
           </form>
@@ -897,7 +896,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               <div class="shell-chset-readonly">
                 <p class="shell-chset-readonly-label">Current modes</p>
                 <p class="shell-chset-readonly-value shell-chset-modes-mono">{modeSummary()}</p>
-                <p class="shell-chset-hint">Only ops can change channel modes.</p>
+                <p class="shell-chset-hint">Only room hosts can change room modes.</p>
               </div>
             }
           >
@@ -975,7 +974,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 <p class="shell-chset-readonly-value shell-chset-modes-mono">
                   {formatEphemeral(ephemeralSeconds())}
                 </p>
-                <p class="shell-chset-hint">Only ops can change history retention.</p>
+                <p class="shell-chset-hint">Only room hosts can change history retention.</p>
               </div>
             }
           >
@@ -993,7 +992,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 </For>
               </select>
               <p id="chset-ephemeral-hint" class="shell-chset-hint">
-                When enabled, replay and search omit messages older than this window, and channel stats skip new messages.
+                When enabled, replay and search omit messages older than this window, and room stats skip new messages.
               </p>
               <Button type="submit" variant="ghost" size="sm" disabled={!isConnected() || ephemeralDraft() === String(ephemeralSeconds() ?? 0)}>
                 Apply retention
@@ -1011,9 +1010,9 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             fallback={
               <div class="shell-chset-readonly">
                 <p class="shell-chset-readonly-label">Persistent access list</p>
-                <p class="shell-chset-readonly-value">Managed by channel ops.</p>
+                <p class="shell-chset-readonly-value">Managed by room hosts.</p>
                 <p class="shell-chset-hint">
-                  IRCX ACCESS grants founder/owner/host/voice on join, or deny/grant masks.
+                  Access entries grant founder, owner, host, or voice on join — or deny/grant masks.
                 </p>
               </div>
             }
@@ -1146,7 +1145,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 <p class="shell-chset-readonly-value shell-chset-modes-mono">
                   {encryptionPolicyLabel()}
                 </p>
-                <p class="shell-chset-hint">Only ops can change the channel encryption policy.</p>
+                <p class="shell-chset-hint">Only room hosts can change the room encryption policy.</p>
               </div>
             }
           >
@@ -1185,7 +1184,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 <p class="shell-chset-readonly-value shell-chset-modes-mono">
                   {historyPolicyLabel()}
                 </p>
-                <p class="shell-chset-hint">Only ops can change the channel history policy.</p>
+                <p class="shell-chset-hint">Only room hosts can change the room history policy.</p>
               </div>
             }
           >
@@ -1240,8 +1239,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             fallback={
               <div class="shell-chset-readonly">
                 <p class="shell-chset-readonly-label">Incoming webhooks</p>
-                <p class="shell-chset-readonly-value">Managed by channel ops.</p>
-                <p class="shell-chset-hint">Discord-compatible webhook URLs can post into this channel.</p>
+                <p class="shell-chset-readonly-value">Managed by room hosts.</p>
+                <p class="shell-chset-hint">Discord-compatible webhook URLs can post into this room.</p>
               </div>
             }
           >

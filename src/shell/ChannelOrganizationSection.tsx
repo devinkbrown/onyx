@@ -44,7 +44,7 @@ export function ChannelOrganizationSection(props: ChannelOrganizationSectionProp
     const folder = assignFolder();
     const channel = assignTarget();
     if (!folder || !channel) {
-      setStatus('Pick a folder and a channel.');
+      setStatus('Pick a folder and a room.');
       return;
     }
     getState().addChannelToFolder(channel, folder);

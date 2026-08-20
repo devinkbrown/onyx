@@ -290,7 +290,7 @@ describe('ChannelSettings panel', () => {
 
     // Assert — no toggle group; read-only notice present
     expect(screen.queryByRole('group', { name: 'Room mode flags' })).toBeNull();
-    expect(screen.getByText('Only ops can change channel modes.')).toBeInTheDocument();
+    expect(screen.getByText('Only room hosts can change room modes.')).toBeInTheDocument();
   });
 
   it('toggling a flag dispatches the MODE command', () => {
@@ -381,7 +381,7 @@ describe('ChannelSettings panel', () => {
     // Assert
     expect(screen.queryByLabelText('Ephemeral history')).toBeNull();
     expect(screen.getByText('1 hour')).toBeInTheDocument();
-    expect(screen.getByText('Only ops can change history retention.')).toBeInTheDocument();
+    expect(screen.getByText('Only room hosts can change history retention.')).toBeInTheDocument();
   });
 
   it('lets an op set the channel encryption policy', () => {
@@ -408,7 +408,7 @@ describe('ChannelSettings panel', () => {
     // Assert
     expect(screen.queryByLabelText('Message policy')).toBeNull();
     expect(screen.getByText('Required')).toBeInTheDocument();
-    expect(screen.getByText('Only ops can change the channel encryption policy.')).toBeInTheDocument();
+    expect(screen.getByText('Only room hosts can change the room encryption policy.')).toBeInTheDocument();
   });
 
   it('lets an op set the channel history-policy', () => {
@@ -429,7 +429,7 @@ describe('ChannelSettings panel', () => {
 
     expect(screen.queryByLabelText('Who can request history')).toBeNull();
     expect(screen.getByText('Members only')).toBeInTheDocument();
-    expect(screen.getByText('Only ops can change the channel history policy.')).toBeInTheDocument();
+    expect(screen.getByText('Only room hosts can change the room history policy.')).toBeInTheDocument();
   });
 
   it('lets an op create, list, and delete webhooks', () => {
@@ -473,7 +473,7 @@ describe('ChannelSettings panel', () => {
 
     // Assert
     expect(screen.queryByLabelText('Webhook name')).toBeNull();
-    expect(screen.getByText('Discord-compatible webhook URLs can post into this channel.')).toBeInTheDocument();
+    expect(screen.getByText('Discord-compatible webhook URLs can post into this room.')).toBeInTheDocument();
   });
 
   it('makes the topic read-only for a non-op in a +t channel', () => {
@@ -486,7 +486,7 @@ describe('ChannelSettings panel', () => {
     // Assert — no editable textarea, lock notice shown
     expect(screen.queryByLabelText('Topic text')).toBeNull();
     expect(
-      screen.getByText('This channel is topic-locked (+t). Only ops can change the topic.'),
+      screen.getByText('This room is topic-locked (+t). Only room hosts can change the topic.'),
     ).toBeInTheDocument();
   });
 });

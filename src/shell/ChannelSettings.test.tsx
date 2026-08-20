@@ -457,7 +457,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     renderPanel();
 
     expect(screen.getByRole('heading', { name: 'Roles & access' })).toBeInTheDocument();
-    expect(screen.getByText(/IRCX ACCESS grants founder/i)).toBeInTheDocument();
+    expect(screen.getByText(/Access entries grant founder/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add access entry' })).not.toBeInTheDocument();
   });
 
