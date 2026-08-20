@@ -6,13 +6,23 @@
  * collection can be selected/expanded without pretending that the You dialog
  * is a location. Conversation rows own the location marker; this component
  * only marks the current top-level surface.
+ *
+ * Labels and current/selected/expanded state come from shellNavigationModel
+ * so the IA stays single-sourced.
  */
 
-import { For, Show, splitProps, type JSX } from 'solid-js';
+import { For, Show, createMemo, splitProps, type JSX } from 'solid-js';
+import {
+  createShellNavigationModel,
+  type ShellCollectionId,
+  type ShellLocationId,
+  type ShellNavigationId,
+  type ShellNavigationItem,
+} from './navigation/shellNavigationModel';
 
-export type PrimarySection = 'home' | 'rooms' | 'messages' | 'calls' | 'you';
-export type PrimaryCurrentSection = Exclude<PrimarySection, 'you'>;
-export type PrimaryCollection = Extract<PrimarySection, 'rooms' | 'messages'>;
+export type PrimarySection = ShellNavigationId;
+export type PrimaryCurrentSection = ShellLocationId;
+export type PrimaryCollection = ShellCollectionId;
 export type PrimaryNavigationVariant = 'desktop' | 'mobile';
 
 export type PrimaryNavigationProps = {
@@ -35,25 +45,15 @@ export type PrimaryNavigationProps = {
   onSelect: (section: PrimarySection) => void;
 };
 
-type NavigationItem = {
-  section: PrimarySection;
-  label: string;
-  glyph: string;
+const GLYPHS: Record<ShellNavigationId, string> = {
+  home: '⌂',
+  rooms: '#',
+  messages: '@',
+  calls: '◉',
+  you: '◇',
 };
 
-const NAVIGATION_ITEMS: readonly NavigationItem[] = [
-  { section: 'home', label: 'Home', glyph: '⌂' },
-  { section: 'rooms', label: 'Rooms', glyph: '#' },
-  { section: 'messages', label: 'Messages', glyph: '@' },
-  { section: 'calls', label: 'Calls', glyph: '◉' },
-  { section: 'you', label: 'You', glyph: '◇' },
-];
-
-const MOBILE_ITEMS: readonly NavigationItem[] = [
-  { section: 'home', label: 'Home', glyph: '⌂' },
-  { section: 'rooms', label: 'Rooms', glyph: '#' },
-  { section: 'messages', label: 'Inbox', glyph: '@' },
-];
+const MOBILE_SECTIONS: readonly ShellNavigationId[] = ['home', 'rooms', 'messages'];
 
 function isCollection(section: PrimarySection): section is PrimaryCollection {
   return section === 'rooms' || section === 'messages';
@@ -74,50 +74,53 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
   ]);
 
   const isMobile = (): boolean => local.variant === 'mobile';
-  const current = (section: PrimarySection): boolean => local.currentSection === section;
-  const selected = (section: PrimarySection): boolean =>
-    isCollection(section) && local.selectedCollection === section;
-  const expanded = (section: PrimarySection): boolean | undefined => {
-    if (!isCollection(section) || local.expandedCollection === undefined) return undefined;
-    return local.expandedCollection === section;
-  };
+  const model = createMemo(() => createShellNavigationModel({
+    variant: local.variant,
+    current: local.currentSection,
+    selectedCollection: local.selectedCollection,
+    expandedCollection: local.expandedCollection,
+    youDialogOpen: local.youDialogOpen,
+  }));
+  const items = createMemo(() => {
+    const all = model();
+    if (!isMobile()) return [...all];
+    return all.filter((item) => MOBILE_SECTIONS.includes(item.id));
+  });
 
-  const renderItem = (item: NavigationItem): JSX.Element => {
-    const itemCurrent = () => current(item.section);
-    const itemSelected = () => selected(item.section);
-    const itemExpanded = () => expanded(item.section);
+  const renderItem = (item: ShellNavigationItem): JSX.Element => {
     const className = (): string => {
       const base = isMobile() ? 'shell-mobile-nav-btn' : 'shell-primary-nav-btn';
       const classes = [base];
-      if (itemCurrent()) classes.push(`${base}--active`);
-      if (itemSelected()) classes.push(`${base}--selected`);
-      if (item.section === 'you' && local.youDialogOpen) classes.push(`${base}--dialog-open`);
+      if (item.current) classes.push(`${base}--active`);
+      if (item.selected) classes.push(`${base}--selected`);
+      if (item.id === 'you' && local.youDialogOpen) classes.push(`${base}--dialog-open`);
       return classes.join(' ');
     };
+    const displayLabel = isMobile() && item.id === 'messages' ? 'Inbox' : item.label;
 
     return (
       <button
         type="button"
-        ref={item.section === 'rooms' ? local.mobileRoomsButtonRef : undefined}
+        ref={item.id === 'rooms' ? local.mobileRoomsButtonRef : undefined}
         class={className()}
         data-primary-nav-item
-        data-section={item.section}
-        data-selected={itemSelected() ? 'true' : undefined}
-        data-expanded={itemExpanded() === true ? 'true' : itemExpanded() === false ? 'false' : undefined}
-        aria-label={isMobile() ? `Open ${item.label}` : undefined}
-        aria-current={itemCurrent() ? 'page' : undefined}
-        aria-pressed={isCollection(item.section) ? itemSelected() : undefined}
-        aria-expanded={isCollection(item.section) ? itemExpanded() : item.section === 'you' ? local.youDialogOpen : undefined}
-        aria-haspopup={item.section === 'you' ? 'dialog' : undefined}
-        title={isMobile() ? `Open ${item.label}` : `Quick switch to ${item.label}`}
-        onClick={() => local.onSelect(item.section)}
+        data-section={item.id}
+        data-selected={item.selected ? 'true' : undefined}
+        data-expanded={item.expanded === true ? 'true' : item.expanded === false ? 'false' : undefined}
+        aria-label={isMobile() ? `Open ${displayLabel}` : undefined}
+        aria-current={item.current ? 'page' : undefined}
+        aria-pressed={isCollection(item.id) ? item.selected : undefined}
+        aria-expanded={isCollection(item.id) ? item.expanded : item.id === 'you' ? local.youDialogOpen : undefined}
+        aria-haspopup={item.hasPopup}
+        title={isMobile() ? `Open ${displayLabel}` : `Quick switch to ${item.label}`}
+        onClick={() => local.onSelect(item.id)}
       >
         {isMobile() ? (
-          <span class="shell-mobile-nav-icon" aria-hidden="true">{item.glyph}</span>
+          <span class="shell-mobile-nav-icon" aria-hidden="true">{GLYPHS[item.id]}</span>
         ) : (
-          <span class="shell-primary-nav-icon" aria-hidden="true">{item.glyph}</span>
+          <span class="shell-primary-nav-icon" aria-hidden="true">{GLYPHS[item.id]}</span>
         )}
-        {item.label}
+        {displayLabel}
       </button>
     );
   };
@@ -148,7 +151,7 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
       data-primary-navigation-variant={local.variant}
     >
       {!isMobile() && <span class="shell-primary-nav-context">Quick switch</span>}
-      <For each={isMobile() ? MOBILE_ITEMS : NAVIGATION_ITEMS}>{renderItem}</For>
+      <For each={items()}>{renderItem}</For>
       <Show when={isMobile()}>{renderMore()}</Show>
     </nav>
   );

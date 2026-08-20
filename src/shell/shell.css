@@ -324,31 +324,31 @@
 
 .shell-primary-nav {
   display: grid;
-  gap: 2px;
-  padding: 8px;
+  gap: 1px;
+  padding: 6px;
   border-bottom: 1px solid var(--seam-faint);
 }
 
 .shell-primary-nav-context {
-  padding: 2px 9px 5px;
+  padding: 2px 8px 4px;
   color: var(--paper-mute);
-  font: 700 0.6rem/1 var(--font-mono);
+  font: 700 0.58rem/1 var(--font-mono);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .shell-primary-nav-btn {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  min-height: 34px;
-  padding: 5px 9px;
+  min-height: 32px;
+  padding: 4px 8px;
   border: 1px solid transparent;
-  border-radius: var(--r-sm);
+  border-radius: 4px;
   background: transparent;
   color: var(--paper-dim);
-  font: 600 0.84rem/1 var(--font-sans);
+  font: 600 0.82rem/1 var(--font-sans);
   text-align: left;
   cursor: pointer;
   transition:

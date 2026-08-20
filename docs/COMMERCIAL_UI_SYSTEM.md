@@ -11,9 +11,13 @@ This document is the durable source of truth for the commercial redesign. Implem
 
 ## 1. Commercial identity
 
-**Onyx** is a public place to talk and gather with people you choose — rooms, messages, and voice/video that start in the same conversation, with honest connection/protection status and history that stays on this device.
+**Onyx** is a public place to talk and gather — rooms, messages, and voice/video
+in one conversation home, with honest connection/protection status and history
+that stays on this device. Usability target: Discord/Twitch-class community
+platform density (rail · rooms · stage/feed), not a SaaS marketing shell.
 
-Not: a terminal for operators. Not: a clone of any big chat brand. Not: a feature-matrix UI.
+Not: a terminal for operators. Not: a clone of any big chat brand. Not: a
+feature-matrix UI.
 
 **Brand house**
 
