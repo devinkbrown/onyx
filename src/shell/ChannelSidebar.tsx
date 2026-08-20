@@ -12,6 +12,7 @@
  */
 
 import {
+  createEffect,
   createMemo,
   createSignal,
   onCleanup,
@@ -251,10 +252,17 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     return normalizeRoomTarget(joinInput()) ?? '';
   });
 
-  // ── sidebar filter (channels + DMs) ──
+  // ── sidebar filter (channels + DMs) — collapsed disclosure by default ──
   const [listFilter, setListFilter] = createSignal('');
   const [unreadOnly, setUnreadOnly] = createSignal(false);
+  const [filterOpen, setFilterOpen] = createSignal(false);
   const filterActive = createMemo(() => listFilter().trim().length > 0 || unreadOnly());
+  createEffect((prevActive: boolean | undefined) => {
+    const active = filterActive();
+    // Auto-open once when a filter engages so the active controls stay visible.
+    if (active && !prevActive) setFilterOpen(true);
+    return active;
+  });
 
   // ── sorted channel list (alpha base; stars + folders layer on top) ──
   const sortedChannels = createMemo(() => {
@@ -584,54 +592,67 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         />
       </Show>
 
-      <div class="shell-sidebar-filter" role="search">
-        <label class="sr-only" for="sidebar-filter-input">
-          {sidebarMode() === 'messages' ? 'Filter direct messages' : 'Filter rooms'}
-        </label>
-        <input
-          id="sidebar-filter-input"
-          class="shell-sidebar-filter-input"
-          type="search"
-          data-testid="sidebar-filter"
-          placeholder={sidebarMode() === 'messages' ? 'Filter messages' : 'Filter rooms'}
-          autocomplete="off"
-          spellcheck={false}
-          value={listFilter()}
-          onInput={(e) => setListFilter(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape' && (listFilter() || unreadOnly())) {
-              e.preventDefault();
-              e.stopPropagation();
-              setListFilter('');
-              setUnreadOnly(false);
-            }
-          }}
-        />
-        <button
-          type="button"
-          class={`shell-sidebar-filter-unread${unreadOnly() ? ' shell-sidebar-filter-unread--on' : ''}`}
-          data-testid="sidebar-unread-only"
-          aria-pressed={unreadOnly()}
-          title={unreadOnly() ? 'Showing unread only — click to show all' : 'Show unread only'}
-          onClick={() => setUnreadOnly((v) => !v)}
-        >
-          Unread
-        </button>
-        <Show when={listFilter().trim().length > 0 || unreadOnly()}>
+      <details
+        class={`shell-sidebar-filter-disclosure${filterActive() ? ' shell-sidebar-filter-disclosure--active' : ''}`}
+        data-testid="sidebar-filter-disclosure"
+        open={filterOpen()}
+        onToggle={(e) => setFilterOpen(e.currentTarget.open)}
+      >
+        <summary class="shell-sidebar-filter-summary">
+          <span>Filter</span>
+          <Show when={filterActive()}>
+            <span class="shell-sidebar-filter-summary-on" aria-hidden="true">on</span>
+          </Show>
+        </summary>
+        <div class="shell-sidebar-filter" role="search">
+          <label class="sr-only" for="sidebar-filter-input">
+            {sidebarMode() === 'messages' ? 'Filter direct messages' : 'Filter rooms'}
+          </label>
+          <input
+            id="sidebar-filter-input"
+            class="shell-sidebar-filter-input"
+            type="search"
+            data-testid="sidebar-filter"
+            placeholder={sidebarMode() === 'messages' ? 'Filter messages' : 'Filter rooms'}
+            autocomplete="off"
+            spellcheck={false}
+            value={listFilter()}
+            onInput={(e) => setListFilter(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && (listFilter() || unreadOnly())) {
+                e.preventDefault();
+                e.stopPropagation();
+                setListFilter('');
+                setUnreadOnly(false);
+              }
+            }}
+          />
           <button
             type="button"
-            class="shell-sidebar-filter-clear"
-            data-testid="sidebar-filter-clear"
-            aria-label="Clear filter"
-            onClick={() => {
-              setListFilter('');
-              setUnreadOnly(false);
-            }}
+            class={`shell-sidebar-filter-unread${unreadOnly() ? ' shell-sidebar-filter-unread--on' : ''}`}
+            data-testid="sidebar-unread-only"
+            aria-pressed={unreadOnly()}
+            title={unreadOnly() ? 'Showing unread only — click to show all' : 'Show unread only'}
+            onClick={() => setUnreadOnly((v) => !v)}
           >
-            Clear
+            Unread
           </button>
-        </Show>
-      </div>
+          <Show when={listFilter().trim().length > 0 || unreadOnly()}>
+            <button
+              type="button"
+              class="shell-sidebar-filter-clear"
+              data-testid="sidebar-filter-clear"
+              aria-label="Clear filter"
+              onClick={() => {
+                setListFilter('');
+                setUnreadOnly(false);
+              }}
+            >
+              Clear
+            </button>
+          </Show>
+        </div>
+      </details>
 
       <Show when={showRooms() && activeChannelLedger()}>
         <div class="shell-sidebar-ledger-row">

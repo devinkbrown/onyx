@@ -166,11 +166,24 @@ describe('ChannelSidebar accessibility', () => {
       connectionStatus: 'connected',
     }, true);
 
-    const { container, getByRole } = render(() => <ChannelSidebar mode="messages" activeSection="rooms" />);
+    const { container, getByRole, getByTestId } = render(() => <ChannelSidebar mode="messages" activeSection="rooms" />);
 
     expect(container.querySelector('[data-testid="conversation-spine"]')).toBeInTheDocument();
     expect(container.querySelector('.shell-conversation-spine-label')).toHaveTextContent('Conversations');
     expect(getByRole('region', { name: 'Messages · 1 conversation' })).toBeInTheDocument();
+    expect(getByTestId('sidebar-filter-disclosure')).not.toHaveAttribute('open');
+  });
+
+  it('opens the collapsed Filter disclosure to search and unread controls', () => {
+    seed();
+    const { getByTestId } = render(() => <ChannelSidebar mode="rooms" />);
+
+    const disclosure = getByTestId('sidebar-filter-disclosure');
+    expect(disclosure).not.toHaveAttribute('open');
+    fireEvent.click(disclosure.querySelector('summary')!);
+    expect(disclosure).toHaveAttribute('open');
+    expect(getByTestId('sidebar-filter')).toBeInTheDocument();
+    expect(getByTestId('sidebar-unread-only')).toBeInTheDocument();
   });
 
   it('keeps the room location current while Messages is the selected collection', () => {

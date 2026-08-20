@@ -1957,6 +1957,7 @@ describe('AppShell', () => {
 
       const drawer = screen.getByRole('dialog', { name: 'Inbox switcher' });
       expect(within(drawer).getByRole('region', { name: 'Messages · 0 conversations' })).toBeInTheDocument();
+      fireEvent.click(within(drawer).getByText('Filter'));
       expect(within(drawer).getByRole('searchbox', { name: 'Filter direct messages' })).toBeInTheDocument();
       const messages = screen.getByRole('button', { name: 'Open Inbox' });
       expect(messages).not.toHaveAttribute('aria-current');

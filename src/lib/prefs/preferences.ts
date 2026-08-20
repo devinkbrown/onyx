@@ -103,10 +103,10 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   clock: '24h',
   localHistory: true,
   e2eeDms: true,
-  timeScrubber: true,
+  timeScrubber: false,
   voiceEntry: true,
   topicTools: true,
-  watchTogether: true,
+  watchTogether: false,
   reactionDensity: 'full',
   experienceMode: 'standard',
 };

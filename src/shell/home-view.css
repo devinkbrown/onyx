@@ -1632,8 +1632,8 @@
 
 /* ── Catch up — "what did I miss" across joined rooms + DMs ───────────────────
    A9 strata residual hierarchy (thesis-first):
-     Needs you  → gold surface band, solid unread seal, largest type
-     Followed   → lapis instrument rail, mid type, no gold competition
+     Needs you  → quiet cyan surface band, solid unread seal, largest type
+     Followed   → lapis instrument rail, mid type, no competing gold
      Quiet      → collapsed ambient tail, demoted by size/weight/chrome only
                   (never whole-section opacity — AA + meaning-not-by-opacity)
    Weight is visual only; structure + a11y labels stay stable. */
@@ -1656,7 +1656,7 @@
   font-weight: 650;
 }
 /* Provenance kicker (live / offline recall) — demoted mono meta under the
-   mention gold count. Real Onyx mute token only; never --text-muted/--fg-muted. */
+   mention count. Real Onyx mute token only; never --text-muted/--fg-muted. */
 .home-catchup-source {
   color: var(--paper-mute);
   font-family: var(--font-mono);
@@ -1706,13 +1706,13 @@
 
 /* ── Stratum: Needs you (attention) — strongest visual weight ───────────────
    Label text stays on the audited --paper-dim token (AA small text). Hierarchy
-   is size/weight + gold surface chrome — never a decorative token on body text. */
+   is size/weight + sparse cyan surface chrome — never a decorative token on body text. */
 .home-catchup-tier--attention {
   gap: var(--space-2);
   padding: var(--space-3) var(--space-3) var(--space-2);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--gold) 8%, var(--stone));
-  border: 1px solid color-mix(in oklab, var(--gold) 28%, var(--line));
+  background: color-mix(in oklab, var(--lapis) 8%, var(--stone));
+  border: 1px solid color-mix(in oklab, var(--lapis) 28%, var(--line));
   box-shadow: none;
 }
 .home-catchup-tier--attention .home-catchup-tier-label {
@@ -1725,28 +1725,27 @@
   min-height: 48px;
   padding: var(--space-3) var(--space-4);
   border-left-width: 3px;
-  border-left-color: var(--gold-bright);
-  background: color-mix(in oklab, var(--gold) 6%, var(--stone));
+  border-left-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 6%, var(--stone));
   box-shadow: none;
 }
 .home-catchup-tier--attention .home-catchup-item:hover {
-  border-color: color-mix(in oklab, var(--gold-bright) 42%, var(--line));
-  background: color-mix(in oklab, var(--gold) 12%, var(--stone));
+  border-color: color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
+  background: color-mix(in oklab, var(--lapis) 12%, var(--stone));
 }
 .home-catchup-tier--attention .home-catchup-name {
   font-weight: 650;
   font-size: 0.98rem;
 }
 .home-catchup-tier--attention .home-catchup-unread {
-  /* Unread chip is solid gold-bright on ink-facing paper text: use on-accent
-     only if present; paper on gold-bright is the badge convention elsewhere. */
+  /* Unread chip: solid lapis-bright with ink-facing paper text. */
   color: var(--ink);
-  background: var(--gold-bright);
+  background: var(--lapis-bright);
   font-weight: 650;
 }
 
 /* ── Stratum: Followed — next weight, lapis instrument chrome ───────────────
-   Grouped by a quiet left rail + faint wash — never a full gold panel, so
+   Grouped by a quiet left rail + faint wash — never a full attention panel, so
    Needs you stays the single primary focus on the surface. */
 .home-catchup-tier--followed {
   margin-top: 8px;

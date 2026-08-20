@@ -3533,7 +3533,7 @@ export function PreferencesPanel(): JSX.Element {
               onToggle={(value) => setPreference('readerMode', value)}
             />
             <Segmented
-              legend="Workspace level"
+              legend="Experience level"
               description="Standard keeps chat calm. Advanced adds room-management details when you have permission. IRC Ops also shows live server operations when your account is an operator."
               options={EXPERIENCE_MODES}
               labels={EXPERIENCE_MODE_LABELS}
