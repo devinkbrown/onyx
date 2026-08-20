@@ -8,7 +8,7 @@
  *   Z3 People   — roster toggle + count (always on channel, incl. 0)
  *   Z4 Edge     — Inbox (temp primary) · More · connection (conn never display:none)
  *
- * More is grouped (Alerts · This room|Conversation · Workspace), not a junk drawer.
+ * More is grouped (Alerts · This room|Conversation · You), not a junk drawer.
  * Jump-to-date lives in More (This room / Conversation). Call presentation reuses
  * pure classifyCallsHubPresentation — no auto-join, no accept/decline in the ribbon.
  * People aria-pressed uses membersOpen (AppShell membersVisible). Persistence deferred.
@@ -1016,66 +1016,21 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 )}
               </Show>
 
-              {/* Workspace — appearance / prefs / account */}
+              {/* You — identity & settings hub (Appearance/Preferences live inside You) */}
               <Show when={!local.contextActionsOnly}>
                 <div
                   class="shell-ribbon-more-section"
                   role="group"
-                  aria-labelledby="ribbon-more-workspace-label"
+                  aria-labelledby="ribbon-more-you-label"
                 >
-                <p id="ribbon-more-workspace-label" class="shell-ribbon-more-label">
-                  Workspace
+                <p id="ribbon-more-you-label" class="shell-ribbon-more-label">
+                  You
                 </p>
                 <div
                   class="shell-ribbon-more-list"
                   role="menu"
-                  aria-labelledby="ribbon-more-workspace-label"
+                  aria-labelledby="ribbon-more-you-label"
                 >
-                  <button
-                    type="button"
-                    class="shell-ribbon-more-item"
-                    role="menuitem"
-                    aria-label="Appearance — theme and background"
-                    aria-haspopup="dialog"
-                    data-testid="ribbon-appearance"
-                    onClick={() => closeMoreThen(() => getState().openAppearance())}
-                    onKeyDown={onMoreMenuKeyDown}
-                  >
-                    <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
-                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-3.9-4-7.4-9-7.4Z" />
-                      <circle cx="7.5" cy="11.5" r="1.1" fill="currentColor" stroke="none" />
-                      <circle cx="11" cy="7.5" r="1.1" fill="currentColor" stroke="none" />
-                      <circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
-                    </svg>
-                    <span>Appearance</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    class="shell-ribbon-more-item"
-                    role="menuitem"
-                    aria-label="Open preferences"
-                    aria-haspopup="dialog"
-                    data-testid="ribbon-preferences"
-                    onClick={() => closeMoreThen(() => openPreferences())}
-                    onKeyDown={onMoreMenuKeyDown}
-                  >
-                    <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
-                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 21v-7" />
-                      <path d="M4 10V3" />
-                      <path d="M12 21v-9" />
-                      <path d="M12 8V3" />
-                      <path d="M20 21v-5" />
-                      <path d="M20 12V3" />
-                      <path d="M2 14h4" />
-                      <path d="M10 8h4" />
-                      <path d="M18 16h4" />
-                    </svg>
-                    <span>Preferences</span>
-                  </button>
-
                   <button
                     type="button"
                     class="shell-ribbon-more-item shell-ribbon-more-item--account"
@@ -1083,8 +1038,8 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                     data-guest={account() ? 'false' : 'true'}
                     aria-label={
                       account()
-                        ? `Account: ${account()} — open account panel`
-                        : 'Guest — open account panel'
+                        ? `You — ${account()} — open account, appearance, and preferences`
+                        : 'You — guest — open account, appearance, and preferences'
                     }
                     aria-haspopup="dialog"
                     data-testid="ribbon-account-chip"
@@ -1097,6 +1052,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       <path d="M5 19.5c1.6-3 4-4.5 7-4.5s5.4 1.5 7 4.5" />
                     </svg>
                     <span class="shell-ribbon-account-text">
+                      <span class="shell-ribbon-account-kicker">You</span>
                       <Show when={account()} fallback={<span class="shell-ribbon-account-name">Guest</span>}>
                         {(acct) => <span class="shell-ribbon-account-name">{acct()}</span>}
                       </Show>

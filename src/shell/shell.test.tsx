@@ -1358,18 +1358,19 @@ describe('AppShell', () => {
       expect(chip.textContent).toContain('alice');
     });
 
-    it('opens preferences from the desktop ribbon', async () => {
+    it('opens You from the desktop ribbon', async () => {
       // Arrange
       seedStore('#general');
 
       // Act
       render(() => <AppShell />);
       openRibbonMore();
-      fireEvent.click(screen.getByTestId('ribbon-preferences'));
+      fireEvent.click(screen.getByTestId('ribbon-account-chip'));
 
       // Assert
-      expect(isPreferencesOpen()).toBe(true);
-      expect(await screen.findByTestId('preferences-panel')).toBeInTheDocument();
+      expect(store.getState().showAccount).toBe(true);
+      expect(await screen.findByTestId('account-panel')).toBeInTheDocument();
+      expect(await screen.findByTestId('you-open-preferences')).toBeInTheDocument();
     });
 
     it('opens the channel video surface without opening voice settings', () => {
@@ -1818,6 +1819,8 @@ describe('AppShell', () => {
       expect(within(more).getByRole('button', { name: 'You' })).toBeInTheDocument();
       expect(within(more).getByRole('button', { name: 'Appearance' })).toBeInTheDocument();
       expect(within(more).getByRole('button', { name: 'Preferences' })).toBeInTheDocument();
+      expect(within(more).queryByText('Workspace')).toBeNull();
+      expect(within(more).queryByText('Personalize')).toBeNull();
     });
 
     it('returns focus to the persistent Menu trigger after closing Appearance', async () => {

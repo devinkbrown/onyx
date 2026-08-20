@@ -431,22 +431,23 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 6px 6px;
+  padding: 6px 8px 8px;
   border-bottom: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 35%, transparent);
 }
 
 .shell-sidebar-filter-input {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 1.75rem;
+  min-height: 1.65rem;
   appearance: none;
   border: 1px solid var(--seam-faint);
   border-radius: 4px;
-  background: color-mix(in oklab, var(--ink) 55%, transparent);
+  background: color-mix(in oklab, var(--ink) 70%, transparent);
   color: var(--paper);
   font-family: var(--font-sans);
-  font-size: 0.8rem;
-  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.45rem;
 }
 
 .shell-sidebar-filter-input::placeholder {
@@ -772,10 +773,10 @@
 
 .shell-sidebar-collection-heading {
   margin: 0;
-  padding: 2px 0 0;
+  padding: 0;
   color: var(--paper);
-  font: 650 0.82rem/1.25 var(--font-sans);
-  letter-spacing: 0.02em;
+  font: 650 0.78rem/1.2 var(--font-sans);
+  letter-spacing: 0.01em;
   text-transform: none;
 }
 
@@ -786,27 +787,29 @@
 
 .shell-conversation-spine-head {
   display: grid;
-  gap: 3px;
-  padding: var(--space-3) var(--space-3) var(--space-2);
+  gap: 2px;
+  padding: var(--space-2) var(--space-3) var(--space-2);
+  border-bottom: 1px solid color-mix(in oklab, var(--seam-faint) 80%, transparent);
 }
 
 .shell-conversation-spine-label {
   margin: 0;
   color: var(--paper-mute);
-  font: 700 0.62rem/1 var(--font-mono);
-  letter-spacing: 0.14em;
+  font: 700 0.58rem/1 var(--font-mono);
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
 .shell-conversation-spine-content {
   position: relative;
+  padding-top: 2px;
 }
 
 @media (min-width: 901px) {
   .shell-conversation-spine-content {
-    margin-left: 14px;
+    margin-left: 12px;
     border-left: 1px solid var(--seam-faint);
-    padding-left: 10px;
+    padding-left: 8px;
   }
 
   .shell-conversation-spine-content > .shell-sidebar-section {
@@ -816,10 +819,10 @@
   .shell-conversation-spine-content > .shell-sidebar-section::before {
     content: '';
     position: absolute;
-    left: -15px;
-    top: calc(var(--space-3) + 0.3rem);
-    width: 5px;
-    height: 5px;
+    left: -13px;
+    top: calc(var(--space-3) + 0.28rem);
+    width: 4px;
+    height: 4px;
     border: 1px solid var(--seam);
     border-radius: 50%;
     background: var(--ink);
@@ -2075,7 +2078,7 @@
 
 /* ── More overflow (commercial 4-zone header) ───────────────────────────────
    Place chips (event · voice · Call) + People own the eye; Date/Inbox stay
-   one-click reach instruments; More groups Alerts · This room · Workspace.
+   one-click reach instruments; More groups Alerts · This room · You.
    Pins / mark-read / DND / AI policy demote into More — not primary density. */
 .shell-ribbon-group .onyx-popover {
   display: inline-flex;
@@ -2147,7 +2150,7 @@
 }
 
 /*
- * Section kickers (Alerts / This room / Conversation / Workspace) live as
+ * Section kickers (Alerts / This room / Conversation / You) live as
  * normal text outside role=menu, associated via aria-labelledby. The --in-menu
  * modifier remains for any residual single-menu layouts; prefer section labels.
  */
@@ -2238,6 +2241,21 @@
   font-size: 0.78rem;
   letter-spacing: 0.04em;
   text-transform: none;
+}
+
+.shell-ribbon-more-item--account .shell-ribbon-account-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+}
+
+.shell-ribbon-more-item--account .shell-ribbon-account-kicker {
+  font: 700 0.58rem/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
 }
 
 .shell-ribbon-more-item--account[data-guest='true'] .shell-ribbon-account-name {

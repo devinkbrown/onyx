@@ -12,7 +12,6 @@ import { fileURLToPath } from 'node:url';
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { openPreferences } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import type { CallState } from '@/lib/cadence-media/types';
@@ -86,7 +85,6 @@ function setRoomVoice(
 describe('PresenceRibbon commercial room header', () => {
   beforeEach(() => {
     store.setState(initialState, true);
-    vi.mocked(openPreferences).mockReset();
   });
 
   afterEach(() => {
@@ -306,19 +304,19 @@ describe('PresenceRibbon commercial room header', () => {
     // Visible section headings (not aria-hidden) name real semantic groups
     expect(screen.getByText('Alerts')).toBeInTheDocument();
     expect(screen.getByText('This room')).toBeInTheDocument();
-    expect(screen.getByText('Workspace')).toBeInTheDocument();
     expect(screen.queryByText('Channel')).not.toBeInTheDocument();
+    expect(screen.queryByText('Workspace')).not.toBeInTheDocument();
     expect(screen.getByText('Alerts')).not.toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByText('This room')).not.toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByText('Workspace')).not.toHaveAttribute('aria-hidden', 'true');
 
     // Labelled section wrappers are role=group (labels name the groups)
     const alertsGroup = screen.getByRole('group', { name: 'Alerts' });
     const roomGroup = screen.getByRole('group', { name: 'This room' });
-    const workspaceGroup = screen.getByRole('group', { name: 'Workspace' });
+    const youGroup = screen.getByRole('group', { name: 'You' });
     expect(alertsGroup).toHaveClass('shell-ribbon-more-section');
     expect(roomGroup).toHaveClass('shell-ribbon-more-section');
-    expect(workspaceGroup).toHaveClass('shell-ribbon-more-section');
+    expect(youGroup).toHaveClass('shell-ribbon-more-section');
+    expect(youGroup.querySelector('.shell-ribbon-more-label')).not.toHaveAttribute('aria-hidden', 'true');
 
     // Menus only contain menuitem children (headings/groups live outside role=menu)
     const menus = screen.getAllByRole('menu');
@@ -330,15 +328,15 @@ describe('PresenceRibbon commercial room header', () => {
       }
     }
 
-    expect(screen.getByTestId('ribbon-preferences')).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-preferences')).not.toBeInTheDocument();
     expect(screen.getByTestId('ribbon-settings-gear')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-account-chip')).toBeInTheDocument();
-    expect(screen.getByTestId('ribbon-appearance')).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-appearance')).not.toBeInTheDocument();
     expect(screen.getByTestId('ribbon-more-channel')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: /Notifications for/ })).toBeInTheDocument();
 
-    // Menu order: This room items before Workspace items (single roving set under panel)
+    // Menu order: This room items before You items (single roving set under panel)
     const panel = screen.getByTestId('ribbon-more-menu');
     const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
     const labels = items.map((el) => el.textContent ?? '');
@@ -346,12 +344,12 @@ describe('PresenceRibbon commercial room header', () => {
     const ledgerIdx = labels.findIndex((t) => t.includes('Channel ledger'));
     const pinsIdx = labels.findIndex((t) => t.includes('Pinned messages'));
     const jumpIdx = labels.findIndex((t) => t.includes('Jump to date'));
-    const appearanceIdx = labels.findIndex((t) => t.includes('Appearance'));
+    const youIdx = labels.findIndex((t) => t.includes('You') || t.includes('Guest'));
     expect(settingsIdx).toBeGreaterThanOrEqual(0);
     expect(ledgerIdx).toBeGreaterThan(settingsIdx);
     expect(pinsIdx).toBeGreaterThan(ledgerIdx);
     expect(jumpIdx).toBeGreaterThan(pinsIdx);
-    expect(appearanceIdx).toBeGreaterThan(jumpIdx);
+    expect(youIdx).toBeGreaterThan(jumpIdx);
     expect(screen.getByTestId('ribbon-channel-ledger')).toHaveAttribute(
       'href',
       '/stats/?room=%23general',
@@ -370,7 +368,10 @@ describe('PresenceRibbon commercial room header', () => {
 
     openMore();
     const account = screen.getByTestId('ribbon-account-chip');
-    expect(account).toHaveAttribute('aria-label', 'Guest — open account panel');
+    expect(account).toHaveAttribute(
+      'aria-label',
+      'You — guest — open account, appearance, and preferences',
+    );
     fireEvent.click(account);
     expect(store.getState().showAccount).toBe(true);
   });
@@ -382,13 +383,13 @@ describe('PresenceRibbon commercial room header', () => {
 
     openMore();
     expect(more).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(screen.getByTestId('ribbon-preferences'));
+    fireEvent.click(screen.getByTestId('ribbon-account-chip'));
 
     await waitFor(() => {
       expect(more).toHaveAttribute('aria-expanded', 'false');
       expect(screen.queryByTestId('ribbon-more-menu')).not.toBeInTheDocument();
     });
-    expect(openPreferences).toHaveBeenCalledTimes(1);
+    expect(store.getState().showAccount).toBe(true);
   });
 
   it('restores focus to More when Escape closes the overflow', async () => {
@@ -440,11 +441,12 @@ describe('PresenceRibbon commercial room header', () => {
     openMore();
     expect(screen.getByText('Conversation')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
-    expect(screen.getByTestId('ribbon-preferences')).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-preferences')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-settings-gear')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-more-channel')).not.toBeInTheDocument();
     expect(screen.queryByText('This room')).not.toBeInTheDocument();
-    expect(screen.getByText('Workspace')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'You' })).toBeInTheDocument();
+    expect(screen.getByTestId('ribbon-account-chip')).toBeInTheDocument();
   });
 
   it('renders Facepile root class that responsive CSS actually hides', () => {

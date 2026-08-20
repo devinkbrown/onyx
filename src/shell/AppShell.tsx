@@ -1386,10 +1386,10 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
               <small>{(activeView() as { channel: string }).channel}</small>
             </button>
           </Show>
-          <p class="shell-mobile-more-sheet__group-label">Workspace</p>
+          <p class="shell-mobile-more-sheet__group-label">Navigate</p>
           <button type="button" onClick={() => selectMobileMore('calls')}>Calls</button>
+          <p class="shell-mobile-more-sheet__group-label">You</p>
           <button type="button" onClick={() => selectMobileMore('you')}>You</button>
-          <p class="shell-mobile-more-sheet__group-label">Personalize</p>
           <button type="button" onClick={() => selectMobileMore('appearance')}>Appearance</button>
           <button type="button" onClick={() => selectMobileMore('preferences')}>Preferences</button>
           <button type="button" onClick={closeMobileMore}>Close</button>
