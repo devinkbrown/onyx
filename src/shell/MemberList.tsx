@@ -165,7 +165,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     const ok = await writeClipboardText(nick);
     getState().addToast({
       variant: ok ? 'success' : 'warning',
-      title: ok ? 'Nick copied' : 'Could not copy nick',
+      title: ok ? 'Name copied' : 'Could not copy name',
       description: ok
         ? `${nick} is on the clipboard.`
         : 'Clipboard access was denied in this browser.',

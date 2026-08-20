@@ -1037,7 +1037,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   <p class="shell-chset-hint" data-testid="chset-access-empty">
                     {accessLoading()
                       ? 'Loading access entries…'
-                      : 'No access entries yet. Add a nick or hostmask below.'}
+                      : 'No access entries yet. Add a name or hostmask below.'}
                   </p>
                 }
               >
@@ -1098,7 +1098,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 <FormField
                   id="chset-access-mask"
                   label="Name or hostmask"
-                  description="Bare nicks expand to nick!*@*. Full masks use nick!user@host."
+                  description="Bare names expand to name!*@*. Full masks use name!user@host."
                   type="text"
                   value={accessMaskDraft()}
                   autocomplete="off"

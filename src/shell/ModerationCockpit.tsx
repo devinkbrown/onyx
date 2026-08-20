@@ -251,7 +251,7 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
         >
           <label for={banId}>Block a matching address</label>
           <div>
-            <input id={banId} value={banMask()} onInput={(event) => setBanMask(event.currentTarget.value)} placeholder="nick!*@*" autocomplete="off" />
+            <input id={banId} value={banMask()} onInput={(event) => setBanMask(event.currentTarget.value)} placeholder="name!*@*" autocomplete="off" />
             <button type="submit" disabled={!connected() || !banMask().trim()}>Review block</button>
           </div>
           <p class="moderation-cockpit__hint">This sends a server-side block after you review it.</p>
