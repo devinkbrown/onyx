@@ -63,9 +63,9 @@ export function publicMeshFeedState(
 
 export function publicMeshFeedLabel(state: PublicMeshFeedState): string {
   switch (state) {
-    case 'loading': return 'checking mesh';
-    case 'current': return 'mesh online';
-    case 'degraded': return 'mesh degraded';
+    case 'loading': return 'checking network';
+    case 'current': return 'network online';
+    case 'degraded': return 'network degraded';
     case 'stale': return 'status stale';
     case 'future': return 'status time mismatch';
     case 'unknown': return 'status undated';

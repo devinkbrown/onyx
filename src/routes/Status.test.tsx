@@ -73,7 +73,7 @@ describe('StatusRoute', () => {
     expect(screen.getByRole('heading', { name: /network health/i })).toBeInTheDocument();
     expect(screen.queryByTestId('status-suspended')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveAttribute('data-feed-state', 'loading');
-    expect(screen.getByRole('status')).toHaveTextContent('checking mesh');
+    expect(screen.getByRole('status')).toHaveTextContent('checking network');
     expect(screen.getByRole('status')).toHaveTextContent('No health claim yet');
   });
 
@@ -82,7 +82,7 @@ describe('StatusRoute', () => {
     const { container } = render(() => <StatusRoute />);
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveAttribute('data-feed-state', 'current'));
-    expect(screen.getByRole('status')).toHaveTextContent('mesh online');
+    expect(screen.getByRole('status')).toHaveTextContent('network online');
     expect(container.querySelector('.status-summary .status-pill')).toHaveAttribute('data-state', 'up');
     expect(container.querySelector('.status-summary .status-pill')).toHaveTextContent('operational');
     expect(screen.getByText('7')).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('StatusRoute', () => {
       {
         source: meshStatus({ mesh: { quorum: false, partitioned: true, components: 2 } }),
         state: 'degraded',
-        label: 'mesh degraded',
+        label: 'network degraded',
       },
       {
         source: meshStatus({ generated_at: NOW - 10 * 60 }),

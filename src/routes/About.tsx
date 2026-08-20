@@ -86,14 +86,14 @@ export default function About() {
         </h1>
         <p class="serif-pull">
           A protocol you can read.<br />
-          A mesh that <em>belongs to no one</em>.<br />
-          A network that tells you exactly how your media is protected.
+          A network that <em>belongs to no one</em>.<br />
+          A place that tells you exactly how your media is protected.
         </p>
         <div class="ab-seam" aria-hidden="true" />
         <p class="sub">
           Onyx is the window. The window matters — but the point is everything behind
           it. This page is the underneath: the protocol, the media model, the
-          cryptography, the mesh, and what each one means for the people who live here
+          cryptography, the network fabric, and what each one means for the people who live here
           and the developers who build on it.
         </p>
         <div
@@ -132,7 +132,7 @@ export default function About() {
         <div class="ab-proto-grid">
           <article class="ab-proto-item">
             <span class="label">Authentication</span>
-            <h3>SASL, your way</h3>
+            <h3>Sign-in, your way</h3>
             <p>
               Onyx Server advertises <b>SASL PLAIN, EXTERNAL, and SCRAM-SHA-256</b>.
               Pick whatever your client supports — SCRAM is preferred when the server
@@ -231,7 +231,7 @@ export default function About() {
             class="ab-media-diagram"
             viewBox="0 0 580 320"
             role="img"
-            aria-label="Media path: clients encode with CADENCEVOX/CADENCEVIS or WASM, send Cadence frames over the mesh relay to the SFU, which forwards them without transcoding."
+            aria-label="Media path: clients encode with CADENCEVOX/CADENCEVIS or WASM, send Cadence frames over the network relay to the SFU, which forwards them without transcoding."
           >
             {/* SFU center */}
             <rect x="230" y="120" width="120" height="80" fill="none" stroke="var(--seam)" stroke-width="1.5" />
@@ -494,12 +494,12 @@ export default function About() {
             <p>
               The client auto-routes to the nearest node — <b>eshmaki.me:8080</b> and
               <b> ircx.us:8080</b> are two entrances to the same network. State replicates
-              over <b>Undertow</b> (a CRDT mesh) sealed by <b>Mooring</b> (post-quantum
+              over <b>Undertow</b> (a CRDT fabric) sealed by <b>Mooring</b> (post-quantum
               secure links between servers), so a change on one node reaches the other
               without full-state floods.
             </p>
             <p>
-              Lose a node and the mesh heals: HyParView partial views maintain an active
+              Lose a node and the network heals: HyParView partial views maintain an active
               set of peers and a passive reserve. A failure promotes a reserve peer to
               active in a single hop. No hub, no coordinator, no single thing to take down.
             </p>
@@ -683,7 +683,7 @@ export default function About() {
             <p>
               The network has more than one door, and any door opens onto the whole of
               it. <b>eshmaki.me</b> and <b>ircx.us</b> are entrances, not destinations —
-              the client picks the nearest one and the mesh does the rest.
+              the client picks the nearest one and the network does the rest.
             </p>
             <p>
               Run your own node and you add another gate to the same waters. There is no
@@ -720,10 +720,10 @@ export default function About() {
       {/* ── 7. Developer ── */}
       <section id="developer" class="r-wrap ab-section" aria-labelledby="developer-heading">
         <span class="r-eyebrow">07 — build on it</span>
-        <h2 id="developer-heading" class="r-title">Open protocol.<br />Sovereign mesh.</h2>
+        <h2 id="developer-heading" class="r-title">Open protocol.<br />Sovereign network.</h2>
         <p class="r-lede">
           The wire format is documented and usable outside Onyx. You can also run
-          your own Onyx Server node and peer it into the mesh — full sovereignty over your
+          your own Onyx Server node and peer it into the network — full sovereignty over your
           slice of the network.
         </p>
 
@@ -739,8 +739,8 @@ export default function About() {
             <p>
               SASL PLAIN gets you in. Add SESSION for persistent reconnect.
               Add CHATHISTORY for message replay. IRCX PROP and ACCESS give you
-              extended channel and user properties. Media is opt-in via
-              <b>MEDIA JOIN #channel voice</b>.
+              extended room and user properties. Media is opt-in via
+              <b>MEDIA JOIN #room voice</b>.
             </p>
             <div class="code-snip" aria-label="Example connection sequence">
               <div><span class="o">→ connect wss://eshmaki.me:8080</span></div>
@@ -762,7 +762,7 @@ export default function About() {
             <p>
               Onyx Server is a pure-Zig daemon. It runs on Linux x86_64 and aarch64.
               Stand it up on your own hardware, configure it, and link it into the
-              mesh — your node becomes another door into the whole network.
+              network — your node becomes another door into the whole network.
             </p>
             <p>
               Node identity is your <b>Ed25519 signing key</b>. The NodeId is

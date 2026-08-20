@@ -148,7 +148,7 @@ describe('normalizeStatus', () => {
 describe('public mesh feed state', () => {
   it('reports online only for a fresh healthy quorum sample', () => {
     expect(publicMeshFeedState(HEALTHY_STATUS, NOW_MS)).toBe('current');
-    expect(publicMeshFeedLabel('current')).toBe('mesh online');
+    expect(publicMeshFeedLabel('current')).toBe('network online');
   });
 
   it('keeps topology failures distinct from feed freshness failures', () => {
@@ -177,8 +177,8 @@ describe('public mesh feed state', () => {
       publicMeshFeedLabel('unknown'),
       publicMeshFeedLabel('unavailable'),
     ]).toEqual([
-      'checking mesh',
-      'mesh degraded',
+      'checking network',
+      'network degraded',
       'status stale',
       'status time mismatch',
       'status undated',

@@ -199,7 +199,7 @@ function ChannelRow(props: {
 export default function StatsRoute() {
   setPageMeta(
     'Onyx stats — live room activity',
-    'See public Onyx room activity, network message trends, people online, and channel sparklines.',
+    'See public Onyx room activity, network message trends, people online, and room sparklines.',
     '/stats/',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
@@ -525,7 +525,7 @@ export default function StatsRoute() {
               </div>
 
               <div class="stats-inspector-metrics" aria-label={`${detail().channel} summary`}>
-                <div data-tone="presence"><span>present now</span><strong>{formatCount(detail().present)}</strong><small>live mesh roster</small></div>
+                <div data-tone="presence"><span>present now</span><strong>{formatCount(detail().present)}</strong><small>live network roster</small></div>
                 <div data-tone="messages"><span>messages tracked</span><strong>{formatCount(detail().totals.messages)}</strong><small>durable public aggregate</small></div>
                 <div data-tone="people"><span>contributors</span><strong>{formatCount(detail().totals.activeUsers)}</strong><small>distinct recorded authors</small></div>
                 <div data-tone="words"><span>words / message</span><strong>{averageWords(detail())}</strong><small>aggregate average</small></div>

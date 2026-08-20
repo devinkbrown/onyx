@@ -101,7 +101,7 @@ export default function StatusRoute() {
                   <div class="data-metric">
                     <span class="label">users online</span>
                     <span class="value">{data().users_online.toLocaleString('en-US')}</span>
-                    <span class="note">reported mesh-wide presence</span>
+                    <span class="note">reported network-wide presence</span>
                   </div>
                   <div class="data-metric">
                     <span class="label">peer links</span>
