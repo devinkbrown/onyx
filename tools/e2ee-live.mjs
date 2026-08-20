@@ -38,7 +38,7 @@ async function registeredUser(prefix, captureSent = false) {
   const join = page.getByRole('textbox', { name: 'Channel name to join' });
   await join.fill('#root');
   await join.press('Enter');
-  await page.getByRole('region', { name: 'Channel members in #root' }).waitFor({ timeout: 30_000 });
+  await page.getByRole('region', { name: 'People in #root' }).waitFor({ timeout: 30_000 });
   return { context, page, nick, sentFrames };
 }
 

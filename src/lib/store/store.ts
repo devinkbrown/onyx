@@ -4212,7 +4212,7 @@ function _resetAccountBoundState(
 
 /**
  * Quarantine message-derived state when the identity behind a live transport
- * changes. Channel membership and roster metadata still describe the same IRC
+ * changes. Peoplehip and roster metadata still describe the same IRC
  * socket, but history visibility may be account-gated, so even channel message
  * buffers must be rehydrated from the new owner's namespace. Decrypted DMs are
  * dropped wholesale and a DM view is closed before the new account is exposed.
