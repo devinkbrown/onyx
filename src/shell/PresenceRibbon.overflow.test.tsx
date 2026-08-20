@@ -298,7 +298,7 @@ describe('PresenceRibbon commercial room header', () => {
     expect(screen.queryByTestId('ribbon-pins')).not.toBeInTheDocument();
 
     openMore();
-    expect(screen.getByRole('dialog', { name: 'More channel and workspace actions' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'More room and workspace actions' })).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-more-menu')).toBeInTheDocument();
 
     // Visible section headings (not aria-hidden) name real semantic groups

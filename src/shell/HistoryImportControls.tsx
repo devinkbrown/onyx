@@ -270,7 +270,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
       }
       setPending({ ownerScope, fileNames, snapshots, channels: targets.size, messages, skipped, droppedOverCap, guild, oldest, newest });
       const rejectedNote = rejected > 0 ? ` ${countLabel(rejected, 'file')} skipped as unreadable.` : '';
-      setStatus(`Ready to import ${countLabel(messages, 'message')} across ${countLabel(targets.size, 'channel')}${guild ? ` from ${guild}` : ''}.${rejectedNote}`);
+      setStatus(`Ready to import ${countLabel(messages, 'message')} across ${countLabel(targets.size, 'room')}${guild ? ` from ${guild}` : ''}.${rejectedNote}`);
       focusSoon(() => reviewHeading);
     } catch {
       if (!importOwner.isActive(ownerScope)) return;
@@ -299,7 +299,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
         imported += result.messages;
       }
       setPending(null);
-      setStatus(`Imported ${countLabel(imported, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+      setStatus(`Imported ${countLabel(imported, 'message')} into ${countLabel(job.channels, 'room')}. Open a room to read the history, or search it from anywhere.`);
       focusSoon(() => fileInput);
     } catch {
       if (!importOwner.isActive(job.ownerScope)) return;
@@ -333,7 +333,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
           <div class="pref-import-review" role="group" aria-labelledby={`pref-${props.id}-review-title`}>
             <h4 id={`pref-${props.id}-review-title`} tabindex={-1} ref={reviewHeading}>Review import</h4>
             <p>
-              {countLabel(job().fileNames.length, 'file')}: {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
+              {countLabel(job().fileNames.length, 'file')}: {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'room')}
               {job().guild ? ` from ${job().guild}` : ''}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
@@ -507,7 +507,7 @@ export function DiscordPackageImportControls(): JSX.Element {
         oldest: s.oldest,
         newest: s.newest,
       });
-      setStatus(`Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'channel')}${s.guild ? ` from ${s.guild}` : ''}.`);
+      setStatus(`Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'room')}${s.guild ? ` from ${s.guild}` : ''}.`);
       focusSoon(() => reviewHeading);
     } catch {
       if (!importOwner.isActive(ownerScope)) return;
@@ -532,7 +532,7 @@ export function DiscordPackageImportControls(): JSX.Element {
       });
       if (!importOwner.isActive(job.ownerScope)) return;
       setPending(null);
-      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'room')}. Open a room to read the history, or search it from anywhere.`);
       focusSoon(() => packageInput);
     } catch {
       if (!importOwner.isActive(job.ownerScope)) return;
@@ -570,7 +570,7 @@ export function DiscordPackageImportControls(): JSX.Element {
           <div class="pref-import-review" role="group" aria-labelledby="pref-discord-package-review-title">
             <h4 id="pref-discord-package-review-title" tabindex={-1} ref={reviewHeading}>Review import</h4>
             <p>
-              {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
+              {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'room')}
               {job().guild ? ` from ${job().guild}` : ''}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
@@ -699,7 +699,7 @@ export function DiscordBotImportControls(): JSX.Element {
         onProgress: (p) => {
           if (importOwner.isActive(ownerScope)) {
             setStatus(
-              `Importing ${p.channelName} (channel ${p.channelIndex} of ${p.channelCount})… ${countLabel(p.fetched, 'message')} so far.`,
+              `Importing ${p.channelName} (room ${p.channelIndex} of ${p.channelCount})… ${countLabel(p.fetched, 'message')} so far.`,
             );
           }
         },
@@ -723,7 +723,7 @@ export function DiscordBotImportControls(): JSX.Element {
         channelsFailed: res.channelsFailed,
       });
       setStatus(
-        `Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'channel')}${s.guild ? ` from ${s.guild}` : ''}.`,
+        `Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'room')}${s.guild ? ` from ${s.guild}` : ''}.`,
       );
       focusSoon(() => reviewHeading);
     } catch (err) {
@@ -759,7 +759,7 @@ export function DiscordBotImportControls(): JSX.Element {
       });
       if (!importOwner.isActive(job.ownerScope)) return;
       setPending(null);
-      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'room')}. Open a room to read the history, or search it from anywhere.`);
       focusSoon(() => tokenInput);
     } catch {
       if (!importOwner.isActive(job.ownerScope)) return;
@@ -851,7 +851,7 @@ export function DiscordBotImportControls(): JSX.Element {
           <div class="pref-import-review" role="group" aria-labelledby="pref-discord-bot-review-title">
             <h4 id="pref-discord-bot-review-title" tabindex={-1} ref={reviewHeading}>Review import</h4>
             <p>
-              {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
+              {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'room')}
               {job().guild ? ` from ${job().guild}` : ''}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().pins > 0 ? ` ${countLabel(job().pins, 'pinned message')} included.` : ''}
@@ -860,7 +860,7 @@ export function DiscordBotImportControls(): JSX.Element {
               {job().rolesSkipped > 0 || job().categoriesSkipped > 0
                 ? ` ${countLabel(job().rolesSkipped, 'role')} and ${countLabel(job().categoriesSkipped, 'category')} have no home here and were skipped.`
                 : ''}
-              {job().channelsFailed > 0 ? ` ${countLabel(job().channelsFailed, 'channel')} could not be read and was skipped.` : ''}
+              {job().channelsFailed > 0 ? ` ${countLabel(job().channelsFailed, 'room')} could not be read and was skipped.` : ''}
               {' '}Existing local history is merged, not replaced.
             </p>
             <div class="pref-import-review__actions">
@@ -963,7 +963,7 @@ export function IrcLogImportControls(): JSX.Element {
     if (!file) return;
     const requestedChannel = channel();
     if (!requestedChannel.trim()) {
-      setStatus('Enter the channel these logs belong to first (e.g. #dev).');
+      setStatus('Enter the room these logs belong to first (e.g. #dev).');
       return;
     }
     const ownerScope = importOwner.capture();
@@ -997,7 +997,7 @@ export function IrcLogImportControls(): JSX.Element {
         && snapshotTarget?.messages.every(message => message.target === actualTarget);
       if (!targetIsConsistent) {
         setPending(null);
-        setStatus('Import rejected because the IRC log did not produce one safe, consistent destination. Enter a different channel and try again.');
+        setStatus('Import rejected because the IRC log did not produce one safe, consistent destination. Enter a different room and try again.');
         return;
       }
       const s = result.summary;

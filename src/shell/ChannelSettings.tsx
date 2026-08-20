@@ -87,7 +87,7 @@ const FLAG_TOGGLES: ReadonlyArray<{ letter: string; label: string; hint: string 
   { letter: 'i', label: 'Invite only', hint: 'Members must be invited to join (+i)' },
   { letter: 't', label: 'Topic locked', hint: 'Only ops may change the topic (+t)' },
   { letter: 'n', label: 'No external messages', hint: 'Block messages from non-members (+n)' },
-  { letter: 's', label: 'Secret', hint: 'Hide the channel from listings (+s)' },
+  { letter: 's', label: 'Secret', hint: 'Hide the room from listings (+s)' },
 ];
 
 const EPHEMERAL_PRESETS: ReadonlyArray<{ seconds: number; label: string }> = [
@@ -122,12 +122,12 @@ const HISTORY_POLICIES: ReadonlyArray<{ value: HistoryPolicy; label: string; hin
   {
     value: 'members',
     label: 'Members only',
-    hint: 'Only people currently in the channel may request history.',
+    hint: 'Only people currently in the room may request history.',
   },
   {
     value: 'opers',
     label: 'Ops only',
-    hint: 'Only channel ops (and network operators) may request history.',
+    hint: 'Only room ops (and network operators) may request history.',
   },
 ];
 
@@ -843,7 +843,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   getState().addToast({
                     variant: 'info',
                     title: `Left ${name}`,
-                    description: 'You parted this channel on this connection.',
+                    description: 'You left this room on this connection.',
                   });
                 }}
               >

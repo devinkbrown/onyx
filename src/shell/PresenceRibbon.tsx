@@ -737,7 +737,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
             open={moreOpen()}
             onOpenChange={setMoreOpen}
             placement="bottom"
-            panelLabel={local.contextActionsOnly ? contextActionsLabel() : 'More channel and workspace actions'}
+            panelLabel={local.contextActionsOnly ? contextActionsLabel() : 'More room and workspace actions'}
             trigger={
               <span
                 class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-more-trigger"
@@ -874,8 +874,8 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       </svg>
                       <span>
                         {channelNotifyMode(channelNotify(), settingsChannel() ?? '') === 'mute'
-                          ? 'Unmute channel'
-                          : 'Mute channel'}
+                          ? 'Unmute room'
+                          : 'Mute room'}
                       </span>
                     </button>
                     <button
@@ -956,7 +956,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                         class="shell-ribbon-more-item"
                         role="menuitem"
                         data-testid="ribbon-mark-read"
-                        aria-label={`Mark ${activeChannel()?.name ?? 'channel'} as read`}
+                        aria-label={`Mark ${activeChannel()?.name ?? 'room'} as read`}
                         onClick={() => {
                           const ch = activeChannel();
                           closeMoreThen(() => {

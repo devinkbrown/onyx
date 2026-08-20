@@ -3542,7 +3542,7 @@ export function PreferencesPanel(): JSX.Element {
             />
             <Segmented
               legend="Clock"
-              description="Timestamp format for messages and channel activity."
+              description="Timestamp format for messages and room activity."
               options={CLOCKS}
               labels={CLOCK_LABELS}
               value={() => preferences().clock}
@@ -3559,27 +3559,27 @@ export function PreferencesPanel(): JSX.Element {
           >
             <PreferenceSection
               title="Conversation"
-              description="Attention level and optional channel surfaces on this device."
+              description="Attention level and optional room surfaces on this device."
             />
             <CalmModeControl />
             <Toggle
               legend="Time scrubber"
               title="Show 24-hour activity strip"
-              description="Shows the channel activity bars and moment jump affordance above the transcript."
+              description="Shows the room activity bars and moment jump affordance above the transcript."
               value={() => preferences().timeScrubber}
               onToggle={(value) => setPreference('timeScrubber', value)}
             />
             <Toggle
               legend="Voice and video"
               title="Show join voice/video controls"
-              description="Keeps media available in the app, but removes the channel header voice/video controls when off."
+              description="Keeps media available in the app, but removes the room header voice/video controls when off."
               value={() => preferences().voiceEntry}
               onToggle={(value) => setPreference('voiceEntry', value)}
             />
             <Toggle
               legend="Topic tools"
               title="Show topic, forum, and follow controls"
-              description="Removes the topic creation row and forum/follow buttons above channel messages."
+              description="Removes the topic creation row and forum/follow buttons above room messages."
               value={() => preferences().topicTools}
               onToggle={(value) => setPreference('topicTools', value)}
             />

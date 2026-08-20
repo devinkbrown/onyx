@@ -96,14 +96,14 @@ describe('DiscordImportControls', () => {
     chooseFile('Choose Discord JSON', fakeFile('general.json', discordExport));
 
     // Review summary appears with the guild name and counts.
-    const review = await screen.findByText(/Ready to import 2 messages across 1 channel from Cool Project/);
+    const review = await screen.findByText(/Ready to import 2 messages across 1 room from Cool Project/);
     expect(review).toBeInTheDocument();
     const reviewHeading = screen.getByRole('heading', { name: 'Review import' });
     await waitFor(() => expect(reviewHeading).toHaveFocus());
 
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
 
-    await screen.findByText(/Imported 2 messages into 1 channel/);
+    await screen.findByText(/Imported 2 messages into 1 room/);
     await waitFor(() => expect(chooser).toHaveFocus());
     const stored = await loadRecent('#general', 400, MEMORY_OWNER);
     expect(stored.map((m) => m.text)).toEqual(['hello', 'world']);
@@ -188,11 +188,11 @@ describe('SlackImportControls', () => {
     const chooser = screen.getByLabelText('Choose Slack JSON') as HTMLInputElement;
     chooseFile('Choose Slack JSON', fakeFile('dev.json', slackExport));
 
-    await screen.findByText(/Ready to import 1 message across 1 channel from Acme/);
+    await screen.findByText(/Ready to import 1 message across 1 room from Acme/);
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Review import' })).toHaveFocus());
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
 
-    await screen.findByText(/Imported 1 message into 1 channel/);
+    await screen.findByText(/Imported 1 message into 1 room/);
     await waitFor(() => expect(chooser).toHaveFocus());
     const stored = await loadRecent('#dev', 400, MEMORY_OWNER);
     expect(stored).toHaveLength(1);
@@ -216,7 +216,7 @@ describe('IrcLogImportControls', () => {
   it('requires a channel before a file can be imported', async () => {
     render(() => <IrcLogImportControls />);
     chooseFile('Choose log file', fakeFile('log.txt', '2025-01-01 10:00:00\t<alice>\thi there'));
-    await screen.findByText(/Enter the channel these logs belong to first/);
+    await screen.findByText(/Enter the room these logs belong to first/);
   });
 
   it('imports a plain-text IRC log into the named channel', async () => {
@@ -358,7 +358,7 @@ describe('DiscordPackageImportControls — a11y contracts', () => {
     fireEvent.change(input, { target: { files: packageFiles } });
 
     const region = await screen.findByRole('status');
-    await screen.findByText(/Ready to import 2 messages across 1 channel from My Server/);
+    await screen.findByText(/Ready to import 2 messages across 1 room from My Server/);
     expect(region).toHaveTextContent(/Ready to import 2 messages/);
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Review import' })).toHaveFocus());
 
@@ -422,7 +422,7 @@ describe('DiscordPackageImportControls — a11y contracts', () => {
 
     chooseFiles('Choose package folder', [unrecognized.file, ...packageFiles]);
 
-    await screen.findByText(/Ready to import 2 messages across 1 channel from My Server/);
+    await screen.findByText(/Ready to import 2 messages across 1 room from My Server/);
     expect(unrecognized.text).not.toHaveBeenCalled();
   });
 });
