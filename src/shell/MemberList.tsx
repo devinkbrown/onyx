@@ -308,9 +308,9 @@ function MemberCard(props: MemberCardProps): JSX.Element {
           size="sm"
           onClick={() => void handleCopyNick()}
           data-testid="member-card-copy-nick"
-          aria-label={`Copy nick ${local.user.nick}`}
+          aria-label={`Copy name ${local.user.nick}`}
         >
-          Copy nick
+          Copy name
         </Button>
         <Button
           variant="ghost"
