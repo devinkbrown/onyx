@@ -307,7 +307,7 @@ export default function About() {
             <h4>Cadence frames<br />over QUIC</h4>
             <p>
               The preferred transport path. Datagram-eligible, head-of-line-blocking
-              free, lower latency than TCP. Opaque media frames ride the mesh path,
+              free, lower latency than TCP. Opaque media frames ride the network path,
               so a lost media packet never stalls channel state.
             </p>
           </article>
