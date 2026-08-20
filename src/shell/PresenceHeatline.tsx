@@ -6,6 +6,7 @@
  * even read a message. Hidden when the channel has no recorded activity.
  */
 import { createMemo, createResource, createSignal, Index, onCleanup, Show, type JSX } from 'solid-js';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { fetchChannelPulse } from '@/lib/stats/channelStats';
 
 type PresenceHeatlineProps = {
@@ -53,21 +54,35 @@ export function PresenceHeatline(props: PresenceHeatlineProps): JSX.Element {
 
   return (
     <Show when={hasActivity()}>
-      <div
-        class="shell-ribbon-heatline"
-        role="img"
-        aria-label={`24-hour activity: ${pulse.latest?.total ?? 0} messages, busiest around ${busiestHour(hours())}:00 UTC`}
-        title="Activity by hour (UTC) — the current hour is marked"
-      >
-        <Index each={hours()!}>
-          {(count, h) => (
-            <span
-              class={`shell-heat-bar${h === nowHour() ? ' shell-heat-bar--now' : ''}${count() > 0 ? ' shell-heat-bar--live' : ''}`}
-              style={{ '--heat': (count() / peak()).toFixed(3) }}
-              aria-hidden="true"
-            />
+      <div class="shell-ribbon-heatline-cluster">
+        <div
+          class="shell-ribbon-heatline"
+          role="img"
+          aria-label={`24-hour activity: ${pulse.latest?.total ?? 0} messages${pulse.latest && pulse.latest.present > 0 ? `, ${pulse.latest.present} present` : ''}, busiest around ${busiestHour(hours())}:00 UTC`}
+          title="Activity by hour (UTC) — the current hour is marked"
+        >
+          <Index each={hours()!}>
+            {(count, h) => (
+              <span
+                class={`shell-heat-bar${h === nowHour() ? ' shell-heat-bar--now' : ''}${count() > 0 ? ' shell-heat-bar--live' : ''}`}
+                style={{ '--heat': (count() / peak()).toFixed(3) }}
+                aria-hidden="true"
+              />
+            )}
+          </Index>
+        </div>
+        <Show when={pulse.latest && pulse.latest.present > 0}>
+          <span class="shell-ribbon-present">
+            {pulse.latest!.present} present
+          </span>
+        </Show>
+        <Show when={props.channel()}>
+          {(channel) => (
+            <a class="shell-ribbon-stats" href={statsRoomHref(channel())} aria-label={`Room ledger for ${channel()}`}>
+              Room ledger
+            </a>
           )}
-        </Index>
+        </Show>
       </div>
     </Show>
   );

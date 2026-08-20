@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { For, createMemo, createSignal } from 'solid-js';
+import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
-import { PublicFooter } from './PublicFooter';
 import './onyxos.css';
 
 type Stage = {
@@ -48,6 +48,30 @@ const stages: readonly Stage[] = [
   },
 ];
 
+const sourcePreview = `NTSTATUS
+NTAPI
+OnyxSaferWriteEventLogEntry(
+    _In_ ULONG NtStatusCode,
+    _In_opt_ PCWSTR TargetPath,
+    _In_opt_ const GUID *LevelGuid,
+    _In_opt_ PVOID Extra)
+{
+    EVENT_DATA_DESCRIPTOR Data[3] = {{0}};
+    PCEVENT_DESCRIPTOR Descriptor;
+    ULONG Count;
+    NTSTATUS Status = STATUS_SUCCESS;
+
+    OnyxSaferEnterCs();
+    if (OnyxSaferEtwRegHandle == 0)
+        Status = (NTSTATUS)EtwEventRegister(&OnyxSaferEtwProviderGuid, NULL,
+                                            NULL, &OnyxSaferEtwRegHandle);
+    OnyxSaferLeaveCs();`;
+
+/** Stable tabpanel id, referenced by every stage tab's `aria-controls`. */
+const METHOD_PANEL_ID = 'onyxos-method-panel';
+/** Stable per-tab id so the panel can name its selected tab. */
+const methodTabId = (stage: Stage['id']): string => `onyxos-method-tab-${stage}`;
+
 export default function OnyxOS() {
   setPageMeta(
     'OnyxOS + Onyx — communication at home in the system',
@@ -57,96 +81,170 @@ export default function OnyxOS() {
 
   const [selected, setSelected] = createSignal<Stage['id']>('oracle');
   const active = createMemo<Stage>(() => stages.find((stage) => stage.id === selected()) ?? stages[0]!);
+  const tabs = new Map<Stage['id'], HTMLButtonElement>();
+
+  /** Follows the tabs pattern: arrow/Home/End move selection *and* focus. */
+  const selectAndFocus = (stage: Stage['id']): void => {
+    setSelected(stage);
+    tabs.get(stage)?.focus();
+  };
+
+  const onTabKeyDown = (event: KeyboardEvent): void => {
+    const index = stages.findIndex((stage) => stage.id === selected());
+    if (index < 0) return;
+
+    let next: Stage | undefined;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        next = stages[(index + 1) % stages.length];
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        next = stages[(index - 1 + stages.length) % stages.length];
+        break;
+      case 'Home':
+        next = stages[0];
+        break;
+      case 'End':
+        next = stages[stages.length - 1];
+        break;
+      default:
+        return;
+    }
+
+    if (!next) return;
+    event.preventDefault();
+    selectAndFocus(next.id);
+  };
 
   return (
-    <main class="onyxos-page">
-      <div class="onyxos-grid" aria-hidden="true" />
-      <header class="onyxos-nav">
-        <a class="onyxos-wordmark" href="/" aria-label="Onyx home">ONYX<span>OS</span></a>
-        <nav aria-label="OnyxOS navigation">
+    <PublicFrame
+      currentPath="/onyxos/"
+      mainLabel="OnyxOS and Onyx"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Native work</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Evidence-led system engineering</span>
+        </p>
+      )}
+    >
+      <div class="onyxos-page">
+        <div class="onyxos-grid" aria-hidden="true" />
+
+        <nav class="onyxos-sections" aria-label="OnyxOS sections">
           <a href="#onyx-native">Onyx</a>
           <a href="#method">Method</a>
+          <a href="#source">Source</a>
           <a href="#workbench">Workbench</a>
-          <a class="onyxos-nav__open" href="/app/">Open Onyx</a>
         </nav>
-      </header>
 
-      <section class="onyxos-hero" aria-labelledby="onyxos-title">
-        <p class="onyxos-eyebrow">Onyx + OnyxOS · one product family</p>
-        <h1 id="onyxos-title">Communication,<br /><em>at home in the system.</em></h1>
-        <p class="onyxos-lede">Onyx is being designed as a first-class native experience in OnyxOS—identity, notifications, protected local history, calls, and accessibility working with the operating system instead of sitting on top of it.</p>
-        <div class="onyxos-hero__actions">
-          <a class="onyxos-button onyxos-button--primary" href="/app/">Open Onyx now <span aria-hidden="true">→</span></a>
-          <a class="onyxos-button" href="#onyx-native">See the native plan</a>
-        </div>
-        <p class="onyxos-proof" role="note"><span aria-hidden="true">◆</span> Onyx stays cross-platform. OnyxOS makes it exceptional.</p>
-      </section>
-
-      <section class="onyxos-native" id="onyx-native" aria-labelledby="onyxos-native-title">
-        <div class="onyxos-section-heading">
-          <p class="onyxos-eyebrow">the native communication layer</p>
-          <h2 id="onyxos-native-title">The same Onyx. Deeper system roots.</h2>
-          <p>Every native enhancement keeps a web fallback and an explicit permission boundary. OnyxOS is the flagship home, not a lock-in requirement.</p>
-        </div>
-        <div class="onyxos-native__grid">
-          <article><span>01</span><h3>Identity</h3><p>System-protected credentials, device continuity, and recovery without inventing a second account.</p></article>
-          <article><span>02</span><h3>Attention</h3><p>Native notifications, quiet modes, call surfaces, and catch-up that respect system focus.</p></article>
-          <article><span>03</span><h3>Memory</h3><p>An OS-protected local vault, deliberate backup policy, fast search, and portable export.</p></article>
-          <article><span>04</span><h3>Media</h3><p>System device routing, screen sharing, captions, and the exact protection state shown in every call.</p></article>
-        </div>
-      </section>
-
-      <section class="onyxos-method" id="method" aria-labelledby="onyxos-method-title">
-        <div class="onyxos-section-heading">
-          <p class="onyxos-eyebrow">the method</p>
-          <h2 id="onyxos-method-title">Choose a signal. Follow it all the way through.</h2>
-        </div>
-        <div class="onyxos-console" aria-label="OnyxOS compatibility method explorer">
-          <div class="onyxos-console__tabs" role="tablist" aria-label="Compatibility stages">
-            <For each={stages}>{(stage) => (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selected() === stage.id}
-                classList={{ 'is-active': selected() === stage.id }}
-                onClick={() => setSelected(stage.id)}
-              >
-                <span>{stage.label}</span>
-                <small>{stage.signal}</small>
-              </button>
-            )}</For>
+        <section class="onyxos-hero" aria-labelledby="onyxos-title">
+          <p class="onyxos-eyebrow">Onyx + OnyxOS · one product family</p>
+          <h1 id="onyxos-title">Communication,<br /><em>at home in the system.</em></h1>
+          <p class="onyxos-lede">Onyx is being designed as a first-class native experience in OnyxOS—identity, notifications, protected local history, calls, and accessibility working with the operating system instead of sitting on top of it.</p>
+          <div class="onyxos-hero__actions">
+            <a class="onyxos-button" href="/app/">Use Onyx in browser <span aria-hidden="true">→</span></a>
+            <a class="onyxos-button" href="#onyx-native">See the native plan</a>
           </div>
-          <article class="onyxos-console__body" role="tabpanel" tabindex="0">
-            <p class="onyxos-console__signal">{active().signal}</p>
-            <h3>{active().title}</h3>
-            <p>{active().body}</p>
-            <ul>
-              <For each={active().checks}>{(check) => <li><span aria-hidden="true">↳</span>{check}</li>}</For>
-            </ul>
-          </article>
-        </div>
-      </section>
+          <p class="onyxos-proof" role="note"><span aria-hidden="true">◆</span> Onyx stays cross-platform. OnyxOS makes it exceptional.</p>
+        </section>
 
-      <section class="onyxos-workbench" id="workbench" aria-labelledby="onyxos-workbench-title">
-        <div>
-          <p class="onyxos-eyebrow">the public workbench</p>
-          <h2 id="onyxos-workbench-title">A site should be as inspectable as the system it describes.</h2>
-          <p>This page is statically delivered, route-aware, and designed to remain useful before any JavaScript loads. The local workbench keeps preview, quality gates, and production deployment separate on purpose.</p>
-        </div>
-        <div class="onyxos-command" aria-label="Local website commands">
-          <p><span>$</span> pnpm site:workbench</p>
-          <p class="onyxos-command__muted">interactive local preview · quality gates · deploy-plan inspection</p>
-          <p><span>$</span> pnpm site:check</p>
-          <p class="onyxos-command__muted">typecheck · lint · tests · production build to dist/</p>
-        </div>
-      </section>
+        <section class="onyxos-native" id="onyx-native" aria-labelledby="onyxos-native-title">
+          <div class="onyxos-section-heading">
+            <p class="onyxos-eyebrow">the native communication layer</p>
+            <h2 id="onyxos-native-title">The same Onyx. Deeper system roots.</h2>
+            <p>Every native enhancement keeps a web fallback and an explicit permission boundary. OnyxOS is the flagship home, not a lock-in requirement.</p>
+          </div>
+          <div class="onyxos-native__grid">
+            <article><span>01</span><h3>Identity</h3><p>System-protected credentials, device continuity, and recovery without inventing a second account.</p></article>
+            <article><span>02</span><h3>Attention</h3><p>Native notifications, quiet modes, call surfaces, and catch-up that respect system focus.</p></article>
+            <article><span>03</span><h3>Memory</h3><p>An OS-protected local vault, deliberate backup policy, fast search, and portable export.</p></article>
+            <article><span>04</span><h3>Media</h3><p>System device routing, screen sharing, captions, and the exact protection state shown in every call.</p></article>
+          </div>
+        </section>
 
-      <section class="onyxos-close" aria-labelledby="onyxos-close-title">
-        <p class="onyxos-eyebrow">one product, every platform</p>
-        <h2 id="onyxos-close-title">Use Onyx now.<br />Meet its native home.</h2>
-        <a class="onyxos-button onyxos-button--primary" href="/roadmap/">See the product roadmap <span aria-hidden="true">→</span></a>
-      </section>
-      <PublicFooter />
-    </main>
+        <section class="onyxos-method" id="method" aria-labelledby="onyxos-method-title">
+          <div class="onyxos-section-heading">
+            <p class="onyxos-eyebrow">the method</p>
+            <h2 id="onyxos-method-title">Choose a signal. Follow it all the way through.</h2>
+          </div>
+          <div class="onyxos-console" aria-label="OnyxOS compatibility method explorer">
+            <div class="onyxos-console__tabs" role="tablist" aria-label="Compatibility stages">
+              <For each={stages}>{(stage) => (
+                <button
+                  ref={(element) => tabs.set(stage.id, element)}
+                  type="button"
+                  role="tab"
+                  id={methodTabId(stage.id)}
+                  aria-selected={selected() === stage.id}
+                  aria-controls={METHOD_PANEL_ID}
+                  tabindex={selected() === stage.id ? 0 : -1}
+                  classList={{ 'is-active': selected() === stage.id }}
+                  onClick={() => setSelected(stage.id)}
+                  onKeyDown={onTabKeyDown}
+                >
+                  <span>{stage.label}</span>
+                  <small>{stage.signal}</small>
+                </button>
+              )}</For>
+            </div>
+            <article
+              class="onyxos-console__body"
+              id={METHOD_PANEL_ID}
+              role="tabpanel"
+              aria-labelledby={methodTabId(selected())}
+              tabindex="0"
+            >
+              <p class="onyxos-console__signal">{active().signal}</p>
+              <h3>{active().title}</h3>
+              <p>{active().body}</p>
+              <ul>
+                <For each={active().checks}>{(check) => <li><span aria-hidden="true">↳</span>{check}</li>}</For>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="onyxos-source" id="source" aria-labelledby="onyxos-source-title">
+          <div class="onyxos-source__intro">
+            <p class="onyxos-eyebrow">source specimen · advapi32</p>
+            <h2 id="onyxos-source-title">This is real OnyxOS code.</h2>
+            <p>The full 290-line clean-room implementation is published exactly as it builds in the working tree. It reconstructs the Windows 11 Safer event-log path, including ETW registration, descriptor selection, buffer sizing, and failure propagation.</p>
+            <dl class="onyxos-source__facts">
+              <div><dt>Language</dt><dd>C</dd></div>
+              <div><dt>Subsystem</dt><dd>Advapi32 · Safer</dd></div>
+              <div><dt>Status</dt><dd>Active integration</dd></div>
+            </dl>
+            <a class="onyxos-button onyxos-button--primary" href="/source/onyxos/safer_record_event_log_entry.c">Open the full source <span aria-hidden="true">→</span></a>
+          </div>
+          <figure class="onyxos-source__sheet">
+            <figcaption><span>safer_record_event_log_entry.c</span><span>excerpt</span></figcaption>
+            <pre tabindex="0"><code>{sourcePreview}</code></pre>
+          </figure>
+        </section>
+
+        <section class="onyxos-workbench" id="workbench" aria-labelledby="onyxos-workbench-title">
+          <div>
+            <p class="onyxos-eyebrow">the public workbench</p>
+            <h2 id="onyxos-workbench-title">A site should be as inspectable as the system it describes.</h2>
+            <p>This page is statically delivered, route-aware, and designed to remain useful before any JavaScript loads. The local workbench keeps preview, quality gates, and production deployment separate on purpose.</p>
+          </div>
+          <div class="onyxos-command" aria-label="Local website commands">
+            <p><span>$</span> pnpm site:workbench</p>
+            <p class="onyxos-command__muted">interactive local preview · quality gates · deploy-plan inspection</p>
+            <p><span>$</span> pnpm site:check</p>
+            <p class="onyxos-command__muted">typecheck · lint · tests · production build to dist/</p>
+          </div>
+        </section>
+
+        <section class="onyxos-close" aria-labelledby="onyxos-close-title">
+          <p class="onyxos-eyebrow">one product, every platform</p>
+          <h2 id="onyxos-close-title">Use Onyx now.<br />Meet its native home.</h2>
+          <a class="onyxos-button onyxos-button--primary" href="/roadmap/">See the product roadmap <span aria-hidden="true">→</span></a>
+        </section>
+      </div>
+    </PublicFrame>
   );
 }

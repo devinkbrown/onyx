@@ -190,3 +190,30 @@ inventory (hero, aperture, telemetry strip, capability prose, operator shelf) +
 `home.css` mineral-night scope + tests. Shared `landing.css` remains for About /
 Download / footer primitives. No new routes. No stage/commit/push/deploy implied
 by this file alone.
+
+---
+
+## Room Current public-frame lock (wave 1)
+
+Validated design for the shared public chrome and Home. This records the
+lock; it does not cut existing route truth, telemetry semantics, or supporting
+public destinations.
+
+| Surface | Contract |
+|---------|----------|
+| Subject | Onyx is a durable room for communities/groups and technically curious people |
+| Page job | In one calm pass: can I enter now, what kind of room is this, and what evidence supports its claims? |
+| Direction | Room Current — a quiet physical threshold into a room |
+| Signature | Room Aperture + Evidence Rail |
+| Primary CTA | Exactly one **Open Onyx** → `/app/`, owned by `PublicFrame` |
+| Aperture | Static, labeled **Preview** / not live content; no fake activity, no laptop mockup |
+| Evidence rail | Source, state, scope, and a Status ledger link; existing mesh/stats telemetry remains |
+| Tokens | `--public-void #05070A`, `--public-surface #0C1016`, `--public-seam #1A222C`, `--public-paper #E6E8EC`, `--public-current #5BA3C9` (action/proof), `--public-ember #C97B6B` (caution/future/degraded only) |
+| Type | Fraunces for thesis/display only; Instrument Sans for body/control; JetBrains Mono for evidence/receipts |
+| Frame | One banner / one main / one footer; skip link; current-path nav; optional current-line `context` slot; 44px targets; forced colors; 200/400% zoom; reduced motion |
+| No-cut | All public routes and slash aliases remain; Home keeps every current content section and telemetry state |
+
+Forbidden on this pass: generic SaaS cards, laptop mockups, fake activity,
+broad neon gradients, gold shouting, Anton shouting, repeated primary CTAs,
+external font/CDN loads, canvas-only information, autoplay media, carousels,
+scroll-jacking, or a new live account/network dependency.

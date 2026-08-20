@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { For } from 'solid-js';
+import { createMemo, For, Show } from 'solid-js';
 import type { SceneProps, SceneVariant } from '../engine';
 import { SceneShell, seededRand } from './SceneShell';
+import { useScenePolicy } from './scenePolicy';
 
 /* ── Retro Arcade: CRT scanlines, pixel characters, neon glow, arcade cabinets ──
    Ported from darkbear's RetroArcadeBg (fixed colorway, CSS keyframes only). */
@@ -189,15 +190,35 @@ const PELLETS = [20, 55, 85].map((x, i) => ({ x, delay: i * 0.5 }));
 const PONG_LINE = Array.from({ length: 10 }, (_, i) => 38 + i * 3);
 
 function RetroArcadeScene(props: SceneProps) {
+  const policy = useScenePolicy();
+  const detail = createMemo(() => props.sceneDetail ?? policy().sceneDetail);
+  const visibleStarsBack = createMemo(() => starsBack.slice(0, detail() === 'sparse' ? 10 : detail() === 'balanced' ? 20 : starsBack.length));
+  const visibleStarsFront = createMemo(() => starsFront.slice(0, detail() === 'sparse' ? 7 : detail() === 'balanced' ? 14 : starsFront.length));
+  const visibleInvaders = createMemo(() => invaders.slice(0, detail() === 'sparse' ? 4 : detail() === 'balanced' ? 8 : invaders.length));
+  const visibleGhosts = createMemo(() => ghosts.slice(0, detail() === 'sparse' ? 1 : detail() === 'balanced' ? 3 : ghosts.length));
+  const visibleTetris = createMemo(() => tetris.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 7 : tetris.length));
+  const visiblePowerups = createMemo(() => powerups.slice(0, detail() === 'sparse' ? 2 : detail() === 'balanced' ? 5 : powerups.length));
+  const visibleExplosions = createMemo(() => explosions.slice(0, detail() === 'sparse' ? 1 : detail() === 'balanced' ? 3 : explosions.length));
+  const visibleCabinets = createMemo(() => cabinets.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 5 : cabinets.length));
+  const visibleLasers = createMemo(() => lasers.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 6 : lasers.length));
+  const visibleCoins = createMemo(() => coins.slice(0, detail() === 'sparse' ? 4 : detail() === 'balanced' ? 9 : coins.length));
+
   return (
-    <SceneShell reducedMotion={props.reducedMotion} base="radial-gradient(ellipse at 50% 38%, #0a0a24 0%, #05050f 55%, #030308 100%)">
+    <SceneShell
+      reducedMotion={props.reducedMotion}
+      sceneDetail={detail()}
+      paused={props.paused}
+      onRuntimePaused={props.onRuntimePaused}
+      base="radial-gradient(ellipse at 50% 38%, #0a0a24 0%, #05050f 55%, #030308 100%)"
+    >
       {/* Deep space gradient */}
       <div class="absolute inset-0" style={{
         background: 'radial-gradient(ellipse at 50% 40%, rgba(20,8,50,0.35) 0%, rgba(4,4,16,0.15) 50%, transparent 100%)',
       }} />
 
       {/* Parallax star layers */}
-      <For each={starsBack}>
+      <div data-scene-layer="stars-back">
+      <For each={visibleStarsBack()}>
         {(s) => (
           <div class="absolute"
             style={{ left: `${s.x}%`, top: `${s.y}%`,
@@ -206,7 +227,9 @@ function RetroArcadeScene(props: SceneProps) {
               animation: `rc-twinkle ${s.dur}s ease-in-out ${s.delay}s infinite` }} />
         )}
       </For>
-      <For each={starsFront}>
+      </div>
+      <div data-scene-layer="stars-front">
+      <For each={visibleStarsFront()}>
         {(s) => (
           <div class="absolute"
             style={{ left: `${s.x}%`, top: `${s.y}%`,
@@ -216,6 +239,7 @@ function RetroArcadeScene(props: SceneProps) {
               animation: `rc-twinkle ${s.dur}s ease-in-out ${s.delay}s infinite` }} />
         )}
       </For>
+      </div>
 
       {/* Pixel grid overlay */}
       <div class="absolute inset-0" style={{
@@ -237,9 +261,9 @@ function RetroArcadeScene(props: SceneProps) {
       }} />
 
       {/* SVG layer — invaders, pac-man, pong, maze, snake, spaceship */}
-      <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+      <svg class="absolute inset-0 w-full h-full" data-scene-layer="arcade-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
         {/* Space Invaders */}
-        <For each={invaders}>
+        <For each={visibleInvaders()}>
           {(inv) => (
             <g style={{ animation: `rc-invader ${inv.dur}s ease-in-out ${inv.delay}s infinite` }}>
               <For each={inv.pixels}>
@@ -292,7 +316,7 @@ function RetroArcadeScene(props: SceneProps) {
         </For>
 
         {/* Maze walls — pac-man style */}
-        <For each={mazeWalls}>
+        <For each={detail() === 'sparse' ? mazeWalls.slice(0, 8) : detail() === 'balanced' ? mazeWalls.slice(0, 14) : mazeWalls}>
           {(w) => (
             <line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2}
               stroke="#0044ff" stroke-width="0.4" opacity="0.12"
@@ -315,7 +339,8 @@ function RetroArcadeScene(props: SceneProps) {
       </svg>
 
       {/* Pac-Man ghosts */}
-      <For each={ghosts}>
+      <div data-scene-layer="ghosts">
+      <For each={visibleGhosts()}>
         {(g) => (
           <svg class="absolute" viewBox="0 0 14 16"
             style={{
@@ -335,9 +360,12 @@ function RetroArcadeScene(props: SceneProps) {
           </svg>
         )}
       </For>
+      </div>
 
       {/* Falling Tetris pieces */}
-      <For each={tetris}>
+      <Show when={detail() !== 'sparse'}>
+      <div data-scene-layer="tetris">
+      <For each={visibleTetris()}>
         {(t) => (
           <div class="absolute" style={{
             left: `${t.x}%`, top: '-5%',
@@ -361,9 +389,13 @@ function RetroArcadeScene(props: SceneProps) {
           </div>
         )}
       </For>
+      </div>
+      </Show>
 
       {/* Power-ups floating */}
-      <For each={powerups}>
+      <Show when={detail() !== 'sparse'}>
+      <div data-scene-layer="powerups">
+      <For each={visiblePowerups()}>
         {(p) => (
           <div class="absolute" style={{
             left: `${p.x}%`, top: `${p.y}%`,
@@ -391,9 +423,13 @@ function RetroArcadeScene(props: SceneProps) {
           </div>
         )}
       </For>
+      </div>
+      </Show>
 
       {/* Pixel explosion bursts */}
-      <For each={explosions}>
+      <Show when={detail() === 'full'}>
+      <div data-scene-layer="explosions">
+      <For each={visibleExplosions()}>
         {(ex) => (
           <div class="absolute" style={{ left: `${ex.x}%`, top: `${ex.y}%`, width: '0', height: '0' }}>
             <For each={ex.particles}>
@@ -413,9 +449,12 @@ function RetroArcadeScene(props: SceneProps) {
           </div>
         )}
       </For>
+      </div>
+      </Show>
 
       {/* Arcade cabinet silhouettes */}
-      <For each={cabinets}>
+      <div data-scene-layer="cabinets">
+      <For each={visibleCabinets()}>
         {(cab) => (
           <div class="absolute bottom-0"
             style={{ left: `${cab.x}%`, width: `${cab.w}%`, height: `${cab.h}%` }}>
@@ -467,9 +506,12 @@ function RetroArcadeScene(props: SceneProps) {
           </div>
         )}
       </For>
+      </div>
 
       {/* Laser shots */}
-      <For each={lasers}>
+      <Show when={detail() !== 'sparse'}>
+      <div data-scene-layer="lasers">
+      <For each={visibleLasers()}>
         {(l) => (
           <div class="absolute"
             style={{
@@ -481,9 +523,13 @@ function RetroArcadeScene(props: SceneProps) {
             }} />
         )}
       </For>
+      </div>
+      </Show>
 
       {/* Falling coins with spin */}
-      <For each={coins}>
+      <Show when={detail() !== 'sparse'}>
+      <div data-scene-layer="coins">
+      <For each={visibleCoins()}>
         {(c) => (
           <div class="absolute"
             style={{
@@ -498,6 +544,8 @@ function RetroArcadeScene(props: SceneProps) {
             }} />
         )}
       </For>
+      </div>
+      </Show>
 
       {/* HUD elements */}
       <div class="absolute top-[2%] left-[50%] -translate-x-1/2" style={{

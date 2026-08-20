@@ -59,7 +59,7 @@ describe('SessionsDevicesSection', () => {
     store.setState({
       accountSessions: [
         { index: 1, current: true, signonMs: 1_710_000_000_000, state: 'attached' },
-        { index: 2, current: false, signonMs: 1_710_000_100_000, state: 'attached' },
+        { index: 2, current: false, signonMs: 1_710_000_100_000, state: 'attached', sid: '0123456789abcdeffedcba9876543210' },
       ],
       accountSessionsPending: false,
     }, false);
@@ -69,7 +69,7 @@ describe('SessionsDevicesSection', () => {
     expect(screen.queryByTestId('sessions-drop-1')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('sessions-drop-2'));
-    expect(sendRaw).toHaveBeenCalledWith('SESSION', 'DROP', '#2');
+    expect(sendRaw).toHaveBeenCalledWith('SESSION', 'DROP', 'sid=0123456789abcdeffedcba9876543210');
   });
 
   it('revokes every other attached session in one action after confirm', () => {

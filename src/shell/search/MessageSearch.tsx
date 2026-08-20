@@ -10,6 +10,7 @@ import {
   untrack,
   type JSX,
 } from 'solid-js';
+import { prefersReducedMotionForInteraction } from '@/lib/a11y/reducedMotion';
 import {
   closeMessageSearch,
   MESSAGE_SEARCH_QUERY_MAX,
@@ -25,6 +26,7 @@ import {
   type SavedSearch,
 } from '@/lib/vault/savedSearches';
 import { openPreferences } from '@/lib/prefs/preferences';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { selectDeviceMemoryOwner, useStore } from '@/lib/store';
 import type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 import './message-search.css';
@@ -80,12 +82,6 @@ function cssEscape(value: string): string {
   return value.replace(/["\\]/g, '\\$&');
 }
 
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined'
-    && typeof window.matchMedia === 'function'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
 function scrollToMessage(messageId: string): number | undefined {
   const selector = `[data-message-search-id="${cssEscape(messageId)}"]`;
   const node = document.querySelector<HTMLElement>(selector);
@@ -93,7 +89,7 @@ function scrollToMessage(messageId: string): number | undefined {
 
   node.scrollIntoView({
     block: 'center',
-    behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+    behavior: prefersReducedMotionForInteraction() ? 'auto' : 'smooth',
   });
 
   node.classList.remove('shell-msg-search-pulse');
@@ -616,6 +612,15 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
             </button>
           </div>
         </div>
+        <Show when={/^[#&]/.test(search.targetLabel())}>
+          <a
+            class="onyx-message-search__ledger"
+            href={statsRoomHref(search.targetLabel())}
+            aria-label={`Room ledger for ${search.targetLabel()}`}
+          >
+            Room ledger
+          </a>
+        </Show>
         <Show when={!search.hasConversation() && !search.localHistoryEnabled()}>
           <div class="onyx-message-search__history-off" role="status">
             <span>Device history is off, so there are no remembered conversations to search.</span>

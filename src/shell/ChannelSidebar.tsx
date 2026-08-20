@@ -12,6 +12,7 @@
  */
 
 import {
+  createEffect,
   createMemo,
   createSignal,
   onCleanup,
@@ -20,6 +21,7 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
+import { prefersReducedMotionForInteraction } from '@/lib/a11y/reducedMotion';
 import { useStore, getState, selectDeviceMemoryOwner } from '@/lib/store';
 import type { Channel } from '@/lib/irc/types';
 import type { ActiveView, ChannelFolder, DMConversation } from '@/lib/store/store';
@@ -27,20 +29,25 @@ import {
   filterSidebarNames,
   matchesSidebarQuery,
 } from '@/lib/channel/sidebarFilter';
+import { normalizeRoomTarget } from './roomIdentity';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { NotificationControls } from './NotificationControls';
+import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
 
 export type ChannelSidebarProps = {
   /** Called when mobile close is triggered */
   onMobileClose?: () => void;
   /** Which conversation collection is visible below the primary navigation. */
   mode?: 'rooms' | 'messages';
-  /** Primary product navigation callbacks are owned by AppShell. */
-  onModeChange?: (mode: 'rooms' | 'messages') => void;
+  /** Retained as a compatibility seam for embedded/test hosts; the dock owns it. */
+  activeSection?: PrimaryCurrentSection | null;
+  youDialogOpen?: boolean;
   onOpenHome?: () => void;
   onOpenCalls?: () => void;
   onOpenYou?: () => void;
+  /** Primary product navigation callbacks are owned by AppShell. */
+  onModeChange?: (mode: 'rooms' | 'messages') => void;
   onConversationOpen?: () => void;
-  activeSection?: 'home' | 'rooms' | 'messages' | 'calls' | 'you';
 };
 
 type NavigationViewTransition = {
@@ -51,8 +58,6 @@ type NavigationViewTransition = {
 type ViewTransitionDocument = Document & {
   startViewTransition?: (update: () => void) => NavigationViewTransition;
 };
-
-const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 function publicNetworkName(networkName: string): string {
   const trimmed = networkName.trim();
@@ -136,6 +141,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     'onOpenYou',
     'onConversationOpen',
     'activeSection',
+    'youDialogOpen',
   ]);
   let navigationEpoch = 0;
   let activeNavigationTransition: NavigationViewTransition | null = null;
@@ -167,15 +173,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
       ? null
       : document as ViewTransitionDocument;
     const startViewTransition = transitionDocument?.startViewTransition;
-    const reduceMotion = (() => {
-      try {
-        return typeof window !== 'undefined' &&
-          typeof window.matchMedia === 'function' &&
-          window.matchMedia(REDUCED_MOTION_QUERY).matches;
-      } catch {
-        return true;
-      }
-    })();
+    const reduceMotion = prefersReducedMotionForInteraction();
 
     if (sameTarget || !transitionDocument || typeof startViewTransition !== 'function' || reduceMotion) {
       update();
@@ -251,15 +249,20 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   // ── join input ──
   const [joinInput, setJoinInput] = createSignal('');
   const joinTarget = createMemo(() => {
-    const raw = joinInput().trim();
-    if (!raw) return '';
-    return raw.startsWith('#') ? raw : `#${raw}`;
+    return normalizeRoomTarget(joinInput()) ?? '';
   });
 
-  // ── sidebar filter (channels + DMs) ──
+  // ── sidebar filter (channels + DMs) — collapsed disclosure by default ──
   const [listFilter, setListFilter] = createSignal('');
   const [unreadOnly, setUnreadOnly] = createSignal(false);
+  const [filterOpen, setFilterOpen] = createSignal(false);
   const filterActive = createMemo(() => listFilter().trim().length > 0 || unreadOnly());
+  createEffect((prevActive: boolean | undefined) => {
+    const active = filterActive();
+    // Auto-open once when a filter engages so the active controls stay visible.
+    if (active && !prevActive) setFilterOpen(true);
+    return active;
+  });
 
   // ── sorted channel list (alpha base; stars + folders layer on top) ──
   const sortedChannels = createMemo(() => {
@@ -356,6 +359,14 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     return !hasRooms && !hasMessages;
   });
 
+  const collectionHeading = createMemo(() => {
+    const count = dms().size;
+    if (sidebarMode() === 'messages') {
+      return `Messages · ${count} ${count === 1 ? 'conversation' : 'conversations'}`;
+    }
+    return `Rooms · ${channels().size} joined`;
+  });
+
   // ── roving tab stop ──
   // One item in the combined list owns the single tab stop (tabindex=0): the
   // active conversation if present, otherwise the first channel (or first DM
@@ -421,6 +432,14 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   }
 
   // ── status dot modifier ──
+  const activeChannelLedger = createMemo(() => {
+    const view = activeView();
+    if (view.kind !== 'channel') return null;
+    const label = normalizeRoomTarget(view.channel) ?? view.channel.trim();
+    if (!/^[#&]/.test(label)) return null;
+    return { channel: label, href: statsRoomHref(label) };
+  });
+
   const statusMod = createMemo(() => {
     const s = connectionStatus();
     if (s === 'connected') return '--connected';
@@ -471,7 +490,20 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     local.onMobileClose?.();
   }
 
+  function handlePrimarySelect(section: PrimarySection): void {
+    if (section === 'home') local.onOpenHome?.();
+    else if (section === 'rooms' || section === 'messages') local.onModeChange?.(section);
+    else if (section === 'calls') local.onOpenCalls?.();
+    else local.onOpenYou?.();
+  }
+
   function renderChannelRow(ch: Channel): JSX.Element {
+    const channelLabel = createMemo(() => normalizeRoomTarget(ch.name) ?? ch.name.trim());
+    const channelSigil = createMemo(() => channelLabel().charAt(0) || '#');
+    const channelName = createMemo(() => {
+      const label = channelLabel();
+      return label.startsWith('#') || label.startsWith('&') ? label.slice(1) : label;
+    });
     const active = createMemo(() => isChannelActive(activeView(), ch));
     const hasUnread = createMemo(() => ch.unread > 0);
     const hasHighlight = createMemo(() => ch.highlights > 0);
@@ -493,12 +525,12 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
               hasUnread() && !active() ? 'shell-channel-item--unread' : '',
               hasHighlight() ? 'shell-channel-item--highlight' : '',
             ].filter(Boolean).join(' ')}
-            aria-current={active() ? 'page' : undefined}
-            aria-label={`${ch.name}${unreadLabel(ch.unread, ch.highlights)}${starred() ? ', favorite' : ''}`}
+            aria-current={active() ? 'location' : undefined}
+            aria-label={`${channelLabel()}${unreadLabel(ch.unread, ch.highlights)}${starred() ? ', favorite' : ''}`}
             onClick={() => handleChannelClick(ch)}
           >
-            <span class="shell-channel-sigil" aria-hidden="true">#</span>
-            <span class="shell-channel-name">{ch.name.replace(/^#/, '')}</span>
+            <span class="shell-channel-sigil" aria-hidden="true">{channelSigil()}</span>
+            <span class="shell-channel-name">{channelName()}</span>
             <Show when={activityStamp(ch.name) && ch.unread === 0 && ch.highlights === 0}>
               <span class="shell-channel-time" aria-hidden="true">
                 {activityStamp(ch.name)}
@@ -534,7 +566,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   }
 
   return (
-    <aside class="shell-sidebar" aria-label="Channel navigation">
+    <aside class="shell-sidebar" aria-label="Room navigation">
       {/* Header */}
       <div class="shell-sidebar-head" aria-hidden="false">
         <span class="shell-sidebar-network">
@@ -550,105 +582,106 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         <NotificationControls />
       </div>
 
-      <nav class="shell-primary-nav" aria-label="Primary">
-        <button
-          type="button"
-          class={`shell-primary-nav-btn${local.activeSection === 'home' ? ' shell-primary-nav-btn--active' : ''}`}
-          aria-current={local.activeSection === 'home' ? 'page' : undefined}
-          onClick={() => local.onOpenHome?.()}
-        >
-          <span aria-hidden="true">⌂</span>Home
-        </button>
-        <button
-          type="button"
-          class={`shell-primary-nav-btn${local.activeSection === 'rooms' ? ' shell-primary-nav-btn--active' : ''}`}
-          aria-current={local.activeSection === 'rooms' ? 'page' : undefined}
-          onClick={() => local.onModeChange?.('rooms')}
-        >
-          <span aria-hidden="true">#</span>Rooms
-        </button>
-        <button
-          type="button"
-          class={`shell-primary-nav-btn${local.activeSection === 'messages' ? ' shell-primary-nav-btn--active' : ''}`}
-          aria-current={local.activeSection === 'messages' ? 'page' : undefined}
-          onClick={() => local.onModeChange?.('messages')}
-        >
-          <span aria-hidden="true">@</span>Messages
-        </button>
-        <button
-          type="button"
-          class={`shell-primary-nav-btn${local.activeSection === 'calls' ? ' shell-primary-nav-btn--active' : ''}`}
-          aria-current={local.activeSection === 'calls' ? 'page' : undefined}
-          onClick={() => local.onOpenCalls?.()}
-        >
-          <span aria-hidden="true">◉</span>Calls
-        </button>
-        <button
-          type="button"
-          class={`shell-primary-nav-btn${local.activeSection === 'you' ? ' shell-primary-nav-btn--active' : ''}`}
-          aria-current={local.activeSection === 'you' ? 'page' : undefined}
-          onClick={() => local.onOpenYou?.()}
-        >
-          <span aria-hidden="true">◇</span>You
-        </button>
-      </nav>
-
-      <div class="shell-sidebar-filter" role="search">
-        <label class="sr-only" for="sidebar-filter-input">
-          {sidebarMode() === 'messages' ? 'Filter direct messages' : 'Filter rooms'}
-        </label>
-        <input
-          id="sidebar-filter-input"
-          class="shell-sidebar-filter-input"
-          type="search"
-          data-testid="sidebar-filter"
-          placeholder={sidebarMode() === 'messages' ? 'Filter messages' : 'Filter rooms'}
-          autocomplete="off"
-          spellcheck={false}
-          value={listFilter()}
-          onInput={(e) => setListFilter(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape' && (listFilter() || unreadOnly())) {
-              e.preventDefault();
-              e.stopPropagation();
-              setListFilter('');
-              setUnreadOnly(false);
-            }
-          }}
+      <Show when={Boolean(local.onOpenHome || local.onOpenCalls || local.onOpenYou || local.activeSection || local.youDialogOpen)}>
+        <PrimaryNavigation
+          variant="desktop"
+          currentSection={local.activeSection}
+          selectedCollection={sidebarMode()}
+          youDialogOpen={local.youDialogOpen}
+          onSelect={handlePrimarySelect}
         />
-        <button
-          type="button"
-          class={`shell-sidebar-filter-unread${unreadOnly() ? ' shell-sidebar-filter-unread--on' : ''}`}
-          data-testid="sidebar-unread-only"
-          aria-pressed={unreadOnly()}
-          title={unreadOnly() ? 'Showing unread only — click to show all' : 'Show unread only'}
-          onClick={() => setUnreadOnly((v) => !v)}
-        >
-          Unread
-        </button>
-        <Show when={listFilter().trim().length > 0 || unreadOnly()}>
+      </Show>
+
+      <details
+        class={`shell-sidebar-filter-disclosure${filterActive() ? ' shell-sidebar-filter-disclosure--active' : ''}`}
+        data-testid="sidebar-filter-disclosure"
+        open={filterOpen()}
+        onToggle={(e) => setFilterOpen(e.currentTarget.open)}
+      >
+        <summary class="shell-sidebar-filter-summary">
+          <span>Filter</span>
+          <Show when={filterActive()}>
+            <span class="shell-sidebar-filter-summary-on" aria-hidden="true">on</span>
+          </Show>
+        </summary>
+        <div class="shell-sidebar-filter" role="search">
+          <label class="sr-only" for="sidebar-filter-input">
+            {sidebarMode() === 'messages' ? 'Filter direct messages' : 'Filter rooms'}
+          </label>
+          <input
+            id="sidebar-filter-input"
+            class="shell-sidebar-filter-input"
+            type="search"
+            data-testid="sidebar-filter"
+            placeholder={sidebarMode() === 'messages' ? 'Filter messages' : 'Filter rooms'}
+            autocomplete="off"
+            spellcheck={false}
+            value={listFilter()}
+            onInput={(e) => setListFilter(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && (listFilter() || unreadOnly())) {
+                e.preventDefault();
+                e.stopPropagation();
+                setListFilter('');
+                setUnreadOnly(false);
+              }
+            }}
+          />
           <button
             type="button"
-            class="shell-sidebar-filter-clear"
-            data-testid="sidebar-filter-clear"
-            aria-label="Clear filter"
-            onClick={() => {
-              setListFilter('');
-              setUnreadOnly(false);
-            }}
+            class={`shell-sidebar-filter-unread${unreadOnly() ? ' shell-sidebar-filter-unread--on' : ''}`}
+            data-testid="sidebar-unread-only"
+            aria-pressed={unreadOnly()}
+            title={unreadOnly() ? 'Showing unread only — click to show all' : 'Show unread only'}
+            onClick={() => setUnreadOnly((v) => !v)}
           >
-            Clear
+            Unread
           </button>
-        </Show>
-      </div>
+          <Show when={listFilter().trim().length > 0 || unreadOnly()}>
+            <button
+              type="button"
+              class="shell-sidebar-filter-clear"
+              data-testid="sidebar-filter-clear"
+              aria-label="Clear filter"
+              onClick={() => {
+                setListFilter('');
+                setUnreadOnly(false);
+              }}
+            >
+              Clear
+            </button>
+          </Show>
+        </div>
+      </details>
+
+      <Show when={showRooms() && activeChannelLedger()}>
+        <div class="shell-sidebar-ledger-row">
+          <a
+            class="shell-sidebar-ledger"
+            href={activeChannelLedger()!.href}
+            aria-label={`Room ledger for ${activeChannelLedger()!.channel}`}
+            data-testid="sidebar-channel-ledger"
+          >
+            Ledger · {activeChannelLedger()!.channel}
+          </a>
+        </div>
+      </Show>
 
       {/* Scrollable list */}
       <div
         class="shell-sidebar-scroll"
         role="region"
-        aria-label={sidebarMode() === 'messages' ? 'Direct messages' : 'Rooms'}
+        aria-labelledby="sidebar-collection-heading"
         onKeyDown={handleListKeyDown}
       >
+        <div class="shell-conversation-spine" data-testid="conversation-spine">
+          <div class="shell-conversation-spine-head">
+            <p class="shell-conversation-spine-label">Conversations</p>
+            <p class="shell-sidebar-collection-heading" id="sidebar-collection-heading" role="heading" aria-level="2">
+              {collectionHeading()}
+            </p>
+          </div>
+          <div class="shell-conversation-spine-content">
         <Show when={showRooms()}>
         {/* Server / status entry — always present unless filter hides non-matches */}
         <Show when={!filterActive() || matchesSidebarQuery('status', listFilter())}>
@@ -661,11 +694,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                   tabindex={rovingKey() === 'status' ? 0 : -1}
                   class={`shell-channel-item${activeView().kind === 'status' ? ' shell-channel-item--active' : ''}`}
                   aria-current={activeView().kind === 'status' ? 'page' : undefined}
-                  aria-label="Server status"
+                  aria-label="Network activity"
                   onClick={handleStatusClick}
                 >
                   <span class="shell-channel-sigil" aria-hidden="true">✦</span>
-                  <span class="shell-channel-name">Status</span>
+                  <span class="shell-channel-name">Activity</span>
                 </button>
               </li>
             </ul>
@@ -676,7 +709,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
           <p class="shell-sidebar-filter-empty" data-testid="sidebar-filter-empty" role="status">
             {unreadOnly() && !listFilter().trim()
               ? 'Nothing unread right now.'
-              : `No channels or DMs match “${listFilter().trim() || 'unread'}”.`}
+              : `No rooms or messages match “${listFilter().trim() || 'unread'}”.`}
           </p>
         </Show>
 
@@ -736,7 +769,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                   }
                 >
                   <p class="shell-sidebar-section-label" id="sidebar-channels-label">
-                    channels
+                    rooms
                   </p>
                 </Show>
                 <ul
@@ -749,8 +782,16 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                     when={group.channels.length > 0}
                     fallback={
                       <Show when={isUncategorized() && sortedChannels().length === 0}>
-                        <li style={{ padding: '4px 10px', color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
-                          No rooms yet
+                        <li class="shell-sidebar-zero">
+                          <p class="shell-sidebar-empty">No rooms yet.</p>
+                          <button
+                            type="button"
+                            class="shell-sidebar-browse"
+                            data-testid="sidebar-browse-rooms"
+                            onClick={() => getState().openChannelBrowser()}
+                          >
+                            Browse rooms
+                          </button>
                         </li>
                       </Show>
                     }
@@ -770,11 +811,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         <Show when={showMessages()}>
           <div class="shell-sidebar-section">
             <p class="shell-sidebar-section-label" id="sidebar-dms-label">
-              direct messages
+              messages
             </p>
             <Show
               when={sortedDms().length > 0}
-              fallback={<p class="shell-sidebar-empty">No direct messages yet.</p>}
+              fallback={<p class="shell-sidebar-empty">No messages yet. Start one from People or search.</p>}
             >
               <ul
                 class="shell-dm-list"
@@ -804,7 +845,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                           hasUnread() && !active() ? 'shell-channel-item--unread' : '',
                           hasHighlight() ? 'shell-channel-item--highlight' : '',
                         ].filter(Boolean).join(' ')}
-                        aria-current={active() ? 'page' : undefined}
+                        aria-current={active() ? 'location' : undefined}
                         aria-label={`DM with ${dm.nick}${unreadLabel(dm.unread, dm.highlights)}${offlineMemoLabel(offlineCount())}`}
                         onClick={() => handleDmClick(dm)}
                       >
@@ -834,6 +875,8 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             </Show>
           </div>
         </Show>
+          </div>
+        </div>
       </div>
 
       {/* Join channel form */}
@@ -841,27 +884,27 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
       <form
         class="shell-join-form"
         onSubmit={handleJoin}
-        aria-label="Join a channel"
+        aria-label="Join a room"
       >
         <label for="shell-join-input" class="sr-only">
-          Channel name
+          Room name
         </label>
         <input
           id="shell-join-input"
           class="shell-join-input"
           type="text"
-          placeholder="join #channel"
+          placeholder="join #room"
           autocomplete="off"
           spellcheck={false}
           value={joinInput()}
           onInput={(e) => setJoinInput(e.currentTarget.value)}
-          aria-label="Channel name to join"
+          aria-label="Room name to join"
         />
         <button
           type="submit"
           class="shell-join-btn"
           disabled={!joinInput().trim()}
-          aria-label={joinTarget() ? `Join ${joinTarget()}` : 'Join channel'}
+          aria-label={joinTarget() ? `Join ${joinTarget()}` : 'Join room'}
         >
           <span aria-hidden="true">+</span>
         </button>

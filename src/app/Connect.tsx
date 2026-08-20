@@ -2,7 +2,7 @@
 /**
  * Connect.tsx — Onyx connect screen (deep-water dark-luxury).
  *
- * The front door to the Onyx Server mesh. A segmented mode switch routes between
+ * The front door to Onyx. A segmented mode switch routes between
  * three auth surfaces, all on the same deep-water atmosphere:
  *
  *   • Guest    — nick only; drifts in anonymously (or with a saved SESSION).
@@ -16,7 +16,7 @@
  *   • GHOST reclaim — when a nick is in use, offer to evict the stale session.
  *   • Session resume — a one-tap "welcome back" when a remembered identity exists.
  *
- * The network is a single mesh, so the client does NOT expose a server picker:
+ * The network is one place, so the client does NOT expose a server picker:
  * it measures latency to each node and attaches to the fastest (nearest) one
  * automatically. Which node is used is never surfaced in the UI.
  *
@@ -66,6 +66,7 @@ import {
   type RememberedIdentity,
   type SavedCredentials,
 } from '@/lib/credentials';
+import { normalizeRoomTarget } from '@/shell/roomIdentity';
 import { initialNode, NODES, selectBestNode, type IrcNode } from './nodes';
 import { installConnectPageLifecycle } from './connectPageLifecycle';
 
@@ -187,10 +188,10 @@ const NETWORK_NAME = 'Onyx';
 /** IRC nick rules — start with a letter / special char, no leading digit. */
 export function validateNick(value: string): string | undefined {
   const v = value.trim();
-  if (!v) return 'Nick is required.';
-  if (v.length > 64) return 'Nick must be 64 characters or fewer.';
+  if (!v) return 'Name is required.';
+  if (v.length > 64) return 'Name must be 64 characters or fewer.';
   if (!/^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/.test(v)) {
-    return 'Nick must start with a letter or IRC special char and contain only letters, numbers, or -[]\\`_^{|}.';
+    return 'Name must start with a letter or allowed special character and contain only letters, numbers, or -[]\\`_^{|}.';
   }
   return undefined;
 }
@@ -357,10 +358,9 @@ export function Connect(props: ConnectProps): JSX.Element {
 
   /** '#chan' | 'chan' → validated '#chan'; empty → null; garbage → undefined. */
   function normalizeRoom(raw: string): string | null | undefined {
-    const trimmed = raw.trim();
-    if (!trimmed) return null;
-    const withHash = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
-    return parseJoinParam(withHash) ?? undefined;
+    const normalized = normalizeRoomTarget(raw);
+    if (!normalized) return null;
+    return parseJoinParam(normalized) ?? undefined;
   }
 
   // ── Shared form state ──────────────────────────────────────────────────────
@@ -557,7 +557,7 @@ export function Connect(props: ConnectProps): JSX.Element {
     }
     switch (formPhase()) {
       case 'connecting':
-        return 'Opening an encrypted channel…';
+        return 'Opening a secure connection…';
       case 'error':
         if (registeredNickNeedsSignIn()) {
           return 'That name belongs to an account. Sign in to use it; Onyx will not connect it as a guest.';
@@ -754,8 +754,8 @@ export function Connect(props: ConnectProps): JSX.Element {
       // Carry the mesh-sealed token into it before store.connect performs its
       // exact (url,nick) lookup; never copy the node-local token across nodes.
       if (resumeCredentials?.meshToken) {
-        const expiryMs = resumeCredentials.tokenExpiry
-          ? new Date(resumeCredentials.tokenExpiry).getTime()
+        const expiryMs = resumeCredentials.meshTokenExpiry
+          ? new Date(resumeCredentials.meshTokenExpiry).getTime()
           : Number.NaN;
         storeMeshToken(
           resumeCredentials.meshToken,
@@ -807,7 +807,7 @@ export function Connect(props: ConnectProps): JSX.Element {
     // join (same path as the website's ?join= deep link).
     const normalizedRoom = normalizeRoom(room());
     if (normalizedRoom === undefined) {
-      setRoomError('Channel names are like #lounge — no spaces or commas.');
+      setRoomError('Room names look like #lounge — no spaces or commas.');
       return;
     }
     setRoomError(undefined);
@@ -1111,9 +1111,18 @@ export function Connect(props: ConnectProps): JSX.Element {
   const inVerifyStep = createMemo(() => registerPhase() === 'verifying');
   const modeGuidance = createMemo(() => MODE_GUIDANCE[mode()]);
   const destinationLabel = createMemo(() => {
-    const entered = room().trim();
-    if (entered) return entered.startsWith('#') ? entered : `#${entered}`;
+    const normalized = normalizeRoomTarget(room());
+    if (normalized) return normalized;
     return 'Home';
+  });
+  const primaryStep = createMemo(() => {
+  if (inVerifyStep()) return 'Use the code we sent to finish creating your account.';
+    if (mode() === 'signin' && passkeySupported() && !passwordPathOpen()) {
+      return 'Use your passkey to sign in, or choose a password or recovery code below.';
+    }
+    if (mode() === 'register') return 'Create the account, then verify it before entering Home.';
+    if (mode() === 'signin') return 'Sign in with the account password for this name.';
+    return 'Choose a guest name, then continue to Home or the optional room above.';
   });
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -1148,13 +1157,57 @@ export function Connect(props: ConnectProps): JSX.Element {
                 </p>
               </header>
 
-              {/* Invite preview — a calm welcome when arriving via an invite link */}
+              {/* Invite preview — mini-shell glimpse of the room you're entering */}
               <Show when={inviteCard} keyed>
                 {(card) => (
                   <div class="conn-invite" role="note" aria-label="Invite preview">
                     <span class="conn-invite-eyebrow">You're invited</span>
+                    <div class="conn-invite-shell" aria-hidden="true">
+                      <div class="conn-invite-rail">
+                        <span class="conn-invite-room is-active">
+                          {card.channel ?? 'Onyx'}
+                        </span>
+                        <Show when={card.channel}>
+                          <span class="conn-invite-room">#root</span>
+                        </Show>
+                      </div>
+                      <div class="conn-invite-pane">
+                        <div class="conn-invite-pane-head">
+                          <span class="conn-invite-hash">#</span>
+                          <span class="conn-invite-pane-name">
+                            {(card.channel ?? 'public room').replace(/^#/, '')}
+                          </span>
+                          <Show when={card.readerMode}>
+                            <span class="conn-invite-chip">Reader</span>
+                          </Show>
+                        </div>
+                        <div class="conn-invite-lines">
+                          <span class="conn-invite-line is-mute" />
+                          <span class="conn-invite-line" />
+                          <span class="conn-invite-line is-short" />
+                        </div>
+                      </div>
+                    </div>
                     <h2 class="conn-invite-title">{inviteTitle(card)}</h2>
                     <p class="conn-invite-desc">{inviteDescription(card)}</p>
+                    <Show when={card.guestName || card.topic}>
+                      <ul class="conn-invite-meta">
+                        <Show when={card.guestName}>
+                          {(name) => (
+                            <li>
+                              Continue as <span class="mono">{name()}</span>
+                            </li>
+                          )}
+                        </Show>
+                        <Show when={card.topic}>
+                          {(topic) => (
+                            <li>
+                              Topic focus: <span class="mono">{topic()}</span>
+                            </li>
+                          )}
+                        </Show>
+                      </ul>
+                    </Show>
                   </div>
                 )}
               </Show>
@@ -1301,6 +1354,11 @@ export function Connect(props: ConnectProps): JSX.Element {
                 </p>
               </section>
 
+              <p class="conn-primary-cue" role="note">
+                <span>Next</span>
+                {primaryStep()}
+              </p>
+
               {/* ── Verify step (register only) ── */}
               <Show when={inVerifyStep()}>
                 <form
@@ -1363,14 +1421,14 @@ export function Connect(props: ConnectProps): JSX.Element {
                 <form
                   onSubmit={handleSubmit}
                   noValidate
-                  aria-label="IRC connection form"
+                  aria-label="Connect form"
                 >
                   <div class="conn-fields">
                     <FormField
                       id="conn-nick"
-                      label={mode() === 'register' ? 'Desired account / nick' : mode() === 'guest' ? 'Guest nick' : 'Nick'}
+                      label={mode() === 'register' ? 'Desired account name' : mode() === 'guest' ? 'Guest name' : 'Name'}
                       type="text"
-                      placeholder="your-nick"
+                      placeholder="your-name"
                       autocomplete="username"
                       maxlength={64}
                       required
@@ -1388,7 +1446,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                     <Show when={mode() !== 'register'}>
                       <FormField
                         id="conn-room"
-                        label="Channel"
+                        label="Room"
                         description="Optional — join a room right away, or browse from Home"
                         type="text"
                         placeholder="#root"
@@ -1574,7 +1632,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                         </label>
                         <p class="conn-toggle-description" id="conn-session-desc">
                           {mode() === 'guest'
-                            ? 'Off by default. Onyx keeps a resumable session token when the network provides one. This does not reserve your nick or create an account.'
+                            ? 'Off by default. Onyx keeps a resumable session token when the network provides one. This does not reserve your name or create an account.'
                             : 'Off by default. When enabled, Onyx stores your account password in this browser so it can sign in and request a SESSION token on reconnect. Use only on a private device.'}
                         </p>
                       </div>
@@ -1616,8 +1674,8 @@ export function Connect(props: ConnectProps): JSX.Element {
                   <Show when={registeredNickNeedsSignIn() && mode() === 'guest'}>
                     <div class="conn-auth-required" role="alert" data-testid="conn-auth-required">
                       <div>
-                        <strong>This nick is protected</strong>
-                        <span>Authenticate before Onyx can present it on IRC.</span>
+                        <strong>This name is protected</strong>
+                        <span>Authenticate before Onyx can use it on the network.</span>
                       </div>
                       <button type="button" onClick={() => switchMode('signin')}>
                         Sign in as {nickTrimmed() || 'this account'}
@@ -1708,7 +1766,7 @@ export function Connect(props: ConnectProps): JSX.Element {
 
             {/* Footer */}
             <footer class="conn-foot">
-              <span><b>Onyx</b> · encrypted · auto-routed</span>
+              <span><b>Onyx</b> · protected · auto-routed</span>
               <span aria-hidden="true">·</span>
               <a href="/download/">Install guide</a>
             </footer>

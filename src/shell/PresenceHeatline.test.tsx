@@ -13,7 +13,7 @@ function stubPulseFetch(): void {
     vi.fn(
       async () =>
         new Response(
-          JSON.stringify({ hours: ACTIVE_HOURS, totals: { messages: 120 } }),
+          JSON.stringify({ hours: ACTIVE_HOURS, totals: { messages: 120 }, present: 7 }),
           { status: 200 },
         ),
     ),
@@ -53,5 +53,9 @@ describe('PresenceHeatline current-hour marker', () => {
     // dependency-free createMemo that only ran once).
     expect(bars()[11]!.classList.contains('shell-heat-bar--now')).toBe(true);
     expect(bars()[10]!.classList.contains('shell-heat-bar--now')).toBe(false);
+    const ledger = container.querySelector('a.shell-ribbon-stats');
+    expect(ledger).toHaveAttribute('href', '/stats/?room=%23root');
+    expect(ledger).toHaveTextContent('Room ledger');
+    expect(container.querySelector('.shell-ribbon-present')).toHaveTextContent('7 present');
   });
 });

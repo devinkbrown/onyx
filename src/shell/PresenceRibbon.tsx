@@ -8,7 +8,7 @@
  *   Z3 People   — roster toggle + count (always on channel, incl. 0)
  *   Z4 Edge     — Inbox (temp primary) · More · connection (conn never display:none)
  *
- * More is grouped (Alerts · This room|Conversation · Workspace), not a junk drawer.
+ * More is grouped (Alerts · This room|Conversation · You), not a junk drawer.
  * Jump-to-date lives in More (This room / Conversation). Call presentation reuses
  * pure classifyCallsHubPresentation — no auto-join, no accept/decline in the ribbon.
  * People aria-pressed uses membersOpen (AppShell membersVisible). Persistence deferred.
@@ -23,6 +23,7 @@ import { openPreferences } from '@/lib/prefs/preferences';
 import { channelNotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Popover } from '@/primitives/index';
 import { ChannelSettings } from './ChannelSettings';
 import { ChannelNotifyControl } from './ChannelNotifyControl';
@@ -31,7 +32,9 @@ import { PresenceHeatline } from './PresenceHeatline';
 import { Facepile } from './Facepile';
 import { facepileInputsFromUsers } from './facepile';
 import { AiPolicyBadge } from './AiPolicyBadge';
+import { GroupControlRoomIndicator } from './GroupControlRoomIndicator';
 import { classifyCallsHubPresentation, type CallsHubPresentation } from './CallsHub';
+import { selectGroupControlRoom } from '@/lib/e2ee/groupControlSelectors';
 import type { AiPolicy } from '@/lib/irc/aiPolicyProp';
 import type { Channel } from '@/lib/irc/types';
 
@@ -46,6 +49,8 @@ export type PresenceRibbonProps = {
   membersOpen?: boolean;
   showJoinVoice?: boolean;
   onJoinVoice?: (withVideo: boolean) => void;
+  /** Mobile uses the persistent Menu for workspace settings; keep this overflow contextual. */
+  contextActionsOnly?: boolean;
 };
 
 export type VoiceRoomStatusInput = {
@@ -132,11 +137,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     'membersOpen',
     'showJoinVoice',
     'onJoinVoice',
+    'contextActionsOnly',
   ]);
 
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const channels = useStore((s) => s.channels);
+  const dms = useStore((s) => s.dms);
   // Fallback only when AppShell does not pass membersOpen (unit hosts).
   const showMemberList = useStore((s) => s.showMemberList);
   // selectChannelEvent parses the prop into a fresh object each call; without a
@@ -147,7 +154,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     return view.kind === 'channel' ? selectChannelEvent(view.channel)(s) : null;
   }, scheduledEventsEqual);
   const account = useStore(selectAccount);
+  // This is a public, metadata-only snapshot. The mutable runtime, controls,
+  // identity tuple, and cryptographic material remain outside the UI store.
+  const groupControlRuntime = useStore((s) => s.groupControlRuntime);
   const voice = useStore((s) => s.voice);
+  const contextActionsLabel = createMemo(() => (
+    activeView().kind === 'channel' ? 'Room actions' : 'Conversation actions'
+  ));
   const voiceChannelParticipants = useStore((s) => s.voiceChannelParticipants);
   const speakingNicks = useStore((s) => s.speakingNicks);
   const mutedNicks = useStore((s) => s.mutedNicks);
@@ -174,6 +187,12 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     if (view.kind !== 'channel') return null;
     return channels().get(view.channel) ?? null;
   });
+  const hasContextActions = createMemo(() => {
+    const view = activeView();
+    if (view.kind === 'channel') return activeChannel() !== null;
+    if (view.kind === 'dm') return dms().has(view.nick.toLowerCase());
+    return false;
+  });
 
   const channelHasUnread = createMemo(
     () => (activeChannel()?.unread ?? 0) > 0 || (activeChannel()?.highlights ?? 0) > 0,
@@ -190,7 +209,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     const view = activeView();
     if (view.kind === 'channel') return view.channel;
     if (view.kind === 'dm') return view.nick;
-    if (view.kind === 'status') return 'Status';
+    if (view.kind === 'status') return 'Activity';
     return null;
   });
 
@@ -216,12 +235,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   });
 
   /**
-   * People `aria-pressed` tracks the *actual* open surface (desktop column or
-   * mobile drawer). AppShell passes `membersVisible()` via membersOpen.
-   * Invariant: empty roster can never show pressed, even if membersOpen is true.
+   * People `aria-expanded` tracks the *actual* open surface (desktop column or
+   * mobile drawer). AppShell passes `membersVisible()` via membersOpen. This
+   * must mirror the real surface state regardless of roster size — a channel
+   * whose roster hasn't landed yet (JOIN before the 353 NAMES burst) can still
+   * open the member drawer, and the trigger must not lie about that.
    */
-  const membersPressed = createMemo(() => {
-    if (memberCount() === 0) return false;
+  const membersExpanded = createMemo(() => {
     if (local.membersOpen !== undefined) return !!local.membersOpen;
     return !!showMemberList();
   });
@@ -235,9 +255,21 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
   // Active channel name for the settings panel (display-cased, e.g. "#general").
   const settingsChannel = createMemo(() => activeChannel()?.name ?? null);
+  // Keep the compact status room-local. A missing projection is intentionally
+  // silent rather than an invented encryption or recovery state.
+  const groupControlRoom = createMemo(() => {
+    const room = settingsChannel();
+    const runtime = groupControlRuntime();
+    if (!room || !runtime || !account()) return null;
+    return selectGroupControlRoom(runtime, room) ? room : null;
+  });
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [moreOpen, setMoreOpen] = createSignal(false);
   let moreMenuRef: HTMLDivElement | undefined;
+
+  createEffect(() => {
+    if (local.contextActionsOnly && !hasContextActions()) setMoreOpen(false);
+  });
 
   const connLabel = createMemo(() => {
     const s = connectionStatus();
@@ -418,10 +450,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     action();
   }
 
-  function moreMenuItems(): HTMLButtonElement[] {
+  function moreMenuItems(): HTMLElement[] {
     if (!moreMenuRef) return [];
     // Multiple section menus share one roving set across the More panel.
-    return Array.from(moreMenuRef.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    return Array.from(moreMenuRef.querySelectorAll<HTMLElement>('[role="menuitem"]'));
   }
 
   function focusMoreMenuItem(index: number): void {
@@ -434,7 +466,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   function onMoreMenuKeyDown(event: KeyboardEvent): void {
     const items = moreMenuItems();
     if (items.length === 0) return;
-    const current = items.indexOf(event.currentTarget as HTMLButtonElement);
+    const current = items.indexOf(event.currentTarget as HTMLElement);
     if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
       event.preventDefault();
       focusMoreMenuItem(current < 0 ? 0 : current + 1);
@@ -480,7 +512,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   );
 
   return (
-    <header class="shell-ribbon" role="banner" aria-label="Channel information">
+    <header class="shell-ribbon" role="banner" aria-label="Room information">
       {/* Inner row shares the conversation reading measure so the title and
           place strip stay aligned to the conversation column chrome. */}
       <div class="shell-ribbon-inner">
@@ -497,7 +529,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               title="Click to copy name"
               aria-label={
                 activeView().kind === 'channel'
-                  ? `Channel ${name()}. Click to copy name.`
+                  ? `Room ${name()}. Click to copy name.`
                   : activeView().kind === 'dm'
                     ? `Direct message ${name()}. Click to copy nick.`
                     : `${name()}. Click to copy.`
@@ -656,6 +688,15 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 <span class="shell-ribbon-action-label">Call</span>
               </button>
             </Show>
+            <Show when={groupControlRoom()}>
+              {(room) => (
+                <GroupControlRoomIndicator
+                  room={room()}
+                  authenticated={Boolean(account())}
+                  projection={groupControlRuntime()}
+                />
+              )}
+            </Show>
           </div>
 
           {/* Z3 People — always on channel, including zero members. */}
@@ -664,8 +705,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               type="button"
               class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-members"
               aria-label={`${memberCount()} members — toggle member list`}
-              aria-pressed={membersPressed()}
-              aria-expanded={membersPressed()}
+              aria-expanded={membersExpanded()}
               data-testid="ribbon-members"
               onClick={handleMembersClick}
             >
@@ -686,14 +726,18 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
         <div class="shell-ribbon-group" role="group" aria-label="Inbox">
           <NotificationCenter />
         </div>
-        <span class="shell-ribbon-divider" aria-hidden="true" />
-
-        <div class="shell-ribbon-group" role="group" aria-label="More">
-          <Popover
+        <Show when={!local.contextActionsOnly || hasContextActions()}>
+          <span class="shell-ribbon-divider" aria-hidden="true" />
+          <div
+            class="shell-ribbon-group"
+            role="group"
+            aria-label={local.contextActionsOnly ? contextActionsLabel() : 'More'}
+          >
+            <Popover
             open={moreOpen()}
             onOpenChange={setMoreOpen}
             placement="bottom"
-            panelLabel="More channel and workspace actions"
+            panelLabel={local.contextActionsOnly ? contextActionsLabel() : 'More room and workspace actions'}
             trigger={
               <span
                 class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-more-trigger"
@@ -705,8 +749,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                   <circle cx="12" cy="12" r="1.6" />
                   <circle cx="19" cy="12" r="1.6" />
                 </svg>
-                <span class="sr-only">More actions</span>
-                <span class="shell-ribbon-action-label" aria-hidden="true">More</span>
+                <span class="sr-only">{local.contextActionsOnly ? contextActionsLabel() : 'More actions'}</span>
+                <span class="shell-ribbon-action-label" aria-hidden="true">
+                  {local.contextActionsOnly ? 'Actions' : 'More'}
+                </span>
               </span>
             }
           >
@@ -764,7 +810,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       type="button"
                       class="shell-ribbon-more-item"
                       role="menuitem"
-                      aria-label={`Channel settings for ${settingsChannel()}`}
+                      aria-label={`Room settings for ${settingsChannel()}`}
                       aria-haspopup="dialog"
                       data-testid="ribbon-settings-gear"
                       onClick={() => closeMoreThen(() => setSettingsOpen(true))}
@@ -775,8 +821,27 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                         <circle cx="12" cy="12" r="3" />
                         <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7.1 4l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1Z" />
                       </svg>
-                      <span>Channel settings</span>
+                      <span>Room settings</span>
                     </button>
+                    <a
+                      class="shell-ribbon-more-item"
+                      role="menuitem"
+                      href={statsRoomHref(settingsChannel()!)}
+                      aria-label={`Room ledger for ${settingsChannel()}`}
+                      data-testid="ribbon-channel-ledger"
+                      onClick={() => setMoreOpen(false)}
+                      onKeyDown={onMoreMenuKeyDown}
+                    >
+                      <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19V5" />
+                        <path d="M4 19h16" />
+                        <path d="M8 15v-4" />
+                        <path d="M12 15V7" />
+                        <path d="M16 15v-6" />
+                      </svg>
+                      <span>Room ledger</span>
+                    </a>
                     <button
                       type="button"
                       class="shell-ribbon-more-item"
@@ -809,8 +874,8 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       </svg>
                       <span>
                         {channelNotifyMode(channelNotify(), settingsChannel() ?? '') === 'mute'
-                          ? 'Unmute channel'
-                          : 'Mute channel'}
+                          ? 'Unmute room'
+                          : 'Mute room'}
                       </span>
                     </button>
                     <button
@@ -891,7 +956,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                         class="shell-ribbon-more-item"
                         role="menuitem"
                         data-testid="ribbon-mark-read"
-                        aria-label={`Mark ${activeChannel()?.name ?? 'channel'} as read`}
+                        aria-label={`Mark ${activeChannel()?.name ?? 'room'} as read`}
                         onClick={() => {
                           const ch = activeChannel();
                           closeMoreThen(() => {
@@ -951,65 +1016,21 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 )}
               </Show>
 
-              {/* Workspace — appearance / prefs / account */}
-              <div
-                class="shell-ribbon-more-section"
-                role="group"
-                aria-labelledby="ribbon-more-workspace-label"
-              >
-                <p id="ribbon-more-workspace-label" class="shell-ribbon-more-label">
-                  Workspace
+              {/* You — identity & settings hub (Appearance/Preferences live inside You) */}
+              <Show when={!local.contextActionsOnly}>
+                <div
+                  class="shell-ribbon-more-section"
+                  role="group"
+                  aria-labelledby="ribbon-more-you-label"
+                >
+                <p id="ribbon-more-you-label" class="shell-ribbon-more-label">
+                  You
                 </p>
                 <div
                   class="shell-ribbon-more-list"
                   role="menu"
-                  aria-labelledby="ribbon-more-workspace-label"
+                  aria-labelledby="ribbon-more-you-label"
                 >
-                  <button
-                    type="button"
-                    class="shell-ribbon-more-item"
-                    role="menuitem"
-                    aria-label="Appearance — theme and background"
-                    aria-haspopup="dialog"
-                    data-testid="ribbon-appearance"
-                    onClick={() => closeMoreThen(() => getState().openAppearance())}
-                    onKeyDown={onMoreMenuKeyDown}
-                  >
-                    <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
-                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-3.9-4-7.4-9-7.4Z" />
-                      <circle cx="7.5" cy="11.5" r="1.1" fill="currentColor" stroke="none" />
-                      <circle cx="11" cy="7.5" r="1.1" fill="currentColor" stroke="none" />
-                      <circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
-                    </svg>
-                    <span>Appearance</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    class="shell-ribbon-more-item"
-                    role="menuitem"
-                    aria-label="Open preferences"
-                    aria-haspopup="dialog"
-                    data-testid="ribbon-preferences"
-                    onClick={() => closeMoreThen(() => openPreferences())}
-                    onKeyDown={onMoreMenuKeyDown}
-                  >
-                    <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
-                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 21v-7" />
-                      <path d="M4 10V3" />
-                      <path d="M12 21v-9" />
-                      <path d="M12 8V3" />
-                      <path d="M20 21v-5" />
-                      <path d="M20 12V3" />
-                      <path d="M2 14h4" />
-                      <path d="M10 8h4" />
-                      <path d="M18 16h4" />
-                    </svg>
-                    <span>Preferences</span>
-                  </button>
-
                   <button
                     type="button"
                     class="shell-ribbon-more-item shell-ribbon-more-item--account"
@@ -1017,8 +1038,8 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                     data-guest={account() ? 'false' : 'true'}
                     aria-label={
                       account()
-                        ? `Account: ${account()} — open account panel`
-                        : 'Guest — open account panel'
+                        ? `You — ${account()} — open account, appearance, and preferences`
+                        : 'You — guest — open account, appearance, and preferences'
                     }
                     aria-haspopup="dialog"
                     data-testid="ribbon-account-chip"
@@ -1031,16 +1052,19 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       <path d="M5 19.5c1.6-3 4-4.5 7-4.5s5.4 1.5 7 4.5" />
                     </svg>
                     <span class="shell-ribbon-account-text">
+                      <span class="shell-ribbon-account-kicker">You</span>
                       <Show when={account()} fallback={<span class="shell-ribbon-account-name">Guest</span>}>
                         {(acct) => <span class="shell-ribbon-account-name">{acct()}</span>}
                       </Show>
                     </span>
                   </button>
                 </div>
-              </div>
+                </div>
+              </Show>
             </div>
-          </Popover>
-        </div>
+            </Popover>
+          </div>
+        </Show>
 
         <span class="shell-ribbon-divider" aria-hidden="true" />
 

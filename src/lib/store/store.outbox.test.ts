@@ -399,6 +399,27 @@ describe('offline outbox — E2EE DMs never persist plaintext', () => {
     expect(store.getState().toasts.some((t) => t.title.includes("Can't queue encrypted DM"))).toBe(true);
   });
 
+  it('returns false (not undefined) when refusing to queue an E2EE DM, so the composer keeps the draft', async () => {
+    // Composer.tsx checks `admitted === false` to keep the draft/textarea
+    // intact on refusal. A bare `return;` resolves to `undefined`, which
+    // `!== false`, so the composer fell through to its normal post-send
+    // draft-clear path and silently destroyed the unsent message.
+    setPreference('e2eeDms', true);
+    store.setState({ peerDmKeys: new Map([['trev', 'peer-device-key-b64']]) });
+
+    const admitted = store.getState().sendMessage('trev', 'do not vanish silently');
+
+    expect(admitted).toBe(false);
+  });
+
+  it('returns false (not undefined) when refusing to queue with no resolvable identity owner', () => {
+    store.setState({ server: { ...server('alice'), url: '' } });
+
+    const admitted = store.getState().sendMessage('#room', 'no owner to queue under');
+
+    expect(admitted).toBe(false);
+  });
+
   it('still queues a plaintext DM to a peer with no device key', async () => {
     setPreference('e2eeDms', true);
     store.setState({ peerDmKeys: new Map() }); // no key → not an E2EE DM
@@ -411,17 +432,38 @@ describe('offline outbox — E2EE DMs never persist plaintext', () => {
     expect(entry!.text).toBe('plain hello');
   });
 
-  it('still queues a plaintext DM when e2eeDms is off, even with a peer key', async () => {
+  it('refuses to queue a designated E2EE DM when e2eeDms is off', async () => {
     setPreference('e2eeDms', false);
     store.setState({ peerDmKeys: new Map([['trev', 'peer-device-key-b64']]) });
 
-    store.getState().sendMessage('trev', 'e2ee disabled, plain send');
+    store.getState().sendMessage('trev', 'e2ee disabled, still designated');
 
-    await until(async () => (await loadOutbox()).length === 1);
-    const [entry] = await loadOutbox();
-    expect(entry!.target).toBe('trev');
-    expect(entry!.text).toBe('e2ee disabled, plain send');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await loadOutbox()).toEqual([]);
+    expect(store.getState().dms.get('trev')?.messages ?? []).toEqual([]);
+    expect(store.getState().toasts.some((t) => t.title.includes("Can't queue encrypted DM"))).toBe(true);
+    expect(store.getState().toasts.some((t) =>
+      `${t.title}\n${t.description ?? ''}`.includes('peer-device-key-b64'),
+    )).toBe(false);
     setPreference('e2eeDms', true); // restore default for other suites
+  });
+
+  it('refuses to queue when only a leftover ocean.dm-keys directory remains', async () => {
+    setPreference('e2eeDms', true);
+    store.setState({
+      peerDmKeys: new Map(),
+      peerDmDeviceKeys: new Map([['trev', ['device-only-directory-key']]]),
+    });
+
+    store.getState().sendMessage('trev', 'do not persist this secret');
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await loadOutbox()).toEqual([]);
+    expect(store.getState().dms.get('trev')?.messages ?? []).toEqual([]);
+    expect(store.getState().toasts.some((t) => t.title.includes("Can't queue encrypted DM"))).toBe(true);
+    expect(store.getState().toasts.some((t) =>
+      `${t.title}\n${t.description ?? ''}`.includes('device-only-directory-key'),
+    )).toBe(false);
   });
 
   it('keeps a queued DM when a newly discovered E2EE key cannot be sealed', async () => {

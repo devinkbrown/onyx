@@ -37,7 +37,7 @@ describe('BridgeStatusBadge', () => {
       />
     ));
 
-    const badge = screen.getByLabelText('No bridge advertised for this channel');
+    const badge = screen.getByLabelText('No bridge advertised for this room');
     expect(badge).toHaveTextContent('No bridge');
     expect(badge).toHaveAttribute('data-bridged', 'false');
   });

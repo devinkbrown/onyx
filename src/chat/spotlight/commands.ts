@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, onCleanup, onMount, type Access
 import { backgroundOptions, type BackgroundId } from '@/backgrounds';
 import { getState, selectDeviceMemoryOwner, useStore } from '@/lib/store';
 import type { State } from '@/lib/store/store';
-import { applyThemeToDom, THEME_IDS, THEMES, type ThemeId } from '@/theme';
+import { THEME_IDS, THEMES, type ThemeId } from '@/theme';
 import { saveRecent, type RecentTarget } from '@/lib/commands/registry';
 import {
   openPreferences,
@@ -44,7 +44,7 @@ import { useSpotlight } from './useSpotlight';
 import { parseTimeExpr } from './timeGrammar';
 import { isSchedulable, parseDateTimeLocal } from '@/lib/schedule/scheduleTime';
 
-export type SpotlightSection = 'Channels' | 'DMs' | 'People' | 'Actions';
+export type SpotlightSection = 'Rooms' | 'DMs' | 'People' | 'Actions';
 
 export type SpotlightCommand = {
   id: string;
@@ -57,7 +57,6 @@ export type SpotlightCommand = {
 
 type CommandState = Pick<State, 'channels' | 'dms' | 'server' | 'ourNick' | 'networkName' | 'activeView' | 'showMemberList' | 'voice'>;
 
-const BACKGROUND_STORAGE_KEY = 'onyx:bg';
 const SPOTLIGHT_INPUT_ID = 'onyx-spotlight-input';
 
 const JUMP_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -568,7 +567,7 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
         title: at
           ? `Go to ${known?.name ?? channel} at ${JUMP_TIME_FORMATTER.format(at)}`
           : known ? `Go to ${known.name}` : `Join ${channel}`,
-        hint: at ? 'time grammar' : known ? channelHint(known) : 'channel',
+        hint: at ? 'time grammar' : known ? channelHint(known) : 'room',
         keywords: [query.trim(), 'goto', 'join', 'open', 'go to', channel, timed?.after ?? ''],
         run: () => {
           const current = getState();
@@ -589,8 +588,8 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
         id: `grammar:part:${channel.toLowerCase()}`,
         section: 'Actions',
         title: `Leave ${name}`,
-        hint: 'part channel',
-        keywords: [query.trim(), 'part', 'leave', 'close channel', 'exit channel', name],
+        hint: 'leave room',
+        keywords: [query.trim(), 'part', 'leave', 'close room', 'exit room', 'close channel', 'exit channel', name],
         run: () => getState().partChannel(name),
       });
     }
@@ -601,8 +600,8 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
         id: `grammar:part:${active.toLowerCase()}`,
         section: 'Actions',
         title: `Leave ${active}`,
-        hint: 'part current channel',
-        keywords: [query.trim(), 'part', 'leave', 'close channel', 'exit channel', active],
+        hint: 'leave current room',
+        keywords: [query.trim(), 'part', 'leave', 'close room', 'exit room', 'close channel', 'exit channel', active],
         run: () => {
           const current = getState();
           const view = current.activeView;
@@ -644,8 +643,8 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
         id: `grammar:star:${channel.toLowerCase()}`,
         section: 'Actions',
         title: `Star ${name}`,
-        hint: 'favorite channel',
-        keywords: [query.trim(), 'star', 'favorite', 'favourite', 'pin channel', 'bookmark', name],
+        hint: 'favorite room',
+        keywords: [query.trim(), 'star', 'favorite', 'favourite', 'pin room', 'pin channel', 'bookmark', name],
         run: () => getState().starChannel(name),
       });
     }
@@ -660,7 +659,7 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
         id: `grammar:unstar:${channel.toLowerCase()}`,
         section: 'Actions',
         title: `Unstar ${name}`,
-        hint: 'favorite channel',
+        hint: 'favorite room',
         keywords: [query.trim(), 'unstar', 'unfavorite', 'unfavourite', 'remove star', name],
         run: () => getState().unstarChannel(name),
       });
@@ -989,27 +988,15 @@ function navigateTo(path: string): void {
 }
 
 function applyTheme(id: ThemeId): void {
-  applyThemeToDom(id);
+  // persistThemeId emits the canonical same-tab event from the store action,
+  // so every non-component entry point reaches the mounted palette owner.
   getState().setTheme(id);
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('onyx:theme-change', { detail: { id } }));
-  }
 }
 
 function applyBackground(id: BackgroundId): void {
-  try {
-    localStorage.setItem(BACKGROUND_STORAGE_KEY, id);
-  } catch {
-    /* storage unavailable */
-  }
-
-  if (typeof document !== 'undefined') {
-    document.documentElement.dataset.onyxBackground = id;
-  }
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('onyx:background-change', { detail: { id } }));
-  }
+  // The shell background is store-owned. Writing localStorage directly here
+  // left the mounted AppShell on its previous scene until a reload.
+  getState().setBackground(id);
 }
 
 /**
@@ -1097,19 +1084,19 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
     {
       id: 'action-browse-channels',
       section: 'Actions',
-      title: 'Browse channels',
-      hint: 'Every public channel on the network (LIST)',
-      keywords: ['channels', 'browse', 'list', 'discover', 'directory'],
+      title: 'Browse rooms',
+      hint: 'Every public room on the network',
+      keywords: ['rooms', 'channels', 'browse', 'list', 'discover', 'directory'],
       run: () => getState().openChannelBrowser(),
     },
     {
       id: 'action:join-channel',
       section: 'Actions',
-      title: 'Join channel...',
-      hint: 'Open a channel by name',
-      keywords: ['channel', 'join', 'irc'],
+      title: 'Join room...',
+      hint: 'Open a room by name',
+      keywords: ['room', 'channel', 'join', 'irc'],
       run: () => {
-        const raw = typeof window === 'undefined' ? '' : window.prompt('Join channel', '#');
+        const raw = typeof window === 'undefined' ? '' : window.prompt('Join room', '#');
         const channel = normalizeChannel(raw ?? '');
         if (!channel) return;
 
@@ -1211,7 +1198,7 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
           {
             id: 'action:start-voice',
             section: 'Actions' as SpotlightSection,
-            title: 'Start voice in current channel',
+            title: 'Start voice in current room',
             hint: activeChannel,
             keywords: ['voice', 'audio', 'call', 'join'],
             run: () => {
@@ -1225,7 +1212,7 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
           {
             id: 'action:start-video',
             section: 'Actions' as SpotlightSection,
-            title: 'Start video in current channel',
+            title: 'Start video in current room',
             hint: activeChannel,
             keywords: ['video', 'camera', 'call', 'join'],
             run: () => {
@@ -1259,9 +1246,9 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
           {
             id: 'action:copy-channel-link',
             section: 'Actions' as SpotlightSection,
-            title: 'Copy channel link',
+            title: 'Copy room link',
             hint: activeChannelLink,
-            keywords: ['copy', 'link', 'channel', 'share', 'invite', 'url', activeChannel],
+            keywords: ['copy', 'link', 'room', 'channel', 'share', 'invite', 'url', activeChannel],
             run: () => {
               const current = getState();
               const view = current.activeView;
@@ -1323,14 +1310,14 @@ export function buildCommands(state: CommandState = getState(), query = ''): Spo
     .sort((a, b) => a.name.localeCompare(b.name))
     .map<SpotlightCommand>((channel) => ({
       id: `channel:${channel.name.toLowerCase()}`,
-      section: 'Channels',
+      section: 'Rooms',
       title: `Go to ${channel.name}`,
       hint: channelHint(channel),
       keywords: [channel.name, channel.name.replace(/^#/, ''), channel.topic],
       run: () => {
         const current = getState();
         saveRecentForCapturedOwner(
-          { id: `channel:${channel.name.toLowerCase()}`, label: `Go to ${channel.name}`, section: 'Channels' },
+          { id: `channel:${channel.name.toLowerCase()}`, label: `Go to ${channel.name}`, section: 'Rooms' },
           memoryOwner,
         );
         current.joinChannel(channel.name);

@@ -63,22 +63,45 @@ describe('public asset delivery policy', () => {
     expect(config).toMatch(/location @onyx_public_asset_not_found \{\s+return 404;\s+\}/);
   });
 
-  it('revalidates the stats SPA shell without weakening asset or data precedence', () => {
-    const body = locationBody('^~ /stats/');
+  it('serves only the exact canonical stats shell and fails descendants closed', () => {
+    const canonical = locationBody('= /stats/');
+    const descendants = locationBody('^~ /stats/');
 
-    expect(body).toContain('alias /home/kain/onyx/out/stats/;');
-    expect(body).toContain('try_files $uri $uri/ /stats/index.html;');
-    expect(body).toContain('add_header Cache-Control "no-cache";');
-    expect(body.match(/Cache-Control/g)).toHaveLength(1);
-    expect(body).not.toContain('expires ');
+    expect(canonical).toContain('root /home/kain/onyx/out;');
+    expect(canonical).toContain('try_files /stats/index.html =404;');
+    expect(canonical).toContain('add_header Cache-Control "no-cache";');
+    expect(canonical).not.toContain('expires ');
+    expect(descendants).toContain('return 404;');
+    expect(descendants).not.toContain('index.html');
   });
 
-  it('emits one revalidation policy for Onyx documents, the worker, and manifest', () => {
+  it('keeps protected resource prefixes bare while rendering branded unknown public routes', () => {
     const body = locationBody('/');
+    const notFound = locationBody('= /404.html');
+    const html = locationBody('~* \\.html$');
 
     expect(body).toContain('try_files $uri $uri/ $uri/index.html =404;');
+    expect(body).toContain('error_page 404 /404.html;');
+    expect(body).not.toContain('error_page 404 =');
     expect(body).toContain('add_header Cache-Control "no-cache";');
     expect(body.match(/Cache-Control/g)).toHaveLength(1);
     expect(body).not.toContain('expires ');
+
+    expect(notFound).toContain('internal;');
+    expect(notFound).toContain('root /home/kain/onyx/out;');
+    expect(notFound).toContain('try_files /404.html =404;');
+    expect(notFound).toContain('add_header Cache-Control "no-store" always;');
+    expect(notFound).toContain('add_header X-Robots-Tag "noindex, nofollow" always;');
+    expect(notFound).not.toContain('error_page');
+
+    expect(config.indexOf('location ~* \\.html$')).toBeLessThan(config.indexOf('location / {'));
+    expect(html).toContain('try_files $uri =404;');
+    expect(html).toContain('error_page 404 /404.html;');
+    expect(html).toContain('add_header Cache-Control "no-cache";');
+
+    for (const selector of ['^~ /assets/', '^~ /stats/assets/', '^~ /stats/data/', '^~ /onyxos/']) {
+      expect(locationBody(selector)).not.toContain('404.html');
+    }
+    expect(locationBody('= /stats/backups/latest.json')).not.toContain('404.html');
   });
 });

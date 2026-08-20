@@ -274,7 +274,7 @@ export function GuestClaimPrompt(): JSX.Element {
     const nick = liveNick();
     const pass = password();
     if (!nick) {
-      setLocalError('You need a nick on this connection before claiming.');
+      setLocalError('You need a name on this connection before claiming.');
       return;
     }
     if (!pass) {
@@ -314,7 +314,7 @@ export function GuestClaimPrompt(): JSX.Element {
       return;
     }
     if (!nick) {
-      setLocalError('Missing nick for verification.');
+      setLocalError('Missing name for verification.');
       return;
     }
     setLocalError(undefined);
@@ -335,7 +335,7 @@ export function GuestClaimPrompt(): JSX.Element {
         <div
           class="guest-claim-chip"
           role="region"
-          aria-label="Keep this nick"
+          aria-label="Keep this name"
           data-testid="guest-claim"
         >
           <p class="guest-claim-chip__text">
@@ -348,14 +348,15 @@ export function GuestClaimPrompt(): JSX.Element {
               variant="primary"
               size="sm"
               data-testid="guest-claim-open"
+              aria-label="Keep this name"
               onClick={openSheetFromChip}
             >
-              Keep this nick
+              Keep
             </Button>
             <button
               type="button"
               class="guest-claim-chip__dismiss"
-              aria-label="Dismiss keep-nick prompt"
+              aria-label="Dismiss keep-name prompt"
               data-testid="guest-claim-dismiss"
               onClick={dismissChip}
             >
@@ -382,7 +383,7 @@ export function GuestClaimPrompt(): JSX.Element {
             }
           }
         }}
-        title="Keep this nick"
+        title="Keep this name"
         description="Register the name you are using on this connection. You stay connected — passkeys and multi-device tools are available after the account exists."
         closeLabel="Close claim panel"
         returnFocus={chipKeepButton}
@@ -393,15 +394,15 @@ export function GuestClaimPrompt(): JSX.Element {
             fallback={
               <form
                 class="guest-claim-sheet__form"
-                aria-label="Keep this nick"
+                aria-label="Keep this name"
                 onSubmit={submitClaim}
                 noValidate
                 data-testid="guest-claim-form"
               >
                 <FormField
                   id="guest-claim-nick"
-                  label="Nick"
-                  description="Your current nick on this connection (not editable here)."
+                  label="Name"
+                  description="Your current name on this connection (not editable here)."
                   autocomplete="username"
                   value={liveNick()}
                   readOnly
@@ -469,7 +470,7 @@ export function GuestClaimPrompt(): JSX.Element {
           >
             <form
               class="guest-claim-sheet__form"
-              aria-label="Verify your nick"
+              aria-label="Verify your name"
               onSubmit={submitVerify}
               noValidate
               data-testid="guest-claim-verify-form"

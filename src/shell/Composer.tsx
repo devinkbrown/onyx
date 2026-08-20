@@ -26,6 +26,7 @@ import {
 import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import { useStore, getState, setState, selectDeviceMemoryOwner, selectOwnedScheduledMessageCount } from '@/lib/store';
 import { searchEmojis } from '@/lib/emoji/emoji';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import {
   completeSlashCommand,
   expandSlashTextCommand,
@@ -272,6 +273,21 @@ export function Composer(props: ComposerProps): JSX.Element {
     return 'Message';
   });
 
+  // Keep the destination and the current composition state visible above the
+  // field. This uses the same target-scoped signals as send, so a reply or edit
+  // from another room cannot leak into the current compose context.
+  const composerBrief = createMemo(() => {
+    const t = target();
+    if (!t) return { destination: 'No conversation selected', state: 'Choose a room or person to begin.' };
+    if (activeEditing()) return { destination: `Editing in ${t}`, state: 'Save or cancel this edit before changing context.' };
+    const reply = activeReply();
+    if (reply) return { destination: `Replying in ${t}`, state: `Reply to ${reply.from}` };
+    if (isOffline()) return { destination: `To ${t}`, state: 'Offline — plain messages queue on this device.' };
+    const topic = activeTopic();
+    if (topic) return { destination: `To ${t}`, state: 'Writing in the current topic' };
+    return { destination: `To ${t}`, state: 'Ready to send' };
+  });
+
   const emojiMatches = createMemo(() => searchEmojis(emojiQuery(), 36));
   const slashCommands = createMemo(() => getSlashCommandSuggestions(text(), 8));
   const slashVisible = createMemo(() => !slashDismissed() && slashCommands().length > 0);
@@ -435,7 +451,10 @@ export function Composer(props: ComposerProps): JSX.Element {
       setScheduleError('Pick a time at least a minute from now.');
       return;
     }
-    getState().scheduleMessage(t, body, epoch);
+    if (!getState().scheduleMessage(t, body, epoch)) {
+      setScheduleError('Protected room messages cannot be stored for later. Send while connected.');
+      return;
+    }
     getState().addToast({
       variant: 'success',
       title: 'Message scheduled',
@@ -974,7 +993,16 @@ export function Composer(props: ComposerProps): JSX.Element {
         return;
       }
 
-      getState().sendMessage(t, content);
+      const admission = getState().sendMessage(t, content);
+      const admitted = admission instanceof Promise ? await admission : admission;
+      // Required encrypted rooms can reject before socket admission when the
+      // session is locked or changes during WebCrypto. Keep the exact draft so
+      // the user can retry instead of turning a safe refusal into data loss.
+      if (admitted === false) {
+        setComposerError('Message was not sent. Your draft is still here.');
+        focusTextarea();
+        return;
+      }
       resetAfterSend(t);
     } finally {
       if (activeUpload === upload) activeUpload = null;
@@ -1021,6 +1049,10 @@ export function Composer(props: ComposerProps): JSX.Element {
       onDrop={handleDrop}
     >
       <div class="shell-composer-measure">
+        <div class="shell-composer-brief" role="note" aria-label="Current compose context">
+          <span class="shell-composer-brief-destination">{composerBrief().destination}</span>
+          <span class="shell-composer-brief-state">{composerBrief().state}</span>
+        </div>
       <Show when={outboxChrome()}>
         {(chrome) => (
           <div
@@ -1046,9 +1078,14 @@ export function Composer(props: ComposerProps): JSX.Element {
 
       <Show when={activeTopic()}>
         {(topic) => (
-          <div class="shell-composer-topic" role="status" aria-live="polite">
-            <span class="shell-composer-topic-label">topic</span>
-            <span class="shell-composer-topic-name">#{topic()}</span>
+          <div
+            class="shell-composer-topic"
+            role="status"
+            aria-live="polite"
+            aria-label={`Writing in topic ${topic()}`}
+          >
+            <span class="shell-composer-topic-label">topic mode</span>
+            <span class="shell-composer-topic-name">Writing in the current topic</span>
             <button type="button" class="shell-composer-topic-clear" aria-label={`Clear topic ${topic()}`} onClick={clearTopic}>
               ×
             </button>
@@ -1163,7 +1200,7 @@ export function Composer(props: ComposerProps): JSX.Element {
             id="shell-nick-menu"
             class="shell-command-menu shell-nick-menu"
             role="listbox"
-            aria-label="Nick completions"
+            aria-label="Name completions"
             data-testid="composer-nick-menu"
           >
             <For each={nickMatches()}>
@@ -1339,7 +1376,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         />
 
         <label for="shell-composer-input" class="sr-only">
-          <Show when={target()} fallback="Message input (no active channel)">
+          <Show when={target()} fallback="Message input (no active room)">
             {(t) => `Message ${t()}`}
           </Show>
         </label>
@@ -1414,7 +1451,7 @@ export function Composer(props: ComposerProps): JSX.Element {
             aria-label="More tools"
             aria-haspopup="dialog"
             aria-expanded={toolsOpen()}
-            aria-controls="shell-composer-tools"
+            aria-controls={toolsOpen() ? 'shell-composer-tools' : undefined}
             title="More tools"
             onClick={() => toggleTools()}
           >
@@ -1494,10 +1531,27 @@ export function Composer(props: ComposerProps): JSX.Element {
                 </span>
               </button>
 
+              <Show when={activeView().kind === 'channel' && target()}>
+                {(channel) => (
+                  <a
+                    class="shell-composer-tools-item shell-composer-tools-ledger"
+                    href={statsRoomHref(channel())}
+                    aria-label={`Room ledger for ${channel()}`}
+                    data-testid="composer-channel-ledger"
+                    onClick={() => setToolsOpen(false)}
+                  >
+                    <span class="shell-composer-tools-item-title">Room ledger</span>
+                    <span class="shell-composer-tools-item-desc">
+                      Public room pulse for {channel()}.
+                    </span>
+                  </a>
+                )}
+              </Show>
+
               <div class="shell-composer-tools-tip" role="note">
                 <p class="shell-composer-tools-item-title">Slash commands</p>
                 <p class="shell-composer-tools-item-desc">
-                  Type <kbd class="shell-composer-tools-kbd">/</kbd> in the message field for commands. Nothing runs until you send.
+                  Type <kbd class="shell-composer-tools-kbd">/</kbd> for commands. Nothing runs until you send.
                 </p>
                 <button
                   type="button"

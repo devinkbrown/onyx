@@ -71,11 +71,12 @@ describe('preferences store', () => {
         clock: '24h',
         localHistory: true,
         e2eeDms: true,
-        timeScrubber: true,
+        timeScrubber: false,
         voiceEntry: true,
         topicTools: true,
-        watchTogether: true,
+        watchTogether: false,
         reactionDensity: 'full',
+        experienceMode: 'standard',
       });
     });
 
@@ -99,11 +100,12 @@ describe('preferences store', () => {
         clock: '24h',
         localHistory: true,
         e2eeDms: true,
-        timeScrubber: true,
+        timeScrubber: false,
         voiceEntry: true,
         topicTools: true,
-        watchTogether: true,
+        watchTogether: false,
         reactionDensity: DEFAULT_PREFERENCES.reactionDensity,
+        experienceMode: DEFAULT_PREFERENCES.experienceMode,
       });
     });
 
@@ -128,6 +130,7 @@ describe('preferences store', () => {
           topicTools: 'yes',
           watchTogether: false,
           reactionDensity: 'not-a-mode',
+          experienceMode: 'not-a-mode',
         }),
       );
 
@@ -211,6 +214,7 @@ describe('preferences store', () => {
           topicTools: true,
           watchTogether: false,
           reactionDensity: 'counts-only',
+          experienceMode: 'advanced',
         }),
       );
 
@@ -234,12 +238,22 @@ describe('preferences store', () => {
         topicTools: true,
         watchTogether: false,
         reactionDensity: 'counts-only',
+        experienceMode: 'advanced',
       });
     });
 
     it('restores a valid reactionDensity value', () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ reactionDensity: 'hidden' }));
       expect(loadPreferences().reactionDensity).toBe('hidden');
+    });
+
+    it('keeps Standard as the safe fallback for an invalid experience mode', () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ experienceMode: 'raw-everything' }));
+      expect(loadPreferences().experienceMode).toBe('standard');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ experienceMode: 'irc-ops' }));
+      expect(loadPreferences().experienceMode).toBe('network-ops');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ experienceMode: 'network-ops' }));
+      expect(loadPreferences().experienceMode).toBe('network-ops');
     });
   });
 
@@ -350,6 +364,7 @@ describe('preferences store', () => {
         topicTools: true,
         watchTogether: false,
         reactionDensity: 'compact',
+        experienceMode: 'advanced',
       });
       const ds = document.documentElement.dataset;
       expect(ds.density).toBe('compact');
@@ -360,6 +375,7 @@ describe('preferences store', () => {
       expect(ds.reduceMotion).toBe('true');
       expect(ds.reduceTransparency).toBe('true');
       expect(ds.highContrast).toBe('true');
+      expect(ds.experienceMode).toBe('advanced');
     });
 
     it('applies the live store value when called without an argument', () => {

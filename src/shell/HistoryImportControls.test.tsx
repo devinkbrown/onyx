@@ -96,14 +96,14 @@ describe('DiscordImportControls', () => {
     chooseFile('Choose Discord JSON', fakeFile('general.json', discordExport));
 
     // Review summary appears with the guild name and counts.
-    const review = await screen.findByText(/Ready to import 2 messages across 1 channel from Cool Project/);
+    const review = await screen.findByText(/Ready to import 2 messages across 1 room from Cool Project/);
     expect(review).toBeInTheDocument();
     const reviewHeading = screen.getByRole('heading', { name: 'Review import' });
     await waitFor(() => expect(reviewHeading).toHaveFocus());
 
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
 
-    await screen.findByText(/Imported 2 messages into 1 channel/);
+    await screen.findByText(/Imported 2 messages into 1 room/);
     await waitFor(() => expect(chooser).toHaveFocus());
     const stored = await loadRecent('#general', 400, MEMORY_OWNER);
     expect(stored.map((m) => m.text)).toEqual(['hello', 'world']);
@@ -188,11 +188,11 @@ describe('SlackImportControls', () => {
     const chooser = screen.getByLabelText('Choose Slack JSON') as HTMLInputElement;
     chooseFile('Choose Slack JSON', fakeFile('dev.json', slackExport));
 
-    await screen.findByText(/Ready to import 1 message across 1 channel from Acme/);
+    await screen.findByText(/Ready to import 1 message across 1 room from Acme/);
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Review import' })).toHaveFocus());
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
 
-    await screen.findByText(/Imported 1 message into 1 channel/);
+    await screen.findByText(/Imported 1 message into 1 room/);
     await waitFor(() => expect(chooser).toHaveFocus());
     const stored = await loadRecent('#dev', 400, MEMORY_OWNER);
     expect(stored).toHaveLength(1);
@@ -216,12 +216,12 @@ describe('IrcLogImportControls', () => {
   it('requires a channel before a file can be imported', async () => {
     render(() => <IrcLogImportControls />);
     chooseFile('Choose log file', fakeFile('log.txt', '2025-01-01 10:00:00\t<alice>\thi there'));
-    await screen.findByText(/Enter the channel these logs belong to first/);
+    await screen.findByText(/Enter the room these logs belong to first/);
   });
 
   it('imports a plain-text IRC log into the named channel', async () => {
     render(() => <IrcLogImportControls />);
-    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '#dev' } });
+    fireEvent.input(screen.getByLabelText('Room'), { target: { value: '#dev' } });
     const chooser = screen.getByLabelText('Choose log file') as HTMLInputElement;
     const log = trackedFile(
       'log.txt',
@@ -248,12 +248,12 @@ describe('IrcLogImportControls', () => {
 
   it('warns when normalization changes the requested label and confirms only the exact displayed target', async () => {
     render(() => <IrcLogImportControls />);
-    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '  #Ops Room!  ' } });
+    fireEvent.input(screen.getByLabelText('Room'), { target: { value: '  #Ops Room!  ' } });
     chooseFile('Choose log file', fakeFile('ops.log', '2025-01-01 10:00:00\t<alice>\tship it'));
 
     await screen.findByText(/Ready to import 1 message into #ops-room/);
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Channel destination changed. Requested " #Ops Room! "; import destination: #ops-room. Confirm only if this is the intended room.',
+      'Room destination changed. Requested " #Ops Room! "; import destination: #ops-room. Confirm only if this is the intended room.',
     );
     expect(await loadRecent('#ops-room', 400, MEMORY_OWNER)).toHaveLength(0);
 
@@ -266,7 +266,7 @@ describe('IrcLogImportControls', () => {
 
   it('makes a collision-looking label explicit before any merge', async () => {
     render(() => <IrcLogImportControls />);
-    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '#ops---room!' } });
+    fireEvent.input(screen.getByLabelText('Room'), { target: { value: '#ops---room!' } });
     chooseFile('Choose log file', fakeFile('ops.log', '2025-01-01 10:00:00\t<alice>\tship it'));
 
     await screen.findByText(/Ready to import 1 message into #ops-room/);
@@ -280,11 +280,11 @@ describe('IrcLogImportControls', () => {
   it('rejects a requested label that normalizes to an unsafe target before reading the log', async () => {
     const unsafe = trackedFile('unsafe.log', '2025-01-01 10:00:00\t<alice>\tignored');
     render(() => <IrcLogImportControls />);
-    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '___' } });
+    fireEvent.input(screen.getByLabelText('Room'), { target: { value: '___' } });
 
     chooseFile('Choose log file', unsafe.file);
 
-    await screen.findByText('The requested channel "___" does not normalize to a safe destination. Enter a channel containing letters or numbers (for example, #dev).');
+    await screen.findByText('The requested room "___" does not normalize to a safe destination. Enter a room name containing letters or numbers (for example, #dev).');
     expect(unsafe.text).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: 'Review import' })).not.toBeInTheDocument();
   });
@@ -292,11 +292,11 @@ describe('IrcLogImportControls', () => {
   it('rejects an oversized IRC log before reading it', async () => {
     const oversized = trackedFile('huge.log', 'ignored', IRC_LOG_MAX_FILE_BYTES + 1);
     render(() => <IrcLogImportControls />);
-    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '#dev' } });
+    fireEvent.input(screen.getByLabelText('Room'), { target: { value: '#dev' } });
 
     chooseFile('Choose log file', oversized.file);
 
-    await screen.findByText('huge.log exceeds the 128 MiB IRC log limit. Split the log and import each part separately.');
+    await screen.findByText('huge.log exceeds the 128 MiB classic log limit. Split the log and import each part separately.');
     expect(oversized.text).not.toHaveBeenCalled();
   });
 });
@@ -358,7 +358,7 @@ describe('DiscordPackageImportControls — a11y contracts', () => {
     fireEvent.change(input, { target: { files: packageFiles } });
 
     const region = await screen.findByRole('status');
-    await screen.findByText(/Ready to import 2 messages across 1 channel from My Server/);
+    await screen.findByText(/Ready to import 2 messages across 1 room from My Server/);
     expect(region).toHaveTextContent(/Ready to import 2 messages/);
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Review import' })).toHaveFocus());
 
@@ -393,7 +393,7 @@ describe('DiscordPackageImportControls — a11y contracts', () => {
 
     chooseFiles('Choose package folder', [metadata.file, oversized.file]);
 
-    await screen.findByText('messages/c100/messages.json exceeds the 128 MiB per-file Discord package limit. Remove that channel export or choose a smaller package.');
+    await screen.findByText('messages/c100/messages.json exceeds the 128 MiB per-file Discord package limit. Remove that Discord export file or choose a smaller package.');
     expect(metadata.text).not.toHaveBeenCalled();
     expect(oversized.text).not.toHaveBeenCalled();
   });
@@ -422,7 +422,7 @@ describe('DiscordPackageImportControls — a11y contracts', () => {
 
     chooseFiles('Choose package folder', [unrecognized.file, ...packageFiles]);
 
-    await screen.findByText(/Ready to import 2 messages across 1 channel from My Server/);
+    await screen.findByText(/Ready to import 2 messages across 1 room from My Server/);
     expect(unrecognized.text).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,292 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Onyx UI · accessibility layer
+
+   Everything in this file is scoped under `.ui-root` (or a media query that
+   only redefines `--ui-*` tokens). That scoping is deliberate and load-bearing:
+   the existing app already ships its own focus and forced-colors rules in
+   src/styles/a11y-media.css, and this layer must not fight them. A surface
+   opts in by carrying `.ui-root`; nothing else in the document changes.
+
+   Contents:
+     · ONE focus-visible specification (the whole system, one rule)
+     · 44px pointer-target floor
+     · reduced-transparency hook
+     · data-readiness hook (honest UI for state we are not sure of)
+     · forced-colors mapping
+     · increased-contrast boost
+     · visually-hidden utility
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Focus ring ────────────────────────────────────────────────────────────
+     Aliases the theme's ring where present. Width/offset are tokens so the
+     increased-contrast and forced-colors blocks can thicken the ring by
+     changing ONE value instead of restating the rule. */
+  --ui-focus-width: var(--ui-border-emphasis);
+  --ui-focus-offset: var(--focus-offset, 3px);
+  --ui-focus-color: var(--ui-action-primary-hover);
+  --ui-focus-halo: color-mix(in oklab, var(--ui-focus-color) 30%, transparent);
+  --ui-focus-halo-width: 4px;
+
+  /* ── Transparency ──────────────────────────────────────────────────────────
+     `1` = translucent surfaces permitted. Components branch on this rather
+     than duplicating the media query. */
+  --ui-transparency-allowed: 1;
+  --ui-blur-panel: 14px;
+  --ui-blur-scrim: 6px;
+}
+
+/* ═══ Focus ═══════════════════════════════════════════════════════════════════
+   THE focus specification. One rule, every focusable descendant of a `.ui-root`
+   surface. Uses :focus-visible only — a mouse click on a button must not paint
+   a ring, but a keyboard tab always must.
+
+   Two layers (solid outline + soft halo) so the ring survives on both a dark
+   plane and a bright accent fill without needing a per-component override.
+   `outline` is used rather than `box-shadow` alone so the ring is still drawn
+   when the element is clipped by an ancestor's overflow. */
+.ui-root :focus-visible {
+  outline: var(--ui-focus-width) solid var(--ui-focus-color);
+  outline-offset: var(--ui-focus-offset);
+  box-shadow: 0 0 0 var(--ui-focus-halo-width) var(--ui-focus-halo);
+  border-radius: var(--ui-radius-sm);
+}
+
+/* A container that takes programmatic focus (a dialog, a landmark jumped to)
+   should acknowledge focus without the ring reading as an editable control. */
+.ui-root [tabindex='-1']:focus-visible {
+  outline-offset: calc(var(--ui-focus-offset) + 1px);
+  box-shadow: none;
+}
+
+/* Never suppress the ring silently. If a surface must restyle focus it should
+   restyle THIS rule's tokens, not set `outline: none`. */
+.ui-root :focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ═══ Target size ═════════════════════════════════════════════════════════════
+   WCAG 2.2 SC 2.5.8 (AA) requires 24px; this system holds the stricter SC 2.5.5
+   (AAA) 44px floor for every pointer target. `--ui-target-inline-min` exists
+   for the documented exception only: a link inside a sentence of running text,
+   where enlarging the target would break the line box. */
+.ui-root .ui-target,
+.ui-root button.ui-target,
+.ui-root [role='button'].ui-target {
+  min-inline-size: var(--ui-target-min);
+  min-block-size: var(--ui-target-min);
+}
+
+/* Coarse pointers get the floor whether or not the author remembered the
+   utility class — a thumb has no pixel precision. */
+@media (pointer: coarse) {
+  .ui-root button,
+  .ui-root [role='button'],
+  .ui-root [role='tab'],
+  .ui-root [role='switch'],
+  .ui-root a[href],
+  .ui-root input:not([type='text']):not([type='search']),
+  .ui-root select {
+    min-block-size: var(--ui-target-min);
+  }
+}
+
+/* ═══ Reduced transparency ════════════════════════════════════════════════════
+   Translucency over a live animated canvas is the single worst legibility
+   offender in this product. Under `prefers-reduced-transparency: reduce` every
+   translucent surface becomes opaque and every backdrop-filter is dropped —
+   blur is expensive AND is exactly what the user asked us to stop doing. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --ui-transparency-allowed: 0;
+    --ui-blur-panel: 0px;
+    --ui-blur-scrim: 0px;
+    --ui-surface-overlay: var(--ui-surface-canvas);
+  }
+
+  .ui-root,
+  .ui-root * {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* Explicit opt-out hook, mirroring the motion control: an in-app
+   "reduce transparency" preference drives this without touching OS settings. */
+[data-ui-transparency='opaque'] {
+  --ui-transparency-allowed: 0;
+  --ui-blur-panel: 0px;
+  --ui-blur-scrim: 0px;
+  --ui-surface-overlay: var(--ui-surface-canvas);
+}
+
+/* ═══ Data readiness ══════════════════════════════════════════════════════════
+   Onyx routinely renders data it cannot fully vouch for: history still
+   backfilling, a vault read that only covers part of a range, a mesh peer
+   mid-reconnect. These hooks let a surface DECLARE that condition so the
+   styling and the assistive-technology story stay in sync, instead of showing
+   a partial result that looks identical to a complete one.
+
+   `data-ui-data` is the container-level readiness of the data being shown.
+   It never invents a value — `unknown` is a legitimate, expected state. */
+.ui-root [data-ui-data='ready'] {
+  --ui-data-confidence: 1;
+}
+
+.ui-root [data-ui-data='partial'] {
+  --ui-data-confidence: 0.5;
+}
+
+.ui-root [data-ui-data='stale'] {
+  --ui-data-confidence: 0.25;
+}
+
+.ui-root [data-ui-data='unknown'] {
+  --ui-data-confidence: 0;
+}
+
+/* A surface whose data is not `ready` is visually de-emphasised, but it is
+   never hidden and never faded below the AA legibility floor — a reader must
+   still be able to read a partial result, and a screen-reader user learns the
+   same fact from the accompanying status text, not from this styling. */
+.ui-root [data-ui-data='partial'],
+.ui-root [data-ui-data='stale'],
+.ui-root [data-ui-data='unknown'] {
+  border-color: var(--ui-surface-line);
+}
+
+/* ═══ Increased contrast ══════════════════════════════════════════════════════
+   Boost the structural tokens only. Foreground colours are intentionally NOT
+   overridden here: ThemeProvider already derives a per-theme, OKLCH-solved
+   high-contrast palette (src/theme/highContrastTheme.ts) so the boost follows
+   the active theme's hue. These tokens are colour-mix expressions over the
+   semantic ink/action, so they inherit that boost automatically. */
+@media (prefers-contrast: more) {
+  :root {
+    --ui-surface-line: color-mix(in oklab, var(--ui-text-primary) 42%, transparent);
+    --ui-surface-line-faint: color-mix(in oklab, var(--ui-text-primary) 26%, transparent);
+    --ui-surface-seam: color-mix(in oklab, var(--ui-action-primary-hover) 72%, var(--ui-text-primary) 28%);
+    --ui-surface-seam-faint: color-mix(
+      in oklab,
+      var(--ui-action-primary-hover) 46%,
+      var(--ui-text-primary) 54%
+    );
+    --ui-surface-hover: color-mix(in oklab, var(--ui-text-primary) 14%, transparent);
+    --ui-focus-width: var(--ui-border-heavy);
+    --ui-focus-halo-width: 5px;
+    --ui-action-disabled: color-mix(in oklab, var(--ui-text-muted) 70%, transparent);
+  }
+
+  /* Proof washes must not thin out into the background at high contrast — a
+     truth state losing its chip is a truth state losing its meaning. */
+  .ui-root [data-ui-truth] {
+    border-width: var(--ui-border-emphasis);
+  }
+}
+
+/* ═══ Forced colors ═══════════════════════════════════════════════════════════
+   Windows High Contrast and friends. Map the semantic layer onto system
+   keywords so the whole token system keeps working rather than being bypassed.
+   Decorative fills are surrendered; meaning is preserved. */
+@media (forced-colors: active) {
+  :root {
+    --ui-surface-canvas: Canvas;
+    --ui-surface-sunken: Canvas;
+    --ui-surface-base: Canvas;
+    --ui-surface-raised: Canvas;
+    --ui-surface-edge: Canvas;
+    --ui-surface-overlay: Canvas;
+    --ui-surface-hover: Canvas;
+    --ui-surface-selected: Highlight;
+    --ui-surface-line: CanvasText;
+    --ui-surface-line-faint: CanvasText;
+    --ui-surface-seam: CanvasText;
+    --ui-surface-seam-faint: CanvasText;
+
+    --ui-text-primary: CanvasText;
+    --ui-text-secondary: CanvasText;
+    --ui-text-muted: GrayText;
+    --ui-text-accent: LinkText;
+    --ui-text-link: LinkText;
+    --ui-text-on-action: HighlightText;
+    --ui-text-on-critical: HighlightText;
+
+    --ui-action-primary: Highlight;
+    --ui-action-primary-hover: Highlight;
+    --ui-action-primary-pressed: Highlight;
+    --ui-action-secondary: ButtonText;
+    --ui-action-secondary-hover: ButtonText;
+    --ui-action-critical: Mark;
+    --ui-action-critical-hover: Mark;
+    --ui-action-quiet: ButtonFace;
+    --ui-action-quiet-hover: ButtonFace;
+    --ui-action-disabled: GrayText;
+
+    /* Truth states collapse to three system colours, so the GLYPH and the TEXT
+       label carry the distinction — which is precisely why this system refuses
+       to encode a state in colour alone. */
+    --ui-proof-verified: CanvasText;
+    --ui-proof-partial: Mark;
+    --ui-proof-local: CanvasText;
+    --ui-proof-reconnecting: CanvasText;
+    --ui-proof-unavailable: Mark;
+    --ui-proof-unknown: GrayText;
+    --ui-proof-verified-wash: Canvas;
+    --ui-proof-partial-wash: Canvas;
+    --ui-proof-local-wash: Canvas;
+    --ui-proof-reconnecting-wash: Canvas;
+    --ui-proof-unavailable-wash: Canvas;
+    --ui-proof-unknown-wash: Canvas;
+
+    --ui-focus-color: Highlight;
+    --ui-focus-halo: transparent;
+    --ui-transparency-allowed: 0;
+  }
+
+  .ui-root,
+  .ui-root * {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Shadows convey nothing in forced colors; borders convey everything. */
+  .ui-root [class*='ui-panel'],
+  .ui-root [class*='ui-card'],
+  .ui-root [data-ui-truth] {
+    box-shadow: none;
+    border: var(--ui-border-hairline) solid CanvasText;
+  }
+
+  .ui-root :focus-visible {
+    outline: var(--ui-border-heavy) solid Highlight;
+    outline-offset: var(--ui-focus-offset);
+    box-shadow: none;
+  }
+
+  .ui-root button,
+  .ui-root [role='button'],
+  .ui-root input,
+  .ui-root select,
+  .ui-root textarea {
+    color: ButtonText;
+    background: ButtonFace;
+    border-color: ButtonText;
+  }
+}
+
+/* ═══ Visually hidden ═════════════════════════════════════════════════════════
+   Available to assistive technology, absent from the visual layer. Prefixed to
+   avoid colliding with the app's existing sr-only/visually-hidden utilities. */
+.ui-visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

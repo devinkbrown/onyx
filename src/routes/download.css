@@ -1,0 +1,248 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Download owns package catalog surfaces, not a second site shell. PublicFrame
+   owns document chrome; every rule here is route-scoped. */
+.dl-page {
+  min-width: 0;
+  color: var(--paper);
+}
+
+.dl-page .r-wrap {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.dl-page .r-section {
+  padding-block: clamp(3rem, 7vw, 6rem);
+}
+
+.dl-hero h1 {
+  max-width: 18ch;
+  font-family: var(--font-sans);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  text-transform: none;
+}
+
+.dl-title-accent {
+  color: var(--public-current, var(--lapis-bright));
+}
+
+.dl-catalog-receipt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 62rem;
+  margin-top: 1.5rem;
+  padding-block: 0.85rem;
+  border-block: 1px solid var(--seam-faint);
+  color: var(--paper-dim);
+  font: 500 0.82rem/1.5 var(--font-mono);
+}
+
+.dl-catalog-receipt__marker {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--paper-mute);
+}
+
+.dl-catalog-receipt[data-catalog-state='loading'] .dl-catalog-receipt__marker {
+  color: var(--public-current, var(--lapis-bright));
+  border-style: dashed;
+}
+
+.dl-catalog-receipt[data-catalog-state='ready'] .dl-catalog-receipt__marker {
+  color: var(--public-current, var(--lapis-bright));
+  background: currentColor;
+}
+
+.dl-catalog-receipt[data-catalog-state='errored'] .dl-catalog-receipt__marker {
+  color: var(--public-ember, var(--warn));
+  border-style: double;
+}
+
+.dl-page .dl-card h3 {
+  margin: 12px 0 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2rem, 1.2rem + 2.6vw, 4rem);
+  line-height: 0.96;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--paper);
+  overflow-wrap: anywhere;
+}
+
+.dl-page .dl-install h4 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: var(--paper);
+}
+
+.dl-soon-arches {
+  list-style: none;
+  padding-left: 0;
+}
+
+.dl-copy {
+  min-width: var(--target-min, 44px);
+}
+
+.dl-page .dl-actions .r-btn,
+.dl-page .dl-copy {
+  min-height: var(--target-min, 44px);
+}
+
+.dl-page .dl-copy:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dl-page .r-btn,
+  .dl-page .dl-copy {
+    transition: none;
+    transform: none;
+  }
+}
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .dl-page,
+  .dl-page .r-wrap,
+  .dl-page .dl-hero,
+  .dl-page .dl-catalog-receipt,
+  .dl-page .dl-grid,
+  .dl-page .dl-card,
+  .dl-page .dl-honesty,
+  .dl-page .dl-verify,
+  .dl-page .dl-actions,
+  .dl-page .dl-checksum,
+  .dl-page .dl-checksum-row,
+  .dl-page .dl-install,
+  .dl-page .dl-soon-arches,
+  .dl-page .dl-soon-arch {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .dl-page .dl-hero {
+    padding-block: 24px 16px;
+  }
+
+  .dl-page .data-hero h1,
+  .dl-page .dl-section-title {
+    overflow-wrap: anywhere;
+  }
+
+  .dl-page .data-hero h1 {
+    max-width: none;
+    font-size: 48px;
+    line-height: 1;
+  }
+
+  .dl-page .dl-section-title {
+    font-size: 28px;
+  }
+
+  .dl-page .data-hero .sub,
+  .dl-page .dl-catalog-receipt,
+  .dl-page .dl-honesty li,
+  .dl-page .dl-facts li,
+  .dl-page .dl-note,
+  .dl-page .dl-checksum-missing {
+    font-size: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  .dl-page .dl-card h3 {
+    font-size: 36px;
+    overflow-wrap: anywhere;
+  }
+
+  .dl-page .dl-install h4 {
+    font-size: 20px;
+    overflow-wrap: anywhere;
+  }
+
+  .dl-page .dl-status {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .dl-page .dl-grid,
+  .dl-page .dl-soon-arches,
+  .dl-page .dl-checksum-row,
+  .dl-page .dl-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dl-page .dl-actions {
+    display: grid;
+  }
+
+  .dl-page .dl-actions .r-btn,
+  .dl-page .dl-copy {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    overflow-wrap: anywhere;
+  }
+
+  .dl-page .dl-pre,
+  .dl-page .dl-hash,
+  .dl-page code {
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+}
+
+@media (forced-colors: active) {
+  .dl-page .dl-title-accent {
+    color: LinkText;
+  }
+
+  .dl-page .dl-catalog-receipt {
+    border-color: CanvasText;
+    color: CanvasText;
+  }
+
+  .dl-page .dl-catalog-receipt__marker,
+  .dl-page .dl-catalog-receipt[data-catalog-state] .dl-catalog-receipt__marker {
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .dl-page .dl-catalog-receipt[data-catalog-state='ready'] .dl-catalog-receipt__marker {
+    color: Highlight;
+    background: Highlight;
+  }
+
+  .dl-page .dl-card,
+  .dl-page .dl-honesty,
+  .dl-page .dl-verify,
+  .dl-page .dl-status,
+  .dl-page .dl-soon-arch,
+  .dl-page .dl-pre,
+  .dl-page .dl-copy {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .dl-page .dl-copy[data-state='copied'],
+  .dl-page .dl-actions .r-btn.primary {
+    color: HighlightText;
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .dl-page .dl-status[data-state='available'] {
+    color: Highlight;
+  }
+}

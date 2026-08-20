@@ -94,7 +94,7 @@ test('contains enlarged mobile navigation in a safe-area-aware horizontal rail',
     expect(button.scrollHeight).toBeLessThanOrEqual(button.clientHeight);
   }
 
-  const finalAction = page.getByRole('button', { name: 'Open You' });
+  const finalAction = page.getByRole('button', { name: 'Open Menu' });
   await finalAction.focus();
   await expect(finalAction).toBeFocused();
   const focusedGeometry = await nav.evaluate((element) => {
@@ -114,4 +114,146 @@ test('contains enlarged mobile navigation in a safe-area-aware horizontal rail',
   expect(focusedGeometry.scrollLeft).toBeGreaterThan(0);
   expect(focusedGeometry.lastLeft).toBeGreaterThanOrEqual(focusedGeometry.safeLeft - 1);
   expect(focusedGeometry.lastRight).toBeLessThanOrEqual(focusedGeometry.safeRight + 1);
+});
+
+test('keeps the Advanced room control desk reachable at 400% short reflow', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Safe-area inset override uses the Chromium DevTools protocol.');
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 320, height: 256 });
+  const session = await page.context().newCDPSession(page);
+  await session.send('Emulation.setSafeAreaInsetsOverride', {
+    insets: {
+      top: 8,
+      topMax: 8,
+      right: 18,
+      rightMax: 18,
+      bottom: 20,
+      bottomMax: 20,
+      left: 12,
+      leftMax: 12,
+    },
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem('onyx:preferences', JSON.stringify({ experienceMode: 'advanced' }));
+  });
+
+  await page.goto('/app/');
+  await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => (
+    /\/assets\/runtime-[^/]+\.js$/.test(new URL(entry.name).pathname)
+  )));
+  await page.evaluate(async () => {
+    const entry = performance.getEntriesByType('resource').find((candidate) => (
+      /\/assets\/runtime-[^/]+\.js$/.test(new URL(candidate.name).pathname)
+    ));
+    if (!entry) throw new Error('Runtime store bundle was not loaded.');
+    const runtime = await import(entry.name) as Record<string, unknown>;
+    const store = Object.values(runtime).find((value): value is RuntimeStore => (
+      typeof value === 'object'
+      && value !== null
+      && typeof (value as RuntimeStore).getState === 'function'
+      && typeof (value as RuntimeStore).setState === 'function'
+    ));
+    if (!store) throw new Error('Runtime store export was not found.');
+
+    document.documentElement.style.fontSize = '64px';
+    store.setState({
+      connectionStatus: 'connected',
+      server: {
+        id: 'ui-qa',
+        name: 'UI QA',
+        network: 'UI QA',
+        url: 'wss://ui-qa.invalid',
+        icon: '',
+        nick: 'ui-qa',
+        account: 'ui-qa',
+        connected: true,
+      },
+      ourNick: 'ui-qa',
+      activeView: { kind: 'channel', channel: '#access' },
+      channels: new Map([['#access', {
+        name: '#access',
+        topic: 'Accessible room operations',
+        topicSetBy: 'ui-qa',
+        topicSetAt: null,
+        modes: '+t',
+        users: new Map([
+          ['ui-qa', { nick: 'ui-qa', modes: new Set(['o']) }],
+          ['ada', { nick: 'ada', modes: new Set() }],
+        ]),
+        unread: 0,
+        highlights: 0,
+        createdAt: null,
+        messages: [],
+      }]]),
+    });
+  });
+
+  const moreTrigger = page.getByRole('button', { name: 'Open Menu' });
+  await moreTrigger.focus();
+  await moreTrigger.click();
+  const more = page.getByRole('dialog', { name: 'Menu' });
+  const appearance = more.getByRole('button', { name: 'Appearance' });
+  const preferences = more.getByRole('button', { name: 'Preferences' });
+  await expect(appearance).toBeVisible();
+  await expect(preferences).toBeVisible();
+  expect((await appearance.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect((await preferences.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  const launcher = more.getByRole('button', { name: /Room control desk.*#access/i });
+  await expect(launcher).toBeVisible();
+  await launcher.click();
+
+  const desk = page.getByRole('dialog', { name: 'Room controls for #access' });
+  await expect(desk).toBeVisible();
+  await expect(desk.getByRole('button', { name: 'Back' })).toBeFocused();
+  await expect(desk.getByTestId('moderation-cockpit')).toBeVisible();
+
+  const invite = desk.getByLabel('Invite someone');
+  const ban = desk.getByLabel('Block a matching address');
+  await invite.scrollIntoViewIfNeeded();
+  await expect(invite).toBeVisible();
+  await ban.fill('ada!*@*');
+  const review = desk.getByRole('button', { name: 'Review block' });
+  await review.scrollIntoViewIfNeeded();
+  await review.focus();
+  await expect(review).toBeFocused();
+  await page.keyboard.press('Enter');
+  const confirmation = page.getByRole('button', { name: 'Block from room' });
+  await confirmation.scrollIntoViewIfNeeded();
+  await confirmation.focus();
+  await expect(confirmation).toBeFocused();
+
+  const geometry = await desk.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      position: getComputedStyle(element).position,
+      height: getComputedStyle(element).height,
+      maxHeight: getComputedStyle(element).maxHeight,
+      topStyle: getComputedStyle(element).top,
+      bottomStyle: getComputedStyle(element).bottom,
+      overflowY: getComputedStyle(element).overflowY,
+    };
+  });
+  expect(geometry.position).toBe('fixed');
+  expect(geometry.overflowY).toBe('auto');
+  expect(geometry.maxHeight).not.toBe('none');
+  expect(geometry.left).toBeGreaterThanOrEqual(0);
+  expect(geometry.right).toBeLessThanOrEqual(320);
+  expect(geometry.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.bottom).toBeLessThanOrEqual(256);
+  expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight);
+  expect(geometry.documentScrollWidth).toBe(geometry.documentClientWidth);
+
+  await page.keyboard.press('Escape');
+  await expect(review).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(desk).toHaveCount(0);
+  await expect(moreTrigger).toBeFocused();
 });

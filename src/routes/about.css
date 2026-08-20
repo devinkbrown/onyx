@@ -1,7 +1,6 @@
-/* Onyx /about — deep-water dark-luxury: depth, azure currents, bioluminescence.
-   Banished: purple, glassmorphism/backdrop-blur cards, neon glow, AI gradient text, Inter.
-   Present: abyssal depth gradients, flowing azure current seams, sea-foam text,
-   champagne gold as a sparing second accent, fluid radii, calm human voice. */
+/* Onyx /about — Room Current technical essay.
+   Banished: purple, glassmorphism/backdrop-blur cards, neon glow, gold shouting, Inter.
+   Present: void/surface/seam tokens, current for proof, ember for caution. */
 
 /* ───────── Inherit atmosphere from landing ───────── */
 /* .r-ground, .r-flecks, .r-veins, .r-grain, .r-divider, .r-status, .r-footer
@@ -9,19 +8,27 @@
    The .ab-ocean overrides below re-tint that shared atmosphere from gold-leaf
    into bioluminescent azure currents without touching landing.css. */
 
+.ab-ocean {
+  --ab-current: var(--public-current);
+  --ab-current-strong: var(--public-signal-strong);
+  --ab-ember: var(--public-ember);
+  min-width: 0;
+  color: var(--public-text);
+}
+
+.ab-ocean .r-wrap,
+.ab-ocean section,
+.ab-ocean article,
+.ab-ocean aside {
+  min-width: 0;
+}
+
 /* Re-tint the shared gold atmosphere to azure bioluminescence (scoped to /about) */
-.ab-ocean .r-veins path { stroke: var(--lapis); }
-.ab-ocean .r-veins .node { fill: var(--lapis-bright); }
+.ab-ocean .r-veins path { stroke: var(--ab-current); }
+.ab-ocean .r-veins .node { fill: var(--ab-current-strong); }
 .ab-ocean .r-flecks {
-  background-image:
-    radial-gradient(1.4px 1.4px at 12% 22%, var(--lapis-bright) 50%, transparent 52%),
-    radial-gradient(1px 1px at 78% 16%, var(--lapis) 50%, transparent 52%),
-    radial-gradient(1.5px 1.5px at 64% 60%, var(--lapis-bright) 50%, transparent 52%),
-    radial-gradient(1px 1px at 30% 78%, var(--lapis) 50%, transparent 52%),
-    radial-gradient(1px 1px at 88% 72%, var(--gold-bright) 50%, transparent 52%),
-    radial-gradient(1.4px 1.4px at 44% 34%, var(--lapis) 50%, transparent 52%),
-    radial-gradient(1px 1px at 22% 52%, var(--lapis-bright) 50%, transparent 52%),
-    radial-gradient(1px 1px at 56% 88%, var(--lapis) 50%, transparent 52%);
+  display: none;
+  background-image: none;
 }
 
 /* Brand mark (Mascot) sits inline with the ONYX wordmark in nav + footer */
@@ -46,7 +53,7 @@
   font-size: 13px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--lapis);
+  color: var(--ab-current);
 }
 
 .ab-hero .r-kicker::before {
@@ -66,22 +73,8 @@
   text-wrap: balance;
 }
 
-/* Hero accent — bioluminescent azure crest cresting over deep water */
-.ab-hero h1 .gold {
-  background: linear-gradient(
-    98deg,
-    var(--lapis-deep) 0%,
-    var(--lapis) 24%,
-    var(--lapis-bright) 46%,
-    #e8fbff 52%,
-    var(--lapis-bright) 60%,
-    var(--lapis) 80%,
-    var(--lapis-deep) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 0 18px color-mix(in oklab, var(--lapis) 40%, transparent));
+.ab-hero h1 .ab-thesis-accent {
+  color: var(--ab-current-strong);
 }
 
 .ab-hero .serif-pull {
@@ -96,7 +89,7 @@
 }
 
 .ab-hero .serif-pull em {
-  color: var(--lapis-bright);
+  color: var(--ab-current-strong);
   font-style: italic;
 }
 
@@ -108,6 +101,89 @@
   line-height: 1.65;
   color: var(--paper-dim);
   text-wrap: pretty;
+}
+
+/* The public report is evidence adjacent to the editorial thesis, never a
+   decorative online light. Non-current states explicitly refuse an uptime
+   claim in visible and announced text. */
+.ab-feed {
+  display: grid;
+  grid-template-columns: auto max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 14px;
+  margin-top: 28px;
+  padding-block: 14px;
+  border-block: 1px solid var(--seam-faint);
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ab-feed__mark {
+  width: 9px;
+  height: 9px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-pill);
+  color: var(--paper-mute);
+}
+
+.ab-feed[data-feed-state='current'] .ab-feed__mark {
+  color: var(--ok);
+  background: currentColor;
+}
+
+.ab-feed[data-feed-state='degraded'] .ab-feed__mark,
+.ab-feed[data-feed-state='stale'] .ab-feed__mark,
+.ab-feed[data-feed-state='future'] .ab-feed__mark,
+.ab-feed[data-feed-state='unknown'] .ab-feed__mark {
+  color: var(--warn);
+  background: currentColor;
+}
+
+.ab-feed[data-feed-state='loading'] .ab-feed__mark {
+  color: var(--lapis-bright);
+  border-style: dashed;
+}
+
+.ab-feed__detail {
+  min-width: 0;
+  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+  line-height: 1.5;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.ab-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-top: 24px;
+}
+
+.ab-topics a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 14px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  color: var(--paper-dim);
+  background: color-mix(in oklab, var(--stone-2) 28%, transparent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.ab-topics a:hover,
+.ab-topics a:focus-visible {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
 }
 
 /* ───────── Section headers ───────── */
@@ -134,24 +210,17 @@
   position: relative;
   padding: clamp(26px, 3vw, 40px);
   border-radius: var(--r-md);
-  background: linear-gradient(
-    160deg,
-    color-mix(in oklab, var(--stone-2) 48%, var(--ink)),
-    color-mix(in oklab, var(--stone) 28%, var(--ink))
-  );
+  background: color-mix(in oklab, var(--stone-2) 38%, var(--ink));
   border: 1px solid var(--seam-faint);
   border-top: 2px solid var(--seam);
   display: flex;
   flex-direction: column;
   gap: 14px;
-  transition: border-top-color var(--dur) var(--ease), transform var(--dur) var(--ease),
-    box-shadow var(--dur) var(--ease);
+  transition: border-top-color var(--dur) var(--ease);
 }
 
 .ab-proto-item:hover {
-  transform: translateY(-3px);
   border-top-color: var(--lapis-bright);
-  box-shadow: 0 18px 40px -28px color-mix(in oklab, var(--lapis) 60%, transparent);
 }
 
 .ab-proto-item .label {
@@ -277,12 +346,7 @@
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
   border-radius: var(--r-md);
-  background: radial-gradient(
-    130% 130% at 50% -10%,
-    color-mix(in oklab, var(--lapis-deep) 22%, var(--ink)),
-    color-mix(in oklab, var(--stone-2) 40%, var(--ink)) 40%,
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--stone-2) 32%, var(--ink));
 }
 
 .ab-media-body {
@@ -328,14 +392,12 @@
   flex-direction: column;
   gap: 10px;
   background: color-mix(in oklab, var(--stone) 20%, transparent);
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
 .ab-transport:hover {
   border-color: var(--seam);
   background: color-mix(in oklab, var(--stone-2) 32%, transparent);
-  transform: translateY(-2px);
 }
 
 /* Primary = the preferred path, the live azure current */
@@ -463,16 +525,11 @@
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
   border-radius: var(--r-md);
-  background: radial-gradient(
-    100% 100% at 50% 0%,
-    color-mix(in oklab, var(--lapis-deep) 20%, var(--ink)),
-    color-mix(in oklab, var(--stone-2) 42%, var(--ink)) 42%,
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--stone-2) 34%, var(--ink));
 }
 
 /* ───────── Cadence mesh section ───────── */
-.ab-mesh-body {
+.ab-network-body {
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   gap: clamp(28px, 4vw, 68px);
@@ -481,33 +538,28 @@
 }
 
 @media (max-width: 860px) {
-  .ab-mesh-body {
+  .ab-network-body {
     grid-template-columns: 1fr;
   }
 }
 
-.ab-mesh-vis {
+.ab-network-vis {
   width: 100%;
   height: auto;
   display: block;
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
   border-radius: var(--r-md);
-  background: radial-gradient(
-    120% 120% at 50% 0%,
-    color-mix(in oklab, var(--lapis-deep) 22%, var(--ink)),
-    color-mix(in oklab, var(--stone-2) 40%, var(--ink)) 42%,
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--stone-2) 32%, var(--ink));
 }
 
-.ab-mesh-text {
+.ab-network-text {
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
 
-.ab-mesh-text p {
+.ab-network-text p {
   margin: 0;
   font-family: var(--font-sans);
   font-size: 0.99rem;
@@ -516,7 +568,7 @@
   text-wrap: pretty;
 }
 
-.ab-mesh-text p b {
+.ab-network-text p b {
   color: var(--paper);
   font-weight: 600;
 }
@@ -552,12 +604,12 @@
 
 .ab-node.esh .dot {
   background: var(--lapis);
-  box-shadow: 0 0 12px var(--lapis);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent);
 }
 
 .ab-node.ircx .dot {
   background: var(--lapis-bright);
-  box-shadow: 0 0 12px var(--lapis-bright);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--paper) 35%, transparent);
 }
 
 .ab-node .meta {
@@ -629,11 +681,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: linear-gradient(
-    160deg,
-    color-mix(in oklab, var(--stone-2) 40%, var(--ink)),
-    color-mix(in oklab, var(--stone) 22%, var(--ink))
-  );
+  background: color-mix(in oklab, var(--stone-2) 32%, var(--ink));
   position: relative;
   overflow: hidden;
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
@@ -648,8 +696,7 @@
 }
 
 .ab-svc:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 18px 40px -30px color-mix(in oklab, var(--lapis) 55%, transparent);
+  box-shadow: none;
 }
 
 .ab-svc .cmd {
@@ -735,20 +782,16 @@
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
   border-radius: var(--r-md);
-  transition: transform var(--dur) var(--ease), border-top-color var(--dur) var(--ease);
+  transition: border-top-color var(--dur) var(--ease);
 }
 
 .ab-myth:hover {
-  transform: translateY(-4px);
+  border-top-color: var(--lapis);
 }
 
 /* serpent = Onyx Server engine — the living azure current */
 .ab-myth.serpent {
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--lapis-deep) 26%, var(--ink)),
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--lapis-deep) 14%, var(--ink));
 }
 
 .ab-myth.serpent:hover {
@@ -757,28 +800,19 @@
 
 /* tide = the gate — the open water you pass through */
 .ab-myth.tide {
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--lapis) 14%, var(--ink)),
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--lapis) 10%, var(--ink));
 }
 
 .ab-myth.tide:hover {
   border-top-color: var(--lapis);
 }
 
-/* jewel = Onyx client — champagne gold, the sparing second accent */
 .ab-myth.jewel {
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--gold-deep) 16%, var(--ink)),
-    var(--ink)
-  );
+  background: color-mix(in oklab, var(--ab-ember) 12%, var(--ink));
 }
 
 .ab-myth.jewel:hover {
-  border-top-color: var(--gold-bright);
+  border-top-color: var(--ab-ember);
 }
 
 .ab-myth .ideograph {
@@ -803,7 +837,7 @@
 }
 
 .ab-myth.jewel .ideograph {
-  color: var(--gold-bright);
+  color: var(--ab-ember);
 }
 
 .ab-myth .name {
@@ -814,9 +848,8 @@
   color: var(--paper);
 }
 
-/* the Onyx client card carries the sparing champagne second accent */
 .ab-myth.jewel .name {
-  color: var(--gold);
+  color: var(--ab-current-strong);
 }
 
 .ab-myth p {
@@ -876,7 +909,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--lapis-bright), transparent);
+  background: var(--seam);
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
 }
@@ -948,6 +981,9 @@
 }
 
 .ab-dev-card a.more {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--lapis-bright);
@@ -981,14 +1017,7 @@
 .ab-seam {
   height: 2px;
   width: min(600px, 80vw);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--lapis) 8%,
-    var(--lapis-bright) 50%,
-    var(--lapis) 92%,
-    transparent
-  );
+  background: color-mix(in oklab, var(--lapis) 42%, var(--seam));
   /* a gentle wave crest rather than a jagged gold seam fracture */
   clip-path: polygon(
     0 50%,
@@ -1004,7 +1033,6 @@
   );
   opacity: 0.85;
   margin-top: 24px;
-  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--lapis) 50%, transparent));
 }
 
 @media (max-width: 42rem) and (max-height: 30rem) {
@@ -1028,6 +1056,30 @@
 
   .ab-hero .serif-pull {
     font-size: 24px;
+  }
+
+  .ab-feed {
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 8px 12px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .ab-feed__detail {
+    grid-column: 2;
+    font-size: 16px;
+  }
+
+  .ab-topics {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ab-topics a {
+    width: 100%;
+    min-width: 0;
+    font-size: 14px;
+    overflow-wrap: anywhere;
   }
 
   .ab-hero p.sub,
@@ -1094,6 +1146,14 @@
     font-size: 14px;
   }
 
+  .ab-media-diagram,
+  .ab-e2ee-visual,
+  .ab-network-vis {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .ab-ocean .r-footer .cols {
     grid-template-columns: 1fr;
   }
@@ -1111,11 +1171,33 @@
   .ab-media-header > *,
   .ab-transport-row > *,
   .ab-e2ee-split > *,
-  .ab-mesh-body > *,
+  .ab-network-body > *,
   .ab-crdt-row > *,
   .ab-svc-grid > *,
   .ab-mythos-grid > *,
   .ab-dev-grid > * {
     min-width: 0;
+  }
+}
+
+@media (forced-colors: active) {
+  .ab-hero h1 .ab-thesis-accent,
+  .ab-myth.jewel .name {
+    color: LinkText;
+  }
+
+  .ab-feed,
+  .ab-topics a {
+    border-color: CanvasText;
+  }
+
+  .ab-feed__mark,
+  .ab-feed[data-feed-state] .ab-feed__mark {
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .ab-feed[data-feed-state='current'] .ab-feed__mark {
+    background: Highlight;
   }
 }

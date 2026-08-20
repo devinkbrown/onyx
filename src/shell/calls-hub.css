@@ -8,11 +8,7 @@
   padding: clamp(24px, 5.5vw, 72px);
   color: var(--paper);
   /* Matte mineral field — no radial glow wash */
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--surface-face, var(--stone)) 55%, var(--surface-void, var(--ink))) 0%,
-    var(--surface-void, var(--ink)) 100%
-  );
+  background: var(--surface-void, var(--ink));
 }
 
 .shell-calls-kicker {
@@ -187,12 +183,7 @@
       max(16px, env(safe-area-inset-right, 0px))
       calc(var(--mnav-h, 56px) + env(safe-area-inset-bottom, 0px) + 28px)
       max(16px, env(safe-area-inset-left, 0px));
-    background: linear-gradient(
-      160deg,
-      color-mix(in oklab, var(--lapis-deep) 18%, var(--ink)) 0%,
-      color-mix(in oklab, var(--stone) 42%, var(--ink)) 38%,
-      var(--ink) 100%
-    );
+    background: var(--ink);
   }
 
   .shell-calls-hub h1 {

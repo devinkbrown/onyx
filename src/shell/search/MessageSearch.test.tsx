@@ -138,6 +138,10 @@ describe('MessageSearch', () => {
     render(() => <MessageSearch />);
 
     expect(screen.getByRole('search', { name: 'Message search' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23root',
+    );
     expect(screen.getByRole('searchbox', { name: 'Search messages' })).toHaveValue('needle');
     expect(screen.getByRole('group', { name: 'Search result navigation' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Visible message search provenance: This device/i)).toBeInTheDocument();
@@ -208,6 +212,44 @@ describe('MessageSearch', () => {
 
     expect(screen.getByText('1 of 2', { selector: '.onyx-message-search__count' }))
       .toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('uses instant match scrolling when in-app reduce motion is enabled', async () => {
+    setPreference('reduceMotion', true);
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+
+    const target = document.createElement('article');
+    target.dataset.messageSearchId = 'needle-first';
+    const scrollSpy = vi.fn();
+    target.scrollIntoView = scrollSpy;
+    Object.defineProperty(target, 'offsetWidth', { get: () => 0 });
+    document.body.appendChild(target);
+
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([['#root', channel('#root', [
+        message('needle-first', 'Kai', 'needle one', 1),
+        message('needle-second', 'Mira', 'needle two', 2),
+      ])]]),
+    }, true);
+    openMessageSearchWithQuery('needle');
+    render(() => <MessageSearch />);
+
+    await waitFor(() => {
+      expect(scrollSpy).toHaveBeenCalled();
+    });
+    expect(scrollSpy).toHaveBeenLastCalledWith({ block: 'center', behavior: 'auto' });
+    target.remove();
   });
 
   it('defers composed queries and leaves candidate keys inside the input method', async () => {
@@ -475,6 +517,7 @@ describe('MessageSearch', () => {
     render(() => <MessageSearch />);
 
     expect(screen.getByText(/Encrypted DM search stays on this device/i)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Room ledger/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId('server-search')).not.toBeInTheDocument();
     expect(screen.getByText('1 of 1')).toBeInTheDocument();
     expect(screen.queryByText('e2ee:v1:cipher-envelope')).not.toBeInTheDocument();

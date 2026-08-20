@@ -2,59 +2,49 @@
 import './landing.css';
 import './data-pages.css';
 import './stats.css';
-import { createMemo, createResource, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
-import { Mascot } from '@/components/brand/Mascot';
-import { fetchChannelDetail, type ChannelDetail } from '@/lib/stats/channelDetail';
+import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
+import {
+  fetchChannelDetail,
+  netMembershipFlow,
+  parseStatsRoomQuery,
+  peakHourShare,
+  roomShareOfNetwork,
+  statsRoomHref,
+  type ChannelDetail,
+} from '@/lib/stats/channelDetail';
 import { fetchStatsIndex, relTime, type NetworkDay, type StatsChannel } from '@/lib/stats/networkIndex';
 import { publicFeedFreshness, type PublicFeedFreshness } from '@/lib/stats/feedBounds';
+import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
-import { PublicFooter } from './PublicFooter';
 
-function PageChrome(props: {
-  children: JSX.Element;
-  feedState: PublicFeedFreshness | 'partial' | 'unavailable';
-}) {
-  const label = () => {
-    switch (props.feedState) {
-      case 'current': return 'stats current';
-      case 'stale': return 'stats stale';
-      case 'future': return 'stats time mismatch';
-      case 'unknown': return 'stats undated';
-      case 'partial': return 'stats incomplete';
-      default: return 'stats unavailable';
-    }
-  };
-  return (
-    <main class="r data-page stats-page">
-      <div class="r-ground" aria-hidden="true" />
-      <div class="r-flecks" aria-hidden="true" />
-      <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
-        <path class="flow" d="M-40 120 C 280 60, 420 280, 720 220 S 1180 120, 1500 240" />
-        <path class="flow" d="M-40 540 C 320 640, 560 420, 860 520 S 1240 660, 1520 560" />
-        <path d="M-40 760 C 360 700, 700 860, 1040 760 S 1320 700, 1520 800" />
-        <circle class="node" cx="720" cy="220" r="3" />
-        <circle class="node" cx="860" cy="520" r="3" />
-      </svg>
-      <div class="r-grain" aria-hidden="true" />
-      <header class="r-status" role="banner">
-        <a class="brand" href="/" aria-label="Onyx home">
-          <Mascot variant="mark" />ONYX
-        </a>
-        <nav aria-label="Primary">
-          <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="/stats/" aria-current="page">Stats</a>
-          <a class="hideable" href="/status/">Status</a>
-          <a class="hideable" href="/roadmap/">Roadmap</a>
-          <a class="hideable" href="/about/">About</a>
-          <a class="hideable" href="/invite/?join=%23root">Invite</a>
-          <span class="live hideable" data-feed-state={props.feedState}><i aria-hidden="true" />{label()}</span>
-          <a class="enter" href="/app/">Open Onyx</a>
-        </nav>
-      </header>
-      {props.children}
-      <PublicFooter />
-    </main>
-  );
+type StatsFeedState = PublicFeedFreshness | 'partial' | 'loading' | 'unavailable';
+
+function feedStateLabel(state: StatsFeedState): string {
+  switch (state) {
+    case 'loading': return 'stats checking';
+    case 'current': return 'stats current';
+    case 'stale': return 'stats stale';
+    case 'future': return 'stats time mismatch';
+    case 'unknown': return 'stats undated';
+    case 'partial': return 'stats incomplete';
+    default: return 'stats unavailable';
+  }
+}
+
+function feedLedgerPhrase(state: StatsFeedState): string {
+  switch (state) {
+    case 'current': return 'export current';
+    case 'partial': return 'export incomplete';
+    case 'stale': return 'export stale';
+    case 'future': return 'export time mismatch';
+    case 'unknown': return 'export undated';
+    case 'loading': return 'export pending';
+    default: return 'export unavailable';
+  }
+}
+
+function presenceFromExport(state: StatsFeedState, whenCurrent: string, otherwise: string): string {
+  return state === 'current' ? whenCurrent : otherwise;
 }
 
 function barHeight(day: NetworkDay, max: number): string {
@@ -199,6 +189,7 @@ function ChannelRow(props: {
             Inspect
           </button>
           <a class="data-action" href={roomDeepLink(c().channel, c().last_active)}>Open room</a>
+          <a class="data-action data-action--ledger" href={statsRoomHref(c().channel)}>Room ledger</a>
         </div>
       </div>
     </article>
@@ -208,7 +199,7 @@ function ChannelRow(props: {
 export default function StatsRoute() {
   setPageMeta(
     'Onyx stats — live room activity',
-    'See public Onyx room activity, network message trends, people online, and channel sparklines.',
+    'See public Onyx room activity, network message trends, people online, and room sparklines.',
     '/stats/',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
@@ -216,7 +207,9 @@ export default function StatsRoute() {
   const [roomSort, setRoomSort] = createSignal<RoomSort>('messages');
   const [roomScope, setRoomScope] = createSignal<RoomScope>('all');
   const [roomQuery, setRoomQuery] = createSignal('');
-  const [inspectedRoom, setInspectedRoom] = createSignal('');
+  const [inspectedRoom, setInspectedRoom] = createSignal(
+    typeof window === 'undefined' ? '' : parseStatsRoomQuery(window.location.search),
+  );
   const timer = setInterval(() => {
     setNowMs(Date.now());
     void refetchStats();
@@ -256,6 +249,13 @@ export default function StatsRoute() {
   });
   const inspectRoom = (channel: string) => {
     setInspectedRoom(channel);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('room', channel);
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // jsdom / sandboxed documents may reject URL mutation
+    }
     // Defer until after Solid commits selected state so scroll/focus target the current inspector.
     queueMicrotask(() => revealStatsInspector());
   };
@@ -281,9 +281,9 @@ export default function StatsRoute() {
     });
   });
   const heatmapMax = createMemo(() => Math.max(0, ...(matchingChannelDetail()?.heatmap.flat() ?? [])));
-  const feedState = createMemo<PublicFeedFreshness | 'partial' | 'unavailable'>(() => {
+  const feedState = createMemo<StatsFeedState>(() => {
     const data = stats.latest;
-    if (!data) return 'unavailable';
+    if (!data) return stats.loading ? 'loading' : 'unavailable';
     const freshness = publicFeedFreshness(data.generated_at, nowMs());
     return freshness === 'current' && (!data.channels_complete || !data.network_days_complete)
       ? 'partial'
@@ -291,20 +291,61 @@ export default function StatsRoute() {
   });
 
   return (
-    <PageChrome feedState={feedState()}>
-      <section class="r-wrap data-hero stats-hero" aria-labelledby="stats-heading">
-        <p class="r-kicker">live network · public rooms</p>
-        <h1 id="stats-heading">The rooms <br /><span class="gold">in motion</span></h1>
+    <PublicFrame
+      currentPath="/stats/"
+      mainLabel="Onyx network stats"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Signal</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Stats</span>
+        </p>
+      )}
+    >
+      <div class="ui-root r data-page stats-page">
+        <div class="r-ground" aria-hidden="true" />
+        <div class="r-flecks" aria-hidden="true" />
+        <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+          <path class="flow" d="M-40 120 C 280 60, 420 280, 720 220 S 1180 120, 1500 240" />
+          <path class="flow" d="M-40 540 C 320 640, 560 420, 860 520 S 1240 660, 1520 560" />
+          <path d="M-40 760 C 360 700, 700 860, 1040 760 S 1320 700, 1520 800" />
+          <circle class="node" cx="720" cy="220" r="3" />
+          <circle class="node" cx="860" cy="520" r="3" />
+        </svg>
+        <div class="r-grain" aria-hidden="true" />
+
+        <section class="r-wrap data-hero stats-hero" aria-labelledby="stats-heading">
+        <p class="r-kicker">public network · room activity</p>
+        <h1 id="stats-heading">The rooms <br /><span class="stats-title-accent">in motion</span></h1>
         <p class="sub">
           See where people are talking, follow the network’s rhythm, and step
           directly into a public conversation. No member rankings. No message text.
         </p>
-        <Show when={stats.latest} fallback={<div class="data-empty">Stats are waiting for the next exported feed.</div>}>
+        <div
+          class="stats-observation"
+          data-feed-state={feedState()}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span class="stats-observation__marker" aria-hidden="true" />
+          {feedStateLabel(feedState())}
+        </div>
+        <Show
+          when={stats.latest}
+          fallback={(
+            <div class="data-empty">
+              {feedState() === 'loading'
+                ? 'Stats are waiting for the next exported feed.'
+                : 'No public stats export is available.'}
+            </div>
+          )}
+        >
           {(data) => (
             <>
               <div class="stats-ledger" aria-label="Live feed ledger">
                 <span class="stats-ledger-mark" data-state={feedState()} aria-hidden="true" />
-                <p><strong>{data().network || 'Onyx'} activity ledger</strong> · conversation current · {data().node || 'network export'} · updated {relTime(data().generated_at, nowMs())}</p>
+                <p><strong>{data().network || 'Onyx'} activity ledger</strong> · {feedLedgerPhrase(feedState())} · {data().node || 'network export'} · updated {relTime(data().generated_at, nowMs())}</p>
                 <button
                   type="button"
                   class="stats-refresh"
@@ -320,12 +361,12 @@ export default function StatsRoute() {
                 <div class="data-metric stats-primary-metric" data-tone="presence">
                   <span class="label">people online</span>
                   <span class="value">{formatCount(data().users_online)}</span>
-                  <span class="note"><i aria-hidden="true" /> live network presence</span>
+                  <span class="note"><i aria-hidden="true" /> {presenceFromExport(feedState(), 'live network presence', 'presence from this export')}</span>
                 </div>
                 <div class="data-metric" data-tone="rooms">
                   <span class="label">rooms moving</span>
                   <span class="value">{formatCount(activeRooms())}</span>
-                  <span class="note">{formatCount(roomsWithPeople())} live right now</span>
+                  <span class="note">{formatCount(roomsWithPeople())} {presenceFromExport(feedState(), 'live right now', 'present in this export')}</span>
                 </div>
                 <div class="data-metric" data-tone="messages">
                   <span class="label">messages observed</span>
@@ -425,7 +466,7 @@ export default function StatsRoute() {
                   <div class="data-metric" data-tone="presence">
                     <span class="label">present</span>
                     <span class="value">{(room().present || room().active_users).toLocaleString('en-US')}</span>
-                    <span class="note">right now</span>
+                    <span class="note">{presenceFromExport(feedState(), 'right now', 'in this export')}</span>
                   </div>
                 </div>
                 <div class="r-cta">
@@ -448,7 +489,7 @@ export default function StatsRoute() {
             <span class="r-eyebrow">room signal</span>
             <h2 class="r-title" id="inspector-heading">
               <Show when={inspectedChannel()} fallback="Choose a room">
-                {(channel) => <>Inside <span class="gold">{channel()}</span></>}
+                {(channel) => <>Inside <span class="stats-title-accent">{channel()}</span></>}
               </Show>
             </h2>
           </div>
@@ -484,12 +525,27 @@ export default function StatsRoute() {
               </div>
 
               <div class="stats-inspector-metrics" aria-label={`${detail().channel} summary`}>
-                <div data-tone="presence"><span>present now</span><strong>{formatCount(detail().present)}</strong><small>live mesh roster</small></div>
+                <div data-tone="presence"><span>present now</span><strong>{formatCount(detail().present)}</strong><small>live network roster</small></div>
                 <div data-tone="messages"><span>messages tracked</span><strong>{formatCount(detail().totals.messages)}</strong><small>durable public aggregate</small></div>
                 <div data-tone="people"><span>contributors</span><strong>{formatCount(detail().totals.activeUsers)}</strong><small>distinct recorded authors</small></div>
                 <div data-tone="words"><span>words / message</span><strong>{averageWords(detail())}</strong><small>aggregate average</small></div>
                 <div data-tone="momentum"><span>busiest day</span><strong>{formatCount(detail().busiestDay?.messages ?? 0)}</strong><small>{detail().busiestDay?.date ?? 'not enough history'}</small></div>
-                <div data-tone="time"><span>peak hour</span><strong>{formatHour(detail().peakHour)}</strong><small>all recorded activity</small></div>
+                <div data-tone="time"><span>peak hour</span><strong>{formatHour(detail().peakHour)}</strong><small>{peakHourShare(detail().hours).toFixed(0)}% of the daily rhythm</small></div>
+                <div data-tone="share">
+                  <span>network share</span>
+                  <strong>
+                    {(() => {
+                      const share = roomShareOfNetwork(detail().totals.messages, totalMessages());
+                      return share === null ? '—' : `${share.toFixed(share >= 10 ? 0 : 1)}%`;
+                    })()}
+                  </strong>
+                  <small>of observed public messages</small>
+                </div>
+                <div data-tone="flow">
+                  <span>net joins</span>
+                  <strong>{netMembershipFlow(detail().totals).toLocaleString('en-US')}</strong>
+                  <small>joins minus parts, quits, and kicks</small>
+                </div>
               </div>
 
               <div class="stats-inspector-grid">
@@ -516,6 +572,44 @@ export default function StatsRoute() {
                       {(messages, hour) => <li>{String(hour()).padStart(2, '0')}:00 UTC: {formatCount(messages)} messages</li>}
                     </For>
                   </ol>
+                </article>
+
+                <article class="data-card stats-days-card">
+                  <div class="stats-card-heading">
+                    <span class="label">recent days</span>
+                    <span class="stats-card-quiet">{detail().days.length} exported days</span>
+                  </div>
+                  <h3>How the room moved</h3>
+                  <Show when={detail().days.length > 0} fallback={<p>No per-room daily series has been exported yet.</p>}>
+                    <figure class="data-chart stats-room-days" aria-labelledby="room-days-caption">
+                      <div class="data-bars" aria-hidden="true">
+                        <For each={detail().days}>
+                          {(day) => {
+                            const peak = Math.max(1, ...detail().days.map((entry) => entry.messages));
+                            return (
+                              <span
+                                class="data-bar"
+                                title={`${day.date}: ${formatCount(day.messages)} messages`}
+                                style={{ '--h': String(Math.max(3, Math.round((day.messages / peak) * 100))) }}
+                              />
+                            );
+                          }}
+                        </For>
+                      </div>
+                      <figcaption id="room-days-caption" class="sr-only">
+                        Daily message totals for {detail().channel}, oldest to newest.
+                      </figcaption>
+                      <ol class="sr-only" aria-label={`${detail().channel} messages by day`}>
+                        <For each={detail().days}>
+                          {(day) => (
+                            <li>
+                              <time datetime={day.date}>{day.date}</time>: {formatCount(day.messages)} messages
+                            </li>
+                          )}
+                        </For>
+                      </ol>
+                    </figure>
+                  </Show>
                 </article>
 
                 <article class="data-card stats-flow-card">
@@ -628,6 +722,7 @@ export default function StatsRoute() {
           </Show>
         </div>
       </section>
-    </PageChrome>
+      </div>
+    </PublicFrame>
   );
 }

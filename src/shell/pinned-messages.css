@@ -6,6 +6,11 @@
   padding: 0.25rem 0;
 }
 
+.pins-ledger {
+  align-self: flex-start;
+  margin-bottom: 0.25rem;
+}
+
 .pins-empty {
   color: var(--paper-dim, #8aa);
   font-size: 0.9rem;

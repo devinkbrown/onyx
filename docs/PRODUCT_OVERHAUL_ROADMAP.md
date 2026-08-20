@@ -185,6 +185,12 @@ Self-hosting is a strong secondary path. It must not compete visually with
 
 ## 6. Visual direction: Human Instrument
 
+> **Superseded (S1).** The Human Instrument palette table below is historical
+> direction only. Shipped token authority is `src/styles/tokens.css` (`:root` /
+> ocean flagship) and the public `--public-*` spine in
+> `src/ui/public/public-frame.css`. Do not treat the hexes in this section as
+> production values.
+
 Onyx should feel precise enough to trust and warm enough to inhabit. The design
 is neither a black-and-acid engineering exhibit nor a generic friendly SaaS
 template.

@@ -53,7 +53,7 @@ test('keeps the high-zoom channel drawer aligned and keyboard reachable', async 
   await expect(toggle).toBeVisible();
   await toggle.click();
 
-  const dialog = page.getByRole('dialog', { name: 'Channel drawer' });
+  const dialog = page.getByRole('dialog', { name: 'Room switcher' });
   const drawer = page.locator('.shell-sidebar');
   await expect(dialog).toBeVisible();
   await expect(drawer).toBeVisible();
@@ -85,7 +85,7 @@ test('keeps the high-zoom channel drawer aligned and keyboard reachable', async 
       listTop: listRect.top,
       listBottom: listRect.bottom,
       listClientHeight: list.clientHeight,
-      focusedInsideHeader: focused ? header.contains(focused) : false,
+      focusedInsideDialog: focused ? element.closest('[role="dialog"]')?.contains(focused) === true : false,
       focusedLeft: focusedRect?.left ?? -1,
       focusedRight: focusedRect?.right ?? -1,
     };
@@ -102,7 +102,7 @@ test('keeps the high-zoom channel drawer aligned and keyboard reachable', async 
   expect(openingGeometry.listRight).toBeLessThanOrEqual(openingGeometry.drawerRight + 1);
   expect(openingGeometry.listBottom).toBeLessThanOrEqual(openingGeometry.drawerBottom + 1);
   expect(openingGeometry.listClientHeight).toBeGreaterThan(0);
-  expect(openingGeometry.focusedInsideHeader).toBe(true);
+  expect(openingGeometry.focusedInsideDialog).toBe(true);
   expect(openingGeometry.focusedLeft).toBeGreaterThanOrEqual(24);
   expect(openingGeometry.focusedRight).toBeLessThanOrEqual(openingGeometry.drawerRight + 1);
 

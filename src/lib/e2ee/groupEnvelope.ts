@@ -21,13 +21,18 @@ import { normalizeGroupRoom, validRoomEpoch } from './groupKeyring';
 
 export const GROUP_ENVELOPE_PREFIX = 'ONYXROOM1 ';
 export const GROUP_ENVELOPE_VERSION = 1;
-export const MAX_GROUP_PLAINTEXT_BYTES = 32 * 1024;
-export const MAX_GROUP_CIPHERTEXT_BYTES = 48 * 1024;
+/** Exact daemon limit for the complete ASCII `ONYXROOM1 ...` trailing body. */
+export const MAX_GROUP_ENVELOPE_WIRE_BYTES = 4096;
+// 3031 plaintext + 16 GCM tag + 17 header/nonce = 3064 raw bytes, whose
+// unpadded base64url plus the 10-byte prefix fits the 4096-byte daemon limit.
+export const MAX_GROUP_PLAINTEXT_BYTES = 3031;
+export const MAX_GROUP_CIPHERTEXT_BYTES = MAX_GROUP_PLAINTEXT_BYTES + 16;
 
 const NONCE_BYTES = 12;
 const GCM_TAG_BYTES = 16;
 const HEADER_BYTES = 1 + 4; // version + epoch
 const MIN_BODY_BYTES = HEADER_BYTES + NONCE_BYTES + GCM_TAG_BYTES;
+const MAX_GROUP_ENVELOPE_BODY_BYTES = HEADER_BYTES + NONCE_BYTES + MAX_GROUP_CIPHERTEXT_BYTES;
 
 /** Copy into a fresh ArrayBuffer so WebCrypto BufferSource typing is satisfied. */
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -67,7 +72,7 @@ export function buildGroupAad(room: string, keyEpoch: number): Uint8Array | null
 export function parseGroupEnvelope(text: string): GroupEnvelopeParts | null {
   if (!isGroupEnvelope(text)) return null;
   const raw = fromB64url(text.slice(GROUP_ENVELOPE_PREFIX.length));
-  if (!raw || raw.length < MIN_BODY_BYTES || raw.length > MAX_GROUP_CIPHERTEXT_BYTES) {
+  if (!raw || raw.length < MIN_BODY_BYTES || raw.length > MAX_GROUP_ENVELOPE_BODY_BYTES) {
     return null;
   }
   const version = raw[0]!;
@@ -104,7 +109,8 @@ export function packGroupEnvelope(
   body[4] = keyEpoch & 0xff;
   body.set(nonce, HEADER_BYTES);
   body.set(ciphertext, HEADER_BYTES + NONCE_BYTES);
-  return `${GROUP_ENVELOPE_PREFIX}${toB64url(body)}`;
+  const wire = `${GROUP_ENVELOPE_PREFIX}${toB64url(body)}`;
+  return wire.length <= MAX_GROUP_ENVELOPE_WIRE_BYTES ? wire : null;
 }
 
 /**

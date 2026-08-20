@@ -15,6 +15,75 @@
   padding: clamp(28px, 6vh, 72px) clamp(18px, 4vw, 32px) 56px;
   box-sizing: border-box;
 }
+@media (min-width: 960px) {
+  .home-inner--ledger {
+    max-width: min(1080px, 100%);
+  }
+}
+
+.home-kicker {
+  margin: 0 0 8px;
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-size: var(--text-xs, 0.6875rem);
+  letter-spacing: var(--tracking-kicker, 0.12em);
+  text-transform: uppercase;
+  color: var(--paper-mute);
+}
+
+.home-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+.home-ledger__main,
+.home-ledger__rail {
+  min-width: 0;
+}
+@media (min-width: 960px) {
+  .home-ledger--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(15.5rem, 18.5rem);
+    column-gap: 32px;
+    align-items: start;
+  }
+  .home-ledger__rail {
+    position: sticky;
+    top: 12px;
+  }
+  .home-ledger__rail .home-live-now {
+    margin-bottom: 0;
+  }
+}
+
+.home-overflow {
+  margin-top: 10px;
+}
+.home-overflow__summary,
+.home-overflow__action {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--paper-dim);
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-size: 12px;
+}
+.home-overflow__summary::-webkit-details-marker { display: none; }
+.home-overflow__summary:focus-visible,
+.home-overflow__action:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
+.home-overflow__body {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
 
 .home-masthead { margin-bottom: clamp(28px, 4vh, 40px); }
 .home-title {
@@ -235,7 +304,8 @@
 
 @media (pointer: coarse) {
   .home-outbox__actions button,
-  .home-outbox__retry {
+  .home-outbox__retry,
+  .home .mark-caught-up__button {
     min-height: 44px;
   }
 }
@@ -261,7 +331,8 @@
   .home-outbox,
   .home-outbox__item,
   .home-outbox__actions button,
-  .home-outbox__retry {
+  .home-outbox__retry,
+  .home-overflow__action {
     border-color: CanvasText;
     background: Canvas;
     color: CanvasText;
@@ -298,6 +369,30 @@
   padding: 0;
   display: grid;
   gap: 8px;
+}
+.home-event-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+.home-event-ledger {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+.home-event-ledger:hover,
+.home-event-ledger:focus-visible {
+  color: var(--paper);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
 }
 .home-event {
   width: 100%;
@@ -378,15 +473,35 @@
   white-space: nowrap;
 }
 
+.home-pulse-block { margin-bottom: 20px; }
+.home-pulse-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.home-pulse-ledger,
+.home-rhythm-ledger {
+  font-size: 0.8rem;
+  color: var(--paper-mute);
+  text-decoration: none;
+}
+.home-pulse-ledger:hover,
+.home-rhythm-ledger:hover { text-decoration: underline; }
+.home-pulse-ledger:focus-visible,
+.home-rhythm-ledger:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
 .home-pulse {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 20px;
 }
 .home-pulse-tile {
   background: color-mix(in oklab, var(--stone) 82%, transparent);
@@ -476,6 +591,10 @@
   border-color: color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
   color: var(--paper);
 }
+.home-action--supporting {
+  border-color: color-mix(in oklab, var(--lapis) 28%, var(--line));
+  color: var(--paper-dim);
+}
 .home-action--quiet {
   border-color: transparent;
   color: var(--paper-mute);
@@ -545,12 +664,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--r-lg, 12px);
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--stone-2) 76%, transparent),
-      color-mix(in oklab, var(--stone) 52%, transparent)
-    );
+  background: color-mix(in oklab, var(--stone-2) 64%, transparent);
   box-shadow: var(--elev-1, none);
 }
 .home-first-room::before {
@@ -558,13 +672,7 @@
   position: absolute;
   inset: 0 auto 0 0;
   width: 3px;
-  background: linear-gradient(
-    180deg,
-    var(--lapis) 0 30%,
-    var(--ok) 30% 54%,
-    var(--shu) 54% 76%,
-    var(--gold) 76% 100%
-  );
+  background: var(--lapis);
 }
 .home-first-room__eyebrow {
   margin: 0 0 8px;
@@ -656,6 +764,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .home-more-activity__summary::before,
+  .home-overflow__summary,
   .home-cta,
   .home-action,
   .home-card,
@@ -683,6 +792,11 @@
 }
 .home-rhythm-head .home-section-label {
   margin: 0;
+}
+.home-rhythm-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 .home-rhythm-summary {
   color: var(--paper-mute);
@@ -835,13 +949,7 @@
   text-align: left;
   border: 1px solid color-mix(in oklab, var(--line) 90%, var(--paper));
   border-radius: var(--r-md);
-  background:
-    linear-gradient(
-      160deg,
-      color-mix(in oklab, var(--paper) 4%, transparent),
-      transparent 48%
-    ),
-    color-mix(in oklab, var(--stone) 78%, transparent);
+  background: color-mix(in oklab, var(--stone) 78%, transparent);
   color: var(--paper);
   cursor: pointer;
   transition: border-color var(--dur, 200ms) var(--ease),
@@ -850,14 +958,7 @@
 }
 .home-memory-card:hover {
   border-color: color-mix(in oklab, var(--lapis) 28%, var(--line));
-  background:
-    linear-gradient(
-      160deg,
-      color-mix(in oklab, var(--paper) 6%, transparent),
-      transparent 50%
-    ),
-    color-mix(in oklab, var(--stone) 70%, transparent);
-  transform: translateY(-1px);
+  background: color-mix(in oklab, var(--stone) 70%, transparent);
 }
 .home-memory-card-head,
 .home-memory-foot {
@@ -927,9 +1028,40 @@
   font-size: 12px;
   color: var(--paper-mute);
 }
+.home-quiet-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.home-quiet-ledger,
+.home-quiet-room-ledger {
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+  text-decoration: none;
+}
+.home-quiet-ledger:hover,
+.home-quiet-room-ledger:hover { text-decoration: underline; }
+.home-quiet-ledger:focus-visible,
+.home-quiet-room-ledger:focus-visible {
+  outline: 1px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
 .home-quiet-list {
   display: grid;
   gap: 6px;
+}
+.home-quiet-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+}
+.home-quiet-room-ledger {
+  min-height: var(--target-min, 44px);
+  display: inline-flex;
+  align-items: center;
 }
 .home-quiet-item {
   width: 100%;
@@ -941,7 +1073,7 @@
   padding: 8px 12px;
   text-align: left;
   border: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
-  border-radius: var(--r-md);
+  border-radius: 2px;
   background: color-mix(in oklab, var(--stone) 64%, transparent);
   color: var(--paper-dim);
   cursor: pointer;
@@ -1125,8 +1257,7 @@
 }
 .home-card:hover {
   border-color: color-mix(in oklab, var(--lapis) 42%, var(--line));
-  transform: translateY(-1px);
-  box-shadow: var(--elev-2, none);
+  box-shadow: none;
 }
 .home-card:focus-within {
   border-color: color-mix(in oklab, var(--lapis) 48%, var(--line));
@@ -1172,6 +1303,7 @@
 .home-card-foot {
   display: flex;
   align-items: center;
+  gap: 0.75rem;
   margin-top: auto;
 }
 .home-card-msgs {
@@ -1180,8 +1312,24 @@
   font-size: 0.7rem;
   color: var(--paper-mute);
 }
-.home-card-join {
+.home-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   margin-left: auto;
+}
+.home-card-ledger {
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--paper-mute);
+  text-decoration: none;
+}
+.home-card-ledger:hover { text-decoration: underline; }
+.home-card-ledger:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
+.home-card-join {
   font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
@@ -1190,9 +1338,7 @@
   border: 0;
   padding: 2px 0;
   cursor: pointer;
-  transition: transform var(--dur, 200ms) var(--ease);
 }
-.home-card-join:hover { transform: translateX(2px); }
 
 /* Recent rooms */
 .home-recent-chips {
@@ -1206,7 +1352,7 @@
   color: var(--paper-dim);
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-md);
   padding: 6px 14px;
   cursor: pointer;
   transition: color var(--dur, 200ms) var(--ease), border-color var(--dur, 200ms) var(--ease);
@@ -1312,7 +1458,8 @@
     justify-content: center;
     border-radius: var(--r-md);
   }
-  .home-action--quiet {
+  .home-action--quiet,
+  .home .mark-caught-up__button {
     min-height: 44px;
   }
   .home-current-rail {
@@ -1485,8 +1632,8 @@
 
 /* ── Catch up — "what did I miss" across joined rooms + DMs ───────────────────
    A9 strata residual hierarchy (thesis-first):
-     Needs you  → gold surface band, solid unread seal, largest type
-     Followed   → lapis instrument rail, mid type, no gold competition
+     Needs you  → quiet cyan surface band, solid unread seal, largest type
+     Followed   → lapis instrument rail, mid type, no competing gold
      Quiet      → collapsed ambient tail, demoted by size/weight/chrome only
                   (never whole-section opacity — AA + meaning-not-by-opacity)
    Weight is visual only; structure + a11y labels stay stable. */
@@ -1509,7 +1656,7 @@
   font-weight: 650;
 }
 /* Provenance kicker (live / offline recall) — demoted mono meta under the
-   mention gold count. Real Onyx mute token only; never --text-muted/--fg-muted. */
+   mention count. Real Onyx mute token only; never --text-muted/--fg-muted. */
 .home-catchup-source {
   color: var(--paper-mute);
   font-family: var(--font-mono);
@@ -1559,13 +1706,13 @@
 
 /* ── Stratum: Needs you (attention) — strongest visual weight ───────────────
    Label text stays on the audited --paper-dim token (AA small text). Hierarchy
-   is size/weight + gold surface chrome — never a decorative token on body text. */
+   is size/weight + sparse cyan surface chrome — never a decorative token on body text. */
 .home-catchup-tier--attention {
   gap: var(--space-2);
   padding: var(--space-3) var(--space-3) var(--space-2);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--gold) 8%, var(--stone));
-  border: 1px solid color-mix(in oklab, var(--gold) 28%, var(--line));
+  background: color-mix(in oklab, var(--lapis) 8%, var(--stone));
+  border: 1px solid color-mix(in oklab, var(--lapis) 28%, var(--line));
   box-shadow: none;
 }
 .home-catchup-tier--attention .home-catchup-tier-label {
@@ -1578,28 +1725,27 @@
   min-height: 48px;
   padding: var(--space-3) var(--space-4);
   border-left-width: 3px;
-  border-left-color: var(--gold-bright);
-  background: color-mix(in oklab, var(--gold) 6%, var(--stone));
+  border-left-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 6%, var(--stone));
   box-shadow: none;
 }
 .home-catchup-tier--attention .home-catchup-item:hover {
-  border-color: color-mix(in oklab, var(--gold-bright) 42%, var(--line));
-  background: color-mix(in oklab, var(--gold) 12%, var(--stone));
+  border-color: color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
+  background: color-mix(in oklab, var(--lapis) 12%, var(--stone));
 }
 .home-catchup-tier--attention .home-catchup-name {
   font-weight: 650;
   font-size: 0.98rem;
 }
 .home-catchup-tier--attention .home-catchup-unread {
-  /* Unread chip is solid gold-bright on ink-facing paper text: use on-accent
-     only if present; paper on gold-bright is the badge convention elsewhere. */
+  /* Unread chip: solid lapis-bright with ink-facing paper text. */
   color: var(--ink);
-  background: var(--gold-bright);
+  background: var(--lapis-bright);
   font-weight: 650;
 }
 
 /* ── Stratum: Followed — next weight, lapis instrument chrome ───────────────
-   Grouped by a quiet left rail + faint wash — never a full gold panel, so
+   Grouped by a quiet left rail + faint wash — never a full attention panel, so
    Needs you stays the single primary focus on the surface. */
 .home-catchup-tier--followed {
   margin-top: 8px;
@@ -1948,13 +2094,7 @@
   grid-template-rows: auto auto minmax(2.8em, 1fr) auto;
   gap: var(--space-2);
   padding: var(--space-3);
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in oklab, var(--gold) 5%, transparent),
-      transparent 42%
-    ),
-    color-mix(in oklab, var(--stone) 78%, transparent);
+  background: color-mix(in oklab, var(--stone) 78%, transparent);
   border: 1px solid color-mix(in oklab, var(--line) 88%, var(--gold));
   border-radius: var(--r-md);
   overflow: hidden;
@@ -2018,7 +2158,7 @@
 .home-recap-card__review,
 .home-recap-card__spotlight {
   min-height: 30px;
-  border-radius: 999px;
+  border-radius: var(--r-md);
   padding: 5px 11px;
   font: inherit;
   font-family: var(--font-mono);
@@ -2027,27 +2167,19 @@
   cursor: pointer;
 }
 .home-recap-card__open {
-  color: var(--on-accent);
+  color: var(--on-secondary);
   background: var(--gold-bright);
   border: 1px solid transparent;
 }
 .home-recap-card__review {
-  color: var(--on-accent);
-  background: color-mix(in oklab, var(--lapis-bright) 82%, var(--gold-bright));
+  color: var(--on-secondary);
+  background: var(--gold-bright);
   border: 1px solid transparent;
 }
 .home-recap-card__spotlight {
   color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, transparent);
-}
-.home-recap-card__open:hover,
-.home-recap-card__review:hover,
-.home-recap-card__spotlight:hover,
-.home-recap-card__open:focus-visible,
-.home-recap-card__review:focus-visible,
-.home-recap-card__spotlight:focus-visible {
-  transform: translateY(-1px);
 }
 .home-review-history {
   margin: 0 0 28px;
@@ -2124,7 +2256,7 @@
 }
 .home-review-history__actions button {
   min-height: 30px;
-  border-radius: 999px;
+  border-radius: var(--r-md);
   padding: 5px 10px;
   color: var(--paper);
   background: color-mix(in oklab, var(--stone) 62%, transparent);
@@ -2141,7 +2273,6 @@
 .home-review-history__actions button:hover,
 .home-review-history__actions button:focus-visible {
   border-color: color-mix(in oklab, var(--lapis-bright) 48%, var(--line));
-  transform: translateY(-1px);
 }
 @media (prefers-reduced-motion: reduce) {
   .home-catchup-item,

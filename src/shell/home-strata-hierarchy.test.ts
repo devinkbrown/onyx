@@ -39,9 +39,10 @@ describe('Home catch-up residual hierarchy (A9)', () => {
     const quiet = block(homeCss, '.home-catchup-tier--quiet');
     // The quiet tier rule itself must not fade the whole group.
     expect(quiet).not.toMatch(/opacity\s*:/);
-    // Attention keeps the gold surface band; quiet stays a seam-only tail.
+    // Attention keeps the lapis surface band; quiet stays a seam-only tail.
     const attention = block(homeCss, '.home-catchup-tier--attention');
-    expect(attention).toMatch(/var\(--gold\)/);
+    expect(attention).toMatch(/var\(--lapis\)/);
+    expect(attention).not.toMatch(/var\(--gold/);
     expect(quiet).not.toMatch(/var\(--gold/);
   });
 

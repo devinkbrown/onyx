@@ -22,7 +22,7 @@
   width: 44px;
   height: 1px;
   margin-top: 10px;
-  background: linear-gradient(90deg, color-mix(in oklab, var(--lapis) 55%, transparent), transparent);
+  background: var(--seam-faint);
 }
 
 .cpulse-wire {
@@ -62,6 +62,18 @@
 .cpulse-wire-sep {
   margin: 0 7px;
   color: var(--paper-mute);
+}
+
+.cpulse-wire-ledger {
+  color: var(--lapis-bright);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cpulse-wire-ledger:hover,
+.cpulse-wire-ledger:focus-visible {
+  color: var(--paper);
+  text-decoration: underline;
 }
 
 .cpulse-deeplink {
@@ -111,7 +123,14 @@
   font-family: var(--font-mono);
   font-weight: 600;
   font-size: 0.85rem;
+  color: var(--lapis-bright);
+  text-decoration: none;
+}
+
+.cpulse-room-name:hover,
+.cpulse-room-name:focus-visible {
   color: var(--paper);
+  text-decoration: underline;
 }
 .cpulse-room-meta {
   margin-left: auto;

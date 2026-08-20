@@ -1,0 +1,151 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Onyx UI · foundation layer
+
+   The PRIMITIVE tier of the design system: raw palette constants and the
+   structural scales (space, radius, measure, border, elevation, layers).
+   Nothing here encodes intent — "what colour is basalt" lives here, "what
+   colour is a raised surface" lives in semantic.css.
+
+   Two hard rules for this file:
+
+     1. It is the ONLY token file permitted to declare raw colour literals, and
+        only on `--room-*` declarations. Every other layer resolves through
+        `var()`. token-contract.ts enforces this.
+
+     2. It NEVER redefines an existing Onyx theme variable. The theme engine
+        (src/theme/themes.ts + ThemeProvider) owns `--ink`, `--stone`, `--paper`,
+        `--lapis`, `--space-*`, `--r-*` and friends. This layer only ALIASES
+        them and supplies a Room Current fallback for the case where a theme
+        does not define a value. Theme IDs are never touched.
+
+   Room Current — the fallback identity, used only where a theme lacks a value:
+
+     current-void  #070A0B   the ground beneath everything
+     basalt        #111718   the working surface
+     edge          #2A3637   the lit edge of a plane
+     paper         #E9ECE6   text at full strength
+     signal        #68AAA6   the one action colour
+     ember         #EE7B5C   the one critical colour
+
+   Consumers must not reference `--room-*` directly — use the `--ui-*` semantic
+   aliases in semantic.css so a theme can always win.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Room Current raw palette ──────────────────────────────────────────────
+     Fixed constants. These never flip with colour scheme; the scheme-aware
+     fallback SLOTS that select between them live in semantic.css. */
+  --room-current-void: #070a0b;
+  --room-basalt: #111718;
+  --room-edge: #2a3637;
+  --room-paper: #e9ece6;
+  --room-signal: #68aaa6;
+  --room-ember: #ee7b5c;
+
+  /* Room Current derived tones — interpolated from the six above so a
+     theme-less fallback still has a full ramp instead of collapsing to three
+     flat planes. Declared as literals because they ARE palette constants. */
+  --room-current-void-2: #0b1112;
+  --room-basalt-raised: #18211f;
+  --room-paper-dim: #9aa5a2;
+  --room-paper-mute: #6b7876;
+  --room-signal-bright: #8fc7c3;
+  --room-signal-deep: #3d6d6a;
+  --room-ember-bright: #f5a288;
+
+  /* Room Current light contract — the same six hues re-grounded for a light
+     surface. Referenced only by the light scheme block in semantic.css. */
+  --room-light-paper: #f4f6f2;
+  --room-light-surface: #e9ece6;
+  --room-light-edge: #cdd4d0;
+  --room-light-ink: #111718;
+  --room-light-ink-dim: #46524f;
+  --room-light-ink-mute: #6b7876;
+  --room-light-signal: #2f6b68;
+  --room-light-ember: #a33f22;
+
+  /* ── Space scale ───────────────────────────────────────────────────────────
+     Aliases the shared 4px rhythm already defined in src/styles/tokens.css so
+     the two systems can never drift; the literal is the standalone fallback. */
+  --ui-space-0: var(--space-0, 0);
+  --ui-space-1: var(--space-1, 0.25rem);
+  --ui-space-2: var(--space-2, 0.5rem);
+  --ui-space-3: var(--space-3, 0.75rem);
+  --ui-space-4: var(--space-4, 1rem);
+  --ui-space-5: var(--space-5, 1.25rem);
+  --ui-space-6: var(--space-6, 1.5rem);
+  --ui-space-7: var(--space-7, 2rem);
+  --ui-space-8: var(--space-8, 2.5rem);
+
+  /* Intent-named spacing — say what the gap is FOR, not how big it is. */
+  --ui-gap-tight: var(--ui-space-2);
+  --ui-gap-row: var(--ui-space-3);
+  --ui-gap-group: var(--ui-space-4);
+  --ui-gap-section: var(--ui-space-6);
+  --ui-pad-control: var(--ui-space-3);
+  --ui-pad-panel: var(--ui-space-4);
+  --ui-pad-region: var(--ui-space-6);
+
+  /* ── Radius ────────────────────────────────────────────────────────────────
+     Themes retune radius (Onyx is tighter than Ocean); we ride their values. */
+  --ui-radius-0: var(--r-0, 0px);
+  --ui-radius-sm: var(--r-sm, 4px);
+  --ui-radius-md: var(--r-md, 8px);
+  --ui-radius-lg: var(--r-lg, 12px);
+  --ui-radius-pill: var(--r-pill, 999px);
+
+  /* ── Border weight ─────────────────────────────────────────────────────────
+     Hairline is the default; emphasis is reserved for focus and forced-colors. */
+  --ui-border-hairline: 1px;
+  --ui-border-emphasis: 2px;
+  --ui-border-heavy: 3px;
+
+  /* ── Measure ───────────────────────────────────────────────────────────────
+     Reading-length caps. `prose` is the sentence measure a paragraph should
+     never exceed; `shell` rides the existing conversation measure. */
+  --ui-measure-compact: 44ch;
+  --ui-measure-prose: 68ch;
+  --ui-measure-wide: 86ch;
+  --ui-measure-shell: var(--shell-measure, 1180px);
+
+  /* ── Target size ───────────────────────────────────────────────────────────
+     WCAG 2.2 SC 2.5.8 floor is 24px; this system holds the stricter 2.5.5
+     Level-AAA 44px floor for every pointer target. */
+  --ui-target-min: var(--target-min, 44px);
+  --ui-target-comfortable: 48px;
+  --ui-target-inline-min: 24px;
+
+  /* ── Layers ────────────────────────────────────────────────────────────────
+     A single ordered z-index ladder. Consumers pick a NAMED layer; nobody
+     invents a magic number, so stacking stays auditable in one place. */
+  --ui-z-base: 0;
+  --ui-z-raised: 10;
+  --ui-z-sticky: 100;
+  --ui-z-nav: 200;
+  --ui-z-overlay: 300;
+  --ui-z-sheet: 400;
+  --ui-z-modal: 500;
+  --ui-z-toast: 600;
+  --ui-z-tooltip: 700;
+  --ui-z-top: 800;
+
+  /* ── Elevation ─────────────────────────────────────────────────────────────
+     Matte and short. Aliases the theme's shadow ladder where present; the
+     fallbacks are colour-mix expressions over the semantic ground, so they
+     re-tint with the active theme instead of baking a black slab. */
+  --ui-elev-0: var(--elev-0, none);
+  --ui-elev-1: var(--elev-1, 0 1px 0 color-mix(in oklab, var(--ui-text-primary) 5%, transparent) inset);
+  --ui-elev-2: var(
+    --elev-2,
+    0 14px 36px -28px color-mix(in oklab, var(--ui-surface-canvas) 88%, transparent)
+  );
+  --ui-elev-3: var(
+    --elev-3,
+    0 28px 56px -32px color-mix(in oklab, var(--ui-surface-canvas) 90%, transparent)
+  );
+  --ui-elev-press: var(
+    --elev-press,
+    inset 0 1px 0 color-mix(in oklab, var(--ui-surface-canvas) 18%, transparent)
+  );
+}

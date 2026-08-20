@@ -32,5 +32,10 @@ describe('SinceDigestCard', () => {
     expect(screen.getByText('This device')).toBeInTheDocument();
     expect(screen.getByLabelText('Local recall terms for #root: launch, storage')).toBeInTheDocument();
     expect(screen.getByText('launch')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open public room ledger' })).toHaveAttribute('href', '/stats/');
+    expect(screen.getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23root',
+    );
   });
 });

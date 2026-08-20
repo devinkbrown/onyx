@@ -17,7 +17,7 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type CommandSection = 'Channels' | 'DMs' | 'People' | 'Actions';
+export type CommandSection = 'Rooms' | 'DMs' | 'People' | 'Actions';
 
 /**
  * A single palette entry. The registry stores these; the palette displays them.
@@ -109,7 +109,9 @@ function purgeOwnerlessRecents(): void {
 
 function parseRecentTarget(value: unknown): RecentTarget | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const { id, label, section, at } = value as Record<string, unknown>;
+  const { id, label, section: rawSection, at } = value as Record<string, unknown>;
+  // Legacy palette recents stored section as `Channels`; normalize to `Rooms`.
+  const section = rawSection === 'Channels' ? 'Rooms' : rawSection;
   if (
     typeof id !== 'string'
     || id.length === 0
@@ -119,7 +121,7 @@ function parseRecentTarget(value: unknown): RecentTarget | null {
     || label.length === 0
     || label.length > MAX_RECENT_LABEL_LENGTH
     || CONTROL_CHARACTERS.test(label)
-    || (section !== 'Channels' && section !== 'DMs' && section !== 'People' && section !== 'Actions')
+    || (section !== 'Rooms' && section !== 'DMs' && section !== 'People' && section !== 'Actions')
     || typeof at !== 'string'
     || at.length === 0
     || at.length > MAX_RECENT_TIMESTAMP_LENGTH
@@ -204,46 +206,46 @@ export type SlashCommand = {
 
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: 'me', usage: '/me <action>', description: 'Send an action message.', kind: 'irc' },
-  { name: 'topic', usage: '/topic <text>', description: 'Set or view the channel topic.', kind: 'irc' },
+  { name: 'topic', usage: '/topic <text>', description: 'Set or view the room topic.', kind: 'irc' },
   { name: 'nick', usage: '/nick <nick>', description: 'Change your nick.', kind: 'irc' },
-  { name: 'join', usage: '/join #channel', description: 'Join a channel.', kind: 'irc', aliases: ['j'] },
-  { name: 'part', usage: '/part [#channel]', description: 'Leave the current or named channel.', kind: 'irc', aliases: ['leave'] },
+  { name: 'join', usage: '/join #room', description: 'Join a room.', kind: 'irc', aliases: ['j'] },
+  { name: 'part', usage: '/part [#room]', description: 'Leave the current or named room.', kind: 'irc', aliases: ['leave'] },
   { name: 'msg', usage: '/msg <nick> <text>', description: 'Send a private message.', kind: 'irc', aliases: ['query'] },
-  { name: 'whois', usage: '/whois <nick>', description: 'Request user information.', kind: 'irc' },
-  { name: 'invite', usage: '/invite <nick>', description: 'Invite someone into the channel.', kind: 'irc' },
-  { name: 'event', usage: '/event <YYYY-MM-DDThh:mmZ> <title>', description: 'Schedule a channel event (ops); /event clear to remove.', kind: 'irc' },
+  { name: 'whois', usage: '/whois <nick>', description: 'Request profile details.', kind: 'irc' },
+  { name: 'invite', usage: '/invite <nick>', description: 'Invite someone into the room.', kind: 'irc' },
+  { name: 'event', usage: '/event <YYYY-MM-DDThh:mmZ> <title>', description: 'Schedule a room event (ops); /event clear to remove.', kind: 'irc' },
   { name: 'webhook', usage: '/webhook <create|list|delete> ...', description: 'Manage Discord-compatible incoming webhooks (ops).', kind: 'irc' },
   // Platform expansion (Era 3 wave)
   { name: 'notice', usage: '/notice <target> <text>', description: 'Send a notice (no auto-reply expectation).', kind: 'irc' },
   { name: 'away', usage: '/away [message]', description: 'Set or clear away status.', kind: 'irc' },
   { name: 'back', usage: '/back', description: 'Clear away status.', kind: 'irc', aliases: ['unaway'] },
-  { name: 'mode', usage: '/mode <target> [modes]', description: 'View or change channel/user modes.', kind: 'irc' },
-  { name: 'kick', usage: '/kick <nick> [reason]', description: 'Remove a user from the channel (ops).', kind: 'irc' },
-  { name: 'ban', usage: '/ban <mask>', description: 'Ban a hostmask from the channel (ops).', kind: 'irc' },
-  { name: 'unban', usage: '/unban <mask>', description: 'Remove a channel ban (ops).', kind: 'irc' },
-  { name: 'op', usage: '/op <nick>', description: 'Grant channel operator (ops).', kind: 'irc' },
-  { name: 'deop', usage: '/deop <nick>', description: 'Remove channel operator (ops).', kind: 'irc' },
-  { name: 'voice', usage: '/voice <nick>', description: 'Grant voice in a moderated channel (ops).', kind: 'irc' },
+  { name: 'mode', usage: '/mode <target> [modes]', description: 'View or change room/user modes.', kind: 'irc' },
+  { name: 'kick', usage: '/kick <nick> [reason]', description: 'Remove a person from the room (ops).', kind: 'irc' },
+  { name: 'ban', usage: '/ban <mask>', description: 'Ban a hostmask from the room (ops).', kind: 'irc' },
+  { name: 'unban', usage: '/unban <mask>', description: 'Remove a room ban (ops).', kind: 'irc' },
+  { name: 'op', usage: '/op <nick>', description: 'Grant room operator (ops).', kind: 'irc' },
+  { name: 'deop', usage: '/deop <nick>', description: 'Remove room operator (ops).', kind: 'irc' },
+  { name: 'voice', usage: '/voice <nick>', description: 'Grant voice in a moderated room (ops).', kind: 'irc' },
   { name: 'devoice', usage: '/devoice <nick>', description: 'Remove voice (ops).', kind: 'irc' },
   { name: 'quote', usage: '/quote <raw>', description: 'Send a raw IRC line (advanced).', kind: 'irc', aliases: ['raw'] },
   { name: 'clear', usage: '/clear', description: 'Clear local scrollback for this view (this device only).', kind: 'irc' },
   { name: 'ignore', usage: '/ignore <nick>', description: 'Hide a nick and silence their notifications locally.', kind: 'irc' },
   { name: 'unignore', usage: '/unignore <nick>', description: 'Stop ignoring a nick.', kind: 'irc' },
-  { name: 'read', usage: '/read', description: 'Mark this channel or DM as read.', kind: 'irc', aliases: ['markread'] },
-  { name: 'star', usage: '/star [#channel]', description: 'Star the current (or named) channel as a favorite.', kind: 'irc' },
-  { name: 'unstar', usage: '/unstar [#channel]', description: 'Remove a channel from favorites.', kind: 'irc' },
-  { name: 'mute', usage: '/mute [#channel]', description: 'Mute notifications for the current (or named) channel on this device.', kind: 'irc' },
-  { name: 'unmute', usage: '/unmute [#channel]', description: 'Unmute channel notifications on this device.', kind: 'irc' },
+  { name: 'read', usage: '/read', description: 'Mark this room or DM as read.', kind: 'irc', aliases: ['markread'] },
+  { name: 'star', usage: '/star [#channel]', description: 'Star the current (or named) room as a favorite.', kind: 'irc' },
+  { name: 'unstar', usage: '/unstar [#channel]', description: 'Remove a room from favorites.', kind: 'irc' },
+  { name: 'mute', usage: '/mute [#channel]', description: 'Mute notifications for the current (or named) room on this device.', kind: 'irc' },
+  { name: 'unmute', usage: '/unmute [#channel]', description: 'Unmute room notifications on this device.', kind: 'irc' },
   { name: 'autojoin', usage: '/autojoin [#channel]', description: 'Rejoin this room on reconnect (this device).', kind: 'irc' },
   { name: 'unautojoin', usage: '/unautojoin [#channel]', description: 'Stop auto-joining a room on reconnect.', kind: 'irc' },
   { name: 'highlight', usage: '/highlight <word>', description: 'Add a local highlight word or phrase.', kind: 'irc' },
   { name: 'unhighlight', usage: '/unhighlight <word>', description: 'Remove a local highlight word.', kind: 'irc' },
   { name: 'snooze', usage: '/snooze <minutes>', description: 'Pause alerts for N minutes (1–1440).', kind: 'irc' },
   { name: 'dnd', usage: '/dnd [on|off|minutes]', description: 'Toggle do-not-disturb or set a timed snooze.', kind: 'irc' },
-  { name: 'color', usage: '/color [#hex|clear]', description: 'Set a personal channel accent color on this device.', kind: 'irc', aliases: ['colour'] },
+  { name: 'color', usage: '/color [#hex|clear]', description: 'Set a personal room accent color on this device.', kind: 'irc', aliases: ['colour'] },
   { name: 'share', usage: '/share', description: 'Copy a deep link to the current room.', kind: 'irc' },
   { name: 'export', usage: '/export [txt|json]', description: 'Download local scrollback for this view (this device only).', kind: 'irc' },
-  { name: 'notify', usage: '/notify all|mentions|mute', description: 'Set personal notification mode for the current channel.', kind: 'irc' },
+  { name: 'notify', usage: '/notify all|mentions|mute', description: 'Set personal notification mode for the current room.', kind: 'irc' },
   { name: 'ping', usage: '/ping [nick]', description: 'Latency check against the server or a peer.', kind: 'irc' },
   { name: 'ctcp', usage: '/ctcp <nick> <cmd>', description: 'Send a CTCP query.', kind: 'irc' },
   { name: 'stage', usage: '/stage [on|off]', description: 'Toggle or query stage mode for the room.', kind: 'irc' },

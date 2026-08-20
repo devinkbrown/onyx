@@ -61,6 +61,15 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
 - Production source: packaged assets from `dist/` via **`zero://app` only**
   (`frontend.productionSource` / explicit `.origin = "zero://app"`).
   **`zero://inline` is not allowed** — productionSource does not require it.
+- Packaged asset resolution is executable-relative: Linux/Windows
+  `bin/onyx[.exe]` resolves the sibling `resources/dist/`, macOS
+  `Contents/MacOS/onyx` resolves `Contents/Resources/dist/`, and source-tree
+  runs fall back to the repository `dist/`. Launching an installed binary no
+  longer depends on its process working directory.
+- The pinned Native SDK patch loads packaged assets through **`zero://app/`**
+  while still serving the configured `index.html` entry. This keeps SPA router
+  location `/`; loading `zero://app/index.html` leaves Solid Router unmatched
+  and produces a background-only window.
 - Dev source: `NATIVE_SDK_FRONTEND_URL` + existing Vite on
   **`http://127.0.0.1:3000`** (exact allowlisted origin; no path).
 - External links: **deny** in **both** `app.zon` and runtime
@@ -91,7 +100,12 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   one tar.gz + SHA-256 + embedded notice. Its fail-closed `install.sh` resolves
   distro-managed GTK4/WebKitGTK 6 packages through apt, dnf, or pacman and
   supports `--prefix`, `--no-deps`, `--dry-run`, and `--help`. **Not**
-  AppImage/Flatpak/deb; the runtime libraries remain distro-managed.
+  AppImage/Flatpak/deb; the runtime libraries remain distro-managed. On the
+  current Linux verification host, the packaged binary was launched under
+  Xvfb from a working directory with no `dist/`: WebKitGTK opened the packaged
+  HTML/JS/CSS, the Solid landing route rendered, and the window produced a
+  nonblank Onyx capture. This is a real WebKitGTK/GTK runtime smoke, not proof
+  of a physical interactive desktop session.
 - **FreeBSD / OpenBSD native Zig host (v0.1.3):** `pnpm desktop:release:freebsd`
   / `pnpm desktop:release:openbsd` — cross-compile `desktop/bsd_host.zig` to
   `x86_64-freebsd` / `x86_64-openbsd`, stage `bin/onyx` + `resources/dist` +
@@ -140,6 +154,8 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   `zig-out/release/` for all of windows+linux+macos-x86_64+macos-arm64+freebsd+openbsd
   (macOS from matching-arch Darwin / GHA matrix only).
 - Verified Windows GUI launch on real Windows hardware/VMs.
+- Interactive Linux launch on a physical desktop session (the connected gate
+  below is headless Xvfb with the real GTK4/WebKitGTK6 stack).
 - Verified macOS GUI launch / Gatekeeper path on real Apple hardware
   (**blocker for local Linux host:** package/DMG must be produced on Darwin —
   use `macos-release.yml` matrix (`macos-15-intel` + `macos-15`) or a real Mac;
@@ -160,10 +176,11 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
 | Package target/version graph defaults | **Configured** in `build.zig` (no macOS hardcode; version from `app.zon` / `0.1.3`) |
 | Zig **0.17.0-dev** pin `build -Dplatform=null` | **PASS** (compile + install of null backend) with pinned SDK patch |
 | Zig **0.17.0-dev** pin `build test -Dplatform=null` | **PASS** |
-| Zig **0.17.0-dev** pin `build -Dplatform=linux` | **Link unblocked** when WebKitGTK 6.0 is installed (`pkg-config webkitgtk-6.0`); still requires exact Zig pin from `.zigversion` |
+| Zig **0.17.0-dev** pin `build/test -Dplatform=linux` | **PASS** with the exact pin, GTK 4.22.4, and WebKitGTK 6.0 / 2.52.5 on this host |
 | Zig **0.17.0-dev** pin x86_64-windows cross-build | **PASS** artifact production (`onyx.exe` + `WebView2Loader.dll`); offline runtime installer is hash-verified, GUI launch is **not verified** here |
 | `pnpm desktop:release:windows` | **Tooling present** — unsigned zip with pinned full offline WebView2 x64 installer + install-and-run command; Windows GUI runtime **not** verified here |
-| `pnpm desktop:release:linux` | **Tooling present** — one tar.gz with `install.sh` after ELF/manifest/resources validation; apt/dnf/pacman resolve distro-managed GTK4 + WebKitGTK 6 |
+| `pnpm desktop:release:linux` | **PASS** — one unsigned tar.gz with `install.sh` after ELF/manifest/resources validation; apt/dnf/pacman resolve distro-managed GTK4 + WebKitGTK 6 |
+| Packaged Linux WebKit runtime from unrelated cwd | **PASS under Xvfb** — executable-relative `resources/dist`; packaged HTML/modules/CSS opened; Solid route rendered at `zero://app/`; nonblank Onyx window capture |
 | `pnpm desktop:release:freebsd` / `:openbsd` | **Tooling present** — Zig-native `bsd_host` x86_64 ELF + `resources/dist` tar.gz; runtime needs GTK/WebKitGTK on BSD; **GUI not claimed** from Linux cross-build |
 | `pnpm desktop:release:macos` | **Fail-closed on non-Darwin** — host arch → `macos-x86_64` or `macos-arm64`; GHA matrix `macos-15-intel` + `macos-15`; unsigned/unnotarized |
 | GUI launch on real FreeBSD/OpenBSD / signing / updater | **Not done / not verified** |
@@ -189,8 +206,10 @@ System WebView path links:
   `patches/@native-sdk__cli@0.6.2.patch` (durable artifact). The patch
   retrofits removed Zig 0.17 `**` array/string repetition to typed `@splat`
   (and explicit comptime multi-byte fill only where needed) plus the removed
-  `errdefer |err|` payload capture in the app-start path. **No** global regex
-  rewrite script is shipped or invoked at install/build time.
+  `errdefer |err|` payload capture in the app-start path. It also loads the
+  configured Linux asset entry through the custom-scheme root
+  (`zero://app/`) so client routers see `/`. **No** global regex rewrite
+  script is shipped or invoked at install/build time.
 - Repo `build.zig` targets Zig **0.17** build APIs (`graph.release_mode`,
   `pathFromRoot` via root join, local sysroot, PATH-based Run path dirs).
   Zig **0.16.x is not supported** for this host tree.
@@ -199,8 +218,8 @@ System WebView path links:
 
   ```bash
   export ONYX_ZIG=/path/to/zig-0.17.0-dev.1476+91a29d707/zig
-  export ZIG_LOCAL_CACHE_DIR=/tmp/onyx-zig017-cache
-  export ZIG_GLOBAL_CACHE_DIR=/tmp/onyx-zig017-global
+  export ZIG_LOCAL_CACHE_DIR="$PWD/.zig-cache/onyx-zig017-local"
+  export ZIG_GLOBAL_CACHE_DIR="$PWD/.zig-cache/onyx-zig017-global"
   pnpm desktop:build:null
   pnpm desktop:test:null
   ```
@@ -280,4 +299,6 @@ checked-in pnpm patch (`pnpm exec native …` or scripts that resolve
 - Keep `vite` `build.outDir: 'dist'`.
 - Do not point builds at `out/` (only `deploy.sh` writes production `out/`).
 - Same routes, assets, and tests for browser, PWA, and zig-desktop host.
+- Packaged entry URL stays `zero://app/` so the browser router starts at `/`;
+  `index.html` remains an implementation entry file, not a public route.
 - Vite dev port **3000** (`strictPort: true`) matches the host allowlist.

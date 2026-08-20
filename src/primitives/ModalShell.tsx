@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { Show, splitProps, type ParentProps } from 'solid-js';
+import { Show, createUniqueId, splitProps, type ParentProps } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { createDialogFocus } from './focusTrap';
 
@@ -9,18 +9,32 @@ export type ModalShellProps = ParentProps<{
   description?: string;
   onOpenChange: (open: boolean) => void;
   closeLabel?: string;
+  returnFocus?: HTMLElement | null;
+  returnFocusFallback?: HTMLElement | null;
 }>;
 
 export function ModalShell(props: ModalShellProps) {
-  const [local, rest] = splitProps(props, ['open', 'title', 'description', 'onOpenChange', 'closeLabel', 'children']);
-  const titleId = () => `${local.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'modal'}-title`;
-  const descriptionId = () => local.description ? `${titleId()}-description` : undefined;
+  const [local, rest] = splitProps(props, [
+    'open',
+    'title',
+    'description',
+    'onOpenChange',
+    'closeLabel',
+    'returnFocus',
+    'returnFocusFallback',
+    'children',
+  ]);
+  const instanceId = createUniqueId();
+  const titleId = `${instanceId}-title`;
+  const descriptionId = `${instanceId}-description`;
   let dialogRef: HTMLElement | undefined;
 
   createDialogFocus({
     isOpen: () => local.open,
     getPanel: () => dialogRef,
     onEscape: () => local.onOpenChange(false),
+    getReturnFocus: () => local.returnFocus,
+    getReturnFocusFallback: () => local.returnFocusFallback,
   });
 
   return (
@@ -35,16 +49,16 @@ export function ModalShell(props: ModalShellProps) {
             class="onyx-modal__dialog"
             role="dialog"
             aria-modal="true"
-            aria-labelledby={titleId()}
-            aria-describedby={descriptionId()}
+            aria-labelledby={titleId}
+            aria-describedby={local.description ? descriptionId : undefined}
             tabindex="-1"
           >
             <header class="onyx-modal__header">
               <div>
                 <p class="onyx-modal__kicker">dialog</p>
-                <h2 id={titleId()}>{local.title}</h2>
+                <h2 id={titleId}>{local.title}</h2>
                 <Show when={local.description}>
-                  <p id={descriptionId()}>{local.description}</p>
+                  <p id={descriptionId}>{local.description}</p>
                 </Show>
               </div>
               <button class="onyx-modal__close" type="button" aria-label={local.closeLabel ?? 'Close dialog'} onClick={() => local.onOpenChange(false)}>×</button>

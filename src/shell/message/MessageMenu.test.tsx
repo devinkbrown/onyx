@@ -800,6 +800,26 @@ describe('<MessageMenu>', () => {
     });
   });
 
+  it('links channel messages to the public room ledger from the overflow menu', () => {
+    const msg: ChatMessage = {
+      id: 'm-ledger',
+      from: 'alice',
+      text: 'room context',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+
+    expect(screen.getByRole('menuitem', { name: 'Room ledger for #general' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23general',
+    );
+  });
+
   it('reports accessible success after copying message text', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {

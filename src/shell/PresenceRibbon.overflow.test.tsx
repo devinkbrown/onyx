@@ -3,7 +3,7 @@
  * PresenceRibbon.overflow.test.tsx — commercial room-header slice.
  *
  * 4-zone place header: Call · People · More; pins + Jump to date in More;
- * People visible at 0 with truthful aria-pressed; conn always present;
+ * People visible at 0 with truthful aria-expanded; conn always present;
  * call lifecycle truth table; More section headings + valid menus.
  */
 import { readFileSync } from 'node:fs';
@@ -12,7 +12,6 @@ import { fileURLToPath } from 'node:url';
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { openPreferences } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import type { CallState } from '@/lib/cadence-media/types';
@@ -86,7 +85,6 @@ function setRoomVoice(
 describe('PresenceRibbon commercial room header', () => {
   beforeEach(() => {
     store.setState(initialState, true);
-    vi.mocked(openPreferences).mockReset();
   });
 
   afterEach(() => {
@@ -114,35 +112,96 @@ describe('PresenceRibbon commercial room header', () => {
     expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
   });
 
-  it('shows People at zero members with accessible count and aria-pressed false', () => {
+  it('uses a room-specific mobile overflow while the persistent Menu owns workspace settings', () => {
+    seedChannel();
+    render(() => <PresenceRibbon contextActionsOnly />);
+
+    expect(screen.getByRole('button', { name: 'Room actions' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Room actions' }));
+    expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-appearance')).toBeNull();
+    expect(screen.queryByTestId('ribbon-preferences')).toBeNull();
+    expect(screen.queryByTestId('ribbon-account-chip')).toBeNull();
+  });
+
+  it.each([
+    { label: 'Home', activeView: { kind: 'home' as const } },
+    { label: 'Activity', activeView: { kind: 'status' as const } },
+    { label: 'a stale resumed channel', activeView: { kind: 'channel' as const, channel: '#missing' } },
+  ])('hides context-only actions on $label when no live conversation context exists', ({ activeView }) => {
+    store.setState({
+      ...initialState,
+      connectionStatus: 'connected',
+      activeView,
+      channels: new Map(),
+      dms: new Map(),
+    });
+    render(() => <PresenceRibbon contextActionsOnly />);
+
+    expect(screen.queryByTestId('ribbon-more')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Room actions|Conversation actions/ })).toBeNull();
+  });
+
+  it('keeps a healthy mobile DM context operable and correctly labelled', () => {
+    store.setState({
+      ...initialState,
+      connectionStatus: 'connected',
+      activeView: { kind: 'dm', nick: 'alice' },
+      dms: new Map([['alice', {
+        nick: 'alice',
+        account: null,
+        unread: 0,
+        highlights: 0,
+        messages: [],
+      }]]),
+    });
+    render(() => <PresenceRibbon contextActionsOnly />);
+
+    const trigger = screen.getByRole('button', { name: 'Conversation actions' });
+    fireEvent.click(trigger);
+    expect(screen.getByText('Conversation')).toBeInTheDocument();
+    expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
+    expect(screen.queryByText('Workspace')).toBeNull();
+  });
+
+  it('shows People at zero members with accessible count and no aria-pressed', () => {
     seedChannel('#empty', new Map());
-    render(() => <PresenceRibbon />);
+    // Drive the surface explicitly (rather than relying on the store's default
+    // showMemberList fallback) so the closed-state assertion is deterministic.
+    render(() => <PresenceRibbon membersOpen={false} />);
 
     const people = screen.getByTestId('ribbon-members');
     expect(people).toBeInTheDocument();
     expect(people).toHaveAttribute('aria-label', '0 members — toggle member list');
-    // Empty roster cannot open a member surface.
-    expect(people).toHaveAttribute('aria-pressed', 'false');
+    // The trigger is a disclosure, not a toggle button — aria-expanded is the
+    // correct state property; aria-pressed must not be present at all.
+    expect(people).toHaveAttribute('aria-expanded', 'false');
+    expect(people).not.toHaveAttribute('aria-pressed');
     expect(people.querySelector('.shell-ribbon-count')).toHaveTextContent('0');
   });
 
-  it('uses membersOpen for People aria-pressed (AppShell membersVisible wiring)', () => {
+  it('uses membersOpen for People aria-expanded (AppShell membersVisible wiring)', () => {
     seedChannel();
     const { unmount } = render(() => <PresenceRibbon membersOpen={false} />);
-    expect(screen.getByTestId('ribbon-members')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('ribbon-members')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('ribbon-members')).not.toHaveAttribute('aria-pressed');
     unmount();
 
     render(() => <PresenceRibbon membersOpen={true} />);
-    expect(screen.getByTestId('ribbon-members')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('ribbon-members')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('ribbon-members')).not.toHaveAttribute('aria-pressed');
   });
 
-  it('forces membersPressed false when memberCount is zero even if membersOpen=true', () => {
+  it('mirrors the real open surface even with an empty roster (membersOpen=true)', () => {
+    // The 353 NAMES burst has not landed yet, but the member drawer is a real
+    // role="dialog" surface — the trigger must not lie about it being closed.
     seedChannel('#empty', new Map());
     render(() => <PresenceRibbon membersOpen={true} />);
 
     const people = screen.getByTestId('ribbon-members');
     expect(people).toHaveAttribute('aria-label', '0 members — toggle member list');
-    expect(people).toHaveAttribute('aria-pressed', 'false');
+    expect(people).toHaveAttribute('aria-expanded', 'true');
+    expect(people).not.toHaveAttribute('aria-pressed');
   });
 
   it('keeps connection status present with a11y text (narrow-safe structure)', () => {
@@ -239,25 +298,25 @@ describe('PresenceRibbon commercial room header', () => {
     expect(screen.queryByTestId('ribbon-pins')).not.toBeInTheDocument();
 
     openMore();
-    expect(screen.getByRole('dialog', { name: 'More channel and workspace actions' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'More room and workspace actions' })).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-more-menu')).toBeInTheDocument();
 
     // Visible section headings (not aria-hidden) name real semantic groups
     expect(screen.getByText('Alerts')).toBeInTheDocument();
     expect(screen.getByText('This room')).toBeInTheDocument();
-    expect(screen.getByText('Workspace')).toBeInTheDocument();
     expect(screen.queryByText('Channel')).not.toBeInTheDocument();
+    expect(screen.queryByText('Workspace')).not.toBeInTheDocument();
     expect(screen.getByText('Alerts')).not.toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByText('This room')).not.toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByText('Workspace')).not.toHaveAttribute('aria-hidden', 'true');
 
     // Labelled section wrappers are role=group (labels name the groups)
     const alertsGroup = screen.getByRole('group', { name: 'Alerts' });
     const roomGroup = screen.getByRole('group', { name: 'This room' });
-    const workspaceGroup = screen.getByRole('group', { name: 'Workspace' });
+    const youGroup = screen.getByRole('group', { name: 'You' });
     expect(alertsGroup).toHaveClass('shell-ribbon-more-section');
     expect(roomGroup).toHaveClass('shell-ribbon-more-section');
-    expect(workspaceGroup).toHaveClass('shell-ribbon-more-section');
+    expect(youGroup).toHaveClass('shell-ribbon-more-section');
+    expect(youGroup.querySelector('.shell-ribbon-more-label')).not.toHaveAttribute('aria-hidden', 'true');
 
     // Menus only contain menuitem children (headings/groups live outside role=menu)
     const menus = screen.getAllByRole('menu');
@@ -269,26 +328,32 @@ describe('PresenceRibbon commercial room header', () => {
       }
     }
 
-    expect(screen.getByTestId('ribbon-preferences')).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-preferences')).not.toBeInTheDocument();
     expect(screen.getByTestId('ribbon-settings-gear')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-account-chip')).toBeInTheDocument();
-    expect(screen.getByTestId('ribbon-appearance')).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-appearance')).not.toBeInTheDocument();
     expect(screen.getByTestId('ribbon-more-channel')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: /Notifications for/ })).toBeInTheDocument();
 
-    // Menu order: This room items before Workspace items (single roving set under panel)
+    // Menu order: This room items before You items (single roving set under panel)
     const panel = screen.getByTestId('ribbon-more-menu');
     const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
     const labels = items.map((el) => el.textContent ?? '');
-    const settingsIdx = labels.findIndex((t) => t.includes('Channel settings'));
+    const settingsIdx = labels.findIndex((t) => t.includes('Room settings'));
+    const ledgerIdx = labels.findIndex((t) => t.includes('Room ledger'));
     const pinsIdx = labels.findIndex((t) => t.includes('Pinned messages'));
     const jumpIdx = labels.findIndex((t) => t.includes('Jump to date'));
-    const appearanceIdx = labels.findIndex((t) => t.includes('Appearance'));
+    const youIdx = labels.findIndex((t) => t.includes('You') || t.includes('Guest'));
     expect(settingsIdx).toBeGreaterThanOrEqual(0);
-    expect(pinsIdx).toBeGreaterThan(settingsIdx);
+    expect(ledgerIdx).toBeGreaterThan(settingsIdx);
+    expect(pinsIdx).toBeGreaterThan(ledgerIdx);
     expect(jumpIdx).toBeGreaterThan(pinsIdx);
-    expect(appearanceIdx).toBeGreaterThan(jumpIdx);
+    expect(youIdx).toBeGreaterThan(jumpIdx);
+    expect(screen.getByTestId('ribbon-channel-ledger')).toHaveAttribute(
+      'href',
+      '/stats/?room=%23general',
+    );
 
     const pins = screen.getByTestId('ribbon-pins');
     expect(pins).toBeInTheDocument();
@@ -303,7 +368,10 @@ describe('PresenceRibbon commercial room header', () => {
 
     openMore();
     const account = screen.getByTestId('ribbon-account-chip');
-    expect(account).toHaveAttribute('aria-label', 'Guest — open account panel');
+    expect(account).toHaveAttribute(
+      'aria-label',
+      'You — guest — open account, appearance, and preferences',
+    );
     fireEvent.click(account);
     expect(store.getState().showAccount).toBe(true);
   });
@@ -315,13 +383,13 @@ describe('PresenceRibbon commercial room header', () => {
 
     openMore();
     expect(more).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(screen.getByTestId('ribbon-preferences'));
+    fireEvent.click(screen.getByTestId('ribbon-account-chip'));
 
     await waitFor(() => {
       expect(more).toHaveAttribute('aria-expanded', 'false');
       expect(screen.queryByTestId('ribbon-more-menu')).not.toBeInTheDocument();
     });
-    expect(openPreferences).toHaveBeenCalledTimes(1);
+    expect(store.getState().showAccount).toBe(true);
   });
 
   it('restores focus to More when Escape closes the overflow', async () => {
@@ -373,11 +441,12 @@ describe('PresenceRibbon commercial room header', () => {
     openMore();
     expect(screen.getByText('Conversation')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
-    expect(screen.getByTestId('ribbon-preferences')).toBeInTheDocument();
+    expect(screen.queryByTestId('ribbon-preferences')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-settings-gear')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-more-channel')).not.toBeInTheDocument();
     expect(screen.queryByText('This room')).not.toBeInTheDocument();
-    expect(screen.getByText('Workspace')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'You' })).toBeInTheDocument();
+    expect(screen.getByTestId('ribbon-account-chip')).toBeInTheDocument();
   });
 
   it('renders Facepile root class that responsive CSS actually hides', () => {

@@ -32,7 +32,7 @@ Companions:
 | Native capability matrix exists and is non-optimistic | **DONE** | `capabilitiesForSurface` — all flags **false** for minimal host |
 | Zig desktop scaffold (manifest + structural check) | **PARTIAL / structural DONE** | `app.zon` `native validate` + `native check` PASS; host sources present |
 | Zig source compile of full Native SDK host (null backend) | **DONE** on Zig **0.17.0-dev** pin | `zig build -Dplatform=null` / `test` with pin `0.17.0-dev.1476+91a29d707`, patched `@native-sdk/cli@0.6.2`, isolated caches |
-| Native GUI link / run (Linux WebKitGTK 6) | **PENDING** | Missing `webkitgtk-6.0`; link fails after successful compile |
+| Native GUI link / run (Linux WebKitGTK 6) | **DONE on current Linux host (Xvfb)** | Exact Zig pin + GTK4/WebKitGTK6 build/test pass; packaged binary resolves `resources/dist` from its executable, loads at `zero://app/`, renders the Solid landing route, and produces a nonblank native-window capture from an unrelated cwd |
 | Downloadable installers | **PARTIAL** | Windows bundles the offline WebView2 installer; Linux/FreeBSD/OpenBSD include `install.sh`; packages remain unsigned |
 | Code signing | **PENDING** | Not configured |
 | Auto-updater | **PENDING** | Capability `updater: false`; no pipeline |
@@ -41,7 +41,7 @@ Companions:
 | Dedicated Product / Communities / Organizations / Trust routes | **PENDING** | Contracted in `PUBLIC_COMPANY_SITE.md`; Home has pillars + audience entries only |
 | Contact / legal pages | **PENDING** | Gated — no fake legal copy |
 | Chromium/CEF parity | **NOT CLAIMED** | System WebView only |
-| Zig 0.17-dev as host toolchain | **DONE (pinned)** | Official pin `0.17.0-dev.1476+91a29d707` + pnpm patch; runtime/signing/installer/updater/deploy still unverified |
+| Zig 0.17-dev as host toolchain | **DONE (pinned)** | Official pin `0.17.0-dev.1476+91a29d707` + pnpm patch; Linux Xvfb runtime is green, while other platform runtimes/signing/updater/deploy remain separate |
 
 ---
 
@@ -97,10 +97,10 @@ Companions:
 | `browser` surface | **DONE** |
 | `pwa` detection (`display-mode: standalone` + iOS `navigator.standalone`) | **DONE** (runtime detect + tests) |
 | `zig-desktop` detection (`window.zero` or `zero://app`) | **DONE** (runtime detect + tests) |
-| Zig host scaffold (`app.zon`, `desktop/*`, `build.zig`) | **PARTIAL** — structural + null compile green on Zig 0.17 pin |
+| Zig host scaffold (`app.zon`, `desktop/*`, `build.zig`) | **PARTIAL cross-platform / Linux runtime green** — structural + null + Linux compile/test/package and connected Xvfb runtime green on Zig 0.17 pin |
 | `native validate` / `native check` | **DONE** (structural gates) |
 | Zig compile of SDK host sources (`-Dplatform=null`) | **DONE** on Zig **0.17.0-dev** pin + patched SDK 0.6.2 |
-| Native GUI link + run | **PENDING** (WebKitGTK 6 missing on Linux verify host) |
+| Native GUI link + run | **DONE for Linux Xvfb gate** (real GTK4/WebKitGTK6; packaged SPA rendered from unrelated cwd); Windows/macOS/BSD runtime gates remain separate |
 | Package output version/target defaults | **DONE** in graph: version from `app.zon` (0.1.3), target from selected platform; `null` not packageable |
 | Toolchain pin | **DONE** — Zig **0.17.0-dev.1476+91a29d707** / Native SDK **0.6.2** via pnpm `patchedDependencies` |
 
@@ -141,7 +141,7 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 
 | Gate | Status |
 |------|--------|
-| `zig build package` produces host-local artifact | **PARTIAL** — Linux/Windows/macOS lanes tooling; BSD uses `bsd-host` package stage |
+| `zig build package` produces host-local artifact | **DONE on current Linux host / PARTIAL cross-platform** — Linux package + release archive verified; Windows/macOS lanes remain separate; BSD uses `bsd-host` package stage |
 | Package target default = selected platform (not hardcoded macOS) | **DONE** (build graph) |
 | Package version = `app.zon` / 0.1.3 (not stale 0.1.0) | **DONE** (build graph) |
 | Linux/FreeBSD/OpenBSD one-install `install.sh` in release tarball | **DONE** (packaging tool + unit tests; BSD GUI not claimed on Linux host) |
@@ -179,12 +179,17 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 - Structural Zig desktop scaffold: `app.zon`, host sources, `build.zig` package path defaults, platform surface + capability matrix tests.
 - `native validate`, `native check`, web `pnpm typecheck` / platform unit tests when run green.
 - Zig **0.17.0-dev** pin null-backend compile + test green (`-Dplatform=null`) with checked-in SDK patch.
+- Linux native compile/test/package green with GTK4/WebKitGTK6, plus a connected
+  Xvfb smoke of the packaged binary from an unrelated cwd. The trace opened
+  packaged `resources/dist` assets, the custom-scheme root stayed `/`, and the
+  Solid landing route rendered into a nonblank Onyx window.
 - Connected **product-frame navigation foundation** (shell-local only): Home / Rooms / Messages / Calls / You; Calls opens `CallsHub` and never auto-joins.
 
 **Explicitly not done (do not claim):**
 
 - Full commercial shell redesign (Home surface, conversation chrome, composer, profile/settings presentation).
-- Native GUI link/run (Linux needs `webkitgtk-6.0`).
+- Physical interactive Linux desktop acceptance beyond the headless Xvfb gate,
+  plus real Windows/macOS and FreeBSD/OpenBSD GUI acceptance.
 - Signed installers, notarization, auto-updater, multi-platform public download ship.
 - Verified FreeBSD/OpenBSD GUI launch on real BSD hardware (cross-build proves ELF/layout only).
 - Dedicated Product/Communities/Organizations/Trust/legal routes.
@@ -196,8 +201,12 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 
 1. Keep Landing/tests aligned with `PUBLIC_COMPANY_SITE.md` when copy changes.
 2. Continue commercial total UI redesign **after** nav/calls foundation: Home surface → conversation → composer → profile/You settings (still without touching protocol/store/media/E2EE kernel).
-3. Install WebKitGTK 6 for Linux GUI link; re-run `zig build -Dplatform=linux` with the Zig 0.17 pin until green.
-4. Prove `zig build package` on a packageable platform with versioned output under `zig-out/package/onyx-0.1.3-…`.
+3. Keep the Linux packaged-runtime regression green: executable-relative
+   `resources/dist`, `zero://app/` router entry, and connected Xvfb render from
+   an unrelated cwd; add a physical interactive-session check when available.
+4. Run the remaining real-platform gates (Windows GUI, macOS Intel/Apple
+   Silicon package + GUI, FreeBSD/OpenBSD GUI) without treating Linux
+   cross-builds as runtime proof.
 5. Keep `/download/` claim level exact: unsigned Windows zip + Linux/FreeBSD/OpenBSD tar.gz + macOS Intel and Apple Silicon DMGs (matching-arch Darwin-built only, never fabricated on Linux); stage with `pnpm desktop:stage-release-downloads:publish` when publishing (requires all six lanes).
 6. Design signing + updater for multi-platform only with evidence; never claim virus-free/codesign for unsigned packages.
 7. Add remaining company-site routes only with real content (Phase 7) — never empty legal.

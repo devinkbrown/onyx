@@ -10,6 +10,7 @@ export default tseslint.config(
     ignores: [
       '.next/**',
       '.wt/**',
+      '.work/**',
       '.claude/**',
       '.onyx-deploy-backups/**',
       'scratchpad/**',

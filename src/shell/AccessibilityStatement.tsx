@@ -62,27 +62,27 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
     summary:
       'Dense app panels are tracked inside Preferences and mirrored here as pass evidence lands.',
     points: [
-      'Channel settings uses a labelled Sheet, labelled forms, switch-mode flags, and read-only non-op fallbacks.',
+      'Room settings uses a labelled Sheet, labelled forms, switch-mode flags, and read-only non-op fallbacks.',
       'Voice controls use a toolbar, grouped labelled controls, aria-pressed media state, and a live call timer.',
       'The mini voice view renders at most five avatars while its participant, hidden, and speaking counts reflect the full case-insensitive room roster.',
       'Appearance uses radio groups for themes and backgrounds with labelled swatches and modal focus handling.',
-      'Home catch-up exposes recaps, reviewed ranges, and the channel directory as labelled card lists with direct action buttons.',
+      'Home catch-up exposes recaps, reviewed ranges, and the room directory as labelled card lists with direct action buttons.',
       'Message search uses a search landmark, labelled match navigation, and named archived/device-memory result lists.',
       'Notification center uses a named inbox dialog, labelled notification list, and row-specific open/dismiss actions.',
-      'Channel browser uses a Sheet dialog, named directory search, labelled public-channel list, and target-specific Join/Open actions.',
+      'Room browser uses a Sheet dialog, named directory search, labelled public-room list, and target-specific Join/Open actions.',
       'Account panel groups account management into named regions with alert/status feedback and target-specific persona actions.',
-      'Channel sidebar uses a complementary navigation landmark, roving channel and DM rows, unread/mention names, and a target-specific join action.',
+      'Room sidebar uses a complementary navigation landmark, roving room and DM rows, unread/mention names, and a target-specific join action.',
       'Keyboard shortcuts uses a named Sheet dialog, labelled close action, grouped shortcut lists generated from the live keymap, and J/K transcript navigation.',
       'Command palette uses a named dialog, described grammar examples, live selected-command status, and literal goto/search/time/reader/mute actions.',
-      'Pinned messages uses a named Sheet dialog, channel-specific pins list, target-specific jump buttons, and real unpin controls.',
+      'Pinned messages uses a named Sheet dialog, room-specific pins list, target-specific jump buttons, and real unpin controls.',
       'Theme import uses a named Sheet dialog, described theme-code input, target-specific import and copy actions, and invalid-code feedback.',
       'Thread panel uses a named Sheet dialog, labelled parent and reply articles, and a reply log scoped to the source message.',
       'Voice settings uses a named Sheet dialog, labelled device/processing/push-to-talk regions, described selects, and target-specific push-to-talk key actions.',
       'Call overlays use named incoming/outgoing dialogs with target-specific accept, decline, and cancel actions.',
       'Message actions use per-row action groups, named reaction and overflow triggers, labelled menus, and row-specific action names.',
-      'Member list uses a channel-scoped complementary landmark, labelled role groups, named member-detail dialogs, target-specific member actions, decorative avatars, and focus retention across MODE/PART.',
+      'Member list uses a room-scoped complementary landmark, labelled role groups, named member-detail dialogs, target-specific member actions, decorative avatars, and focus retention across MODE/PART.',
       'Notification controls use a labelled compact control group, described calm-mode radios, and pressed-state desktop, sound, push, and do-not-disturb toggles.',
-      'Time scrubber uses a channel-scoped region, labelled UTC-hour jump buttons, a date jump input, and a target-specific moment-copy action.',
+      'Time scrubber uses a room-scoped region, labelled UTC-hour jump buttons, a date jump input, and a target-specific moment-copy action.',
       'Jump to date uses a named Sheet dialog, UTC date/time fields, quick-date presets, target-specific jump and moment-copy actions, and ribbon/composer openers.',
       'Watch together uses named review and host-control groups, a bounded participant list, polite atomic outcome status, and focus restoration after successful or stale confirmations.',
       'Reader memory uses a named device-memory region, reviewed-span and context-trail groups, labelled transcript jumps, and cross-room peer-review handoffs with focus-visible dense rows.',
@@ -150,7 +150,7 @@ export function AccessibilityStatement(props: { class?: string }): JSX.Element {
             <h4 id="a11y-reporting-title">Reporting accessibility bugs</h4>
             <p>
               Onyx welcomes accessibility bug reports through your community&apos;s
-              admin or an <code>#accessibility</code> channel so issues can be
+              admin or an <code>#accessibility</code> room so issues can be
               reproduced and prioritized.
             </p>
           </section>

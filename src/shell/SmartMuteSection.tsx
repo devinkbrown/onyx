@@ -48,7 +48,7 @@ export function SmartMuteSection(props: SmartMuteSectionProps): JSX.Element {
       owner,
     );
     setStatus(ok
-      ? `Saved ${keywords.length} keyword mute(s). Ignored nicks also silence notifications.`
+      ? `Saved ${keywords.length} keyword mute(s). Ignored names also silence notifications.`
       : 'Could not save smart mute rules.');
   }
 
@@ -66,7 +66,7 @@ export function SmartMuteSection(props: SmartMuteSectionProps): JSX.Element {
           </h3>
           <p class="acct-section-hint" id="acct-smartmute-hint">
             Silence OS notifications for keyword spam. Does not hide messages in the room.
-            Ignored nicks already mute notifications and feed visibility.
+            Ignored names already mute notifications and feed visibility.
           </p>
         </div>
         <div class="acct-section-body">

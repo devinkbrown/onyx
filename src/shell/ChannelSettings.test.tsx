@@ -16,6 +16,37 @@ import type { NotifyLevel } from '@/lib/notifications/channelNotifyMode';
 import { readChannelTopicDraft, saveChannelTopicDraft } from '@/lib/channel/topicDrafts';
 import { ChannelSettings } from './ChannelSettings';
 
+vi.mock('@/lib/stats/channelDetail', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/stats/channelDetail')>();
+  return {
+    ...actual,
+    fetchChannelDetail: vi.fn(async () => ({
+      channel: '#general',
+      generatedAt: 1,
+      firstSeen: 1,
+      lastActive: Math.floor(Date.now() / 1000) - 60,
+      present: 8,
+      lastSpeaker: 'alice',
+      totals: {
+        messages: 500,
+        words: 1200,
+        activeUsers: 8,
+        joins: 2,
+        parts: 1,
+        quits: 0,
+        kicks: 0,
+        topicChanges: 0,
+      },
+      hours: Array.from({ length: 24 }, () => 0),
+      days: [],
+      heatmap: Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0)),
+      busiestDay: { date: '2026-07-01', messages: 50 },
+      peakHour: 12,
+      complete: true,
+    })),
+  };
+});
+
 const initialState = store.getInitialState();
 const ALICE_OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
 const BOB_OWNER = { serverUrl: 'wss://example.test', identity: 'bob' } as const;
@@ -101,6 +132,19 @@ afterEach(() => {
   vi.restoreAllMocks();
   Reflect.deleteProperty(navigator, 'share');
   Reflect.deleteProperty(navigator, 'canShare');
+});
+
+describe('ChannelSettings — Public insights', () => {
+  it('deep-links the embedded room insights strip to the room ledger', async () => {
+    seed();
+    renderPanel();
+
+    expect(await screen.findByTestId('room-insights-open-stats')).toHaveAttribute(
+      'href',
+      '/stats/?room=%23general',
+    );
+    expect(screen.getByTestId('room-insights-open-stats')).toHaveTextContent('Room ledger');
+  });
 });
 
 describe('ChannelSettings — Notifications', () => {
@@ -413,7 +457,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     renderPanel();
 
     expect(screen.getByRole('heading', { name: 'Roles & access' })).toBeInTheDocument();
-    expect(screen.getByText(/IRCX ACCESS grants founder/i)).toBeInTheDocument();
+    expect(screen.getByText(/Access entries grant founder/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add access entry' })).not.toBeInTheDocument();
   });
 
@@ -435,7 +479,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     renderPanel();
 
     expect(sendRaw).toHaveBeenCalledWith('ACCESS', '#general', 'LIST');
-    const list = screen.getByRole('list', { name: 'Channel access entries' });
+    const list = screen.getByRole('list', { name: 'Room access entries' });
     expect(list).toBeInTheDocument();
     expect(list).toHaveTextContent('bob!*@*');
     expect(list).toHaveTextContent('*!*@spam.example');
@@ -450,7 +494,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
 
     renderPanel();
     fireEvent.change(screen.getByLabelText('Role level'), { target: { value: 'VOICE' } });
-    fireEvent.input(screen.getByLabelText('Nick or hostmask'), { target: { value: 'carol' } });
+    fireEvent.input(screen.getByLabelText('Name or hostmask'), { target: { value: 'carol' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add access entry' }));
 
     expect(addSpy).toHaveBeenCalledWith('#general', 'VOICE', 'carol!*@*', undefined);
@@ -463,7 +507,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
 
     renderPanel();
     fireEvent.change(screen.getByLabelText('Role level'), { target: { value: 'DENY' } });
-    fireEvent.input(screen.getByLabelText('Nick or hostmask'), {
+    fireEvent.input(screen.getByLabelText('Name or hostmask'), {
       target: { value: 'bad!*@spam.example' },
     });
     fireEvent.input(screen.getByLabelText('Timeout seconds (optional)'), {
@@ -483,7 +527,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     sendRaw.mockClear();
     fireEvent.click(screen.getByRole('button', { name: 'Add access entry' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/nick or hostmask/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/name or hostmask/i);
     expect(addSpy).not.toHaveBeenCalled();
     // Opening the panel issues ACCESS LIST once; the invalid submit must not.
     expect(sendRaw).not.toHaveBeenCalled();
@@ -525,7 +569,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
       ]),
     });
 
-    const list = screen.getByRole('list', { name: 'Channel access entries' });
+    const list = screen.getByRole('list', { name: 'Room access entries' });
     expect(list).toHaveTextContent('dana!*@*');
     expect(list).toHaveTextContent('Owner');
   });

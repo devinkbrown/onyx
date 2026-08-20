@@ -14,7 +14,7 @@
   padding: var(--space-1) var(--space-3);
   background: var(--stone);
   border: 1px solid var(--line);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   color: var(--paper);
   font: inherit;
   font-size: 0.8rem;

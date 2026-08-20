@@ -110,6 +110,22 @@ describe('isPreviewableUrl (SSRF defense in depth)', () => {
     }
   });
 
+  it('rejects a trailing DNS root label used to defeat the internal-host denylist', () => {
+    // Control: the bare (no-dot) host is already correctly rejected.
+    expect(isPreviewableUrl('http://vault.internal/')).toBe(false);
+    // A root-labeled hostname must be rejected identically — `URL` preserves
+    // the trailing dot verbatim in `.hostname`, so without normalization each
+    // of these previously slipped past every suffix/exact-match host check.
+    expect(isPreviewableUrl('https://wiki.intranet.corp./page', {
+      linkPreviews: true,
+      httpsOnly: true,
+      blockedHosts: ['intranet.corp'],
+    })).toBe(false);
+    expect(isPreviewableUrl('https://printer.intranet.local./p.png')).toBe(false);
+    expect(isPreviewableUrl('https://api.svc.internal./x')).toBe(false);
+    expect(isPreviewableUrl('https://localhost./x.png')).toBe(false);
+  });
+
   it('rejects private / loopback / link-local IPv4 literals', () => {
     for (const href of [
       'http://127.0.0.1/',

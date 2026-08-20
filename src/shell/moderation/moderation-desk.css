@@ -1,0 +1,166 @@
+/* Room safety desk — compact authority rail and review surfaces. */
+
+.moderation-desk__rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.moderation-desk__rail > div {
+  display: flex;
+  gap: 6px;
+  min-height: 24px;
+  align-items: baseline;
+}
+
+.moderation-desk__rail dt {
+  margin: 0;
+  color: var(--paper-mute);
+  font: 700 var(--text-2xs)/1.2 var(--font-mono);
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+}
+
+.moderation-desk__rail dd {
+  margin: 0;
+  color: var(--paper);
+  font: 650 var(--text-sm)/1.2 var(--font-sans);
+}
+
+.moderation-desk__offline {
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.moderation-desk__log,
+.moderation-desk__bans,
+.moderation-desk__members {
+  display: grid;
+  gap: 6px;
+}
+
+.moderation-desk__log-list,
+.moderation-desk__ban-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.moderation-desk__log-list li,
+.moderation-desk__ban-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  color: var(--paper);
+  font-size: var(--text-sm);
+}
+
+.moderation-desk__ban-mask {
+  overflow-wrap: anywhere;
+  font: var(--text-sm) var(--font-mono);
+}
+
+.moderation-action-review__body {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.moderation-action-review__summary,
+.moderation-action-review__impact,
+.moderation-action-review__status,
+.moderation-action-review__errors {
+  margin: 0;
+  color: var(--paper);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.moderation-action-review__impact,
+.moderation-action-review__status {
+  color: var(--paper-mute);
+}
+
+.moderation-action-review__errors {
+  color: var(--shu);
+}
+
+.moderation-action-review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.moderation-action-review__actions button,
+.moderation-desk__ban-row button,
+.moderation-cockpit__form button,
+.moderation-cockpit__form select {
+  min-height: 40px;
+}
+
+.moderation-cockpit__form select {
+  min-width: 0;
+  flex: 1;
+  max-width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: var(--surface-void);
+  color: var(--paper);
+  font: var(--text-sm) var(--font-sans);
+}
+
+@media (max-width: 320px) {
+  .moderation-desk__rail,
+  .moderation-action-review__actions,
+  .moderation-desk__ban-row,
+  .moderation-cockpit__form > div {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .moderation-desk__ban-row button,
+  .moderation-action-review__actions button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moderation-cockpit,
+  .moderation-action-review__body,
+  .moderation-desk__ban-row {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .moderation-cockpit__mode[aria-pressed='true'],
+  .moderation-cockpit__confirm-action,
+  .moderation-desk__ban-row,
+  .moderation-desk__log-list li {
+    border: 1px solid ButtonText;
+  }
+
+  .moderation-action-review__errors,
+  .moderation-desk__offline,
+  .moderation-cockpit__state--offline {
+    color: Mark;
+  }
+
+  .moderation-cockpit__form button:focus-visible,
+  .moderation-action-review__actions button:focus-visible,
+  .moderation-desk__ban-row button:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+}

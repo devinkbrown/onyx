@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { For, Show } from 'solid-js';
+import { createMemo, For, Show } from 'solid-js';
 import type { SceneProps, SceneVariant } from '../engine';
 import { SceneShell, seededRand } from './SceneShell';
+import { useScenePolicy } from './scenePolicy';
 
 /* ── Neon night: dense neon cityscape — building silhouettes with blinking
    windows, driving rain, colorful puddle reflections, drifting clouds, fog,
@@ -82,8 +83,23 @@ const neons = (() => {
 })();
 
 function NeonNightScene(props: SceneProps) {
+  const policy = useScenePolicy();
+  const detail = createMemo(() => props.sceneDetail ?? policy().sceneDetail);
+  const visibleBuildings = createMemo(() => buildings.slice(0, detail() === 'sparse' ? 8 : detail() === 'balanced' ? 14 : buildings.length));
+  const visibleRain = createMemo(() => rain.slice(0, detail() === 'sparse' ? 12 : detail() === 'balanced' ? 26 : rain.length));
+  const visiblePuddles = createMemo(() => puddles.slice(0, detail() === 'sparse' ? 6 : detail() === 'balanced' ? 10 : puddles.length));
+  const visibleCars = createMemo(() => cars.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 6 : cars.length));
+  const visibleClouds = createMemo(() => clouds.slice(0, detail() === 'sparse' ? 2 : detail() === 'balanced' ? 4 : clouds.length));
+  const visibleNeons = createMemo(() => neons.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 4 : neons.length));
+
   return (
-    <SceneShell reducedMotion={props.reducedMotion} base="linear-gradient(180deg, #0a1420 0%, #0f1e2b 55%, #060b12 100%)">
+    <SceneShell
+      reducedMotion={props.reducedMotion}
+      sceneDetail={detail()}
+      paused={props.paused}
+      onRuntimePaused={props.onRuntimePaused}
+      base="linear-gradient(180deg, #0a1420 0%, #0f1e2b 55%, #060b12 100%)"
+    >
       {/* Dark cyberpunk sky */}
       <div class="absolute top-0 left-0 right-0 h-[70%]"
         style={{ background: 'linear-gradient(180deg, rgba(0,24,44,0.8), rgba(84,172,241,0.25) 60%, rgba(93,182,254,0.15) 80%, transparent)' }} />
@@ -96,15 +112,17 @@ function NeonNightScene(props: SceneProps) {
       </div>
 
       {/* Dense moving clouds */}
-      <For each={clouds}>
-        {(cl) => (
-          <div class="absolute"
-            style={{ top: `${cl.y}%`, left: '-20%', width: `${cl.w}px`, height: `${cl.h}px`,
-              background: 'radial-gradient(ellipse, rgba(31,64,90,0.6), rgba(7,43,70,0.3) 60%, transparent)',
-              filter: 'blur(12px)', 'border-radius': '50%',
-              animation: `tn-cloud ${cl.dur}s linear ${cl.delay}s infinite` }} />
-        )}
-      </For>
+      <div data-scene-layer="clouds">
+        <For each={visibleClouds()}>
+          {(cl) => (
+            <div class="absolute"
+              style={{ top: `${cl.y}%`, left: '-20%', width: `${cl.w}px`, height: `${cl.h}px`,
+                background: 'radial-gradient(ellipse, rgba(31,64,90,0.6), rgba(7,43,70,0.3) 60%, transparent)',
+                filter: 'blur(12px)', 'border-radius': '50%',
+                animation: `tn-cloud ${cl.dur}s linear ${cl.delay}s infinite` }} />
+          )}
+        </For>
+      </div>
 
       {/* Atmospheric fog layers */}
       <div class="absolute left-0 right-0" style={{ bottom: '30%', height: '20%',
@@ -115,88 +133,100 @@ function NeonNightScene(props: SceneProps) {
         filter: 'blur(8px)' }} />
 
       {/* Neon sign glows */}
-      <For each={neons}>
-        {(n) => (
-          <div class="absolute rounded-full"
-            style={{ left: `${n.x}%`, top: `${n.y}%`, width: `${n.w}px`, height: `${n.h}px`,
-              background: `radial-gradient(ellipse, ${n.color}60, ${n.color}30 50%, transparent 80%)`,
-              filter: 'blur(8px)',
-              'box-shadow': `0 0 20px ${n.color}80, 0 0 40px ${n.color}40`,
-              animation: `${n.anim} ${n.dur}s ease-in-out ${n.delay}s infinite` }} />
-        )}
-      </For>
+      <div data-scene-layer="neons">
+        <For each={visibleNeons()}>
+          {(n) => (
+            <div class="absolute rounded-full"
+              style={{ left: `${n.x}%`, top: `${n.y}%`, width: `${n.w}px`, height: `${n.h}px`,
+                background: `radial-gradient(ellipse, ${n.color}60, ${n.color}30 50%, transparent 80%)`,
+                filter: 'blur(8px)',
+                'box-shadow': `0 0 20px ${n.color}80, 0 0 40px ${n.color}40`,
+                animation: `${n.anim} ${n.dur}s ease-in-out ${n.delay}s infinite` }} />
+          )}
+        </For>
+      </div>
 
       {/* Dark street ground */}
       <div class="absolute bottom-0 left-0 right-0 h-[15%]"
         style={{ background: 'linear-gradient(180deg, rgba(15,28,40,0.9), rgba(15,15,25,0.95))' }} />
 
       {/* Building silhouettes */}
-      <For each={buildings}>
-        {(b) => (
-          <div class="absolute bottom-[15%]"
-            style={{ left: `${b.x}%`, width: `${b.w}%`, height: `${b.h}%`,
-              background: 'rgba(10,23,35,0.95)',
-              'border-top': '2px solid rgba(50,98,137,0.6)',
-              'box-shadow': 'inset 0 1px 0 rgba(50,98,137,0.3)' }}>
-            <Show when={b.spire}>
-              <div style={{ position: 'absolute', left: '45%', top: `-${b.spireH}px`, width: '3px', height: `${b.spireH}px`,
-                background: 'rgba(84,172,241,0.6)',
-                'box-shadow': '0 0 6px rgba(84,172,241,0.8)' }} />
-            </Show>
-            <For each={b.windows}>
-              {(w) => (
-                <div class="absolute"
-                  style={{ left: '12%', right: '12%', height: '5px',
-                    top: `${w.top}%`,
-                    background: w.color,
-                    opacity: 0, 'border-radius': '2px',
-                    'box-shadow': `0 0 8px ${w.color}`,
-                    animation: `tn-blink ${w.dur}s ease-in-out ${w.delay}s infinite` }} />
-              )}
-            </For>
-          </div>
-        )}
-      </For>
+      <div data-scene-layer="buildings">
+        <For each={visibleBuildings()}>
+          {(b) => (
+            <div class="absolute bottom-[15%]"
+              style={{ left: `${b.x}%`, width: `${b.w}%`, height: `${b.h}%`,
+                background: 'rgba(10,23,35,0.95)',
+                'border-top': '2px solid rgba(50,98,137,0.6)',
+                'box-shadow': 'inset 0 1px 0 rgba(50,98,137,0.3)' }}>
+              <Show when={b.spire}>
+                <div style={{ position: 'absolute', left: '45%', top: `-${b.spireH}px`, width: '3px', height: `${b.spireH}px`,
+                  background: 'rgba(84,172,241,0.6)',
+                  'box-shadow': '0 0 6px rgba(84,172,241,0.8)' }} />
+              </Show>
+              <For each={b.windows}>
+                {(w) => (
+                  <div class="absolute"
+                    style={{ left: '12%', right: '12%', height: '5px',
+                      top: `${w.top}%`,
+                      background: w.color,
+                      opacity: 0, 'border-radius': '2px',
+                      'box-shadow': `0 0 8px ${w.color}`,
+                      animation: `tn-blink ${w.dur}s ease-in-out ${w.delay}s infinite` }} />
+                )}
+              </For>
+            </div>
+          )}
+        </For>
+      </div>
 
       {/* Bright street reflections */}
       <div class="absolute bottom-[15%] left-0 right-0 h-[2px]"
         style={{ background: 'linear-gradient(90deg, rgba(84,172,241,0.4), rgba(93,182,254,0.3), rgba(255,158,100,0.2))', filter: 'blur(1px)' }} />
 
       {/* Colorful puddle reflections */}
-      <For each={puddles}>
-        {(p) => (
-          <div class="absolute bottom-[15%]"
-            style={{ left: `${p.x}%`, width: `${p.w}px`, height: '8px',
-              background: `linear-gradient(90deg, transparent, ${p.color}50 30%, ${p.color}70 50%, ${p.color}50 70%, transparent)`,
-              filter: 'blur(2px)', 'border-radius': '50%',
-              animation: `tn-puddle ${p.dur}s ease-in-out ${p.delay}s infinite` }} />
-        )}
-      </For>
+      <div data-scene-layer="puddles">
+        <For each={visiblePuddles()}>
+          {(p) => (
+            <div class="absolute bottom-[15%]"
+              style={{ left: `${p.x}%`, width: `${p.w}px`, height: '8px',
+                background: `linear-gradient(90deg, transparent, ${p.color}50 30%, ${p.color}70 50%, ${p.color}50 70%, transparent)`,
+                filter: 'blur(2px)', 'border-radius': '50%',
+                animation: `tn-puddle ${p.dur}s ease-in-out ${p.delay}s infinite` }} />
+          )}
+        </For>
+      </div>
 
       {/* Heavy rain */}
-      <For each={rain}>
-        {(r) => (
-          <div class="absolute opacity-0"
-            style={{ left: `${r.x}%`, top: '-8%', width: '2px', height: `${r.h}px`,
-              background: 'linear-gradient(180deg, transparent, rgba(84,172,241,0.6), rgba(84,172,241,0.4))',
-              transform: `rotate(${r.angle}deg)`,
-              animation: `tn-rain ${r.dur}s linear ${r.delay}s infinite` }} />
-        )}
-      </For>
+      <div data-scene-layer="rain">
+        <For each={visibleRain()}>
+          {(r) => (
+            <div class="absolute opacity-0"
+              style={{ left: `${r.x}%`, top: '-8%', width: '2px', height: `${r.h}px`,
+                background: 'linear-gradient(180deg, transparent, rgba(84,172,241,0.6), rgba(84,172,241,0.4))',
+                transform: `rotate(${r.angle}deg)`,
+                animation: `tn-rain ${r.dur}s linear ${r.delay}s infinite` }} />
+          )}
+        </For>
+      </div>
 
       {/* Bright car headlights */}
-      <For each={cars}>
-        {(car) => (
-          <div class="absolute rounded-full"
-            style={{ bottom: `${15 + car.y * 2}%`, width: '8px', height: '3px',
-              background: car.color,
-              'box-shadow': `0 0 15px ${car.color}, 0 0 30px ${car.color}80`,
-              animation: `${car.anim} ${car.speed}s linear ${car.delay}s infinite` }} />
-        )}
-      </For>
+      <div data-scene-layer="cars">
+        <For each={visibleCars()}>
+          {(car) => (
+            <div class="absolute rounded-full"
+              style={{ bottom: `${15 + car.y * 2}%`, width: '8px', height: '3px',
+                background: car.color,
+                'box-shadow': `0 0 15px ${car.color}, 0 0 30px ${car.color}80`,
+                animation: `${car.anim} ${car.speed}s linear ${car.delay}s infinite` }} />
+          )}
+        </For>
+      </div>
 
       {/* Intense lightning flash */}
-      <div class="absolute inset-0" style={{ animation: 'tn-lightning 12s ease-in-out infinite' }} />
+      <Show when={detail() === 'full'}>
+        <div class="absolute inset-0" data-scene-layer="lightning" style={{ animation: 'tn-lightning 12s ease-in-out infinite' }} />
+      </Show>
 
       <style>{`
         @keyframes tn-blink { 0%,100%{opacity:0.2} 40%{opacity:0.9} 60%{opacity:0.9} }

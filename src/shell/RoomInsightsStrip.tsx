@@ -3,23 +3,18 @@
  * RoomInsightsStrip.tsx — in-app channel insights (Era 2 B10).
  *
  * Pulls the public chanstats room detail for the active channel and links to
- * the full /stats/ inspector. Aggregate-only (no per-user leaderboards).
+ * the full /stats/?room= inspector. Aggregate-only (no per-user leaderboards).
  */
 import { createMemo, createResource, Show, type JSX } from 'solid-js';
 import { useStore } from '@/lib/store';
-import { fetchChannelDetail } from '@/lib/stats/channelDetail';
+import {
+  fetchChannelDetail,
+  netMembershipFlow,
+  peakHourShare,
+  statsRoomHref,
+} from '@/lib/stats/channelDetail';
 import { relTime } from '@/lib/stats/networkIndex';
 import './stage-panel.css';
-
-/** Deep-link into /stats (and optional time jump) without importing the route module. */
-function statsDeepLink(channel: string, lastActiveUnixSec = 0): string {
-  const params = new URLSearchParams({ join: channel });
-  const ms = lastActiveUnixSec * 1000;
-  if (lastActiveUnixSec > 0 && Number.isFinite(ms) && ms <= 8.64e15) {
-    params.set('at', new Date(ms).toISOString());
-  }
-  return `/stats/?${params.toString()}`;
-}
 
 function formatCount(n: number): string {
   if (!Number.isFinite(n) || n < 0) return '0';
@@ -27,6 +22,18 @@ function formatCount(n: number): string {
   if (n >= 10_000) return `${Math.round(n / 1000)}k`;
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
+}
+
+function formatSigned(n: number): string {
+  if (!Number.isFinite(n)) return '0';
+  if (n > 0) return `+${formatCount(n)}`;
+  if (n < 0) return `−${formatCount(Math.abs(n))}`;
+  return '0';
+}
+
+function formatHour(hour: number | null): string {
+  if (hour === null) return '—';
+  return `${String(hour).padStart(2, '0')}:00 UTC`;
 }
 
 export function RoomInsightsStrip(): JSX.Element {
@@ -50,13 +57,13 @@ export function RoomInsightsStrip(): JSX.Element {
           aria-label={`Insights for ${ch()}`}
         >
           <div class="room-insights__head">
-            <h2 class="room-insights__title">Room insights</h2>
+            <h2 class="room-insights__title">Room pulse</h2>
             <a
               class="room-insights__link"
-              href={statsDeepLink(ch(), detail()?.lastActive ?? 0)}
+              href={statsRoomHref(ch())}
               data-testid="room-insights-open-stats"
             >
-              Full stats
+              Room ledger
             </a>
           </div>
           <Show
@@ -70,7 +77,7 @@ export function RoomInsightsStrip(): JSX.Element {
                 {detail.loading
                   ? 'Loading public room stats…'
                   : detail.error
-                    ? 'Could not load room stats. Try Full stats or check back later.'
+                    ? 'Could not load room stats. Try Room ledger or check back later.'
                     : 'No public stats for this room yet.'}
               </p>
             }
@@ -88,6 +95,16 @@ export function RoomInsightsStrip(): JSX.Element {
                 <li>
                   <span>Contributors</span>
                   <strong>{formatCount(d().totals.activeUsers)}</strong>
+                </li>
+                <li>
+                  <span>Net joins</span>
+                  <strong>{formatSigned(netMembershipFlow(d().totals))}</strong>
+                </li>
+                <li>
+                  <span>Peak hour</span>
+                  <strong title={d().peakHour === null ? undefined : `${peakHourShare(d().hours).toFixed(0)}% of the day`}>
+                    {formatHour(d().peakHour)}
+                  </strong>
                 </li>
                 <li>
                   <span>Last active</span>

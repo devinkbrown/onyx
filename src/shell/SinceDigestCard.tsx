@@ -10,6 +10,7 @@ import {
   type ChannelDigest,
   type SinceDigest,
 } from '@/lib/notifications/sinceDigest';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { ProvenanceBadge } from './ProvenanceBadge';
 
 const MAX_VISIBLE_PARTICIPANTS = 3;
@@ -28,6 +29,9 @@ export function SinceDigestCard(props: {
         <p class="since-digest-card__reader-note">{digestReaderNote(props.digest)}</p>
         <div class="since-digest-card__handoff">
           <p class="since-digest-card__since">since {formatSince(props.digest.since)}</p>
+          <a class="since-digest-card__ledger-index" href="/stats/" aria-label="Open public room ledger">
+            Room ledger
+          </a>
           <Show when={props.digest.totalMessages > 0 ? props.onReviewUnread : undefined} keyed>
             {(onReviewUnread) => (
               <button
@@ -60,26 +64,37 @@ export function SinceDigestCard(props: {
           <For each={props.digest.channels}>
             {(channelDigest) => (
               <li class="since-digest-card__item">
-                <Show
-                  when={props.onOpenChannel}
-                  keyed
-                  fallback={
-                    <div class={rowClass(channelDigest)}>
-                      <ChannelDigestRowContent channelDigest={channelDigest} />
-                    </div>
-                  }
-                >
-                  {(onOpenChannel) => (
-                    <button
-                      type="button"
-                      class={`${rowClass(channelDigest)} since-digest-card__row--button`}
-                      aria-label={rowAriaLabel(channelDigest)}
-                      onClick={() => onOpenChannel(channelDigest.channel)}
+                <div class="since-digest-card__item-row">
+                  <Show
+                    when={props.onOpenChannel}
+                    keyed
+                    fallback={
+                      <div class={rowClass(channelDigest)}>
+                        <ChannelDigestRowContent channelDigest={channelDigest} />
+                      </div>
+                    }
+                  >
+                    {(onOpenChannel) => (
+                      <button
+                        type="button"
+                        class={`${rowClass(channelDigest)} since-digest-card__row--button`}
+                        aria-label={rowAriaLabel(channelDigest)}
+                        onClick={() => onOpenChannel(channelDigest.channel)}
+                      >
+                        <ChannelDigestRowContent channelDigest={channelDigest} />
+                      </button>
+                    )}
+                  </Show>
+                  <Show when={isPublicChannel(channelDigest.channel)}>
+                    <a
+                      class="since-digest-card__ledger"
+                      href={statsRoomHref(channelDigest.channel)}
+                      aria-label={`Room ledger for ${channelDigest.channel}`}
                     >
-                      <ChannelDigestRowContent channelDigest={channelDigest} />
-                    </button>
-                  )}
-                </Show>
+                      Ledger
+                    </a>
+                  </Show>
+                </div>
               </li>
             )}
           </For>
@@ -149,6 +164,10 @@ function ChannelDigestRowContent(props: { channelDigest: ChannelDigest }): JSX.E
 
 function rowClass(channelDigest: ChannelDigest): string {
   return `since-digest-card__row${hasMentions(channelDigest) ? ' is-mentioned' : ''}`;
+}
+
+function isPublicChannel(channel: string): boolean {
+  return /^[#&]/.test(channel.trim());
 }
 
 function hasMentions(channelDigest: ChannelDigest): boolean {

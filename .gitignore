@@ -24,6 +24,8 @@
 # local deployment snapshots (never publish generated site output)
 /.onyx-deploy-backups/
 /deploy-backups/
+/.work/
+/.runtime-debug.log
 
 # misc
 .DS_Store

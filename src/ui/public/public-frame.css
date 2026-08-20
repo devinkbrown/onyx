@@ -1,0 +1,262 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Public company-site identity. The --public-* spine aliases canonical
+   src/styles/tokens.css values so public routes share one authority. */
+.public-frame {
+  --public-void: var(--ink);
+  --public-surface: var(--stone);
+  --public-raised: var(--stone-2);
+  --public-seam: var(--stone-3);
+  --public-paper: var(--paper);
+  --public-text: var(--public-paper);
+  --public-muted: var(--paper-dim);
+  --public-current: var(--lapis);
+  --public-signal: var(--public-current);
+  --public-signal-strong: color-mix(in oklab, var(--public-current) 72%, var(--public-paper));
+  --public-on-signal: var(--on-accent);
+  --public-ember: var(--shu);
+  --public-ok: var(--ok);
+  --public-line: var(--line);
+  --public-radius: 4px;
+  --public-target: var(--target-min, 44px);
+  --public-measure: min(100% - 2rem, 74rem);
+  --public-sans: var(--font-sans);
+  --public-serif: var(--font-serif);
+  --public-mono: var(--font-mono);
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  color: var(--public-text);
+  background:
+    radial-gradient(120% 70% at 12% -10%, color-mix(in oklab, var(--public-current) 12%, transparent), transparent 55%),
+    var(--public-void);
+  font-family: var(--public-sans);
+}
+
+.public-frame * { box-sizing: border-box; }
+.public-frame a { color: inherit; }
+.public-frame a:focus-visible,
+.public-frame button:focus-visible {
+  outline: 2px solid var(--public-signal-strong);
+  outline-offset: 3px;
+}
+
+.public-frame__skip {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  left: max(0.75rem, env(safe-area-inset-left));
+  z-index: 100;
+  min-height: var(--public-target);
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 1rem;
+  border-radius: var(--public-radius);
+  color: var(--public-on-signal);
+  background: var(--public-signal);
+  font: 700 0.875rem/1 var(--public-sans);
+  transform: translateY(calc(-100% - 1rem));
+  transition: transform var(--dur-fast, 160ms) var(--ease, ease);
+}
+.public-frame__skip:focus-visible { transform: translateY(0); }
+
+.public-frame__header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--public-line);
+  background: var(--public-void);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.public-frame__header-inner,
+.public-frame__footer-inner {
+  width: var(--public-measure);
+  margin-inline: auto;
+}
+.public-frame__header-inner {
+  min-height: calc(var(--public-target) + 0.5rem);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.public-frame__brand,
+.public-frame__open,
+.public-frame__menu-toggle,
+.public-frame__nav a,
+.public-frame__footer a {
+  min-height: var(--public-target);
+  display: inline-flex;
+  align-items: center;
+}
+.public-frame__brand {
+  flex: none;
+  gap: 0.5rem;
+  font: 650 0.95rem/1 var(--public-sans);
+  letter-spacing: 0.02em;
+  text-decoration: none;
+}
+.public-frame__brand svg { width: 1.4rem; height: 1.4rem; color: var(--public-signal-strong); }
+.public-frame__nav-cluster { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+.public-frame__nav { display: flex; align-items: center; gap: 0.25rem; }
+.public-frame__nav a {
+  padding-inline: 0.75rem;
+  color: var(--public-muted);
+  font: 600 0.875rem/1.2 var(--public-sans);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.public-frame__nav a:hover,
+.public-frame__nav a[aria-current='page'] { color: var(--public-text); text-decoration: underline; text-underline-offset: 0.28em; }
+.public-frame__open {
+  justify-content: center;
+  padding-inline: 1rem;
+  border: 1px solid var(--public-signal-strong);
+  border-radius: var(--public-radius);
+  color: var(--public-on-signal);
+  background: var(--public-signal);
+  font: 650 0.8125rem/1.2 var(--public-sans);
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.public-frame__open:hover { background: var(--public-signal-strong); }
+.public-frame__menu-toggle {
+  display: none;
+  flex: 0 0 var(--public-target);
+  width: var(--public-target);
+  min-width: var(--public-target);
+  height: var(--public-target);
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0;
+  border: 1px solid var(--public-line);
+  border-radius: var(--public-radius);
+  color: var(--public-text);
+  background: var(--public-raised);
+  cursor: pointer;
+}
+.public-frame__menu-toggle span { width: 1.15rem; height: 2px; background: currentColor; transition: transform var(--dur-fast, 160ms) var(--ease, ease); }
+.public-frame__menu-toggle[aria-expanded='true'] span:first-child { transform: translateY(0.2rem) rotate(45deg); }
+.public-frame__menu-toggle[aria-expanded='true'] span:last-child { transform: translateY(-0.2rem) rotate(-45deg); }
+
+.public-frame__context {
+  width: var(--public-measure);
+  margin-inline: auto;
+  min-width: 0;
+  padding-block: 0.55rem;
+  border-bottom: 1px solid var(--public-seam);
+  color: var(--public-muted);
+}
+.public-frame__current-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.6rem;
+  margin: 0;
+  font: 500 0.72rem/1.4 var(--public-mono);
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+.public-frame__current-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--public-current);
+}
+.public-frame__current-label { color: var(--public-text); }
+.public-frame__main { width: var(--public-measure); margin-inline: auto; flex: 1 0 auto; min-width: 0; padding-block: clamp(1rem, 2.4vw, 2rem); }
+.public-frame__footer { margin-top: auto; border-top: 1px solid var(--public-line); background: var(--public-surface); }
+.public-frame__footer-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem; padding-block: 2rem max(2rem, env(safe-area-inset-bottom)); }
+.public-frame__footer p { max-width: 48ch; margin: 0.65rem 0 0; color: var(--public-muted); font: 400 0.95rem/1.55 var(--public-sans); }
+.public-frame__footer-brand { font: 650 1rem/1 var(--public-sans); letter-spacing: 0.02em; text-decoration: none; }
+.public-frame__footer nav { display: grid; grid-template-columns: repeat(2, max-content); gap: 0.25rem 1.25rem; align-content: start; }
+.public-frame__footer a:not(.public-frame__footer-brand) { color: var(--public-muted); font: 600 0.875rem/1.2 var(--public-sans); text-decoration: none; }
+.public-frame__footer a:not(.public-frame__footer-brand):hover { color: var(--public-text); text-decoration: underline; text-underline-offset: 0.25em; }
+
+@media (max-width: 70rem) {
+  .public-frame__nav { position: absolute; top: 100%; right: 0; left: 0; display: none; max-height: calc(100dvh - var(--public-target) - 1rem); overflow-y: auto; overscroll-behavior: contain; padding: 0.5rem max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); border-bottom: 1px solid var(--public-line); background: var(--public-void); }
+  .public-frame__nav.is-open { display: grid; }
+  .public-frame__nav a { min-height: var(--public-target); border-bottom: 1px solid var(--public-line); }
+  .public-frame__menu-toggle { display: inline-flex; }
+}
+
+@media (max-width: 34rem) {
+  .public-frame__header-inner { gap: 0.5rem; }
+  .public-frame__brand span { display: none; }
+  .public-frame__nav-cluster { gap: 0.5rem; }
+  .public-frame__open { min-width: 0; padding-inline: 0.65rem; font-size: 0.72rem; }
+  .public-frame__footer-inner { grid-template-columns: 1fr; }
+  .public-frame__footer nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* At extreme text zoom a sticky header can consume most of a short viewport
+   and trap route content beneath it. Keep the same semantic header in normal
+   flow so the CTA and disclosure remain reachable through document scroll. */
+@media (max-height: 30rem) {
+  .public-frame {
+    --public-measure: min(calc(100% - 24px), 74rem);
+    overflow-wrap: anywhere;
+  }
+
+  .public-frame__skip {
+    right: 12px;
+    left: 12px;
+    max-width: calc(100vw - 24px);
+    padding-inline: 16px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .public-frame__header { position: relative; }
+  .public-frame__header-inner {
+    position: relative;
+    flex-wrap: wrap;
+    padding-block: 8px;
+  }
+  .public-frame__nav-cluster {
+    flex: 1 1 100%;
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
+  }
+  .public-frame__open {
+    min-width: 0;
+    max-width: calc(100% - var(--public-target) - 8px);
+    padding-inline: 8px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+  .public-frame__menu-toggle span { width: 16px; }
+
+  .public-frame__context,
+  .public-frame__current-line,
+  .public-frame__main,
+  .public-frame__main * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .public-frame__footer-inner,
+  .public-frame__footer-inner > *,
+  .public-frame__footer nav,
+  .public-frame__footer a {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .public-frame__footer nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-frame *, .public-frame *::before, .public-frame *::after { scroll-behavior: auto !important; transition-duration: 0ms !important; animation-duration: 0ms !important; }
+}
+@media (forced-colors: active) {
+  .public-frame__header, .public-frame__footer, .public-frame__nav, .public-frame__context { background: Canvas; }
+  .public-frame__context { border-bottom-color: CanvasText; }
+  .public-frame__current-kicker { color: Highlight; }
+  .public-frame__open { color: HighlightText; background: Highlight; border-color: Highlight; }
+  .public-frame a:focus-visible, .public-frame button:focus-visible { outline: 3px solid Highlight; }
+}

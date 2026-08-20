@@ -23,6 +23,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  createUniqueId,
   For,
   onCleanup,
   Show,
@@ -32,9 +33,23 @@ import {
 import { useStore, getState, selectIsChannelOp } from '@/lib/store';
 import type { ChannelUser } from '@/lib/irc/types';
 import { createGroupReconciler, type ResolvedRole } from '@/lib/memberGroups';
+import {
+  computeMemberWindow,
+  flattenMemberRows,
+  memberPrefixHeight,
+  sectionMemberWindow,
+} from './memberWindow';
 import { formatMentionInsert } from '@/lib/composer/composerInject';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
+import { preferences } from '@/lib/prefs/preferences';
+import {
+  memberModerationKindsForMode,
+  type ModerationActionDraft,
+  type NormalizedModerationAction,
+} from '@/lib/moderation/actionModel';
 import { Avatar, Popover, Button, IconButton } from '@/primitives/index';
+import { ModerationActionReview } from './moderation/ModerationActionReview';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 
 // Role resolution, grouping, and identity-stable reconciliation live in
 // `@/lib/memberGroups` (unit-tested there). See that module for why entry/group
@@ -79,10 +94,12 @@ type MemberCardProps = {
   onOpenDm?: (nick: string) => void;
   /** Open WHOIS with a persistent row control as the modal return target. */
   onOpenWhois?: (nick: string, returnFocus: HTMLElement) => void;
+  /** Stage a reviewed room action without sending it yet. */
+  onRequestModeration?: (draft: ModerationActionDraft, returnFocus: HTMLElement | null) => void;
 };
 
 function MemberCard(props: MemberCardProps): JSX.Element {
-  const [local] = splitProps(props, ['user', 'role', 'channel', 'onOpenDm', 'onOpenWhois']);
+  const [local] = splitProps(props, ['user', 'role', 'channel', 'onOpenDm', 'onOpenWhois', 'onRequestModeration']);
 
   // Reactive op-gate: moderation controls only render for op (or higher).
   const canModerate = useStore((s) => selectIsChannelOp(local.channel)(s));
@@ -91,10 +108,11 @@ function MemberCard(props: MemberCardProps): JSX.Element {
   // Whether the target currently holds the named status mode.
   const hasMode = (m: string): boolean => local.user.modes.has(m);
   const isSelf = (): boolean => local.user.nick.toLowerCase() === ourNick().toLowerCase();
+  const cardInstanceId = createUniqueId();
   const cardId = createMemo(() => {
     const channel = local.channel.replace(/[^a-z0-9_-]+/giu, '-').replace(/^-|-$/gu, '') || 'channel';
     const nick = local.user.nick.replace(/[^a-z0-9_-]+/giu, '-').replace(/^-|-$/gu, '') || 'member';
-    return `member-card-${channel}-${nick}`;
+    return `member-card-${cardInstanceId}-${channel}-${nick}`;
   });
 
   function memberTriggerForAction(event: MouseEvent): HTMLButtonElement | null {
@@ -134,7 +152,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     getState().addToast({
       variant: 'info',
       title: `Mention ${local.user.nick}`,
-      description: 'Inserted into the composer for this channel.',
+      description: 'Inserted into the composer for this room.',
     });
     queueMicrotask(() => {
       document.querySelector<HTMLElement>('[data-composer-input]')?.focus();
@@ -147,7 +165,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     const ok = await writeClipboardText(nick);
     getState().addToast({
       variant: ok ? 'success' : 'warning',
-      title: ok ? 'Nick copied' : 'Could not copy nick',
+      title: ok ? 'Name copied' : 'Could not copy name',
       description: ok
         ? `${nick} is on the clipboard.`
         : 'Clipboard access was denied in this browser.',
@@ -167,25 +185,51 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     getState().whois(local.user.nick);
   }
 
+  const showRoomModeration = createMemo(() => {
+    const kinds = memberModerationKindsForMode(preferences().experienceMode);
+    return canModerate() && !isSelf() && kinds.includes('kick');
+  });
+
+  const showIrcRoleControls = createMemo(() => {
+    const kinds = memberModerationKindsForMode(preferences().experienceMode);
+    return canModerate() && !isSelf() && kinds.includes('op');
+  });
+
+  function requestModeration(event: MouseEvent, draft: ModerationActionDraft): void {
+    const trigger = closeCardForHandoff(event, true);
+    local.onRequestModeration?.(draft, trigger);
+  }
+
   function handleOp(event: MouseEvent): void {
-    closeCardForHandoff(event, true);
-    getState().opMember(local.channel, local.user.nick, !hasMode('o'));
+    requestModeration(event, {
+      kind: hasMode('o') ? 'deop' : 'op',
+      channel: local.channel,
+      target: local.user.nick,
+    });
   }
 
   function handleVoice(event: MouseEvent): void {
-    closeCardForHandoff(event, true);
-    getState().voiceMember(local.channel, local.user.nick, !hasMode('v'));
+    requestModeration(event, {
+      kind: hasMode('v') ? 'devoice' : 'voice',
+      channel: local.channel,
+      target: local.user.nick,
+    });
   }
 
   function handleKick(event: MouseEvent): void {
-    closeCardForHandoff(event, true);
-    getState().kickMember(local.channel, local.user.nick);
+    requestModeration(event, {
+      kind: 'kick',
+      channel: local.channel,
+      target: local.user.nick,
+    });
   }
 
   function handleBan(event: MouseEvent): void {
-    closeCardForHandoff(event, true);
-    // Ban by nick mask — a conservative, readable default.
-    getState().banMask(local.channel, `${local.user.nick}!*@*`);
+    requestModeration(event, {
+      kind: 'ban',
+      channel: local.channel,
+      target: local.user.nick,
+    });
   }
 
   const isIgnored = useStore((s) => s.isIgnored(local.user.nick));
@@ -198,7 +242,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
       getState().addToast({
         variant: 'info',
         title: `Unignored ${nick}`,
-        description: 'Messages and notifications from this nick resume on this device.',
+        description: 'Messages and notifications from this name resume on this device.',
       });
       return;
     }
@@ -264,9 +308,9 @@ function MemberCard(props: MemberCardProps): JSX.Element {
           size="sm"
           onClick={() => void handleCopyNick()}
           data-testid="member-card-copy-nick"
-          aria-label={`Copy nick ${local.user.nick}`}
+          aria-label={`Copy name ${local.user.nick}`}
         >
-          Copy nick
+          Copy name
         </Button>
         <Button
           variant="ghost"
@@ -293,29 +337,31 @@ function MemberCard(props: MemberCardProps): JSX.Element {
         </Show>
       </div>
 
-      {/* Moderation — op (or higher) only, and never against yourself. */}
-      <Show when={canModerate() && !isSelf()}>
+      {/* Advanced / Network Ops only — never against yourself, never in Standard. */}
+      <Show when={showRoomModeration()}>
         <div
           class="shell-member-card-mod"
           role="group"
           aria-label={`Moderate ${local.user.nick}`}
         >
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleOp}
-            aria-label={hasMode('o') ? `Remove op from ${local.user.nick}` : `Give op to ${local.user.nick}`}
-          >
-            {hasMode('o') ? 'Deop' : 'Op'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleVoice}
-            aria-label={hasMode('v') ? `Remove voice from ${local.user.nick}` : `Give voice to ${local.user.nick}`}
-          >
-            {hasMode('v') ? 'Devoice' : 'Voice'}
-          </Button>
+          <Show when={showIrcRoleControls()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleOp}
+              aria-label={hasMode('o') ? `Remove op from ${local.user.nick}` : `Give op to ${local.user.nick}`}
+            >
+              {hasMode('o') ? 'Deop' : 'Op'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleVoice}
+              aria-label={hasMode('v') ? `Remove voice from ${local.user.nick}` : `Give voice to ${local.user.nick}`}
+            >
+              {hasMode('v') ? 'Devoice' : 'Voice'}
+            </Button>
+          </Show>
           <Button
             variant="danger"
             size="sm"
@@ -345,6 +391,7 @@ type MemberRowProps = {
   hidden?: boolean;
   onOpenDm?: (nick: string) => void;
   onOpenWhois?: (nick: string, returnFocus: HTMLElement) => void;
+  onRequestModeration?: (draft: ModerationActionDraft, returnFocus: HTMLElement | null) => void;
   getRoster: () => HTMLElement | undefined;
 };
 
@@ -434,6 +481,7 @@ function MemberRow(props: MemberRowProps): JSX.Element {
           channel={props.channel}
           onOpenDm={props.onOpenDm}
           onOpenWhois={props.onOpenWhois}
+          onRequestModeration={props.onRequestModeration}
         />
       </Popover>
     </li>
@@ -453,12 +501,33 @@ export type MemberListProps = {
 export function MemberList(props: MemberListProps): JSX.Element {
   const [local] = splitProps(props, ['hidden', 'modal', 'onClose', 'onOpenDm', 'onOpenWhois']);
   let memberListRef: HTMLElement | undefined;
+  let memberScrollRef: HTMLDivElement | undefined;
+  const instanceId = createUniqueId();
+  const filterId = `member-filter-input-${instanceId}`;
   const [memberFilter, setMemberFilter] = createSignal('');
+  const [pendingModeration, setPendingModeration] = createSignal<{
+    draft: ModerationActionDraft;
+    returnFocus: HTMLElement | null;
+  } | null>(null);
+  const ourNick = useStore((s) => s.ourNick);
+  const connectionStatus = useStore((s) => s.connectionStatus);
+  const serverConnected = useStore((s) => !!s.server?.connected);
+  const isOper = useStore((s) => s.isOper);
+  const canModeratePending = createMemo(() => {
+    const channel = pendingModeration()?.draft.channel;
+    if (!channel) return false;
+    // Subscribe to every input used by selectIsChannelOp so authority loss
+    // invalidates an open review even though the pending channel is local UI
+    // state rather than a store field.
+    void isOper();
+    void channels();
+    void ourNick();
+    return selectIsChannelOp(channel)(getState());
+  });
 
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
   const rosterSyncing = useStore((s) => s.rosterSyncing);
-  const connectionStatus = useStore((s) => s.connectionStatus);
   const modeToPrefix = useStore((s) => s.client?.modeToPrefix ?? s.isupportModeToPrefix);
 
   const activeChannel = createMemo(() => {
@@ -523,6 +592,26 @@ export function MemberList(props: MemberListProps): JSX.Element {
     return visibleGroups().reduce((sum, g) => sum + g.members.length, 0);
   });
 
+  const [scrollTop, setScrollTop] = createSignal(0);
+  const flatRows = createMemo(() => flattenMemberRows(visibleGroups()));
+  const memberWindow = createMemo(() => computeMemberWindow(flatRows(), scrollTop()));
+  const windowedSections = createMemo(() => {
+    const win = memberWindow();
+    return sectionMemberWindow(flatRows(), win.start, win.end);
+  });
+  const padBefore = createMemo(() => memberPrefixHeight(flatRows(), memberWindow().start));
+  const padAfter = createMemo(() => {
+    const rows = flatRows();
+    return memberPrefixHeight(rows, rows.length) - memberPrefixHeight(rows, memberWindow().end);
+  });
+
+  createEffect(() => {
+    void activeChannel()?.name;
+    void memberFilter();
+    setScrollTop(0);
+    if (memberScrollRef) memberScrollRef.scrollTop = 0;
+  });
+
   const memberListLabel = createMemo(() => {
     const channel = activeChannel();
     return channel ? `Member list for ${channel.name}` : 'Member list';
@@ -530,7 +619,15 @@ export function MemberList(props: MemberListProps): JSX.Element {
 
   const rosterLabel = createMemo(() => {
     const channel = activeChannel();
-    return channel ? `Channel members in ${channel.name}` : 'Channel members';
+    return channel ? `People in ${channel.name}` : 'People';
+  });
+
+  const channelLedger = createMemo(() => {
+    const ch = activeChannel();
+    if (!ch) return null;
+    const name = ch.name.trim();
+    if (!/^[#&]/.test(name)) return null;
+    return { channel: name, href: statsRoomHref(name) };
   });
 
   // Solid's DOM property table predates `HTMLElement.inert` in some supported
@@ -556,7 +653,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
       tabindex={!local.hidden ? -1 : undefined}
     >
       <div class="shell-members-head">
-        <span class="shell-members-title">members</span>
+        <span class="shell-members-title">People</span>
         {/*
           Not a live region: on a busy channel the count churns on every
           join/leave (and on history replay / ?at= time-travel / roster
@@ -566,6 +663,18 @@ export function MemberList(props: MemberListProps): JSX.Element {
           changes are announced elsewhere — never by re-reading this number.
         */}
         <span class="shell-members-head-actions">
+          <Show when={channelLedger()}>
+            {(ledger) => (
+              <a
+                class="shell-members-ledger shell-ribbon-stats"
+                href={ledger().href}
+                aria-label={`Room ledger for ${ledger().channel}`}
+                data-testid="members-channel-ledger"
+              >
+                Ledger
+              </a>
+            )}
+          </Show>
           <span class="shell-members-head-meta">
             <Show when={isRefreshingRoster() && groups().length > 0}>
               <span class="shell-members-refresh" role="status" aria-label="Refreshing members">sync</span>
@@ -596,9 +705,9 @@ export function MemberList(props: MemberListProps): JSX.Element {
 
       <Show when={!isLoadingRoster() && groups().length > 0}>
         <div class="shell-members-filter" role="search">
-          <label class="sr-only" for="member-filter-input">Filter members</label>
+          <label class="sr-only" for={filterId}>Filter members</label>
           <input
-            id="member-filter-input"
+            id={filterId}
             class="shell-members-filter-input"
             type="search"
             data-testid="member-filter"
@@ -618,7 +727,13 @@ export function MemberList(props: MemberListProps): JSX.Element {
         </div>
       </Show>
 
-      <div class="shell-members-scroll" role="region" aria-label={rosterLabel()}>
+      <div
+        class="shell-members-scroll"
+        role="region"
+        aria-label={rosterLabel()}
+        ref={memberScrollRef}
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      >
         <Show
           when={!isLoadingRoster() && groups().length > 0}
           fallback={
@@ -652,9 +767,10 @@ export function MemberList(props: MemberListProps): JSX.Element {
               </p>
             }
           >
-            <For each={visibleGroups()}>
+            <div class="shell-members-window-pad" style={{ height: `${padBefore()}px` }} aria-hidden="true" />
+            <For each={windowedSections()}>
               {(group) => {
-                const groupLabelId = `members-group-${group.key}`;
+                const groupLabelId = `members-group-${instanceId}-${group.key}`;
                 return (
                   <section aria-labelledby={groupLabelId}>
                     <p
@@ -663,18 +779,21 @@ export function MemberList(props: MemberListProps): JSX.Element {
                       role="heading"
                       aria-level={3}
                     >
-                      {group.label} — {group.members.length}
+                      {group.label} — {group.count}
                     </p>
                     <ul class="shell-members-group-list" role="list" aria-labelledby={groupLabelId}>
                       <For each={group.members}>
-                        {({ user, role }) => (
+                        {(entry) => (
                           <MemberRow
-                            user={user}
-                            role={role}
+                            user={entry.user}
+                            role={entry.role}
                             channel={activeChannel()?.name ?? ''}
                             hidden={local.hidden}
                             onOpenDm={local.onOpenDm}
                             onOpenWhois={local.onOpenWhois}
+                            onRequestModeration={(draft, returnFocus) => {
+                              setPendingModeration({ draft, returnFocus });
+                            }}
                             getRoster={() => memberListRef}
                           />
                         )}
@@ -684,9 +803,54 @@ export function MemberList(props: MemberListProps): JSX.Element {
                 );
               }}
             </For>
+            <div class="shell-members-window-pad" style={{ height: `${padAfter()}px` }} aria-hidden="true" />
           </Show>
         </Show>
       </div>
+      <ModerationActionReview
+        open={pendingModeration() !== null}
+        draft={pendingModeration()?.draft ?? null}
+        actorNick={ourNick()}
+        connected={connectionStatus() === 'connected' && serverConnected()}
+        canModerate={canModeratePending()}
+        returnFocus={pendingModeration()?.returnFocus ?? memberListRef ?? null}
+        onConfirm={(action) => {
+          applyMemberModeration(action);
+          setPendingModeration(null);
+        }}
+        onCancel={() => setPendingModeration(null)}
+      />
     </aside>
   );
+}
+
+function applyMemberModeration(action: NormalizedModerationAction): void {
+  const state = getState();
+  switch (action.kind) {
+    case 'kick':
+      state.kickMember(action.channel, action.target, action.reason);
+      break;
+    case 'ban':
+      state.banMask(action.channel, action.mask);
+      break;
+    case 'unban':
+      state.unbanMask(action.channel, action.mask);
+      break;
+    case 'op':
+      state.opMember(action.channel, action.target, true);
+      break;
+    case 'deop':
+      state.opMember(action.channel, action.target, false);
+      break;
+    case 'voice':
+      state.voiceMember(action.channel, action.target, true);
+      break;
+    case 'devoice':
+      state.voiceMember(action.channel, action.target, false);
+      break;
+    default: {
+      const _exhaustive: never = action;
+      void _exhaustive;
+    }
+  }
 }

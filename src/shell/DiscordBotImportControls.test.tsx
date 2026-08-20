@@ -131,7 +131,7 @@ describe('DiscordBotImportControls', () => {
     const tokenInput = screen.getByLabelText('Bot token') as HTMLInputElement;
     await enterAndFetch('super-secret-token', '9');
 
-    await screen.findByText(/Ready to import 2 messages across 1 channel/, undefined, { timeout: 4000 });
+    await screen.findByText(/Ready to import 2 messages across 1 room/, undefined, { timeout: 4000 });
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Review import' })).toHaveFocus());
     // The first call enumerates the guild's channels over the same-origin proxy.
     const [url, init] = fetchMock.mock.calls[0]!;
@@ -139,7 +139,7 @@ describe('DiscordBotImportControls', () => {
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bot super-secret-token');
 
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
-    await screen.findByText(/Imported 2 messages into 1 channel/);
+    await screen.findByText(/Imported 2 messages into 1 room/);
     await waitFor(() => expect(tokenInput).toHaveFocus());
     const stored = await loadRecent('#general', 400, MEMORY_OWNER);
     expect(stored.map((m) => m.text)).toEqual(['hello', 'world']);
@@ -164,7 +164,7 @@ describe('DiscordBotImportControls', () => {
     render(() => <DiscordBotImportControls />);
     await enterAndFetch('tok', '9');
 
-    await screen.findByText(/Ready to import 2 messages across 1 channel/, undefined, { timeout: 4000 });
+    await screen.findByText(/Ready to import 2 messages across 1 room/, undefined, { timeout: 4000 });
     await screen.findByText(/1 pinned message included/);
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
     await screen.findByText(/Imported 2 messages/);

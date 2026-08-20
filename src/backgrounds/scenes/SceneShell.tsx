@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createEffect, createSignal, onCleanup, onMount, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup, onMount, Show, untrack, type JSX } from 'solid-js';
 import { startSceneRuntime } from './sceneRuntime';
+import { useScenePolicy } from './scenePolicy';
+import type { SceneDetail } from '../backgroundPolicy';
 
 type SvgTimeline = SVGSVGElement & {
   pauseAnimations?: () => void;
@@ -71,6 +73,12 @@ export function seededRand(seed: number): () => number {
 
 export interface SceneShellProps {
   reducedMotion: boolean;
+  /** Policy detail — omit finishing grain on `sparse`. Falls back to context. */
+  sceneDetail?: SceneDetail;
+  /** Host-level pause hook; ORed with the visibility/focus/idle runtime. */
+  paused?: boolean;
+  /** Report visibility/focus/idle holds to the fixed background host. */
+  onRuntimePaused?: (paused: boolean) => void;
   /** Opaque base colorway painted under the scene layers. Scenes are fixed
    *  colorways (ported from darkbear) — they do NOT follow the active theme,
    *  so each brings its own backdrop instead of leaking the theme surface. */
@@ -91,19 +99,32 @@ export interface SceneShellProps {
  *   ground (props.base) → ink (children) → grain → vignette
  */
 export function SceneShell(props: SceneShellProps) {
+  const policy = useScenePolicy();
   const [runtimePaused, setRuntimePaused] = createSignal(false);
   const pausedTimelines = new Set<SvgTimeline>();
   let root: HTMLDivElement | undefined;
 
+  const sceneDetail = createMemo(
+    () => props.sceneDetail ?? policy().sceneDetail,
+  );
+  const policyPaused = createMemo(() => props.paused === true || policy().paused);
+  const combinedPaused = createMemo(
+    () => runtimePaused() || props.reducedMotion || policyPaused(),
+  );
+
   onMount(() => {
-    const dispose = startSceneRuntime(setRuntimePaused);
+    const dispose = startSceneRuntime((paused) => {
+      setRuntimePaused(paused);
+      const callback = untrack(() => props.onRuntimePaused);
+      callback?.(paused);
+    });
     onCleanup(dispose);
   });
 
   createEffect(() => {
     // Read both sources even when the first is true. A Still -> Animated change
     // while the runtime remains paused must not resume the SMIL timeline.
-    const runtimePauseActive = runtimePaused();
+    const runtimePauseActive = runtimePaused() || policyPaused();
     const reducedMotionActive = props.reducedMotion;
     if (root) {
       syncSvgTimelines(root, runtimePauseActive || reducedMotionActive, pausedTimelines);
@@ -116,6 +137,8 @@ export function SceneShell(props: SceneShellProps) {
       class="onyx-scene absolute inset-0 overflow-hidden"
       data-scene-static={props.reducedMotion ? 'true' : undefined}
       data-scene-runtime-paused={runtimePaused() ? 'true' : undefined}
+      data-scene-paused={combinedPaused() ? 'true' : undefined}
+      data-scene-detail={sceneDetail()}
       data-scene-signature="true"
       style={{ contain: 'layout style', background: props.base, 'pointer-events': 'none' }}
     >
@@ -125,6 +148,14 @@ export function SceneShell(props: SceneShellProps) {
         .onyx-scene[data-scene-runtime-paused] *,
         .onyx-scene[data-scene-runtime-paused] *::before,
         .onyx-scene[data-scene-runtime-paused] *::after { animation-play-state: paused !important; }
+        /* Host policy pauses (including a still/off policy or a displaced
+           scene lease) must stop CSS animations too. Keep this selector on the
+           combined telemetry attribute so hidden/blurred state is visible to
+           both the browser and diagnostics. */
+        .onyx-scene[data-scene-paused],
+        .onyx-scene[data-scene-paused] *,
+        .onyx-scene[data-scene-paused] *::before,
+        .onyx-scene[data-scene-paused] *::after { animation-play-state: paused !important; }
         @media (prefers-reduced-motion: reduce) { .onyx-scene, .onyx-scene * { animation: none !important; } }
         /* Shared finishing layers — static, never animated, pointer-inert. */
         .onyx-scene-grain,
@@ -145,7 +176,9 @@ export function SceneShell(props: SceneShellProps) {
         }
       `}</style>
       {props.children}
-      <div class="onyx-scene-grain" data-scene-layer="grain" aria-hidden="true" />
+      <Show when={sceneDetail() !== 'sparse'}>
+        <div class="onyx-scene-grain" data-scene-layer="grain" aria-hidden="true" />
+      </Show>
       <div class="onyx-scene-vignette" data-scene-layer="vignette" aria-hidden="true" />
     </div>
   );

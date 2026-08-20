@@ -50,6 +50,45 @@
   gap: 8px 10px;
 }
 
+.since-digest-card__ledger-index,
+.since-digest-card__ledger {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.since-digest-card__ledger-index:hover,
+.since-digest-card__ledger:hover {
+  color: var(--paper);
+  text-decoration: underline;
+}
+
+.since-digest-card__ledger-index:focus-visible,
+.since-digest-card__ledger:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.since-digest-card__item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.since-digest-card__ledger {
+  align-self: center;
+  min-height: var(--target-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+}
+
 .since-digest-card__review {
   min-height: 28px;
   padding: 4px 10px;
@@ -123,7 +162,6 @@
 .since-digest-card__row--button:hover {
   background: color-mix(in oklab, var(--stone-2) 70%, transparent);
   border-color: var(--stone-line);
-  transform: translateY(-1px);
 }
 
 .since-digest-card__row--button:focus-visible {
@@ -304,11 +342,7 @@
   border-block: 1px solid color-mix(in oklab, var(--lapis-bright) 24%, transparent);
   border-inline: 0;
   border-radius: 0;
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--lapis) 11%, transparent),
-    transparent 62%
-  );
+  background: color-mix(in oklab, var(--lapis) 8%, transparent);
 }
 
 :root[data-reader='true'] .since-digest-card__title {
@@ -342,6 +376,16 @@
   .since-digest-card__row {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .since-digest-card__item-row {
+    grid-template-columns: 1fr;
+  }
+
+  .since-digest-card__ledger {
+    justify-self: start;
+    min-height: auto;
+    padding: 0 2px 4px;
   }
 
   .since-digest-card__stats {

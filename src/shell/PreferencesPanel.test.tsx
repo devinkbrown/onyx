@@ -181,7 +181,7 @@ type TransferToolLabel =
   | 'Discord package'
   | 'Discord bot'
   | 'Slack JSON'
-  | 'IRC log';
+  | 'Classic log';
 
 function selectPreferenceCategory(category: PreferenceCategoryLabel): HTMLElement {
   const tab = screen.getByRole('tab', { name: new RegExp(`^${category}`) });
@@ -317,7 +317,7 @@ describe('PreferencesPanel', () => {
       'Discord package',
       'Discord bot',
       'Slack JSON',
-      'IRC log',
+      'Classic log',
     ]);
     expect(screen.getByRole('button', { name: 'Portable vault' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('button', { name: 'Portable vault' })).toHaveAttribute('tabindex', '0');
@@ -406,7 +406,7 @@ describe('PreferencesPanel', () => {
 
     fireEvent.keyDown(portable, { key: 'End' });
 
-    const ircLog = screen.getByRole('button', { name: 'IRC log' });
+    const ircLog = screen.getByRole('button', { name: 'Classic log' });
     expect(ircLog).toHaveFocus();
     expect(ircLog).toHaveAttribute('aria-expanded', 'true');
     expect(ircLog).toHaveAttribute('aria-controls', 'pref-transfer-panel-irc-log');
@@ -805,10 +805,10 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Open Appearance for themes, room atmosphere, shared theme import, and background selection.')).toBeInTheDocument();
     selectPreferenceCategory('Conversation');
     expect(screen.getByRole('heading', { name: 'Conversation' })).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: /Show 24-hour activity strip/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('switch', { name: /Show 24-hour activity strip/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: /Show join voice\/video controls/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('switch', { name: /Show topic, forum, and follow controls/i })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('switch', { name: /Show shared watch activity/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('switch', { name: /Show shared watch activity/i })).toHaveAttribute('aria-checked', 'false');
     const reactionDensity = screen.getByRole('radiogroup', { name: 'Reaction density' });
     expect(reactionDensity).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Full' })).toHaveAttribute('aria-checked', 'true');
@@ -850,15 +850,15 @@ describe('PreferencesPanel', () => {
     selectPreferenceCategory('Accessibility');
     expect(screen.getByRole('heading', { name: 'Client access audit' })).toBeInTheDocument();
     expect(screen.getByText('Connect')).toBeInTheDocument();
-    expect(screen.getByText('Channel settings')).toBeInTheDocument();
+    expect(screen.getByText('Room settings')).toBeInTheDocument();
     expect(screen.getByText('Voice controls')).toBeInTheDocument();
     expect(screen.getByText('Appearance')).toBeInTheDocument();
     expect(screen.getByText('Home catch-up')).toBeInTheDocument();
     expect(screen.getByText('Message search')).toBeInTheDocument();
     expect(screen.getByText('Notification center')).toBeInTheDocument();
-    expect(screen.getByText('Channel browser')).toBeInTheDocument();
+    expect(screen.getByText('Room browser')).toBeInTheDocument();
     expect(screen.getByText('Account panel')).toBeInTheDocument();
-    expect(screen.getByText('Channel sidebar')).toBeInTheDocument();
+    expect(screen.getByText('Room sidebar')).toBeInTheDocument();
     expect(screen.getByText('Keyboard shortcuts')).toBeInTheDocument();
     expect(screen.getByText('Command palette')).toBeInTheDocument();
     expect(screen.getByText('Pinned messages')).toBeInTheDocument();
@@ -869,7 +869,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Message actions')).toBeInTheDocument();
     expect(screen.getByText('Member list')).toBeInTheDocument();
     expect(screen.getByText('Notification controls')).toBeInTheDocument();
-    expect(screen.getByText('Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.')).toBeInTheDocument();
+    expect(screen.getByText('Room-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.')).toBeInTheDocument();
     // Prefer unique notes — surface titles like "Watch together" also appear as pref legends.
     expect(screen.getByText('Named Sheet dialog, UTC date/time fields, quick-date presets, target-specific jump and moment-copy actions, and ribbon/composer openers.')).toBeInTheDocument();
     expect(screen.getByText('Named review and host-control groups, bounded participant list, polite atomic outcome status, and focus restoration after confirmations.')).toBeInTheDocument();
@@ -884,22 +884,22 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Labelled Sheet, topic form, switch-mode flags, read-only non-op fallbacks.')).toBeInTheDocument();
     expect(screen.getByText('Toolbar groups, labelled icon buttons, aria-pressed media states, live timer.')).toBeInTheDocument();
     expect(screen.getByText('Theme and background radio groups, labelled swatches, Sheet focus trap.')).toBeInTheDocument();
-    expect(screen.getByText('Catch-up recaps, reviewed ranges, and channel directory cards expose list semantics and labelled actions.')).toBeInTheDocument();
+    expect(screen.getByText('Catch-up recaps, reviewed ranges, and room directory cards expose list semantics and labelled actions.')).toBeInTheDocument();
     expect(screen.getByText('Search landmark, labelled result navigation, and named archived/device-memory result lists.')).toBeInTheDocument();
     expect(screen.getByText('Named inbox dialog, labelled notification list, and row-specific open/dismiss actions.')).toBeInTheDocument();
-    expect(screen.getByText('Sheet dialog, named directory search, labelled public-channel list, and target-specific Join/Open actions.')).toBeInTheDocument();
+    expect(screen.getByText('Sheet dialog, named directory search, labelled public-room list, and target-specific Join/Open actions.')).toBeInTheDocument();
     expect(screen.getByText('Named account-management regions, alert/status feedback, and target-specific persona actions.')).toBeInTheDocument();
-    expect(screen.getByText('Complementary navigation landmark, roving channel/DM rows, unread/mention names, and target-specific join action.')).toBeInTheDocument();
+    expect(screen.getByText('Complementary navigation landmark, roving room/DM rows, unread/mention names, and target-specific join action.')).toBeInTheDocument();
     expect(screen.getByText('Named shortcuts dialog, labelled close action, grouped live keymap lists, and J/K transcript navigation.')).toBeInTheDocument();
-    expect(screen.getByText('Named pins dialog, channel-specific pins list, target-specific jump buttons, and real unpin controls.')).toBeInTheDocument();
+    expect(screen.getByText('Named pins dialog, room-specific pins list, target-specific jump buttons, and real unpin controls.')).toBeInTheDocument();
     expect(screen.getByText('Named import/share dialog, described theme-code input, target-specific import and copy actions, and invalid-code feedback.')).toBeInTheDocument();
     expect(screen.getByText('Named thread Sheet, labelled parent/reply articles, and reply log scoped to the source message.')).toBeInTheDocument();
     expect(screen.getByText('Named settings Sheet, labelled device/processing/PTT regions, described selects, and target-specific PTT key actions.')).toBeInTheDocument();
     expect(screen.getByText('Named incoming/outgoing call dialogs with target-specific accept, decline, and cancel actions.')).toBeInTheDocument();
     expect(screen.getByText('Per-message action groups, named reaction/overflow triggers, labelled menus, and row-specific action names.')).toBeInTheDocument();
-    expect(screen.getByText('Channel-scoped member landmark, labelled role groups, named detail dialogs, target-specific member actions, decorative avatars, and focus retention across MODE/PART.')).toBeInTheDocument();
+    expect(screen.getByText('Room-scoped member landmark, labelled role groups, named detail dialogs, target-specific member actions, decorative avatars, and focus retention across MODE/PART.')).toBeInTheDocument();
     expect(screen.getByText('Labelled compact control group, described calm-mode radios, and pressed-state desktop/sound/push/DND toggles.')).toBeInTheDocument();
-    expect(screen.getByText('Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.')).toBeInTheDocument();
+    expect(screen.getByText('Room-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.')).toBeInTheDocument();
     expect(screen.getByText('Bottom-nav trigger handoff, drawer-initial focus, Escape close, Tab trap, and trigger focus restore.')).toBeInTheDocument();
     expect(screen.queryByText(/still need a pass/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Public ledger' })).toHaveAttribute(
@@ -3301,8 +3301,8 @@ describe('PreferencesPanel', () => {
     reset.focus();
     fireEvent.click(reset);
 
-    expect(sceneMotion()).toBe('animated');
-    expect(document.documentElement.dataset.sceneMotion).toBe('animated');
+    expect(sceneMotion()).toBe('adaptive');
+    expect(document.documentElement.dataset.sceneMotion).toBe('adaptive');
     await waitFor(() => expect(announcements).toHaveLength(1));
     expect(status).toHaveTextContent('Preferences reset to defaults.');
     expect(reset).toHaveFocus();
@@ -3310,7 +3310,7 @@ describe('PreferencesPanel', () => {
     setSceneMotion('off');
     fireEvent.click(reset);
 
-    expect(sceneMotion()).toBe('animated');
+    expect(sceneMotion()).toBe('adaptive');
     await waitFor(() => expect(announcements).toHaveLength(2));
     expect(reset).toHaveFocus();
     observer.disconnect();

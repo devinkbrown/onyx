@@ -10,24 +10,15 @@
   gap: var(--space-3);
   padding: var(--space-4);
   overflow: hidden;
-  background:
-    radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--lapis) 13%, transparent), transparent 38%),
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 44%, transparent), color-mix(in oklab, var(--ink) 46%, transparent));
+  background: color-mix(in oklab, var(--stone-2) 44%, var(--ink));
   border: 1px solid var(--seam-faint);
   border-top-color: var(--seam);
   border-radius: var(--r-md);
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent),
-    0 18px 48px -40px color-mix(in oklab, var(--ink) 96%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent);
 }
 
 .voice-settings__section::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(120deg, transparent 0 62%, color-mix(in oklab, var(--lapis-bright) 10%, transparent) 68%, transparent 76%);
-  opacity: 0.4;
+  content: none;
 }
 
 .voice-settings__section > * {
@@ -80,8 +71,7 @@
   border-radius: var(--r-sm);
   padding: 0.68rem 0.78rem;
   color: var(--paper);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone) 42%, transparent), color-mix(in oklab, var(--ink) 72%, var(--stone)));
+  background: color-mix(in oklab, var(--stone) 42%, var(--ink));
   font: inherit;
   outline: none;
   transition:
@@ -97,9 +87,7 @@
 
 .voice-settings__select:focus-visible {
   border-color: var(--lapis-bright);
-  box-shadow:
-    0 0 0 2px color-mix(in oklab, var(--lapis-bright) 26%, transparent),
-    0 0 22px color-mix(in oklab, var(--lapis-bright) 12%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lapis-bright) 26%, transparent);
 }
 
 .voice-settings__select:disabled {
@@ -121,8 +109,7 @@
   padding: var(--space-3);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone) 26%, transparent), color-mix(in oklab, var(--ink) 48%, transparent));
+  background: color-mix(in oklab, var(--stone) 26%, var(--ink));
   cursor: pointer;
   transition:
     border-color var(--dur) var(--ease),
@@ -167,7 +154,7 @@
 .voice-settings__toggle input:checked {
   border-color: color-mix(in oklab, var(--lapis-bright) 62%, var(--seam));
   background: color-mix(in oklab, var(--lapis) 34%, var(--ink));
-  box-shadow: 0 0 16px color-mix(in oklab, var(--lapis-bright) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent);
 }
 
 .voice-settings__toggle input:checked::before {
@@ -217,8 +204,7 @@
   min-height: 2.7rem;
   padding: 0.68rem 0.78rem;
   color: var(--paper);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone) 42%, transparent), color-mix(in oklab, var(--ink) 72%, var(--stone)));
+  background: color-mix(in oklab, var(--stone) 42%, var(--ink));
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   font-family: var(--font-mono);
@@ -242,17 +228,17 @@
 
 .voice-settings .onyx-button--danger {
   color: var(--paper);
-  background: linear-gradient(180deg, color-mix(in oklab, var(--shu) 70%, var(--stone)), color-mix(in oklab, var(--shu) 54%, var(--ink)));
+  background: color-mix(in oklab, var(--shu) 68%, var(--stone));
   border-color: color-mix(in oklab, var(--shu) 58%, var(--paper));
 }
 
 .voice-settings .onyx-button:hover:not(:disabled):not([aria-disabled='true']) {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 38px -30px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
+  border-color: var(--seam);
 }
 
 .voice-settings .onyx-button--danger:hover:not(:disabled):not([aria-disabled='true']) {
-  box-shadow: 0 16px 38px -30px color-mix(in oklab, var(--shu) 82%, transparent);
+  background: color-mix(in oklab, var(--shu) 78%, var(--stone));
+  border-color: var(--shu-bright);
 }
 
 .voice-settings .onyx-button:focus-visible {

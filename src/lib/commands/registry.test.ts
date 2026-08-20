@@ -76,11 +76,11 @@ describe('getCommandsBySection', () => {
 
   it('returns only commands in the specified section', () => {
     registerCommand(makeCmd({ id: 'a', section: 'Actions' }));
-    registerCommand(makeCmd({ id: 'b', section: 'Channels' }));
+    registerCommand(makeCmd({ id: 'b', section: 'Rooms' }));
     registerCommand(makeCmd({ id: 'c', section: 'Actions' }));
 
     expect(getCommandsBySection('Actions')).toHaveLength(2);
-    expect(getCommandsBySection('Channels')).toHaveLength(1);
+    expect(getCommandsBySection('Rooms')).toHaveLength(1);
     expect(getCommandsBySection('DMs')).toHaveLength(0);
   });
 });
@@ -96,24 +96,36 @@ describe('recents', () => {
       { id: 'dm:private', label: 'Open DM with private', section: 'DMs', at: new Date().toISOString() },
     ]));
         expect(loadRecents()).toEqual([]);
-    saveRecent({ id: 'channel:#secret', label: '#secret', section: 'Channels' });
+    saveRecent({ id: 'channel:#secret', label: '#secret', section: 'Rooms' });
 
     expect(localStorage.getItem(PALETTE_RECENTS_STORAGE_KEY)).toBeNull();
   });
 
   it('saves and loads a recent target for one owner', () => {
-    saveRecent({ id: 'channel:#lapis', label: 'Go to #lapis', section: 'Channels' }, ALICE);
+    saveRecent({ id: 'channel:#lapis', label: 'Go to #lapis', section: 'Rooms' }, ALICE);
     const recents = loadRecents(ALICE);
     expect(recents).toHaveLength(1);
     expect(recents[0]!.id).toBe('channel:#lapis');
     expect(recents[0]!.label).toBe('Go to #lapis');
   });
 
+  it('migrates legacy Channels section labels to Rooms on load', () => {
+    const key = deviceMemoryStorageKey(PALETTE_RECENTS_STORAGE_KEY, ALICE);
+    expect(key).not.toBeNull();
+    if (key === null) throw new Error('expected an owner-scoped recents storage key');
+    localStorage.setItem(key, JSON.stringify([
+      { id: 'channel:#legacy', label: 'Go to #legacy', section: 'Channels', at: new Date().toISOString() },
+    ]));
+    const recents = loadRecents(ALICE);
+    expect(recents).toHaveLength(1);
+    expect(recents[0]!.section).toBe('Rooms');
+  });
+
   it('isolates owners and moves an existing entry to the front on re-access', () => {
-    saveRecent({ id: 'channel:#a', label: '#a', section: 'Channels' }, ALICE);
-    saveRecent({ id: 'channel:#b', label: '#b', section: 'Channels' }, ALICE);
-    saveRecent({ id: 'channel:#bob', label: '#bob', section: 'Channels' }, BOB);
-    saveRecent({ id: 'channel:#a', label: '#a', section: 'Channels' }, ALICE); // re-access #a
+    saveRecent({ id: 'channel:#a', label: '#a', section: 'Rooms' }, ALICE);
+    saveRecent({ id: 'channel:#b', label: '#b', section: 'Rooms' }, ALICE);
+    saveRecent({ id: 'channel:#bob', label: '#bob', section: 'Rooms' }, BOB);
+    saveRecent({ id: 'channel:#a', label: '#a', section: 'Rooms' }, ALICE); // re-access #a
     const recents = loadRecents(ALICE);
     expect(recents[0]!.id).toBe('channel:#a');
     expect(recents.map((entry) => entry.id)).not.toContain('channel:#bob');

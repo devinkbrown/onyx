@@ -1,0 +1,152 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Layout-only primitives. Spacing is enumerated data-* tokens mapped to
+   semantic --ui-* variables with existing theme-token fallbacks. No brand
+   hex and no interaction chrome. */
+
+.ui-layout {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ui-frame,
+.ui-stack,
+.ui-cluster,
+.ui-split,
+.ui-scroll {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ui-frame {
+  display: block;
+}
+
+.ui-frame[data-align],
+.ui-frame[data-justify],
+.ui-frame[data-gap] {
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-frame[data-measure] {
+  width: 100%;
+  max-width: var(--ui-measure-shell, var(--shell-measure, 100%));
+  margin-inline: auto;
+}
+
+.ui-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-cluster {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.ui-split {
+  display: flex;
+  flex-wrap: wrap;
+  --ui-split-min: var(--ui-split-md, 32rem);
+}
+
+.ui-split[data-collapse='sm'] {
+  --ui-split-min: var(--ui-split-sm, 24rem);
+}
+
+.ui-split[data-collapse='md'] {
+  --ui-split-min: var(--ui-split-md, 32rem);
+}
+
+.ui-split[data-collapse='lg'] {
+  --ui-split-min: var(--ui-split-lg, 42rem);
+}
+
+.ui-split > * {
+  flex-grow: 1;
+  flex-basis: calc((var(--ui-split-min, 32rem) - 100%) * 999);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ui-split[data-ratio='start'] > :first-child {
+  flex-grow: 2;
+}
+
+.ui-split[data-ratio='end'] > :last-child {
+  flex-grow: 2;
+}
+
+.ui-scroll {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.ui-layout[data-pad='0'] { padding: var(--ui-space-0, var(--space-0, 0)); }
+.ui-layout[data-pad='1'] { padding: var(--ui-space-1, var(--space-1, 0.25rem)); }
+.ui-layout[data-pad='2'] { padding: var(--ui-space-2, var(--space-2, 0.5rem)); }
+.ui-layout[data-pad='3'] { padding: var(--ui-space-3, var(--space-3, 0.75rem)); }
+.ui-layout[data-pad='4'] { padding: var(--ui-space-4, var(--space-4, 1rem)); }
+.ui-layout[data-pad='5'] { padding: var(--ui-space-5, var(--space-5, 1.25rem)); }
+.ui-layout[data-pad='6'] { padding: var(--ui-space-6, var(--space-6, 1.5rem)); }
+.ui-layout[data-pad='7'] { padding: var(--ui-space-7, var(--space-7, 2rem)); }
+.ui-layout[data-pad='8'] { padding: var(--ui-space-8, var(--space-8, 2.5rem)); }
+
+.ui-layout[data-gap='0'] { gap: var(--ui-space-0, var(--space-0, 0)); }
+.ui-layout[data-gap='1'] { gap: var(--ui-space-1, var(--space-1, 0.25rem)); }
+.ui-layout[data-gap='2'] { gap: var(--ui-space-2, var(--space-2, 0.5rem)); }
+.ui-layout[data-gap='3'] { gap: var(--ui-space-3, var(--space-3, 0.75rem)); }
+.ui-layout[data-gap='4'] { gap: var(--ui-space-4, var(--space-4, 1rem)); }
+.ui-layout[data-gap='5'] { gap: var(--ui-space-5, var(--space-5, 1.25rem)); }
+.ui-layout[data-gap='6'] { gap: var(--ui-space-6, var(--space-6, 1.5rem)); }
+.ui-layout[data-gap='7'] { gap: var(--ui-space-7, var(--space-7, 2rem)); }
+.ui-layout[data-gap='8'] { gap: var(--ui-space-8, var(--space-8, 2.5rem)); }
+
+.ui-layout[data-align='start'] { align-items: flex-start; }
+.ui-layout[data-align='center'] { align-items: center; }
+.ui-layout[data-align='end'] { align-items: flex-end; }
+.ui-layout[data-align='stretch'] { align-items: stretch; }
+.ui-layout[data-align='baseline'] { align-items: baseline; }
+
+.ui-layout[data-justify='start'] { justify-content: flex-start; }
+.ui-layout[data-justify='center'] { justify-content: center; }
+.ui-layout[data-justify='end'] { justify-content: flex-end; }
+.ui-layout[data-justify='between'] { justify-content: space-between; }
+.ui-layout[data-justify='around'] { justify-content: space-around; }
+.ui-layout[data-justify='evenly'] { justify-content: space-evenly; }
+
+.ui-scroll:focus {
+  outline: none;
+}
+
+.ui-scroll:focus-visible {
+  outline: var(--ui-border-emphasis, 2px) solid currentColor;
+  outline-offset: var(--focus-offset, 3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-frame,
+  .ui-stack,
+  .ui-cluster,
+  .ui-split,
+  .ui-scroll {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto;
+  }
+}
+
+@media (forced-colors: active) {
+  .ui-frame,
+  .ui-stack,
+  .ui-cluster,
+  .ui-split,
+  .ui-scroll {
+    forced-color-adjust: auto;
+    outline-color: CanvasText;
+  }
+}

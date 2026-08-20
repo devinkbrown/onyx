@@ -153,6 +153,7 @@ import {
 import '@/lib/prefs/preferences.css';
 import { CLOCKS,
   DENSITIES,
+  EXPERIENCE_MODES,
   FONT_SCALES,
   REACTION_DENSITIES,
   WIDTHS,
@@ -166,6 +167,7 @@ import { CLOCKS,
   resetPreferences,
   setPreference,
   type Density,
+  type ExperienceMode,
   type FontScale,
   type PreferenceCategory,
   type ReactionDensityPref,
@@ -176,6 +178,11 @@ const CLOCK_LABELS = { '24h': '24-hour', '12h': '12-hour' } as const;
 const DENSITY_LABELS: Record<Density, string> = { compact: 'Compact', cozy: 'Cozy', roomy: 'Roomy' };
 const FONT_SCALE_LABELS: Record<FontScale, string> = { sm: 'Small', md: 'Medium', lg: 'Large' };
 const WIDTH_LABELS: Record<Width, string> = { measured: 'Measured', full: 'Full-width' };
+const EXPERIENCE_MODE_LABELS: Record<ExperienceMode, string> = {
+  standard: 'Standard',
+  advanced: 'Advanced',
+  'network-ops': 'Network Ops',
+};
 /** Labels avoid "Compact" so they never collide with Message density radios. */
 const REACTION_DENSITY_LABELS: Record<ReactionDensityPref, string> = {
   full: 'Full',
@@ -184,6 +191,7 @@ const REACTION_DENSITY_LABELS: Record<ReactionDensityPref, string> = {
   hidden: 'Hidden',
 };
 const SCENE_MOTION_LABELS: Record<SceneMotion, string> = {
+  adaptive: 'Adaptive',
   animated: 'Animated',
   still: 'Still',
   off: 'Off',
@@ -213,7 +221,7 @@ const VAULT_AGE_LABELS: Record<VaultAgeOption, string> = {
 
 const PREFERENCE_CATEGORIES = [
   { id: 'display', label: 'Display', summary: 'Reading and rhythm' },
-  { id: 'conversation', label: 'Conversation', summary: 'Channel surfaces' },
+  { id: 'conversation', label: 'Conversation', summary: 'Room surfaces' },
   { id: 'history', label: 'History & data', summary: 'Local vault' },
   { id: 'transfer', label: 'Import & export', summary: 'Move conversation data' },
   { id: 'tools', label: 'App & tools', summary: 'Install and extensions' },
@@ -229,7 +237,7 @@ const TRANSFER_TOOLS = [
   { id: 'discord-package', label: 'Discord package', summary: 'Official data request' },
   { id: 'discord-bot', label: 'Discord bot', summary: 'Import through this deployment' },
   { id: 'slack', label: 'Slack JSON', summary: 'Workspace export files' },
-  { id: 'irc-log', label: 'IRC log', summary: 'Plain-text client logs' },
+  { id: 'irc-log', label: 'Classic log', summary: 'weechat / irssi / mIRC text logs' },
 ] as const satisfies ReadonlyArray<{ id: TransferTool; label: string; summary: string }>;
 
 function resetAllPreferences(): void {
@@ -254,7 +262,7 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Keyboard send/edit paths and visible focus.',
   },
   {
-    surface: 'Channel settings',
+    surface: 'Room settings',
     status: 'checked',
     note: 'Labelled Sheet, topic form, switch-mode flags, read-only non-op fallbacks.',
   },
@@ -271,7 +279,7 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Home catch-up',
     status: 'checked',
-    note: 'Catch-up recaps, reviewed ranges, and channel directory cards expose list semantics and labelled actions.',
+    note: 'Catch-up recaps, reviewed ranges, and room directory cards expose list semantics and labelled actions.',
   },
   {
     surface: 'Message search',
@@ -284,9 +292,9 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Named inbox dialog, labelled notification list, and row-specific open/dismiss actions.',
   },
   {
-    surface: 'Channel browser',
+    surface: 'Room browser',
     status: 'checked',
-    note: 'Sheet dialog, named directory search, labelled public-channel list, and target-specific Join/Open actions.',
+    note: 'Sheet dialog, named directory search, labelled public-room list, and target-specific Join/Open actions.',
   },
   {
     surface: 'Account panel',
@@ -294,9 +302,9 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Named account-management regions, alert/status feedback, and target-specific persona actions.',
   },
   {
-    surface: 'Channel sidebar',
+    surface: 'Room sidebar',
     status: 'checked',
-    note: 'Complementary navigation landmark, roving channel/DM rows, unread/mention names, and target-specific join action.',
+    note: 'Complementary navigation landmark, roving room/DM rows, unread/mention names, and target-specific join action.',
   },
   {
     surface: 'Keyboard shortcuts',
@@ -311,7 +319,7 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Pinned messages',
     status: 'checked',
-    note: 'Named pins dialog, channel-specific pins list, target-specific jump buttons, and real unpin controls.',
+    note: 'Named pins dialog, room-specific pins list, target-specific jump buttons, and real unpin controls.',
   },
   {
     surface: 'Theme import',
@@ -341,7 +349,7 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Member list',
     status: 'checked',
-    note: 'Channel-scoped member landmark, labelled role groups, named detail dialogs, target-specific member actions, decorative avatars, and focus retention across MODE/PART.',
+    note: 'Room-scoped member landmark, labelled role groups, named detail dialogs, target-specific member actions, decorative avatars, and focus retention across MODE/PART.',
   },
   {
     surface: 'Notification controls',
@@ -351,7 +359,7 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Time scrubber',
     status: 'checked',
-    note: 'Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.',
+    note: 'Room-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.',
   },
   {
     surface: 'Jump to date',
@@ -1131,7 +1139,7 @@ function PortableVaultControls(): JSX.Element {
         <h3 id="pref-vault-portable-title" class="pref-label">Portable vault</h3>
       </div>
       <p class="pref-desc">
-        Export or merge this device's local history, reviewed catch-up state, room composer drafts, channel topic drafts, followed rooms/topics, named-conversation read cursors, saved searches, saved sign-in targets, retention policy, and Preferences switches. Read cursors contain only room/topic, message ID, and timestamp metadata. Saved query text is included. Passwords, session tokens, mesh tokens, and decrypted DM plaintext are not exported automatically.
+        Export or merge this device's local history, reviewed catch-up state, room composer drafts, room topic drafts, followed rooms/topics, named-conversation read cursors, saved searches, saved sign-in targets, retention policy, and Preferences switches. Read cursors contain only room/topic, message ID, and timestamp metadata. Saved query text is included. Passwords, session tokens, network tokens, and decrypted DM plaintext are not exported automatically.
       </p>
       <div class="pref-vault-actions">
         <button
@@ -2090,7 +2098,7 @@ function DiscardLocalDraftsControls(): JSX.Element {
         </span>
       </div>
       <p class="pref-desc">
-        Discard unsent room composer drafts and channel-topic drafts stored on this device. This
+        Discard unsent room composer drafts and room-topic drafts stored on this device. This
         does not change messages, vault history, queued sends, reviewed anchors, topic read
         positions, saved searches, followed topics, or sign-in data.
       </p>
@@ -3400,6 +3408,10 @@ function AppearanceLauncher(): JSX.Element {
 
 export function PreferencesPanel(): JSX.Element {
   const [activeCategory, setActiveCategory] = createSignal<PreferenceCategory>('display');
+  const activeCategoryMeta = createMemo(() =>
+    PREFERENCE_CATEGORIES.find((category) => category.id === activeCategory())
+      ?? PREFERENCE_CATEGORIES[0],
+  );
   let panelRef: HTMLDivElement | undefined;
 
   function revealFocusedPreference(event: FocusEvent): void {
@@ -3470,6 +3482,10 @@ export function PreferencesPanel(): JSX.Element {
         data-testid="preferences-panel"
         onFocusIn={revealFocusedPreference}
       >
+        <p class="pref-context-cue" role="note">
+          <span>{activeCategoryMeta().label}</span>
+          {activeCategoryMeta().summary} · changes apply on this device immediately.
+        </p>
         <PreferenceCategoryNavigation active={activeCategory} onSelect={selectCategory} />
 
         <div class="pref-category-content">
@@ -3487,7 +3503,7 @@ export function PreferencesPanel(): JSX.Element {
             <AppearanceLauncher />
             <Segmented
               legend="Message density"
-              description="Vertical rhythm of the message feed."
+              description="Compact packs the feed like a live room. Cozy is the default. Roomy opens reading space."
               options={DENSITIES}
               labels={DENSITY_LABELS}
               value={() => preferences().density}
@@ -3517,8 +3533,16 @@ export function PreferencesPanel(): JSX.Element {
               onToggle={(value) => setPreference('readerMode', value)}
             />
             <Segmented
+              legend="Experience level"
+              description="Standard keeps chat calm. Advanced adds room-management details when you have permission. Network Ops also shows live server operations when your account is an operator."
+              options={EXPERIENCE_MODES}
+              labels={EXPERIENCE_MODE_LABELS}
+              value={() => preferences().experienceMode}
+              onSelect={(value) => setPreference('experienceMode', value)}
+            />
+            <Segmented
               legend="Clock"
-              description="Timestamp format for messages and channel activity."
+              description="Timestamp format for messages and room activity."
               options={CLOCKS}
               labels={CLOCK_LABELS}
               value={() => preferences().clock}
@@ -3535,27 +3559,27 @@ export function PreferencesPanel(): JSX.Element {
           >
             <PreferenceSection
               title="Conversation"
-              description="Attention level and optional channel surfaces on this device."
+              description="Attention level and optional room surfaces on this device."
             />
             <CalmModeControl />
             <Toggle
               legend="Time scrubber"
               title="Show 24-hour activity strip"
-              description="Shows the channel activity bars and moment jump affordance above the transcript."
+              description="Shows the room activity bars and moment jump affordance above the transcript."
               value={() => preferences().timeScrubber}
               onToggle={(value) => setPreference('timeScrubber', value)}
             />
             <Toggle
               legend="Voice and video"
               title="Show join voice/video controls"
-              description="Keeps media available in the app, but removes the channel header voice/video controls when off."
+              description="Keeps media available in the app, but removes the room header voice/video controls when off."
               value={() => preferences().voiceEntry}
               onToggle={(value) => setPreference('voiceEntry', value)}
             />
             <Toggle
               legend="Topic tools"
               title="Show topic, forum, and follow controls"
-              description="Removes the topic creation row and forum/follow buttons above channel messages."
+              description="Removes the topic creation row and forum/follow buttons above room messages."
               value={() => preferences().topicTools}
               onToggle={(value) => setPreference('topicTools', value)}
             />

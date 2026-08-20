@@ -1,0 +1,32 @@
+/* Compact panel uses the shared picker’s data and semantics, but avoids a wall
+   of equally weighted controls by giving the groups a quieter rhythm. */
+.ap-panel .background-picker { gap: 17px; }
+.ap-panel .background-picker__grid { grid-template-columns: 1fr; }
+.ap-panel .background-picker__card { min-height: 44px; }
+.ap-panel .background-picker__heading { color: var(--paper-mute); }
+@media (max-width: 20rem) { .ap-panel .background-picker__card { padding-inline: 7px; } }
+
+.ap-panel-background-browser {
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 30%, transparent);
+  overflow: clip;
+}
+.ap-panel-background-browser > summary {
+  display: grid;
+  gap: 4px;
+  min-height: 52px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--paper);
+}
+.ap-panel-background-browser > summary::marker { color: var(--lapis); }
+.ap-panel-background-browser > summary span {
+  color: var(--paper-mute);
+  font: 0.62rem var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ap-panel-background-browser > summary b { font: 600 0.82rem var(--font-sans); }
+.ap-panel-background-browser[open] > summary { border-bottom: 1px solid var(--seam-faint); }
+.ap-panel-background-browser__body { padding: 12px; }

@@ -81,16 +81,56 @@ function prefixFor(modeToPrefix: Record<string, string>, mode: string, fallback:
   return modeToPrefix[mode] || fallback;
 }
 
+interface NamedRole {
+  key: RoleKey;
+  label: string;
+  fallbackSymbol: string;
+}
+
+/** The conventional named ladder, in fixed rank order (highest first). Used
+ *  as-is when the learned PREFIX map has nothing to say about a user's modes,
+ *  and to recover the label/key for a mode the learned map DOES recognise. */
+const NAMED_ROLES: ReadonlyMap<string, NamedRole> = new Map([
+  ['Y', { key: 'netop',   label: 'Network Oper', fallbackSymbol: '*' }],
+  ['Q', { key: 'founder', label: 'Founder',      fallbackSymbol: '!' }],
+  ['q', { key: 'owner',   label: 'Owner',        fallbackSymbol: '.' }],
+  ['a', { key: 'admin',   label: 'Admin',        fallbackSymbol: '&' }],
+  ['o', { key: 'op',      label: 'Op',           fallbackSymbol: '@' }],
+  ['h', { key: 'halfop',  label: 'Half-op',      fallbackSymbol: '%' }],
+  ['v', { key: 'voice',   label: 'Voice',        fallbackSymbol: '+' }],
+]);
+
 export function resolveRole(user: ChannelUser, modeToPrefix: Record<string, string>): ResolvedRole {
   const modes = user.modes;
-  if (modes.has('Y')) return { key: 'netop',   label: 'Network Oper', symbol: prefixFor(modeToPrefix, 'Y', '*'), sort: ROLE_ORDER.netop };
-  if (modes.has('Q')) return { key: 'founder',  label: 'Founder',      symbol: prefixFor(modeToPrefix, 'Q', '!'), sort: ROLE_ORDER.founder };
-  if (modes.has('q')) return { key: 'owner',    label: 'Owner',        symbol: prefixFor(modeToPrefix, 'q', '.'), sort: ROLE_ORDER.owner };
-  if (modes.has('a')) return { key: 'admin',    label: 'Admin',        symbol: prefixFor(modeToPrefix, 'a', '&'), sort: ROLE_ORDER.admin };
-  if (modes.has('o')) return { key: 'op',       label: 'Op',           symbol: prefixFor(modeToPrefix, 'o', '@'), sort: ROLE_ORDER.op };
-  if (modes.has('h')) return { key: 'halfop',   label: 'Half-op',      symbol: prefixFor(modeToPrefix, 'h', '%'), sort: ROLE_ORDER.halfop };
-  if (modes.has('v')) return { key: 'voice',    label: 'Voice',        symbol: prefixFor(modeToPrefix, 'v', '+'), sort: ROLE_ORDER.voice };
-  return               { key: 'member',   label: 'Member',       symbol: '',  sort: ROLE_ORDER.member };
+
+  // Prefer the learned PREFIX's own declaration order: parsePREFIX
+  // (irc/parser.ts) fills modeToPrefix in PREFIX order, and plain-object
+  // string-key insertion order is preserved, so Object.keys(modeToPrefix)
+  // IS the server's real rank order — including a non-standard letter a
+  // fixed if-ladder would otherwise drop (e.g. PREFIX=(Xohv)!@%+). The first
+  // of the user's modes to appear in that order is the highest-precedence
+  // one, mirroring the old ladder's "check highest rank first" behavior.
+  let i = 0;
+  for (const mode of Object.keys(modeToPrefix)) {
+    if (modes.has(mode)) {
+      const named = NAMED_ROLES.get(mode);
+      const symbol = prefixFor(modeToPrefix, mode, named?.fallbackSymbol ?? '');
+      return named
+        ? { key: named.key, label: named.label, symbol, sort: i }
+        : { key: 'member', label: 'Member', symbol, sort: i };
+    }
+    i += 1;
+  }
+
+  // The learned map has nothing to say about this user's modes (empty
+  // PREFIX, or none of their modes were ever declared) — fall back to the
+  // named ladder in its conventional rank order, same as before.
+  for (const [mode, named] of NAMED_ROLES) {
+    if (modes.has(mode)) {
+      return { key: named.key, label: named.label, symbol: prefixFor(modeToPrefix, mode, named.fallbackSymbol), sort: ROLE_ORDER[named.key] };
+    }
+  }
+  return { key: 'member', label: 'Member', symbol: '', sort: ROLE_ORDER.member };
 }
 
 function sameRole(a: ResolvedRole, b: ResolvedRole): boolean {

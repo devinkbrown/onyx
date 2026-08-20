@@ -5,6 +5,7 @@ test('contains the Theme Studio save workflow at 400% short reflow', async ({ pa
   await page.setViewportSize({ width: 320, height: 256 });
   await page.goto('/appearance/');
 
+  await page.getByText('Advanced mode', { exact: true }).click();
   const studio = page.getByTestId('theme-studio');
   await expect(studio).toBeVisible();
   await page.evaluate(() => {

@@ -30,6 +30,10 @@ export type Clock = (typeof CLOCKS)[number];
 export const REACTION_DENSITIES = ['full', 'compact', 'counts-only', 'hidden'] as const;
 export type ReactionDensityPref = (typeof REACTION_DENSITIES)[number];
 
+/** How much operational detail the authenticated client intentionally exposes. */
+export const EXPERIENCE_MODES = ['standard', 'advanced', 'network-ops'] as const;
+export type ExperienceMode = (typeof EXPERIENCE_MODES)[number];
+
 export const PREFERENCE_CATEGORY_IDS = [
   'display',
   'conversation',
@@ -80,6 +84,8 @@ export interface Preferences {
   watchTogether: boolean;
   /** How densely reaction/boost pills render under messages. */
   reactionDensity: ReactionDensityPref;
+  /** Standard is the calm default; operational controls are progressive disclosure. */
+  experienceMode: ExperienceMode;
 }
 
 export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
@@ -97,11 +103,12 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   clock: '24h',
   localHistory: true,
   e2eeDms: true,
-  timeScrubber: true,
+  timeScrubber: false,
   voiceEntry: true,
   topicTools: true,
-  watchTogether: true,
+  watchTogether: false,
   reactionDensity: 'full',
+  experienceMode: 'standard',
 };
 
 /** Cap on blocked host suffixes persisted with preferences. */
@@ -198,6 +205,11 @@ function preferencesFromRecord(raw: Record<string, unknown>): Preferences {
     reactionDensity: isOneOf(raw.reactionDensity, REACTION_DENSITIES)
       ? raw.reactionDensity
       : DEFAULT_PREFERENCES.reactionDensity,
+    experienceMode: (() => {
+      // Legacy storage id `irc-ops` migrates to `network-ops`.
+      const mode = raw.experienceMode === 'irc-ops' ? 'network-ops' : raw.experienceMode;
+      return isOneOf(mode, EXPERIENCE_MODES) ? mode : DEFAULT_PREFERENCES.experienceMode;
+    })(),
   };
 }
 
@@ -260,6 +272,7 @@ export function applyPreferences(prefs: Preferences = preferences()): void {
   root.dataset.reduceMotion = String(prefs.reduceMotion);
   root.dataset.reduceTransparency = String(prefs.reduceTransparency);
   root.dataset.highContrast = String(prefs.highContrast);
+  root.dataset.experienceMode = prefs.experienceMode;
 }
 
 // ── reactive store ──────────────────────────────────────────────────────────

@@ -19,6 +19,14 @@ export default defineConfig({
           if (id.includes('/node_modules/solid-js/') || id.includes('/node_modules/@solidjs/')) {
             return 'solid';
           }
+          // Rollup's own preload-helper virtual module is a shared leaf that
+          // Vite otherwise folds into whatever chunk happens to reference it
+          // first. Pin it to `solid` (loaded eagerly everywhere anyway) so it
+          // can't drag an unrelated chunk into the landing entry's static
+          // import graph.
+          if (id.includes('preload-helper')) {
+            return 'solid';
+          }
           // The media engine (voice/video, wasm codec) is NOT needed on first
           // paint — only inside the lazy /app route once a call starts. Keep it
           // in its own `media` chunk so it stays out of the eager `runtime`
@@ -29,15 +37,27 @@ export default defineConfig({
           // Theme token data (themes/customThemes/themeStorage) is a small, pure
           // leaf cluster the eager ThemeProvider needs on first paint. store.ts
           // ALSO imports themes.ts (DEFAULT_THEME_ID/THEME_IDS), so without an
-          // explicit split Rollup folds the trio INTO the ~58kB `runtime` (store
-          // + irc + e2ee + notifications) chunk — which then becomes a static
-          // dependency of the marketing landing entry purely to read theme
-          // tokens. Give it its own tiny `theme` chunk so the landing entry pulls
-          // only that; `runtime` re-imports it (cheap) and stays lazy to /app.
+          // explicit split Rollup folds the trio INTO the ~482kB `runtime`
+          // (store + irc + e2ee + historyVault) chunk — which then becomes a
+          // static dependency of the marketing landing entry purely to read
+          // theme tokens. Give it its own tiny `theme` chunk so the landing
+          // entry pulls only that; `runtime` re-imports it (cheap) and stays
+          // lazy to /app.
           if (
             id.includes('/src/theme/themes') ||
             id.includes('/src/theme/customThemes') ||
             id.includes('/src/theme/themeStorage')
+          ) {
+            return 'theme';
+          }
+          // Two more shared leaves reached eagerly from the landing route
+          // (src/index.tsx → theme/ThemeProvider.tsx and routes/Landing.tsx)
+          // that would otherwise pull `runtime` in transitively alongside
+          // them. Route into `theme` — it's already an eager landing chunk,
+          // small, and these are equally small pure leaves.
+          if (
+            id.includes('/src/lib/prefs/preferences') ||
+            id.includes('/src/lib/stats/fetchPublicJson')
           ) {
             return 'theme';
           }

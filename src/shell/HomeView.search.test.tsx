@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import 'fake-indexeddb/auto';
-import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -52,7 +52,8 @@ describe('Home Search Center integration', () => {
     expect(screen.queryByRole('searchbox', { name: 'Search messages' })).not.toBeInTheDocument();
     expect(document.activeElement).toBe(homeTrigger);
 
-    const appearance = screen.getByRole('button', { name: 'Appearance' });
+    const appearance = within(screen.getByRole('main', { name: 'Network home' }))
+      .getByRole('button', { name: 'Appearance' });
     appearance.focus();
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
     const reopenedInput = screen.getByRole('searchbox', { name: 'Search messages' });

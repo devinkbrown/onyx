@@ -1764,3 +1764,11 @@ index e4632194fb8171665c86e659e96612c3d7022c16..58f44c9f05e01861d50dd808feb093eb
  }
 
  test "spawnPgid requests a fresh group on posix" {
+diff --git a/src/platform/linux/gtk_host.c b/src/platform/linux/gtk_host.c
+--- a/src/platform/linux/gtk_host.c
++++ b/src/platform/linux/gtk_host.c
+@@ -3542,3 +3542,3 @@ void native_sdk_gtk_load_window_webview(native_sdk_gtk_host_t *host, uint64_t wi
+-        char *uri = g_strdup_printf("%s/%s", origin, entry);
++        char *uri = g_strdup_printf("%s/", origin);
+         webkit_web_view_load_uri(win->web_view, uri);
+         g_free(uri);

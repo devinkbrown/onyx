@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatSessionAge,
   isSessionListEnd,
+  isSessionDropSuccess,
   otherAttachedSessions,
   parseSessionDropOk,
   parseSessionListLine,
@@ -25,6 +26,12 @@ describe('sessionList parse helpers', () => {
     });
   });
 
+  it('accepts a validated current-server physical SID without weakening legacy rows', () => {
+    expect(parseSessionListLine('SESSION LIST - #2 signon=1710000100 attached sid=0123456789ABCDEFfedcba9876543210'))
+      .toMatchObject({ index: 2, sid: '0123456789abcdeffedcba9876543210' });
+    expect(parseSessionListLine('SESSION LIST - #2 signon=1 attached sid=bad')).toBeNull();
+  });
+
   it('rejects hostile or malformed list lines', () => {
     expect(parseSessionListLine('SESSION LIST * #0 signon=1 attached')).toBeNull();
     expect(parseSessionListLine('SESSION LIST * #1 signon=x attached')).toBeNull();
@@ -38,6 +45,10 @@ describe('sessionList parse helpers', () => {
     expect(isSessionListEnd('SESSION LIST * #1 signon=1 attached')).toBe(false);
     expect(parseSessionDropOk('SESSION DROP #3 ok')).toBe(3);
     expect(parseSessionDropOk('SESSION DROP ok')).toBeNull();
+    expect(isSessionDropSuccess('SESSION DROP sid=0123456789abcdefFEDCBA9876543210 ok')).toBe(true);
+    expect(isSessionDropSuccess('SESSION DROP sid=bad ok')).toBe(false);
+    expect(isSessionDropSuccess('SESSION DROP ok client=42 signon=100')).toBe(true);
+    expect(isSessionDropSuccess('SESSION DROP ok')).toBe(false);
   });
 
   it('formats session age and lists other attached devices', () => {

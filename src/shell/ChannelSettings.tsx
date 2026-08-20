@@ -87,7 +87,7 @@ const FLAG_TOGGLES: ReadonlyArray<{ letter: string; label: string; hint: string 
   { letter: 'i', label: 'Invite only', hint: 'Members must be invited to join (+i)' },
   { letter: 't', label: 'Topic locked', hint: 'Only ops may change the topic (+t)' },
   { letter: 'n', label: 'No external messages', hint: 'Block messages from non-members (+n)' },
-  { letter: 's', label: 'Secret', hint: 'Hide the channel from listings (+s)' },
+  { letter: 's', label: 'Secret', hint: 'Hide the room from listings (+s)' },
 ];
 
 const EPHEMERAL_PRESETS: ReadonlyArray<{ seconds: number; label: string }> = [
@@ -117,17 +117,17 @@ const HISTORY_POLICIES: ReadonlyArray<{ value: HistoryPolicy; label: string; hin
   {
     value: 'public',
     label: 'Public',
-    hint: 'Anyone who can open CHATHISTORY may read this room’s history (server default).',
+    hint: 'Anyone who can request room history may read this room’s history (server default).',
   },
   {
     value: 'members',
     label: 'Members only',
-    hint: 'Only people currently in the channel may request history.',
+    hint: 'Only people currently in the room may request history.',
   },
   {
     value: 'opers',
     label: 'Ops only',
-    hint: 'Only channel ops (and network operators) may request history.',
+    hint: 'Only room ops (and network operators) may request history.',
   },
 ];
 
@@ -525,7 +525,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     const level = parseAccessLevel(accessLevelDraft());
     const mask = normalizeAccessMask(accessMaskDraft());
     if (!level || !mask) {
-      setAccessFormError('Enter a nick or hostmask (e.g. alice or alice!*@*).');
+      setAccessFormError('Enter a name or hostmask (e.g. alice or alice!*@*).');
       return;
     }
     const rawTimeout = accessTimeoutDraft().trim();
@@ -601,10 +601,10 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   return (
     <Sheet
       open={local.open}
-      title="Channel settings"
+      title="Room settings"
       description={channel()?.name ?? local.channel}
       onOpenChange={local.onOpenChange}
-      closeLabel="Close channel settings"
+      closeLabel="Close room settings"
       data-testid="channel-settings"
     >
       <div class="shell-chset">
@@ -617,7 +617,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               <div class="shell-chset-readonly">
                 <p class="shell-chset-readonly-value">{serverTopic() || 'No topic set'}</p>
                 <p class="shell-chset-hint">
-                  This channel is topic-locked (+t). Only ops can change the topic.
+                  This room is topic-locked (+t). Only room hosts can change the topic.
                 </p>
               </div>
             }
@@ -649,7 +649,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   when={isConnected()}
                   fallback="Offline: topic changes stay drafted on this device and can be saved after reconnect."
                 >
-                  <Show when={topicLocked()} fallback="Press Save to update the channel topic.">
+                  <Show when={topicLocked()} fallback="Press Save to update the room topic.">
                     Topic-locked (+t): your op rank lets you edit it.
                   </Show>
                 </Show>
@@ -801,12 +801,11 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
           </span>
         </section>
 
-        {/* ── Leave channel ── */}
+        {/* ── Leave room ── */}
         <section class="shell-chset-section" aria-labelledby="chset-leave-heading">
-          <h3 id="chset-leave-heading" class="shell-chset-heading">Leave channel</h3>
+          <h3 id="chset-leave-heading" class="shell-chset-heading">Leave room</h3>
           <p class="shell-chset-hint" id="chset-leave-hint">
-            Parts {channel()?.name ?? local.channel} on this connection. You can rejoin later with /join
-            or the channel browser. Local scrollback stays on this device.
+            Leaves {channel()?.name ?? local.channel} on this connection. You can rejoin later from Browse rooms. Local scrollback stays on this device.
           </p>
           <Show
             when={leaveConfirming()}
@@ -820,7 +819,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 disabled={!isConnected()}
                 onClick={() => setLeaveConfirming(true)}
               >
-                Leave channel
+                Leave room
               </Button>
             }
           >
@@ -843,7 +842,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   getState().addToast({
                     variant: 'info',
                     title: `Left ${name}`,
-                    description: 'You parted this channel on this connection.',
+                    description: 'You left this room on this connection.',
                   });
                 }}
               >
@@ -881,7 +880,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               </For>
             </select>
             <p id="chset-notify-hint" class="shell-chset-hint">
-              Your own alerts for this channel on this device. All messages notify, Mentions only
+              Your own alerts for this room on this device. All messages notify, Mentions only
               alerts when someone @-mentions you, and Mute silences it.
             </p>
           </form>
@@ -897,12 +896,12 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               <div class="shell-chset-readonly">
                 <p class="shell-chset-readonly-label">Current modes</p>
                 <p class="shell-chset-readonly-value shell-chset-modes-mono">{modeSummary()}</p>
-                <p class="shell-chset-hint">Only ops can change channel modes.</p>
+                <p class="shell-chset-hint">Only room hosts can change room modes.</p>
               </div>
             }
           >
             {/* Flag toggles */}
-            <ul class="shell-chset-flags" role="group" aria-label="Channel mode flags">
+            <ul class="shell-chset-flags" role="group" aria-label="Room mode flags">
               <For each={FLAG_TOGGLES}>
                 {(flag) => {
                   const on = createMemo(() => modeState().flags.has(flag.letter));
@@ -936,8 +935,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             <form onSubmit={applyKey} class="shell-chset-param">
               <FormField
                 id="chset-key"
-                label="Channel key (+k)"
-                description="Members must supply this key to join. Leave blank to remove."
+                label="Room key (+k)"
+                description="People must supply this key to join. Leave blank to remove."
                 type="text"
                 value={keyDraft()}
                 autocomplete="off"
@@ -975,7 +974,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 <p class="shell-chset-readonly-value shell-chset-modes-mono">
                   {formatEphemeral(ephemeralSeconds())}
                 </p>
-                <p class="shell-chset-hint">Only ops can change history retention.</p>
+                <p class="shell-chset-hint">Only room hosts can change history retention.</p>
               </div>
             }
           >
@@ -993,7 +992,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 </For>
               </select>
               <p id="chset-ephemeral-hint" class="shell-chset-hint">
-                When enabled, replay and search omit messages older than this window, and channel stats skip new messages.
+                When enabled, replay and search omit messages older than this window, and room stats skip new messages.
               </p>
               <Button type="submit" variant="ghost" size="sm" disabled={!isConnected() || ephemeralDraft() === String(ephemeralSeconds() ?? 0)}>
                 Apply retention
@@ -1011,9 +1010,9 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             fallback={
               <div class="shell-chset-readonly">
                 <p class="shell-chset-readonly-label">Persistent access list</p>
-                <p class="shell-chset-readonly-value">Managed by channel ops.</p>
+                <p class="shell-chset-readonly-value">Managed by room hosts.</p>
                 <p class="shell-chset-hint">
-                  IRCX ACCESS grants founder/owner/host/voice on join, or deny/grant masks.
+                  Access entries grant founder, owner, host, or voice on join — or deny/grant masks.
                 </p>
               </div>
             }
@@ -1038,11 +1037,11 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   <p class="shell-chset-hint" data-testid="chset-access-empty">
                     {accessLoading()
                       ? 'Loading access entries…'
-                      : 'No ACCESS entries yet. Add a nick or hostmask below.'}
+                      : 'No access entries yet. Add a name or hostmask below.'}
                   </p>
                 }
               >
-                <ul class="shell-chset-access-list" aria-label="Channel access entries">
+                <ul class="shell-chset-access-list" aria-label="Room access entries">
                   <For each={accessEntries()}>
                     {(entry) => (
                       <li class="shell-chset-access-row">
@@ -1098,8 +1097,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
                 <FormField
                   id="chset-access-mask"
-                  label="Nick or hostmask"
-                  description="Bare nicks expand to nick!*@*. Full masks use nick!user@host."
+                  label="Name or hostmask"
+                  description="Bare names expand to name!*@*. Full masks use name!user@host."
                   type="text"
                   value={accessMaskDraft()}
                   autocomplete="off"
@@ -1146,7 +1145,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 <p class="shell-chset-readonly-value shell-chset-modes-mono">
                   {encryptionPolicyLabel()}
                 </p>
-                <p class="shell-chset-hint">Only ops can change the channel encryption policy.</p>
+                <p class="shell-chset-hint">Only room hosts can change the room encryption policy.</p>
               </div>
             }
           >
@@ -1185,7 +1184,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 <p class="shell-chset-readonly-value shell-chset-modes-mono">
                   {historyPolicyLabel()}
                 </p>
-                <p class="shell-chset-hint">Only ops can change the channel history policy.</p>
+                <p class="shell-chset-hint">Only room hosts can change the room history policy.</p>
               </div>
             }
           >
@@ -1240,8 +1239,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             fallback={
               <div class="shell-chset-readonly">
                 <p class="shell-chset-readonly-label">Incoming webhooks</p>
-                <p class="shell-chset-readonly-value">Managed by channel ops.</p>
-                <p class="shell-chset-hint">Discord-compatible webhook URLs can post into this channel.</p>
+                <p class="shell-chset-readonly-value">Managed by room hosts.</p>
+                <p class="shell-chset-hint">Discord-compatible webhook URLs can post into this room.</p>
               </div>
             }
           >

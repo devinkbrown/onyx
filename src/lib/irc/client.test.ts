@@ -7,6 +7,8 @@ import { _resetDeviceSigningForTests } from '../e2ee/deviceSign';
 import type { IRCMessage } from './types';
 
 const MIB = 1024 * 1024;
+const SRM2_LOCAL = 'srm2l.00112233445566778899aabbccddeeff.aabbccddeeff00112233445566778899';
+const SRM2_MESH = `srm2m.${'deadc0de'.repeat(8)}.bbccddeeff00112233445566778899aa`;
 
 interface TestSocket {
   readyState: number;
@@ -81,6 +83,7 @@ describe('IRCClient WebSocket subprotocol', () => {
       });
 
       expect(client.connect()).toBe(true);
+      expect(client.socketGeneration).toBe(1);
       expect(constructions).toEqual([{
         url: 'wss://ircx.us:8080/',
         protocols: ['onyx.irc-media.v1', 'text.ircv3.net'],
@@ -95,6 +98,7 @@ describe('IRCClient WebSocket subprotocol', () => {
       // The store's reconnect path reuses the same client and calls connect();
       // connect itself closes and detaches the prior socket before replacing it.
       expect(client.connect()).toBe(true);
+      expect(client.socketGeneration).toBe(2);
       expect(constructions).toHaveLength(2);
       expect(constructions[1]).toEqual(constructions[0]);
       sockets[1]?.onopen?.(new Event('open'));
@@ -480,6 +484,19 @@ describe('IRCClient bounded WebSocket sends', () => {
     expect(errors).toEqual([]);
   });
 
+  it('sends ACTIVITY subscribe/unsubscribe only for channel targets', () => {
+    const { client } = makeSendClient();
+    const { sent } = attachSocket(client);
+
+    expect(client.activitySubscribe('#ops')).toBe(true);
+    expect(client.activityUnsubscribe('&ops')).toBe(true);
+    expect(client.activitySubscribe('ops')).toBe(false);
+    expect(sent).toEqual([
+      'ACTIVITY SUBSCRIBE #ops\r\n',
+      'ACTIVITY UNSUBSCRIBE &ops\r\n',
+    ]);
+  });
+
   it('rejects a closed socket with an explicit error and no raw-log entry', () => {
     const { client, errors, raw } = makeSendClient();
     const { sent } = attachSocket(client, { readyState: WebSocket.CLOSED });
@@ -638,6 +655,47 @@ describe('IRCClient session-resume token lifecycle', () => {
     feed900();
     expect(sent.filter(line => line === 'SESSION RESUME remembered-mesh\r\n')).toHaveLength(1);
     expect(sent.filter(line => line === 'SESSION TOKEN\r\n')).toHaveLength(1);
+  });
+
+  it('replays an attachment-scoped mesh credential byte-exact after account proof', () => {
+    const { sent, feed001, feed900 } = makeSessionClient({
+      sessionToken: SRM2_LOCAL,
+      meshToken: SRM2_MESH,
+    });
+    feed001();
+    feed900();
+
+    expect(sent).toContain(`SESSION RESUME ${SRM2_MESH}\r\n`);
+    expect(sent).not.toContain(`SESSION RESUME ${SRM2_LOCAL}\r\n`);
+  });
+
+  it('starts a token-only SESSION generation after switching accounts', () => {
+    const { client, sent, feed001, feed900 } = makeSessionClient({ meshToken: SRM2_MESH });
+    const priv = client as unknown as { _onMessage(ev: { data: string }): void };
+    feed001();
+    feed900();
+    expect(sent).toContain(`SESSION RESUME ${SRM2_MESH}\r\n`);
+
+    priv._onMessage({
+      data: ':eshmaki.me 900 onyx onyx!web@example second :You are now logged in as second',
+    });
+
+    expect(sent.filter(line => line === 'SESSION TOKEN\r\n')).toHaveLength(2);
+    expect(sent.filter(line => line.startsWith('SESSION RESUME '))).toEqual([
+      `SESSION RESUME ${SRM2_MESH}\r\n`,
+    ]);
+  });
+
+  it('can request a fresh token after logout and re-identify on one transport', () => {
+    const { client, sent, feed001, feed900 } = makeSessionClient({ sessionToken: 'old-token' });
+    const priv = client as unknown as { _onMessage(ev: { data: string }): void };
+    feed001();
+    feed900();
+    priv._onMessage({ data: ':eshmaki.me 901 onyx onyx!web@example :You are now logged out' });
+    feed900();
+
+    expect(sent.filter(line => line === 'SESSION TOKEN\r\n')).toHaveLength(2);
+    expect(sent.filter(line => line === 'SESSION RESUME old-token\r\n')).toHaveLength(1);
   });
 
   it('requests a session token when a connected guest signs in later', () => {

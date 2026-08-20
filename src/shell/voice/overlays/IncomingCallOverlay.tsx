@@ -103,7 +103,7 @@ export function IncomingCallOverlay() {
     <ModalShell
       open={open()}
       title="Incoming call"
-      description="Voice request over the media mesh."
+      description="Voice request over the media network."
       closeLabel="Decline call"
       onOpenChange={(nextOpen) => {
         if (!nextOpen) declineCall(caller());

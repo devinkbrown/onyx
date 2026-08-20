@@ -32,6 +32,7 @@
   --lapis: #5ba3c9;
   --lapis-bright: #8bc4d9;
   --lapis-deep: #2e5f7a;
+  --accent: var(--lapis);
 
   /* Mineral second accent — cool steel, never neon glacier. */
   --gold: #7a9aab;
@@ -49,6 +50,7 @@
      Ocean (canonical) contrast: --on-accent ~6.9 : 1 vs --lapis,
      ~10 : 1 vs --lapis-bright; --on-danger 7.06 : 1 vs --shu (AAA). */
   --on-accent: #061018;
+  --on-secondary: #061018;
   --on-danger: #1c0906;
 
   /* Text — cool paper over mineral night */

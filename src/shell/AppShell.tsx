@@ -55,6 +55,11 @@ import { WatchTogetherActivity } from './WatchTogetherActivity';
 import { MessageView } from './MessageView';
 import { TypingIndicator } from './TypingIndicator';
 import { Composer } from './Composer';
+import { ContextRail } from './ContextRail';
+import { ModerationCockpit } from './ModerationCockpit';
+import { OperEventConsole } from './OperEventConsole';
+import { RoomInsightsStrip } from './RoomInsightsStrip';
+import { RoomSwitcherSheet } from './RoomSwitcherSheet';
 type MediaModule = Pick<typeof import('@/media/useCadenceMedia'), 'mountMedia'>;
 const defaultMediaModuleLoader = (): Promise<MediaModule> => import('@/media/useCadenceMedia');
 let mediaModuleLoader = defaultMediaModuleLoader;
@@ -84,6 +89,8 @@ const ReactionsOverlay = lazy(() =>
   import('./voice/overlays/ReactionsOverlay').then((m) => ({ default: m.ReactionsOverlay })),
 );
 import { MemberList } from './MemberList';
+import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
+import { CallsHub } from './CallsHub';
 // Panels are entered from explicit controls and should not inflate the initial
 // connected-shell bundle. Each preserves its existing Suspense boundary below.
 const AccountPanel = lazy(() => import('@/app/Account').then((m) => ({ default: m.AccountPanel })));
@@ -92,7 +99,7 @@ const PreferencesPanel = lazy(() => import('./PreferencesPanel').then((m) => ({ 
 const PinnedMessages = lazy(() => import('./PinnedMessages').then((m) => ({ default: m.PinnedMessages })));
 const ScheduledMessagesSheet = lazy(() => import('./ScheduledMessagesSheet').then((m) => ({ default: m.ScheduledMessagesSheet })));
 const JumpToDateSheet = lazy(() => import('./JumpToDateSheet').then((m) => ({ default: m.JumpToDateSheet })));
-import { applyPreferences, closePreferences, isPreferencesOpen, preferences } from '@/lib/prefs/preferences';
+import { applyPreferences, closePreferences, isPreferencesOpen, openPreferences, preferences } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
 const ShortcutsOverlay = lazy(() => import('./ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })));
@@ -100,6 +107,7 @@ import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { MessageSearch } from './search/MessageSearch';
 import { closeMessageSearch, openMessageSearch } from './search/useMessageSearch';
 import { channelIdentityTarget, roomIdentityForTarget, type RoomIdentity } from './roomIdentity';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import {
   forcedColors,
   prefersMoreContrast,
@@ -161,63 +169,6 @@ function LazySurface(props: {
   );
 }
 
-function CallsHub(props: {
-  activeCallChannel: string | null;
-  onOpenRooms: () => void;
-  onReturnToCall: (channel: string) => void;
-}): JSX.Element {
-  return (
-    <main class="shell-calls-hub" aria-labelledby="shell-calls-title">
-      <div class="shell-calls-kicker">Calls</div>
-      <h1 id="shell-calls-title">
-        {props.activeCallChannel ? 'Your call is still here.' : 'Talk where the conversation already lives.'}
-      </h1>
-      <p class="shell-calls-intro">
-        {props.activeCallChannel
-          ? `Return to ${props.activeCallChannel} without losing your place in the room.`
-          : 'Voice and video begin inside a room, so people arrive with the same context before, during, and after the call.'}
-      </p>
-
-      <Show
-        when={props.activeCallChannel}
-        fallback={(
-          <button type="button" class="shell-calls-primary" onClick={() => props.onOpenRooms()}>
-            Choose a room
-          </button>
-        )}
-      >
-        {(channel) => (
-          <button
-            type="button"
-            class="shell-calls-primary"
-            onClick={() => props.onReturnToCall(channel())}
-          >
-            Return to call
-          </button>
-        )}
-      </Show>
-
-      <div class="shell-calls-proof" aria-label="Call capabilities">
-        <article>
-          <span aria-hidden="true">01</span>
-          <h2>Voice and video</h2>
-          <p>Join from the room ribbon when your people are ready.</p>
-        </article>
-        <article>
-          <span aria-hidden="true">02</span>
-          <h2>Live captions</h2>
-          <p>Keep the conversation easier to follow in the moment.</p>
-        </article>
-        <article>
-          <span aria-hidden="true">03</span>
-          <h2>Honest state</h2>
-          <p>Onyx shows connection and protection status instead of hiding uncertainty.</p>
-        </article>
-      </div>
-    </main>
-  );
-}
-
 // ── Disconnected banner ──────────────────────────────────────────────────────
 
 function handleMessageSearchHotkey(event: KeyboardEvent): void {
@@ -257,6 +208,19 @@ function roomIdentityStyle(identity: RoomIdentity | null): JSX.CSSProperties {
   } as JSX.CSSProperties;
 }
 
+type ShellCurrent = {
+  kind: 'home' | 'room' | 'message' | 'status' | 'calls';
+  label: string;
+  detail: string;
+};
+
+function unreadDetail(unread: number, highlights: number): string {
+  if (highlights > 0) {
+    return `${unread} unread · ${highlights} ${highlights === 1 ? 'mention' : 'mentions'}`;
+  }
+  return unread > 0 ? `${unread} unread` : 'caught up';
+}
+
 // ── AppShell ─────────────────────────────────────────────────────────────────
 
 export function AppShell(props: AppShellProps): JSX.Element {
@@ -266,6 +230,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   // ── store reads ──
   const activeView = useStore((s) => s.activeView);
+  const channels = useStore((s) => s.channels);
+  const dms = useStore((s) => s.dms);
   const showMemberList = useStore((s) => s.showMemberList);
   const mobileSidebarOpen = useStore((s) => s.mobileSidebarOpen);
   const ourNick = useStore((s) => s.ourNick);
@@ -276,9 +242,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const showJumpToDate = useStore((s) => s.showJumpToDate);
   const showWhois = useStore((s) => s.showWhois);
   const showKeyboardShortcuts = useStore((s) => s.showKeyboardShortcuts);
+  const isOper = useStore((s) => s.isOper);
   const reducedData = makeReducedDataSignal();
   const [primarySurface, setPrimarySurface] = createSignal<'conversation' | 'calls'>('conversation');
-  const [browseActive, setBrowseActive] = createSignal(false);
+  const [contextRailOpen, setContextRailOpen] = createSignal(false);
   const [sidebarMode, setSidebarMode] = createSignal<'rooms' | 'messages'>(
     activeView().kind === 'dm' ? 'messages' : 'rooms',
   );
@@ -585,11 +552,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
     }
   }
 
-  // ── The rail is hidden when fewer than 3 servers are present.
-  //    We only have one Onyx network for now, so the rail collapses.
-  //    Per blueprint #16: "collapse the server rail when <3 servers".
-  const CONNECTED_SERVERS = 1;
-  const showRail = createMemo(() => CONNECTED_SERVERS >= 3);
+  // Atlas keeps a compact product dock available on desktop even on a single
+  // network. Its destination controls replace the old sidebar quick-switch.
+  const showRail = createMemo(() => true);
 
   // ── active background (reactive: live-updates when changed in the panel) ──
   // 'auto' follows the active theme's signature background (see themeBackground).
@@ -620,9 +585,18 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // so on narrow viewports it gets its own open state.
   const [isMobile, setIsMobile] = createSignal(false);
   const [mobileMembersOpen, setMobileMembersOpen] = createSignal(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = createSignal(false);
+  const [mobileMoreView, setMobileMoreView] = createSignal<'destinations' | 'room-controls'>('destinations');
+  const [mobileMenuReturnSurface, setMobileMenuReturnSurface] = createSignal<'appearance' | 'preferences' | 'you' | null>(null);
   let mobileMembersTarget: string | null = null;
+  let mobileRoomControlsTarget: string | null = null;
   let sidebarDrawerRef: HTMLDivElement | undefined;
   let mobileRoomsButtonRef: HTMLButtonElement | undefined;
+  let mobileMenuButtonRef: HTMLButtonElement | undefined;
+  let mobileMoreRef: HTMLDivElement | undefined;
+  let mobileRoomControlsLauncherRef: HTMLButtonElement | undefined;
+  let mobileRoomControlsBackRef: HTMLButtonElement | undefined;
+  let contextTriggerRef: HTMLButtonElement | undefined;
   let mobileDrawerRestoreTarget: HTMLElement | null = null;
 
   function rememberMobileDrawerTrigger(): void {
@@ -634,9 +608,15 @@ export function AppShell(props: AppShellProps): JSX.Element {
   function restoreMobileDrawerFocus(): void {
     const target = mobileDrawerRestoreTarget;
     mobileDrawerRestoreTarget = null;
-    if (target?.isConnected) {
-      queueMicrotask(() => target.focus());
-    }
+    queueMicrotask(() => {
+      const targetLabel = target?.getAttribute('aria-label');
+      const fallback = targetLabel
+        ? Array.from(document.querySelectorAll<HTMLElement>('[data-primary-navigation-variant="mobile"] [aria-label]'))
+          .find((candidate) => candidate.getAttribute('aria-label') === targetLabel)
+        : null;
+      const destination = target?.isConnected ? target : fallback;
+      destination?.focus();
+    });
   }
 
   function membersDrawerElement(): HTMLElement | null {
@@ -647,6 +627,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
     if (!isMobile()) return null;
     if (mobileSidebarOpen()) return sidebarDrawerRef ?? null;
     if (mobileMembersOpen()) return membersDrawerElement();
+    if (mobileMoreOpen()) return mobileMoreRef ?? null;
     return null;
   }
 
@@ -676,12 +657,20 @@ export function AppShell(props: AppShellProps): JSX.Element {
     });
   });
 
-  function focusFirstInMobileDrawer(root: HTMLElement | null | undefined): void {
-    queueMicrotask(() => {
-      const first = focusableIn(root)[0];
-      (first ?? root)?.focus();
-    });
-  }
+function focusFirstInMobileDrawer(root: HTMLElement | null | undefined): void {
+  queueMicrotask(() => {
+    const first = focusableIn(root)[0];
+    (first ?? root)?.focus();
+  });
+}
+
+function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
+  queueMicrotask(() => {
+    const close = root?.querySelector<HTMLElement>('.shell-members-close');
+    const first = focusableIn(root)[0];
+    (close ?? first ?? root)?.focus();
+  });
+}
 
   function trapMobileDrawerTab(event: KeyboardEvent, root: HTMLElement): void {
     const focusables = focusableIn(root);
@@ -718,6 +707,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   function closeActiveMobileDrawer(restoreFocus = true): void {
     if (mobileSidebarOpen()) getState().closeMobileSidebar();
     if (mobileMembersOpen()) setMobileMembersOpen(false);
+    if (mobileMoreOpen()) setMobileMoreOpen(false);
     if (restoreFocus) restoreMobileDrawerFocus();
   }
 
@@ -741,6 +731,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
         mobileDrawerRestoreTarget ||= document.querySelector<HTMLElement>('[data-testid="ribbon-members"]');
         setMobileMembersOpen(true);
       }
+      // Context never owns the column-4 slot on mobile (it is a fixed edge
+      // sheet there instead — see the >=901px CSS gate). Close it on the
+      // transition so asideOccupant() cannot keep reporting 'context' after
+      // the viewport can no longer render it as a column occupant.
+      if (e.matches) setContextRailOpen(false);
       setIsMobile(e.matches);
       keyboardOverlay?.setMobile(e.matches);
       if (!e.matches) {
@@ -782,6 +777,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
     rememberMobileDrawerTrigger();
     mobileDrawerRestoreTarget ||= mobileRoomsButtonRef ?? null;
     setMobileMembersOpen(false); // never both drawers at once
+    setMobileMoreOpen(false);
     getState().openMobileSidebar();
     focusFirstInMobileDrawer(sidebarDrawerRef);
   }
@@ -802,9 +798,19 @@ export function AppShell(props: AppShellProps): JSX.Element {
       rememberMobileDrawerTrigger();
       mobileDrawerRestoreTarget ||= document.querySelector<HTMLElement>('[data-testid="ribbon-members"]');
       getState().closeMobileSidebar();
+      setMobileMoreOpen(false);
       setMobileMembersOpen(true);
-      queueMicrotask(() => focusFirstInMobileDrawer(membersDrawerElement()));
+      queueMicrotask(() => focusMobileMembersDrawer(membersDrawerElement()));
     } else {
+      // People wins the column-4 slot over an open Context rail. Flip the
+      // signal directly (never route through closeContextRail — that queues
+      // focus onto the Context trigger and would yank focus off the People
+      // button the user just pressed, violating WCAG SC 3.2.1 On Focus).
+      if (contextRailOpen()) {
+        setContextRailOpen(false);
+        if (!showMemberList()) getState().toggleMemberList();
+        return;
+      }
       getState().toggleMemberList();
     }
   }
@@ -841,13 +847,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
   function openHome(): void {
     closeActiveMobileDrawer(false);
     setPrimarySurface('conversation');
-    setBrowseActive(false);
     getState().navigate({ kind: 'home' });
   }
 
   function selectSidebarMode(mode: 'rooms' | 'messages'): void {
     setPrimarySurface('conversation');
-    setBrowseActive(true);
     setSidebarMode(mode);
   }
 
@@ -862,7 +866,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   function openCalls(): void {
     closeActiveMobileDrawer(false);
-    setBrowseActive(false);
     setPrimarySurface('calls');
   }
 
@@ -870,6 +873,149 @@ export function AppShell(props: AppShellProps): JSX.Element {
     closeActiveMobileDrawer(false);
     getState().openAccount();
   }
+
+  function openMobileMore(): void {
+    rememberMobileDrawerTrigger();
+    getState().closeMobileSidebar();
+    setMobileMembersOpen(false);
+    setMobileMoreView('destinations');
+    setMobileMoreOpen(true);
+    queueMicrotask(() => focusFirstInMobileDrawer(mobileMoreRef));
+  }
+
+  function closeMobileMore(): void {
+    setMobileMoreOpen(false);
+    setMobileMoreView('destinations');
+    mobileRoomControlsTarget = null;
+    restoreMobileDrawerFocus();
+  }
+
+  function closeMobileMoreForSurface(): void {
+    setMobileMoreOpen(false);
+    setMobileMoreView('destinations');
+    mobileRoomControlsTarget = null;
+    // The destination Sheet now owns keyboard focus. Its close transition
+    // restores focus to the persistent Menu trigger below.
+    mobileDrawerRestoreTarget = null;
+  }
+
+  function openMobileRoomControls(): void {
+    const view = activeView();
+    if (view.kind !== 'channel') return;
+    mobileRoomControlsTarget = view.channel.toLowerCase();
+    setMobileMoreView('room-controls');
+  }
+
+  function returnToMobileMore(): void {
+    setMobileMoreView('destinations');
+    queueMicrotask(() => mobileRoomControlsLauncherRef?.focus({ preventScroll: true }));
+  }
+
+  function closeContextRail(): void {
+    setContextRailOpen(false);
+    queueMicrotask(() => {
+      if (contextTriggerRef?.isConnected) contextTriggerRef.focus({ preventScroll: true });
+    });
+  }
+
+  function selectMobileMore(destination: 'calls' | 'you'): void {
+    if (destination === 'you') {
+      closeMobileMoreForSurface();
+      getState().openAccount();
+      // Arm after open so the lifecycle effect does not treat the pre-open
+      // state as an immediate close.
+      setMobileMenuReturnSurface('you');
+      return;
+    }
+    closeMobileMore();
+    openCalls();
+  }
+
+  function mobileMoreDialogLabel(): string {
+    const view = activeView();
+    return mobileMoreView() === 'room-controls' && view.kind === 'channel'
+      ? `Room controls for ${view.channel}`
+      : 'Menu';
+  }
+
+  function restoreMobileMenuTriggerFocus(): void {
+    const returnToMobile = isMobile();
+    queueMicrotask(() => {
+      const mobileFallback = document.querySelector<HTMLElement>(
+        '[data-primary-navigation-variant="mobile"] [aria-label="Open Menu"]',
+      );
+      const desktopNav = document.querySelector<HTMLElement>(
+        '[data-primary-navigation-variant="desktop"]',
+      );
+      const desktopFallback = desktopNav?.querySelector<HTMLElement>('[aria-current="page"]')
+        ?? desktopNav?.querySelector<HTMLElement>('button');
+      const mobileTarget = mobileMenuButtonRef?.isConnected
+        ? mobileMenuButtonRef
+        : mobileFallback?.isConnected ? mobileFallback : null;
+      const target = returnToMobile ? mobileTarget : desktopFallback;
+      target?.focus({ preventScroll: true });
+    });
+  }
+
+  // You / Appearance / Preferences are portaled Sheets. Observe their shared
+  // state rather than relying on one close button so Escape, backdrop clicks,
+  // and You-hub handoffs all return focus through the same contract.
+  createEffect(() => {
+    const appearanceOpen = showAppearance();
+    const preferencesOpen = isPreferencesOpen();
+    const youOpen = showAccount();
+    const returnSurface = mobileMenuReturnSurface();
+    if (!returnSurface) return;
+
+    if (returnSurface === 'you') {
+      if (youOpen) return;
+      // Account closes itself, then opens Appearance/Preferences in a sibling
+      // microtask. Defer two ticks so that handoff can land before we treat
+      // the Account close as a Menu-return (a single microtask races and clears
+      // the armed surface while the nested sheet is still opening).
+      const armed = returnSurface;
+      queueMicrotask(() => {
+        queueMicrotask(() => {
+          if (mobileMenuReturnSurface() !== armed) return;
+          if (showAppearance()) {
+            setMobileMenuReturnSurface('appearance');
+            return;
+          }
+          if (isPreferencesOpen()) {
+            setMobileMenuReturnSurface('preferences');
+            return;
+          }
+          if (showAccount()) return;
+          setMobileMenuReturnSurface(null);
+          restoreMobileMenuTriggerFocus();
+        });
+      });
+      return;
+    }
+
+    if ((returnSurface === 'appearance' && appearanceOpen)
+      || (returnSurface === 'preferences' && preferencesOpen)) return;
+    setMobileMenuReturnSurface(null);
+    restoreMobileMenuTriggerFocus();
+  });
+
+  // The room-controls transition removes the focused launcher. Move focus only
+  // after the replacement subtree (and its Back ref) exists, so browsers never
+  // collapse focus to <body> between the two views.
+  createEffect(() => {
+    if (!mobileMoreOpen() || mobileMoreView() !== 'room-controls') return;
+    queueMicrotask(() => mobileRoomControlsBackRef?.focus({ preventScroll: true }));
+  });
+
+  // The control desk is scoped to the room from which it was opened. Global
+  // navigation can replace activeView without using the desk's own controls;
+  // close instead of leaving an empty or stale modal over the new destination.
+  createEffect(() => {
+    const view = activeView();
+    if (!mobileMoreOpen() || mobileMoreView() !== 'room-controls') return;
+    const nextTarget = view.kind === 'channel' ? view.channel.toLowerCase() : null;
+    if (nextTarget === null || nextTarget !== mobileRoomControlsTarget) closeMobileMore();
+  });
 
   function openRoomsFromCalls(): void {
     if (isMobile()) {
@@ -881,7 +1027,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   function returnToCall(channel: string): void {
     setPrimarySurface('conversation');
-    setBrowseActive(false);
     getState().navigate({ kind: 'channel', channel });
   }
 
@@ -914,24 +1059,108 @@ export function AppShell(props: AppShellProps): JSX.Element {
     hasMemberRoster() && (isMobile() ? mobileMembersOpen() : showMemberList()),
   );
 
-  const activeSection = createMemo<'home' | 'rooms' | 'messages' | 'calls' | 'you'>(() => {
-    if (showAccount()) return 'you';
-    if (primarySurface() === 'calls') return 'calls';
-    if (browseActive()) return sidebarMode();
-    if (activeView().kind === 'home') return 'home';
-    if (activeView().kind === 'dm') return 'messages';
-    return sidebarMode();
+  // ── single-occupant column-4 slot ──
+  // Column 4 can hold the member roster, the Context rail, or nothing — never
+  // both the roster and the rail at once. This is what makes "both claim
+  // grid-column:4" unrepresentable: exactly one branch below can be true, and
+  // AppShell threads the result through a single tri-state DOM attribute
+  // (`data-shell-aside`) that both MemberList and ContextRail read off of,
+  // instead of two independently-computed booleans that could drift apart.
+  // Context never takes the column on mobile — it stays a fixed edge sheet
+  // there (see the >=901px CSS gate), so mobile always falls through to the
+  // member drawer/column state.
+  type ShellAside = 'members' | 'context' | 'none';
+  const asideOccupant = createMemo<ShellAside>(() => {
+    if (!isMobile() && contextRailOpen()) return 'context';
+    if (membersVisible()) return 'members';
+    return 'none';
   });
+
+  // A11y: openMemberWhois above captures `.shell-members` as the WHOIS
+  // return-focus fallback. If Context then claims column 4, that fallback
+  // goes [inert] the instant asideOccupant() moves off 'members' —
+  // focusTrap.ts's canRestoreDialogFocus rejects [inert]/[aria-hidden="true"]
+  // targets, so closing WHOIS would strand focus on <body> (WCAG SC 2.4.3).
+  // Re-point the fallback to a control that stays interactive for as long as
+  // Context owns the slot.
+  createEffect(() => {
+    if (asideOccupant() === 'members' || !showWhois()) return;
+    const ribbonMembers = document.querySelector<HTMLElement>('[data-testid="ribbon-members"]');
+    setWhoisReturnFocusFallback(ribbonMembers ?? contextTriggerRef ?? null);
+  });
+
+  const activeSection = createMemo<PrimaryCurrentSection>(() => {
+    if (primarySurface() === 'calls') return 'calls';
+    const view = activeView();
+    if (view.kind === 'home') return 'home';
+    if (view.kind === 'dm') return 'messages';
+    return 'rooms';
+  });
+
+  // This is orientation, not a new source of truth: it only projects the
+  // selected store target and its existing unread counters. It deliberately
+  // says nothing about transport, E2EE, or call protection.
+  const roomCurrent = createMemo<ShellCurrent>(() => {
+    if (primarySurface() === 'calls') {
+      return { kind: 'calls', label: 'Calls', detail: voice().callChannel ?? 'Call directory' };
+    }
+
+    const view = activeView();
+    if (view.kind === 'channel') {
+      const channel = channels().get(view.channel.toLowerCase());
+      return {
+        kind: 'room',
+        label: channel?.name ?? view.channel,
+        detail: unreadDetail(channel?.unread ?? 0, channel?.highlights ?? 0),
+      };
+    }
+    if (view.kind === 'dm') {
+      const dm = dms().get(view.nick.toLowerCase());
+      return {
+        kind: 'message',
+        label: `Message · ${dm?.nick ?? view.nick}`,
+        detail: unreadDetail(dm?.unread ?? 0, dm?.highlights ?? 0),
+      };
+    }
+    if (view.kind === 'status') {
+      return { kind: 'status', label: 'Network status', detail: 'read-only ledger' };
+    }
+
+    const items = [...channels().values(), ...dms().values()];
+    const unread = items.reduce((total, item) => total + item.unread, 0);
+    const highlights = items.reduce((total, item) => total + item.highlights, 0);
+    return { kind: 'home', label: 'Home', detail: unreadDetail(unread, highlights) };
+  });
+
+  function handlePrimaryNavigation(section: PrimarySection): void {
+    switch (section) {
+      case 'home':
+        openHome();
+        break;
+      case 'rooms':
+      case 'messages':
+        openMobileCollection(section);
+        break;
+      case 'calls':
+        openCalls();
+        break;
+      case 'you':
+        openYou();
+        break;
+    }
+  }
 
   function handleDisconnect(): void {
     local.onDisconnect?.();
   }
 
   // ── shell class ──
+  // Column-4 occupancy is no longer a class concern — it lives entirely on
+  // the data-shell-aside attribute (asideOccupant above), which CSS reads via
+  // .shell[data-shell-aside=...] attribute selectors.
   const shellClass = createMemo(() => {
     const classes = ['shell'];
     if (!showRail()) classes.push('shell--no-rail');
-    if (!showMemberList() || !hasMemberRoster()) classes.push('shell--members-hidden');
     return classes.join(' ');
   });
 
@@ -948,44 +1177,37 @@ export function AppShell(props: AppShellProps): JSX.Element {
         class={shellClass()}
         data-testid="app-shell"
         data-room-identity={roomIdentity()?.target}
+        data-shell-aside={asideOccupant()}
         style={roomIdentityVars()}
       >
         {/* ── Server Rail — hidden when < 3 servers ── */}
         <Show when={showRail()}>
-          <ServerRail onDisconnect={handleDisconnect} />
+          <ServerRail
+            onDisconnect={handleDisconnect}
+            currentSection={activeSection()}
+            selectedCollection={sidebarMode()}
+            youDialogOpen={showAccount()}
+            onSelect={handlePrimaryNavigation}
+          />
         </Show>
 
         {/* ── Channel Sidebar ── */}
         {/* Mobile backdrop */}
-        <Show when={mobileSidebarOpen()}>
-          <div
-            class="shell-sidebar-backdrop"
-            aria-hidden="true"
-            onClick={closeMobileSidebar}
-          />
-        </Show>
-        <div
-          ref={sidebarDrawerRef}
-          class={`shell-sidebar-slot${mobileSidebarOpen() ? ' shell-sidebar--mobile-open' : ''}`}
-          role={isMobile() && mobileSidebarOpen() ? 'dialog' : undefined}
-          aria-modal={isMobile() && mobileSidebarOpen() ? 'true' : undefined}
-          aria-label={isMobile() && mobileSidebarOpen() ? 'Channel drawer' : undefined}
-          tabindex={isMobile() && mobileSidebarOpen() ? -1 : undefined}
+        <RoomSwitcherSheet
+          open={mobileSidebarOpen()}
+          mode={sidebarMode()}
+          onDismiss={closeMobileSidebar}
+          sheetRef={(element) => { sidebarDrawerRef = element; }}
         >
           <ChannelSidebar
             mode={sidebarMode()}
-            activeSection={activeSection()}
             onModeChange={selectSidebarMode}
-            onOpenHome={openHome}
-            onOpenCalls={openCalls}
-            onOpenYou={openYou}
             onConversationOpen={() => {
               setPrimarySurface('conversation');
-              setBrowseActive(false);
             }}
             onMobileClose={closeMobileSidebar}
           />
-        </div>
+        </RoomSwitcherSheet>
 
         {/* ── Conversation Column ── */}
         {/* Always grid-column 3 (CSS). The rail track stays in the grid at 0px
@@ -997,11 +1219,32 @@ export function AppShell(props: AppShellProps): JSX.Element {
           {/* Presence ribbon */}
           <PresenceRibbon
             selfNick={displayNick()}
+            contextActionsOnly={isMobile()}
             onToggleMembers={handleToggleMembers}
-            membersOpen={membersVisible()}
+            membersOpen={asideOccupant() === 'members'}
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
           />
+          <div
+            class="shell-room-current"
+            data-shell-current-kind={roomCurrent().kind}
+            role="note"
+            aria-label={`Room current: ${roomCurrent().label}, ${roomCurrent().detail}`}
+          >
+            <span class="shell-room-current__kicker">Room current</span>
+            <span class="shell-room-current__label">{roomCurrent().label}</span>
+            <span class="shell-room-current__detail">{roomCurrent().detail}</span>
+            <button
+              ref={(element) => { contextTriggerRef = element; }}
+              type="button"
+              class="shell-room-current__context"
+              aria-expanded={contextRailOpen()}
+              aria-controls="shell-context-rail"
+              onClick={() => setContextRailOpen((open) => !open)}
+            >
+              Context
+            </button>
+          </div>
           <Show
             when={primarySurface() === 'calls'}
             fallback={(
@@ -1053,7 +1296,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
                 </Show>
                 }>
                   <div class="shell-status-stack" data-testid="status-stack">
-                    <CapabilityMatrixSection />
+                    <Show when={preferences().experienceMode !== 'standard'}>
+                      <CapabilityMatrixSection />
+                    </Show>
                     <MessageView selfNick={displayNick()} />
                   </div>
                 </Show>
@@ -1063,7 +1308,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
             )}
           >
             <CallsHub
-              activeCallChannel={inCall() ? voice().callChannel : null}
+              callState={voice().callState}
+              callChannel={voice().callChannel}
+              callWith={voice().callWith}
+              callStartedAt={voice().callStartedAt}
               onOpenRooms={openRoomsFromCalls}
               onReturnToCall={returnToCall}
             />
@@ -1079,68 +1327,109 @@ export function AppShell(props: AppShellProps): JSX.Element {
           />
         </Show>
         <MemberList
-          hidden={!membersVisible()}
+          hidden={asideOccupant() !== 'members'}
           modal={isMobile()}
           onClose={closeMobileMembers}
           onOpenDm={openMemberDm}
           onOpenWhois={openMemberWhois}
         />
+        <ContextRail open={asideOccupant() === 'context'} onClose={closeContextRail} />
       </div>
 
-      {/* Mobile bottom tab bar — product frame: Home / Rooms / Messages / Calls / You.
-          No Leave here; disconnect remains on ServerRail / account. Members stay
-          on the presence ribbon (not a bottom-tab). */}
-      <nav class="shell-mobile-nav" aria-label="Mobile navigation">
-        <button
-          type="button"
-          class={`shell-mobile-nav-btn${activeSection() === 'home' ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open Home"
-          aria-current={activeSection() === 'home' ? 'page' : undefined}
-          onClick={openHome}
+      {/* Mobile bottom tab bar — the same product-frame navigation as the
+          desktop sidebar. The account dialog is transient, so You exposes
+          expanded state without becoming the current location. */}
+      <PrimaryNavigation
+        variant="mobile"
+        currentSection={activeSection()}
+        selectedCollection={sidebarMode()}
+        expandedCollection={mobileSidebarOpen() ? sidebarMode() : null}
+        youDialogOpen={showAccount()}
+        moreOpen={mobileMoreOpen()}
+        onOpenMore={openMobileMore}
+        mobileRoomsButtonRef={(element) => { mobileRoomsButtonRef = element; }}
+        mobileMenuButtonRef={(element) => { mobileMenuButtonRef = element; }}
+        onSelect={handlePrimaryNavigation}
+      />
+      <Show when={mobileMoreOpen()}>
+        <div class="shell-mobile-more-backdrop" aria-hidden="true" onClick={closeMobileMore} />
+      </Show>
+      <div
+        ref={(element) => { mobileMoreRef = element; }}
+        class={`shell-mobile-more-sheet${mobileMoreOpen() ? ' shell-mobile-more-sheet--open' : ''}${mobileMoreView() === 'room-controls' ? ' shell-mobile-more-sheet--room-controls' : ''}`}
+        role={mobileMoreOpen() ? 'dialog' : undefined}
+        aria-modal={mobileMoreOpen() ? 'true' : undefined}
+        aria-label={mobileMoreOpen() ? mobileMoreDialogLabel() : undefined}
+        tabindex={mobileMoreOpen() ? -1 : undefined}
+      >
+        <Show
+          when={mobileMoreView() === 'destinations'}
+          fallback={(
+            <Show when={activeView().kind === 'channel'}>
+              <section class="shell-mobile-more-sheet__room-tools" aria-label="Room control desk">
+                <header class="shell-mobile-more-sheet__room-head">
+                  <button
+                    ref={(element) => { mobileRoomControlsBackRef = element; }}
+                    type="button"
+                    class="shell-mobile-more-sheet__back"
+                    onClick={returnToMobileMore}
+                  >Back</button>
+                  <div>
+                    <p class="shell-mobile-more-sheet__title">Room control desk</p>
+                    <div class="shell-mobile-more-sheet__room-title">
+                      <h2>{(activeView() as { channel: string }).channel}</h2>
+                      <Show when={/^[#&]/.test((activeView() as { channel: string }).channel.trim())}>
+                        <a
+                          class="shell-mobile-more-sheet__ledger shell-ribbon-stats"
+                          href={statsRoomHref((activeView() as { channel: string }).channel)}
+                          aria-label={`Room ledger for ${(activeView() as { channel: string }).channel}`}
+                          data-testid="mobile-room-ledger"
+                        >
+                          Ledger
+                        </a>
+                      </Show>
+                    </div>
+                  </div>
+                  <button type="button" class="shell-mobile-more-sheet__close" onClick={closeMobileMore}>Close</button>
+                </header>
+                <RoomInsightsStrip />
+                <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
+                <Show when={preferences().experienceMode === 'network-ops' && isOper()}>
+                  <OperEventConsole />
+                </Show>
+                <Show when={preferences().experienceMode === 'network-ops' && !isOper()}>
+                  <p class="shell-context-rail__empty" role="status">Operator tools appear here after this account is granted access.</p>
+                </Show>
+              </section>
+            </Show>
+          )}
         >
-          <b aria-hidden="true">⌂</b>Home
-        </button>
-        <button
-          ref={mobileRoomsButtonRef}
-          type="button"
-          class={`shell-mobile-nav-btn${activeSection() === 'rooms' ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open Rooms"
-          aria-current={activeSection() === 'rooms' ? 'page' : undefined}
-          aria-expanded={mobileSidebarOpen()}
-          onClick={() => openMobileCollection('rooms')}
-        >
-          <b aria-hidden="true">#</b>Rooms
-        </button>
-        <button
-          type="button"
-          class={`shell-mobile-nav-btn${activeSection() === 'messages' ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open Messages"
-          aria-current={activeSection() === 'messages' ? 'page' : undefined}
-          aria-expanded={mobileSidebarOpen() && sidebarMode() === 'messages'}
-          onClick={() => openMobileCollection('messages')}
-        >
-          <b aria-hidden="true">@</b>Messages
-        </button>
-        <button
-          type="button"
-          class={`shell-mobile-nav-btn${activeSection() === 'calls' ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open Calls"
-          aria-current={activeSection() === 'calls' ? 'page' : undefined}
-          onClick={openCalls}
-        >
-          <b aria-hidden="true">◉</b>Calls
-        </button>
-        <button
-          type="button"
-          class={`shell-mobile-nav-btn${activeSection() === 'you' ? ' shell-mobile-nav-btn--active' : ''}`}
-          aria-label="Open You"
-          aria-current={activeSection() === 'you' ? 'page' : undefined}
-          aria-haspopup="dialog"
-          onClick={openYou}
-        >
-          <b aria-hidden="true">◇</b>You
-        </button>
-      </nav>
+          <p class="shell-mobile-more-sheet__title">Menu</p>
+          <Show when={activeView().kind === 'channel' && preferences().experienceMode !== 'standard'}>
+            <button
+              ref={(element) => { mobileRoomControlsLauncherRef = element; }}
+              type="button"
+              class="shell-mobile-more-sheet__room-launcher"
+              onClick={openMobileRoomControls}
+            >
+              <span aria-hidden="true">#</span>
+              <span>Room control desk</span>
+              <small>{(activeView() as { channel: string }).channel}</small>
+            </button>
+          </Show>
+          <p class="shell-mobile-more-sheet__group-label">Navigate</p>
+          <button type="button" onClick={() => selectMobileMore('calls')}>Calls</button>
+          <p class="shell-mobile-more-sheet__group-label">You</p>
+          <button
+            type="button"
+            aria-label="You — account, appearance, and preferences"
+            onClick={() => selectMobileMore('you')}
+          >
+            You
+          </button>
+          <button type="button" onClick={closeMobileMore}>Close</button>
+        </Show>
+      </div>
 
       {/* Account management panel — portal modal, gated on store.showAccount */}
       <Show when={showAccount()}>

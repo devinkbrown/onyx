@@ -1,9 +1,23 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
 .roadmap-page {
+  --roadmap-current: var(--public-current);
+  --roadmap-current-strong: var(--public-signal-strong);
+  --roadmap-warm: var(--public-ember);
   min-height: 100svh;
+  overflow: clip;
+}
+
+.roadmap-page .r-wrap {
+  position: relative;
+  z-index: 1;
 }
 
 .roadmap-hero h1 {
   max-width: 12ch;
+}
+
+.roadmap-hero h1 .roadmap-title-accent {
+  color: var(--roadmap-current-strong);
 }
 
 .roadmap-legend {
@@ -37,16 +51,16 @@
 
 .roadmap-legend span[data-state='active'],
 .roadmap-card[data-state='active'] .roadmap-state {
-  color: var(--lapis-bright);
-  border-color: color-mix(in oklab, var(--lapis) 48%, var(--seam-faint));
-  background: color-mix(in oklab, var(--lapis) 14%, transparent);
+  color: var(--roadmap-current-strong);
+  border-color: color-mix(in oklab, var(--roadmap-current) 48%, var(--seam-faint));
+  background: color-mix(in oklab, var(--roadmap-current) 14%, transparent);
 }
 
 .roadmap-legend span[data-state='next'],
 .roadmap-card[data-state='next'] .roadmap-state {
-  color: var(--gold-bright, var(--paper));
-  border-color: color-mix(in oklab, var(--gold, var(--paper-mute)) 38%, var(--seam-faint));
-  background: color-mix(in oklab, var(--gold, var(--paper-mute)) 10%, transparent);
+  color: var(--roadmap-warm);
+  border-color: color-mix(in oklab, var(--roadmap-warm) 38%, var(--seam-faint));
+  background: color-mix(in oklab, var(--roadmap-warm) 10%, transparent);
 }
 
 .roadmap-legend span[data-state='gated'],
@@ -76,7 +90,11 @@
 }
 
 .roadmap-card[data-state='active']::before {
-  background: var(--lapis-bright);
+  background: var(--roadmap-current-strong);
+}
+
+.roadmap-card[data-state='next']::before {
+  background: var(--roadmap-warm);
 }
 
 .roadmap-card-head {
@@ -123,9 +141,7 @@
 }
 
 .roadmap-principle .data-card {
-  background:
-    linear-gradient(120deg, color-mix(in oklab, var(--lapis) 13%, transparent), transparent 58%),
-    color-mix(in oklab, var(--stone-2) 42%, var(--ink));
+  background: var(--stone-2);
 }
 
 .roadmap-principle p {
@@ -146,5 +162,65 @@
 
   .roadmap-card-head {
     margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .roadmap-page .roadmap-legend,
+  .roadmap-page .roadmap-grid,
+  .roadmap-page .roadmap-card,
+  .roadmap-page .roadmap-principle,
+  .roadmap-page .roadmap-principle > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .roadmap-page .roadmap-card-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .roadmap-page .roadmap-card h2,
+  .roadmap-page .roadmap-card p,
+  .roadmap-page .roadmap-principle h2,
+  .roadmap-page .roadmap-principle p {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (forced-colors: active) {
+  .roadmap-hero h1 .roadmap-title-accent {
+    color: LinkText;
+  }
+
+  .roadmap-legend span,
+  .roadmap-state,
+  .roadmap-card::before {
+    border-color: CanvasText;
+    color: CanvasText;
+    background: Canvas;
+    forced-color-adjust: none;
+  }
+
+  .roadmap-legend span[data-state='active'],
+  .roadmap-card[data-state='active'] .roadmap-state,
+  .roadmap-card[data-state='active']::before {
+    border-color: Highlight;
+    color: HighlightText;
+    background: Highlight;
+  }
+
+  .roadmap-legend span[data-state='next'],
+  .roadmap-card[data-state='next'] .roadmap-state,
+  .roadmap-card[data-state='next']::before {
+    border-color: LinkText;
+    color: LinkText;
+  }
+
+  .roadmap-legend span[data-state='gated'],
+  .roadmap-card[data-state='gated'] .roadmap-state,
+  .roadmap-card[data-state='gated']::before {
+    border-color: GrayText;
+    color: GrayText;
   }
 }

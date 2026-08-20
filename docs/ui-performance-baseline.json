@@ -1,0 +1,141 @@
+{
+  "schema": "onyx-ui-performance-budget/v1",
+  "policy": {
+    "headroomPercent": 5,
+    "rounding": "Math.ceil",
+    "enforceArtifactCount": true,
+    "enforceRawAndGzip": true
+  },
+  "evidence": {
+    "source": "vite-output",
+    "command": "pnpm build",
+    "measurementCommand": "node tools/check-ui-budgets.mjs --measure-only --json",
+    "gzip": {
+      "algorithm": "gzip",
+      "level": 9
+    },
+    "buildDigest": "75dd70a3fe6b9ac0cdd9cc4eedad8fd63048490780b734a4876f2628f68cf6ec"
+  },
+  "groups": {
+    "eagerJs": {
+      "count": 4,
+      "rawBytes": 577381,
+      "gzipBytes": 172724,
+      "rawCeilingBytes": 606251,
+      "gzipCeilingBytes": 181361,
+      "artifacts": [
+        {
+          "path": "assets/index-Dk4oLT4C.js",
+          "sha256": "af26a8b3b7aa593e1f82902253619d6293bead9ea33b1a5f4873cb394c182e37"
+        },
+        {
+          "path": "assets/runtime-v-GcG6xR.js",
+          "sha256": "42245b11336f12c3cc4387c1dbbb0cf176c58672e1a4edfad3dd3b223b5b16db"
+        },
+        {
+          "path": "assets/solid-b1FM0zeu.js",
+          "sha256": "3c2ce8df67a6b218bd36be99c9fdbe5ed99e403d6da4061df84d8df73ed8a21b"
+        },
+        {
+          "path": "assets/theme-Bj6t_J66.js",
+          "sha256": "cf9d6ccce1cf2161f205c2080af37ce5a37d6089b99788bd8101ea1584d3e87b"
+        }
+      ]
+    },
+    "eagerCss": {
+      "count": 1,
+      "rawBytes": 120100,
+      "gzipBytes": 24093,
+      "rawCeilingBytes": 126105,
+      "gzipCeilingBytes": 25298,
+      "artifacts": [
+        {
+          "path": "assets/index-CAw_NGHH.css",
+          "sha256": "54136a8c47eed5026fb32582370996a18a5a577d3dfb61cf2e1b57db60098075"
+        }
+      ]
+    },
+    "eagerIndexJs": {
+      "count": 1,
+      "rawBytes": 51313,
+      "gzipBytes": 18292,
+      "rawCeilingBytes": 53879,
+      "gzipCeilingBytes": 19207,
+      "artifacts": [
+        {
+          "path": "assets/index-Dk4oLT4C.js",
+          "sha256": "af26a8b3b7aa593e1f82902253619d6293bead9ea33b1a5f4873cb394c182e37"
+        }
+      ]
+    },
+    "eagerIndexCss": {
+      "count": 1,
+      "rawBytes": 120100,
+      "gzipBytes": 24093,
+      "rawCeilingBytes": 126105,
+      "gzipCeilingBytes": 25298,
+      "artifacts": [
+        {
+          "path": "assets/index-CAw_NGHH.css",
+          "sha256": "54136a8c47eed5026fb32582370996a18a5a577d3dfb61cf2e1b57db60098075"
+        }
+      ]
+    },
+    "sharedRuntimeJs": {
+      "count": 1,
+      "rawBytes": 453715,
+      "gzipBytes": 131677,
+      "rawCeilingBytes": 476401,
+      "gzipCeilingBytes": 138261,
+      "artifacts": [
+        {
+          "path": "assets/runtime-v-GcG6xR.js",
+          "sha256": "42245b11336f12c3cc4387c1dbbb0cf176c58672e1a4edfad3dd3b223b5b16db"
+        }
+      ]
+    },
+    "appShellJs": {
+      "count": 1,
+      "rawBytes": 452245,
+      "gzipBytes": 134598,
+      "rawCeilingBytes": 474858,
+      "gzipCeilingBytes": 141328,
+      "artifacts": [
+        {
+          "path": "assets/AppShell-CluA-5vy.js",
+          "sha256": "b8f4e43989a17dcc667e8b385806e67dca59182ea4e3cb85d74026d1ff2436da"
+        }
+      ]
+    },
+    "appShellCss": {
+      "count": 1,
+      "rawBytes": 294734,
+      "gzipBytes": 43121,
+      "rawCeilingBytes": 309471,
+      "gzipCeilingBytes": 45278,
+      "artifacts": [
+        {
+          "path": "assets/AppShell-B2_SXk__.css",
+          "sha256": "3c8bdc846ec6e041772f25fc42349851261283b5fc6bf1a64e210b53ed762f79"
+        }
+      ]
+    },
+    "lazyMediaJs": {
+      "count": 2,
+      "rawBytes": 123675,
+      "gzipBytes": 36565,
+      "rawCeilingBytes": 129859,
+      "gzipCeilingBytes": 38394,
+      "artifacts": [
+        {
+          "path": "assets/media-BTgKLJ-z.js",
+          "sha256": "5bd4a0534f8e6cad61d42ee6430bb2eb0ad4c64537ad5b65a565d22a4e0e8b4c"
+        },
+        {
+          "path": "assets/videoEncodeWorker-B8-g4JQi.js",
+          "sha256": "eeb9bc17a4d8b786d1cdd4fa6fafc683a434019d79c5328e422ebd047afdee9e"
+        }
+      ]
+    }
+  }
+}

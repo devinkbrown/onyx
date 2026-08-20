@@ -2,312 +2,112 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@solidjs/testing-library';
 
-const backgroundHarness = vi.hoisted(() => ({
-  mounts: 0,
-  ids: [] as string[],
-  throwOnId: null as string | null,
-}));
-
 vi.mock('@/backgrounds', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/backgrounds')>();
-  const { createEffect } = await import('solid-js');
   return {
     ...actual,
-    Background: (props: { id?: string }) => {
-      backgroundHarness.mounts += 1;
-      const element = document.createElement('div');
-      element.dataset.testid = 'background-preview';
-      createEffect(() => {
-        const id = props.id ?? '';
-        if (backgroundHarness.throwOnId && id === backgroundHarness.throwOnId) {
-          throw new Error(`simulated wallpaper failure: ${id}`);
-        }
-        backgroundHarness.ids.push(id);
-        element.dataset.backgroundId = id;
-      });
-      return element;
-    },
+    Background: (props: { id?: string; motionOverride?: string }) => (
+      <div
+        data-testid="background-preview"
+        data-background-id={props.id}
+        data-motion-override={props.motionOverride}
+      />
+    ),
   };
 });
 
-import { ThemeProvider, THEME_IDS } from '@/theme';
-import { backgroundOptions } from '@/backgrounds';
+import { ThemeProvider } from '@/theme';
 import { getState } from '@/lib/store';
-import {
-  resetSceneMotion,
-  sceneMotion,
-  setSceneMotion,
-} from '@/lib/prefs/sceneMotion';
-import Appearance, {
-  POINTER_PREVIEW_DELAY_MS,
-  isTouchPointerEvent,
-  prefersNoHoverPreview,
-} from './Appearance';
+import Appearance from './Appearance';
+import { BACKGROUND_PREVIEW_DELAY_MS } from '@/backgrounds/picker/BackgroundPicker';
+import { resetSceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 
-const renderAppearance = () => render(() => (
-  <ThemeProvider>
-    <Appearance />
-  </ThemeProvider>
-));
-
-const originalMatchMedia = window.matchMedia;
-
-function installMatchMedia(matchesFor: (query: string) => boolean): void {
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    writable: true,
-    value: (query: string) => ({
-      matches: matchesFor(query),
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }),
-  });
-}
-
-beforeEach(() => {
-  vi.useFakeTimers();
-  backgroundHarness.mounts = 0;
-  backgroundHarness.ids.length = 0;
-  backgroundHarness.throwOnId = null;
-  getState().setBackground('obsidian');
-  resetSceneMotion();
-  window.matchMedia = originalMatchMedia;
-});
-
-afterEach(() => {
-  cleanup();
-  resetSceneMotion();
-  vi.useRealTimers();
-  window.matchMedia = originalMatchMedia;
-});
+const renderAppearance = () => render(() => <ThemeProvider><Appearance /></ThemeProvider>);
+const card = (container: HTMLElement, label: string) => {
+  const item = [...container.querySelectorAll<HTMLButtonElement>('[data-background-id]')].find((button) => button.textContent?.includes(label));
+  if (!item) throw new Error(`Missing background ${label}`);
+  return item;
+};
 
 describe('Appearance', () => {
-  it('renders the customization hero', () => {
-    const { getByText } = renderAppearance();
-    expect(getByText(/make it/i)).toBeInTheDocument();
-  });
+  beforeEach(() => { vi.useFakeTimers(); getState().setBackground('obsidian'); });
+  afterEach(() => { cleanup(); resetSceneMotion(); vi.useRealTimers(); });
 
-  it('offers a chip for every theme and every background', () => {
-    const { getAllByRole } = renderAppearance();
-    const labels = getAllByRole('button').map((b) => b.textContent ?? '');
-    // at least one chip per theme + per background (studio adds more)
-    expect(getAllByRole('button').length).toBeGreaterThanOrEqual(THEME_IDS.length + backgroundOptions.length);
-    expect(labels.join(' ')).toMatch(/onyx/i);
-    expect(labels.join(' ')).toMatch(/gold veins/i);
-  });
-
-  it('marks the active theme chip as pressed', () => {
-    const { getAllByRole } = renderAppearance();
-    const pressed = getAllByRole('button').filter((b) => b.getAttribute('aria-pressed') === 'true');
-    expect(pressed.length).toBeGreaterThan(0);
-  });
-
-  it('settles rapid pointer sweeps on only the final background', () => {
-    const { container, getByTestId } = renderAppearance();
-    const preview = getByTestId('background-preview');
-
-    fireEvent.pointerEnter(getBackgroundChip(container, 'Deep Current'), { pointerType: 'mouse' });
-    fireEvent.pointerEnter(getBackgroundChip(container, 'Starfield'), { pointerType: 'mouse' });
-    fireEvent.pointerEnter(getBackgroundChip(container, 'Mineral Aurora'), { pointerType: 'mouse' });
-    vi.advanceTimersByTime(POINTER_PREVIEW_DELAY_MS - 1);
-
-    expect(preview).toHaveAttribute('data-background-id', 'obsidian');
-    expect(backgroundHarness.ids).toEqual(['obsidian']);
-
-    vi.advanceTimersByTime(1);
-    expect(preview).toHaveAttribute('data-background-id', 'aurora');
-    expect(backgroundHarness.ids).toEqual(['obsidian', 'aurora']);
-    expect(backgroundHarness.mounts).toBe(1);
-  });
-
-  it('cancels an early pointer leave without changing the selected background', () => {
-    const { container, getByTestId } = renderAppearance();
-    const preview = getByTestId('background-preview');
-    const starfield = getBackgroundChip(container, 'Starfield');
-
-    fireEvent.pointerEnter(starfield, { pointerType: 'mouse' });
-    vi.advanceTimersByTime(POINTER_PREVIEW_DELAY_MS - 1);
-    fireEvent.pointerLeave(starfield, { pointerType: 'mouse' });
-    vi.advanceTimersByTime(POINTER_PREVIEW_DELAY_MS);
-
-    expect(preview).toHaveAttribute('data-background-id', 'obsidian');
-    expect(backgroundHarness.ids).toEqual(['obsidian']);
-  });
-
-  it('commits a click immediately and cancels its pending pointer preview', () => {
-    const { container, getByTestId } = renderAppearance();
-    const preview = getByTestId('background-preview');
-    const goldVeins = getBackgroundChip(container, 'Gold Veins');
-
-    fireEvent.pointerEnter(goldVeins, { pointerType: 'mouse' });
-    fireEvent.click(goldVeins);
-
-    expect(preview).toHaveAttribute('data-background-id', 'gold-veins');
-    expect(goldVeins).toHaveAttribute('aria-pressed', 'true');
-    vi.advanceTimersByTime(POINTER_PREVIEW_DELAY_MS);
-    expect(backgroundHarness.ids).toEqual(['obsidian', 'gold-veins']);
-  });
-
-  it('makes an explicit wallpaper selection visible after motion was Off', () => {
-    setSceneMotion('off');
-    const { container } = renderAppearance();
-
-    fireEvent.click(getBackgroundChip(container, 'Gold Veins'));
-
-    expect(getState().backgroundId).toBe('gold-veins');
-    expect(sceneMotion()).toBe('animated');
-  });
-
-  it('previews keyboard focus immediately and restores selection on blur', () => {
-    const { container, getByTestId } = renderAppearance();
-    const preview = getByTestId('background-preview');
-    const phoenix = getBackgroundChip(container, 'Phoenix');
-
-    fireEvent.focus(phoenix);
-    expect(preview).toHaveAttribute('data-background-id', 'phoenix');
-    expect(vi.getTimerCount()).toBe(0);
-
-    fireEvent.blur(phoenix);
-    expect(preview).toHaveAttribute('data-background-id', 'obsidian');
-    expect(backgroundHarness.ids).toEqual(['obsidian', 'phoenix', 'obsidian']);
-  });
-
-  it('clears a pending pointer preview when Appearance unmounts', () => {
-    const { container, unmount } = renderAppearance();
-    const beforeHoverTimers = vi.getTimerCount();
-
-    fireEvent.pointerEnter(getBackgroundChip(container, 'Starfield'), { pointerType: 'mouse' });
-    expect(vi.getTimerCount()).toBe(beforeHoverTimers + 1);
-
-    unmount();
-    expect(vi.getTimerCount()).toBe(beforeHoverTimers);
-    vi.advanceTimersByTime(POINTER_PREVIEW_DELAY_MS);
-    expect(backgroundHarness.ids).toEqual(['obsidian']);
-  });
-
-  it('does not arm delayed pointer preview for touch pointerenter', () => {
-    const { container, getByTestId } = renderAppearance();
-    const preview = getByTestId('background-preview');
-    const starfield = getBackgroundChip(container, 'Starfield');
-    const beforeTimers = vi.getTimerCount();
-
-    fireEvent.pointerEnter(starfield, { pointerType: 'touch' });
-    expect(vi.getTimerCount()).toBe(beforeTimers);
-    vi.advanceTimersByTime(POINTER_PREVIEW_DELAY_MS);
-
-    expect(preview).toHaveAttribute('data-background-id', 'obsidian');
-    expect(backgroundHarness.ids).toEqual(['obsidian']);
+  it('keeps all background choices staged until Apply', () => {
+    const { container, getByRole } = renderAppearance();
+    fireEvent.click(card(container, 'Gold Veins'));
     expect(getState().backgroundId).toBe('obsidian');
-    expect(starfield).toHaveAttribute('aria-pressed', 'false');
-  });
-
-  it('does not arm delayed pointer preview when (hover: none)', () => {
-    installMatchMedia((query) => query.includes('hover: none'));
-    expect(prefersNoHoverPreview()).toBe(true);
-
-    const { container, getByTestId } = renderAppearance();
-    const preview = getByTestId('background-preview');
-    const beforeTimers = vi.getTimerCount();
-
-    fireEvent.pointerEnter(getBackgroundChip(container, 'Starfield'), { pointerType: 'mouse' });
-    expect(vi.getTimerCount()).toBe(beforeTimers);
-    vi.advanceTimersByTime(POINTER_PREVIEW_DELAY_MS);
-
-    expect(preview).toHaveAttribute('data-background-id', 'obsidian');
-    expect(backgroundHarness.ids).toEqual(['obsidian']);
-  });
-
-  it('commits touch tap selection through pointerdown/focus/leave/click ordering', () => {
-    const { container, getByTestId } = renderAppearance();
-    const preview = getByTestId('background-preview');
-    const goldVeins = getBackgroundChip(container, 'Gold Veins');
-
-    // Mobile order: touch pointer → focus (suppressed preview) → leave → click commit.
-    fireEvent.pointerDown(goldVeins, { pointerType: 'touch' });
-    fireEvent.focus(goldVeins);
-    // Focus must not leave a sticky preview before activation.
-    expect(preview).toHaveAttribute('data-background-id', 'obsidian');
-    expect(backgroundHarness.ids).toEqual(['obsidian']);
-
-    fireEvent.pointerLeave(goldVeins, { pointerType: 'touch' });
-    fireEvent.click(goldVeins);
-
+    expect(getByRole('button', { name: 'Apply background' })).not.toBeDisabled();
+    fireEvent.click(getByRole('button', { name: 'Apply background' }));
     expect(getState().backgroundId).toBe('gold-veins');
-    expect(goldVeins).toHaveAttribute('aria-pressed', 'true');
-    expect(preview).toHaveAttribute('data-background-id', 'gold-veins');
-    expect(goldVeins.classList.contains('previewing')).toBe(false);
-    expect(backgroundHarness.ids).toEqual(['obsidian', 'gold-veins']);
   });
 
-  it('keeps store selection truth after touch activation even if a later mouse preview arms', () => {
+  it('cancels a staged background with Escape', () => {
     const { container } = renderAppearance();
-    const goldVeins = getBackgroundChip(container, 'Gold Veins');
-    const starfield = getBackgroundChip(container, 'Starfield');
-
-    fireEvent.pointerDown(goldVeins, { pointerType: 'touch' });
-    fireEvent.click(goldVeins);
-    expect(getState().backgroundId).toBe('gold-veins');
-    expect(goldVeins).toHaveAttribute('aria-pressed', 'true');
-
-    // Synthetic post-touch mouseenter must not desync the pressed chip.
-    fireEvent.pointerEnter(starfield, { pointerType: 'mouse' });
-    vi.advanceTimersByTime(POINTER_PREVIEW_DELAY_MS);
-    expect(getState().backgroundId).toBe('gold-veins');
-    expect(goldVeins).toHaveAttribute('aria-pressed', 'true');
-    expect(starfield).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(card(container, 'Starfield'));
+    fireEvent.keyDown(container.querySelector('.ap')!, { key: 'Escape' });
+    expect(card(container, 'Obsidian')).toHaveAttribute('aria-checked', 'true');
+    expect(getState().backgroundId).toBe('obsidian');
   });
 
-  it('keeps Appearance chrome when a wallpaper render throws', () => {
-    backgroundHarness.throwOnId = 'phoenix';
-    const { container, getByText, queryByTestId } = renderAppearance();
-    const phoenix = getBackgroundChip(container, 'Phoenix');
+  it('previews hover only after the 160ms intent delay without persisting', () => {
+    const { container, getByTestId } = renderAppearance();
+    fireEvent.pointerEnter(card(container, 'Phoenix'), { pointerType: 'mouse' });
+    vi.advanceTimersByTime(BACKGROUND_PREVIEW_DELAY_MS - 1);
+    expect(getByTestId('background-preview')).toHaveAttribute('data-background-id', 'obsidian');
+    vi.advanceTimersByTime(1);
+    expect(getByTestId('background-preview')).toHaveAttribute('data-background-id', 'phoenix');
+    expect(getState().backgroundId).toBe('obsidian');
+  });
 
-    fireEvent.click(phoenix);
+  it('previews a still frame from Motion Off without changing it before Apply', () => {
+    setSceneMotion('off');
+    const { container, getByTestId, getByRole } = renderAppearance();
+    expect(getByTestId('background-preview')).not.toHaveAttribute('data-motion-override');
 
+    fireEvent.pointerEnter(card(container, 'Phoenix'), { pointerType: 'mouse' });
+    vi.advanceTimersByTime(BACKGROUND_PREVIEW_DELAY_MS);
+    expect(getByTestId('background-preview')).toHaveAttribute('data-motion-override', 'still');
+
+    fireEvent.pointerLeave(card(container, 'Phoenix'));
+    expect(getByTestId('background-preview')).not.toHaveAttribute('data-motion-override');
+    expect(getByRole('button', { name: 'Apply background' })).toBeDisabled();
+  });
+
+  it('keeps Motion Off after applying a staged wallpaper', () => {
+    setSceneMotion('off');
+    const { container, getByRole } = renderAppearance();
+    fireEvent.click(card(container, 'Phoenix'));
+    fireEvent.click(getByRole('button', { name: 'Apply background' }));
+    expect(localStorage.getItem('onyx:scene-motion')).toBe('off');
     expect(getState().backgroundId).toBe('phoenix');
-    expect(phoenix).toHaveAttribute('aria-pressed', 'true');
-    // Picker chrome stays; only the wallpaper subtree falls back.
-    expect(getByText(/make it/i)).toBeInTheDocument();
-    expect(getByText(/← back to app/i)).toBeInTheDocument();
-    expect(queryByTestId('background-fallback')).toBeInTheDocument();
-    expect(queryByTestId('background-preview')).not.toBeInTheDocument();
   });
 
-  it('recovers the wallpaper subtree after selecting a different background', async () => {
-    backgroundHarness.throwOnId = 'phoenix';
-    const { container, queryByTestId } = renderAppearance();
-
-    fireEvent.click(getBackgroundChip(container, 'Phoenix'));
-    expect(queryByTestId('background-fallback')).toBeInTheDocument();
-
-    fireEvent.click(getBackgroundChip(container, 'Gold Veins'));
-
-    expect(getState().backgroundId).toBe('gold-veins');
-    await Promise.resolve();
-    expect(queryByTestId('background-fallback')).not.toBeInTheDocument();
-    expect(queryByTestId('background-preview')).toHaveAttribute(
-      'data-background-id',
-      'gold-veins',
-    );
+  it('presents all five picker groups with radio semantics', () => {
+    const { getByRole, getAllByRole } = renderAppearance();
+    for (const label of ['Match my theme', 'Living ambient', 'Quiet stills', 'Featured scenes', 'More presets']) expect(getByRole('heading', { name: label })).toBeInTheDocument();
+    expect(getAllByRole('radio').length).toBeGreaterThan(20);
   });
-});
 
-describe('Appearance pointer helpers', () => {
-  it('classifies touch pointer events', () => {
-    expect(isTouchPointerEvent({ pointerType: 'touch' })).toBe(true);
-    expect(isTouchPointerEvent({ pointerType: 'mouse' })).toBe(false);
-    expect(isTouchPointerEvent({})).toBe(false);
+  it('uses arrow keys to select and focus the next background radio', () => {
+    const { container } = renderAppearance();
+    const obsidian = card(container, 'Obsidian');
+    obsidian.focus();
+    fireEvent.keyDown(obsidian, { key: 'ArrowRight' });
+
+    const lapis = card(container, 'Lapis Gradient');
+    expect(lapis).toHaveAttribute('aria-checked', 'true');
+    expect(document.activeElement).toBe(lapis);
+    expect(getState().backgroundId).toBe('obsidian');
+  });
+
+  it('clears an aborted touch gesture before keyboard preview', () => {
+    const { container, getByTestId } = renderAppearance();
+    const phoenix = card(container, 'Phoenix');
+    fireEvent.pointerDown(phoenix, { pointerType: 'touch' });
+    fireEvent.pointerCancel(phoenix, { pointerType: 'touch' });
+    fireEvent.focus(phoenix);
+    vi.advanceTimersByTime(BACKGROUND_PREVIEW_DELAY_MS);
+    expect(getByTestId('background-preview')).toHaveAttribute('data-background-id', 'phoenix');
   });
 });
-
-function getBackgroundChip(container: HTMLElement, label: string): HTMLButtonElement {
-  const chip = [...container.querySelectorAll<HTMLButtonElement>('.ap-chip:not(.ap-chip--theme)')]
-    .find((button) => button.textContent?.startsWith(label));
-  if (!chip) throw new Error(`Background chip not found: ${label}`);
-  return chip;
-}

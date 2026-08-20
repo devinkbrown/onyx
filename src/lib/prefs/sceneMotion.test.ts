@@ -4,6 +4,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 import {
   DEFAULT_SCENE_MOTION,
@@ -12,11 +13,10 @@ import {
   loadSceneMotion,
   parseSceneMotion,
   resetSceneMotion,
+  SCENE_MOTION_STORAGE_KEY,
   sceneMotion,
   setSceneMotion,
 } from '@/lib/prefs/sceneMotion';
-
-const STORAGE_KEY = 'onyx:scene-motion';
 
 describe('scene motion store', () => {
   beforeEach(() => localStorage.clear());
@@ -26,19 +26,20 @@ describe('scene motion store', () => {
   });
 
   it('falls back to the default when storage has an invalid value', () => {
-    localStorage.setItem(STORAGE_KEY, 'cinematic');
+    localStorage.setItem(SCENE_MOTION_STORAGE_KEY, 'cinematic');
 
     expect(loadSceneMotion()).toBe(DEFAULT_SCENE_MOTION);
   });
 
   it('falls back to the default for malformed serialized input', () => {
     for (const stored of ['', 'null', '"off"', 'OFF', JSON.stringify({ value: 'off' })]) {
-      localStorage.setItem(STORAGE_KEY, stored);
+      localStorage.setItem(SCENE_MOTION_STORAGE_KEY, stored);
       expect(loadSceneMotion()).toBe(DEFAULT_SCENE_MOTION);
     }
   });
 
   it('parses only known scene motion values', () => {
+    expect(parseSceneMotion('adaptive')).toBe('adaptive');
     expect(parseSceneMotion('animated')).toBe('animated');
     expect(parseSceneMotion('still')).toBe('still');
     expect(parseSceneMotion('off')).toBe('off');
@@ -46,10 +47,18 @@ describe('scene motion store', () => {
     expect(parseSceneMotion({ value: 'off' })).toBeNull();
   });
 
+  it('defaults missing or invalid storage to Adaptive without replacing an explicit Animated choice', () => {
+    expect(DEFAULT_SCENE_MOTION).toBe('adaptive');
+    expect(loadSceneMotion()).toBe('adaptive');
+
+    localStorage.setItem(SCENE_MOTION_STORAGE_KEY, 'animated');
+    expect(loadSceneMotion()).toBe('animated');
+  });
+
   it('roundtrips through localStorage and updates the signal', () => {
     setSceneMotion('still');
 
-    expect(localStorage.getItem(STORAGE_KEY)).toBe('still');
+    expect(localStorage.getItem(SCENE_MOTION_STORAGE_KEY)).toBe('still');
     expect(loadSceneMotion()).toBe('still');
     expect(sceneMotion()).toBe('still');
   });
@@ -58,7 +67,7 @@ describe('scene motion store', () => {
     for (const value of SCENE_MOTIONS) {
       setSceneMotion(value);
 
-      expect(localStorage.getItem(STORAGE_KEY)).toBe(value);
+      expect(localStorage.getItem(SCENE_MOTION_STORAGE_KEY)).toBe(value);
       expect(loadSceneMotion()).toBe(value);
       expect(sceneMotion()).toBe(value);
     }
@@ -70,11 +79,28 @@ describe('scene motion store', () => {
     expect(document.documentElement.dataset.sceneMotion).toBe('off');
   });
 
-  it('resets scene motion to animated in storage, signal, and DOM', () => {
+  it('synchronizes scene motion changes made in another tab', () => {
+    localStorage.setItem(SCENE_MOTION_STORAGE_KEY, 'still');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: SCENE_MOTION_STORAGE_KEY,
+      newValue: 'still',
+    }));
+
+    expect(sceneMotion()).toBe('still');
+    expect(document.documentElement.dataset.sceneMotion).toBe('still');
+  });
+
+  it('lets the effective Background policy own Still and Off presentation', () => {
+    const css = readFileSync('src/backgrounds/scene-motion.css', 'utf8');
+    expect(css).toContain("[data-background-mode='still']");
+    expect(css).not.toContain("data-scene-motion='off'");
+  });
+
+  it('resets scene motion to Adaptive in storage, signal, and DOM', () => {
     setSceneMotion('off');
     resetSceneMotion();
 
-    expect(localStorage.getItem(STORAGE_KEY)).toBe(DEFAULT_SCENE_MOTION);
+    expect(localStorage.getItem(SCENE_MOTION_STORAGE_KEY)).toBe(DEFAULT_SCENE_MOTION);
     expect(sceneMotion()).toBe(DEFAULT_SCENE_MOTION);
     expect(document.documentElement.dataset.sceneMotion).toBe(DEFAULT_SCENE_MOTION);
   });

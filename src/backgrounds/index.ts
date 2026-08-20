@@ -13,6 +13,26 @@ export type {
   SceneProps,
   SceneVariant,
 } from './engine';
+export {
+  applyBackgroundPolicyDataset,
+  applyBackgroundRuntime,
+  deriveBackgroundPolicy,
+  DESKTOP_DPR_CAP,
+  DESKTOP_FRAME_CAP_FPS,
+  MOBILE_DPR_CAP,
+  MOBILE_FRAME_CAP_FPS,
+  NARROW_VIEWPORT_MAX_PX,
+  PREVIEW_DPR_CAP,
+  PREVIEW_FRAME_CAP_FPS,
+} from './backgroundPolicy';
+export type {
+  BackgroundMode,
+  BackgroundPolicy,
+  BackgroundPolicyInput,
+  BackgroundPolicyReason,
+  BackgroundRuntimeView,
+  SceneDetail,
+} from './backgroundPolicy';
 // Picker metadata + on-demand loader only — NO eager variant render code. The
 // eager registry (allBackgroundVariants / backgroundRegistry / getBackground)
 // is test-only and imported directly from './registry', so it never reaches the

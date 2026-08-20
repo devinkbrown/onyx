@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import 'fake-indexeddb/auto';
+import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
+import {
+  LOCKED_PLACEHOLDER,
+  _resetDeviceKeysForTests,
+  _resetSharedKeysForTests,
+  deviceKeys,
+  toB64url,
+} from '@/lib/e2ee/dmCipher';
+import { _resetVaultForTests } from '@/lib/vault/historyVault';
 import type { ChatMessage } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { store, type DMConversation } from './store';
@@ -49,13 +58,45 @@ function dm(messages: ChatMessage[]): DMConversation {
 
 const feed = (line: string) => store.getState()._handleMessage(parseIRCMessage(line));
 
+async function peerPublicKey(): Promise<string> {
+  const pair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' },
+    true,
+    ['deriveKey', 'deriveBits'],
+  );
+  const raw = new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey));
+  return toB64url(raw);
+}
+
+async function until(ok: () => boolean, ms = 2000): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (!ok() && Date.now() <= deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 beforeEach(() => {
+  globalThis.indexedDB = new IDBFactory();
+  _resetDeviceKeysForTests();
+  _resetSharedKeysForTests();
+  _resetVaultForTests();
+  localStorage.clear();
   store.setState({
     ...initialState,
     ourNick: 'me',
     connectionStatus: 'connected',
     client: mockClient(),
     activeView: { kind: 'dm', nick: 'alice' },
+    server: {
+      id: 'reply-edit',
+      name: 'Reply edit test',
+      network: 'reply-edit',
+      url: 'wss://reply-edit.example/ws',
+      icon: 'R',
+      nick: 'me',
+      account: 'me',
+      connected: true,
+    },
   }, true);
 });
 
@@ -84,14 +125,21 @@ describe('E2EE reply and edit boundary', () => {
     expect(store.getState().dms.get('alice')!.messages).toEqual([mine, theirs]);
   });
 
-  it('keeps active plaintext transient and snapshots an encrypted reply as a placeholder', () => {
+  it('keeps active plaintext transient and snapshots an encrypted reply as a placeholder', async () => {
+    await deviceKeys();
+    const peerKey = await peerPublicKey();
     const parent = encryptedMessage('parent', 'alice', 'private parent');
-    store.setState({ dms: new Map([['alice', dm([parent])]]) });
+    store.setState({
+      dms: new Map([['alice', dm([parent])]]),
+      peerDmKeys: new Map([['alice', peerKey]]),
+    });
     store.getState().setReplyingTo(parent);
 
-    store.getState().sendMessage('alice', 'public child');
+    store.getState().sendMessage('alice', 'private child');
+    await until(() => (store.getState().dms.get('alice')?.messages.length ?? 0) === 2);
 
     const child = store.getState().dms.get('alice')!.messages.at(-1)!;
+    expect(child.encrypted).toBe(true);
     expect(child.replyTo).toEqual({
       id: parent.id,
       from: parent.from,

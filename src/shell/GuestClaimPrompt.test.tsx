@@ -482,13 +482,13 @@ describe('GuestClaimPrompt — focus / Escape', () => {
     fireEvent.click(openBtn);
 
     await vi.waitFor(() => {
-      expect(screen.getByRole('dialog', { name: /keep this nick/i })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: /keep this name/i })).toBeInTheDocument();
     });
 
     fireEvent.keyDown(document, { key: 'Escape' });
 
     await vi.waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /keep this nick/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: /keep this name/i })).not.toBeInTheDocument();
       expect(screen.getByTestId('guest-claim-open')).toHaveFocus();
     });
   });
@@ -497,7 +497,7 @@ describe('GuestClaimPrompt — focus / Escape', () => {
     seed({ account: null, nick: 'Nova' });
     openSheetFromChip();
     await vi.waitFor(() => {
-      const dialog = screen.getByRole('dialog', { name: /keep this nick/i });
+      const dialog = screen.getByRole('dialog', { name: /keep this name/i });
       expect(dialog.contains(document.activeElement)).toBe(true);
     });
   });
@@ -520,7 +520,7 @@ describe('GuestClaimPrompt — focus / Escape', () => {
     });
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.getByRole('dialog', { name: /keep this nick/i })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /keep this name/i })).toBeInTheDocument();
     expect(isGuestClaimSheetOpen()).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: /close claim panel/i }));
@@ -543,14 +543,14 @@ describe('GuestClaimPrompt — focus / Escape', () => {
     fireEvent.click(openBtn);
 
     await vi.waitFor(() => {
-      expect(screen.getByRole('dialog', { name: /keep this nick/i })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: /keep this name/i })).toBeInTheDocument();
     });
     expect(screen.getByTestId('guest-claim-not-now')).not.toBeDisabled();
 
     fireEvent.keyDown(document, { key: 'Escape' });
 
     await vi.waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /keep this nick/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: /keep this name/i })).not.toBeInTheDocument();
       expect(screen.getByTestId('guest-claim-open')).toHaveFocus();
     });
   });
@@ -569,7 +569,7 @@ describe('GuestClaimPrompt — honest copy', () => {
     expect(combined).not.toMatch(/multi-device sessions/);
     expect(combined).not.toMatch(/no reconnect needed/);
     // Dialog description is outside data-testid sheet body — check dialog too.
-    const dialog = screen.getByRole('dialog', { name: /keep this nick/i });
+    const dialog = screen.getByRole('dialog', { name: /keep this name/i });
     expect(dialog.textContent?.toLowerCase()).toMatch(/stay connected|passkeys/);
     expect(dialog.textContent?.toLowerCase()).not.toMatch(/settings across/);
     // Sheet surface present for within-query sanity.

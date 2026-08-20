@@ -80,6 +80,7 @@ describe('Composer accessibility', () => {
     expect(queryByRole('button', { name: 'Jump to date in conversation history' })).toBeNull();
     expect(queryByRole('button', { name: 'Schedule message to send later' })).toBeNull();
     expect(queryByRole('button', { name: /export|format/i })).toBeNull();
+    expect(screen.getByRole('note', { name: 'Current compose context' })).toHaveTextContent('To #roomReady to send');
   });
 
   it('locks Standard primary control order: attach, message, emoji, more, send', () => {
@@ -99,16 +100,24 @@ describe('Composer accessibility', () => {
     const more = getByRole('button', { name: 'More tools' }) as HTMLButtonElement;
 
     expect(more.getAttribute('aria-expanded')).toBe('false');
-    expect(more.getAttribute('aria-controls')).toBe('shell-composer-tools');
+    // The panel is not mounted while collapsed — the IDREF must not dangle.
+    expect(more.hasAttribute('aria-controls')).toBe(false);
     fireEvent.click(more);
 
     const tray = getByTestId('composer-tools-tray');
     expect(tray.getAttribute('role')).toBe('dialog');
     expect(tray.getAttribute('aria-modal')).toBe('false');
     expect(more.getAttribute('aria-expanded')).toBe('true');
+    expect(more.getAttribute('aria-controls')).toBe('shell-composer-tools');
+    // The referenced id must actually resolve to a mounted element.
+    expect(document.getElementById('shell-composer-tools')).toBeInstanceOf(HTMLElement);
     // Advanced controls appear only after More.
     expect(getByRole('button', { name: 'Schedule message to send later' })).toBeDefined();
     expect(getByRole('button', { name: 'Jump to date in conversation history' })).toBeDefined();
+    expect(getByRole('link', { name: 'Room ledger for #room' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23room',
+    );
     expect(getByRole('button', { name: 'Insert /' })).toBeDefined();
     // No invented formatting/export chrome.
     expect(queryByTestId('composer-tools-tray')!.textContent).not.toMatch(/\bExport\b|\bFormat\b/);
@@ -116,6 +125,7 @@ describe('Composer accessibility', () => {
     fireEvent.keyDown(tray, { key: 'Escape' });
     expect(queryByTestId('composer-tools-tray')).toBeNull();
     expect(more.getAttribute('aria-expanded')).toBe('false');
+    expect(more.hasAttribute('aria-controls')).toBe(false);
     await Promise.resolve();
     expect(document.activeElement).toBe(more);
   });
@@ -413,6 +423,23 @@ describe('Composer accessibility', () => {
     // Assert — now the finished message is sent to the active target.
     expect(sendSpy).toHaveBeenCalledTimes(1);
     expect(sendSpy).toHaveBeenCalledWith('#room', 'こんにち');
+  });
+
+  it('keeps the draft when an encrypted-room send is refused asynchronously', async () => {
+    seedActiveChannel();
+    const sendSpy = vi
+      .spyOn(store.getState(), 'sendMessage')
+      .mockImplementation(async () => false);
+    const { getByRole, findByText } = render(() => <Composer />);
+    const textarea = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
+    fireEvent.input(textarea, { target: { value: 'keep this private draft' } });
+
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    await findByText('Message was not sent. Your draft is still here.');
+    expect(sendSpy).toHaveBeenCalledWith('#room', 'keep this private draft');
+    expect(textarea.value).toBe('keep this private draft');
+    expect(document.activeElement).toBe(textarea);
   });
 
   it('moves focus into the emoji dialog on open and restores it to the textarea on Escape', async () => {

@@ -32,17 +32,7 @@
   inset: 0;
   z-index: -3;
   pointer-events: none;
-  background:
-    radial-gradient(90% 55% at 50% -8%,
-      color-mix(in oklab, var(--lapis) 8%, transparent) 0%,
-      transparent 58%),
-    radial-gradient(70% 40% at 88% 10%,
-      color-mix(in oklab, var(--stone-2) 50%, transparent) 0%,
-      transparent 60%),
-    linear-gradient(180deg,
-      color-mix(in oklab, var(--stone-2) 55%, var(--ink)) 0%,
-      color-mix(in oklab, var(--stone) 35%, var(--ink)) 40%,
-      var(--ink) 100%);
+  background: var(--ink);
 }
 
 /* Legacy caustic layer — static hairline grid wash, never animated. */
@@ -121,17 +111,10 @@
 .conn-card {
   position: relative;
   width: min(520px, calc(100vw - 40px));
-  border-radius: var(--r-lg, var(--r-md));
-  background:
-    linear-gradient(180deg,
-      color-mix(in oklab, var(--surface-edge, var(--stone-3)) 48%, var(--surface-void, var(--ink))),
-      color-mix(in oklab, var(--surface-face, var(--stone)) 32%, var(--surface-void, var(--ink)))
-    );
-  border: 1px solid var(--seam-faint);
-  /* Shared elev-3 with landing aperture — landing → connect continuity */
-  box-shadow: var(--elev-3,
-    0 28px 56px -32px color-mix(in oklab, var(--ink) 90%, transparent),
-    inset 0 1px 0 color-mix(in oklab, var(--paper) 5%, transparent));
+  border-radius: 2px;
+  background: var(--stone);
+  border: 1px solid var(--seam);
+  box-shadow: none;
   backdrop-filter: none;
 }
 
@@ -141,14 +124,7 @@
   inset: 0 0 auto 0;
   height: 1px;
   border-radius: var(--r-md) var(--r-md) 0 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in oklab, var(--lapis) 45%, transparent) 18%,
-    color-mix(in oklab, var(--lapis) 70%, transparent) 50%,
-    color-mix(in oklab, var(--lapis) 45%, transparent) 82%,
-    transparent 100%
-  );
+  background: var(--seam);
   box-shadow: none;
 }
 
@@ -196,7 +172,7 @@
   content: '';
   width: 26px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--lapis));
+  background: var(--seam-faint);
 }
 
 .conn-title {
@@ -225,12 +201,7 @@
 /* ── Divider seam — a whisper hairline with an azure head ── */
 .conn-seam {
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--lapis) 38%, transparent) 0%,
-    var(--line) 30%,
-    transparent 100%
-  );
+  background: var(--line);
   opacity: 0.8;
 }
 
@@ -452,6 +423,30 @@
 
 .conn-arrival .conn-route {
   padding: 0;
+}
+
+/* One stable cue between the arrival summary and the adaptive form. It makes
+   the next decision explicit without adding another competing primary button. */
+.conn-primary-cue {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: calc(-1 * var(--gap-row, 0.75rem)) 0 0;
+  padding: 0 2px;
+  color: var(--paper-dim);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.conn-primary-cue > span {
+  flex: none;
+  margin-top: 0.12rem;
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 /* ── Remembered identity switcher ── */
@@ -748,15 +743,15 @@
   line-height: 1.35;
 }
 
-/* ── Invite preview — a calm welcome when arriving via an invite link ── */
+/* ── Invite preview — mini-shell handoff when arriving via an invite link ── */
 .conn-invite {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 15px 17px;
-  border-radius: var(--r-sm);
+  gap: 10px;
+  padding: 14px 14px 16px;
+  border-radius: 6px;
   border: 1px solid var(--seam-faint);
-  background: color-mix(in oklab, var(--ink) 52%, var(--stone));
+  background: color-mix(in oklab, var(--ink) 62%, var(--stone));
   box-shadow: none;
 }
 
@@ -766,6 +761,110 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--paper-mute);
+}
+
+.conn-invite-shell {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  min-height: 5.5rem;
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--ink) 88%, black);
+}
+
+.conn-invite-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 6px;
+  border-right: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 70%, var(--stone));
+}
+
+.conn-invite-room {
+  display: block;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  color: var(--paper-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conn-invite-room.is-active {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--lapis-deep, #2a4a7a) 34%, transparent);
+}
+
+.conn-invite-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 8px 10px 10px;
+  gap: 8px;
+}
+
+.conn-invite-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.conn-invite-hash {
+  color: var(--paper-mute);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.conn-invite-pane-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--paper);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conn-invite-chip {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lapis-bright, #7eb6ff);
+  border: 1px solid color-mix(in oklab, var(--lapis, #4a7ab8) 40%, transparent);
+  border-radius: 3px;
+  padding: 2px 5px;
+}
+
+.conn-invite-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.conn-invite-line {
+  display: block;
+  height: 6px;
+  width: 88%;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--paper) 14%, transparent);
+}
+
+.conn-invite-line.is-mute {
+  width: 62%;
+  background: color-mix(in oklab, var(--paper) 8%, transparent);
+}
+
+.conn-invite-line.is-short {
+  width: 44%;
 }
 
 .conn-invite-title {
@@ -784,6 +883,22 @@
   font-style: italic;
   font-size: 0.9rem;
   line-height: 1.5;
+  color: var(--paper-dim);
+}
+
+.conn-invite-meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--paper-mute);
+}
+
+.conn-invite-meta .mono {
+  font-family: var(--font-mono);
   color: var(--paper-dim);
 }
 
@@ -862,12 +977,7 @@
 .conn-passkey-divider::after {
   content: '';
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in oklab, var(--lapis) 36%, var(--line)),
-    transparent
-  );
+  background: var(--line);
 }
 
 .conn-passkey-button {
@@ -1348,11 +1458,7 @@
     z-index: 2;
     bottom: 0;
     padding: 12px 0 2px;
-    background: linear-gradient(
-      180deg,
-      transparent,
-      color-mix(in oklab, var(--stone) 94%, var(--ink)) 28%
-    );
+    background: color-mix(in oklab, var(--stone) 94%, var(--ink));
   }
 }
 
@@ -1368,13 +1474,8 @@
     justify-content: flex-start;
     overflow-y: auto;
     padding: 0;
-    /* Keep the front door recognizably Onyx without returning to decorative
-       glow: a single mineral-blue threshold behind the full-height card. */
-    background: linear-gradient(
-      160deg,
-      color-mix(in oklab, var(--lapis-deep) 14%, var(--ink)),
-      var(--ink) 42%
-    );
+    /* Keep the front door recognizably Onyx without decorative glow washes. */
+    background: var(--ink);
   }
 
   .conn-sea-caustics,

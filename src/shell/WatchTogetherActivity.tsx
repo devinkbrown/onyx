@@ -377,7 +377,7 @@ export function WatchTogetherActivity(): JSX.Element {
     const current = getState();
     const view = current.activeView;
     if (view.kind !== 'channel' || view.channel.toLowerCase() !== revision.channel.toLowerCase()) {
-      announceMutationFailure(`Could not ${spec.action} because the active channel changed`);
+      announceMutationFailure(`Could not ${spec.action} because the active room changed`);
       return;
     }
 
@@ -562,7 +562,7 @@ export function WatchTogetherActivity(): JSX.Element {
     const view = current.activeView;
     if (view.kind !== 'channel' || view.channel.toLowerCase() !== staged.channel.toLowerCase()) {
       setEndConfirmation(null);
-      setPublishNotice('The activity was not ended because the active channel changed');
+      setPublishNotice('The activity was not ended because the active room changed');
       focusAfterClosedReview(() => endActivityTrigger);
       return;
     }
@@ -681,7 +681,7 @@ export function WatchTogetherActivity(): JSX.Element {
     if (!currentChannel || activity() || !publishingAvailable()) {
       setStartFeedback({
         kind: 'error',
-        message: 'This channel is not currently available for a new watch activity',
+        message: 'This room is not currently available for a new watch activity',
       });
       return;
     }
@@ -723,7 +723,7 @@ export function WatchTogetherActivity(): JSX.Element {
       setStartReview(null);
       setStartFeedback({
         kind: 'error',
-        message: 'The activity was not started because the active channel changed',
+        message: 'The activity was not started because the active room changed',
       });
       focusAfterClosedReview(() => reviewStartButton);
       return;
@@ -792,13 +792,13 @@ export function WatchTogetherActivity(): JSX.Element {
             class="shell-watch-start__launcher"
             aria-label="Start watch activity"
             aria-expanded={startEditorOpen()}
-            aria-controls="watch-start-editor"
+            aria-controls={startEditorOpen() ? 'watch-start-editor' : undefined}
             onClick={() => startEditorOpen() ? onCloseStartEditor() : onOpenStartEditor()}
           >
             <span class="shell-watch-start__cue" aria-hidden="true">▶</span>
             <span class="shell-watch-start__launcher-copy">
               <strong>Start watch activity</strong>
-              <span>Share a media cue with {channel() ?? 'this channel'}</span>
+              <span>Share a media cue with {channel() ?? 'this room'}</span>
             </span>
             <span class="shell-watch-start__launcher-action" aria-hidden="true">Open</span>
           </button>
@@ -819,8 +819,8 @@ export function WatchTogetherActivity(): JSX.Element {
         open={startEditorOpen()}
         title={startReview() ? 'Review room-wide activity' : 'Start watch activity'}
         description={startReview()
-          ? `Confirming publishes these details to everyone in ${channel() ?? 'this channel'}.`
-          : `Review before publishing. Confirming makes these details room-wide in ${channel() ?? 'this channel'}; this draft is temporary and is never saved.`}
+          ? `Confirming publishes these details to everyone in ${channel() ?? 'this room'}.`
+          : `Review before publishing. Confirming makes these details room-wide in ${channel() ?? 'this room'}; this draft is temporary and is never saved.`}
         closeLabel="Close activity editor"
         onOpenChange={(open) => {
           if (!open) onCloseStartEditor();
@@ -909,7 +909,7 @@ export function WatchTogetherActivity(): JSX.Element {
                 <strong class="shell-watch-start__heading">{pending().activity.title}</strong>
                 <p class="shell-watch-start__summary">
                   Host {pending().activity.host} in {pending().channel}. These details become
-                  visible to everyone in the channel only after you confirm.
+                  visible to everyone in the room only after you confirm.
                 </p>
                 <dl class="shell-watch-start__review-details">
                   <Show when={pending().activity.url}>
@@ -999,7 +999,7 @@ export function WatchTogetherActivity(): JSX.Element {
             class="shell-watch-together__ctl"
             aria-label={rosterButtonLabel()}
             aria-expanded={rosterOpen()}
-            aria-controls="watch-participant-roster"
+            aria-controls={rosterOpen() ? 'watch-participant-roster' : undefined}
             onClick={() => setRosterOpen((open) => !open)}
             onKeyDown={onRosterKeyDown}
             data-testid="watch-roster-toggle"

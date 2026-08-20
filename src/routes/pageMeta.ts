@@ -50,6 +50,7 @@ function canonicalUrl(path = '/'): string {
  */
 export function setPageMeta(title: string, description: string, path = '/'): void {
   if (typeof document === 'undefined') return;
+  document.querySelector('meta[data-onyx-route-robots]')?.remove();
   const url = canonicalUrl(path);
   document.title = title;
   upsertMeta('meta[name="description"]', { name: 'description', content: description });

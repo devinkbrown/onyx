@@ -32,6 +32,7 @@ import { _resetVaultForTests, queueOutbox, saveMessages } from '@/lib/vault/hist
 import { setMountedCadenceMediaEngine } from '@/lib/mediaEngineMount';
 import { Spotlight } from '@/chat/spotlight';
 import { AppShell, _setMediaModuleLoaderForTests } from './AppShell';
+import { DEFAULT_WINDOW_SIZE } from './messageWindow';
 
 // AppShell lazily mounts the media engine on Join voice/video. Keep that path
 // off the real codec graph in unit tests.
@@ -185,7 +186,7 @@ describe('AppShell', () => {
       const { getByRole } = render(() => <AppShell />);
 
       // Assert — sidebar should list the channel name
-      const nav = getByRole('complementary', { name: 'Channel navigation' });
+      const nav = getByRole('complementary', { name: 'Room navigation' });
       expect(nav.textContent).toContain('general');
     });
 
@@ -196,9 +197,9 @@ describe('AppShell', () => {
       // Act
       const { getAllByRole } = render(() => <AppShell />);
 
-      // Assert — the active channel button has aria-current=page
+      // Assert — the active conversation row has aria-current=location.
       const buttons = getAllByRole('button', { name: /#general/ });
-      const activeBtn = buttons.find((b) => b.getAttribute('aria-current') === 'page');
+      const activeBtn = buttons.find((b) => b.getAttribute('aria-current') === 'location');
       expect(activeBtn).toBeDefined();
     });
   });
@@ -600,7 +601,7 @@ describe('AppShell', () => {
       expect(within(boosts).getByTitle('alice +49')).toBeInTheDocument();
     });
 
-    it('renders a since-you-left digest from the unread boundary', () => {
+    it('renders a since-you-left digest from the unread boundary', async () => {
       const scrollIntoView = vi.fn();
       Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
         value: scrollIntoView,
@@ -631,14 +632,16 @@ describe('AppShell', () => {
 
       const digest = screen.getByRole('region', { name: 'Since you left' });
       expect(within(digest).getByText('Since you left')).toBeInTheDocument();
-      expect(within(digest).getByText('2 messages across 1 channel · 1 mention')).toBeInTheDocument();
+      expect(within(digest).getByText('2 messages across 1 room · 1 mention')).toBeInTheDocument();
       expect(within(digest).getByText('Read from here: bob and carol added 2 lines.')).toBeInTheDocument();
       expect(within(digest).getByText('bob')).toBeInTheDocument();
       expect(within(digest).getByText('carol')).toBeInTheDocument();
 
       fireEvent.click(within(digest).getByRole('button', { name: 'Review new messages' }));
-      expect(scrollIntoView).toHaveBeenCalled();
-      expect(screen.queryByRole('region', { name: 'Since you left' })).not.toBeInTheDocument();
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+      await waitFor(() => {
+        expect(screen.queryByRole('region', { name: 'Since you left' })).not.toBeInTheDocument();
+      });
       expect(store.getState().viewUnreadDividerId.has('#general')).toBe(false);
       expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
         target: '#general',
@@ -649,7 +652,115 @@ describe('AppShell', () => {
       });
     });
 
-    it('keeps a valid non-hash channel in reader and reviewed-anchor handoffs', () => {
+    it('reviews new messages from a historical start page only after the unread divider is handed off', async () => {
+      setPreference('readerMode', true);
+      const total = DEFAULT_WINDOW_SIZE + 30;
+      const unreadIndex = DEFAULT_WINDOW_SIZE + 10;
+      const unreadId = `m-${unreadIndex}`;
+      const lastIndex = total - 1;
+      const scrolledDividerWhileMapped: string[] = [];
+      const setupScroll = Element.prototype.scrollIntoView;
+      const scrollIntoView = vi.fn(function (this: HTMLElement) {
+        if (this.getAttribute('aria-label') === 'New messages') {
+          scrolledDividerWhileMapped.push(store.getState().viewUnreadDividerId.get('#general') ?? '');
+        }
+      });
+      Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+        configurable: true,
+        writable: true,
+        value: scrollIntoView,
+      });
+
+      const messages = Array.from({ length: total }, (_, index) => {
+        const message = makeMessage(`m-${index}`, index === unreadIndex ? 'bob' : 'alice', `line ${index}`, '#general');
+        return index === unreadIndex ? { ...message, highlight: true } : message;
+      });
+      const channel = makeChannel('#general', messages, [makeUser('alice'), makeUser('bob')]);
+      store.setState({
+        ...initialState,
+        server: memoryServer,
+        channels: new Map([['#general', channel]]),
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        viewUnreadDividerId: new Map([['#general', unreadId]]),
+      }, true);
+
+      try {
+        render(() => <AppShell />);
+
+        const feed = screen.getByRole('log', { name: 'Message history' });
+        fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+        expect(screen.getByText('line 0')).toBeInTheDocument();
+        expect(screen.queryByText(`line ${unreadIndex}`)).not.toBeInTheDocument();
+        expect(feed.querySelector('.shell-unread-divider')).toBeNull();
+
+        scrollIntoView.mockClear();
+        scrolledDividerWhileMapped.length = 0;
+        fireEvent.click(screen.getByRole('button', { name: 'Review new messages' }));
+
+        await waitFor(() => {
+          const divider = feed.querySelector('.shell-unread-divider');
+          expect(divider).not.toBeNull();
+          expect(document.activeElement).toBe(divider);
+          expect(store.getState().viewUnreadDividerId.get('#general')).toBe(unreadId);
+          expect(scrolledDividerWhileMapped).toContain(unreadId);
+        });
+        await waitFor(() => {
+          expect(store.getState().viewUnreadDividerId.has('#general')).toBe(false);
+        });
+        expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
+          target: '#general',
+          firstMessageId: unreadId,
+          messageCount: total - unreadIndex,
+          mentionCount: 1,
+          preview: `line ${lastIndex}`,
+        });
+        expect(feed.querySelectorAll('[data-message-search-id]').length).toBeLessThanOrEqual(DEFAULT_WINDOW_SIZE);
+      } finally {
+        Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+          configurable: true,
+          writable: true,
+          value: setupScroll,
+        });
+      }
+    });
+
+    it('does not clear the unread divider when review handoff cannot land', async () => {
+      setPreference('readerMode', true);
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-old', 'alice', 'Old note', '#general'),
+          makeMessage('msg-new-a', 'bob', 'New note one', '#general'),
+        ],
+        [makeUser('alice'), makeUser('bob')],
+      );
+      store.setState({
+        ...initialState,
+        server: memoryServer,
+        channels: new Map([['#general', channel]]),
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        viewUnreadDividerId: new Map([['#general', 'msg-new-a']]),
+      }, true);
+
+      render(() => <AppShell />);
+
+      const review = screen.getByRole('button', { name: 'Review new messages' });
+      store.setState({
+        viewUnreadDividerId: new Map([['#general', 'missing-id']]),
+      });
+      fireEvent.click(review);
+
+      await waitFor(() => {
+        expect(store.getState().viewUnreadDividerId.get('#general')).toBe('missing-id');
+      });
+      expect(readReviewHistory(MEMORY_OWNER)).toHaveLength(0);
+    });
+
+    it('keeps a valid non-hash channel in reader and reviewed-anchor handoffs', async () => {
       setPreference('readerMode', true);
       setPreference('localHistory', true);
       const channel = makeChannel(
@@ -675,10 +786,12 @@ describe('AppShell', () => {
       render(() => <AppShell />);
 
       const digest = screen.getByRole('region', { name: 'Since you left' });
-      expect(within(digest).getByText('1 message across 1 channel')).toBeInTheDocument();
+      expect(within(digest).getByText('1 message across 1 room')).toBeInTheDocument();
       fireEvent.click(within(digest).getByRole('button', { name: 'Review new messages' }));
-      expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
-        target: '&ops', kind: 'channel', firstMessageId: 'ops-new',
+      await waitFor(() => {
+        expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
+          target: '&ops', kind: 'channel', firstMessageId: 'ops-new',
+        });
       });
       expect(screen.getByRole('region', { name: 'Device memory context' })).toHaveTextContent('&ops');
     });
@@ -1153,7 +1266,7 @@ describe('AppShell', () => {
 
       const { getByRole } = render(() => <AppShell />);
 
-      const ribbon = getByRole('banner', { name: 'Channel information' });
+      const ribbon = getByRole('banner', { name: 'Room information' });
       expect(ribbon.textContent).toContain('Home');
       expect(ribbon.textContent).not.toContain('Onyx');
     });
@@ -1166,7 +1279,7 @@ describe('AppShell', () => {
       const { getByRole } = render(() => <AppShell />);
 
       // Assert
-      const ribbon = getByRole('banner', { name: 'Channel information' });
+      const ribbon = getByRole('banner', { name: 'Room information' });
       expect(ribbon.textContent).toContain('general');
       expect(ribbon.textContent).toContain('Welcome to #general');
     });
@@ -1190,7 +1303,7 @@ describe('AppShell', () => {
       const { getByRole } = render(() => <AppShell />);
 
       // Assert
-      const ribbon = getByRole('banner', { name: 'Channel information' });
+      const ribbon = getByRole('banner', { name: 'Room information' });
       expect(ribbon.textContent).toContain('general');
       expect(ribbon.textContent).not.toContain('testuser');
     });
@@ -1245,18 +1358,19 @@ describe('AppShell', () => {
       expect(chip.textContent).toContain('alice');
     });
 
-    it('opens preferences from the desktop ribbon', async () => {
+    it('opens You from the desktop ribbon', async () => {
       // Arrange
       seedStore('#general');
 
       // Act
       render(() => <AppShell />);
       openRibbonMore();
-      fireEvent.click(screen.getByTestId('ribbon-preferences'));
+      fireEvent.click(screen.getByTestId('ribbon-account-chip'));
 
       // Assert
-      expect(isPreferencesOpen()).toBe(true);
-      expect(await screen.findByTestId('preferences-panel')).toBeInTheDocument();
+      expect(store.getState().showAccount).toBe(true);
+      expect(await screen.findByTestId('account-panel')).toBeInTheDocument();
+      expect(await screen.findByTestId('you-open-preferences')).toBeInTheDocument();
     });
 
     it('opens the channel video surface without opening voice settings', () => {
@@ -1549,6 +1663,7 @@ describe('AppShell', () => {
 
     it('shows watch-together room activity from channel metadata', () => {
       seedStore('#general');
+      setPreference('watchTogether', true);
       store.setState({
         channelProps: new Map([[
           '#general',
@@ -1575,6 +1690,27 @@ describe('AppShell', () => {
   });
 
   describe('home state', () => {
+    it('hides the Status capability matrix in Standard experience', () => {
+      seedStore('#general');
+      setPreference('experienceMode', 'standard');
+      store.setState({ activeView: { kind: 'status' } });
+
+      render(() => <AppShell />);
+
+      expect(screen.getByTestId('status-stack')).toBeInTheDocument();
+      expect(screen.queryByTestId('capability-matrix-section')).toBeNull();
+    });
+
+    it('shows the Status capability matrix in Advanced experience', () => {
+      seedStore('#general');
+      setPreference('experienceMode', 'advanced');
+      store.setState({ activeView: { kind: 'status' } });
+
+      render(() => <AppShell />);
+
+      expect(screen.getByTestId('capability-matrix-section')).toBeInTheDocument();
+    });
+
     it('renders the home view when activeView is home', () => {
       // Arrange
       store.setState({
@@ -1652,7 +1788,7 @@ describe('AppShell', () => {
       await waitFor(() => {
         expect(screen.queryByTestId('shell-suspended')).not.toBeInTheDocument();
         expect(container.querySelector('[data-testid="app-shell"]')).toBeInTheDocument();
-        const roster = screen.getByRole('region', { name: 'Channel members in #general' });
+        const roster = screen.getByRole('region', { name: 'People in #general' });
         expect(roster).toBeInTheDocument();
         expect(within(roster).getByText('alice', { exact: true })).toBeInTheDocument();
         expect(within(roster).getByText('bob', { exact: true })).toBeInTheDocument();
@@ -1685,7 +1821,7 @@ describe('AppShell', () => {
       expect(screen.getByRole('button', { name: 'Open Home' })).toHaveAttribute('aria-current', 'page');
     });
 
-    it('uses the public five-part information architecture on mobile', () => {
+    it('keeps mobile navigation focused and exposes workspace destinations through Menu', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
@@ -1694,10 +1830,152 @@ describe('AppShell', () => {
       expect(within(nav).getAllByRole('button').map((button) => button.textContent)).toEqual([
         '⌂Home',
         '#Rooms',
-        '@Messages',
-        '◉Calls',
-        '◇You',
+        '@Inbox',
+        '•••Menu',
       ]);
+      expect(within(nav).queryByRole('button', { name: /Calls|You/ })).toBeNull();
+
+      fireEvent.click(within(nav).getByRole('button', { name: 'Open Menu' }));
+      const more = screen.getByRole('dialog', { name: 'Menu' });
+      expect(within(more).getByRole('button', { name: 'Calls' })).toBeInTheDocument();
+      expect(within(more).getByRole('button', { name: /You/ })).toBeInTheDocument();
+      expect(within(more).queryByRole('button', { name: 'Appearance' })).toBeNull();
+      expect(within(more).queryByRole('button', { name: 'Preferences' })).toBeNull();
+      expect(within(more).queryByText('Workspace')).toBeNull();
+      expect(within(more).queryByText('Personalize')).toBeNull();
+    });
+
+    it('returns focus to the persistent Menu trigger after closing Appearance via You', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+      render(() => <AppShell />);
+
+      const menuTrigger = screen.getByRole('button', { name: 'Open Menu' });
+      menuTrigger.focus();
+      fireEvent.click(menuTrigger);
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Menu' }))
+        .getByRole('button', { name: /You/ }));
+
+      expect(store.getState().showAccount).toBe(true);
+      fireEvent.click(await screen.findByTestId('you-open-appearance'));
+
+      await waitFor(() => expect(store.getState().showAppearance).toBe(true));
+      expect(screen.queryByRole('dialog', { name: 'Menu' })).toBeNull();
+      store.getState().closeAppearance();
+      await waitFor(() => expect(menuTrigger).toHaveFocus());
+    });
+
+    it('returns focus to the persistent Menu trigger after closing Preferences via You', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+      render(() => <AppShell />);
+
+      const menuTrigger = screen.getByRole('button', { name: 'Open Menu' });
+      menuTrigger.focus();
+      fireEvent.click(menuTrigger);
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Menu' }))
+        .getByRole('button', { name: /You/ }));
+
+      expect(store.getState().showAccount).toBe(true);
+      fireEvent.click(await screen.findByTestId('you-open-preferences'));
+
+      await waitFor(() => expect(isPreferencesOpen()).toBe(true));
+      expect(await screen.findByRole('dialog', { name: 'Preferences' })).toBeInTheDocument();
+      closePreferences();
+      await waitFor(() => expect(menuTrigger).toHaveFocus());
+    });
+
+    it('returns Menu-launched focus to the desktop current destination after a resize', async () => {
+      const resize = stubResizableViewport(true);
+      seedStore('#general');
+      render(() => <AppShell />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Menu' }))
+        .getByRole('button', { name: /You/ }));
+      fireEvent.click(await screen.findByTestId('you-open-preferences'));
+      expect(await screen.findByRole('dialog', { name: 'Preferences' })).toBeInTheDocument();
+      resize(false);
+      closePreferences();
+
+      const desktopRooms = within(screen.getByRole('navigation', { name: 'Primary' }))
+        .getByRole('button', { name: 'Rooms' });
+      await waitFor(() => expect(desktopRooms).toHaveFocus());
+    });
+
+    it('opens Advanced room tools as a dedicated mobile control desk and restores its launcher', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+      setPreference('experienceMode', 'advanced');
+
+      render(() => <AppShell />);
+      const moreTrigger = screen.getByRole('button', { name: 'Open Menu' });
+      moreTrigger.focus();
+      fireEvent.click(moreTrigger);
+
+      const more = screen.getByRole('dialog', { name: 'Menu' });
+      const launcher = within(more).getByRole('button', { name: /Room control desk.*#general/i });
+      expect(launcher).toBeInTheDocument();
+      expect(within(more).queryByTestId('moderation-cockpit')).toBeNull();
+
+      fireEvent.click(launcher);
+      const desk = screen.getByRole('dialog', { name: 'Room controls for #general' });
+      expect(screen.queryByRole('dialog', { name: 'Menu' })).toBeNull();
+      expect(within(desk).getByRole('heading', { name: '#general' })).toBeInTheDocument();
+      expect(within(desk).getByTestId('mobile-room-ledger')).toHaveAttribute(
+        'href',
+        '/stats/?room=%23general',
+      );
+      expect(within(desk).getByTestId('moderation-cockpit')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(within(desk).getByRole('button', { name: 'Back' })).toHaveFocus();
+      });
+
+      fireEvent.click(within(desk).getByRole('button', { name: 'Back' }));
+      const restoredMore = screen.getByRole('dialog', { name: 'Menu' });
+      await waitFor(() => {
+        expect(within(restoredMore).getByRole('button', { name: /Room control desk.*#general/i })).toHaveFocus();
+      });
+    });
+
+    it('closes the mobile room control desk when global navigation leaves its room', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+      setPreference('experienceMode', 'advanced');
+
+      render(() => <AppShell />);
+      const moreTrigger = screen.getByRole('button', { name: 'Open Menu' });
+      moreTrigger.focus();
+      fireEvent.click(moreTrigger);
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Menu' })).getByRole('button', { name: /Room control desk.*#general/i }));
+      expect(screen.getByRole('dialog', { name: 'Room controls for #general' })).toBeInTheDocument();
+
+      store.setState({ activeView: { kind: 'home' } });
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: /Room controls for/i })).toBeNull();
+      });
+      expect(screen.getByRole('button', { name: 'Open Menu' })).toHaveFocus();
+    });
+
+    it('gates the mobile room control desk by workspace level and operator authority', () => {
+      stubMobileViewport();
+      seedStore('#general');
+
+      const { unmount } = render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));
+      expect(within(screen.getByRole('dialog', { name: 'Menu' })).queryByRole('button', { name: /Room control desk/i })).toBeNull();
+      unmount();
+
+      setPreference('experienceMode', 'network-ops');
+      store.setState({ isOper: true });
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Menu' })).getByRole('button', { name: /Room control desk.*#general/i }));
+
+      const desk = screen.getByRole('dialog', { name: 'Room controls for #general' });
+      expect(within(desk).getByTestId('oper-event-console')).toBeInTheDocument();
+      expect(within(desk).getByRole('button', { name: 'Refresh events' })).toBeInTheDocument();
     });
 
     it('opens direct messages as their own mobile collection', async () => {
@@ -1705,34 +1983,45 @@ describe('AppShell', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Open Messages' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open Inbox' }));
 
-      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
-      expect(within(drawer).getByRole('region', { name: 'Direct messages' })).toBeInTheDocument();
+      const drawer = screen.getByRole('dialog', { name: 'Inbox switcher' });
+      expect(within(drawer).getByRole('region', { name: 'Messages · 0 conversations' })).toBeInTheDocument();
+      fireEvent.click(within(drawer).getByText('Filter'));
       expect(within(drawer).getByRole('searchbox', { name: 'Filter direct messages' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveAttribute('aria-current', 'page');
+      const messages = screen.getByRole('button', { name: 'Open Inbox' });
+      expect(messages).not.toHaveAttribute('aria-current');
+      expect(messages).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('opens a truthful calls hub without starting a call', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Open Calls' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Menu' })).getByRole('button', { name: 'Calls' }));
 
       expect(screen.getByRole('heading', { name: 'Talk where the conversation already lives.' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Choose a room' })).toBeInTheDocument();
       expect(store.getState().voice.callState).toBe('idle');
-      expect(screen.getByRole('button', { name: 'Open Calls' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
+      expect(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: 'Calls' })).toHaveAttribute('aria-current', 'page');
     });
 
     it('opens account management from You', () => {
       seedStore('#general');
 
       render(() => <AppShell />);
-      fireEvent.click(screen.getByRole('button', { name: 'Open You' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Menu' })).getByRole('button', { name: /You/ }));
 
       expect(store.getState().showAccount).toBe(true);
-      expect(screen.getByRole('button', { name: 'Open You' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
+      const primary = screen.getByRole('navigation', { name: 'Primary' });
+      const desktopYou = within(primary).getByRole('button', { name: 'You' });
+      expect(desktopYou).not.toHaveAttribute('aria-current');
+      expect(desktopYou).toHaveAttribute('aria-expanded', 'true');
+      expect(desktopYou).toHaveClass('shell-primary-nav-btn--dialog-open');
     });
 
     it('moves focus into the mobile channel drawer and restores it on Escape', async () => {
@@ -1749,7 +2038,7 @@ describe('AppShell', () => {
       roomsButton.focus();
       fireEvent.click(roomsButton);
 
-      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
+      const drawer = screen.getByRole('dialog', { name: 'Room switcher' });
       await waitFor(() => {
         expect(drawer.contains(document.activeElement)).toBe(true);
         expect(drawer).not.toHaveAttribute('inert');
@@ -1760,10 +2049,14 @@ describe('AppShell', () => {
       fireEvent.keyDown(document, { key: 'Escape' });
 
       await waitFor(() => {
-        expect(screen.queryByRole('dialog', { name: 'Channel drawer' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('dialog', { name: 'Room switcher' })).not.toBeInTheDocument();
         expect(conversation).not.toHaveAttribute('inert');
         expect(mobileNav).not.toHaveAttribute('inert');
-        expect(roomsButton).toHaveFocus();
+        // Drawer open/close can replace the mobile nav button node; re-query.
+        expect(
+          within(screen.getByRole('navigation', { name: 'Mobile navigation' }))
+            .getByRole('button', { name: 'Open Rooms' }),
+        ).toHaveFocus();
       });
     });
 
@@ -1773,16 +2066,16 @@ describe('AppShell', () => {
 
       render(() => <AppShell />);
       fireEvent.click(screen.getByRole('button', { name: 'Open Rooms' }));
-      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
+      const drawer = screen.getByRole('dialog', { name: 'Room switcher' });
       await waitFor(() => expect(drawer.contains(document.activeElement)).toBe(true));
 
       fireEvent.keyDown(document, { key: 'Escape', isComposing: true });
-      expect(screen.getByRole('dialog', { name: 'Channel drawer' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Room switcher' })).toBeInTheDocument();
 
       const claimed = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
       claimed.preventDefault();
       document.dispatchEvent(claimed);
-      expect(screen.getByRole('dialog', { name: 'Channel drawer' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Room switcher' })).toBeInTheDocument();
 
       fireEvent.keyDown(document, { key: 'Escape' });
       await waitFor(() => {
@@ -1807,7 +2100,7 @@ describe('AppShell', () => {
       expect(sidebar).not.toHaveAttribute('inert');
       expect(conversation).not.toHaveAttribute('inert');
       expect(mobileNav).not.toHaveAttribute('inert');
-      expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'People in #general' })).toBeNull();
       for (const trigger of memberList!.querySelectorAll<HTMLButtonElement>('.onyx-popover__trigger')) {
         expect(trigger).toBeDisabled();
       }
@@ -1837,7 +2130,7 @@ describe('AppShell', () => {
         expect(mobileNav).not.toHaveAttribute('inert');
         expect(membersButton).toHaveFocus();
       });
-      expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'People in #general' })).toBeNull();
     });
 
     it('closes member details before closing the mobile member drawer on Escape', async () => {
@@ -1973,14 +2266,14 @@ describe('AppShell', () => {
       expect(memberList).not.toBeNull();
       expect(memberList).toHaveAttribute('aria-hidden', 'true');
       expect(memberList).toHaveAttribute('inert');
-      expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'People in #general' })).toBeNull();
 
       fireEvent.click(screen.getByRole('button', { name: /3 members — toggle member list/i }));
 
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'false');
         expect(memberList).not.toHaveAttribute('inert');
-        expect(screen.getByRole('region', { name: 'Channel members in #general' })).toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'People in #general' })).toBeInTheDocument();
       });
     });
 
@@ -2211,10 +2504,120 @@ describe('AppShell', () => {
 
       const { container } = render(() => <AppShell />);
 
-      expect(container.querySelector('[data-testid="app-shell"]')).toHaveClass('shell--members-hidden');
+      expect(container.querySelector('[data-testid="app-shell"]')).toHaveAttribute('data-shell-aside', 'none');
       expect(container.querySelector('aside.shell-members')).toHaveAttribute('inert');
-      expect(screen.queryByRole('region', { name: /Channel members/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: /People/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /members — toggle member list/i })).not.toBeInTheDocument();
+    });
+
+    it('models the column-4 slot as a single tri-state attribute (members ↔ context)', async () => {
+      // Arrange — desktop viewport, an active channel so the member roster
+      // owns the slot by default (Context must REPLACE it, per asideOccupant
+      // in AppShell.tsx — never both at once).
+      stubMobileViewport(false);
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const shellEl = container.querySelector('[data-testid="app-shell"]')!;
+      const trigger = screen.getByRole('button', { name: 'Context' });
+      const rail = container.querySelector('#shell-context-rail')!;
+      const roster = container.querySelector('aside.shell-members')!;
+      // Query by selector, not role: the rail starts [inert], and dom-testing-
+      // library excludes inert subtrees from the accessible role tree, so
+      // getByRole would fail to find it before Context ever opens.
+      const closeRail = rail.querySelector<HTMLButtonElement>('.shell-context-rail__close')!;
+
+      // Assert — closed by default: roster owns the slot, Context is inert.
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'members');
+      expect(roster).not.toHaveAttribute('inert');
+      expect(rail).toHaveAttribute('inert');
+      expect(rail).toHaveAttribute('data-open', 'false');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+      // Act — open Context.
+      fireEvent.click(trigger);
+
+      // Assert — Context now owns the slot: roster goes inert, rail does not.
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'context');
+      expect(roster).toHaveAttribute('inert');
+      expect(roster).toHaveAttribute('aria-hidden', 'true');
+      expect(rail).not.toHaveAttribute('inert');
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      await waitFor(() => expect(closeRail).toHaveFocus());
+
+      // Act — close Context via its own Close control.
+      fireEvent.click(closeRail);
+
+      // Assert — roster reclaims the slot; focus returns to the trigger.
+      await waitFor(() => {
+        expect(shellEl).toHaveAttribute('data-shell-aside', 'members');
+        expect(trigger).toHaveFocus();
+      });
+      expect(rail).toHaveAttribute('inert');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('gives the People button priority over an open Context rail without yanking focus', () => {
+      stubMobileViewport(false);
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const shellEl = container.querySelector('[data-testid="app-shell"]')!;
+      fireEvent.click(screen.getByRole('button', { name: 'Context' }));
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'context');
+
+      const peopleButton = screen.getByRole('button', { name: /members — toggle member list/i });
+      peopleButton.focus();
+      fireEvent.click(peopleButton);
+
+      // People wins the slot back, and — unlike the Context Close control —
+      // never queues focus onto the Context trigger (WCAG SC 3.2.1 On Focus).
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'members');
+      expect(peopleButton).toHaveFocus();
+    });
+
+    it('never grants Context the column-4 slot after a resize to mobile', () => {
+      const resize = stubResizableViewport(false);
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const shellEl = container.querySelector('[data-testid="app-shell"]')!;
+      fireEvent.click(screen.getByRole('button', { name: 'Context' }));
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'context');
+
+      resize(true);
+
+      expect(shellEl).not.toHaveAttribute('data-shell-aside', 'context');
+    });
+
+    it('keeps WHOIS focus restoration valid when Context claims the slot while it is open', async () => {
+      stubMobileViewport(false);
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+        } as never,
+      });
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
+      fireEvent.click(memberTrigger);
+      fireEvent.click(screen.getByRole('button', { name: 'View profile of alice' }));
+      await screen.findByRole('dialog', { name: 'Profile: alice' });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Context' }));
+      await waitFor(() => expect(container.querySelector('[data-testid="app-shell"]'))
+        .toHaveAttribute('data-shell-aside', 'context'));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close member profile' }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Profile: alice' })).toBeNull();
+        expect(document.activeElement).not.toBe(document.body);
+      });
     });
 
     it('summarizes unread home recaps and hands them to Spotlight', async () => {
@@ -2413,7 +2816,7 @@ describe('AppShell', () => {
       render(() => <AppShell />);
 
       const rhythm = await screen.findByLabelText('Room rhythm');
-      const directory = screen.getByRole('list', { name: 'Active channel directory' });
+      const directory = screen.getByRole('list', { name: 'Active room directory' });
       expect(within(directory).getAllByRole('listitem')).toHaveLength(2);
       expect(within(rhythm).getByText('#general')).toBeInTheDocument();
       expect(within(rhythm).getByText('3 people here now')).toBeInTheDocument();

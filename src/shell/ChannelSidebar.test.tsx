@@ -13,8 +13,9 @@
  * AAA pattern; descriptive names.
  */
 
-import { cleanup, fireEvent, render } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
 import type { DMConversation } from '@/lib/store/store';
@@ -99,6 +100,7 @@ function rows(container: HTMLElement): HTMLButtonElement[] {
 describe('ChannelSidebar accessibility', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+    resetPreferences();
   });
 
   afterEach(() => {
@@ -120,7 +122,7 @@ describe('ChannelSidebar accessibility', () => {
     const { getByRole } = render(() => <ChannelSidebar />);
 
     // Assert
-    expect(getByRole('complementary', { name: 'Channel navigation' })).toBeDefined();
+    expect(getByRole('complementary', { name: 'Room navigation' })).toBeDefined();
   });
 
   it('keeps the retired IRCXNet wire label out of the public sidebar', () => {
@@ -133,6 +135,84 @@ describe('ChannelSidebar accessibility', () => {
     expect(network).not.toHaveTextContent('IRCXNet');
   });
 
+  it('links the active channel to its public ledger in rooms mode', () => {
+    seed();
+
+    const { getByTestId } = render(() => <ChannelSidebar mode="rooms" />);
+
+    expect(getByTestId('sidebar-channel-ledger')).toHaveAttribute('href', '/stats/?room=%23bravo');
+    expect(getByTestId('sidebar-channel-ledger')).toHaveAttribute('aria-label', 'Room ledger for #bravo');
+  });
+
+  it('hides the room ledger when the active view is not a channel', () => {
+    seed();
+    store.setState({ activeView: { kind: 'dm', nick: 'dave' } });
+
+    const { queryByTestId } = render(() => <ChannelSidebar mode="rooms" />);
+
+    expect(queryByTestId('sidebar-channel-ledger')).toBeNull();
+  });
+
+  it('exposes the Conversations spine and singular collection heading', () => {
+    const channels = new Map<string, Channel>();
+    channels.set('#alpha', makeChannel('#alpha'));
+    const dms = new Map<string, DMConversation>();
+    dms.set('dave', makeDm('dave'));
+    store.setState({
+      ...initialState,
+      channels,
+      dms,
+      activeView: { kind: 'channel', channel: '#alpha' },
+      connectionStatus: 'connected',
+    }, true);
+
+    const { container, getByRole, getByTestId } = render(() => <ChannelSidebar mode="messages" activeSection="rooms" />);
+
+    expect(container.querySelector('[data-testid="conversation-spine"]')).toBeInTheDocument();
+    expect(container.querySelector('.shell-conversation-spine-label')).toHaveTextContent('Conversations');
+    expect(getByRole('region', { name: 'Messages · 1 conversation' })).toBeInTheDocument();
+    expect(getByTestId('sidebar-filter-disclosure')).not.toHaveAttribute('open');
+  });
+
+  it('opens the collapsed Filter disclosure to search and unread controls', () => {
+    seed();
+    const { getByTestId } = render(() => <ChannelSidebar mode="rooms" />);
+
+    const disclosure = getByTestId('sidebar-filter-disclosure');
+    expect(disclosure).not.toHaveAttribute('open');
+    fireEvent.click(disclosure.querySelector('summary')!);
+    expect(disclosure).toHaveAttribute('open');
+    expect(getByTestId('sidebar-filter')).toBeInTheDocument();
+    expect(getByTestId('sidebar-unread-only')).toBeInTheDocument();
+  });
+
+  it('keeps the room location current while Messages is the selected collection', () => {
+    seed();
+
+    const { getByRole } = render(() => (
+      <ChannelSidebar mode="messages" activeSection="rooms" />
+    ));
+    const rooms = getByRole('button', { name: 'Rooms' });
+    const messages = getByRole('button', { name: 'Messages' });
+    expect(rooms).toHaveAttribute('aria-current', 'page');
+    expect(rooms).toHaveAttribute('aria-pressed', 'false');
+    expect(messages).not.toHaveAttribute('aria-current');
+    expect(messages).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('surfaces desktop You dialog state without making it a location', () => {
+    seed();
+
+    const { getByRole } = render(() => (
+      <ChannelSidebar activeSection="rooms" youDialogOpen />
+    ));
+    const primary = getByRole('navigation', { name: 'Primary' });
+    const you = within(primary).getByRole('button', { name: 'You' });
+    expect(you).not.toHaveAttribute('aria-current');
+    expect(you).toHaveAttribute('aria-expanded', 'true');
+    expect(you).toHaveClass('shell-primary-nav-btn--dialog-open');
+  });
+
   it('keeps a single tab stop on the active conversation', () => {
     // Arrange — #bravo is active.
     seed();
@@ -143,7 +223,7 @@ describe('ChannelSidebar accessibility', () => {
 
     // Assert — exactly one row is in the tab order, and it is the active one.
     expect(tabbable).toHaveLength(1);
-    expect(tabbable[0]!.getAttribute('aria-current')).toBe('page');
+    expect(tabbable[0]!.getAttribute('aria-current')).toBe('location');
   });
 
   it('includes unread and mention counts in the accessible name', () => {
@@ -267,11 +347,48 @@ describe('ChannelSidebar accessibility', () => {
 
     const { getByLabelText, getByRole } = render(() => <ChannelSidebar />);
 
-    fireEvent.input(getByLabelText('Channel name to join'), {
+    fireEvent.input(getByLabelText('Room name to join'), {
       target: { value: 'harbor' },
     });
 
     expect(getByRole('button', { name: 'Join #harbor' })).toBeInTheDocument();
+  });
+
+  it('preserves # and & prefixes for join labels', () => {
+    seed();
+
+    const { getByLabelText, getByRole } = render(() => <ChannelSidebar />);
+    const joinInput = getByLabelText('Room name to join');
+
+    fireEvent.input(joinInput, { target: { value: '&ops' } });
+    expect(getByRole('button', { name: 'Join &ops' })).toBeInTheDocument();
+
+    fireEvent.input(joinInput, { target: { value: '#ops' } });
+    expect(getByRole('button', { name: 'Join #ops' })).toBeInTheDocument();
+
+    fireEvent.input(joinInput, { target: { value: 'ops' } });
+    expect(getByRole('button', { name: 'Join #ops' })).toBeInTheDocument();
+  });
+
+  it('renders local & channels without a synthetic # prefix', () => {
+    const channels = new Map<string, Channel>();
+    channels.set('&ops', makeChannel('&ops'));
+    store.setState({
+      ...initialState,
+      channels,
+      dms: new Map(),
+      activeView: { kind: 'channel', channel: '&ops' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+    }, true);
+
+    const { getByRole } = render(() => <ChannelSidebar />);
+    const ops = getByRole('button', { name: '&ops' });
+
+    expect(ops).toBeInTheDocument();
+    expect(ops.textContent).toContain('&ops');
+    expect(ops.textContent).not.toContain('#&ops');
   });
 
   it('moves focus down with ArrowDown', () => {
@@ -359,7 +476,7 @@ describe('ChannelSidebar accessibility', () => {
     fireEvent.click(status);
 
     // Assert
-    expect(status.getAttribute('aria-label')).toBe('Server status');
+    expect(status.getAttribute('aria-label')).toBe('Network activity');
     expect(navigateSpy).toHaveBeenCalledWith({ kind: 'status' });
     navigateSpy.mockRestore();
   });
@@ -384,6 +501,19 @@ describe('ChannelSidebar accessibility', () => {
   it('uses the synchronous path when reduced motion is requested', () => {
     seed();
     const startViewTransition = installViewTransitions(() => pendingTransition(), true);
+    const navigateSpy = vi.spyOn(store.getState(), 'navigate');
+    const { getByRole } = render(() => <ChannelSidebar />);
+
+    fireEvent.click(getByRole('button', { name: '#alpha' }));
+
+    expect(startViewTransition).not.toHaveBeenCalled();
+    expect(navigateSpy).toHaveBeenCalledWith({ kind: 'channel', channel: '#alpha' });
+  });
+
+  it('uses the synchronous path when in-app reduce motion is enabled', () => {
+    seed();
+    setPreference('reduceMotion', true);
+    const startViewTransition = installViewTransitions(() => pendingTransition(), false);
     const navigateSpy = vi.spyOn(store.getState(), 'navigate');
     const { getByRole } = render(() => <ChannelSidebar />);
 
@@ -486,7 +616,7 @@ describe('ChannelSidebar accessibility', () => {
     const rooms = render(() => (
       <ChannelSidebar mode="rooms" activeSection="rooms" />
     ));
-    expect(rooms.getByRole('region', { name: 'Rooms' })).toBeInTheDocument();
+    expect(rooms.getByRole('region', { name: 'Rooms · 3 joined' })).toBeInTheDocument();
     expect(rooms.getByRole('button', { name: /#bravo/ })).toBeInTheDocument();
     expect(rooms.queryByRole('button', { name: /DM with dave/ })).toBeNull();
     rooms.unmount();
@@ -494,7 +624,7 @@ describe('ChannelSidebar accessibility', () => {
     const messages = render(() => (
       <ChannelSidebar mode="messages" activeSection="messages" />
     ));
-    expect(messages.getByRole('region', { name: 'Direct messages' })).toBeInTheDocument();
+    expect(messages.getByRole('region', { name: 'Messages · 1 conversation' })).toBeInTheDocument();
     expect(messages.getByRole('button', { name: /DM with dave/ })).toBeInTheDocument();
     expect(messages.queryByRole('button', { name: /#bravo/ })).toBeNull();
   });
@@ -508,5 +638,26 @@ describe('ChannelSidebar accessibility', () => {
 
     fireEvent.click(getByRole('button', { name: '#alpha' }));
     expect(onConversationOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers Browse rooms when the room list is empty', () => {
+    store.setState({
+      ...initialState,
+      channels: new Map(),
+      dms: new Map(),
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+      showChannelBrowser: false,
+    }, true);
+
+    const { getByTestId, getByText } = render(() => (
+      <ChannelSidebar mode="rooms" activeSection="rooms" />
+    ));
+
+    expect(getByText('No rooms yet.')).toBeInTheDocument();
+    fireEvent.click(getByTestId('sidebar-browse-rooms'));
+    expect(store.getState().showChannelBrowser).toBe(true);
   });
 });

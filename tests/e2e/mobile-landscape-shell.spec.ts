@@ -69,7 +69,7 @@ test('keeps the ordinary landscape shell balanced without activating zoom fallba
   expect(geometry.ribbonRight).toBeLessThanOrEqual(844);
   expect(geometry.homeTop).toBeGreaterThanOrEqual(geometry.ribbonBottom - 1);
   expect(geometry.homeBottom).toBeLessThanOrEqual(geometry.navTop + 1);
-  expect(geometry.buttons).toHaveLength(5);
+  expect(geometry.buttons).toHaveLength(4);
   for (const button of geometry.buttons) {
     expect(button.left).toBeGreaterThanOrEqual(0);
     expect(button.right).toBeLessThanOrEqual(844);

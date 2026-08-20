@@ -49,7 +49,7 @@ test('keeps the compact guest chip and claim sheet usable at short-height reflow
     });
   });
 
-  const guest = page.getByRole('region', { name: 'Keep this nick' });
+  const guest = page.getByRole('region', { name: 'Keep this name' });
   const home = page.locator('.home');
   const searchAction = page.getByRole('button', { name: 'Search messages' });
   await expect(guest).toBeVisible();
@@ -58,7 +58,9 @@ test('keeps the compact guest chip and claim sheet usable at short-height reflow
   const collapsedGeometry = await guest.evaluate((element) => {
     const guestRect = element.getBoundingClientRect();
     const home = document.querySelector<HTMLElement>('.home')!;
+    const conversation = document.querySelector<HTMLElement>('.shell-conversation')!;
     const homeRect = home.getBoundingClientRect();
+    const conversationRect = conversation.getBoundingClientRect();
     const dismissRect = element.querySelector<HTMLElement>('.guest-claim-chip__dismiss')!
       .getBoundingClientRect();
     return {
@@ -73,6 +75,10 @@ test('keeps the compact guest chip and claim sheet usable at short-height reflow
       homeBottom: homeRect.bottom,
       homeClientHeight: home.clientHeight,
       homeOverflowY: getComputedStyle(home).overflowY,
+      conversationBottom: conversationRect.bottom,
+      conversationClientHeight: conversation.clientHeight,
+      conversationScrollHeight: conversation.scrollHeight,
+      conversationOverflowY: getComputedStyle(conversation).overflowY,
       dismissTop: dismissRect.top,
       dismissBottom: dismissRect.bottom,
       dismissRight: dismissRect.right,
@@ -86,9 +92,14 @@ test('keeps the compact guest chip and claim sheet usable at short-height reflow
   expect(collapsedGeometry.guestTop).toBeGreaterThanOrEqual(12);
   expect(collapsedGeometry.guestRight).toBeLessThanOrEqual(320 - 24);
   expect(collapsedGeometry.homeTop).toBeGreaterThanOrEqual(collapsedGeometry.guestBottom);
-  expect(collapsedGeometry.homeBottom).toBeLessThanOrEqual(256);
+  expect(collapsedGeometry.homeBottom).toBeGreaterThan(collapsedGeometry.conversationBottom);
   expect(collapsedGeometry.homeClientHeight).toBeGreaterThan(0);
+  // overflow-x:hidden computes overflow-y:visible to auto per CSS Overflow.
   expect(collapsedGeometry.homeOverflowY).toBe('auto');
+  expect(collapsedGeometry.conversationBottom).toBeLessThanOrEqual(256);
+  expect(collapsedGeometry.conversationClientHeight).toBeGreaterThan(0);
+  expect(collapsedGeometry.conversationScrollHeight).toBeGreaterThan(collapsedGeometry.conversationClientHeight);
+  expect(collapsedGeometry.conversationOverflowY).toBe('auto');
   expect(collapsedGeometry.dismissTop).toBeGreaterThanOrEqual(collapsedGeometry.guestTop);
   expect(collapsedGeometry.dismissBottom).toBeLessThanOrEqual(collapsedGeometry.guestBottom);
   expect(collapsedGeometry.dismissRight).toBeLessThanOrEqual(320 - 24);
@@ -99,12 +110,12 @@ test('keeps the compact guest chip and claim sheet usable at short-height reflow
   await expect(page.getByRole('searchbox', { name: 'Search messages' })).toBeFocused();
   await page.getByRole('searchbox', { name: 'Search messages' }).press('Escape');
 
-  await page.getByRole('button', { name: 'Keep this nick' }).click();
+  await page.getByRole('button', { name: 'Keep this name' }).click();
   const email = page.getByRole('textbox', { name: 'Recovery email (optional)' });
   await expect(email).toBeVisible();
   await email.focus();
 
-  const dialog = page.getByRole('dialog', { name: 'Keep this nick' });
+  const dialog = page.getByRole('dialog', { name: 'Keep this name' });
   await expect(dialog).toBeVisible();
   const expandedGeometry = await dialog.evaluate((element) => {
     const panelRect = element.getBoundingClientRect();

@@ -79,6 +79,33 @@ afterEach(() => {
 });
 
 describe('MemberList accessibility', () => {
+  it('links to the room ledger for public room channels', () => {
+    seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
+
+    render(() => <MemberList />);
+
+    expect(screen.getByTestId('members-channel-ledger')).toHaveAttribute(
+      'href',
+      '/stats/?room=%23general',
+    );
+    expect(screen.getByRole('link', { name: 'Room ledger for #general' })).toHaveTextContent('Ledger');
+  });
+
+  it('omits the room ledger link outside # and & rooms', () => {
+    const client = makeClient();
+    store.setState({
+      ...initialState,
+      client: client as never,
+      ourNick: 'alice',
+      activeView: { kind: 'dm', nick: 'bob' },
+      connectionStatus: 'connected',
+    }, true);
+
+    render(() => <MemberList />);
+
+    expect(screen.queryByTestId('members-channel-ledger')).toBeNull();
+  });
+
   it('provides an operable close control only when the roster is an open modal', () => {
     seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
     const onClose = vi.fn();
@@ -102,7 +129,7 @@ describe('MemberList accessibility', () => {
     expect(memberList).not.toBeNull();
     expect(memberList).toHaveAttribute('aria-hidden', 'true');
     expect(memberList).toHaveAttribute('inert');
-    expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'People in #general' })).toBeNull();
 
     const triggers = container.querySelectorAll<HTMLButtonElement>('.shell-members .onyx-popover__trigger');
     expect(triggers).toHaveLength(2);
@@ -161,7 +188,7 @@ describe('MemberList accessibility', () => {
     render(() => <MemberList />);
 
     expect(screen.getByRole('complementary', { name: 'Member list for &ops' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Channel members in &ops' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'People in &ops' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Open member details for bob, Voice/ })).toBeInTheDocument();
   });
 
@@ -322,6 +349,20 @@ describe('MemberList accessibility', () => {
 
     const opTrigger = await screen.findByRole('button', { name: /Open member details for bob, Op/ });
     await waitFor(() => expect(opTrigger).toHaveFocus());
+  });
+
+  it('windows a large roster instead of mounting every member row', () => {
+    const users = Array.from({ length: 220 }, (_, i) => (
+      i === 0 ? makeUser('me', ['o']) : makeUser(`nick${i}`)
+    ));
+    seedChannel(users);
+    render(() => <MemberList />);
+
+    const triggers = screen.getAllByRole('button', { name: /Open member details/ });
+    expect(triggers.length).toBeGreaterThan(20);
+    expect(triggers.length).toBeLessThan(160);
+    expect(screen.getByLabelText('220 members')).toHaveTextContent('220');
+    expect(screen.getByRole('heading', { name: /Members — 219/ })).toBeInTheDocument();
   });
 
   it('returns focus to the stable roster when the focused member leaves', async () => {

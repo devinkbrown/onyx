@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { For } from 'solid-js';
+import { createMemo, For, Show } from 'solid-js';
 import type { SceneProps, SceneVariant } from '../engine';
 import { SceneShell, seededRand } from './SceneShell';
+import { useScenePolicy } from './scenePolicy';
 
 /* ── Starfield: deep space — Milky Way band, tiered twinkling stars, nebulae,
    spiral galaxies, supernovae with lens flares, shooting stars, star clusters.
@@ -89,34 +90,56 @@ const SHOOTERS = [
 ];
 
 function StarfieldScene(props: SceneProps) {
+  const policy = useScenePolicy();
+  const detail = createMemo(() => props.sceneDetail ?? policy().sceneDetail);
+  const sparse = createMemo(() => detail() === 'sparse');
+  const full = createMemo(() => detail() === 'full');
+  const visibleStars = createMemo(() => {
+    const tier = detail();
+    if (tier === 'sparse') return stars.slice(0, 72);
+    if (tier === 'balanced') return stars.slice(0, 160);
+    return stars;
+  });
+  const visibleMilkyWay = createMemo(() => (
+    detail() === 'full' ? milkyWayStars : milkyWayStars.slice(0, 80)
+  ));
+
   return (
-    <SceneShell reducedMotion={props.reducedMotion} base="radial-gradient(ellipse at 30% 25%, #001427 0%, #000d1b 45%, #04050e 100%)">
+    <SceneShell
+      reducedMotion={props.reducedMotion}
+      sceneDetail={detail()}
+      paused={props.paused}
+      onRuntimePaused={props.onRuntimePaused}
+      base="radial-gradient(ellipse at 30% 25%, #001427 0%, #000d1b 45%, #04050e 100%)"
+    >
       {/* Milky Way band — diagonal haze */}
       <div class="absolute inset-0" style={{
         background: 'linear-gradient(135deg, transparent 15%, rgba(122,192,250,0.04) 30%, rgba(137,201,255,0.06) 45%, rgba(144,202,251,0.05) 55%, rgba(122,192,250,0.03) 70%, transparent 85%)',
         filter: 'blur(40px)',
       }} />
-      <div class="absolute inset-0" style={{
-        background: 'linear-gradient(135deg, transparent 20%, rgba(255,220,180,0.02) 40%, rgba(255,200,160,0.03) 50%, rgba(255,220,180,0.02) 60%, transparent 80%)',
-        filter: 'blur(60px)',
-      }} />
-
-      {/* Dense Milky Way star cluster */}
-      <For each={milkyWayStars}>
-        {(s) => (
-          <div class="absolute rounded-full bg-white"
-            style={{
-              left: `${s.x}%`, top: `${s.y}%`,
-              width: `${s.size}px`, height: `${s.size}px`,
-              opacity: s.opacity,
-              animation: `sf-twinkle ${s.dur}s ease-in-out ${s.delay}s infinite`,
-            }} />
-        )}
-      </For>
+      <Show when={!sparse()}>
+        <div data-scene-layer="milky-way" class="absolute inset-0">
+          <div class="absolute inset-0" style={{
+            background: 'linear-gradient(135deg, transparent 20%, rgba(255,220,180,0.02) 40%, rgba(255,200,160,0.03) 50%, rgba(255,220,180,0.02) 60%, transparent 80%)',
+            filter: 'blur(60px)',
+          }} />
+          <For each={visibleMilkyWay()}>
+            {(s) => (
+              <div class="absolute rounded-full bg-white"
+                style={{
+                  left: `${s.x}%`, top: `${s.y}%`,
+                  width: `${s.size}px`, height: `${s.size}px`,
+                  opacity: s.opacity,
+                  animation: `sf-twinkle ${s.dur}s ease-in-out ${s.delay}s infinite`,
+                }} />
+            )}
+          </For>
+        </div>
+      </Show>
 
       {/* Main star field with slow drift */}
-      <div class="absolute inset-0" style={{ animation: 'sf-field-drift 180s linear infinite' }}>
-        <For each={stars}>
+      <div class="absolute inset-0" data-scene-layer="stars" style={{ animation: 'sf-field-drift 180s linear infinite' }}>
+        <For each={visibleStars()}>
           {(s) => (
             <div class="absolute rounded-full"
               style={{
@@ -130,6 +153,9 @@ function StarfieldScene(props: SceneProps) {
         </For>
       </div>
 
+      <Show when={!sparse()}>
+      <div data-scene-layer="extras">
+      <div data-scene-layer="nebulae">
       {/* Nebula clouds — vivid, large */}
       <div class="absolute w-[800px] h-[800px] sm:w-[1200px] sm:h-[1200px] -top-[300px] -right-[250px] rounded-full"
         style={{ background: 'radial-gradient(circle, rgba(39,160,242,0.14) 0%, rgba(39,160,242,0.04) 35%, transparent 55%)', animation: 'sf-drift-a 40s ease-in-out infinite', filter: 'blur(20px)' }} />
@@ -145,9 +171,9 @@ function StarfieldScene(props: SceneProps) {
       {/* Deep rose cloud */}
       <div class="absolute w-[400px] h-[400px] top-[50%] left-[25%] rounded-full"
         style={{ background: 'radial-gradient(circle, rgba(255,120,150,0.05) 0%, transparent 50%)', animation: 'sf-drift-b 42s ease-in-out infinite', filter: 'blur(20px)' }} />
-
+      </div>
       {/* Galaxy 1 — spiral with arms */}
-      <div class="absolute" style={{ top: '15%', right: '10%', width: '120px', height: '120px', animation: 'sf-galaxy-spin 100s linear infinite' }}>
+      <div data-scene-layer="galaxies" class="absolute" style={{ top: '15%', right: '10%', width: '120px', height: '120px', animation: 'sf-galaxy-spin 100s linear infinite' }}>
         <div class="absolute inset-0 rounded-full"
           style={{ background: 'radial-gradient(circle, rgba(178,218,252,0.25) 0%, rgba(39,160,242,0.08) 30%, transparent 55%)' }} />
         <svg class="absolute inset-0" viewBox="0 0 120 120" style={{ opacity: 0.15 }}>
@@ -218,11 +244,17 @@ function StarfieldScene(props: SceneProps) {
         <div class="absolute" style={{ width: '1.5px', height: '44px', top: '-19px', left: '2px', background: 'linear-gradient(180deg, transparent, rgba(255,180,180,0.3), rgba(255,255,255,0.55), rgba(255,180,180,0.3), transparent)', animation: 'sf-nova 15s ease-in-out 4s infinite' }} />
         <div class="rounded-full" style={{ width: '5px', height: '5px', background: 'radial-gradient(circle, #fff, rgba(255,100,100,0.4))', 'box-shadow': '0 0 10px rgba(255,100,100,0.5)' }} />
       </div>
+      </div>
 
+      </Show>
+      <Show when={full()}>
+      <div data-scene-layer="full-extras">
       {/* Shooting stars — varied angles and speeds */}
-      <For each={SHOOTERS}>
-        {(sh) => <div class={sh.cls} style={{ top: sh.top, left: sh.left, 'animation-delay': sh.delay }} />}
-      </For>
+      <div data-scene-layer="shooters">
+        <For each={SHOOTERS}>
+          {(sh) => <div class={sh.cls} style={{ top: sh.top, left: sh.left, 'animation-delay': sh.delay }} />}
+        </For>
+      </div>
 
       {/* Star cluster 1 — open cluster */}
       <div class="absolute" style={{ top: '52%', right: '22%', width: '80px', height: '80px' }}>
@@ -269,14 +301,18 @@ function StarfieldScene(props: SceneProps) {
           )}
         </For>
       </div>
+      </div>
 
+      </Show>
       {/* Cosmic dust lane — diagonal dark band */}
       <div class="absolute inset-0 opacity-[0.03]"
         style={{ background: 'linear-gradient(135deg, transparent 30%, rgba(0,0,0,0.8) 45%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.8) 55%, transparent 70%)' }} />
 
+      <Show when={!sparse()}>
       {/* Noise grain */}
       <div class="absolute inset-0 opacity-[0.03]"
         style={{ 'background-image': `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E")` }} />
+      </Show>
 
       <style>{`
         @keyframes sf-twinkle {

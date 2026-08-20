@@ -93,4 +93,4 @@ All import processing happens in your browser. Your Discord export — the Disco
 The same on-device import model — no accounts, no network calls, full privacy — also covers:
 
 - **Slack** — request your workspace export (Slack → Settings & administration → Workspace settings → Import/Export Data), unzip it, and choose the per-channel JSON files under **Import from Slack**.
-- **IRC logs** — plain-text weechat, irssi, or mIRC logs. Under **Import an IRC log**, name the channel the log belongs to, then choose the file.
+- **Classic client logs** — plain-text weechat, irssi, or mIRC logs. Under **Import a classic client log**, name the room the log belongs to, then choose the file.

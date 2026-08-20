@@ -64,6 +64,7 @@ import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { openGuestClaimSheet } from '@/shell/guestClaimState';
+import { openPreferences } from '@/lib/prefs/preferences';
 
 export interface AccountPanelProps {
   open: boolean;
@@ -509,11 +510,51 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     <ModalShell
       open={local.open}
       onOpenChange={local.onOpenChange}
-      title="Account"
+      title="You"
       description={isGuest() ? 'You are browsing as a guest.' : `Signed in as ${account()}`}
       closeLabel="Close account panel"
     >
       <div class="acct" data-testid="account-panel" data-guest={isGuest() ? 'true' : 'false'}>
+        <nav class="acct-hub" aria-label="You workspace">
+          <button
+            type="button"
+            class="acct-hub-link acct-hub-link--current"
+            aria-current="page"
+          >
+            Account
+          </button>
+          <button
+            type="button"
+            class="acct-hub-link"
+            data-testid="you-open-appearance"
+            onClick={() => {
+              local.onOpenChange(false);
+              queueMicrotask(() => getState().openAppearance());
+            }}
+          >
+            Appearance
+          </button>
+          <button
+            type="button"
+            class="acct-hub-link"
+            data-testid="you-open-preferences"
+            onClick={() => {
+              local.onOpenChange(false);
+              queueMicrotask(() => openPreferences());
+            }}
+          >
+            Preferences
+          </button>
+        </nav>
+        <p class="acct-context-cue" role="note">
+          <span>Next</span>
+          <Show
+            when={isGuest()}
+            fallback="Review account protection and recovery on this device. Device keys remain separate from sign-in safeguards."
+          >
+            Keep this name if you want to protect it without disconnecting.
+          </Show>
+        </p>
         {/* ── Guest state ── */}
         <Show when={isGuest()}>
           <div class="acct-guest" data-testid="account-guest">
@@ -523,12 +564,12 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
             </svg>
             <h3 class="acct-guest-title">You're browsing as a guest</h3>
             <p class="acct-guest-body">
-              Register the nick you are using on this connection to protect it with a
+              Register the name you are using on this connection to protect it with a
               password. You stay connected. Passkeys, recovery codes, certificates,
               and multi-device encryption tools are available after the account exists.
             </p>
             <ol class="acct-guest-steps" aria-label="Account claim steps">
-              <li>Keep the nick you are using — register it without reconnecting.</li>
+              <li>Keep the name you are using — register it without reconnecting.</li>
               <li>Add an optional recovery email if the server asks for verification.</li>
               <li>After sign-in, bind a passkey or client certificate from this panel.</li>
               <li>After sign-in, publish an E2EE device key if you use more than one browser.</li>
@@ -540,7 +581,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               data-testid="guest-open-claim"
               onClick={openClaimWithoutDisconnect}
             >
-              Keep this nick
+              Keep this name
             </Button>
           </div>
         </Show>
@@ -693,7 +734,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Section>
 
           {/* Protection */}
-          <Section title="Protection" hint="Nick + login protection. Toggling these requires your password.">
+          <Section title="Protection" hint="Name + login protection. Toggling these requires your password.">
             <PasswordField
               id="acct-protect-password"
               label="Account password (to change protection)"
@@ -723,7 +764,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
             <div class="acct-toggle-row">
               <div class="acct-toggle-body">
                 <span class="acct-toggle-label">Enforce</span>
-                <p class="acct-toggle-desc">Protect your registered nick — unauthenticated holders get force-renamed.</p>
+                <p class="acct-toggle-desc">Protect your registered name — unauthenticated holders get force-renamed.</p>
               </div>
               <label class="acct-switch">
                 <input
@@ -741,7 +782,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Section>
 
           {/* Certificates */}
-          <Section title="Certificates" hint="Bind a TLS client-certificate fingerprint for password-less login (SASL EXTERNAL).">
+          <Section title="Certificates" hint="Bind a TLS client-certificate fingerprint for password-less login (certificate auth).">
             <div class="acct-cert-actions">
               <Button type="button" variant="ghost" size="sm" onClick={bindThisCert}>
                 Bind this connection's certificate
@@ -877,20 +918,27 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
           {/* Sessions & devices — current browser + Era 2 (B8) remote list skeleton */}
           <SessionsDevicesSection account={account()} />
-          <OperEventConsole />
-          <CapabilityMatrixSection />
-          <ChannelOrganizationSection owner={memoryOwner()} />
-          <SmartMuteSection owner={memoryOwner()} />
-          <PortableIdentitySection
-            owner={memoryOwner()}
-            networkHint={networkName() || undefined}
-          />
 
           {/* Offline recovery codes — B8 remainder */}
           <RecoveryCodesSection account={account()} />
 
           {/* Passkeys — WebAuthn passwordless login: register, list, rename, remove */}
           <PasskeysSection account={account()} owner={memoryOwner()} active={local.open} />
+
+          <details class="acct-advanced" data-testid="you-advanced">
+            <summary class="acct-advanced-summary">
+              <span class="acct-advanced-title">Advanced</span>
+              <span class="acct-advanced-hint">Ops tools, room organization, device keys, and personas</span>
+            </summary>
+            <div class="acct-advanced-body">
+              <OperEventConsole />
+              <CapabilityMatrixSection />
+              <ChannelOrganizationSection owner={memoryOwner()} />
+              <SmartMuteSection owner={memoryOwner()} />
+              <PortableIdentitySection
+                owner={memoryOwner()}
+                networkHint={networkName() || undefined}
+              />
 
           <Section
             title="Device encryption keys"
@@ -1004,15 +1052,17 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               </Show>
             </div>
           </Section>
+            </div>
+          </details>
 
-          {/* Recover nick */}
-          <Section title="Recover a nick" hint="Force an unauthenticated holder off your registered nick.">
-            <form onSubmit={submitRecover} noValidate aria-label="Recover a nick">
+          {/* Recover name */}
+          <Section title="Recover a name" hint="Force an unauthenticated holder off your registered name.">
+            <form onSubmit={submitRecover} noValidate aria-label="Recover a name">
               <FormField
                 id="acct-recover-nick"
-                label="Nick"
+                label="Name"
                 type="text"
-                placeholder="your-registered-nick"
+                placeholder="your-registered-name"
                 maxlength={RECOVER_NICK_MAX_LENGTH}
                 value={recoverNick()}
                 onInput={(e) => setRecoverNick(boundedAccountInput(
@@ -1030,7 +1080,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                 onInput={setRecoverPassword}
               />
               <Button type="submit" variant="ghost" size="sm" disabled={!recoverNick().trim()}>
-                Recover nick
+                Recover name
               </Button>
             </form>
           </Section>

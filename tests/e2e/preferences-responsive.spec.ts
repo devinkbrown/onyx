@@ -88,7 +88,7 @@ async function renderNarrowPreferences(
                   <button class="pref-transfer-tool" aria-expanded="false"><span class="pref-transfer-tool__label">Discord package</span></button>
                   <button class="pref-transfer-tool" aria-expanded="false"><span class="pref-transfer-tool__label">Discord bot</span></button>
                   <button class="pref-transfer-tool" aria-expanded="false"><span class="pref-transfer-tool__label">Slack JSON</span></button>
-                  <button class="pref-transfer-tool" aria-expanded="false"><span class="pref-transfer-tool__label">IRC log</span></button>
+                  <button class="pref-transfer-tool" aria-expanded="false"><span class="pref-transfer-tool__label">Classic log</span></button>
                 </div>
               </nav>
               <div class="pref-transfer-tool-content">
@@ -310,7 +310,7 @@ for (const viewport of [
     expect(geometry.contentScrollHeight).toBeGreaterThan(geometry.contentClientHeight);
     expect(geometry.contentOverflowY).toBe('auto');
 
-    const lastRoute = page.getByRole('button', { name: 'IRC log', exact: true });
+    const lastRoute = page.getByRole('button', { name: 'Classic log', exact: true });
     await lastRoute.evaluate((element) => {
       element.scrollIntoView({ block: 'nearest', inline: 'end' });
       (element as HTMLElement).focus();

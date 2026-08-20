@@ -14,18 +14,132 @@
   gap: var(--gap-section);
 }
 
+/* You hub — Account · Appearance · Preferences as one workspace */
+.acct-hub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 var(--space-2);
+  padding: 3px;
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ink) 55%, transparent);
+}
+
+.acct-hub-link {
+  appearance: none;
+  cursor: pointer;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+}
+
+.acct-hub-link:hover {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+
+.acct-hub-link--current,
+.acct-hub-link[aria-current='page'] {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--lapis-deep) 28%, transparent);
+}
+
+.acct-hub-link:focus-visible {
+  outline: 2px solid var(--accent, var(--lapis));
+  outline-offset: 1px;
+}
+
+.acct-advanced {
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ink) 40%, transparent);
+}
+
+.acct-advanced-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  color: var(--paper);
+}
+
+.acct-advanced-summary::-webkit-details-marker {
+  display: none;
+}
+
+.acct-advanced-title {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+}
+
+.acct-advanced-hint {
+  font-size: 0.78rem;
+  color: var(--paper-dim);
+  line-height: 1.4;
+}
+
+.acct-advanced[open] > .acct-advanced-summary {
+  border-bottom: 1px solid var(--seam-faint);
+}
+
+.acct-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-section);
+  padding: var(--space-3);
+}
+
+/* Shared sheet cue: explains the immediate task without competing with the
+   panel title or claiming that account security enables message encryption. */
+.acct-context-cue {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid color-mix(in oklab, var(--lapis) 72%, var(--seam));
+  background: color-mix(in oklab, var(--lapis) 7%, transparent);
+  color: var(--paper-dim);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.acct-context-cue > span {
+  flex: none;
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 /* ── Guest state ─────────────────────────────────────────────────────────── */
 
 .acct-guest {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
+  align-items: flex-start;
+  text-align: left;
   gap: var(--space-3);
-  padding: var(--space-7) var(--space-5);
+  padding: var(--space-4);
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--stone) 36%, transparent);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--stone) 28%, transparent);
 }
 
 .acct-guest-glyph {
@@ -90,24 +204,24 @@
 .acct-identity {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--stone) 42%, transparent);
-  box-shadow: inset 0 1px 0 0 color-mix(in oklab, var(--paper) 4%, transparent);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--stone) 32%, transparent);
+  box-shadow: none;
 }
 
 .acct-identity-avatar {
   flex: none;
-  width: 3rem;
-  height: 3rem;
+  width: 2.5rem;
+  height: 2.5rem;
   display: grid;
   place-items: center;
-  border-radius: var(--r-md);
+  border-radius: 4px;
   font-family: var(--font-sans);
   font-weight: 650;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   letter-spacing: 0.02em;
   color: var(--on-accent, var(--ink));
   background: var(--lapis);

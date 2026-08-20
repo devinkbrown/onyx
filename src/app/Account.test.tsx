@@ -78,7 +78,7 @@ describe('Account panel — guest state', () => {
       screen.getByRole('heading', { name: /browsing as a guest/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Account claim steps' })).toBeInTheDocument();
-    expect(screen.getByText(/Keep the nick you are using/)).toBeInTheDocument();
+    expect(screen.getByText(/Keep the name you are using/)).toBeInTheDocument();
     expect(screen.getByText(/After sign-in, bind a passkey/)).toBeInTheDocument();
     expect(screen.getByTestId('guest-open-claim')).toBeInTheDocument();
   });
@@ -108,7 +108,7 @@ describe('Account panel — guest state', () => {
     });
     render(() => <AccountPanel open={true} onOpenChange={closeSpy} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Keep this nick' }));
+    fireEvent.click(screen.getByRole('button', { name: /keep this name/i }));
 
     expect(disconnectSpy).not.toHaveBeenCalled();
     expect(closeSpy).toHaveBeenCalledWith(false);
@@ -343,6 +343,27 @@ describe('Account panel — signed in', () => {
     expect(screen.getByRole('region', { name: 'Delete account' })).toBeInTheDocument();
   });
 
+  it('exposes a You workspace rail into Appearance', async () => {
+    const openAppearance = vi.spyOn(getState(), 'openAppearance');
+    const closeSpy = vi.fn();
+    store.setState({
+      client: makeClient() as never,
+      server: seedServer('alice'),
+    });
+    render(() => <AccountPanel open={true} onOpenChange={closeSpy} />);
+
+    expect(screen.getByRole('navigation', { name: 'You workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Account' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('you-advanced')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'You' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('you-open-appearance'));
+    expect(closeSpy).toHaveBeenCalledWith(false);
+    await waitFor(() => {
+      expect(openAppearance).toHaveBeenCalled();
+    });
+  });
+
   it('renders structured account facts from accountInfo', () => {
     store.setState({
       accountInfo: {
@@ -420,22 +441,22 @@ describe('Account panel — signed in', () => {
     const spy = vi.spyOn(getState(), 'recover');
     renderPanel({ account: 'alice' });
 
-    fireEvent.input(screen.getByLabelText('Nick'), { target: { value: 'alice' } });
-    fireEvent.submit(screen.getByRole('form', { name: 'Recover a nick' }));
+    fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'alice' } });
+    fireEvent.submit(screen.getByRole('form', { name: 'Recover a name' }));
     expect(spy).toHaveBeenCalledWith('alice', undefined);
   });
 
   it('bounds an oversized recover-nick paste before dispatch', () => {
     const spy = vi.spyOn(getState(), 'recover');
     renderPanel({ account: 'alice' });
-    const input = screen.getByLabelText('Nick');
+    const input = screen.getByLabelText('Name');
     const expected = 'n'.repeat(64);
 
     fireEvent.input(input, { target: { value: `${expected}${'x'.repeat(32)}` } });
 
     expect(input).toHaveAttribute('maxlength', '64');
     expect(input).toHaveValue(expected);
-    fireEvent.submit(screen.getByRole('form', { name: 'Recover a nick' }));
+    fireEvent.submit(screen.getByRole('form', { name: 'Recover a name' }));
     expect(spy).toHaveBeenCalledWith(expected, undefined);
   });
 

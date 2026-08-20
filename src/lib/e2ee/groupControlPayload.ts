@@ -26,19 +26,23 @@ import {
 } from './deviceSign';
 import { fromB64url, toB64url } from './dmCipher';
 
-/** Domain separation label for the Ed25519 transcript. */
-export const GROUP_CONTROL_PAYLOAD_DOMAIN = 'ONYX-GROUP-CONTROL-v1';
+/** Domain separation label for the Ed25519 transcript (current v2). */
+export const GROUP_CONTROL_PAYLOAD_DOMAIN = 'ONYX-GROUP-CONTROL-v2';
+/** Legacy v1 domain is retained only to classify diagnostics; it is never verified. */
+export const GROUP_CONTROL_PAYLOAD_LEGACY_DOMAIN = 'ONYX-GROUP-CONTROL-v1';
 
 /**
- * Fixed 4-byte ASCII magic prefix for binary v1 (`OGC1`).
+ * Fixed 4-byte ASCII magic prefix for binary OGC1 (`OGC1`).
  * Rejects accidental non-control base64url blobs at parse time.
  */
 export const GROUP_CONTROL_PAYLOAD_MAGIC = 'OGC1';
 
 const MAGIC_BYTES = new TextEncoder().encode(GROUP_CONTROL_PAYLOAD_MAGIC);
 
-/** First versioned payload format. */
-export const GROUP_CONTROL_PAYLOAD_VERSION = 1;
+/** Current versioned payload format. */
+export const GROUP_CONTROL_PAYLOAD_VERSION = 2;
+/** Legacy payload version: parse for diagnostics, never trust or verify. */
+export const GROUP_CONTROL_PAYLOAD_LEGACY_VERSION = 1;
 
 /**
  * Hard cap on the body field (bytes). Chosen so the full binary envelope
@@ -97,6 +101,8 @@ export type GroupControlRouting = {
   channel: string;
   kind: GroupControlPayloadKind;
   fromDevice: string;
+  /** Authenticated sender account; canonicalized to lowercase in v2. */
+  fromAccount: string;
   /** Required when kind === 'welcome'; must be absent otherwise. */
   toAccount?: string;
   /** Required when kind === 'welcome'; must be absent otherwise. */
@@ -116,6 +122,8 @@ export type GroupControlPayloadParts = {
    */
   signerPub: Uint8Array;
   signature: Uint8Array;
+  /** True only for a legacy v1 payload that must render locked. */
+  diagnosticOnly?: boolean;
 };
 
 /** Inputs for building a signed payload. */
@@ -227,6 +235,11 @@ function validAccount(value: string): boolean {
     && ACCOUNT_RE.test(value);
 }
 
+function normalizeFromAccount(value: string): string | null {
+  const normalized = value.trim().toLowerCase();
+  return validAccount(normalized) ? normalized : null;
+}
+
 export function validControlEpoch(epoch: number): boolean {
   return Number.isInteger(epoch) && epoch >= 0 && epoch <= 0xffffffff;
 }
@@ -244,6 +257,8 @@ export function normalizeGroupControlRouting(
 ): GroupControlRouting | null {
   const channel = normalizeControlChannel(routing.channel);
   if (!channel || !validDevice(routing.fromDevice)) return null;
+  const fromAccount = normalizeFromAccount(routing.fromAccount);
+  if (!fromAccount) return null;
 
   if (routing.kind === 'welcome') {
     const toAccount = routing.toAccount;
@@ -253,6 +268,7 @@ export function normalizeGroupControlRouting(
     return {
       channel,
       kind: 'welcome',
+      fromAccount,
       fromDevice: routing.fromDevice,
       toAccount,
       toDevice,
@@ -266,6 +282,7 @@ export function normalizeGroupControlRouting(
   return {
     channel,
     kind: routing.kind,
+    fromAccount,
     fromDevice: routing.fromDevice,
   };
 }
@@ -282,6 +299,7 @@ function kindFromCode(code: number): GroupControlPayloadKind | null {
  * Ed25519 transcript (pure). Bindings:
  *
  *   domain ‖ 0x00 ‖
+ *   u8(from_account_len) ‖ from_account_utf8 ‖
  *   u8(channel_len) ‖ channel_utf8 ‖
  *   u8(kind_code) ‖
  *   u8(from_device_len) ‖ from_device_utf8 ‖
@@ -311,12 +329,14 @@ export function buildGroupControlTranscript(
 
   const enc = new TextEncoder();
   const channel = enc.encode(norm.channel);
+  const fromAccount = enc.encode(norm.fromAccount);
   const fromDevice = enc.encode(norm.fromDevice);
   const toAccount = enc.encode(norm.toAccount ?? '');
   const toDevice = enc.encode(norm.toDevice ?? '');
 
   if (
     channel.length > 255
+    || fromAccount.length > 255
     || fromDevice.length > 255
     || toAccount.length > 255
     || toDevice.length > 255
@@ -329,6 +349,7 @@ export function buildGroupControlTranscript(
     domain.length
     + 1
     + 1 + channel.length
+    + 1 + fromAccount.length
     + 1
     + 1 + fromDevice.length
     + 1 + toAccount.length
@@ -344,6 +365,9 @@ export function buildGroupControlTranscript(
   out.set(domain, off);
   off += domain.length;
   out[off++] = 0;
+  out[off++] = fromAccount.length;
+  out.set(fromAccount, off);
+  off += fromAccount.length;
   out[off++] = channel.length;
   out.set(channel, off);
   off += channel.length;
@@ -375,7 +399,10 @@ export function buildGroupControlTranscript(
 export function packGroupControlPayload(
   parts: GroupControlPayloadParts,
 ): string | null {
-  if (parts.version !== GROUP_CONTROL_PAYLOAD_VERSION) return null;
+  if (
+    parts.version !== GROUP_CONTROL_PAYLOAD_VERSION
+    && parts.version !== GROUP_CONTROL_PAYLOAD_LEGACY_VERSION
+  ) return null;
   if (!validControlEpoch(parts.epoch) || !validBody(parts.body)) return null;
   if (parts.signerPub.byteLength !== ED25519_PUBLIC_KEY_BYTES) return null;
   if (parts.signature.byteLength !== ED25519_SIGNATURE_BYTES) return null;
@@ -431,7 +458,10 @@ export function parseGroupControlPayload(
   }
 
   const version = raw[OFF_VERSION]!;
-  if (version !== GROUP_CONTROL_PAYLOAD_VERSION) return null;
+  if (
+    version !== GROUP_CONTROL_PAYLOAD_VERSION
+    && version !== GROUP_CONTROL_PAYLOAD_LEGACY_VERSION
+  ) return null;
   const kind = kindFromCode(raw[OFF_KIND]!);
   if (!kind) return null;
   const epoch = readU32be(raw, OFF_EPOCH);
@@ -452,6 +482,7 @@ export function parseGroupControlPayload(
     body: raw.slice(bodyStart, bodyEnd),
     signerPub: raw.slice(signerStart, sigStart),
     signature: raw.slice(sigStart, sigStart + ED25519_SIGNATURE_BYTES),
+    diagnosticOnly: version === GROUP_CONTROL_PAYLOAD_LEGACY_VERSION,
   };
 }
 
@@ -525,6 +556,9 @@ export async function verifyGroupControlPayload(
 ): Promise<GroupControlPayloadParts | null> {
   const parts = parseGroupControlPayload(wireB64);
   if (!parts) return null;
+  // Legacy OGC1 is parseable for diagnostics only. It is never a trusted
+  // signer assertion and cannot pass this verifier.
+  if (parts.version !== GROUP_CONTROL_PAYLOAD_VERSION || parts.diagnosticOnly) return null;
 
   const norm = normalizeGroupControlRouting(routing);
   if (!norm) return null;

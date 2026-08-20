@@ -51,7 +51,11 @@ describe('WhoisSheet', () => {
       expect(within(dialog).getByText('Alice Example')).toBeInTheDocument();
       expect(within(dialog).getByText('Network operator')).toBeInTheDocument();
       expect(within(dialog).getByText('2 minutes')).toBeInTheDocument();
-      expect(within(dialog).getByRole('list', { name: 'Channels shared with alice' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('list', { name: 'Rooms shared with alice' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
+        'href',
+        '/stats/?room=%23root',
+      );
     });
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close member profile' }));

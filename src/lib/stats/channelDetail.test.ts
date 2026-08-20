@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchChannelDetail, normalizeChannelDetail } from './channelDetail';
+import {
+  fetchChannelDetail,
+  netMembershipFlow,
+  normalizeChannelDetail,
+  parseStatsRoomQuery,
+  peakHourShare,
+  roomShareOfNetwork,
+  statsRoomHref,
+} from './channelDetail';
 
 function validDetail() {
   return {
@@ -83,5 +91,33 @@ describe('fetchChannelDetail', () => {
 
     fetchMock.mockRejectedValueOnce(new Error('offline'));
     await expect(fetchChannelDetail('#Root')).resolves.toBeNull();
+  });
+});
+
+describe('channel rhythm helpers', () => {
+  it('computes room share, peak concentration, and net membership flow', () => {
+    expect(roomShareOfNetwork(25, 100)).toBe(25);
+    expect(roomShareOfNetwork(10, 0)).toBeNull();
+    expect(peakHourShare([0, 0, 8, 2])).toBe(80);
+    expect(peakHourShare([0, 0, 0])).toBe(0);
+    expect(netMembershipFlow({
+      messages: 12,
+      words: 40,
+      activeUsers: 3,
+      joins: 10,
+      parts: 2,
+      quits: 1,
+      kicks: 1,
+      topicChanges: 0,
+    })).toBe(6);
+  });
+
+  it('builds and parses public room inspector links without accepting injection', () => {
+    expect(statsRoomHref('#root')).toBe('/stats/?room=%23root');
+    expect(parseStatsRoomQuery('?room=%23root')).toBe('#root');
+    expect(parseStatsRoomQuery('room=ops')).toBe('#ops');
+    expect(parseStatsRoomQuery('?room=%26ops')).toBe('&ops');
+    expect(parseStatsRoomQuery('?room=%23evil,%20x')).toBe('');
+    expect(parseStatsRoomQuery('?room=')).toBe('');
   });
 });

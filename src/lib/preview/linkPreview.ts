@@ -120,7 +120,13 @@ export function isPreviewableUrl(
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
   // Credentials in the authority are a classic SSRF/parser-confusion vector.
   if (parsed.username !== '' || parsed.password !== '') return false;
-  const host = parsed.hostname.toLowerCase();
+  // Strip a trailing DNS root label before every suffix/exact-match host check
+  // below — `URL` preserves it verbatim in `.hostname` (`new URL('https://
+  // x.internal./p').hostname === 'x.internal.'`), so `x.internal.` would
+  // otherwise fail `endsWith('.internal')`/`BLOCKED_HOSTNAMES.has('localhost')`
+  // and reach the fetcher. IP literals are unaffected — `URL` already drops the
+  // trailing dot for a bare IPv4 (`127.0.0.1.` → `127.0.0.1`).
+  const host = parsed.hostname.toLowerCase().replace(/\.+$/, '');
   if (host === '') return false;
   if (BLOCKED_HOSTNAMES.has(host)) return false;
   if (host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.localhost')) {
@@ -146,7 +152,13 @@ export function pickPreviewUrl(
   for (const href of hrefs.slice(0, LINK_PREVIEW_HREF_SCAN_MAX)) {
     if (!isPreviewableUrl(href, privacy)) continue;
     const parsed = new URL(href);
-    if (SKIP_HOSTS.has(parsed.hostname) && parsed.pathname.startsWith('/uploads/')) continue;
+    // Normalize the same way `isPreviewableUrl`'s host checks do, so an
+    // uppercased or root-labeled form of our own upload host (still a safe,
+    // already-validated target at this point) doesn't skip the "render
+    // inline instead of unfurling" case and fall through to a redundant
+    // same-origin preview request.
+    const skipHost = parsed.hostname.toLowerCase().replace(/\.+$/, '');
+    if (SKIP_HOSTS.has(skipHost) && parsed.pathname.startsWith('/uploads/')) continue;
     return href;
   }
   return null;

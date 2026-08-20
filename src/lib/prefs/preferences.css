@@ -10,28 +10,80 @@
 
 /* ── Message density ─────────────────────────────────────────────────────────
    Adjust the vertical rhythm of the feed without touching the grid. Cozy is the
-   shell default, so it carries no overrides. */
+   shell default, so it carries no overrides. Compact leans Discord/Twitch-dense
+   (tighter avatar column + line height); roomy keeps a reading-room cadence. */
 
 :root[data-density='compact'] .shell-msg-group {
-  padding-block: var(--space-1) 0;
-  margin-top: var(--space-1);
+  grid-template-columns: 28px 1fr;
+  gap: 0 6px;
+  padding-block: 1px 0;
+  padding-inline: var(--space-3);
+  margin-top: 1px;
+}
+:root[data-density='compact'] .shell-msg-group--system {
+  padding-left: calc(28px + 6px + var(--space-3));
+  padding-block: 0;
 }
 :root[data-density='compact'] .shell-msg-cont {
   padding-block: 0;
+  padding-inline: var(--space-3);
+  margin-top: 0;
 }
 :root[data-density='compact'] .shell-msg-system {
   padding-block: 0;
+  font-size: 0.78rem;
+}
+:root[data-density='compact'] .shell-msg-meta {
+  margin-bottom: 0;
+  gap: 5px;
+}
+:root[data-density='compact'] .shell-msg-author {
+  font-size: 0.8rem;
+}
+:root[data-density='compact'] .shell-msg-ts,
+:root[data-density='compact'] .shell-msg-cont-ts {
+  font-size: 0.55rem;
+}
+:root[data-density='compact'] .shell-msg-text {
+  font-size: 0.88rem;
+  line-height: 1.3;
+}
+:root[data-density='compact'] .shell-msg-avatar .onyx-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 0.62rem;
 }
 
 :root[data-density='roomy'] .shell-msg-group {
+  grid-template-columns: 48px 1fr;
+  gap: 0 var(--space-4);
   padding-block: var(--space-4) var(--space-2);
   margin-top: var(--space-4);
 }
+:root[data-density='roomy'] .shell-msg-group--system {
+  padding-left: calc(48px + var(--space-4) + var(--space-5));
+  padding-block: var(--space-2);
+}
 :root[data-density='roomy'] .shell-msg-cont {
   padding-block: var(--space-1);
+  padding-inline: var(--space-5);
 }
 :root[data-density='roomy'] .shell-msg-system {
   padding-block: var(--space-2);
+}
+:root[data-density='roomy'] .shell-msg-meta {
+  margin-bottom: var(--space-2);
+}
+:root[data-density='roomy'] .shell-msg-author {
+  font-size: 0.95rem;
+}
+:root[data-density='roomy'] .shell-msg-text {
+  line-height: 1.6;
+  font-size: 0.98rem;
+}
+:root[data-density='roomy'] .shell-msg-avatar .onyx-avatar {
+  width: 40px;
+  height: 40px;
 }
 
 /* ── Font scale ──────────────────────────────────────────────────────────────
@@ -292,13 +344,11 @@
 
 .pref-category-tab[aria-selected='true'] {
   color: var(--paper);
-  background:
-    linear-gradient(90deg, color-mix(in oklab, var(--lapis) 19%, transparent), transparent 92%);
+  background: color-mix(in oklab, var(--lapis) 19%, transparent);
 }
 
 .pref-category-tab[aria-selected='true']::before {
   background: var(--lapis-bright);
-  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 46%, transparent);
 }
 
 .pref-category-tab__label {
@@ -314,6 +364,31 @@
 
 .pref-category-content {
   min-width: 0;
+}
+
+/* Keep the current category and persistence scope visible while the sheet's
+   many controls progressively disclose their own detail. */
+.pref-context-cue {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid color-mix(in oklab, var(--lapis) 72%, var(--seam));
+  background: color-mix(in oklab, var(--lapis) 7%, transparent);
+  color: var(--paper-mute);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.pref-context-cue > span {
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .pref-category-panel {
@@ -340,9 +415,7 @@
   padding: var(--space-2);
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 22%, var(--line));
   border-radius: var(--r-md);
-  background:
-    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 8%, transparent), transparent 46%),
-    color-mix(in oklab, var(--ink) 36%, transparent);
+  background: color-mix(in oklab, var(--ink) 40%, transparent);
 }
 
 .pref-transfer-tools {
@@ -404,12 +477,11 @@
 
 .pref-transfer-tool[aria-expanded='true'] {
   color: var(--paper);
-  background: linear-gradient(90deg, color-mix(in oklab, var(--lapis) 20%, transparent), transparent);
+  background: color-mix(in oklab, var(--lapis) 20%, transparent);
 }
 
 .pref-transfer-tool[aria-expanded='true']::before {
   background: var(--lapis-bright);
-  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 44%, transparent);
 }
 
 .pref-transfer-tool__label {
@@ -568,9 +640,7 @@
     align-items: center;
     margin-inline: calc(-1 * var(--space-1));
     padding: var(--space-1);
-    background: color-mix(in oklab, var(--ink) 94%, transparent);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
+    background: color-mix(in oklab, var(--ink) 98%, transparent);
   }
 
   .pref-category-nav__eyebrow {
@@ -659,6 +729,7 @@
   }
 
   .onyx-sheet:has(.pref-panel) .onyx-sheet__body {
+    overflow-x: hidden;
     padding:
       8px
       max(8px, env(safe-area-inset-right, 0px))
@@ -668,6 +739,17 @@
 
   .pref-panel {
     gap: 8px;
+  }
+
+  .pref-context-cue {
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: 14px;
+    line-height: 1.3;
+  }
+
+  .pref-context-cue > span {
+    font-size: 12px;
   }
 
   .pref-category-nav {
@@ -780,13 +862,11 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  min-height: 58px;
+  min-height: 52px;
   padding: var(--space-3);
-  border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, var(--line));
-  border-radius: var(--r-md);
-  background:
-    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 14%, transparent), transparent 70%),
-    color-mix(in oklab, var(--ink) 45%, transparent);
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ink) 48%, transparent);
   color: var(--paper);
   cursor: pointer;
   font: inherit;
@@ -795,10 +875,8 @@
 }
 
 .pref-action-card:hover {
-  border-color: color-mix(in oklab, var(--lapis-bright) 58%, var(--line));
-  background:
-    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 20%, transparent), transparent 70%),
-    color-mix(in oklab, var(--ink) 52%, transparent);
+  border-color: color-mix(in oklab, var(--lapis-bright) 45%, var(--line));
+  background: color-mix(in oklab, var(--ink) 54%, transparent);
 }
 
 .pref-action-card:focus-visible {
@@ -810,12 +888,12 @@
   display: inline-grid;
   place-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--line);
-  border-radius: var(--r-pill);
+  border-radius: 4px;
   color: var(--lapis-bright);
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
 
 .pref-action-card__body {
@@ -1122,9 +1200,7 @@
   padding: var(--space-3);
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 24%, var(--line));
   border-radius: var(--r-md);
-  background:
-    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 9%, transparent), transparent 58%),
-    color-mix(in oklab, var(--ink) 32%, transparent);
+  background: color-mix(in oklab, var(--ink) 36%, transparent);
 }
 
 .pref-vault-retention__scope {

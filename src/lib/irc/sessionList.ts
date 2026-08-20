@@ -3,7 +3,7 @@
  * sessionList.ts — pure parse helpers for Onyx Server SESSION LIST / DROP notices.
  *
  * Wire (server NOTICE, no nick prefix):
- *   SESSION LIST * #1 signon=1710000000 attached
+ *   SESSION LIST * #1 signon=1710000000 attached sid=0123...cdef
  *   SESSION LIST - #2 signon=1710000100 detached
  *   SESSION: end of session list
  *   SESSION DROP #2 ok
@@ -17,10 +17,12 @@ export type AccountSessionRow = {
   /** Sign-on wall time in milliseconds (server epoch). */
   signonMs: number;
   state: 'attached' | 'detached';
+  /** Exact physical-row selector offered by current servers; absent on legacy rows. */
+  sid?: string;
 };
 
 const LIST_RE =
-  /^SESSION LIST\s+([*-])\s+#(\d+)\s+signon=(\d+)\s+(attached|detached)\s*$/i;
+  /^SESSION LIST\s+([*-])\s+#(\d+)\s+signon=(\d+)\s+(attached|detached)(?:\s+sid=([0-9a-f]{32}))?\s*$/i;
 const END_RE = /^SESSION:\s*end of session list\s*$/i;
 const DROP_OK_RE = /^SESSION DROP\s+#(\d+)\s+ok\s*$/i;
 
@@ -30,11 +32,13 @@ export function parseSessionListLine(text: string): AccountSessionRow | null {
   const index = Number.parseInt(match[2]!, 10);
   const signonMs = Number.parseInt(match[3]!, 10);
   if (!Number.isFinite(index) || index <= 0 || !Number.isFinite(signonMs)) return null;
+  const sid = match[5]?.toLowerCase();
   return {
     index,
     current: match[1] === '*',
     signonMs,
     state: match[4]!.toLowerCase() === 'attached' ? 'attached' : 'detached',
+    ...(sid ? { sid } : {}),
   };
 }
 
@@ -47,6 +51,11 @@ export function parseSessionDropOk(text: string): number | null {
   if (!match) return null;
   const index = Number.parseInt(match[1]!, 10);
   return Number.isFinite(index) && index > 0 ? index : null;
+}
+
+/** SID and owner-reactor replies have no ordinal; both confirm a completed DROP. */
+export function isSessionDropSuccess(text: string): boolean {
+  return /^(?:SESSION DROP\s+sid=[0-9a-f]{32}\s+ok|SESSION DROP\s+ok\s+client=\d+\s+signon=-?\d+)\s*$/i.test(text.trim());
 }
 
 export function formatSessionSignon(signonMs: number, _nowMs = Date.now()): string {

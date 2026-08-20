@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
+import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { MemberList } from './MemberList';
 import { PresenceRibbon } from './PresenceRibbon';
 
@@ -62,7 +63,7 @@ function seedChannel(opts: { ourNick: string; users: ChannelUser[]; modes?: stri
     ourNick: opts.ourNick,
     server: {
       id: 'channel-settings',
-      name: 'Channel settings test',
+      name: 'Room settings test',
       network: 'channel-settings',
       url: MEMORY_OWNER.serverUrl,
       icon: 'C',
@@ -79,6 +80,7 @@ function seedChannel(opts: { ourNick: string; users: ChannelUser[]; modes?: stri
 beforeEach(() => {
   store.setState(initialState, true);
   localStorage.clear();
+  resetPreferences();
 });
 
 afterEach(() => {
@@ -94,7 +96,7 @@ describe('MemberList moderation', () => {
     render(() => <MemberList />);
 
     expect(screen.getByRole('complementary', { name: 'Member list for #general' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Channel members in #general' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'People in #general' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: /Voice/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Open member details for bob, Voice/ }));
@@ -128,6 +130,7 @@ describe('MemberList moderation', () => {
 
   it('shows Kick/Ban controls to an op when targeting another member', () => {
     // Arrange — we are op, bob is a plain member
+    setPreference('experienceMode', 'advanced');
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
 
     // Act — open bob's popover card
@@ -140,10 +143,28 @@ describe('MemberList moderation', () => {
     expect(screen.getByRole('group', { name: 'Moderate bob' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Kick bob from #general' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ban bob from #general' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Give op to bob' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Give voice to bob' })).toBeNull();
+  });
+
+  it('hides room moderation controls in Standard even when the member is an op', () => {
+    setPreference('experienceMode', 'standard');
+    seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
+
+    const { getAllByRole } = render(() => <MemberList />);
+    fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('bob'))!);
+
+    expect(screen.getByRole('button', { name: 'Send DM to bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View profile of bob' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Moderate bob' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Kick bob from #general' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ban bob from #general' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Give op to bob' })).toBeNull();
   });
 
   it('hides moderation controls from a non-op', () => {
     // Arrange — we are a plain member
+    setPreference('experienceMode', 'advanced');
     seedChannel({ ourNick: 'me', users: [makeUser('me', []), makeUser('bob')] });
 
     // Act
@@ -157,6 +178,7 @@ describe('MemberList moderation', () => {
 
   it('does not show moderation controls against yourself', () => {
     // Arrange — we are op; open our own card
+    setPreference('experienceMode', 'advanced');
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
     // Act
@@ -170,18 +192,22 @@ describe('MemberList moderation', () => {
 
   it('clicking Kick dispatches KICK through the client', () => {
     // Arrange
+    setPreference('experienceMode', 'advanced');
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
 
     // Act
     const { getAllByRole } = render(() => <MemberList />);
     fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('bob'))!);
     fireEvent.click(screen.getByRole('button', { name: 'Kick bob from #general' }));
+    expect(client.sendRaw).not.toHaveBeenCalledWith('KICK', '#general', 'bob');
+    fireEvent.click(screen.getByTestId('moderation-review-confirm'));
 
     // Assert
     expect(client.sendRaw).toHaveBeenCalledWith('KICK', '#general', 'bob');
   });
 
   it('keeps focus in the roster when a kicked member row is removed', () => {
+    setPreference('experienceMode', 'advanced');
     seedChannel({
       ourNick: 'me',
       users: [makeUser('me', ['o']), makeUser('bob'), makeUser('carol')],
@@ -190,6 +216,7 @@ describe('MemberList moderation', () => {
     render(() => <MemberList />);
     fireEvent.click(screen.getByRole('button', { name: /Open member details for bob/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Kick bob from #general' }));
+    fireEvent.click(screen.getByTestId('moderation-review-confirm'));
     store.getState()._handleMessage(parseIRCMessage(':me!user@host KICK #general bob :Removed'));
 
     expect(screen.queryByRole('button', { name: /Open member details for bob/ })).toBeNull();
@@ -198,15 +225,30 @@ describe('MemberList moderation', () => {
 
   it('clicking Op dispatches MODE +o through the client', () => {
     // Arrange
+    setPreference('experienceMode', 'network-ops');
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
 
     // Act
     const { getAllByRole } = render(() => <MemberList />);
     fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('bob'))!);
     fireEvent.click(screen.getByRole('button', { name: 'Give op to bob' }));
+    expect(client.sendRaw).not.toHaveBeenCalledWith('MODE', '#general', '+o', 'bob');
+    fireEvent.click(screen.getByTestId('moderation-review-confirm'));
 
     // Assert
     expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#general', '+o', 'bob');
+  });
+
+  it('shows role controls only in Network Ops', () => {
+    setPreference('experienceMode', 'network-ops');
+    seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
+
+    const { getAllByRole } = render(() => <MemberList />);
+    fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('bob'))!);
+
+    expect(screen.getByRole('button', { name: 'Give op to bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Give voice to bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kick bob from #general' })).toBeInTheDocument();
   });
 });
 
@@ -231,9 +273,9 @@ describe('ChannelSettings panel', () => {
     openSettings();
 
     // Assert — both sections render; op sees mode toggles
-    expect(screen.getByRole('dialog', { name: 'Channel settings' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Room settings' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Topic' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Channel mode flags' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Room mode flags' })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Moderated/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Encryption' })).toBeInTheDocument();
@@ -247,8 +289,8 @@ describe('ChannelSettings panel', () => {
     openSettings();
 
     // Assert — no toggle group; read-only notice present
-    expect(screen.queryByRole('group', { name: 'Channel mode flags' })).toBeNull();
-    expect(screen.getByText('Only ops can change channel modes.')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Room mode flags' })).toBeNull();
+    expect(screen.getByText('Only room hosts can change room modes.')).toBeInTheDocument();
   });
 
   it('toggling a flag dispatches the MODE command', () => {
@@ -339,7 +381,7 @@ describe('ChannelSettings panel', () => {
     // Assert
     expect(screen.queryByLabelText('Ephemeral history')).toBeNull();
     expect(screen.getByText('1 hour')).toBeInTheDocument();
-    expect(screen.getByText('Only ops can change history retention.')).toBeInTheDocument();
+    expect(screen.getByText('Only room hosts can change history retention.')).toBeInTheDocument();
   });
 
   it('lets an op set the channel encryption policy', () => {
@@ -366,7 +408,7 @@ describe('ChannelSettings panel', () => {
     // Assert
     expect(screen.queryByLabelText('Message policy')).toBeNull();
     expect(screen.getByText('Required')).toBeInTheDocument();
-    expect(screen.getByText('Only ops can change the channel encryption policy.')).toBeInTheDocument();
+    expect(screen.getByText('Only room hosts can change the room encryption policy.')).toBeInTheDocument();
   });
 
   it('lets an op set the channel history-policy', () => {
@@ -387,7 +429,7 @@ describe('ChannelSettings panel', () => {
 
     expect(screen.queryByLabelText('Who can request history')).toBeNull();
     expect(screen.getByText('Members only')).toBeInTheDocument();
-    expect(screen.getByText('Only ops can change the channel history policy.')).toBeInTheDocument();
+    expect(screen.getByText('Only room hosts can change the room history policy.')).toBeInTheDocument();
   });
 
   it('lets an op create, list, and delete webhooks', () => {
@@ -431,7 +473,7 @@ describe('ChannelSettings panel', () => {
 
     // Assert
     expect(screen.queryByLabelText('Webhook name')).toBeNull();
-    expect(screen.getByText('Discord-compatible webhook URLs can post into this channel.')).toBeInTheDocument();
+    expect(screen.getByText('Discord-compatible webhook URLs can post into this room.')).toBeInTheDocument();
   });
 
   it('makes the topic read-only for a non-op in a +t channel', () => {
@@ -444,7 +486,7 @@ describe('ChannelSettings panel', () => {
     // Assert — no editable textarea, lock notice shown
     expect(screen.queryByLabelText('Topic text')).toBeNull();
     expect(
-      screen.getByText('This channel is topic-locked (+t). Only ops can change the topic.'),
+      screen.getByText('This room is topic-locked (+t). Only room hosts can change the topic.'),
     ).toBeInTheDocument();
   });
 });

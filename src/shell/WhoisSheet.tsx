@@ -9,6 +9,7 @@
  */
 import { createMemo, For, Show, splitProps, type JSX } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Avatar, Sheet } from '@/primitives';
 import './whois-sheet.css';
 
@@ -83,7 +84,7 @@ export function WhoisSheet(props: WhoisSheetProps): JSX.Element {
     <Sheet
       open={open()}
       title={`Profile: ${nick() ?? 'member'}`}
-      description="Live network identity and presence details from WHOIS."
+      description="Live network identity and presence details."
       closeLabel="Close member profile"
       returnFocus={props.returnFocus}
       returnFocusFallback={props.returnFocusFallback}
@@ -131,11 +132,11 @@ export function WhoisSheet(props: WhoisSheetProps): JSX.Element {
               {(value) => <WhoisField label="Identity">{value()}</WhoisField>}
             </Show>
             <Show when={info()?.realHost}>
-              {(host) => <WhoisField label="Actual host">{host()}</WhoisField>}
+              {(host) => <WhoisField label="Host">{host()}</WhoisField>}
             </Show>
             <Show when={info()?.server || info()?.serverInfo}>
-              <WhoisField label="Server">
-                <span>{info()?.server ?? 'Unknown server'}</span>
+              <WhoisField label="Node">
+                <span>{info()?.server ?? 'Unknown node'}</span>
                 <Show when={info()?.serverInfo}>
                   {(serverInfo) => <small>{serverInfo()}</small>}
                 </Show>
@@ -145,7 +146,7 @@ export function WhoisSheet(props: WhoisSheetProps): JSX.Element {
               <WhoisField label="Role"><span class="shell-whois-oper">Network operator</span></WhoisField>
             </Show>
             <Show when={info()?.idleSecs !== undefined}>
-              <WhoisField label="Idle">{formatIdle(info()?.idleSecs ?? 0)}</WhoisField>
+              <WhoisField label="Away">{formatIdle(info()?.idleSecs ?? 0)}</WhoisField>
             </Show>
             <Show when={signedOn()}>
               {(date) => (
@@ -155,9 +156,26 @@ export function WhoisSheet(props: WhoisSheetProps): JSX.Element {
               )}
             </Show>
             <Show when={(info()?.channels?.length ?? 0) > 0}>
-              <WhoisField label="Channels">
-                <ul class="shell-whois-channels" aria-label={`Channels shared with ${nick() ?? 'member'}`}>
-                  <For each={info()?.channels ?? []}>{(channel) => <li>{channel}</li>}</For>
+              <WhoisField label="Rooms">
+                <ul class="shell-whois-channels" aria-label={`Rooms shared with ${nick() ?? 'member'}`}>
+                  <For each={info()?.channels ?? []}>
+                    {(channel) => (
+                      <li>
+                        <Show
+                          when={/^[#&]/.test(channel.trim())}
+                          fallback={channel}
+                        >
+                          <a
+                            href={statsRoomHref(channel)}
+                            aria-label={`Room ledger for ${channel}`}
+                            data-testid="whois-channel-ledger"
+                          >
+                            {channel}
+                          </a>
+                        </Show>
+                      </li>
+                    )}
+                  </For>
                 </ul>
               </WhoisField>
             </Show>

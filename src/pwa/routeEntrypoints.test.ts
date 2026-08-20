@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -14,12 +15,12 @@ const fallbackSitemap = readFileSync(join(root, 'public', 'sitemap.xml'), 'utf8'
 
 const expected = {
   app: {
-    title: 'Open Onyx — chat on the open mesh',
+    title: 'Open Onyx — chat on the open network',
     description: 'Open Onyx in your browser for local-first rooms, honest media security, live network context, and an identity you control.',
   },
   about: {
-    title: 'About Onyx — open protocol, sovereign mesh',
-    description: 'Learn how Onyx, Cadence media, and the open mesh work together without closed-platform lock-in.',
+    title: 'About Onyx — open protocol, sovereign network',
+    description: 'Learn how Onyx, Cadence media, and the open network work together without closed-platform lock-in.',
   },
   appearance: {
     title: 'Onyx appearance — themes and backgrounds',
@@ -27,11 +28,11 @@ const expected = {
   },
   stats: {
     title: 'Onyx stats — live room activity',
-    description: 'See public Onyx room activity, network message trends, people online, and channel sparklines.',
+    description: 'See public Onyx room activity, network message trends, people online, and room sparklines.',
   },
   status: {
-    title: 'Onyx status — mesh health',
-    description: 'Public Onyx mesh health, node uptime, peer latency, users online, and backup readiness.',
+    title: 'Onyx status — network health',
+    description: 'Public Onyx network health, node uptime, peer latency, users online, and backup readiness.',
   },
   roadmap: {
     title: 'Onyx roadmap — what shipped and what is next',
@@ -60,8 +61,8 @@ const expected = {
     description: 'Read the public Onyx accessibility contract for keyboard use, focus recovery, motion, contrast, and status announcements.',
   },
   glossary: {
-    title: 'Onyx glossary — names used across the mesh',
-    description: 'A concise guide to Onyx, Onyx Server, Cadence, Mooring, Armor, and the open mesh.',
+    title: 'Onyx glossary — names used across the network',
+    description: 'A concise guide to Onyx, Onyx Server, Cadence, Mooring, Armor, and the open network.',
   },
   integrations: {
     title: 'Onyx integrations — constrained by design',
@@ -93,13 +94,90 @@ afterEach(() => {
   }
 });
 
-describe('SPA route entrypoint materializer', () => {
-  it('covers every non-root route in the Solid router table', () => {
-    // Whitespace-robust: lazy PublicInfo routes use multiline <Route\n path=.../>.
-    const routes = [...routeTable.matchAll(/<Route\s+path="\/([^"/]+)\/?"/g)]
-      .map((match) => match[1])
-      .filter((route): route is string => route !== undefined);
+function readLiteralPathStrings(initializer: ts.JsxAttributeValue): readonly string[] {
+  if (ts.isStringLiteral(initializer)) return [initializer.text];
+  if (!ts.isJsxExpression(initializer) || initializer.expression === undefined) {
+    throw new Error('Route path must be a string literal or a literal string array');
+  }
+  const expression = initializer.expression;
+  if (ts.isStringLiteral(expression)) return [expression.text];
+  if (!ts.isArrayLiteralExpression(expression)) {
+    throw new Error('Route path expression must be a literal array of string literals');
+  }
+  return expression.elements.map((element) => {
+    if (ts.isSpreadElement(element) || !ts.isStringLiteral(element)) {
+      throw new Error('Route path arrays may contain only string literals');
+    }
+    return element.text;
+  });
+}
 
+function routerPathNames(sourceText: string): readonly string[] {
+  const source = ts.createSourceFile(
+    'src/index.tsx',
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const names: string[] = [];
+  let routeCount = 0;
+  let pathAttributeCount = 0;
+
+  function visit(node: ts.Node): void {
+    const element = ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node) ? node : undefined;
+    if (element && element.tagName.getText(source) === 'Route') {
+      routeCount += 1;
+      let paths: readonly string[] | undefined;
+      for (const attribute of element.attributes.properties) {
+        if (ts.isJsxSpreadAttribute(attribute)) {
+          throw new Error('Route declarations cannot use attribute spreads');
+        }
+        if (!ts.isJsxAttribute(attribute) || attribute.name.getText(source) !== 'path') continue;
+        if (attribute.initializer === undefined) {
+          throw new Error('Route path attribute is missing a value');
+        }
+        paths = readLiteralPathStrings(attribute.initializer);
+      }
+      if (paths === undefined) throw new Error('Route declaration is missing a path attribute');
+      if (paths.length === 0) throw new Error('Route path produced no string literals');
+      pathAttributeCount += 1;
+      for (const path of paths) {
+        const canonical = path === '/' ? path : path.replace(/\/+$/u, '') || '/';
+        if (canonical === '/' || canonical === '/*notFound') continue;
+        names.push(canonical.replace(/^\//u, ''));
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(source);
+  expect(pathAttributeCount).toBe(routeCount);
+  return names;
+}
+
+describe('SPA route entrypoint materializer', () => {
+  it('keeps exactly one final client route terminus outside materialized entrypoints', () => {
+    const source = ts.createSourceFile('src/index.tsx', routeTable, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const terminus: string[] = [];
+    function visit(node: ts.Node): void {
+      const element = ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node) ? node : undefined;
+      if (element?.tagName.getText(source) === 'Route') {
+        const path = element.attributes.properties.find((property) => ts.isJsxAttribute(property) && property.name.getText(source) === 'path');
+        const component = element.attributes.properties.find((property) => ts.isJsxAttribute(property) && property.name.getText(source) === 'component');
+        if (path && ts.isJsxAttribute(path) && path.initializer && readLiteralPathStrings(path.initializer).includes('/*notFound')) {
+          terminus.push(component && ts.isJsxAttribute(component) && component.initializer && ts.isJsxExpression(component.initializer)
+            ? component.initializer.expression?.getText(source) ?? '' : '');
+        }
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(source);
+    expect(terminus).toEqual(['NotFoundRoute']);
+  });
+
+  it('covers every non-root route in the Solid router table', () => {
+    const routes = routerPathNames(routeTable);
     expect([...new Set(routes)].sort()).toEqual(Object.keys(expected).sort());
   });
 

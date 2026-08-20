@@ -1,0 +1,34 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Onyx UI · token entrypoint
+
+   Import THIS file, never an individual layer — the cascade order below is the
+   contract. Later layers resolve `var()` references declared by earlier ones,
+   and the accessibility layer must land last so its media-query overrides win
+   over the base declarations they are correcting.
+
+     1. foundation      raw palette + structural scales (space, radius, layers)
+     2. semantic        --ui-surface / text / action / proof, dark + light
+     3. typography      the three voices and the role classes
+     4. motion          duration ladder + reduced-motion
+     5. accessibility   focus, targets, transparency, forced-colors, contrast
+
+   ── Adoption ────────────────────────────────────────────────────────────────
+   This entrypoint is deliberately NOT imported by src/styles/global.css. The
+   layer ships inert: it declares custom properties on :root (which cost
+   nothing and change nothing until read) and scopes every visual rule under
+   `.ui-root`. Existing app surfaces are untouched.
+
+   To adopt it on a surface:
+
+       import '@/ui/tokens/index.css';
+       <section class="ui-root"> … </section>
+
+   and consume `--ui-*` — never `--room-*`, never a raw hex.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@import './foundation.css';
+@import './semantic.css';
+@import './typography.css';
+@import './motion.css';
+@import './accessibility.css';

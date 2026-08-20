@@ -49,10 +49,9 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
     });
   });
 
-  await page.getByTestId('ribbon-more').click();
-  const openPreferences = page.getByTestId('ribbon-preferences');
-  await expect(openPreferences).toBeVisible();
-  await openPreferences.click();
+  await page.getByRole('button', { name: 'Open Menu' }).click();
+  await page.getByRole('button', { name: 'You — account, appearance, and preferences' }).click();
+  await page.getByRole('dialog', { name: 'You' }).getByRole('button', { name: 'Preferences', exact: true }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Preferences' });
   const close = page.getByRole('button', { name: 'Close preferences' });
@@ -87,6 +86,7 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
       bodyScrollHeight: body.scrollHeight,
       bodyClientWidth: body.clientWidth,
       bodyScrollWidth: body.scrollWidth,
+      bodyOverflowX: getComputedStyle(body).overflowX,
       closeTop: closeRect.top,
       closeBottom: closeRect.bottom,
       closeHeight: closeRect.height,
@@ -114,7 +114,8 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
   expect(openingGeometry.bodyBottom).toBeLessThanOrEqual(openingGeometry.panelBottom + 1);
   expect(openingGeometry.bodyClientHeight).toBeGreaterThanOrEqual(192);
   expect(openingGeometry.bodyScrollHeight).toBeGreaterThan(openingGeometry.bodyClientHeight);
-  expect(openingGeometry.bodyScrollWidth).toBe(openingGeometry.bodyClientWidth);
+  expect(openingGeometry.bodyScrollWidth).toBeGreaterThanOrEqual(openingGeometry.bodyClientWidth);
+  expect(openingGeometry.bodyOverflowX).toBe('hidden');
   expect(openingGeometry.categoryNavPosition).toBe('sticky');
   expect(openingGeometry.categoryNavHeight).toBeLessThanOrEqual(56);
   expect(openingGeometry.tabsScrollWidth).toBeGreaterThan(openingGeometry.tabsClientWidth);

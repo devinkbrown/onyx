@@ -93,6 +93,12 @@ describe('<CatchUpSummary>', () => {
     expect(names).toEqual(['#high', '#mid', 'trev', '#low']);
     // read room is excluded
     expect(names).not.toContain('#read');
+    expect(screen.getAllByTestId('catchup-channel-ledger')).toHaveLength(3);
+    expect(screen.getByRole('link', { name: 'Room ledger for #high' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23high',
+    );
+    expect(screen.queryByRole('link', { name: 'Room ledger for trev' })).toBeNull();
   });
 
   it('summarises unread + mention totals', () => {
@@ -108,7 +114,7 @@ describe('<CatchUpSummary>', () => {
   it('navigates to a channel on click via the store navigate action', () => {
     seed({ channels: [channel({ name: '#root', unread: 5 })] });
     render(() => <CatchUpSummary />);
-    fireEvent.click(screen.getByRole('button', { name: /Open channel #root/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Open room #root/i }));
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
   });
 
@@ -123,7 +129,7 @@ describe('<CatchUpSummary>', () => {
     const opened: string[] = [];
     seed({ channels: [channel({ name: '#root', unread: 5 })] });
     render(() => <CatchUpSummary onNavigate={(row) => opened.push(row.target)} />);
-    fireEvent.click(screen.getByRole('button', { name: /Open channel #root/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Open room #root/i }));
     expect(opened).toEqual(['#root']);
   });
 
@@ -143,7 +149,7 @@ describe('<CatchUpSummary>', () => {
   it('updates reactively when the store channel map is replaced', () => {
     seed({ channels: [channel({ name: '#root', unread: 2 })] });
     render(() => <CatchUpSummary />);
-    expect(screen.getByRole('button', { name: /Open channel #root, 2 unread/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open room #root, 2 unread/i })).toBeInTheDocument();
 
     // Simulate new traffic: replace the channels map (the store's immutable idiom).
     store.setState({
@@ -154,8 +160,8 @@ describe('<CatchUpSummary>', () => {
     });
 
     // The busier new room now ranks first and the count reflects the update.
-    expect(screen.getByRole('button', { name: /Open channel #zig, 20 unread/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Open channel #root, 9 unread/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open room #zig, 20 unread/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open room #root, 9 unread/i })).toBeInTheDocument();
     const list = screen.getByRole('list', { name: /unread activity/i });
     const names = within(list)
       .getAllByRole('listitem')

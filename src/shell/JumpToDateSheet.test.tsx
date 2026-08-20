@@ -96,6 +96,41 @@ describe('JumpToDateSheet', () => {
     expect(store.getState().showJumpToDate).toBe(false);
   });
 
+  it('links the active room to the public room ledger', () => {
+    seedChannel('#general');
+    render(() => <JumpToDateSheet />);
+
+    expect(screen.getByRole('link', { name: 'Room ledger for #general' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23general',
+    );
+  });
+
+  it('omits the room ledger from a DM jump', () => {
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'dm', nick: 'alice' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      showJumpToDate: true,
+      server: {
+        id: 'jump-date-test',
+        name: 'Onyx',
+        network: 'Onyx',
+        url: 'wss://example.test',
+        icon: '',
+        nick: 'me',
+        account: 'me',
+        connected: true,
+      },
+    }, true);
+
+    render(() => <JumpToDateSheet />);
+
+    expect(screen.getByRole('heading', { name: 'Jump to date' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Room ledger/i })).not.toBeInTheDocument();
+  });
+
   it('applies Today / Yesterday / 7 days ago presets', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-19T18:00:00.000Z'));

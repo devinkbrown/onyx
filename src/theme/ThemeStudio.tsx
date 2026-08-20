@@ -176,7 +176,7 @@ function StudioPreview() {
           <div class="ts-pv-side__server">
             <span class="ts-pv-side__sigil">◆</span>onyx
           </div>
-          <div class="ts-pv-side__group">channels</div>
+          <div class="ts-pv-side__group">rooms</div>
           <div class="ts-pv-chan" data-active="true">
             <span class="ts-pv-chan__hash">#</span>general
           </div>
@@ -191,7 +191,7 @@ function StudioPreview() {
           <div class="ts-pv-chan ts-pv-chan--muted">
             <span class="ts-pv-chan__hash">#</span>abyss
           </div>
-          <div class="ts-pv-side__group">voice</div>
+          <div class="ts-pv-side__group">calls</div>
           <div class="ts-pv-chan">
             <span class="ts-pv-chan__hash ts-pv-chan__hash--voice">◉</span>tide-pool
           </div>
@@ -222,7 +222,7 @@ function StudioPreview() {
             <div class="ts-pv-msg">
               <span class="ts-pv-msg__time">21:07</span>
               <span class="ts-pv-msg__nick" style={{"color":"var(--ok)"}}>onyx</span>
-              <span class="ts-pv-msg__text ts-pv-msg__text--dim">→ mesh: 2 shards linked, quorum ok</span>
+              <span class="ts-pv-msg__text ts-pv-msg__text--dim">→ network: 2 homes linked, quorum ok</span>
             </div>
             <div class="ts-pv-msg">
               <span class="ts-pv-msg__time">21:09</span>
@@ -232,7 +232,7 @@ function StudioPreview() {
           </div>
 
           <div class="ts-pv-actions">
-            <button class="ts-pv-btn ts-pv-btn--primary" type="button" tabIndex={-1}>join voice</button>
+            <button class="ts-pv-btn ts-pv-btn--primary" type="button" tabIndex={-1}>join call</button>
             <button class="ts-pv-btn ts-pv-btn--danger" type="button" tabIndex={-1}>leave</button>
           </div>
 
@@ -246,7 +246,7 @@ function StudioPreview() {
 
         {/* Member list with role sigils */}
         <div class="ts-pv-members">
-          <div class="ts-pv-members__head">online — 4</div>
+          <div class="ts-pv-members__head">people — 4</div>
           <div class="ts-pv-member">
             <span class="ts-pv-member__sigil" style={{"color":"var(--gold-bright)"}}>!</span>aoi
             <span class="ts-pv-member__dot" style={{"background":"var(--ok)"}} />
@@ -1841,27 +1841,21 @@ const STUDIO_CSS = `
   color: var(--lapis-bright);
   border-color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis-deep) 32%, var(--stone));
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
-    0 0 22px -14px var(--lapis-bright);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent);
   transform: none;
   animation: ts-seed-copied-flash var(--dur) var(--ease);
 }
 @keyframes ts-seed-copied-flash {
   0% {
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
-      0 0 0 0 color-mix(in oklab, var(--lapis-bright) 55%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent);
   }
   60% {
     box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
+      inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent),
       0 0 0 4px color-mix(in oklab, var(--lapis-bright) 20%, transparent);
   }
   100% {
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
-      0 0 22px -14px var(--lapis-bright);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent);
   }
 }
 @media (prefers-reduced-motion: reduce) {

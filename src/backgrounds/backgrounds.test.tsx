@@ -357,13 +357,14 @@ describe('BackgroundEngine lifecycle', () => {
   it.each([
     { label: 'solid variant', kind: 'solid' as const, staticMode: false },
     { label: 'static animated variant', kind: 'animated' as const, staticMode: true },
-  ])('does not repaint a $label for a no-op resize notification', ({ kind, staticMode }) => {
+  ])('does not repaint a $label for a no-op resize notification', async ({ kind, staticMode }) => {
     const variant = { ...createVariant(), kind };
     const engine = new BackgroundEngine({ canvas: createCanvas(), variant, staticMode });
 
     engine.start();
     const framesAtStart = (variant.frame as ReturnType<typeof vi.fn>).mock.calls.length;
     window.dispatchEvent(new Event('resize'));
+    await flushCoalescedResize();
 
     expect(variant.frame).toHaveBeenCalledTimes(framesAtStart);
     engine.dispose();
@@ -372,7 +373,7 @@ describe('BackgroundEngine lifecycle', () => {
   it.each([
     { label: 'solid variant', kind: 'solid' as const, staticMode: false },
     { label: 'static animated variant', kind: 'animated' as const, staticMode: true },
-  ])('repaints a $label for real layout and quality changes', ({ kind, staticMode }) => {
+  ])('repaints a $label for real layout and quality changes', async ({ kind, staticMode }) => {
     const canvas = createCanvas();
     const variant = { ...createVariant(), kind };
     const engine = new BackgroundEngine({ canvas, variant, staticMode });
@@ -381,6 +382,7 @@ describe('BackgroundEngine lifecycle', () => {
     const framesAtStart = (variant.frame as ReturnType<typeof vi.fn>).mock.calls.length;
     vi.mocked(canvas.getBoundingClientRect).mockReturnValue(canvasBounds(800, 450));
     window.dispatchEvent(new Event('resize'));
+    await flushCoalescedResize();
 
     expect(variant.frame).toHaveBeenCalledTimes(framesAtStart + 1);
     engine.setQuality('med');
@@ -388,7 +390,215 @@ describe('BackgroundEngine lifecycle', () => {
     engine.dispose();
   });
 
-  it('defers a frozen resize repaint while hidden and flushes it on visibility return', () => {
+  it('coalesces a resize storm into a single backing-store update', async () => {
+    const canvas = createCanvas();
+    const variant = { ...createVariant(), kind: 'solid' as const };
+    const engine = new BackgroundEngine({ canvas, variant });
+    const resize = vi.spyOn(engine, 'resize');
+
+    engine.start();
+    resize.mockClear();
+    vi.mocked(canvas.getBoundingClientRect).mockReturnValue(canvasBounds(800, 450));
+    window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new Event('resize'));
+    expect(resize).not.toHaveBeenCalled();
+    await flushCoalescedResize();
+    expect(resize).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
+  it('applies policy presentation in place without recreating the variant', () => {
+    const canvas = createCanvas();
+    const variant = createVariant();
+    const engine = new BackgroundEngine({
+      canvas,
+      variant,
+      quality: 'high',
+      frameCapFps: 30,
+      dprCap: 2,
+    });
+
+    engine.start();
+    expect(variant.init).toHaveBeenCalledTimes(1);
+    engine.applyPresentation({ quality: 'med', frameCapFps: 21, dprCap: 1.5, staticMode: true });
+    expect(engine.quality).toBe('med');
+    expect(engine.frameCapFps).toBe(21);
+    expect(engine.dprCap).toBe(1.5);
+    expect(engine.staticMode).toBe(true);
+    expect(variant.init).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
+  it('caps backing-store DPR from the policy ceiling on a 3x display', () => {
+    const dprDescriptor = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 3 });
+    const canvas = createCanvas();
+    const variant = { ...createVariant(), kind: 'solid' as const };
+    const engine = new BackgroundEngine({ canvas, variant, quality: 'med', dprCap: 1.5 });
+
+    try {
+      engine.start();
+      expect(canvas.width).toBe(960);
+      expect(canvas.height).toBe(540);
+    } finally {
+      engine.dispose();
+      if (dprDescriptor) Object.defineProperty(window, 'devicePixelRatio', dprDescriptor);
+      else Reflect.deleteProperty(window, 'devicePixelRatio');
+    }
+  });
+
+  it('suppresses an older live canvas engine when a second live surface starts', () => {
+    const raf = installControlledAnimationFrame();
+    const first = new BackgroundEngine({ canvas: createCanvas(), variant: createVariant(), live: true });
+    const second = new BackgroundEngine({ canvas: createCanvas(), variant: createVariant(), live: true });
+
+    try {
+      first.start();
+      expect(raf.pendingCount()).toBe(1);
+      second.start();
+      expect(raf.pendingCount()).toBe(1);
+      raf.runNext(16);
+      expect(first.canvas.dataset.backgroundPaused).toBe('true');
+    } finally {
+      second.dispose();
+      first.dispose();
+      raf.restore();
+    }
+  });
+
+  it('restores the displaced live engine when the replacement unmounts', () => {
+    const raf = installControlledAnimationFrame();
+    const first = new BackgroundEngine({ canvas: createCanvas(), variant: createVariant(), live: true });
+    const second = new BackgroundEngine({ canvas: createCanvas(), variant: createVariant(), live: true });
+
+    try {
+      first.start();
+      second.start();
+      expect(first.canvas.dataset.backgroundPaused).toBe('true');
+
+      second.dispose();
+
+      expect(first.canvas.dataset.backgroundPaused).toBeUndefined();
+      expect(raf.pendingCount()).toBe(1);
+    } finally {
+      second.dispose();
+      first.dispose();
+      raf.restore();
+    }
+  });
+
+  it('does not displace a runnable engine when a replacement has no 2D context', () => {
+    const first = new BackgroundEngine({ canvas: createCanvas(), variant: createVariant(), live: true });
+    const failedCanvas = createCanvas();
+    failedCanvas.getContext = vi.fn(() => null) as unknown as typeof failedCanvas.getContext;
+    const failed = new BackgroundEngine({ canvas: failedCanvas, variant: createVariant(), live: true });
+
+    try {
+      first.start();
+      failed.start();
+      expect(first.canvas.dataset.backgroundPaused).toBeUndefined();
+      expect(failed.canvas.dataset.backgroundPaused).toBeUndefined();
+    } finally {
+      failed.dispose();
+      first.dispose();
+    }
+  });
+
+  it('resizes and repaints a frozen canvas when DPR changes without a layout resize', () => {
+    const dprDescriptor = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+    const mediaQueries: Array<{
+      media: string;
+      listener: ((event: MediaQueryListEvent) => void) | null;
+      removeEventListener: ReturnType<typeof vi.fn>;
+    }> = [];
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation((media) => {
+      const record = {
+        media,
+        listener: null as ((event: MediaQueryListEvent) => void) | null,
+        removeEventListener: vi.fn(),
+      };
+      mediaQueries.push(record);
+      return {
+        matches: true,
+        media,
+        onchange: null,
+        addEventListener: vi.fn((_type: string, listener: EventListenerOrEventListenerObject) => {
+          record.listener = listener as (event: MediaQueryListEvent) => void;
+        }),
+        removeEventListener: record.removeEventListener,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      } as unknown as MediaQueryList;
+    });
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 });
+    const canvas = createCanvas();
+    const variant = { ...createVariant(), kind: 'solid' as const };
+    const engine = new BackgroundEngine({ canvas, variant, quality: 'high' });
+
+    try {
+      engine.start();
+      const context = vi.mocked(canvas.getContext).mock.results[0]?.value as CanvasRenderingContext2D;
+      expect(canvas.width).toBe(640);
+      expect(canvas.height).toBe(360);
+      expect(mediaQueries[0]?.media).toBe('(resolution: 1dppx)');
+
+      // The canvas keeps the same 640x360 CSS bounds; only display density
+      // changes, which ResizeObserver alone cannot report.
+      Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
+      mediaQueries[0]?.listener?.(new Event('change') as MediaQueryListEvent);
+
+      expect(canvas.width).toBe(1280);
+      expect(canvas.height).toBe(720);
+      expect(context.setTransform).toHaveBeenLastCalledWith(2, 0, 0, 2, 0, 0);
+      expect(variant.frame).toHaveBeenCalledTimes(2);
+      expect(mediaQueries[0]?.removeEventListener).toHaveBeenCalledWith(
+        'change',
+        mediaQueries[0]?.listener,
+      );
+      expect(mediaQueries[1]?.media).toBe('(resolution: 2dppx)');
+
+      engine.dispose();
+      expect(mediaQueries[1]?.removeEventListener).toHaveBeenCalledWith(
+        'change',
+        mediaQueries[1]?.listener,
+      );
+    } finally {
+      engine.dispose();
+      matchMedia.mockRestore();
+      if (dprDescriptor) Object.defineProperty(window, 'devicePixelRatio', dprDescriptor);
+      else Reflect.deleteProperty(window, 'devicePixelRatio');
+    }
+  });
+
+  it('keeps rendering when a partial matchMedia implementation rejects DPR listeners', () => {
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation((media) => ({
+      matches: true,
+      media,
+      onchange: null,
+      addEventListener: vi.fn(() => {
+        throw new TypeError('change listeners are unavailable');
+      }),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    } as unknown as MediaQueryList));
+    const variant = createVariant();
+    const engine = new BackgroundEngine({ canvas: createCanvas(), variant, staticMode: true });
+
+    try {
+      expect(() => engine.start()).not.toThrow();
+      expect(variant.init).toHaveBeenCalledTimes(1);
+      expect(variant.frame).toHaveBeenCalledTimes(1);
+    } finally {
+      engine.dispose();
+      matchMedia.mockRestore();
+    }
+  });
+
+  it('defers a frozen resize repaint while hidden and flushes it on visibility return', async () => {
     const hidden = Object.getOwnPropertyDescriptor(document, 'hidden');
     const variant = { ...createVariant(), kind: 'solid' as const };
     const engine = new BackgroundEngine({ canvas: createCanvas(), variant });
@@ -399,9 +609,12 @@ describe('BackgroundEngine lifecycle', () => {
       const framesAtStart = (variant.frame as ReturnType<typeof vi.fn>).mock.calls.length;
 
       setDocumentHidden(true);
+      document.dispatchEvent(new Event('visibilitychange'));
       vi.mocked(engine.canvas.getBoundingClientRect).mockReturnValue(canvasBounds(800, 450));
       window.dispatchEvent(new Event('resize'));
+      await flushCoalescedResize();
       expect(variant.frame).toHaveBeenCalledTimes(framesAtStart);
+      expect(engine.canvas.dataset.backgroundPaused).toBe('true');
 
       setDocumentHidden(false);
       document.dispatchEvent(new Event('visibilitychange'));
@@ -677,6 +890,103 @@ describe('Background reduced-motion selection', () => {
   });
 });
 
+describe('Background policy application', () => {
+  const originalMatchMedia = window.matchMedia;
+  const originalGetContext = HTMLCanvasElement.prototype.getContext;
+  const innerWidthDescriptor = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+  const dprDescriptor = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    if (innerWidthDescriptor) Object.defineProperty(window, 'innerWidth', innerWidthDescriptor);
+    else Reflect.deleteProperty(window, 'innerWidth');
+    if (dprDescriptor) Object.defineProperty(window, 'devicePixelRatio', dprDescriptor);
+    else Reflect.deleteProperty(window, 'devicePixelRatio');
+  });
+
+  function stubDesktopMedia() {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    HTMLCanvasElement.prototype.getContext = vi.fn(
+      () => create2dContext(),
+    ) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+  }
+
+  function setViewport(width: number, dpr: number) {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: dpr });
+  }
+
+  it.each([
+    { width: 320, dpr: 3 },
+    { width: 390, dpr: 3 },
+  ])('keeps explicit Animated on a $width CSS-px DPR$dpr phone at med/balanced', async ({ width, dpr }) => {
+    stubDesktopMedia();
+    setViewport(width, dpr);
+    setSceneMotion('animated');
+
+    const { container } = render(() => <Background id="deep-current" quality="high" />);
+    const canvas = await waitFor(() => {
+      const el = container.querySelector('canvas');
+      expect(el).not.toBeNull();
+      return el as HTMLCanvasElement;
+    });
+
+    expect(canvas.getAttribute('data-background-mode')).toBe('animated');
+    expect(canvas.getAttribute('data-background-quality')).toBe('med');
+    expect(canvas.getAttribute('data-background-detail')).toBe('balanced');
+    expect(canvas.getAttribute('data-background-kind')).toBe('animated');
+    const fps = Number(canvas.getAttribute('data-background-fps'));
+    expect(fps).toBeGreaterThanOrEqual(18);
+    expect(fps).toBeLessThanOrEqual(24);
+    expect(canvas.getAttribute('data-background-dpr-cap')).toBe('1.5');
+  });
+
+  it('caps a desktop DPR2+ wallpaper at high/full and dpr 2', async () => {
+    stubDesktopMedia();
+    setViewport(1440, 2.75);
+
+    const { container } = render(() => <Background id="deep-current" />);
+    const canvas = await waitFor(() => {
+      const el = container.querySelector('canvas');
+      expect(el).not.toBeNull();
+      return el as HTMLCanvasElement;
+    });
+
+    expect(canvas.getAttribute('data-background-mode')).toBe('animated');
+    expect(canvas.getAttribute('data-background-quality')).toBe('high');
+    expect(canvas.getAttribute('data-background-detail')).toBe('full');
+    expect(canvas.getAttribute('data-background-fps')).toBe('30');
+    expect(canvas.getAttribute('data-background-dpr-cap')).toBe('2');
+  });
+
+  it('caps a preview surface at low/sparse regardless of desktop size', async () => {
+    stubDesktopMedia();
+    setViewport(1440, 2);
+
+    const { container } = render(() => <Background id="deep-current" preview />);
+    const canvas = await waitFor(() => {
+      const el = container.querySelector('canvas');
+      expect(el).not.toBeNull();
+      return el as HTMLCanvasElement;
+    });
+
+    expect(canvas.getAttribute('data-background-quality')).toBe('low');
+    expect(canvas.getAttribute('data-background-detail')).toBe('sparse');
+    expect(canvas.getAttribute('data-background-preview')).toBe('true');
+    expect(canvas.getAttribute('data-background-dpr-cap')).toBe('1');
+  });
+});
+
 describe('background variants', () => {
   it.each(backgroundRegistry)('$id keeps init setup-only', (variant) => {
     const frame = vi.spyOn(variant, 'frame');
@@ -781,6 +1091,47 @@ describe('scene variants', () => {
 
     // Assert
     expect(root?.getAttribute('data-scene-static')).toBe('true');
+    expect(root?.getAttribute('data-scene-paused')).toBe('true');
+  });
+
+  it('omits expensive Starfield layers under the sparse policy hook', async () => {
+    const { ScenePolicyProvider } = await import('./scenes/scenePolicy');
+    const scene = sceneRegistry.find((entry) => entry.id === 'starfield');
+    expect(scene).toBeDefined();
+    const { container } = render(() => (
+      <ScenePolicyProvider value={() => ({ sceneDetail: 'sparse', reducedMotion: false, paused: false })}>
+        <Dynamic component={scene!.component} reducedMotion={false} sceneDetail="sparse" />
+      </ScenePolicyProvider>
+    ));
+    const root = container.querySelector('.onyx-scene');
+    expect(root?.getAttribute('data-scene-detail')).toBe('sparse');
+    expect(root?.querySelector('[data-scene-layer="stars"]')).not.toBeNull();
+    expect(root?.querySelector('[data-scene-layer="shooters"]')).toBeNull();
+    expect(root?.querySelector('[data-scene-layer="milky-way"]')).toBeNull();
+    expect(root?.querySelector('[data-scene-layer="grain"]')).toBeNull();
+  });
+
+  it.each([
+    { id: 'aurora-borealis', omitted: 'crackles' },
+    { id: 'lightning', omitted: 'sheet-flashes' },
+    { id: 'neon-night', omitted: 'lightning' },
+    { id: 'phoenix', omitted: 'feathers' },
+    { id: 'retro-arcade', omitted: 'explosions' },
+    { id: 'volcanic', omitted: 'debris' },
+  ] as const)('enforces sparse detail for $id by omitting $omitted', ({ id, omitted }) => {
+    const scene = sceneRegistry.find((entry) => entry.id === id);
+    expect(scene).toBeDefined();
+    const { container, unmount } = render(() => (
+      <Dynamic component={scene!.component} reducedMotion={false} sceneDetail="sparse" />
+    ));
+
+    try {
+      const root = container.querySelector('.onyx-scene');
+      expect(root?.getAttribute('data-scene-detail')).toBe('sparse');
+      expect(root?.querySelector(`[data-scene-layer="${omitted}"]`)).toBeNull();
+    } finally {
+      unmount();
+    }
   });
 });
 
@@ -840,6 +1191,13 @@ function createCanvas(): HTMLCanvasElement {
   canvas.getBoundingClientRect = vi.fn(() => canvasBounds(640, 360));
   canvas.getContext = vi.fn(() => create2dContext()) as unknown as typeof canvas.getContext;
   return canvas;
+}
+
+function flushCoalescedResize(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+    else queueMicrotask(() => resolve());
+  });
 }
 
 function canvasBounds(width: number, height: number): DOMRect {

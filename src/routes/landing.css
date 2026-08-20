@@ -1,59 +1,34 @@
-/* Onyx launch site — deep-water dark luxury, community-first.
-   Atmosphere: a vertical depth gradient (abyss → filtered surface light),
-   flowing azure currents, drifting bioluminescent motes, faint film grain.
-   Elegant, generous spacing; designed hover/focus; reduced-motion safe.
+/* Onyx launch site — mineral-night public shell.
+   Atmosphere nodes stay in the tree for Invite/Stats/About contracts but
+   do not paint. PublicFrame owns document chrome on live routes.
    NOTE: the .r-* atmosphere + shell classes are shared with /about. */
 
 .r { position: relative; min-height: 100svh; display: flex; flex-direction: column; isolation: isolate; font-family: var(--font-sans); color: var(--paper); background: var(--ink); }
 
-/* ───────── Atmosphere: depth · currents · bioluminescence · grain ───────── */
+/* ───────── Atmosphere: void ground (selectors kept for Invite/Stats/About) ───────── */
 .r-ground {
   position: fixed; inset: 0; z-index: -3;
-  /* light filtering down onto deep water — surface glow up top, trench below */
-  background:
-    radial-gradient(150% 78% at 50% -14%, color-mix(in oklab, var(--lapis-deep) 38%, transparent), transparent 56%),
-    radial-gradient(70% 48% at 82% 4%, color-mix(in oklab, var(--lapis-bright) 16%, transparent), transparent 60%),
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 60%, var(--ink)) 0%, var(--stone) 30%, var(--ink) 78%, var(--ink-2) 100%);
+  background: var(--ink);
 }
-.r-ground::before { /* very faint depth contour grid, masked toward the surface */
-  content: ''; position: absolute; inset: 0;
-  background-image: linear-gradient(var(--line-faint) 1px, transparent 1px), linear-gradient(90deg, var(--line-faint) 1px, transparent 1px);
-  background-size: 76px 76px;
-  mask-image: radial-gradient(130% 100% at 50% 0%, #000 14%, transparent 70%);
-  opacity: 0.35;
+.r-ground::before,
+.r-ground::after {
+  content: none;
+  display: none;
+  animation: none !important;
 }
-.r-ground::after { /* soft caustic light band drifting near the surface */
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(120% 36% at 30% 0%, color-mix(in oklab, var(--lapis-bright) 12%, transparent), transparent 70%);
-  opacity: 0.7; animation: r-caustic 18s var(--ease) infinite;
-}
-@keyframes r-caustic { 0%, 100% { transform: translateX(-4%); opacity: 0.45; } 50% { transform: translateX(6%); opacity: 0.85; } }
+@keyframes r-caustic { 0%, 100% { transform: none; opacity: 0; } }
 
-/* Drifting bioluminescent motes (replaces the gold flecks) */
-.r-flecks { position: fixed; inset: 0; z-index: -2; pointer-events: none;
-  background-image:
-    radial-gradient(1.5px 1.5px at 12% 24%, var(--lapis-bright) 50%, transparent 52%),
-    radial-gradient(1px 1px at 78% 16%, var(--lapis) 50%, transparent 52%),
-    radial-gradient(1.6px 1.6px at 64% 60%, var(--lapis-bright) 50%, transparent 52%),
-    radial-gradient(1px 1px at 30% 80%, var(--lapis) 50%, transparent 52%),
-    radial-gradient(1.2px 1.2px at 88% 72%, var(--gold-bright) 50%, transparent 52%),
-    radial-gradient(1.4px 1.4px at 44% 36%, var(--lapis-bright) 50%, transparent 52%),
-    radial-gradient(1px 1px at 22% 54%, var(--lapis) 50%, transparent 52%),
-    radial-gradient(1px 1px at 56% 90%, var(--lapis-bright) 50%, transparent 52%);
-  opacity: 0.55; animation: r-rise 11s ease-in-out infinite;
-}
-@keyframes r-rise { 0%, 100% { opacity: 0.34; transform: translateY(3px); } 50% { opacity: 0.66; transform: translateY(-3px); } }
+/* Decorative motes stay in the tree; they do not paint. */
+.r-flecks { position: fixed; inset: 0; z-index: -2; pointer-events: none; display: none; }
+@keyframes r-rise { 0%, 100% { opacity: 0; transform: none; } }
 
-/* Flowing azure currents (SVG paths — replaces the gold gold veins) */
-.r-veins { position: fixed; inset: 0; z-index: -2; width: 100%; height: 100%; pointer-events: none; opacity: 0.42; }
+.r-veins { position: fixed; inset: 0; z-index: -2; width: 100%; height: 100%; pointer-events: none; display: none; }
 .r-veins path { fill: none; stroke: var(--lapis); stroke-width: 1; opacity: 0.5; }
-.r-veins path.flow { stroke-dasharray: 3 11; animation: r-flow 11s linear infinite; }
-.r-veins .node { fill: var(--lapis-bright); filter: drop-shadow(0 0 4px var(--lapis)); }
-@keyframes r-flow { to { stroke-dashoffset: -140; } }
+.r-veins path.flow { stroke-dasharray: 3 11; }
+.r-veins .node { fill: var(--lapis-bright); }
+@keyframes r-flow { to { stroke-dashoffset: 0; } }
 
-/* Film grain */
-.r-grain { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.04; mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.r-grain { position: fixed; inset: 0; z-index: -1; pointer-events: none; display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .r-flecks, .r-veins path.flow, .r-status .live i, .r-vein, .r-ground::after { animation: none !important; }
@@ -63,12 +38,12 @@
 .r-wrap { width: 100%; max-width: 1240px; margin: 0 auto; padding-inline: clamp(20px, 5vw, 56px); }
 .r-section { position: relative; padding-block: clamp(64px, 10vw, 148px); }
 .r-eyebrow { display: inline-flex; align-items: center; gap: 12px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--lapis-bright); }
-.r-eyebrow::before { content: ''; width: 30px; height: 1px; background: linear-gradient(90deg, transparent, var(--lapis)); }
+.r-eyebrow::before { content: ''; width: 30px; height: 1px; background: var(--seam-faint); }
 .r-title { margin: 18px 0 0; font-family: var(--font-display); font-weight: 400; text-transform: uppercase; letter-spacing: 0; line-height: 0.92; color: var(--paper); font-size: clamp(2.3rem, 1rem + 5vw, 5rem); text-wrap: balance; }
 .r-lede { margin: 22px 0 0; max-width: 60ch; font-family: var(--font-serif); font-optical-sizing: auto; font-weight: 380; font-size: clamp(1.12rem, 1rem + 0.7vw, 1.5rem); line-height: 1.5; color: var(--paper-dim); text-wrap: pretty; }
 
 /* ───────── Top bar ───────── */
-.r-status { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px clamp(20px, 5vw, 56px); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper-dim); background: color-mix(in oklab, var(--ink) 74%, transparent); border-bottom: 1px solid var(--seam-faint); backdrop-filter: blur(10px) saturate(125%); }
+.r-status { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px clamp(20px, 5vw, 56px); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper-dim); background: var(--ink); border-bottom: 1px solid var(--seam-faint); }
 .r-status .brand {
   display: inline-flex;
   align-items: center;
@@ -102,24 +77,19 @@
   border-radius: var(--r-md);
   color: var(--on-accent);
   background: var(--lapis);
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--paper) 18%, transparent) inset,
-    0 14px 30px -20px var(--lapis-bright);
+  box-shadow: none;
   font-weight: 800;
-  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .r-status .enter:hover,
 .r-status .enter:focus-visible {
   color: var(--ink);
   border-color: var(--lapis-bright);
-  transform: translateY(-1px);
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--paper) 26%, transparent) inset,
-    0 18px 38px -20px var(--lapis-bright),
-    0 0 28px -18px var(--lapis-bright);
+  background: var(--lapis-bright);
+  box-shadow: none;
 }
 .r-status .live { color: var(--ok); display: inline-flex; align-items: center; gap: 8px; }
-.r-status .live i { width: 7px; height: 7px; border-radius: 999px; background: var(--ok); box-shadow: 0 0 10px var(--ok); animation: r-pulse 2.6s var(--ease) infinite; }
+.r-status .live i { width: 7px; height: 7px; border-radius: 999px; background: var(--ok); box-shadow: none; animation: r-pulse 2.6s var(--ease) infinite; }
 .r-status .live:not([data-feed-state='current']) { color: var(--text-3); }
 .r-status .live[data-feed-state='degraded'] { color: var(--shu-bright); }
 .r-status .live:not([data-feed-state='current']) i {
@@ -220,41 +190,33 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 .r-btn.primary {
   color: var(--on-accent);
   background: var(--lapis);
   border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--seam));
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--paper) 18%, transparent) inset,
-    0 14px 30px -20px var(--lapis-bright);
+  box-shadow: none;
 }
 .r-btn.primary:hover,
 .r-btn.primary:focus-visible {
   color: var(--ink);
-  transform: translateY(-1px);
   border-color: var(--lapis-bright);
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--paper) 26%, transparent) inset,
-    0 18px 38px -20px var(--lapis-bright),
-    0 0 28px -18px var(--lapis-bright);
+  background: var(--lapis-bright);
+  box-shadow: none;
 }
 .r-btn.ghost {
   color: var(--paper);
   background: color-mix(in oklab, var(--stone-2) 28%, transparent);
   border-color: var(--seam-faint);
-  box-shadow: 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent) inset;
+  box-shadow: none;
 }
 .r-btn.ghost:hover,
 .r-btn.ghost:focus-visible {
   color: var(--lapis-bright);
   border-color: var(--seam);
   background: color-mix(in oklab, var(--stone-3) 34%, transparent);
-  transform: translateY(-1px);
-  box-shadow:
-    0 1px 0 color-mix(in oklab, var(--paper) 10%, transparent) inset,
-    0 12px 28px -24px var(--lapis-bright);
+  box-shadow: none;
 }
 .r-ticker { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 38px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; color: var(--paper-mute); text-transform: uppercase; }
 .r-ticker b { color: var(--paper-dim); font-weight: 400; }
@@ -314,7 +276,7 @@
 .r-live-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
 .r-live-link { flex: none; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lapis-bright); border-bottom: 1px solid var(--seam); padding-bottom: 5px; }
 .r-live-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); margin-top: 38px; }
-.r-live-tile { min-height: 162px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; padding: clamp(20px, 2.3vw, 30px); border: 1px solid var(--seam-faint); border-radius: var(--r-md); background: linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 45%, var(--ink)), color-mix(in oklab, var(--stone) 24%, var(--ink))); overflow: hidden; }
+.r-live-tile { min-height: 162px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; padding: clamp(20px, 2.3vw, 30px); border: 1px solid var(--seam-faint); border-radius: 2px; background: var(--stone-2); overflow: hidden; }
 .r-live-tile .k { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lapis-bright); }
 .r-live-tile strong { display: block; font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(1.7rem, 1rem + 1.8vw, 3.1rem); line-height: 0.95; color: var(--paper); overflow-wrap: anywhere; }
 .r-live-tile strong[data-state='operational'] { color: var(--ok); }
@@ -324,18 +286,18 @@
 @media (max-width: 620px) { .r-live-head { display: block; } .r-live-link { display: inline-flex; margin-top: 22px; } .r-live-grid { grid-template-columns: 1fr; } }
 
 .r-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: clamp(16px, 2vw, 28px); margin-top: 44px; }
-.r-stat { display: flex; flex-direction: column; gap: 8px; padding: clamp(22px, 2.4vw, 32px); border-left: 2px solid var(--seam); background: linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 36%, var(--ink)), color-mix(in oklab, var(--stone) 22%, var(--ink))); border-radius: 0 var(--r-md) var(--r-md) 0; transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease); }
-.r-stat:hover { transform: translateY(-3px); border-left-color: var(--lapis-bright); }
+.r-stat { display: flex; flex-direction: column; gap: 8px; padding: clamp(22px, 2.4vw, 32px); border-left: 2px solid var(--seam); background: var(--stone-2); border-radius: 0; transition: border-color var(--dur) var(--ease); }
+.r-stat:hover { border-left-color: var(--lapis-bright); }
 .r-stat .n { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(1.5rem, 1rem + 1.4vw, 2.1rem); color: var(--lapis-bright); line-height: 1; }
 .r-stat .l { font-family: var(--font-serif); font-style: italic; font-size: 1rem; line-height: 1.45; color: var(--paper-dim); }
 
 /* ───────── Rooms / culture cards (shared .r-board) ───────── */
 .r-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 272px), 1fr)); gap: clamp(14px, 1.8vw, 24px); margin-top: 42px; }
 .r-board.three { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
-.r-card { position: relative; background: linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 38%, var(--ink)), color-mix(in oklab, var(--stone) 24%, var(--ink))); border: 1px solid var(--seam-faint); border-radius: var(--r-md); padding: clamp(24px, 2.4vw, 34px); display: flex; flex-direction: column; gap: 11px; transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); overflow: hidden; }
-.r-card::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 2px; background: linear-gradient(90deg, var(--lapis-bright), transparent); transform: scaleX(0); transform-origin: left; transition: transform 420ms var(--ease); }
-.r-card:hover { transform: translateY(-5px); border-color: var(--seam); box-shadow: 0 24px 50px -30px color-mix(in oklab, var(--lapis) 60%, transparent); }
-.r-card:hover::before { transform: scaleX(1); }
+.r-card { position: relative; background: var(--stone-2); border: 1px solid var(--seam-faint); border-radius: 2px; padding: clamp(24px, 2.4vw, 34px); display: flex; flex-direction: column; gap: 11px; transition: border-color var(--dur) var(--ease); overflow: hidden; }
+.r-card::before { content: none; }
+.r-card:hover { border-color: var(--seam); }
+.r-card:hover::before { transform: none; }
 .r-card .k { align-self: flex-start; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lapis-bright); padding: 3px 10px; border: 1px solid var(--seam-faint); border-radius: var(--r-pill); }
 .r-card h2, .r-card h4 { margin: 2px 0 0; font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: 1.5rem; color: var(--paper); letter-spacing: 0.01em; }
 .r-card p { margin: 0; font-family: var(--font-sans); font-size: 0.96rem; line-height: 1.6; color: var(--paper-dim); }
@@ -352,7 +314,7 @@
 .r-steps li b { color: var(--paper); font-weight: 600; }
 .r-steps .idx { flex: none; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.16em; color: var(--lapis-bright); padding-top: 4px; }
 
-.term { border: 1px solid var(--seam); border-radius: var(--r-md); background: color-mix(in oklab, var(--ink) 70%, var(--stone)); font-family: var(--font-mono); box-shadow: 0 30px 80px -40px rgba(0, 0, 0, 0.9); overflow: hidden; }
+.term { border: 1px solid var(--seam); border-radius: 2px; background: var(--ink); font-family: var(--font-mono); box-shadow: none; overflow: hidden; }
 .term .bar { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--seam-faint); color: var(--paper-mute); font-size: 12px; letter-spacing: 0.1em; }
 .term .bar .lights { display: inline-flex; gap: 7px; }
 .term .bar .lights i { width: 10px; height: 10px; border-radius: 999px; }
@@ -369,7 +331,7 @@
 @media (prefers-reduced-motion: reduce) { .term .body .cursor { animation: none; } }
 
 /* ───────── Run your own (mesh visual) ───────── */
-.r-sovereign .r-meshvis { width: 100%; height: auto; display: block; border: 1px solid var(--seam-faint); border-radius: var(--r-md); background: radial-gradient(120% 120% at 50% 0%, color-mix(in oklab, var(--stone-2) 50%, var(--ink)), var(--ink)); }
+.r-sovereign .r-meshvis { width: 100%; height: auto; display: block; border: 1px solid var(--seam-faint); border-radius: var(--r-md); background: color-mix(in oklab, var(--stone-2) 36%, var(--ink)); }
 .r-vein { stroke-dasharray: 4 7; animation: r-flow2 5s linear infinite; }
 @keyframes r-flow2 { to { stroke-dashoffset: -44; } }
 

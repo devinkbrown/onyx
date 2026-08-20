@@ -202,6 +202,85 @@ describe('blockKitLite', () => {
     )).toBeNull();
   });
 
+  it('rejects a smuggled CTCP control byte in an action value (forged remote EDIT/DELETE/STAGE/POLL_VOTE)', () => {
+    // \x01 (SOH) is not ECMAScript whitespace, so `.trim()` alone would leave
+    // it standing, and the wire-layer `stripWireControl` only strips
+    // [\r\n\x00] — letting the byte survive into `PRIVMSG :\x01EDIT <id>
+    // <text>\x01` and forge an edit against the *sender's own* prior message
+    // (store.ts matches `m.from === sender`) for every channel viewer.
+    expect(prepareBlockKitAction(
+      { type: 'send', target: '#ops', value: '\x01EDIT abc123 I confess to everything\x01' },
+      '#ops',
+    )).toBeNull();
+    expect(prepareBlockKitAction(
+      { type: 'send', target: '#ops', value: '\x01DELETE abc123\x01' },
+      '#ops',
+    )).toBeNull();
+    expect(prepareBlockKitAction(
+      { type: 'send', target: '#ops', value: '\x01STAGE anything\x01' },
+      '#ops',
+    )).toBeNull();
+    expect(prepareBlockKitAction(
+      { type: 'send', target: '#ops', value: '\x01POLL_VOTE abc123 0\x01' },
+      '#ops',
+    )).toBeNull();
+
+    const block = parseBlockKitLitePayload(JSON.stringify({
+      buttons: [{ label: 'Confirm', action: { type: 'send', target: '#ops', value: '\x01EDIT m1 pwned\x01' } }],
+    }));
+    expect(block?.buttons[0]?.action).toBeNull();
+  });
+
+  it('rejects bidi-override and invisible Unicode formatting characters in every text field', () => {
+    // U+202E (RIGHT-TO-LEFT OVERRIDE) can visually reorder rendered text; U+200B
+    // (ZERO WIDTH SPACE) is non-printing. Both must be rejected everywhere a
+    // block can carry attacker text, not just the action value that reaches the
+    // confirmation dialog.
+    expect(prepareBlockKitAction(
+      { type: 'send', target: '#ops', value: 'approve\u202e signature' },
+      '#ops',
+    )).toBeNull();
+    expect(prepareBlockKitAction(
+      { type: 'send', target: '#ops', value: 'zero\u200bwidth' },
+      '#ops',
+    )).toBeNull();
+
+    // A safe sibling field (`safeTitle`) keeps the block itself non-null so
+    // each unsafe field's individual rejection is observable rather than
+    // masked by the "no content at all" empty-block short-circuit.
+    const block = parseBlockKitLitePayload(JSON.stringify({
+      title: 'Deploy\u202egnippihs',
+      text: 'Body with\u200bzwsp',
+      buttons: [
+        { label: 'Ok\u202e', value: 'v' },
+        { label: 'safeTitle', value: 'safe' },
+      ],
+      fields: [{ label: 'Field', value: 'val\u202eue' }],
+    }));
+    expect(block?.title).toBeNull();
+    expect(block?.text).toBeNull();
+    expect(block?.buttons).toEqual([{ label: 'safeTitle', url: null, value: 'safe', action: null }]);
+    // The field itself is kept (label is safe) but its unsafe value is
+    // dropped to empty — never smuggled through as text, matching the
+    // existing missing-value fallback (`trimText(...) ?? ''`).
+    expect(block?.fields).toEqual([{ label: 'Field', value: '' }]);
+  });
+
+  it('rejects the wider invisible/bidi-formatting set flagged in review (ALM, word joiner, soft hyphen, tag chars)', () => {
+    // U+061C ARABIC LETTER MARK is a real bidi formatting control that the
+    // narrower ZWSP..RLM/embed-override ranges alone do not cover; U+2060
+    // WORD JOINER and U+00AD SOFT HYPHEN are invisible; U+E0001 sits in the
+    // deprecated language-tag plane, the classic invisible-text-smuggling
+    // block.
+    for (const codePoint of [0x061c, 0x2060, 0x00ad, 0x180e, 0xe0001]) {
+      const payload = `hidden${String.fromCodePoint(codePoint)}payload`;
+      expect(prepareBlockKitAction(
+        { type: 'send', target: '#ops', value: payload },
+        '#ops',
+      )).toBeNull();
+    }
+  });
+
   it('routes select-option values through the action-value guard (CRLF/leading-slash rejected)', () => {
     const block = parseBlockKitLitePayload(JSON.stringify({
       selects: [{

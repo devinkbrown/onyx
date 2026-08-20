@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { For } from 'solid-js';
+import { createMemo, For, Show } from 'solid-js';
 import type { SceneProps, SceneVariant } from '../engine';
 import { SceneShell, seededRand } from './SceneShell';
+import { useScenePolicy } from './scenePolicy';
 
 /* ── Aurora Borealis: mountain silhouettes, star field, rich flowing curtains,
    light pillars, ground reflection and electric crackles. Ported from
@@ -65,45 +66,65 @@ const CURTAINS = [
 ];
 
 function AuroraBorealisScene(props: SceneProps) {
+  const policy = useScenePolicy();
+  const detail = createMemo(() => props.sceneDetail ?? policy().sceneDetail);
+  const visibleStars = createMemo(() => stars.slice(0, detail() === 'sparse' ? 18 : detail() === 'balanced' ? 36 : stars.length));
+  const visibleCurtains = createMemo(() => CURTAINS.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 5 : CURTAINS.length));
+  const visibleColumns = createMemo(() => cols.slice(0, detail() === 'sparse' ? 8 : detail() === 'balanced' ? 14 : cols.length));
+  const visibleParticles = createMemo(() => particles.slice(0, detail() === 'sparse' ? 6 : detail() === 'balanced' ? 12 : particles.length));
+  const visibleCrackles = createMemo(() => crackles.slice(0, detail() === 'balanced' ? 3 : crackles.length));
+
   return (
-    <SceneShell reducedMotion={props.reducedMotion} base="linear-gradient(180deg, #070313 0%, #0b0620 45%, #04020c 100%)">
+    <SceneShell
+      reducedMotion={props.reducedMotion}
+      sceneDetail={detail()}
+      paused={props.paused}
+      onRuntimePaused={props.onRuntimePaused}
+      base="linear-gradient(180deg, #070313 0%, #0b0620 45%, #04020c 100%)"
+    >
       {/* Deep space background */}
       <div class="absolute top-0 left-0 right-0 h-[50%]"
         style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(100,60,180,0.25), rgba(50,30,100,0.15) 50%, transparent 80%)', filter: 'blur(6px)' }} />
 
       {/* Bright star field */}
-      <For each={stars}>
-        {(s) => (
-          <div class="absolute rounded-full"
-            style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.size}px`, height: `${s.size}px`,
-              background: s.color,
-              opacity: s.opacity,
-              'box-shadow': `0 0 4px ${s.glow}`,
-              animation: `au-twinkle ${s.dur}s ease-in-out ${s.delay}s infinite` }} />
-        )}
-      </For>
+      <div data-scene-layer="stars">
+        <For each={visibleStars()}>
+          {(s) => (
+            <div class="absolute rounded-full"
+              style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.size}px`, height: `${s.size}px`,
+                background: s.color,
+                opacity: s.opacity,
+                'box-shadow': `0 0 4px ${s.glow}`,
+                animation: `au-twinkle ${s.dur}s ease-in-out ${s.delay}s infinite` }} />
+          )}
+        </For>
+      </div>
 
       {/* Aurora curtain bands */}
-      <For each={CURTAINS}>
-        {(c) => (
-          <div class="absolute left-0 right-0"
-            style={{ top: c.top, height: c.h,
-              background: `linear-gradient(180deg, ${c.c1}80 0%, ${c.c1}60 20%, ${c.c2}50 40%, ${c.c2}30 60%, transparent 100%)`,
-              animation: `au-curtain ${c.dur} ease-in-out ${c.delay} infinite`,
-              filter: `blur(${c.blur}px)` }} />
-        )}
-      </For>
+      <div data-scene-layer="curtains">
+        <For each={visibleCurtains()}>
+          {(c) => (
+            <div class="absolute left-0 right-0"
+              style={{ top: c.top, height: c.h,
+                background: `linear-gradient(180deg, ${c.c1}80 0%, ${c.c1}60 20%, ${c.c2}50 40%, ${c.c2}30 60%, transparent 100%)`,
+                animation: `au-curtain ${c.dur} ease-in-out ${c.delay} infinite`,
+                filter: `blur(${c.blur}px)` }} />
+          )}
+        </For>
+      </div>
 
       {/* Vertical light pillars */}
-      <For each={cols}>
-        {(col) => (
-          <div class="absolute top-0"
-            style={{ left: `${col.left}%`, width: '6%', height: `${col.h}%`,
-              background: `linear-gradient(180deg, ${col.color}60, ${col.color}40 30%, ${col.color}20 60%, transparent)`,
-              animation: `au-col ${col.dur}s ease-in-out ${col.delay}s infinite`,
-              filter: 'blur(8px)' }} />
-        )}
-      </For>
+      <div data-scene-layer="pillars">
+        <For each={visibleColumns()}>
+          {(col) => (
+            <div class="absolute top-0"
+              style={{ left: `${col.left}%`, width: '6%', height: `${col.h}%`,
+                background: `linear-gradient(180deg, ${col.color}60, ${col.color}40 30%, ${col.color}20 60%, transparent)`,
+                animation: `au-col ${col.dur}s ease-in-out ${col.delay}s infinite`,
+                filter: 'blur(8px)' }} />
+          )}
+        </For>
+      </div>
 
       {/* Aurora reflection on ground */}
       <div class="absolute left-0 right-0" style={{ bottom: '0%', height: '25%' }}>
@@ -113,26 +134,30 @@ function AuroraBorealisScene(props: SceneProps) {
       </div>
 
       {/* Floating aurora particles */}
-      <For each={particles}>
-        {(p) => (
-          <div class="absolute rounded-full"
-            style={{ left: `${p.x}%`, top: `${p.y}%`, width: `${p.size}px`, height: `${p.size}px`,
-              background: p.color, opacity: 0,
-              'box-shadow': `0 0 ${p.size * 8}px ${p.color}`,
-              animation: `au-spark ${p.dur}s ease-in-out ${p.delay}s infinite` }} />
-        )}
-      </For>
-
-      {/* Electric aurora crackles + mountain silhouettes */}
-      <svg class="absolute inset-0 w-full h-full">
-        <For each={crackles}>
-          {(cr) => (
-            <line x1={`${cr.x1}%`} y1={`${cr.y1}%`} x2={`${cr.x2}%`} y2={`${cr.y2}%`}
-              stroke="rgba(220,200,255,0.8)" stroke-width="1.5" stroke-linecap="round"
-              style={{ filter: 'drop-shadow(0 0 3px rgba(220,200,255,0.6))', animation: `au-crackle ${cr.dur}s ease-in-out ${cr.delay}s infinite` }} />
+      <div data-scene-layer="particles">
+        <For each={visibleParticles()}>
+          {(p) => (
+            <div class="absolute rounded-full"
+              style={{ left: `${p.x}%`, top: `${p.y}%`, width: `${p.size}px`, height: `${p.size}px`,
+                background: p.color, opacity: 0,
+                'box-shadow': `0 0 ${p.size * 8}px ${p.color}`,
+                animation: `au-spark ${p.dur}s ease-in-out ${p.delay}s infinite` }} />
           )}
         </For>
-      </svg>
+      </div>
+
+      {/* Electric aurora crackles + mountain silhouettes */}
+      <Show when={detail() !== 'sparse'}>
+        <svg class="absolute inset-0 w-full h-full" data-scene-layer="crackles">
+          <For each={visibleCrackles()}>
+            {(cr) => (
+              <line x1={`${cr.x1}%`} y1={`${cr.y1}%`} x2={`${cr.x2}%`} y2={`${cr.y2}%`}
+                stroke="rgba(220,200,255,0.8)" stroke-width="1.5" stroke-linecap="round"
+                style={{ filter: 'drop-shadow(0 0 3px rgba(220,200,255,0.6))', animation: `au-crackle ${cr.dur}s ease-in-out ${cr.delay}s infinite` }} />
+            )}
+          </For>
+        </svg>
+      </Show>
       <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
         <path d="M0,100 L0,88 L6,80 L11,85 L18,68 L24,75 L32,55 L40,70 L48,48 L55,62 L62,40 L68,58 L76,44 L82,60 L90,50 L95,65 L100,58 L100,100 Z"
           fill="rgba(15,15,25,0.8)" />

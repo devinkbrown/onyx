@@ -34,6 +34,16 @@ beforeEach(() => {
   _resetDeviceSigningForTests();
 });
 
+async function writeStoredSigning(value: unknown): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const open = indexedDB.open('onyx-keys', 1);
+    open.onupgradeneeded = () => { if (!open.result.objectStoreNames.contains('device')) open.result.createObjectStore('device'); };
+    open.onsuccess = () => { try { const db = open.result; const tx = db.transaction('device', 'readwrite'); tx.objectStore('device').put(value, 'sign-v1'); tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = () => reject(tx.error); } catch (error) { reject(error); } };
+    open.onerror = () => reject(open.error);
+  });
+}
+async function deleteKeysDb(): Promise<void> { await new Promise<void>((resolve) => { const req = indexedDB.deleteDatabase('onyx-keys'); req.onsuccess = req.onerror = req.onblocked = () => resolve(); }); }
+
 // ── residence wire KAT (mirrors the daemon Zig KAT: kain / 0xA1B2C3D4E5F60718 / 7 / 1e6)
 const KAT_BINDING = { account: 'kain', nodeHex: 'a1b2c3d4e5f60718', epoch: 7, expiryMs: 1_000_000 };
 const KAT_UNSIGNED_HEX =
@@ -142,6 +152,48 @@ describe('deviceSigningKeys', () => {
     delete globalThis.indexedDB;
     expect(await deviceSigningKeys()).toBeNull();
     expect(await signHex(new Uint8Array([1]))).toBeNull();
+  });
+
+  it('never exposes or caches a generated identity when IDB put transaction aborts', async () => {
+    const original = IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction = function (this: IDBDatabase, ...args: Parameters<typeof original>) {
+      const tx = original.apply(this, args);
+      if (args[1] === 'readwrite') {
+        queueMicrotask(() => {
+          tx.abort();
+        });
+      }
+      return tx;
+    } as typeof original;
+    try {
+      expect(await deviceSigningKeys()).toBeNull();
+      // A failed promise may be retried, but it must not retain a trusted key.
+      expect(await deviceSigningKeys()).toBeNull();
+    } finally { IDBDatabase.prototype.transaction = original; }
+  });
+  it('never exposes or caches a generated identity when IDB put throws', async () => {
+    const original = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (this: IDBObjectStore, ..._args: Parameters<typeof original>) {
+      throw new DOMException('quota', 'QuotaExceededError');
+    } as typeof original;
+    try { expect(await deviceSigningKeys()).toBeNull(); expect(await deviceSigningKeys()).toBeNull(); }
+    finally { IDBObjectStore.prototype.put = original; }
+  });
+  it('fails closed on malformed, extractable, and mismatched stored signing pairs without rotating them', async () => {
+    await writeStoredSigning({ nope: true }); expect(await deviceSigningKeys()).toBeNull(); _resetDeviceSigningForTests();
+    await deleteKeysDb(); globalThis.indexedDB = new IDBFactory();
+    const extractable = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']) as CryptoKeyPair;
+    await writeStoredSigning(extractable); expect(await deviceSigningKeys()).toBeNull(); _resetDeviceSigningForTests();
+    await deleteKeysDb(); globalThis.indexedDB = new IDBFactory();
+    const [one, two] = await Promise.all([crypto.subtle.generateKey('Ed25519', false, ['sign', 'verify']), crypto.subtle.generateKey('Ed25519', false, ['sign', 'verify'])]) as [CryptoKeyPair, CryptoKeyPair];
+    await writeStoredSigning({ privateKey: one.privateKey, publicKey: two.publicKey }); expect(await deviceSigningKeys()).toBeNull();
+  });
+  it('closes IDB connections after existing and failed write paths so deletion is not blocked', async () => {
+    expect(await deviceSigningKeys()).not.toBeNull(); _resetDeviceSigningForTests(); expect(await deviceSigningKeys()).not.toBeNull(); await deleteKeysDb(); _resetDeviceSigningForTests();
+    globalThis.indexedDB = new IDBFactory(); const original = IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction = function (this: IDBDatabase, ...args: Parameters<typeof original>) { const tx = original.apply(this, args); if (args[1] === 'readwrite') queueMicrotask(() => tx.abort()); return tx; } as typeof original;
+    try { expect(await deviceSigningKeys()).toBeNull(); } finally { IDBDatabase.prototype.transaction = original; }
+    await deleteKeysDb();
   });
 });
 

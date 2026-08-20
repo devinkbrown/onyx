@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './data-pages.css';
+import './invite.css';
 import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
-import { Mascot } from '@/components/brand/Mascot';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { buildInviteCard, inviteDescription, inviteTitle } from '@/lib/invite/inviteCard';
+import { statsRoomHref } from '@/lib/stats/channelDetail';
+import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
-import { PublicFooter } from './PublicFooter';
 
 const NETWORK_NAME = 'Onyx';
 
@@ -35,6 +36,10 @@ function formatMoment(at: Date): string {
     timeStyle: 'short',
     timeZone: 'UTC',
   }).format(at);
+}
+
+function isPublicStatsChannel(channel: string | null): channel is string {
+  return channel !== null && /^[#&]/.test(channel.trim());
 }
 
 export default function InviteRoute() {
@@ -82,7 +87,18 @@ export default function InviteRoute() {
   }
 
   return (
-    <main class="r data-page invite-page">
+    <PublicFrame
+      currentPath="/invite/"
+      mainLabel="Onyx invite"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Threshold</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Invite</span>
+        </p>
+      )}
+    >
+      <div class="ui-root r data-page invite-page">
       <div class="r-ground" aria-hidden="true" />
       <div class="r-flecks" aria-hidden="true" />
       <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
@@ -92,31 +108,59 @@ export default function InviteRoute() {
       </svg>
       <div class="r-grain" aria-hidden="true" />
 
-      <header class="r-status" role="banner">
-        <a class="brand" href="/" aria-label="Onyx home">
-          <Mascot variant="mark" />ONYX
-        </a>
-        <nav aria-label="Primary">
-          <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="/stats/">Stats</a>
-          <a class="hideable" href="/status/">Status</a>
-          <a class="hideable" href="/roadmap/">Roadmap</a>
-          <a class="hideable" href="/about/">About</a>
-          <a class="hideable" href="/invite/?join=%23root" aria-current="page">Invite</a>
-          <a class="enter" href="/app/">Open Onyx</a>
-        </nav>
-      </header>
-
       <section class="r-wrap data-hero" aria-labelledby="invite-heading">
         <p class="r-kicker">invite</p>
-        <h1 id="invite-heading">
-          <Show when={card().channel} fallback={<>Join<br /><span class="gold">{NETWORK_NAME}</span></>}>
-            {(channel) => <>Join<br /><span class="gold">{channel()}</span></>}
+        <h1 id="invite-heading" aria-label={card().channel ? `Join ${card().channel}` : `Join ${NETWORK_NAME}`}>
+          <Show when={card().channel} fallback={<>Join<br /><span class="invite-title-accent">{NETWORK_NAME}</span></>}>
+            {(channel) => (
+              <>
+                Join<br />
+                <Show
+                  when={isPublicStatsChannel(channel())}
+                  fallback={<span class="invite-title-accent">{channel()}</span>}
+                >
+                  <a
+                    class="invite-title-accent invite-title-ledger"
+                    href={statsRoomHref(channel())}
+                    aria-label={`Room ledger for ${channel()}`}
+                    data-testid="invite-hero-ledger"
+                  >
+                    {channel()}
+                  </a>
+                </Show>
+              </>
+            )}
           </Show>
         </h1>
         <p class="sub">{description()}</p>
+        <dl class="invite-safety-receipt" aria-label="Invite handoff receipt">
+          <div>
+            <dt>Source</dt>
+            <dd>This invite URL</dd>
+          </div>
+          <div>
+            <dt>Destination</dt>
+            <dd>{card().channel ?? 'Onyx room directory'}</dd>
+          </div>
+          <div>
+            <dt>Handoff</dt>
+            <dd>Only supported fields move into Onyx when you choose Open invite.</dd>
+          </div>
+        </dl>
         <div class="r-cta">
           <a class="r-btn primary" href={appHref()}>Open invite in Onyx</a>
+          <Show when={isPublicStatsChannel(card().channel) ? card().channel : undefined}>
+            {(channel) => (
+              <a
+                class="r-btn ghost"
+                href={statsRoomHref(channel())}
+                aria-label={`Room ledger for ${channel()}`}
+                data-testid="invite-cta-ledger"
+              >
+                Room ledger
+              </a>
+            )}
+          </Show>
           <button
             type="button"
             class="r-btn ghost"
@@ -126,7 +170,7 @@ export default function InviteRoute() {
           >
             {copyButtonLabel()}
           </button>
-          <a class="r-btn ghost" href="/guides/">Read the quick guides</a>
+          <a class="r-btn ghost" href="/about/">How Onyx works</a>
         </div>
         <Show when={copyState() === 'copied'}>
           <p class="invite-copy-status" role="status">Invite link copied to clipboard.</p>
@@ -150,7 +194,27 @@ export default function InviteRoute() {
               <div><strong>Network</strong><span>{card().network}</span></div>
             </div>
             <div class="data-row">
-              <div><strong>Room</strong><span>{card().channel ?? 'Choose a room from Home'}</span></div>
+              <div>
+                <strong>Room</strong>
+                <Show
+                  when={isPublicStatsChannel(card().channel) ? card().channel : undefined}
+                  fallback={<span>{card().channel ?? 'Choose a room from Home'}</span>}
+                >
+                  {(channel) => (
+                    <span class="invite-room-detail">
+                      <span>{channel()}</span>
+                      <a
+                        class="invite-room-ledger"
+                        href={statsRoomHref(channel())}
+                        aria-label={`Room ledger for ${channel()}`}
+                        data-testid="invite-room-ledger"
+                      >
+                        Room ledger
+                      </a>
+                    </span>
+                  )}
+                </Show>
+              </div>
             </div>
             <Show when={card().at}>
               {(at) => (
@@ -203,7 +267,7 @@ export default function InviteRoute() {
           <div role="listitem"><strong>After claim</strong><span>Same room path, saved identity, local memory.</span></div>
         </div>
       </section>
-      <PublicFooter />
-    </main>
+      </div>
+    </PublicFrame>
   );
 }

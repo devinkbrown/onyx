@@ -35,7 +35,6 @@
   border-color: color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
   background: color-mix(in oklab, var(--stone) 84%, var(--lapis) 16%);
   color: var(--paper);
-  transform: translateY(-1px);
 }
 
 .boost-pill:focus-visible {

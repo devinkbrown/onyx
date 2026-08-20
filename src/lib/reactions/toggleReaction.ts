@@ -58,6 +58,34 @@ export function toggleMessageReactions(
 }
 
 /**
+ * Add `nick` to an emoji bucket without toggling-off when already present.
+ * Used by inbound ACTIVITY react / remote REACT fold-back.
+ */
+export function addMessageReactor(
+  reactions: readonly MessageReaction[] | undefined,
+  emoji: string,
+  nick: string,
+): MessageReaction[] {
+  const existing = reactions ?? [];
+  if (!emoji || !nick) return existing.map((r) => ({ emoji: r.emoji, users: [...r.users] }));
+
+  const rIdx = existing.findIndex((r) => r.emoji === emoji);
+  if (rIdx < 0) {
+    return [...existing.map((r) => ({ emoji: r.emoji, users: [...r.users] })), { emoji, users: [nick] }];
+  }
+
+  const current = existing[rIdx]!;
+  if (current.users.some((u) => sameNick(u, nick))) {
+    return existing.map((r) => ({ emoji: r.emoji, users: [...r.users] }));
+  }
+  return existing.map((r, i) =>
+    i === rIdx
+      ? { emoji: r.emoji, users: [...r.users, nick] }
+      : { emoji: r.emoji, users: [...r.users] },
+  );
+}
+
+/**
  * Drop a single nick from an emoji bucket without toggling-on when absent.
  * Used by inbound unreact / removeReaction paths.
  */

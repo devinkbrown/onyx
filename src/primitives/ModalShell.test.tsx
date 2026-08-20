@@ -10,6 +10,26 @@ const tick = () => new Promise((resolve) => window.setTimeout(resolve, 0));
 afterEach(cleanup);
 
 describe('ModalShell', () => {
+  it('keeps heading ids unique across concurrent dialogs', () => {
+    render(() => (
+      <>
+        <ModalShell open title="Review room action" onOpenChange={() => undefined}>
+          <p>One</p>
+        </ModalShell>
+        <ModalShell open title="Review room action" onOpenChange={() => undefined}>
+          <p>Two</p>
+        </ModalShell>
+      </>
+    ));
+
+    const dialogs = screen.getAllByRole('dialog', { name: 'Review room action' });
+    expect(dialogs).toHaveLength(2);
+    const ids = dialogs.map((dialog) => dialog.getAttribute('aria-labelledby'));
+    expect(ids[0]).toBeTruthy();
+    expect(ids[1]).toBeTruthy();
+    expect(ids[0]).not.toBe(ids[1]);
+  });
+
   it('renders an accessible modal dialog with layered Onyx structure', () => {
     render(() => (
       <ModalShell open title="Confirm disconnect" description="Leave the current room" onOpenChange={() => undefined}>

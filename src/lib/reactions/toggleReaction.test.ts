@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 import type { MessageReaction } from '@/lib/irc/types';
-import { removeMessageReactor, toggleMessageReactions } from './toggleReaction';
+import { addMessageReactor, removeMessageReactor, toggleMessageReactions } from './toggleReaction';
 
 const base: MessageReaction[] = [
   { emoji: '👍', users: ['Alice', 'bob'] },
@@ -48,6 +48,19 @@ describe('toggleMessageReactions', () => {
       emoji: r.emoji,
       users: [...r.users],
     })));
+  });
+});
+
+describe('addMessageReactor', () => {
+  it('adds a nick without toggling off an existing reactor', () => {
+    expect(addMessageReactor(base, '👍', 'me')).toEqual([
+      { emoji: '👍', users: ['Alice', 'bob', 'me'] },
+      { emoji: '🔥', users: ['carol'] },
+    ]);
+    expect(addMessageReactor(base, '👍', 'ALICE')).toEqual([
+      { emoji: '👍', users: ['Alice', 'bob'] },
+      { emoji: '🔥', users: ['carol'] },
+    ]);
   });
 });
 

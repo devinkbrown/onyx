@@ -56,38 +56,41 @@ export interface BackgroundMeta {
   kind: BackgroundKind;
   /** Signature family this preset belongs to (grouping, not a render path). */
   family: SignatureFamily;
+  /** Picker-only visual and operational description. Never a render import. */
+  character: string;
+  detail: 'low' | 'medium' | 'high';
 }
 
 /** Canvas-engine variants (init/frame/dispose). Order = picker order. */
 const CANVAS_META: readonly BackgroundMeta[] = [
-  { id: 'deep-current',    label: 'Deep Current',    kind: 'animated', family: 'deep-current' },
-  { id: 'bioluminescence', label: 'Bioluminescence', kind: 'animated', family: 'deep-current' },
-  { id: 'caustics',        label: 'Caustic Tide',    kind: 'animated', family: 'deep-current' },
-  { id: 'aurora',          label: 'Mineral Aurora',  kind: 'animated', family: 'deep-current' },
-  { id: 'pyrite-field',    label: 'Pyrite Field',    kind: 'animated', family: 'gold-seam' },
-  { id: 'gold-veins',      label: 'Gold Veins',      kind: 'animated', family: 'gold-seam' },
-  { id: 'ember',           label: 'Ember',           kind: 'animated', family: 'ember-field' },
-  { id: 'forest',          label: 'Grove',           kind: 'animated', family: 'ember-field' },
-  { id: 'resin',           label: 'Resin',           kind: 'animated', family: 'ember-field' },
-  { id: 'ink-wash',        label: 'Ink wash',        kind: 'animated', family: 'ink-drift' },
-  { id: 'mist',            label: 'Mist',            kind: 'animated', family: 'ink-drift' },
-  { id: 'frost',           label: 'Frost',           kind: 'animated', family: 'ink-drift' },
-  { id: 'aurora-ribbons',  label: 'Aurora Ribbons',  kind: 'animated', family: 'deep-current' },
-  { id: 'tide-bands',      label: 'Tide Bands',      kind: 'animated', family: 'deep-current' },
-  { id: 'obsidian',        label: 'Obsidian',        kind: 'solid',    family: 'paper-still' },
-  { id: 'lapis-gradient',  label: 'Lapis Gradient',  kind: 'solid',    family: 'gold-seam' },
-  { id: 'paper-grain',     label: 'Paper grain',     kind: 'solid',    family: 'paper-still' },
+  { id: 'deep-current', label: 'Deep Current', kind: 'animated', family: 'deep-current', character: 'cool tide', detail: 'medium' },
+  { id: 'bioluminescence', label: 'Bioluminescence', kind: 'animated', family: 'deep-current', character: 'blue bloom', detail: 'high' },
+  { id: 'caustics', label: 'Caustic Tide', kind: 'animated', family: 'deep-current', character: 'water light', detail: 'medium' },
+  { id: 'aurora', label: 'Mineral Aurora', kind: 'animated', family: 'deep-current', character: 'mineral glow', detail: 'high' },
+  { id: 'pyrite-field', label: 'Pyrite Field', kind: 'animated', family: 'gold-seam', character: 'dark ore', detail: 'medium' },
+  { id: 'gold-veins', label: 'Gold Veins', kind: 'animated', family: 'gold-seam', character: 'gold seam', detail: 'medium' },
+  { id: 'ember', label: 'Ember', kind: 'animated', family: 'ember-field', character: 'banked fire', detail: 'medium' },
+  { id: 'forest', label: 'Grove', kind: 'animated', family: 'ember-field', character: 'deep grove', detail: 'medium' },
+  { id: 'resin', label: 'Resin', kind: 'animated', family: 'ember-field', character: 'amber depth', detail: 'low' },
+  { id: 'ink-wash', label: 'Ink wash', kind: 'animated', family: 'ink-drift', character: 'soft ink', detail: 'low' },
+  { id: 'mist', label: 'Mist', kind: 'animated', family: 'ink-drift', character: 'quiet haze', detail: 'low' },
+  { id: 'frost', label: 'Frost', kind: 'animated', family: 'ink-drift', character: 'cold grain', detail: 'low' },
+  { id: 'aurora-ribbons', label: 'Aurora Ribbons', kind: 'animated', family: 'deep-current', character: 'ribbon light', detail: 'high' },
+  { id: 'tide-bands', label: 'Tide Bands', kind: 'animated', family: 'deep-current', character: 'tidal bands', detail: 'low' },
+  { id: 'obsidian', label: 'Obsidian', kind: 'solid', family: 'paper-still', character: 'black glass', detail: 'low' },
+  { id: 'lapis-gradient', label: 'Lapis Gradient', kind: 'solid', family: 'gold-seam', character: 'blue mineral', detail: 'low' },
+  { id: 'paper-grain', label: 'Paper grain', kind: 'solid', family: 'paper-still', character: 'warm paper', detail: 'low' },
 ];
 
 /** DOM/SVG scenes (Solid components). */
 const SCENE_META: readonly BackgroundMeta[] = [
-  { id: 'retro-arcade',    label: 'Retro Arcade',    kind: 'scene', family: 'scene' },
-  { id: 'starfield',       label: 'Starfield',       kind: 'scene', family: 'scene' },
-  { id: 'lightning',       label: 'Thunderstorm',    kind: 'scene', family: 'scene' },
-  { id: 'phoenix',         label: 'Phoenix',         kind: 'scene', family: 'scene' },
-  { id: 'aurora-borealis', label: 'Aurora Borealis', kind: 'scene', family: 'scene' },
-  { id: 'volcanic',        label: 'Volcanic',        kind: 'scene', family: 'scene' },
-  { id: 'neon-night',      label: 'Neon night',      kind: 'scene', family: 'scene' },
+  { id: 'retro-arcade', label: 'Retro Arcade', kind: 'scene', family: 'scene', character: 'pixel neon', detail: 'high' },
+  { id: 'starfield', label: 'Starfield', kind: 'scene', family: 'scene', character: 'open sky', detail: 'medium' },
+  { id: 'lightning', label: 'Thunderstorm', kind: 'scene', family: 'scene', character: 'storm front', detail: 'high' },
+  { id: 'phoenix', label: 'Phoenix', kind: 'scene', family: 'scene', character: 'fire bird', detail: 'high' },
+  { id: 'aurora-borealis', label: 'Aurora Borealis', kind: 'scene', family: 'scene', character: 'northern lights', detail: 'medium' },
+  { id: 'volcanic', label: 'Volcanic', kind: 'scene', family: 'scene', character: 'lava field', detail: 'high' },
+  { id: 'neon-night', label: 'Neon night', kind: 'scene', family: 'scene', character: 'city neon', detail: 'medium' },
 ];
 
 export const BACKGROUND_CATALOGUE: readonly BackgroundMeta[] = [...CANVAS_META, ...SCENE_META];
@@ -95,11 +98,13 @@ export const BACKGROUND_CATALOGUE: readonly BackgroundMeta[] = [...CANVAS_META, 
 export type BackgroundId = (typeof BACKGROUND_CATALOGUE)[number]['id'];
 
 /** For the picker: id + label + kind + family, in display order. */
-export const backgroundOptions = BACKGROUND_CATALOGUE.map(({ id, label, kind, family }) => ({
+export const backgroundOptions = BACKGROUND_CATALOGUE.map(({ id, label, kind, family, character, detail }) => ({
   id,
   label,
   kind,
   family,
+  character,
+  detail,
 }));
 
 export const backgroundIds = BACKGROUND_CATALOGUE.map(({ id }) => id) as BackgroundId[];

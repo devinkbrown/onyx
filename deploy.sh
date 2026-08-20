@@ -19,7 +19,7 @@
 # for the public root and all SPA routes. /home/kain/landing is no longer the
 # public website: it may only contribute explicitly allowlisted, non-conflicting
 # legacy support resources (guides, community, install, …). Root documents
-# (index.html, robots.txt, sitemap.xml, favicons) and SPA-owned paths are never
+# (index.html, 404.html, robots.txt, sitemap.xml, favicons) and SPA-owned paths are never
 # overlaid from landing.
 #
 # Usage:
@@ -70,6 +70,7 @@ LEGACY_SUPPORT_ALLOWLIST=(
 # SPA / app-owned names that must never be copied from landing (defense in depth).
 SPA_OWNED_BLOCKLIST=(
   index.html
+  404.html
   robots.txt
   sitemap.xml
   favicon.ico
@@ -98,6 +99,23 @@ SPA_OWNED_BLOCKLIST=(
   opcodec_wasm.wasm
   codecs
 )
+
+# Runtime-owned public feeds. Their producers update the live file atomically
+# and may run during a site cutover, so deployment must preserve their current
+# bytes instead of racing a staged snapshot. A missing live feed is seeded once
+# from staging; subsequent deploys exclude it from rsync and byte comparison.
+RUNTIME_MUTABLE_RELATIVE_PATHS=(
+  onyxOS/status.json
+)
+
+is_runtime_mutable_path() {
+  local candidate="$1"
+  local mutable
+  for mutable in "${RUNTIME_MUTABLE_RELATIVE_PATHS[@]}"; do
+    [[ "${candidate}" == "${mutable}" ]] && return 0
+  done
+  return 1
+}
 
 # ---------------------------------------------------------------------------
 # Pure helpers (also exercised by tools/deploy-controller.test.sh)
@@ -433,6 +451,9 @@ verify_staged_in_live() {
 
   while IFS= read -r -d '' f; do
     rel="${f#"${staged}/"}"
+    if is_runtime_mutable_path "${rel}"; then
+      continue
+    fi
     live_f="${live_out}/${rel}"
     if [[ ! -f "${live_f}" ]]; then
       echo "FAIL: staged file missing from live after sync: ${rel}" >&2
@@ -531,6 +552,17 @@ verify_live_out() {
     echo "FAIL: live app/index.html missing after sync" >&2
     return 1
   fi
+  if [[ ! -f "${live_out}/404.html" ]]; then
+    echo "FAIL: live 404.html missing after sync" >&2
+    return 1
+  fi
+  if ! grep -q 'Onyx — page not found' "${live_out}/404.html" \
+    || ! grep -q 'name="robots" content="noindex, nofollow"' "${live_out}/404.html" \
+    || grep -q 'rel="canonical"' "${live_out}/404.html" \
+    || grep -q 'property="og:url"' "${live_out}/404.html"; then
+    echo "FAIL: live 404.html metadata contract is unsafe" >&2
+    return 1
+  fi
   if [[ ! -f "${live_out}/sw.js" ]]; then
     echo "FAIL: live sw.js missing after sync" >&2
     return 1
@@ -565,13 +597,25 @@ sync_live_with_rollback() {
 
   mkdir -p "${live_out}"
 
+  # Seed runtime-owned feeds only when absent. Their producers retain authority
+  # over existing live bytes and may update them while this deploy is running.
+  local mutable staged_mutable live_mutable
+  for mutable in "${RUNTIME_MUTABLE_RELATIVE_PATHS[@]}"; do
+    staged_mutable="${staged}/${mutable}"
+    live_mutable="${live_out}/${mutable}"
+    if [[ ! -e "${live_mutable}" && -f "${staged_mutable}" ]]; then
+      mkdir -p "$(dirname "${live_mutable}")"
+      cp --no-clobber "${staged_mutable}" "${live_mutable}"
+    fi
+  done
+
   # Phase 1 — root tree: delete stale non-assets; leave live/assets alone.
   # --exclude='/assets/' is path-relative to the transfer root. Never pass
   # delete-excluded (that would purge retained hashed assets).
   # --checksum: after hard-link snapshot, size+mtime can match while content
   # differs; content identity is required for a correct live cutover.
-  echo "==> syncing root (exclude /assets/, --delete) ${staged}/ -> ${live_out}/"
-  if ! rsync --archive --checksum --delete --exclude='/assets/' "${staged}/" "${live_out}/"; then
+  echo "==> syncing root (exclude /assets/ and runtime feeds, --delete) ${staged}/ -> ${live_out}/"
+  if ! rsync --archive --checksum --delete --exclude='/assets/' --exclude='/onyxOS/status.json' "${staged}/" "${live_out}/"; then
     sync_rc=1
     reason="rsync_root_failed"
     echo "FAIL: rsync root --archive --checksum --delete (exclude /assets/) failed: ${staged}/ -> ${live_out}/" >&2
@@ -634,7 +678,8 @@ sync_live_with_rollback() {
 print_would_sync() {
   local staged="$1"
   local live_out="$2"
-  echo "==> DRY RUN: would rsync --archive --checksum --delete --exclude=/assets/ ${staged}/ -> ${live_out}/"
+  echo "==> DRY RUN: would preserve runtime feed /onyxOS/status.json (seed from staging only if absent)"
+  echo "==> DRY RUN: would rsync --archive --checksum --delete --exclude=/assets/ --exclude=/onyxOS/status.json ${staged}/ -> ${live_out}/"
   if [[ -d "${staged}/assets" ]]; then
     echo "==> DRY RUN: would mkdir -p ${live_out}/assets"
     echo "==> DRY RUN: would rsync --archive --checksum (no --delete) ${staged}/assets/ -> ${live_out}/assets/"
@@ -694,6 +739,10 @@ deploy_main() {
     || { echo "FAIL: dist/app/index.html missing after materialise"; exit 1; }
   test -f dist/download/index.html \
     || { echo "FAIL: dist/download/index.html missing after materialise"; exit 1; }
+  test -f dist/404.html \
+    || { echo "FAIL: dist/404.html missing after materialise"; exit 1; }
+  test ! -e dist/404/index.html \
+    || { echo "FAIL: materialiser must emit flat dist/404.html, never dist/404/index.html"; exit 1; }
 
   # Optional: stage site-local public release artifacts (never the default).
   # Six public lanes: windows + linux + macos-x86_64 + macos-arm64 + freebsd + openbsd.

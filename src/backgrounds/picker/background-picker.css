@@ -1,0 +1,15 @@
+.background-picker { display: grid; gap: 22px; min-width: 0; }
+.background-picker__group { display: grid; gap: 8px; min-width: 0; }
+.background-picker__heading { margin: 0; color: var(--paper-mute); font: 0.66rem/1 var(--font-mono); letter-spacing: .15em; text-transform: uppercase; }
+.background-picker__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.background-picker__card { display: grid; grid-template-columns: 34px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 9px; align-items: center; min-height: 44px; padding: 8px 9px; color: var(--paper); text-align: left; border: 1px solid var(--seam-faint); border-radius: var(--r-md); background: color-mix(in oklab, var(--stone-2) 28%, transparent); cursor: pointer; transition: border-color 160ms var(--ease), background 160ms var(--ease), transform 160ms var(--ease); }
+.background-picker__card:hover { border-color: var(--seam); background: color-mix(in oklab, var(--lapis-deep) 14%, transparent); }
+.background-picker__card:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 3px; }
+.background-picker__card--selected { border-color: var(--lapis); background: color-mix(in oklab, var(--lapis-deep) 24%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis) 30%, transparent); }
+.background-picker__swatch { grid-row: 1 / span 2; display: flex; overflow: hidden; width: 32px; height: 28px; border: 1px solid color-mix(in oklab, var(--ink) 50%, transparent); border-radius: 7px; background: #10213c; }
+.background-picker__swatch i { flex: 1; background: var(--lapis); }.background-picker__swatch i:nth-child(2) { background: var(--gold); }.background-picker__swatch i:nth-child(3) { background: var(--shu, #b45a50); }
+.background-picker__card[data-kind='solid'] .background-picker__swatch { filter: saturate(.65); }.background-picker__card[data-kind='scene'] .background-picker__swatch { background: #170f28; }.background-picker__card[data-kind='auto'] .background-picker__swatch { background: color-mix(in oklab, var(--lapis) 68%, var(--stone)); }
+.background-picker__copy { min-width: 0; display: grid; gap: 2px; }.background-picker__copy b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 .78rem/1.15 var(--font-sans); }.background-picker__copy small, .background-picker__meta { color: var(--paper-mute); font: .58rem/1.1 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; }.background-picker__meta { grid-column: 2; margin-top: 2px; }
+@media (prefers-reduced-motion: reduce) { .background-picker__card { transition: none; } }
+@media (forced-colors: active) { .background-picker__card { color: CanvasText; border-color: CanvasText; background: Canvas; }.background-picker__card--selected { color: HighlightText; border-color: Highlight; background: Highlight; }.background-picker__swatch { background: Canvas; border-color: CanvasText; }.background-picker__swatch i { background: CanvasText !important; } }
+@media (max-width: 20rem) { .background-picker__grid { grid-template-columns: 1fr; } }

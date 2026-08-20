@@ -45,6 +45,23 @@ describe('resolveRole', () => {
   it('falls back to a default symbol when the prefix map lacks the mode', () => {
     expect(resolveRole(user('a', 'v'), {}).symbol).toBe('+');
   });
+
+  it('derives rank from a non-standard learned PREFIX letter instead of dropping it', () => {
+    // A server advertising e.g. PREFIX=(Xohv)!@%+ — 'X' is not one of the
+    // seven hardcoded letters, but its declared rank (first) is above 'o'.
+    const learned: Record<string, string> = { X: '!', o: '@', v: '+' };
+    const xRole = resolveRole(user('a', 'X'), learned);
+    const opRole = resolveRole(user('b', 'o'), learned);
+    expect(xRole.symbol).toBe('!');
+    expect(xRole.sort).toBeLessThan(opRole.sort);
+  });
+
+  it('keeps the standard named ladder unchanged when PREFIX only has known letters', () => {
+    expect(resolveRole(user('a', 'ov'), PREFIX)).toMatchObject({ key: 'op', symbol: '@' });
+    expect(resolveRole(user('a', 'Yo'), PREFIX)).toMatchObject({ key: 'netop', symbol: '*' });
+    expect(resolveRole(user('a', 'qv'), PREFIX)).toMatchObject({ key: 'owner', symbol: '.' });
+    expect(resolveRole(user('a', 'hv'), PREFIX)).toMatchObject({ key: 'halfop', symbol: '%' });
+  });
 });
 
 describe('createGroupReconciler — grouping & sorting', () => {

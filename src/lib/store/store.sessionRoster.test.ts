@@ -8,9 +8,16 @@ import { emptyIdentityProfileMemory, saveIdentityProfileMemory } from '@/lib/ide
 import { saveUserNotes } from '@/lib/userNotes';
 import { saveBookmarks } from '@/lib/bookmarks';
 import { saveNickAliases } from '@/lib/nickAliases';
-import { _resetSessionRestoreForTests, store } from './store';
+import {
+  _beginNamesBurstForTests,
+  _resetSessionRestoreForTests,
+  MAX_LIVE_CHANNEL_USERS,
+  store,
+} from './store';
 
 const initialState = store.getInitialState();
+const SRM2_LOCAL = 'srm2l.00112233445566778899aabbccddeeff.aabbccddeeff00112233445566778899';
+const SRM2_MESH = `srm2m.${'deadc0de'.repeat(8)}.bbccddeeff00112233445566778899aa`;
 
 class FakeWebSocket {
   static readonly OPEN = 1;
@@ -184,6 +191,214 @@ describe('remembered session roster restoration', () => {
     expect([...root!.users.values()].map(user => user.nick).sort()).toEqual(['alice', 'kain', 'trev']);
   });
 
+  it('appends (never replaces) a late 353 that outlives the settled burst TTL, even for a still-privileged restore identity', () => {
+    // Hypothesis this guards: _NAMES_BURST_TTL_MS (15s) is shorter than
+    // _SESSION_RESTORE_CONNECT_MS (45s), so a settled burst's late-line
+    // protection could expire while `canCreateFromResume` is still true,
+    // letting the inbound-353 auto-arm path (`canCreateFromResume &&
+    // !_recentNamesBurst(key)`) re-arm 'expect' and let a late/cross-node
+    // partial 353 REPLACE the roster (the "#root collapses" class).
+    //
+    // REFUTED: `_armSessionRestoreReplay` (called on 001, store.ts ~10503)
+    // re-pins the restore's `expiresAt` to `_now() + _SESSION_RESTORE_REPLAY_MS`
+    // (also 15s) the instant registration completes — the same clock the
+    // burst TTL uses — and a burst's `at` can only start ticking from a 353
+    // that itself arrives after 001 on the same ordered socket. So the
+    // restore window can never outlive a channel's own burst window; by the
+    // time a burst goes stale, `canCreateFromResume` has already gone false
+    // too. Kept as a regression guard: if `_armSessionRestoreReplay` (or its
+    // 15s constant) ever drifts out of sync with `_NAMES_BURST_TTL_MS`, this
+    // test starts failing (roster would collapse to ['bob', 'kain']).
+    vi.useFakeTimers();
+    try {
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'kain',
+        password: 'remembered-secret',
+      });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+
+      receive(':example.test 433 * kain :Nickname is already in use');
+      receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
+      store.getState().client?.updateResumeTokens({ sessionToken: 'resume-token' });
+      receive(':example.test 001 kain_ :Welcome to Onyx');
+
+      receive(':example.test 353 kain_ = #root :@kain trev alice');
+      receive(':example.test 366 kain_ #root :End of NAMES list');
+
+      const beforeLate = store.getState().channels.get('#root');
+      expect([...beforeLate!.users.values()].map(user => user.nick).sort())
+        .toEqual(['alice', 'kain', 'trev']);
+
+      // Past the burst's 15s settled-TTL, still inside the 45s restore window.
+      vi.advanceTimersByTime(16_000);
+      receive(':example.test 353 kain_ = #root :@kain bob');
+
+      const root = store.getState().channels.get('#root')!;
+      expect([...root.users.values()].map(user => user.nick).sort())
+        .toEqual(['alice', 'bob', 'kain', 'trev']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('folds canonical and collision-alias self rows, unions modes, and PART removes the equivalence', () => {
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'Kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+
+    receive(':example.test 433 * Kain :Nickname is already in use');
+    receive(':example.test 900 Kain_ Kain_!webchat@example Kain :You are now logged in as Kain');
+    receive(':example.test 001 Kain_ :Welcome to Onyx');
+    receive(':Kain!webchat@example JOIN #root');
+    receive(':example.test 353 Kain_ = #root :@kain +Kain_ alice');
+    receive(':example.test 366 Kain_ #root :End of NAMES list');
+
+    const restored = store.getState().channels.get('#root');
+    expect([...restored!.users.keys()].sort()).toEqual(['alice', 'kain']);
+    expect(restored!.users.get('kain')).toMatchObject({ nick: 'Kain' });
+    expect(restored!.users.get('kain')?.modes).toEqual(new Set(['o', 'v']));
+
+    // The canonical PART belongs to the equivalent resumed identity, not the
+    // current Kain_ transport nick. It must remove every equivalent roster row
+    // without treating the live alias socket as having left the channel.
+    receive(':kain!webchat@example PART #root :old session closed');
+    const afterPart = store.getState().channels.get('#root');
+    expect(afterPart).toBeDefined();
+    expect([...afterPart!.users.keys()].sort()).toEqual(['alice', 'kain_']);
+    expect(afterPart!.users.get('kain_')).toMatchObject({ nick: 'Kain_' });
+    expect(afterPart!.users.get('kain_')?.modes).toEqual(new Set(['v']));
+    expect(afterPart!.users.get('kain_')?.modes.has('o')).toBe(false);
+
+    // Late lines from the completed burst cannot resurrect the canonical twin.
+    receive(':example.test 353 Kain_ = #root :@kain +Kain_');
+    expect([...store.getState().channels.get('#root')!.users.keys()].sort())
+      .toEqual(['alice', 'kain_']);
+
+    // An actual PART from the current transport identity still means we left.
+    receive(':Kain_!webchat@example PART #root :leaving');
+    expect(store.getState().channels.has('#root')).toBe(false);
+  });
+
+  it('QUIT of either restored self spelling cannot leave an equivalent twin stale', () => {
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 433 * kain :Nickname is already in use');
+    receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain_ :Welcome to Onyx');
+    receive(':kain!webchat@example JOIN #root');
+    receive(':example.test 353 kain_ = #root :@kain +kain_ alice');
+    receive(':example.test 366 kain_ #root :End of NAMES list');
+
+    receive(':kain!webchat@example QUIT :ghost closed');
+
+    const root = store.getState().channels.get('#root');
+    expect([...root!.users.keys()].sort()).toEqual(['alice', 'kain_']);
+    expect(root!.users.get('kain_')).toMatchObject({ nick: 'kain_' });
+    expect(root!.users.get('kain_')?.modes).toEqual(new Set(['v']));
+    expect(root!.users.get('kain_')?.modes.has('o')).toBe(false);
+
+    receive(':example.test 353 kain_ = #root :@kain +kain_');
+    expect([...store.getState().channels.get('#root')!.users.keys()].sort())
+      .toEqual(['alice', 'kain_']);
+  });
+
+  it('bounds multi-line NAMES while retaining only self-spelling mode provenance', () => {
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'Kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 433 * Kain :Nickname is already in use');
+    receive(':example.test 900 Kain_ Kain_!webchat@example Kain :You are now logged in as Kain');
+    receive(':example.test 001 Kain_ :Welcome to Onyx');
+    receive(':Kain!webchat@example JOIN #root');
+
+    const first = Array.from({ length: 3_000 }, (_, index) => `user${index}`);
+    const second = Array.from({ length: 3_000 }, (_, index) => `user${index + 3_000}`);
+    receive(`:example.test 353 Kain_ = #root :@kain +Kain_ ${first.join(' ')}`);
+    receive(`:example.test 353 Kain_ = #root :${second.join(' ')}`);
+    receive(':example.test 366 Kain_ #root :End of NAMES list');
+
+    expect(store.getState().channels.get('#root')!.users.size).toBe(MAX_LIVE_CHANNEL_USERS);
+
+    // Flooded peer tokens cannot consume/contaminate the tiny self-only mode
+    // provenance used to reconstruct the still-live transport spelling.
+    receive(':kain!webchat@example PART #root :ghost closed');
+    const root = store.getState().channels.get('#root')!;
+    expect(root.users.size).toBe(MAX_LIVE_CHANNEL_USERS);
+    expect(root.users.get('kain_')?.modes).toEqual(new Set(['v']));
+    expect(root.users.get('kain_')?.modes.has('o')).toBe(false);
+  });
+
+  it('keeps alias equivalence for authoritative NAMES after the restore timers expire', () => {
+    vi.useFakeTimers();
+    try {
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'Kain',
+        password: 'remembered-secret',
+      });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 433 * Kain :Nickname is already in use');
+      receive(':example.test 900 Kain_ Kain_!webchat@example Kain :You are now logged in as Kain');
+      receive(':example.test 001 Kain_ :Welcome to Onyx');
+      receive(':Kain!webchat@example JOIN #root');
+      receive(':example.test 353 Kain_ = #root :Kain_ stale-user');
+      receive(':example.test 366 Kain_ #root :End of NAMES list');
+
+      vi.advanceTimersByTime(46_000);
+      _beginNamesBurstForTests('#root');
+      receive(':example.test 353 Kain_ = #root :@kain +Kain_ fresh-user');
+      receive(':example.test 366 Kain_ #root :End of NAMES list');
+
+      const root = store.getState().channels.get('#root')!;
+      expect([...root.users.keys()].sort()).toEqual(['fresh-user', 'kain']);
+      expect(root.users.get('kain')).toMatchObject({ nick: 'Kain' });
+      expect(root.users.get('kain')?.modes).toEqual(new Set(['o', 'v']));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts a fresh authoritative NAMES generation after reconnect', () => {
+    vi.useFakeTimers();
+    try {
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'kain',
+        password: 'remembered-secret',
+      });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+      receive(':example.test 001 kain :Welcome to Onyx');
+      receive(':kain!webchat@example JOIN #root');
+      // Deliberately omit 366: this leaves the old socket's burst appending.
+      receive(':example.test 353 kain = #root :kain stale-user');
+
+      FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 001 kain :Welcome back');
+      vi.advanceTimersByTime(600);
+      receive(':example.test 353 kain = #root :kain fresh-user');
+      receive(':example.test 366 kain #root :End of NAMES list');
+
+      expect([...store.getState().channels.get('#root')!.users.keys()].sort())
+        .toEqual(['fresh-user', 'kain']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not let a stray NAMES reply create a channel outside a restore generation', () => {
     store.setState({ ourNick: 'kain', connectionStatus: 'connected' });
 
@@ -275,6 +490,34 @@ describe('remembered session roster restoration', () => {
 
     expect(store.getState().server?.account).toBe('kain');
     expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('late-token');
+  });
+
+  it('preserves resume credentials when an unrelated SESSION DROP fails', () => {
+    saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+    storeSessionToken('local-held');
+    storeMeshToken('mesh-held');
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to Onyx');
+
+    receive(':example.test FAIL SESSION STALE_LIST :SESSION LIST snapshot is no longer valid; list again');
+    receive(':example.test FAIL SESSION CANNOT_DROP_CURRENT :Cannot drop this connection; use LOGOUT or disconnect');
+
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('local-held');
+    expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBe('mesh-held');
+
+    FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+    store.getState().reconnectNow();
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome back');
+
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME mesh-held\r\n');
   });
 
   it('does not promote an ordinary guest from an unsolicited SESSION token note', () => {
@@ -395,6 +638,38 @@ describe('remembered session roster restoration', () => {
     expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME local-fresh\r\n');
   });
 
+  it('overwrites legacy bearers and reconnects with the composite mesh credential byte-exact', () => {
+    saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
+    storeSessionToken('legacy-local');
+    storeMeshToken('legacy-mesh');
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to Onyx');
+
+    receive(`:example.test NOTICE kain :SESSION TOKEN ${SRM2_LOCAL}`);
+    receive(`:example.test NOTICE kain :SESSION MTOKEN ${SRM2_MESH} expires=1800000000`);
+
+    expect(loadCredentials('wss://example.test', 'kain')).toMatchObject({
+      sessionToken: SRM2_LOCAL,
+      meshToken: SRM2_MESH,
+      meshTokenExpiry: '2027-01-15T08:00:00.000Z',
+    });
+
+    FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+    store.getState().reconnectNow();
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 001 kain :Welcome back');
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith(`SESSION RESUME ${SRM2_MESH}\r\n`);
+    expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME legacy-mesh\r\n');
+  });
+
   it('rejects an oversized SESSION TOKEN note without persisting or arming resume', () => {
     saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
     store.getState().connect({
@@ -453,9 +728,9 @@ describe('remembered session roster restoration', () => {
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME notice-mesh\r\n');
   });
 
-  it('records MTOKEN expires= as tokenExpiry so portable state can purge', () => {
+  it('records MTOKEN expires= as meshTokenExpiry so portable state can purge', () => {
     // Live Onyx Server: `SESSION MTOKEN <hex> expires=<unix>` (mesh wall clock,
-    // 12h portable lifetime). Without folding expires into tokenExpiry the
+    // 12h portable lifetime). Without folding expires into meshTokenExpiry the
     // credential lingers in localStorage past the portable window.
     saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
     store.getState().connect({
@@ -472,13 +747,13 @@ describe('remembered session roster restoration', () => {
 
     const creds = loadCredentials('wss://example.test', 'kain');
     expect(creds?.meshToken).toBe('mesh-with-ttl');
-    expect(creds?.tokenExpiry).toBe('2027-01-15T08:00:00.000Z');
+    expect(creds?.meshTokenExpiry).toBe('2027-01-15T08:00:00.000Z');
 
     // Malformed expires must fail closed — do not install a bare token that
     // would never purge (and must not clobber the good one above).
     receive(':example.test NOTICE kain :SESSION MTOKEN evil-token expires=not-a-number');
     expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBe('mesh-with-ttl');
-    expect(loadCredentials('wss://example.test', 'kain')?.tokenExpiry).toBe('2027-01-15T08:00:00.000Z');
+    expect(loadCredentials('wss://example.test', 'kain')?.meshTokenExpiry).toBe('2027-01-15T08:00:00.000Z');
   });
 
   it('WARN SESSION leaves the resume credential intact (retryable mesh path)', () => {
@@ -609,6 +884,73 @@ describe('remembered session roster restoration', () => {
       // a node that only has classic IRC) does not keep a ghost channel UI.
       expect(send).toHaveBeenCalledWith('JOIN #root\r\n');
       expect(send).toHaveBeenCalledWith('NAMES #root\r\n');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not run socket A delayed rejoin work on socket B of the same client', () => {
+    vi.useFakeTimers();
+    try {
+      store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 001 kain :Welcome to Onyx');
+      receive(':kain!webchat@example JOIN #root');
+      receive(':example.test 353 kain = #root :kain alice');
+      receive(':example.test 366 kain #root :End of NAMES list');
+
+      // Socket A reconnect registers and schedules its 600 ms roster work.
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 001 kain :Welcome on socket A');
+
+      // Before A's timer fires, the same IRCClient is reused for socket B.
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      const socketBSend = FakeWebSocket.latest!.send;
+      socketBSend.mockClear();
+      receive(':example.test 001 kain :Welcome on socket B');
+      vi.advanceTimersByTime(600);
+
+      expect(socketBSend.mock.calls.filter(([line]) => line === 'JOIN #root\r\n')).toHaveLength(1);
+      expect(socketBSend.mock.calls.filter(([line]) => line === 'NAMES #root\r\n')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('runs delayed 001 outbox, schedule, deep-link, and travel work exactly once for the current socket', () => {
+    vi.useFakeTimers();
+    try {
+      const flushOutbox = vi.fn(async () => {});
+      const dispatchScheduled = vi.fn();
+      const travelTo = vi.fn();
+      store.setState({
+        flushOutbox,
+        _dispatchScheduledMessages: dispatchScheduled,
+        travelTo,
+        pendingDeepLinkJoin: '#root',
+        pendingDeepLinkAt: new Date('2026-08-14T08:00:00.000Z'),
+      });
+
+      store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      receive(':example.test 001 kain :Welcome on socket A');
+
+      // Reuse the IRCClient before any socket-A delayed callback is due.
+      store.getState().reconnectNow();
+      FakeWebSocket.latest?.onopen?.(new Event('open'));
+      const socketBSend = FakeWebSocket.latest!.send;
+      socketBSend.mockClear();
+      receive(':example.test 001 kain :Welcome on socket B');
+
+      vi.advanceTimersByTime(4_000);
+
+      expect(flushOutbox).toHaveBeenCalledTimes(1);
+      expect(dispatchScheduled).toHaveBeenCalledTimes(1);
+      expect(socketBSend.mock.calls.filter(([line]) => line === 'JOIN #root\r\n')).toHaveLength(1);
+      expect(travelTo).toHaveBeenCalledTimes(1);
+      expect(travelTo).toHaveBeenCalledWith('#root', new Date('2026-08-14T08:00:00.000Z'));
     } finally {
       vi.useRealTimers();
     }

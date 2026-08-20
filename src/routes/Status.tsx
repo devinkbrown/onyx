@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './data-pages.css';
+import './status.css';
 import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
-import { Mascot } from '@/components/brand/Mascot';
 import { fetchBackupManifest } from '@/lib/stats/backups';
 import { relTime } from '@/lib/stats/networkIndex';
 import {
@@ -10,18 +10,35 @@ import {
   formatDuration,
   publicMeshFeedLabel,
   publicMeshFeedState,
+  type PublicMeshFeedState,
 } from '@/lib/stats/status';
+import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
-import { PublicFooter } from './PublicFooter';
 
-function topologyState(quorum: boolean, partitioned: boolean, peersComplete: boolean): 'up' | 'degraded' {
-  return quorum && !partitioned && peersComplete ? 'up' : 'degraded';
+type StatusTone = 'up' | 'degraded' | 'unknown';
+
+function topologyPresentation(state: PublicMeshFeedState): { label: string; tone: StatusTone } {
+  if (state === 'current') return { label: 'operational', tone: 'up' };
+  if (state === 'degraded') return { label: 'degraded', tone: 'degraded' };
+  return { label: publicMeshFeedLabel(state), tone: 'unknown' };
+}
+
+function feedDetail(state: PublicMeshFeedState): string {
+  switch (state) {
+    case 'loading': return 'Requesting the public export. No health claim yet.';
+    case 'current': return 'A fresh, complete report observes quorum with no partition.';
+    case 'degraded': return 'The current report observes missing quorum, a partition, or incomplete peer data.';
+    case 'stale': return 'The last report is too old to support a current health claim.';
+    case 'future': return 'The report timestamp is in the future, so it cannot support a current health claim.';
+    case 'unknown': return 'The report has no usable timestamp, so freshness cannot be established.';
+    default: return 'No public status export is available. No health claim is being made.';
+  }
 }
 
 export default function StatusRoute() {
   setPageMeta(
-    'Onyx status — mesh health',
-    'Public Onyx mesh health, node uptime, peer latency, users online, and backup readiness.',
+    'Onyx status — network health',
+    'Public Onyx network health, node uptime, peer latency, users online, and backup readiness.',
     '/status/',
   );
   const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus, { initialValue: null });
@@ -33,176 +50,176 @@ export default function StatusRoute() {
     void refetchBackups();
   }, 30_000);
   onCleanup(() => clearInterval(timer));
-  const feedState = createMemo(() => {
-    return publicMeshFeedState(status.latest, nowMs());
-  });
+  const feedState = createMemo<PublicMeshFeedState>(() => (
+    status.loading ? 'loading' : publicMeshFeedState(status.latest, nowMs())
+  ));
+  const topology = createMemo(() => topologyPresentation(feedState()));
 
   return (
-    <main class="r data-page">
-      <div class="r-ground" aria-hidden="true" />
-      <div class="r-flecks" aria-hidden="true" />
-      <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
-        <path class="flow" d="M-40 150 C 280 70, 470 280, 760 230 S 1160 120, 1500 250" />
-        <path class="flow" d="M-40 560 C 330 650, 560 430, 870 530 S 1240 660, 1520 570" />
-        <path d="M-40 790 C 360 720, 700 860, 1040 760 S 1320 720, 1520 820" />
-        <circle class="node" cx="760" cy="230" r="3" />
-        <circle class="node" cx="870" cy="530" r="3" />
-      </svg>
-      <div class="r-grain" aria-hidden="true" />
-
-      <header class="r-status" role="banner">
-        <a class="brand" href="/" aria-label="Onyx home">
-          <Mascot variant="mark" />ONYX
-        </a>
-        <nav aria-label="Primary">
-          <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="/stats/">Stats</a>
-          <a class="hideable" href="/status/" aria-current="page">Status</a>
-          <a class="hideable" href="/roadmap/">Roadmap</a>
-          <a class="hideable" href="/about/">About</a>
-          <a class="hideable" href="/invite/?join=%23root">Invite</a>
-          <span class="live hideable" data-feed-state={feedState()}>
-            <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
-          </span>
-          <a class="enter" href="/app/">Open Onyx</a>
-        </nav>
-      </header>
-
-      <section class="r-wrap data-hero" aria-labelledby="status-heading">
-        <p class="r-kicker">network status</p>
-        <h1 id="status-heading">Mesh health,<br /><span class="gold">in public</span></h1>
-        <p class="sub">
-          Node uptime, quorum, peer links, and latency from the same exported health
-          feed operators use to see whether the network is whole.
+    <PublicFrame
+      currentPath="/status/"
+      mainLabel="Onyx network status"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">Ledger</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Status</span>
         </p>
-        <Show when={status.latest} fallback={<div class="data-empty">Status is waiting for the next exported feed.</div>}>
-          {(data) => {
-            const state = () => topologyState(
-              data().mesh.quorum,
-              data().mesh.partitioned,
-              data().peers_complete,
-            );
-            const upPeers = () => data().peers.filter((p) => p.up).length;
-            return (
-              <div class="data-summary" aria-label="Status summary">
-                <div class="data-metric">
-                  <span class="label">state</span>
-                  <span class="status-pill" data-state={state()}>{state() === 'up' ? 'operational' : 'degraded'}</span>
-                  <span class="note">updated {relTime(data().generated_at, nowMs())}</span>
-                </div>
-                <div class="data-metric">
-                  <span class="label">users online</span>
-                  <span class="value">{data().users_online.toLocaleString('en-US')}</span>
-                  <span class="note">mesh-wide presence</span>
-                </div>
-                <div class="data-metric">
-                  <span class="label">peer links</span>
-                  <span class="value">{upPeers()}/{data().peers.length}</span>
-                  <span class="note">
-                    {data().peers_complete ? 'currently established' : 'incomplete peer feed'}
-                  </span>
-                </div>
-                <div class="data-metric">
-                  <span class="label">uptime</span>
-                  <span class="value">{formatDuration(data().uptime_seconds)}</span>
-                  <span class="note">{data().node || data().network || 'current node'}</span>
-                </div>
-              </div>
-            );
-          }}
-        </Show>
-      </section>
-
-      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
-
-      <section class="r-wrap r-section data-grid" aria-label="Mesh detail">
-        <article class="data-card">
-          <span class="label">quorum</span>
-          <Show when={status.latest} fallback={<h2>No feed yet</h2>}>
-            {(data) => (
-              <>
-                <h2>{data().mesh.quorum ? 'Majority side' : 'Minority side'}</h2>
-                <p>
-                  {data().mesh.partitioned
-                    ? `The mesh reports ${data().mesh.components} visible components. Traffic keeps flowing where links remain established.`
-                    : 'The mesh reports one healthy component. Peer links are sharing one view of the network.'}
-                </p>
-              </>
-            )}
-          </Show>
-        </article>
-
-        <aside class="data-card">
-          <span class="label">backups</span>
-          <h3>Vault backups</h3>
-          <p>
-            <Show when={backups.latest} fallback="Waiting for the public backup manifest.">
-              {(manifest) => manifest().files.length === 0
-                ? 'The backup manifest is present, but no snapshot files are listed.'
-                : `${manifest().files.length} snapshot file${manifest().files.length === 1 ? '' : 's'} published ${relTime(manifest().generated_at, nowMs())}.`}
-            </Show>
+      )}
+    >
+      <div class="ui-root r data-page status-route">
+        <section class="r-wrap data-hero status-hero" aria-labelledby="status-heading">
+          <p class="r-kicker">network status</p>
+          <h1 id="status-heading">Network health,<br /><span class="status-title-accent">in public</span></h1>
+          <p class="sub">
+            Node uptime, quorum, peer links, and latency from the exported public
+            observation — including when that observation cannot support a health claim.
           </p>
-          <Show when={backups.latest?.files.length}>
-            <div class="data-list data-list--compact">
-              <For each={backups.latest?.files ?? []}>
-                {(file) => (
-                  <div class="data-row">
-                    <div>
-                      <strong>{file.kind}</strong>
-                      <span>{file.name}</span>
-                    </div>
+
+          <div
+            class="status-observation"
+            data-feed-state={feedState()}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <span class="status-observation__marker" aria-hidden="true" />
+            <span class="status-observation__label">{publicMeshFeedLabel(feedState())}</span>
+            <span class="status-observation__detail">{feedDetail(feedState())}</span>
+          </div>
+
+          <Show when={status.latest}>
+            {(data) => {
+              const upPeers = () => data().peers.filter((peer) => peer.up).length;
+              return (
+                <div class="data-summary status-summary" aria-label="Status summary">
+                  <div class="data-metric">
+                    <span class="label">observed state</span>
+                    <span class="status-pill" data-state={topology().tone}>{topology().label}</span>
+                    <span class="note">report generated {relTime(data().generated_at, nowMs())}</span>
                   </div>
-                )}
-              </For>
-            </div>
+                  <div class="data-metric">
+                    <span class="label">users online</span>
+                    <span class="value">{data().users_online.toLocaleString('en-US')}</span>
+                    <span class="note">reported network-wide presence</span>
+                  </div>
+                  <div class="data-metric">
+                    <span class="label">peer links</span>
+                    <span class="value">{upPeers()}/{data().peers.length}</span>
+                    <span class="note">
+                      {data().peers_complete ? 'complete peer observation' : 'incomplete peer observation'}
+                    </span>
+                  </div>
+                  <div class="data-metric">
+                    <span class="label">node uptime</span>
+                    <span class="value">{formatDuration(data().uptime_seconds)}</span>
+                    <span class="note">{data().node || data().network || 'unnamed reported node'}</span>
+                  </div>
+                </div>
+              );
+            }}
           </Show>
-        </aside>
-      </section>
+        </section>
 
-      <section class="r-wrap r-section data-grid" aria-label="Related public surfaces">
-        <article class="data-card">
-          <span class="label">activity</span>
-          <h2>Rooms and graph history</h2>
-          <p>Move from node health into public room activity, daily message bars, and room handoff links.</p>
-          <div class="r-cta"><a class="r-btn ghost" href="/stats/">Open stats &rarr;</a></div>
-        </article>
-        <aside class="data-card">
-          <span class="label">plan</span>
-          <h3>Roadmap context</h3>
-          <p>See how status, stats, and backup readiness fit into the operations phase.</p>
-          <div class="r-cta"><a class="r-btn ghost" href="/roadmap/">Open roadmap &rarr;</a></div>
-        </aside>
-      </section>
+        <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      <section class="r-wrap r-section" aria-labelledby="peers-heading">
-        <span class="r-eyebrow">peers</span>
-        <h2 class="r-title" id="peers-heading">Links between<br />the shores</h2>
-        <Show when={status.latest?.peers.length} fallback={<div class="data-empty">No peer links are present in the current feed.</div>}>
-          <table class="peer-table">
-            <thead>
-              <tr>
-                <th>Peer</th>
-                <th>State</th>
-                <th>RTT</th>
-                <th>Since</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={status.latest?.peers ?? []}>
-                {(peer) => (
-                  <tr>
-                    <td>{peer.name}</td>
-                    <td><span class="status-pill" data-state={peer.up ? 'up' : 'down'}>{peer.state}</span></td>
-                    <td>{peer.rtt_ms === null ? 'no sample' : `${Math.round(peer.rtt_ms)}ms`}</td>
-                    <td>{formatDuration(peer.since_seconds)}</td>
-                  </tr>
-                )}
-              </For>
-            </tbody>
-          </table>
-        </Show>
-      </section>
-      <PublicFooter />
-    </main>
+        <section class="r-wrap r-section data-grid" aria-label="Network detail">
+          <article class="data-card">
+            <span class="label">quorum observation</span>
+            <Show when={status.latest} fallback={<h2>No report available</h2>}>
+              {(data) => (
+                <>
+                  <h2>{data().mesh.quorum ? 'Majority side' : 'Minority side'}</h2>
+                  <p>
+                    {data().mesh.partitioned
+                      ? `The report contains ${data().mesh.components} visible components. It does not establish whole-network availability.`
+                      : 'The report contains one component. Freshness and peer completeness still determine whether it supports a current health claim.'}
+                  </p>
+                </>
+              )}
+            </Show>
+          </article>
+
+          <aside class="data-card">
+            <span class="label">backup publication</span>
+            <h3>Vault backups</h3>
+            <p>
+              <Show
+                when={backups.latest}
+                fallback={backups.loading
+                  ? 'Checking the public backup manifest.'
+                  : 'No public backup manifest is available.'}
+              >
+                {(manifest) => manifest().files.length === 0
+                  ? 'The backup manifest is present, but no snapshot files are listed.'
+                  : `${manifest().files.length} snapshot file${manifest().files.length === 1 ? '' : 's'} published ${relTime(manifest().generated_at, nowMs())}.`}
+              </Show>
+            </p>
+            <Show when={backups.latest?.files.length}>
+              <div class="data-list data-list--compact" aria-label="Published backup files">
+                <For each={backups.latest?.files ?? []}>
+                  {(file) => (
+                    <div class="data-row">
+                      <div>
+                        <strong>{file.kind}</strong>
+                        <span>{file.name}</span>
+                      </div>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </aside>
+        </section>
+
+        <section class="r-wrap r-section data-grid" aria-label="Related public surfaces">
+          <article class="data-card">
+            <span class="label">activity</span>
+            <h2>Rooms and graph history</h2>
+            <p>Move from node health into public room activity, daily message bars, and room handoff links.</p>
+            <div class="r-cta"><a class="r-btn ghost" href="/stats/">Open stats &rarr;</a></div>
+          </article>
+          <aside class="data-card">
+            <span class="label">plan</span>
+            <h3>Roadmap context</h3>
+            <p>See how status, stats, and backup readiness fit into the operations phase.</p>
+            <div class="r-cta"><a class="r-btn ghost" href="/roadmap/">Open roadmap &rarr;</a></div>
+          </aside>
+        </section>
+
+        <section class="r-wrap r-section status-peers" aria-labelledby="peers-heading">
+          <span class="r-eyebrow">peer observations</span>
+          <h2 class="r-title" id="peers-heading">Links between<br />the shores</h2>
+          <Show
+            when={status.latest?.peers.length}
+            fallback={<div class="data-empty">No peer links are present in the current public report.</div>}
+          >
+            <table class="peer-table">
+              <caption>Peer link observations from the current public report</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Peer</th>
+                  <th scope="col">State</th>
+                  <th scope="col">RTT</th>
+                  <th scope="col">Since</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For each={status.latest?.peers ?? []}>
+                  {(peer) => (
+                    <tr>
+                      <th scope="row" data-label="Peer">{peer.name}</th>
+                      <td data-label="State"><span class="status-pill" data-state={peer.up ? 'up' : 'down'}>{peer.state}</span></td>
+                      <td data-label="RTT">{peer.rtt_ms === null ? 'no sample' : `${Math.round(peer.rtt_ms)}ms`}</td>
+                      <td data-label="Since">{formatDuration(peer.since_seconds)}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </Show>
+        </section>
+      </div>
+    </PublicFrame>
   );
 }

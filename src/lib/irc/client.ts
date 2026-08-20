@@ -11,6 +11,7 @@ import {
   splitWireFrame,
   type SaslMechanism,
 } from './parser';
+import { activitySubscribeArgs } from './activitySubscribe';
 import type { IRCMessage, ISupport } from './types';
 import { AccountAttribution } from './attribution';
 import { serializeWatchTogetherProp } from '../media/watchTogetherController';
@@ -125,15 +126,54 @@ function hasWebSocketSendCapacity(ws: WebSocket, payloadBytes: number): boolean 
  * line (`AUTHENTICATE PLAIN` / `SCRAM-SHA-256` / `EXTERNAL`). Anything else — any
  * base64 chunk, in either direction — is redacted.
  */
-function redactAuthenticateForLog(line: string): string {
-  const PREFIX = 'AUTHENTICATE ';
-  if (!line.startsWith(PREFIX)) return line;
-  const arg = line.slice(PREFIX.length);
+function redactSensitiveLineForLog(line: string): string {
+  // The parser removes NULs before command dispatch. Classify the same logical
+  // spelling so a NUL-split sensitive token cannot be logged and then become a
+  // valid command downstream. The original bytes still go to wire/parser.
+  line = line.replaceAll('\0', '');
+  const containsSensitiveToken = /(?:^|[\s:\r\n])(?:AUTHENTICATE|E2EEGROUP|E2EE\.KEYPACKAGE|E2EE\.COMMIT|E2EE\.WELCOME|E2EEKEY)(?=$|[\s:\r\n])/iu;
+  let cursor = line.trimStart();
+  if (cursor.startsWith('@')) {
+    const end = cursor.indexOf(' ');
+    if (end < 0) return /E2EE|AUTHENTICATE/iu.test(cursor) ? '<sensitive> <redacted>' : line;
+    cursor = cursor.slice(end + 1).trimStart();
+  }
+  if (cursor.startsWith(':')) {
+    const end = cursor.indexOf(' ');
+    if (end < 0) return /E2EE|AUTHENTICATE/iu.test(cursor) ? '<sensitive> <redacted>' : line;
+    cursor = cursor.slice(end + 1).trimStart();
+  }
+  const boundary = cursor.search(/\s/u);
+  const command = (boundary < 0 ? cursor : cursor.slice(0, boundary)).toUpperCase();
+  const rest = boundary < 0 ? '' : cursor.slice(boundary).trimStart();
+
+  if (command === 'AUTHENTICATE') {
+    const arg = rest;
   // Only the mechanisms this client can actually select are safe to expose.
   // A shape-based uppercase test leaks valid unpadded base64 such as
   // `QUJDREVGR0hJSktM`, which is indistinguishable from a made-up mechanism.
-  if (arg === '+' || arg === 'PLAIN' || arg === 'SCRAM-SHA-256' || arg === 'EXTERNAL') return line;
-  return `${PREFIX}<redacted>`;
+    if (arg === '+' || arg === 'PLAIN' || arg === 'SCRAM-SHA-256' || arg === 'EXTERNAL') return line;
+    return 'AUTHENTICATE <redacted>';
+  }
+
+  if (command === 'E2EEGROUP' || command === 'E2EE.KEYPACKAGE'
+    || command === 'E2EE.COMMIT' || command === 'E2EE.WELCOME' || command === 'E2EEKEY') {
+    return `${command} <redacted>`;
+  }
+  if (command === 'NOTICE') {
+    const trailing = rest.startsWith(':')
+      ? rest.slice(1)
+      : rest.includes(' :') ? rest.slice(rest.indexOf(' :') + 2) : rest.replace(/^\S+\s+:?/u, '');
+    if (/^E2EEKEY(?:\s|$)/iu.test(trailing)) return 'NOTICE E2EEKEY <redacted>';
+  }
+  if (command === 'FAIL' || command === 'WARN' || command === 'NOTE') {
+    const subject = rest.match(/^:?([^\s]+)/u)?.[1]?.toUpperCase();
+    if (subject === 'E2EEGROUP' || subject === 'E2EEKEY') return `${command} ${subject} <redacted>`;
+  }
+  // Fail closed for malformed or multiply-prefixed sensitive-looking lines.
+  // This is a log-copy policy only: parsing and wire delivery still receive
+  // the original bytes.
+  return containsSensitiveToken.test(line) ? '<sensitive> <redacted>' : line;
 }
 
 /** RFC 4616 SASL PLAIN fields are UTF-8; btoa itself accepts Latin-1 only. */
@@ -200,12 +240,16 @@ export class IRCClient {
   private _authNick: string;
   private reconnectDelay = RECONNECT_BASE;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Monotonic owner for delayed work tied to one concrete WebSocket. */
+  private _socketGeneration = 0;
   private pingTimer: ReturnType<typeof setTimeout> | null = null;
   private pongTimeout: ReturnType<typeof setTimeout> | null = null;
   private _destroyed = false;
   private _registered = false;
   /** True once SASL has succeeded (903). Allows a fresh session to request a resume token. */
   private _loggedIn = false;
+  /** Account that authorized this transport's current SESSION generation. */
+  private _sessionAccount: string | null = null;
   /** Prevent duplicate post-registration SESSION commands on one connection. */
   private _sessionCommandsSent = false;
   private _saslPending = false;
@@ -323,6 +367,10 @@ export class IRCClient {
 
   connect(): boolean {
     if (this._destroyed) return false;
+    // The IRCClient instance is deliberately reused by the store on reconnect.
+    // Advance the owner before tearing down the old socket so delayed work can
+    // distinguish socket A from its replacement socket B.
+    this._socketGeneration++;
     // Never run two sockets in parallel. Tear down any prior socket first, and
     // detach its handlers so its close event can't trigger another reconnect.
     if (this.ws) {
@@ -342,6 +390,7 @@ export class IRCClient {
     this.opts.nick = this._authNick;
     this._registered = false;
     this._loggedIn = false;
+    this._sessionAccount = null;
     this._sessionCommandsSent = false;
     this._saslPending = false;
     this._capNegotiating = true;
@@ -421,16 +470,14 @@ export class IRCClient {
     // `text.ircv3.net` carries exactly one unterminated IRC line per text
     // message. Onyx's own protocol keeps the legacy CRLF framing because it
     // also multiplexes binary Cadence media on this socket.
-    const payload = ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL && line.endsWith('\r\n')
-      ? line.slice(0, -2)
-      : line;
-    if (
-      ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL
-      && (payload.includes('\r') || payload.includes('\n'))
-    ) {
-      this.opts.onError?.('Message was not sent: text.ircv3.net requires exactly one IRC line per frame.');
+    const lineBody = line.endsWith('\r\n') ? line.slice(0, -2) : line;
+    if (lineBody.includes('\r') || lineBody.includes('\n')) {
+      this.opts.onError?.(ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL
+        ? 'Message was not sent: text.ircv3.net requires exactly one IRC line per frame.'
+        : 'Message was not sent: IRC WebSocket frames require exactly one IRC line.');
       return false;
     }
+    const payload = ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL ? lineBody : line;
 
     // Fast character bound avoids allocating another huge buffer just to learn
     // that a hostile/accidental line cannot be admitted.
@@ -464,12 +511,26 @@ export class IRCClient {
       return false;
     }
 
-    this.opts.onRaw?.(redactAuthenticateForLog(line.replace(/\r\n$/, '')), 'out');
+    this.opts.onRaw?.(redactSensitiveLineForLog(line.replace(/\r\n$/, '')), 'out');
     return true;
   }
 
   sendRaw(command: string, ...params: string[]): boolean {
     return this.send(formatIRCLine(command, ...params));
+  }
+
+  /**
+   * Emit a narrow recovery control asking peers to re-issue current-epoch
+   * welcome material for this device.
+   */
+  sendCurrentEpochWelcomeRequest(
+    room: string,
+    _epoch: number,
+    _account: string,
+    deviceId: string,
+    payload: string,
+  ): boolean {
+    return this.sendRaw('E2EEGROUP', room, 'key-package', deviceId, payload);
   }
 
   /**
@@ -490,6 +551,11 @@ export class IRCClient {
   /** The effective current nick (registration nick, or the post-433 alias). */
   get currentNick(): string {
     return this.opts.nick;
+  }
+
+  /** Current concrete WebSocket generation (increments on every connect call). */
+  get socketGeneration(): number {
+    return this._socketGeneration;
   }
 
   /**
@@ -534,6 +600,16 @@ export class IRCClient {
 
   join(channel: string, key?: string) {
     this.sendRaw('JOIN', channel, ...(key ? [key] : []));
+  }
+
+  activitySubscribe(channel: string): boolean {
+    const args = activitySubscribeArgs(channel, 'SUBSCRIBE');
+    return args ? this.sendRaw(...args) : false;
+  }
+
+  activityUnsubscribe(channel: string): boolean {
+    const args = activitySubscribeArgs(channel, 'UNSUBSCRIBE');
+    return args ? this.sendRaw(...args) : false;
   }
 
   tagmsg(target: string, tags: Record<string, string>) {
@@ -769,13 +845,16 @@ export class IRCClient {
     // lines, all of which it returns. No mutable buffer lives here to tempt a
     // reintroduction of the stash.
     for (const line of splitWireFrame(data)) {
-      this.opts.onRaw?.(redactAuthenticateForLog(line), 'in');
+      const logLine = redactSensitiveLineForLog(line);
+      this.opts.onRaw?.(logLine, 'in');
       try {
         const msg = parseIRCMessage(line);
         this._handleMessage(msg);
       } catch (e) {
         // A malformed line must not abort processing of the rest of the frame.
-        console.warn('[nexus] failed to handle IRC line:', line, e);
+        // Handler/parser exceptions are not a safe diagnostic channel: their
+        // messages may contain the original remote control payload.
+        console.warn('[nexus] failed to handle IRC line:', logLine);
       }
     }
   }
@@ -986,9 +1065,28 @@ export class IRCClient {
         // account-scoped, so passwordless reconnects must wait for this proof
         // instead of replaying a bearer while they are still a guest.
         if (msg.params.length >= 4 && msg.params[2]) {
+          const account = msg.params[2];
+          if (this._sessionAccount !== null
+            && this._sessionAccount.toLowerCase() !== account.toLowerCase()) {
+            // IDENTIFY can switch accounts on an already-registered socket.
+            // The old bearer selects a row owned by the old account, so never
+            // replay it into the new account's SESSION generation. Request a
+            // fresh TOKEN only; durable credentials remain separately keyed in
+            // the store.
+            this.clearResumeTokens();
+            this._sessionCommandsSent = false;
+          }
+          this._sessionAccount = account;
           this._loggedIn = true;
           if (this._registered) this._sendSessionCommandsAfterAuthentication();
         }
+        break;
+
+      case '901': // RPL_LOGGEDOUT
+        this._loggedIn = false;
+        this._sessionAccount = null;
+        this._sessionCommandsSent = false;
+        this.clearResumeTokens();
         break;
 
       case '904': // ERR_SASLFAIL (during SASL only)

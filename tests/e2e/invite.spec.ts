@@ -174,7 +174,7 @@ test.describe('invite create → consume round-trip (connected DEV build)', () =
       const gear = page.getByTestId('ribbon-settings-gear');
       await expect(gear).toBeVisible({ timeout: 30_000 });
       await gear.click();
-      const dialog = page.getByRole('dialog', { name: 'Channel settings' });
+      const dialog = page.getByRole('dialog', { name: 'Room settings' });
       await expect(dialog).toBeVisible();
 
       // Suggest a guest name — the create-side field that flows into the link.

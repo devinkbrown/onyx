@@ -50,7 +50,7 @@ test('keeps a production ModalShell usable at 400% short reflow', async ({ page,
     });
   });
 
-  const dialog = page.getByRole('dialog', { name: 'Account' });
+  const dialog = page.getByRole('dialog', { name: 'You' });
   const close = page.getByRole('button', { name: 'Close account panel' });
   await expect(dialog).toBeVisible();
   await expect(close).toBeFocused();

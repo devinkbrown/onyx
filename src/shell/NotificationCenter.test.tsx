@@ -78,6 +78,10 @@ describe('<NotificationCenter>', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(trigger).toHaveAttribute('aria-controls', dialog.id);
     expect(getByText(/Nothing yet/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open public room ledger' })).toHaveAttribute(
+      'href',
+      '/stats/',
+    );
   });
 
   it('counts only unread mentions and DMs in the badge', () => {
@@ -108,6 +112,18 @@ describe('<NotificationCenter>', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(trigger).toHaveAccessibleName('Inbox');
     expect(screen.queryByRole('dialog', { name: 'Notification inbox' })).toBeNull();
+  });
+
+  it('links channel mentions to the public room ledger', () => {
+    store.setState({
+      notifications: [note({ id: 'm1', type: 'mention', from: 'trev', channel: '#root', text: 'ping kain' })],
+    });
+    render(() => <NotificationCenter />);
+    fireEvent.click(screen.getByRole('button', { name: 'Inbox — 1 unread notification' }));
+    expect(screen.getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23root',
+    );
   });
 
   it('clicking a followed conversation notification marks it read and navigates to the channel', () => {

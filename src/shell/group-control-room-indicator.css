@@ -1,0 +1,66 @@
+/* Passive room-local control-plane state. It never signals encryption readiness. */
+.shell-group-control-indicator {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 28px;
+  gap: 5px;
+  padding: 4px 7px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  color: var(--paper-mute);
+  background: color-mix(in oklab, var(--stone-2) 22%, transparent);
+  font: 650 0.68rem/1.2 var(--font-sans);
+}
+
+.shell-group-control-indicator-mark {
+  flex: 0 0 auto;
+  color: currentColor;
+  font: 700 0.78rem/1 var(--font-mono);
+}
+
+.shell-group-control-indicator-label {
+  white-space: nowrap;
+}
+
+.shell-group-control-indicator-detail {
+  min-width: 0;
+  color: var(--paper-dim);
+}
+
+.shell-group-control-indicator[data-state='pending'],
+.shell-group-control-indicator[data-state='identity-pending'] {
+  color: var(--gold-bright);
+}
+
+.shell-group-control-indicator[data-state='recovery-required'] {
+  color: var(--shu);
+  border-color: color-mix(in oklab, var(--shu) 44%, var(--seam-faint));
+}
+
+@container conversation (max-width: 33rem) {
+  .shell-group-control-indicator-detail {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
+@media (forced-colors: active) {
+  .shell-group-control-indicator {
+    color: ButtonText;
+    background: ButtonFace;
+    border-color: ButtonText;
+  }
+
+  .shell-group-control-indicator[data-state='recovery-required'] {
+    color: Highlight;
+    border-color: Highlight;
+  }
+}

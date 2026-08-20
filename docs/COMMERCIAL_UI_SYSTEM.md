@@ -1,6 +1,6 @@
 # Onyx commercial UI system
 
-**Status:** Locked design contract for general-public shell redesign.
+**Status:** Complete — rooms/network language locked; experience mode id is `network-ops` (migrates legacy `irc-ops`); public surfaces say network report / peer channel; protocol essays keep real CAP/config tokens under open-wire framing.
 **Scope:** Presentation and information hierarchy only. Kernel frozen.
 **Slice 1 (implemented here):** Room header commercial chrome — `PresenceRibbon` + ribbon CSS + focused tests.
 **Reviewer:** Codex · **Writer (this tree):** implementer lane · **Claude:** off for this pass.
@@ -11,9 +11,13 @@ This document is the durable source of truth for the commercial redesign. Implem
 
 ## 1. Commercial identity
 
-**Onyx** is a public place to talk and gather with people you choose — rooms, messages, and voice/video that start in the same conversation, with honest connection/protection status and history that stays on this device.
+**Onyx** is a public place to talk and gather — rooms, messages, and voice/video
+in one conversation home, with honest connection/protection status and history
+that stays on this device. Usability target: Discord/Twitch-class community
+platform density (rail · rooms · stage/feed), not a SaaS marketing shell.
 
-Not: a terminal for operators. Not: a clone of any big chat brand. Not: a feature-matrix UI.
+Not: a terminal for operators. Not: a clone of any big chat brand. Not: a
+feature-matrix UI.
 
 **Brand house**
 
@@ -68,14 +72,14 @@ Shell-local surface state (`primarySurface`, `sidebarMode`, mobile bottom nav) a
 | Oper / capability matrix as product chrome | Status / You → Advanced |
 | Sidebar “unread only” + dense filters as primary | Collapsed Filter disclosure |
 | Guest claim **expanded form** in first mobile viewport | Compact chip → sheet |
-| Dual Appearance + Preferences + Account as three ribbon doors | **You** hub (later slice); temporary Workspace group in More |
+| Dual Appearance + Preferences + Account as three ribbon doors | **You** hub (Account rail + More/Menu You entry) |
 
 ### Merge
 
 | Merge | Into |
 |-------|------|
 | Room tools (pins, notify, settings, export, topic edit) | Room sheet / **More → This room** (slice 1 uses More) |
-| Appearance + prefs + account entry | **You** hub (later); Workspace group until then |
+| Appearance + prefs + account entry | **You** hub (Account + Menu) |
 | Home digests | Needs you → Continue → Live now → Explore → More activity |
 | Composer attach/format/schedule | Standard primary: **+** · message · emoji · **More tools** · Send; schedule/jump in More (slice 4) |
 
@@ -251,9 +255,9 @@ disconnecting, without blocking the composer, and without false product claims.
 | **1** | Room header commercial chrome | `PresenceRibbon.tsx`, `shell.css` (ribbon), `PresenceRibbon.*.test.*`, this doc | **This slice** |
 | **2** | Guest claim compact + sheet | `GuestClaimPrompt.*`, `guestClaimState.ts`, Account guest CTA, this doc | **This slice** |
 | **3** | Home Needs you / Continue hierarchy | `HomeView.*`, `home-view.css`, `HomeView*.test.tsx`, this doc | **This slice** |
-| **4** | Composer public default (+ tray) | `Composer.tsx`, `Composer.test.tsx`, composer CSS in `shell.css`, this doc | **This slice** |
-| **5** | You hub tiers | AppShell you surface, Preferences structure, Appearance, Account | Not started |
-| **6** | Rooms/Messages collection polish | `ChannelSidebar.*`, sidebar CSS | Not started |
+| **4** | Composer public default (+ tray) | `Composer.tsx`, `Composer.test.tsx`, composer CSS in `shell.css`, this doc | **Done** (denser More tools tray) |
+| **5** | You hub tiers | AppShell you surface, Preferences structure, Appearance, Account | **Done** (You + Account; ops matrix off Activity in Standard) |
+| **6** | Rooms/Messages collection polish | `ChannelSidebar.*`, sidebar CSS + shell/landing copy | **Done** |
 
 **Deferred beyond top 6:** transcript type density; default-off TimeScrubber/Watch; Connect copy; Landing claim alignment when packaging ledger green; **member-column persistence**.
 

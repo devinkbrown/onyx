@@ -1,8 +1,11 @@
 # Group E2EE (Era 3 C1) — control payload
 
-**Status:** staged Onyx v1 design — **not product-complete**.
+**Status:** revision-3 control lifecycle, required-room message seal/open, and
+truthful activation (`hold` → `active` after verified genesis bootstrap) are
+product-wired; persistent higher-epoch recovery and production dual-node
+acceptance remain incomplete.
 
-This document defines the first **versioned client payload** that rides the
+This document defines the current **versioned client payload** that rides the
 opaque `E2EEGROUP` trailing parameter. It is an Onyx in-house control format.
 It does **not** claim MLS or RFC 9420 wire interoperability.
 
@@ -11,17 +14,18 @@ It does **not** claim MLS or RFC 9420 wire interoperability.
 | Side | Reality |
 |------|---------|
 | **Onyx Server** | Source has an **active** opaque `E2EEGROUP` delivery path: authenticated membership/routing policy, local fan-out as `E2EE.KEYPACKAGE` / `E2EE.COMMIT` / `E2EE.WELCOME`, and mesh hop custody for exact origin-signed wires. The daemon does **not** parse the trailing payload as crypto, decrypt group secrets, or act as a group member. |
-| **Onyx client payload** | OGC1 signed envelope is **implemented as pure codec helpers** (`groupControlPayload.ts`) and remains **staged / unwired** into the live store send/open and transport handler path. Product room E2EE is not complete. |
+| **Onyx client payload** | The connection/account-owned observer verifies authenticated OGC1-v2 controls from the trusted device directory. The runtime can pair a signed genesis commit/welcome, provision an ephemeral epoch-1 `GroupSession`, and seal/open `ONYXROOM1` messages for policy-required rooms through a private bridge. Persistent recovery, higher-epoch history recovery, and production dual-node acceptance are not complete. |
 
 ## Layers
 
 | Layer | Module | Role |
 |-------|--------|------|
 | IRC routing | `src/lib/e2ee/groupControl.ts` | `E2EEGROUP` command shape; opaque base64url; no crypto |
-| Signed payload (this) | `src/lib/e2ee/groupControlPayload.ts` | Canonical binary + Ed25519 envelope (staged; not store-wired) |
+| Signed payload (this) | `src/lib/e2ee/groupControlPayload.ts` | Canonical binary + Ed25519 envelope, consumed by the live observer/runtime |
 | Content envelope | `src/lib/e2ee/groupEnvelope.ts` | `ONYXROOM1` room ciphertext (separate) |
-| Local epoch keys | `src/lib/e2ee/groupKeyring.ts` | In-memory AES-GCM keys; never vaulted |
-| Welcome key-wrap (future) | *not implemented* | Pairwise wrap of epoch secrets into welcome **body** |
+| Live genesis session | `src/lib/e2ee/groupSession.ts` | Owns the ephemeral epoch-1 key and exposes only narrow session operations; never vaulted |
+| Envelope helper keyring | `src/lib/e2ee/groupKeyring.ts` | Bounded helper/test keyring; not installed into the revision-3 runtime |
+| Welcome key-wrap | `src/lib/e2ee/groupWelcome.ts` | Authenticated device-bound epoch-secret wrap/open; plaintext is single-use and zeroized |
 
 ## Outer IRC forms (unchanged)
 
@@ -40,7 +44,7 @@ E2EEGROUP <channel> welcome <from-device> <to-account> <to-device> :<opaque-base
 Payload encoding on IRC: **canonical unpadded base64url** only. The server
 forwards the parameter; it does not parse, decrypt, or persist group secrets.
 
-## Versioned payload wire (v1)
+## Versioned payload wire (v2)
 
 `opaque-base64url` = canonical base64url of the binary layout below
 (all multi-byte integers **big-endian**):
@@ -48,7 +52,7 @@ forwards the parameter; it does not parse, decrypt, or persist group secrets.
 | Offset | Field | Size | Notes |
 |-------:|-------|-----:|-------|
 | 0 | `magic` | 4 | ASCII `OGC1` (`GROUP_CONTROL_PAYLOAD_MAGIC`) |
-| 4 | `version` | u8 | Must be `1` (`GROUP_CONTROL_PAYLOAD_VERSION`) |
+| 4 | `version` | u8 | Must be `2` (`GROUP_CONTROL_PAYLOAD_VERSION`) |
 | 5 | `kind` | u8 | `1` key-package, `2` welcome, `3` commit |
 | 6 | `epoch` | u32be | Room epoch this control advances or advertises |
 | 10 | `body_len` | u16be | `1 … 2048` (`MAX_GROUP_CONTROL_BODY_BYTES`) |
@@ -60,25 +64,29 @@ forwards the parameter; it does not parse, decrypt, or persist group secrets.
 Re-encoding the decoded bytes must equal the original base64url string
 (non-canonical encodings fail closed). Magic mismatch fails closed at parse.
 
-### Body rules (v1)
+Version 1 remains parseable for locked diagnostic rendering only. It is never
+trusted, verified, or admitted into a session.
+
+### Body rules (v2)
 
 | Kind | Body meaning | Forbidden |
 |------|--------------|-----------|
 | `key-package` | Public join / leaf material for a later schedule | Raw room AES key, extractable secrets |
 | `commit` | Public epoch-advance / membership update material | Raw room AES key |
-| `welcome` | Reserved for **pairwise key-wrap ciphertext** (future owner) | Cleartext room key; server-readable secrets |
+| `welcome` | Authenticated **pairwise key-wrap ciphertext** owned by `groupWelcome.ts` | Cleartext room key; server-readable secrets |
 
 Bodies are opaque to this module: `sign` / `parse` / `verify` never interpret
-them as keys. A later pairwise welcome key-wrap layer owns encryption of any
-epoch secret into the welcome body and decryption under the recipient device
-key. Until that layer exists, welcome bodies must not be treated as room keys.
+them as keys. `groupWelcome.ts` separately owns authenticated pairwise wrapping
+and opening of epoch installation material. A welcome body is never treated as
+a cleartext room key, and an opened welcome is a single-use capability.
 
 ## Ed25519 transcript (exact field order)
 
-Domain label: `ONYX-GROUP-CONTROL-v1`
+Domain label: `ONYX-GROUP-CONTROL-v2`
 
 ```text
 domain_utf8 ‖ 0x00 ‖
+u8(from_account_len) ‖ from_account_utf8 ‖ // authenticated sender; lowercase
 u8(channel_len) ‖ channel_utf8 ‖          // trim + lowercase; leading # or &
 u8(kind_code) ‖                           // 1 | 2 | 3
 u8(from_device_len) ‖ from_device_utf8 ‖
@@ -126,11 +134,12 @@ closed if export is unavailable). The wire key alone is never account auth.
 | `signGroupControlPayload` | Ed25519 sign → wire string |
 | `verifyGroupControlPayload` | Parse + routing match + trusted equality + verify |
 
-These are intentionally pure crypto/codec helpers. They are **not yet wired**
-into the store/send/open path: no live handler currently signs outbound
-controls, verifies inbound `E2EE.*` records against a trusted directory, or
-installs epoch keys from welcome bodies. A future pairwise welcome key-wrap
-layer will produce welcome `body` bytes, then call `signGroupControlPayload`.
+These remain pure crypto/codec helpers. The live observer and runtime call them
+to verify inbound `E2EE.*` records against the authenticated device directory,
+pair commit/welcome controls, provision a strictly bound ephemeral genesis
+session, and seal/open required-room messages through narrow bridge operations.
+The store retains ciphertext as `text`, exposes only transient opened plaintext,
+and never receives room keys or mutable crypto handles.
 
 ## What exists elsewhere today
 
@@ -140,10 +149,11 @@ layer will produce welcome `body` bytes, then call `signGroupControlPayload`.
 | Multi-device keys | Per-device publish via `E2EEKEY` + KEYTRANS list (C2 partial) |
 | Media E2EE | Mooring paths for calls (separate from room E2EE) |
 | Room policy | `encryption-policy` PROP (`off` / `optional` / `required`) |
-| Ephemeral epoch keys | Bounded in-memory `RoomEpochKeyring`; never serialized into the history vault |
+| Ephemeral genesis key | Retained only inside the active in-memory `GroupSession`; never serialized into the history vault |
+| Envelope helper keyring | `RoomEpochKeyring` remains implemented for bounded helper/test seal-open paths; the revision-3 runtime does not install it |
 | Server opaque delivery | Active `E2EEGROUP` → `E2EE.*` path + mesh hop authority for opaque wires (daemon source) |
-| Control IRC codec (client) | Strict `E2EEGROUP` build/parse helpers; **store/transport product wiring incomplete** |
-| OGC1 payload (client) | Sign/parse/verify implemented; **staged / unwired** to store send/open |
+| Control IRC codec (client) | Strict `E2EEGROUP` build/parse helpers; the connection-owned observer consumes server-origin `E2EE.*` controls |
+| OGC1 payload (client) | Sign/parse/verify and trusted-directory verification are production-wired; genesis provisioning is ephemeral epoch 1 only |
 
 ## Non-goals (current)
 
@@ -155,17 +165,12 @@ layer will produce welcome `body` bytes, then call `signGroupControlPayload`.
 
 ## Next implementation slices
 
-1. **Pairwise welcome key-wrap** (separate module): encrypt epoch installation
-   material to a target device public key; place ciphertext in welcome `body`;
-   keep sign/verify ownership in `groupControlPayload.ts`.
-2. **Client store send/open integration**: outbound sign + IRC send; inbound
-   `E2EE.*` parse/verify with trusted signer directory; keyring install.
-3. Single-room two-device welcome/commit flow that installs one epoch key into
-   the browser-only keyring.
-4. Channel send/open: `ONYXROOM1` + fail-closed locked placeholder when the
-   epoch key is missing; ciphertext stays ciphertext-only at rest.
-5. **Production acceptance** after packaging and dual-node operator gates
+1. Higher-epoch recovery and rotation with explicit recovery state; genesis
+   provisioning remains intentionally limited to epoch 0→1.
+2. Persistent recovery for historical epochs without serializing raw room keys
+   into the history vault.
+3. **Production acceptance** after packaging and dual-node operator gates
    (not claimed by the v0.5.7 pre-deploy note alone).
 
-See also: `onyx-client-contract.v1.json` (`group_e2ee`),
+See also: `onyx-client-contract.v2.json` (`group_e2ee`),
 `onyx-server/docs/ops/release-v0.5.7-e2ee-group-control.md`, Era 3 C1 roadmap.

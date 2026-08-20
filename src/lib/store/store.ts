@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { resolveBackgroundId as resolveCatalogueBackgroundId } from '@/backgrounds/catalogue';
 import '@/lib/customCssRemoval';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
 import {
@@ -30,6 +31,7 @@ import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric
 import {
   isSessionListEnd,
   parseSessionDropOk,
+  isSessionDropSuccess,
   parseSessionListLine,
   type AccountSessionRow,
 } from '@/lib/irc/sessionList';
@@ -39,6 +41,13 @@ import {
   eventReplayJsonParams,
   type EventReplayFeed,
 } from '@/lib/irc/eventReplayJson';
+import {
+  describeBanListView,
+  EMPTY_BAN_LIST_META,
+  type BanListEntry as BanListViewEntry,
+  type BanListMeta,
+  type BanListView,
+} from '@/lib/moderation/banListView';
 import {
   isRecoveryCodesCleared,
   isRecoveryCodesGenerated,
@@ -84,6 +93,11 @@ import {
 } from '@/lib/composer/scheduledSend';
 import { deviceKeys, isEnvelope, isValidPeerPublicKey, normalizePeerDeviceKeys } from '@/lib/e2ee/dmCipher';
 import { isGroupEnvelope } from '@/lib/e2ee/groupEnvelope';
+import type { GroupControlRuntimeState } from '@/lib/e2ee/groupControlRuntime';
+import {
+  createGroupControlBridge,
+  type GroupControlBridge,
+} from './groupControlBridge';
 import {
   hasEncryptedMessageBoundary,
   isEncryptedWireText,
@@ -93,7 +107,8 @@ import {
 } from '@/lib/e2ee/replyPrivacy';
 import { activeReplyForTarget } from '@/lib/composer/messageContext';
 import { mergeComposerInsert } from '@/lib/composer/composerInject';
-import { removeMessageReactor, toggleMessageReactions } from '@/lib/reactions/toggleReaction';
+import { addMessageReactor, removeMessageReactor, toggleMessageReactions } from '@/lib/reactions/toggleReaction';
+import { activitySubscribeArgs, parseActivityStream } from '@/lib/irc/activitySubscribe';
 import { openDmTrusted, peerSafetyNumber, pinnedPeerKey, pinPeerKey, safetyNumber, sealDmTrustedToDevices } from '@/lib/e2ee/keyPinning';
 import {
   ENCRYPTION_POLICY_PROP,
@@ -251,7 +266,9 @@ import {
   isPasskeySupported,
 } from '@/lib/webauthn/passkey';
 import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from '@/theme/themes';
-import { persistThemeId, readThemeId } from '@/theme/themeStorage';
+import { normalizeThemeId, persistThemeId, readThemeId } from '@/theme/themeStorage';
+
+export const BACKGROUND_STORAGE_KEY = 'onyx:bg';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -671,6 +688,8 @@ export interface OnyxState {
   reconnectIn: number;
   /** Whether auto-reconnect is enabled */
   autoReconnect: boolean;
+  /** Safe inbound group-control metadata. It is never an encryption-readiness predicate. */
+  groupControlRuntime: GroupControlRuntimeState | null;
   /**
    * True when a connected flush finished with owned outbox rows still waiting
    * and the auto-retry budget is exhausted. Composer + Home chrome surface this
@@ -722,6 +741,8 @@ export interface OnyxState {
 
   // ── Properties (IRCX PROP) ──────────────────────────────────────────
   channelProps: Map<string, Record<string, string>>;
+  /** IRCX channels whose current-connection PROP snapshot ended with 819. */
+  channelPropsSynced: Set<string>;
   userProps: Map<string, Record<string, string>>;
 
   // ── Channel Info Panel ───────────────────────────────────────────────
@@ -854,8 +875,8 @@ export interface OnyxState {
   /** `SESSION LIST` — refresh the account session roster from the server. */
   refreshAccountSessions(): void;
   /**
-   * `SESSION DROP #<n>` — revoke another attachment. Refuses the current
-   * connection (server-side CANNOT_DROP_CURRENT); UI also disables that row.
+   * Revoke another attachment by its current-server physical SID, falling back
+   * to the legacy LIST ordinal. The current connection is always refused.
    */
   dropAccountSession(index: number): void;
   /**
@@ -1273,7 +1294,7 @@ export interface OnyxState {
   vhostOff(): void;
 
   /** Send a message (PRIVMSG) */
-  sendMessage(target: string, text: string): void;
+  sendMessage(target: string, text: string): void | boolean | Promise<boolean>;
 
   /** Send a raw IRC line (full formatted line including CRLF) */
   sendRaw(line: string): void;
@@ -1577,7 +1598,7 @@ export interface OnyxState {
   // ── Scheduled Messages ──────────────────────────────────────────────
   scheduledMessages: ScheduledMessage[];
   showScheduledMessages: boolean;
-  scheduleMessage: (channel: string, text: string, sendAt: number) => void;
+  scheduleMessage: (channel: string, text: string, sendAt: number) => boolean;
   cancelScheduledMessage: (id: string) => void;
   /** Send every past-due scheduled message (when connected) and drop it. */
   _dispatchScheduledMessages: () => void;
@@ -1650,6 +1671,7 @@ export interface OnyxState {
   moderationLog: Array<{ timestamp: number; action: string; target: string; by: string; channel: string }>;
   addModerationEntry: (entry: { action: string; target: string; by: string; channel: string }) => void;
   banList: Map<string, Array<{ mask: string; setBy?: string; setAt?: number }>>;
+  banListMeta: Map<string, BanListMeta>;
   setBanList: (channel: string, bans: Array<{ mask: string; setBy?: string; setAt?: number }>) => void;
   fetchBanList: (channel: string) => void;
   tempBan: (channel: string, mask: string, minutes: number) => void;
@@ -2583,6 +2605,13 @@ function _collectHistoryMessage(collector: BatchCollector, message: ChatMessage)
   const timeMs = message.time.getTime();
   if (!Number.isFinite(timeMs)) return;
   const id = message.id.slice(0, SERVER_SEARCH_ID_MAX);
+  const seenIds = collector.seenIds ?? new Set<string>();
+  collector.seenIds = seenIds;
+  if (seenIds.has(id)) {
+    collector.duplicateDropped = true;
+    return;
+  }
+  seenIds.add(id);
   const from = message.from.slice(0, SERVER_SEARCH_FROM_MAX);
   let text = message.text.slice(0, HISTORY_BATCH_TEXT_MAX);
   const finalCodeUnit = text.charCodeAt(text.length - 1);
@@ -3148,10 +3177,10 @@ function _humanizeMeshSendFail(command: string, code: string, description?: stri
   const desc = (description || '').trim();
   if (code === 'TEMPORARILY_UNAVAILABLE' && _isMessagingCommand(command)) {
     if (/mesh durable admit failed/i.test(desc) || /could not durably admit/i.test(desc)) {
-      return desc || 'Mesh is busy or peers are down — message was not sent. Retry in a moment.';
+      return desc || 'The network is busy or peers are down — message was not sent. Retry in a moment.';
     }
     if (/mesh authority rejected/i.test(desc) || /authority rejected/i.test(desc)) {
-      return desc || 'Mesh rejected the message — it was not delivered.';
+      return desc || 'The network rejected the message — it was not delivered.';
     }
     if (desc) return desc;
     return 'Server temporarily unavailable — message not sent. Retry shortly.';
@@ -3404,6 +3433,8 @@ type NamesBurst = {
   at: number;
   /** Live removals/renames that a stale later 353 must not resurrect. */
   excludedNicks: Set<string>;
+  /** Exact modes reported for each wire spelling in this bounded burst. */
+  modeProvenance: Map<string, Set<string>>;
 };
 const _namesBursts = new Map<string, NamesBurst>();
 /** A burst older than this (its 366 was lost) is treated as finished. */
@@ -3432,6 +3463,7 @@ function _beginNamesBurst(key: string): void {
     phase: 'expect',
     at: _now(),
     excludedNicks: existing?.excludedNicks ?? new Set(),
+    modeProvenance: new Map(),
   });
 }
 
@@ -3613,6 +3645,8 @@ const MAX_BAN_CHANNEL_LENGTH = 256;
 const MAX_BAN_MASK_LENGTH = 512;
 const MAX_BAN_SETTER_LENGTH = 128;
 const _banBuffer = new Map<string, BanListEntry[]>();
+/** Invalidates in-flight MODE +b replies after disconnect or account change. */
+let _banListEpoch = 0;
 
 function _normalizeBanChannel(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -3658,6 +3692,7 @@ function _normalizeBanList(values: readonly BanListEntry[]): BanListEntry[] {
 
 function _clearBanListTransport(): void {
   _banBuffer.clear();
+  _banListEpoch += 1;
 }
 
 /** Isolate module-level protocol state between focused store tests. */
@@ -3734,6 +3769,9 @@ export function _resetTempBanTimersForTests(): void {
 
 // ── Reconnect countdown (module-level) ────────────────────────────────────────
 let _reconnectAttempts = 0;
+const _RECONNECT_DELAY_CAP_SECONDS = 60;
+const _RECONNECT_JITTER_RATIO = 0.2;
+let _reconnectRandom: () => number = Math.random;
 
 // ── Nick alias try index (module-level) ──────────────────────────────────────
 /** How many aliases have been tried for the current connection attempt */
@@ -3787,7 +3825,16 @@ function _startNickReclaim(desiredNick: string) {
 }
 
 function _reconnectDelay(attempt: number): number {
-  return Math.min(5 * Math.pow(2, attempt), 60);
+  const baseDelay = Math.min(5 * Math.pow(2, attempt), _RECONNECT_DELAY_CAP_SECONDS);
+  const jitterWindow = Math.max(1, Math.floor(baseDelay * _RECONNECT_JITTER_RATIO));
+  const randomUnit = Math.min(1, Math.max(0, _reconnectRandom()));
+  const jitterOffset = Math.round((randomUnit * 2 - 1) * jitterWindow);
+  return Math.max(1, Math.min(_RECONNECT_DELAY_CAP_SECONDS, baseDelay + jitterOffset));
+}
+
+/** Deterministic probe for reconnect-delay tests. */
+export function _reconnectDelayForTests(attempt: number): number {
+  return _reconnectDelay(attempt);
 }
 
 function _clearReconnectCountdown() {
@@ -3795,8 +3842,54 @@ function _clearReconnectCountdown() {
   if (_reconnectScheduleTimer) { clearTimeout(_reconnectScheduleTimer); _reconnectScheduleTimer = null; }
 }
 
+/** Test seam for deterministic reconnect jitter assertions. */
+export function _setReconnectRandomForTests(randomFn: () => number): void {
+  _reconnectRandom = randomFn;
+}
+
+/** Reset reconnect randomness + attempt/timer state between focused tests. */
+export function _resetReconnectBackoffForTests(): void {
+  _reconnectRandom = Math.random;
+  _reconnectAttempts = 0;
+  _clearReconnectCountdown();
+}
+
 type SetFn = (partial: Partial<OnyxState> | ((s: OnyxState) => Partial<OnyxState>)) => void;
 type GetFn = () => OnyxState;
+
+function _writeBanListMeta(
+  map: Map<string, BanListMeta>,
+  key: string,
+  patch: Partial<BanListMeta>,
+): Map<string, BanListMeta> {
+  const next = new Map(map);
+  const previous = next.get(key) ?? EMPTY_BAN_LIST_META;
+  next.set(key, { ...previous, ...patch });
+  return next;
+}
+
+function _ownedBanListRequest(state: OnyxState, key: string): BanListMeta | null {
+  const meta = state.banListMeta.get(key);
+  if (!meta || meta.status !== 'loading' || meta.epoch !== _banListEpoch) return null;
+  return meta;
+}
+
+function _settlePendingBanLists(
+  set: SetFn,
+  status: 'error' | 'unavailable',
+  error: string,
+): void {
+  set((s) => {
+    let changed = false;
+    const banListMeta = new Map(s.banListMeta);
+    for (const [key, meta] of banListMeta) {
+      if (meta.status !== 'loading') continue;
+      banListMeta.set(key, { ...meta, status, error });
+      changed = true;
+    }
+    return changed ? { banListMeta } : {};
+  });
+}
 
 function _requestHistoryTargetDiscovery(get: GetFn): void {
   const client = get().client;
@@ -4090,6 +4183,7 @@ function _resetAccountBoundState(
       ctcpTimeEnabled: DEFAULT_CTCP_CONFIG.timeEnabled,
       invisibleMode: false,
       banList: new Map(),
+      banListMeta: new Map(),
       channelAccess: new Map(),
       channelAccessLoading: new Set(),
       mutedDMs: new Set(),
@@ -4118,7 +4212,7 @@ function _resetAccountBoundState(
 
 /**
  * Quarantine message-derived state when the identity behind a live transport
- * changes. Channel membership and roster metadata still describe the same IRC
+ * changes. Room membership and roster metadata still describe the same IRC
  * socket, but history visibility may be account-gated, so even channel message
  * buffers must be rehydrated from the new owner's namespace. Decrypted DMs are
  * dropped wholesale and a DM view is closed before the new account is exposed.
@@ -4139,9 +4233,25 @@ function _resetAccountPrivateMessageState(set: SetFn): void {
         highlights: 0,
       });
     }
+    // scheduleMessage/_persistScheduledMessages write a queued row's body to
+    // localStorage in the clear (defense-in-depth guards keep newly-scheduled
+    // E2EE-designated DMs out of the queue, but legacy pre-guard rows may
+    // still be sitting there). The array intentionally survives an account
+    // switch for OTHER identities — selectOwnedScheduledMessages and
+    // _dispatchScheduledMessages already scope visibility/dispatch by owner,
+    // so a user can hold scheduled sends under multiple accounts on one
+    // device — but the identity that is actually logging out here must not
+    // leave its plaintext bodies sitting in localStorage indefinitely.
+    const outgoingOwner = _scheduledMessageOwner(s);
+    const filteredScheduledMessages = outgoingOwner
+      ? s.scheduledMessages.filter((message) => !_sameScheduledMessageOwner(message.owner, outgoingOwner))
+      : s.scheduledMessages;
+    const scheduledMessagesChanged = filteredScheduledMessages.length !== s.scheduledMessages.length;
+    if (scheduledMessagesChanged) _persistScheduledMessages(filteredScheduledMessages);
     return {
       channels,
       dms: new Map(),
+      scheduledMessages: scheduledMessagesChanged ? filteredScheduledMessages : s.scheduledMessages,
       activeView: s.activeView.kind === 'dm' ? { kind: 'home' as const } : s.activeView,
       timeTravelLandingId: null,
       historyLoading: new Map(),
@@ -4271,6 +4381,79 @@ function _addSessionRestoreIdentity(get: GetFn, identity: string | null | undefi
 
 function _isSessionRestoreIdentity(get: GetFn, identity: string): boolean {
   return Boolean(identity && _currentSessionRestore(get)?.identities.has(identity.toLowerCase()));
+}
+
+interface SelfIdentityContext {
+  canonicalNick: string;
+  transportNick: string;
+  identities: Set<string>;
+}
+
+/**
+ * Equivalent self spellings owned by this live authenticated connection.
+ *
+ * The restore context admits early replay, but its timer is not the identity
+ * lifetime: while registration is still using a 433 alias, canonical account
+ * and transport alias remain equivalent until NICK reclaim succeeds.
+ */
+function _selfIdentityContext(get: GetFn): SelfIdentityContext | null {
+  const state = get();
+  const canonicalNick = _saslAccount || state.server?.account || _connectNick || state.ourNick;
+  const transportNick = state.ourNick;
+  const identities = new Set(_currentSessionRestore(get)?.identities ?? []);
+  if (
+    state.currentNickIsAlias
+    && canonicalNick
+    && transportNick
+    && canonicalNick.toLowerCase() !== transportNick.toLowerCase()
+    && Boolean(_saslAccount || state.server?.account)
+  ) {
+    identities.add(canonicalNick.toLowerCase());
+    identities.add(transportNick.toLowerCase());
+    if (_connectNick) identities.add(_connectNick.toLowerCase());
+  }
+  return identities.size > 0 ? { canonicalNick, transportNick, identities } : null;
+}
+
+/** A PART/QUIT for either resumed self spelling removes every equivalent row. */
+function _equivalentRemovalKeys(get: GetFn, identity: string): Set<string> {
+  const key = identity.toLowerCase();
+  const context = _selfIdentityContext(get);
+  return context?.identities.has(key) ? new Set(context.identities) : new Set([key]);
+}
+
+function _isEquivalentSelfIdentity(get: GetFn, identity: string): boolean {
+  return Boolean(identity && _selfIdentityContext(get)?.identities.has(identity.toLowerCase()));
+}
+
+function _removeEquivalentRosterRows(
+  source: Map<string, ChannelUser>,
+  removalKeys: Set<string>,
+  preserveTransport?: { nick: string; modes: Set<string> },
+): { users: Map<string, ChannelUser>; removed: boolean } {
+  const users = new Map(source);
+  let removed = false;
+  let retained: ChannelUser | undefined;
+  for (const removalKey of removalKeys) {
+    const row = users.get(removalKey);
+    if (!row) continue;
+    removed = true;
+    retained ??= row;
+    users.delete(removalKey);
+  }
+  if (removed && preserveTransport) {
+    const transportKey = preserveTransport.nick.toLowerCase();
+    users.set(transportKey, {
+      ...retained,
+      nick: preserveTransport.nick,
+      // Never inherit the departed equivalent spelling's privileges. Exact
+      // per-spelling NAMES provenance is bounded to this burst; absent that,
+      // fail closed to an unprivileged row until the next authoritative sync.
+      modes: new Set(preserveTransport.modes),
+      away: retained?.away ?? false,
+    });
+  }
+  return { users, removed };
 }
 
 function _armSessionRestoreReplay(get: GetFn, set: SetFn): void {
@@ -4489,6 +4672,16 @@ function _tryPendingDeepLinkTopicResolution(
  * rapid focus switching can't spam the server. No-op when disconnected or not a
  * member. Safe to call freely: NAMES rebuilds the roster and is idempotent.
  */
+function _requestActivitySubscription(
+  get: GetFn,
+  channel: string,
+  op: 'SUBSCRIBE' | 'UNSUBSCRIBE',
+): void {
+  const args = activitySubscribeArgs(channel, op);
+  if (!args) return;
+  get().client?.sendRaw(...args);
+}
+
 function _refreshChannelRoster(get: GetFn, channel: string): void {
   const key = channel.toLowerCase();
   const st = get();
@@ -4627,6 +4820,8 @@ function _startReconnectCountdown(get: GetFn, set: SetFn) {
   }
 
   const delaySecs = _reconnectDelay(_reconnectAttempts);
+  const scheduledClient = get().client;
+  const scheduledGeneration = scheduledClient?.socketGeneration;
   set({ connectionStatus: "reconnecting", reconnectIn: delaySecs });
 
   let remaining = delaySecs;
@@ -4640,6 +4835,10 @@ function _startReconnectCountdown(get: GetFn, set: SetFn) {
 
   _reconnectScheduleTimer = setTimeout(() => {
     _clearReconnectCountdown();
+    if (
+      get().client !== scheduledClient
+      || scheduledClient?.socketGeneration !== scheduledGeneration
+    ) return;
     _reconnectAttempts++;
     if (!get().autoReconnect) {
       set({ connectionStatus: "disconnected", reconnectIn: 0 });
@@ -4648,6 +4847,8 @@ function _startReconnectCountdown(get: GetFn, set: SetFn) {
     set({ connectionStatus: "connecting", reconnectIn: 0 });
     const { client } = get();
     if (client) {
+      _namesBursts.clear();
+      _lastRosterRefresh.clear();
       _beginSessionRestore(
         get,
         set,
@@ -4789,6 +4990,53 @@ export function selectDeviceMemoryOwner(
   state: Pick<OnyxState, 'server' | 'ourNick'>,
 ): DeviceMemoryOwner | null {
   return _outboxOwner(state);
+}
+
+/** Snapshot fields that decide whether a DM must stay on the encrypted path. */
+export type DmE2eeDesignationState = Pick<
+  OnyxState,
+  'peerDmKeys' | 'peerDmDeviceKeys' | 'peerKeyChanges' | 'dms' | 'client' | 'server' | 'ourNick'
+>;
+
+function dmDeviceDirectoryDesignates(devices: readonly string[] | undefined): boolean {
+  if (!devices || devices.length === 0) return false;
+  // A nonempty valid directory designates. A nonempty but corrupt list also
+  // designates so the send/outbox/search paths fail closed instead of treating
+  // garbage as "no E2EE".
+  return true;
+}
+
+/**
+ * True when this DM is designated for E2EE and must never fall through to
+ * plaintext send, offline outbox persistence, or server search.
+ *
+ * Independent of the `e2eeDms` preference: a published legacy key, a nonempty
+ * multi-device directory, a pending key-change, loaded ciphertext, or
+ * vault-classified encrypted history keeps the conversation on the encrypted
+ * path. Empty directories and genuinely plain DMs stay undesignated.
+ */
+export function isDmE2eeDesignated(state: DmE2eeDesignationState, peer: string): boolean {
+  const trimmed = peer.trim();
+  if (!trimmed) return false;
+  const chantypes = state.client?.isupport.CHANTYPES ?? '#&';
+  if (chantypes.includes(trimmed[0]!)) return false;
+
+  const key = trimmed.toLowerCase();
+  if (state.peerKeyChanges.has(key)) return true;
+  if (state.peerDmKeys.has(key)) return true;
+  if (dmDeviceDirectoryDesignates(state.peerDmDeviceKeys.get(key))) return true;
+
+  const conversation = state.dms.get(key);
+  if (conversation?.messages.some((message) => hasEncryptedMessageBoundary(message))) {
+    return true;
+  }
+
+  const memoryOwner = selectDeviceMemoryOwner(state);
+  if (memoryOwner) {
+    const privacyTarget = deviceMemoryPrivacyTarget(memoryOwner, key);
+    if (privacyTarget && getVaultDmSearchPrivacy(privacyTarget) === 'encrypted') return true;
+  }
+  return false;
 }
 
 function _loadOwnedComposerDrafts(
@@ -5202,27 +5450,79 @@ function deliverChatMessage(
     if (targetIsChannel) get().updateChannelActivity(target);
   };
 
-  // A DM to a peer who published a device key (and with E2EE on) is sealed
-  // before socket admission. A seal or admission failure must not create an
-  // optimistic echo; the offline caller also keeps its durable row untouched.
+  // A designated E2EE DM is sealed before socket admission. Preference cannot
+  // downgrade an already-designated conversation to plaintext. A seal or
+  // admission failure must not create an optimistic echo; the offline caller
+  // also keeps its durable row untouched.
   const cp = client.isupport.CHANTYPES ?? '#&';
   const isDm = target.length > 0 && !cp.includes(target[0]!);
 
-  // Era 3 C1: rooms with encryption-policy=required must never accept plaintext
-  // until group envelope seal ships. Locked group ciphertext may still echo.
-  if (targetIsChannel && !isGroupEnvelope(text)) {
+  // Required rooms admit only a freshly sealed ONYXROOM1 envelope from the
+  // connection-owned group runtime.  The runtime/session/key never enter
+  // Zustand, and every async completion is rebound to the exact socket and
+  // bridge owner before ciphertext reaches the wire.
+  if (targetIsChannel) {
     const policy = selectChannelEncryptionPolicy(target)(get());
     if (policy === 'required') {
-      get().addToast({
-        variant: 'error',
-        title: 'Room requires encryption',
-        description: `Messages in ${target} cannot be sent as plaintext yet — group E2EE delivery is not ready on this client.`,
-      });
-      get().addNotification({
-        type: 'error',
-        text: `Encryption required — message to ${target} was not sent (group E2EE not available).`,
-      });
-      return false;
+      const bridge = _groupControlBridge;
+      const ownerToken = _groupControlOwnerToken;
+      if (!bridge) {
+        get().addToast({
+          variant: 'error',
+          title: 'Encrypted room is locked',
+          description: `Your message was not sent. Reconnect or wait for ${target}'s encryption setup to finish, then try again.`,
+        });
+        return false;
+      }
+      return bridge.sealRoomMessage(target, text).then((outcome) => {
+        if (
+          generation !== _accountGeneration
+          || client !== get().client
+          || _groupControlBridge !== bridge
+          || _groupControlOwnerToken !== ownerToken
+        ) return false;
+        if (!outcome.ok) {
+          get().addToast({
+            variant: 'error',
+            title: 'Encrypted room is locked',
+            description: `Your message was not sent. ${outcome.reason === 'recovery-required'
+              ? 'This room needs encryption recovery before sending.'
+              : 'Wait for the room encryption status to become ready, then try again.'}`,
+          });
+          get().addNotification({
+            type: 'error',
+            text: `Encryption unavailable — message to ${target} was not sent.`,
+          });
+          return false;
+        }
+        const encryptedTags = { ...outboundTags, ...e2eeMessageTag('mls') };
+        if (!client.send(formatTaggedLine(encryptedTags, 'PRIVMSG', target, outcome.envelope))) return false;
+        if (label) {
+          commitLabeledOptimistic({
+            text: outcome.envelope,
+            encrypted: true,
+            e2ee: 'mls',
+            plaintext: text,
+          });
+        } else if (!waitForServerEcho) {
+          set(s => _addMessage(s, target, {
+            id: uid(),
+            time: new Date(),
+            from: ourNick,
+            text: outcome.envelope,
+            plaintext: text,
+            type: 'msg',
+            target,
+            encrypted: true,
+            e2ee: 'mls',
+            ...(activeTopic ? { topic: activeTopic } : {}),
+            ...(replySnapshot ? { replyTo: replySnapshot } : {}),
+          }));
+          get().updateChannelActivity(target);
+        }
+        if (activeReply) set({ replyingTo: null });
+        return true;
+      }).catch(() => false);
     }
   }
 
@@ -5231,13 +5531,10 @@ function deliverChatMessage(
     ...(get().peerDmDeviceKeys.get(target.toLowerCase()) ?? []),
     ...(peerKey ? [peerKey] : []),
   ]);
-  // Designated E2EE DM: any directory entry (even a structurally invalid key)
-  // MUST enter the encrypted path and fail closed — never fall through to
-  // plaintext because normalizePeerDeviceKeys dropped a bad key.
-  const e2eeDesignated = isDm && preferences().e2eeDms && (
-    !!peerKey
-    || (get().peerDmDeviceKeys.get(target.toLowerCase())?.length ?? 0) > 0
-  );
+  // Designated E2EE DM: leftover device directories, invalid keys, loaded
+  // ciphertext, and key-change state MUST enter the encrypted path and fail
+  // closed — never fall through to plaintext.
+  const e2eeDesignated = isDm && isDmE2eeDesignated(get(), target);
   if (e2eeDesignated) {
     const memoryContext = captureDeviceMemoryContext(get());
     if (!memoryContext) {
@@ -5332,6 +5629,22 @@ function deliverChatMessage(
       // Only consume the armed reply when this send actually used it.
       if (activeReply) set({ replyingTo: null });
       return true;
+    }).catch(() => {
+      // A rejection here (vs. a resolved non-'sealed' outcome above) still
+      // fails closed — nothing reaches the wire and the draft survives — but
+      // silently swallowing it left the user staring at a message that just
+      // vanished with zero feedback. Surface the same toast/notification the
+      // resolved seal-failure path already shows.
+      get().addToast({
+        variant: 'error',
+        title: 'Encryption unavailable',
+        description: `Your message to ${target} was NOT sent — the encrypted DM could not be sealed. Try again.`,
+      });
+      get().addNotification({
+        type: 'error',
+        text: `Encryption unavailable — message to ${target} was not sent (the encrypted DM could not be sealed).`,
+      });
+      return false;
     });
   }
 
@@ -5391,6 +5704,112 @@ const _initialInvisibleMode = loadInvisibleMode();
 // codec promise can never resurrect a call the user already left.
 let _voiceJoinAttempt = 0;
 
+// Group-control ownership is intentionally module-private. Zustand receives
+// only GroupControlRuntimeState, never the mutable integration or signer-store
+// handles. The token closes stale async subscriptions before client replacement.
+let _groupControlBridge: GroupControlBridge | null = null;
+let _groupControlOwnerToken = 0;
+const _groupRoomOpenInFlight = new Set<string>();
+
+/**
+ * Open one retained room envelope through the private connection runtime.
+ * Ciphertext remains `text`; only the transient `plaintext` view is attached.
+ * The exact account generation, socket, bridge owner, room, id, and ciphertext
+ * are rechecked after WebCrypto so stale completions fail closed.
+ */
+function _openGroupRoomMessage(
+  set: SetFn,
+  get: GetFn,
+  room: string,
+  message: ChatMessage,
+): void {
+  if (!message.encrypted || message.plaintext !== undefined || !isGroupEnvelope(message.text)) return;
+  const bridge = _groupControlBridge;
+  const client = get().client;
+  if (!bridge || !client || bridge.client !== client) return;
+  const generation = _accountGeneration;
+  const ownerToken = _groupControlOwnerToken;
+  const roomKey = room.toLowerCase();
+  const ciphertext = message.text;
+  const flightKey = `${generation}\u0000${roomKey}\u0000${message.id}\u0000${ciphertext}`;
+  if (_groupRoomOpenInFlight.has(flightKey)) return;
+  _groupRoomOpenInFlight.add(flightKey);
+  void bridge.openRoomMessage(room, ciphertext).then((outcome) => {
+    if (
+      !outcome.ok
+      || generation !== _accountGeneration
+      || ownerToken !== _groupControlOwnerToken
+      || bridge !== _groupControlBridge
+      || client !== get().client
+    ) return;
+    set((state) => {
+      const channel = state.channels.get(roomKey);
+      if (!channel) return {};
+      let changed = false;
+      const messages = channel.messages.map((current) => {
+        if (
+          current.id !== message.id
+          || current.text !== ciphertext
+          || current.plaintext !== undefined
+        ) return current;
+        changed = true;
+        return { ...current, plaintext: outcome.plaintext };
+      });
+      if (!changed) return {};
+      const channels = new Map(state.channels);
+      channels.set(roomKey, { ...channel, messages });
+      return { channels };
+    });
+    // A history collector may still hold this exact (now-superseded) object
+    // reference. Mutate the transient field AFTER the immutable set above so
+    // the set's own `plaintext !== undefined` guard sees the pre-update value
+    // and genuinely swaps the row (new channels Map, new message object) —
+    // that reference swap is what makes `useStore(s => s.channels)` notify.
+    message.plaintext = outcome.plaintext;
+  }).catch(() => undefined).finally(() => {
+    _groupRoomOpenInFlight.delete(flightKey);
+  });
+}
+
+function _groupControlFor(client: IRCClient): GroupControlBridge | null {
+  const bridge = _groupControlBridge;
+  return bridge?.client === client ? bridge : null;
+}
+
+function _destroyGroupControlBridge(set: SetFn, client?: IRCClient): Promise<void> {
+  const bridge = _groupControlBridge;
+  if (!bridge || (client && bridge.client !== client)) return Promise.resolve();
+  _groupControlBridge = null;
+  _groupControlOwnerToken += 1;
+  _groupRoomOpenInFlight.clear();
+  // Clear the safe projection before any transport owner is destroyed.
+  set({ groupControlRuntime: null });
+  return bridge.destroy();
+}
+
+function _createGroupControlBridge(
+  client: IRCClient,
+  endpoint: string,
+  set: SetFn,
+  get: GetFn,
+): GroupControlBridge {
+  const ownerToken = ++_groupControlOwnerToken;
+  const bridge = createGroupControlBridge({
+    client,
+    endpoint,
+    authenticatedAccount: () => get().server?.account ?? _saslAccount,
+    isConnected: () => get().client === client && get().connectionStatus === 'connected',
+    isCurrent: () => _groupControlOwnerToken === ownerToken && _groupControlBridge === bridge,
+    publish: (runtime) => {
+      if (_groupControlOwnerToken !== ownerToken || _groupControlBridge !== bridge) return;
+      set({ groupControlRuntime: runtime });
+    },
+  });
+  _groupControlBridge = bridge;
+  bridge.start();
+  return bridge;
+}
+
 export const store = createStore<OnyxState>()(
   subscribeWithSelector<OnyxState>((set, get) => ({
     status: 'disconnected',
@@ -5399,6 +5818,7 @@ export const store = createStore<OnyxState>()(
     connectionStatus: 'disconnected',
     reconnectIn: 0,
     autoReconnect: false,
+    groupControlRuntime: null,
     outboxDeliveryFailed: false,
     latencyMs: null,
     serverStats: null,
@@ -5418,6 +5838,7 @@ export const store = createStore<OnyxState>()(
     ourNick: '',
     rosterSyncing: new Set(),
     channelProps: new Map(),
+    channelPropsSynced: new Set(),
     userProps: new Map(),
     showChannelInfo: false,
     channelInfoChannel: null,
@@ -5616,6 +6037,11 @@ export const store = createStore<OnyxState>()(
       _reconnectAttempts = 0;
       const { client } = get();
       if (client) {
+        // An appending burst belongs to the old socket. If it survives, the
+        // replacement socket's first authoritative 353 only appends and stale
+        // users can never be removed.
+        _namesBursts.clear();
+        _lastRosterRefresh.clear();
         _beginSessionRestore(
           get,
           set,
@@ -5636,7 +6062,10 @@ export const store = createStore<OnyxState>()(
     connect({ url, nick, password, realname, hasClientCert }) {
       const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
       const prev = get().client;
-      if (prev) prev.destroy();
+      if (prev) {
+        void _destroyGroupControlBridge(set, prev);
+        prev.destroy();
+      }
       _resetAccountBoundState(set, true);
       // Clear any in-progress reconnect countdown
       _clearReconnectCountdown();
@@ -5741,6 +6170,7 @@ export const store = createStore<OnyxState>()(
           _clearReconnectCountdown();
           _reconnectAttempts = 0;
           set({ status: 'connected', connectionStatus: 'connected', reconnectIn: 0, autoReconnect: true, connectedAt: new Date() });
+          _groupControlFor(client)?.onConnected();
           get().addServerLog(hasRegistered ? 'Reconnected.' : `Connected to ${get().server?.url ?? 'server'}.`);
           // On a RECONNECT without onyx/session-sync, re-establish every channel
           // the UI still shows. A guest's reconnect is a brand-new session —
@@ -5756,8 +6186,10 @@ export const store = createStore<OnyxState>()(
           // suppressed. Skipped on the first connect either way (its JOINs
           // already pull fresh NAMES).
           if (hasRegistered) {
+            const reconnectGeneration = client.socketGeneration;
             setTimeout(() => {
               if (get().client !== client) return;
+              if (client.socketGeneration !== reconnectGeneration) return;
               if (get().connectionStatus !== 'connected') return;
               // Server-driven reclaim owns the channel list when session-sync
               // is active; re-check after the delay in case CAP settled late.
@@ -5775,6 +6207,9 @@ export const store = createStore<OnyxState>()(
         },
         onDisconnected(reason) {
           if (get().client !== client) return;
+          // Detach group-control admission and invalidate directory work before
+          // any reconnect countdown can reuse the transport owner.
+          _groupControlFor(client)?.onDisconnected();
           // A credential/mechanism failure is deterministic, not a transient
           // network flap. Retrying the same rejected SASL exchange used to burn
           // through the entire reconnect backoff before finally returning the
@@ -5802,6 +6237,7 @@ export const store = createStore<OnyxState>()(
           _stopLatencyPing();
           _clearBanListTransport();
           _clearAccessListTransport();
+          _settlePendingBanLists(set, 'unavailable', 'Reconnect to refresh the block list.');
           _typingLastSent.clear();
           _pendingTravel = null;
           _pendingPinnedMessages.clear();
@@ -5914,6 +6350,7 @@ export const store = createStore<OnyxState>()(
           get().addRawLogEntry(dir, line);
         },
       });
+      _createGroupControlBridge(client, url, set, get);
       client.onCapChange = () => {
         if (get().client !== client) return;
         // mediaAvailable is NOT a cap: MEDIA is exposed as a plain channel
@@ -5942,6 +6379,7 @@ export const store = createStore<OnyxState>()(
         // immediately instead of leaving it on "connecting" forever.
         _stopRosterPoll();
         _stopScheduledDispatch();
+        void _destroyGroupControlBridge(set, client);
         client.destroy();
         set({
           client: null,
@@ -6005,6 +6443,7 @@ export const store = createStore<OnyxState>()(
               networkName: net,
               serverCapabilities: caps,
             });
+            void _groupControlFor(client)?.refreshAuthenticatedAccount();
             _syncOwnCustomStatusActivity(get, set);
             unsub();
           }
@@ -6045,7 +6484,11 @@ export const store = createStore<OnyxState>()(
       // and close the provisional room so it cannot resurrect after reconnect.
       if (get().voice.callState !== 'idle') get().leaveVoiceChannel();
       else _voiceJoinAttempt += 1;
-      get().client?.destroy();
+      const client = get().client;
+      if (client) {
+        void _destroyGroupControlBridge(set, client);
+        client.destroy();
+      }
       _resetAccountBoundState(set, true, true);
       set({
         client: null,
@@ -6874,10 +7317,6 @@ export const store = createStore<OnyxState>()(
         return;
       }
 
-      const dm = state.dms.get(targetKey);
-      const encryptedDm = dm?.messages.some(
-        (message) => message.encrypted || isEncryptedWireText(message.text),
-      ) ?? false;
       const chantypes = client.isupport.CHANTYPES ?? '#&';
       const targetIsDm = !chantypes.includes(cleanTarget[0]!);
       const memoryOwner = selectDeviceMemoryOwner(state);
@@ -6887,11 +7326,7 @@ export const store = createStore<OnyxState>()(
       const vaultPrivacy = targetIsDm && privacyTarget
         ? getVaultDmSearchPrivacy(privacyTarget)
         : targetIsDm ? 'unknown' : 'plain';
-      const encryptedBoundary = targetIsDm && (
-        encryptedDm
-        || vaultPrivacy === 'encrypted'
-        || (preferences().e2eeDms && state.peerDmKeys.has(targetKey))
-      );
+      const encryptedBoundary = isDmE2eeDesignated(state, cleanTarget);
       const privacyUnknown = targetIsDm && vaultPrivacy === 'unknown';
       if (encryptedBoundary || privacyUnknown) {
         // The action is a public boundary, not just a UI helper. Start the proof
@@ -7041,22 +7476,37 @@ export const store = createStore<OnyxState>()(
         // only happens on the online send path (flushOutbox → sendMessage re-
         // seals on reconnect). Queuing an E2EE DM here would therefore write
         // plaintext at rest, breaking the "outbox only ever sees ciphertext"
-        // invariant above. Refuse rather than leak — the user can resend once
-        // reconnected. Non-E2EE DMs and channel messages queue as before.
+        // invariant above. Required E2EE rooms have the same constraint: their
+        // user input must be sealed by the live, connection-owned group runtime.
+        // Refuse rather than leak — the user can resend once reconnected.
         const cp = client?.isupport.CHANTYPES ?? '#&';
         const isDm = target.length > 0 && !cp.includes(target[0]!);
-        if (isDm && preferences().e2eeDms && get().peerDmKeys.has(target.toLowerCase())) {
+        const isRequiredRoom = selectChannelEncryptionPolicy(target)(get()) === 'required';
+        if (isRequiredRoom) {
+          get().addToast({
+            variant: 'error',
+            title: "Can't queue encrypted room message",
+            description: `Messages for ${target} must be encrypted while connected, so this plaintext was not stored. Reconnect to send it.`,
+          });
+          return false;
+        }
+        if (isDm && isDmE2eeDesignated(get(), target)) {
           get().addToast({
             variant: 'error',
             title: "Can't queue encrypted DM",
             description: "Encrypted DMs aren't stored while offline — reconnect to send this message.",
           });
-          return;
+          // `false` (not a bare `return`) — Composer.tsx checks `admitted ===
+          // false` to keep the draft/textarea intact on refusal. A bare
+          // `return` resolves to `undefined`, which !== false, so the
+          // composer fell through to its normal post-send draft-clear path
+          // and silently destroyed the unsent message.
+          return false;
         }
         const owner = _outboxOwner(get());
         if (!owner) {
           get().addToast({ variant: 'error', title: 'Offline', description: 'Reconnect before queueing a message for this identity.' });
-          return;
+          return false;
         }
         void queueOutbox(target, text, owner).then((entry) => {
           if (!_sameOutboxOwner(owner, _outboxOwner(get()))) return;
@@ -7162,7 +7612,7 @@ export const store = createStore<OnyxState>()(
             get().addToast({
               variant: 'info',
               title: `Unignored ${nick}`,
-              description: 'Messages and notifications from this nick resume on this device.',
+              description: 'Messages and notifications from this name resume on this device.',
             });
           }
           return;
@@ -7181,8 +7631,8 @@ export const store = createStore<OnyxState>()(
           if (!ch || !(client.isupport.CHANTYPES ?? '#&').includes(ch[0]!)) {
             get().addToast({
               variant: 'warning',
-              title: 'Star a channel',
-              description: 'Use /star in a channel, or /star #room.',
+              title: 'Star a room',
+              description: 'Use /star in a room, or /star #room.',
             });
             return;
           }
@@ -7200,8 +7650,8 @@ export const store = createStore<OnyxState>()(
           if (!ch || !(client.isupport.CHANTYPES ?? '#&').includes(ch[0]!)) {
             get().addToast({
               variant: 'warning',
-              title: 'Mute a channel',
-              description: 'Use /mute in a channel, or /mute #room.',
+              title: 'Mute a room',
+              description: 'Use /mute in a room, or /mute #room.',
             });
             return;
           }
@@ -7217,7 +7667,7 @@ export const store = createStore<OnyxState>()(
             get().addToast({
               variant: 'info',
               title: `Unmuted ${ch}`,
-              description: 'Room notifications resume (mentions still follow channel notify mode).',
+              description: 'Room notifications resume (mentions still follow this room notify mode).',
             });
           }
           return;
@@ -7228,7 +7678,7 @@ export const store = createStore<OnyxState>()(
             get().addToast({
               variant: 'warning',
               title: 'Auto-join',
-              description: 'Use /autojoin in a channel, or /autojoin #room.',
+              description: 'Use /autojoin in a room, or /autojoin #room.',
             });
             return;
           }
@@ -7322,8 +7772,8 @@ export const store = createStore<OnyxState>()(
           if (!targetIsChannel) {
             get().addToast({
               variant: 'warning',
-              title: 'Channel color',
-              description: 'Use /color #hex in a channel.',
+              title: 'Room color',
+              description: 'Use /color #hex in a room.',
             });
             return;
           }
@@ -7332,7 +7782,7 @@ export const store = createStore<OnyxState>()(
             get().setChannelColor(target, '');
             get().addToast({
               variant: 'info',
-              title: 'Channel color cleared',
+              title: 'Room color cleared',
               description: `${target} uses the default accent again.`,
             });
             return;
@@ -7340,7 +7790,7 @@ export const store = createStore<OnyxState>()(
           get().setChannelColor(target, color);
           get().addToast({
             variant: 'info',
-            title: 'Channel color set',
+            title: 'Room color set',
             description: `${target} accent updated on this device.`,
           });
           return;
@@ -7365,7 +7815,7 @@ export const store = createStore<OnyxState>()(
             get().addToast({
               variant: 'warning',
               title: 'Share a room',
-              description: 'Open a channel, then use /share to copy a deep link.',
+              description: 'Open a room, then use /share to copy a deep link.',
             });
             return;
           }
@@ -7401,8 +7851,8 @@ export const store = createStore<OnyxState>()(
           if (!targetIsChannel) {
             get().addToast({
               variant: 'warning',
-              title: 'Channel notifications',
-              description: 'Use /notify all|mentions|mute inside a channel.',
+              title: 'Room notifications',
+              description: 'Use /notify all|mentions|mute inside a room.',
             });
             return;
           }
@@ -7463,7 +7913,7 @@ export const store = createStore<OnyxState>()(
         return;
       }
 
-      void deliverChatMessage(set, get, client, target, text);
+      return deliverChatMessage(set, get, client, target, text);
     },
 
     // ── sendRaw ──────────────────────────────────────────────────────────
@@ -7679,7 +8129,7 @@ export const store = createStore<OnyxState>()(
         return;
       }
       set({ accountSessionsPending: true, accountSessionsError: null });
-      client.sendRaw('SESSION', 'DROP', `#${Math.trunc(index)}`);
+      client.sendRaw('SESSION', 'DROP', row?.sid ? `sid=${row.sid}` : `#${Math.trunc(index)}`);
     },
 
     accountSet(field, value, password) {
@@ -7859,8 +8309,9 @@ export const store = createStore<OnyxState>()(
       set({ showAppearance: false });
     },
     setBackground(id) {
-      _saveBackground(id);
-      set({ backgroundId: id });
+      const valid = id === 'auto' ? 'auto' : (resolveCatalogueBackgroundId(id) ?? 'auto');
+      _saveBackground(valid);
+      set({ backgroundId: valid });
     },
 
     // ── markRead ─────────────────────────────────────────────────────────
@@ -9102,10 +9553,11 @@ export const store = createStore<OnyxState>()(
 
     // ── Theme ─────────────────────────────────────────────────────────────
     setTheme(theme) {
-      persistThemeId(theme);
+      const valid = normalizeThemeId(theme) ?? DEFAULT_THEME_ID;
+      persistThemeId(valid);
       set({
-        activeTheme: theme,
-        ...(isThemeId(theme) ? { theme } : {}),
+        activeTheme: valid,
+        ...(isThemeId(valid) ? { theme: valid } : {}),
       });
     },
 
@@ -9587,15 +10039,23 @@ export const store = createStore<OnyxState>()(
           return;
         }
         if (standard.kind === 'FAIL' && standard.command === 'SESSION') {
-          clearSessionToken(get().server?.url, _connectNick || get().ourNick);
-          // A terminal resume failure invalidates the stale bearer, but a 900
-          // may already have authenticated this socket independently. Keep
-          // accepting the freshly-queued SESSION TOKEN only for that proven
-          // account; an ordinary guest remains unable to persist token notes.
-          _sessionTokenWritesAllowed = Boolean(_saslAccount || get().server?.account);
-          _credentialTokenCanonicalOnly = true;
-          get().client?.clearResumeTokens?.();
-          _clearSessionRestore(set);
+          // SESSION is also the namespace for LIST and DROP failures. Those do
+          // not say anything about the resume bearer and must never erase it.
+          // The daemon reserves INVALID_TOKEN and NO_SESSION for terminal
+          // RESUME rejection; retryable resume conditions arrive as WARN.
+          const resumeCredentialRejected = standard.code === 'INVALID_TOKEN'
+            || standard.code === 'NO_SESSION';
+          if (resumeCredentialRejected) {
+            clearSessionToken(get().server?.url, _connectNick || get().ourNick);
+            // A terminal resume failure invalidates the stale bearer, but a 900
+            // may already have authenticated this socket independently. Keep
+            // accepting the freshly-queued SESSION TOKEN only for that proven
+            // account; an ordinary guest remains unable to persist token notes.
+            _sessionTokenWritesAllowed = Boolean(_saslAccount || get().server?.account);
+            _credentialTokenCanonicalOnly = true;
+            get().client?.clearResumeTokens?.();
+            _clearSessionRestore(set);
+          }
           get().addNotification({ type: 'error', text: standard.description || `SESSION ${standard.code}` });
           return;
         }
@@ -10084,6 +10544,15 @@ export const store = createStore<OnyxState>()(
 
         // ── Registration ──────────────────────────────────────────────────
         case '001': { // RPL_WELCOME
+          const registrationClient = get().client;
+          const registrationGeneration = registrationClient?.socketGeneration;
+          const registrationStillCurrent = () => Boolean(
+            registrationClient
+            && get().client === registrationClient
+            && registrationClient.socketGeneration === registrationGeneration,
+          );
+          const groupControl = registrationClient ? _groupControlFor(registrationClient) : null;
+          groupControl?.onRegistered(msg);
           _addSessionRestoreIdentity(get, params[0]);
           _addSessionRestoreIdentity(get, _saslAccount);
           _addSessionRestoreIdentity(get, _connectNick);
@@ -10091,7 +10560,7 @@ export const store = createStore<OnyxState>()(
           // Onyx Server exposes voice/video via the MEDIA channel command for any
           // registered member — there is no media cap to gate on, so mark it
           // available on registration. MEDIA EVENTs keep it true.
-          set({ ourNick: params[0], mediaAvailable: true });
+          set({ ourNick: params[0], mediaAvailable: true, channelPropsSynced: new Set() });
           get().addServerLog(params[1] ?? `Welcome, ${params[0]}.`, msg.prefix ?? '');
           // Offline recovery-code login queued from Connect before the socket was up.
           if (_pendingRecoveryLogin) {
@@ -10136,11 +10605,15 @@ export const store = createStore<OnyxState>()(
               // (after the session-sync join replay, so channel sends land).
               _outboxRetries = 0;
               if (get().outboxDeliveryFailed) set({ outboxDeliveryFailed: false });
-              setTimeout(() => get().flushOutbox(), 2500);
+              setTimeout(() => {
+                if (registrationStillCurrent()) get().flushOutbox();
+              }, 2500);
               // Flush any scheduled messages that came due while the app was
               // closed or offline — once, promptly, right after the session
               // settles (so channel sends land after the join replay).
-              setTimeout(() => get()._dispatchScheduledMessages(), 2600);
+              setTimeout(() => {
+                if (registrationStillCurrent()) get()._dispatchScheduledMessages();
+              }, 2600);
             }
             {
               const pendingJoin = get().pendingDeepLinkJoin;
@@ -10148,7 +10621,8 @@ export const store = createStore<OnyxState>()(
               const pendingTopic = get().pendingDeepLinkTopic;
               if (pendingJoin) {
                 setTimeout(() => {
-                  get().client?.sendRaw('JOIN', pendingJoin);
+                  if (!registrationStillCurrent()) return;
+                  registrationClient?.sendRaw('JOIN', pendingJoin);
                   if (pendingTopic) {
                     // Keep the requested label pending until the server's PROP
                     // registry or replayed history can prove it exists. The
@@ -10162,7 +10636,9 @@ export const store = createStore<OnyxState>()(
                     // ?at= time travel: fetch AROUND the moment once the join
                     // replay has had a beat to land (the sorted merge tolerates
                     // either order; the delay just keeps one batch in flight).
-                    setTimeout(() => get().travelTo(pendingJoin, pendingAt), 2400);
+                    setTimeout(() => {
+                      if (registrationStillCurrent()) get().travelTo(pendingJoin, pendingAt);
+                    }, 2400);
                   }
                 }, 1600);
               }
@@ -10251,6 +10727,8 @@ export const store = createStore<OnyxState>()(
           } else {
             _stopNickReclaim();
           }
+          void (authenticated.client ? _groupControlFor(authenticated.client) : null)
+            ?.setAuthenticatedAccount(account);
           break;
         }
 
@@ -10299,7 +10777,7 @@ export const store = createStore<OnyxState>()(
           }
           const restore = _currentSessionRestore(get);
           const isSelf = joiner.toLowerCase() === ourNick.toLowerCase()
-            || _isSessionRestoreIdentity(get, joiner);
+            || _isEquivalentSelfIdentity(get, joiner);
           if (isSelf && _recentNamesBurst(key)?.phase === 'settled') {
             // A new self-JOIN is a new membership generation. Let its explicit
             // reconcile replace the completed generation and its tombstones.
@@ -10346,6 +10824,9 @@ export const store = createStore<OnyxState>()(
             }
             // Fetch WHO data for away status
             get().client?.sendRaw('WHO', ch);
+            // Opt into the server activity stream (#33) so typing/react
+            // events arrive as ACTIVITY even when TAGMSG caps differ.
+            _requestActivitySubscription(get, ch, 'SUBSCRIBE');
             // Roster: a traditional JOIN gets automatic 353/366, but a client
             // that negotiated no-implicit-names must request the authoritative
             // roster itself. Arm before sending so even an immediate reply can
@@ -10427,6 +10908,7 @@ export const store = createStore<OnyxState>()(
           const isSelf = parter.toLowerCase() === ourNick.toLowerCase();
 
           if (isSelf) {
+            _requestActivitySubscription(get, ch, 'UNSUBSCRIBE');
             // A pending/late NAMES reply is not proof that we are still joined.
             _namesBursts.delete(key);
             _lastRosterRefresh.delete(key);
@@ -10482,22 +10964,37 @@ export const store = createStore<OnyxState>()(
                   : {}),
               };
             });
+            const partClient = get().client;
+            if (partClient) _groupControlFor(partClient)?.onRoomPart(ch);
           } else {
-            _excludeNickFromNames(key, parter);
+            const identityContext = _selfIdentityContext(get);
+            const removalKeys = _equivalentRemovalKeys(get, parter);
+            const preserveTransportNick = identityContext?.identities.has(parter.toLowerCase())
+              && parter.toLowerCase() !== ourNick.toLowerCase()
+              ? ourNick
+              : undefined;
+            const preserveTransport = preserveTransportNick
+              ? {
+                  nick: preserveTransportNick,
+                  modes: new Set(
+                    _recentNamesBurst(key)?.modeProvenance.get(preserveTransportNick.toLowerCase()) ?? [],
+                  ),
+                }
+              : undefined;
+            for (const removalKey of removalKeys) _excludeNickFromNames(key, removalKey);
             let removed = false;
             set(s => {
               const channels = new Map(s.channels);
               const c = channels.get(key);
-              if (c?.users.has(parter.toLowerCase())) {
-                const users = new Map(c.users);
-                users.delete(parter.toLowerCase());
+              if (c && [...removalKeys].some(removalKey => c.users.has(removalKey))) {
+                const result = _removeEquivalentRosterRows(c.users, removalKeys, preserveTransport);
                 const reasonSuffix = partReason ? ` (${partReason})` : '';
                 const msgs = _appendBoundedChannelMessage(
                   c.messages,
                   sysMsg(`${parter} left${reasonSuffix}`, ch, eventTime(tags)),
                 );
-                channels.set(key, { ...c, users, messages: msgs } as Channel);
-                removed = true;
+                channels.set(key, { ...c, users: result.users, messages: msgs } as Channel);
+                removed = result.removed;
               }
               return { channels };
             });
@@ -10524,24 +11021,37 @@ export const store = createStore<OnyxState>()(
             _pushReplayEvent(tags, null, `${quitter} quit${quitReason ? `: ${quitReason}` : ''}`);
             break;
           }
+          const identityContext = _selfIdentityContext(get);
+          const removalKeys = _equivalentRemovalKeys(get, quitter);
+          const preserveTransportNick = identityContext?.identities.has(quitter.toLowerCase())
+            && quitter.toLowerCase() !== get().ourNick.toLowerCase()
+            ? get().ourNick
+            : undefined;
           for (const [channelKey, channel] of get().channels) {
-            if (channel.users.has(quitter.toLowerCase())) {
-              _excludeNickFromNames(channelKey, quitter);
+            if ([...removalKeys].some(removalKey => channel.users.has(removalKey))) {
+              for (const removalKey of removalKeys) _excludeNickFromNames(channelKey, removalKey);
             }
           }
           const quitChannels: string[] = [];
           set(s => {
             const channels = new Map(s.channels);
             for (const [chanKey, ch] of channels) {
-              if (ch.users.has(quitter.toLowerCase())) {
-                const users = new Map(ch.users);
-                users.delete(quitter.toLowerCase());
+              if ([...removalKeys].some(removalKey => ch.users.has(removalKey))) {
+                const preserveTransport = preserveTransportNick
+                  ? {
+                      nick: preserveTransportNick,
+                      modes: new Set(
+                        _recentNamesBurst(chanKey)?.modeProvenance.get(preserveTransportNick.toLowerCase()) ?? [],
+                      ),
+                    }
+                  : undefined;
+                const result = _removeEquivalentRosterRows(ch.users, removalKeys, preserveTransport);
                 const quitText = quitReason ? `${quitter} quit: ${quitReason}` : `${quitter} quit`;
                 const msgs = _appendBoundedChannelMessage(
                   ch.messages,
                   sysMsg(quitText, ch.name, eventTime(tags)),
                 );
-                channels.set(chanKey, { ...ch, users, messages: msgs } as Channel);
+                channels.set(chanKey, { ...ch, users: result.users, messages: msgs } as Channel);
                 quitChannels.push(ch.name);
               }
             }
@@ -10635,6 +11145,10 @@ export const store = createStore<OnyxState>()(
             }
             return { channels };
           });
+          if (isSelf) {
+            const kickClient = get().client;
+            if (kickClient) _groupControlFor(kickClient)?.onRoomKick(ch);
+          }
           if (!isSelf && removed) {
             get().addChannelEvent(ch, { type: 'kick', nick: target, text: `${target} was kicked by ${actor}${reason ? ` (${reason})` : ''}`, time: new Date() });
           }
@@ -10749,7 +11263,9 @@ export const store = createStore<OnyxState>()(
         case '819': { // RPL_PROPEND — the requested registry snapshot is complete
           const propTarget = _normalizePropertyTarget(params[1] ?? '');
           if (propTarget && isChan(propTarget)) {
+            set(s => ({ channelPropsSynced: new Set(s.channelPropsSynced).add(propTarget.toLowerCase()) }));
             _tryPendingDeepLinkTopicResolution(get, set, propTarget, { registryComplete: true });
+            get()._dispatchScheduledMessages();
           }
           break;
         }
@@ -10774,6 +11290,9 @@ export const store = createStore<OnyxState>()(
           const names = _boundedNamesTokens(namesStr ?? '');
           const recipient = params[0] ?? '';
           const restore = _currentSessionRestore(get);
+          const identityContext = _selfIdentityContext(get);
+          const canonicalSelfNick = identityContext?.canonicalNick ?? '';
+          const canonicalSelfKey = canonicalSelfNick.toLowerCase();
           const namesContainRestoringSelf = names.some(name => {
             const parsed = parseNamesPrefix(name, client?.prefixToMode ?? DEFAULT_PREFIX_TO_MODE);
             return _isSessionRestoreIdentity(get, parsed.nick);
@@ -10821,15 +11340,37 @@ export const store = createStore<OnyxState>()(
                 || n.includes(',')
                 || burst?.excludedNicks.has(n.toLowerCase())
               ) continue;
-              const userKey = n.toLowerCase();
+              const incomingKey = n.toLowerCase();
+              const isEquivalentSelf = Boolean(identityContext?.identities.has(incomingKey));
+              // Provenance is consumed only when one equivalent self spelling
+              // departs. Never retain arbitrary roster tokens here: a channel
+              // may send many capped 353 lines in one burst.
+              if (isEquivalentSelf) burst?.modeProvenance.set(incomingKey, new Set(modes));
+              const userKey = isEquivalentSelf ? canonicalSelfKey : incomingKey;
+              const combinedModes = new Set(modes);
+              let existing = users.get(userKey) ?? c.users.get(userKey);
+              if (isEquivalentSelf) {
+                // A resume replay may contain both the authenticated account
+                // and its temporary 433 alias, possibly split across 353 lines.
+                // Collapse them to one canonical row and union their status
+                // modes so neither line order nor casing loses privilege bits.
+                for (const identityKey of identityContext!.identities) {
+                  const equivalent = users.get(identityKey);
+                  if (equivalent) {
+                    existing ??= equivalent;
+                    for (const mode of equivalent.modes) combinedModes.add(mode);
+                  }
+                  users.delete(identityKey);
+                  existing ??= c.users.get(identityKey);
+                }
+              }
               if (!users.has(userKey) && users.size >= MAX_LIVE_CHANNEL_USERS) continue;
-              const existing = c.users.get(userKey);
               users.set(userKey, {
                 ...existing,
                 // NAMES owns membership, canonical casing, and status modes;
                 // it does not carry WHO/AWAY or extended-JOIN account data.
-                nick: n,
-                modes: new Set(modes),
+                nick: isEquivalentSelf ? canonicalSelfNick : n,
+                modes: combinedModes,
                 away: existing?.away ?? false,
               });
             }
@@ -10998,9 +11539,11 @@ export const store = createStore<OnyxState>()(
               break;
             }
             const dropped = parseSessionDropOk(text);
-            if (dropped !== null) {
+            if (dropped !== null || isSessionDropSuccess(text)) {
               set((st) => ({
-                accountSessions: st.accountSessions.filter((r) => r.index !== dropped),
+                accountSessions: dropped === null
+                  ? st.accountSessions
+                  : st.accountSessions.filter((r) => r.index !== dropped),
                 accountSessionsPending: false,
                 accountSessionsError: null,
               }));
@@ -11164,6 +11707,9 @@ export const store = createStore<OnyxState>()(
                 };
               });
               _saslAccount = null;
+              const logoutClient = get().client;
+              void (logoutClient ? _groupControlFor(logoutClient) : null)
+                ?.setAuthenticatedAccount(null);
               get().addServiceNotice('Account', text);
               break;
             }
@@ -11562,6 +12108,9 @@ export const store = createStore<OnyxState>()(
             ...(e2eeTag ? { e2ee: e2eeTag } : {}),
             ...(replyTo ? { replyTo } : {}),
           };
+          if (isChannel && isGroupCipher) {
+            _openGroupRoomMessage(set, get, msgTarget, chatMsg);
+          }
           // Never put wire ciphertext into notification rows (in-app center
           // renders note.text directly). Neutral placeholder only.
           const safeNotifyText = isEncryptedBody
@@ -11944,6 +12493,9 @@ export const store = createStore<OnyxState>()(
           if (isChan(target)) {
             const modeStr = params[1] ?? '';
             const modeArgs = params.slice(2);
+            // A delayed or unsolicited MODE for a room outside this live
+            // session must not seed audit/moderation/ban-list state.
+            if (!get().channels.has(key)) break;
             set(s => {
               const channels = new Map(s.channels);
               const c = channels.get(key);
@@ -11958,7 +12510,9 @@ export const store = createStore<OnyxState>()(
               for (const ch of modeStr) {
                 if (ch === '+') { adding = true; continue; }
                 if (ch === '-') { adding = false; continue; }
-                const consumesArg = modeConsumesArg(ch, adding, chanmodes, prefixModes);
+                // Ban masks always consume an argument even before ISUPPORT's
+                // CHANMODES tuple has arrived.
+                const consumesArg = ch === 'b' || modeConsumesArg(ch, adding, chanmodes, prefixModes);
                 const modeArg = consumesArg ? modeArgs[argIdx++] : undefined;
                 if (!prefixModes.has(ch) || !modeArg) continue;
                 const userKey = modeArg.toLowerCase();
@@ -11990,7 +12544,7 @@ export const store = createStore<OnyxState>()(
             for (const ch of modeStr) {
               if (ch === '+') { adding = true; continue; }
               if (ch === '-') { adding = false; continue; }
-              const consumesArg = modeConsumesArg(ch, adding, chanmodes, prefixModes);
+              const consumesArg = ch === 'b' || modeConsumesArg(ch, adding, chanmodes, prefixModes);
               const modeArg = consumesArg ? modeArgs[argIdx++] : undefined;
               if (ch === 'b') {
                 sawBan = true;
@@ -12009,14 +12563,27 @@ export const store = createStore<OnyxState>()(
                 });
                 if (modeArg) {
                   set(s => {
+                    if (!s.channels.has(key)) return {};
+                    const normalized = _normalizeBanEntry({
+                      mask: modeArg,
+                      setBy: nick ?? 'server',
+                      setAt: Math.floor(Date.now() / 1000),
+                    });
+                    if (!normalized) return {};
                     const banList = new Map(s.banList);
                     const existing = banList.get(key) ?? [];
+                    banList.delete(key);
                     banList.set(
                       key,
                       adding
-                        ? [...existing.filter(b => b.mask !== modeArg), { mask: modeArg, setBy: nick ?? 'server', setAt: Math.floor(Date.now() / 1000) }]
-                        : existing.filter(b => b.mask !== modeArg),
+                        ? _normalizeBanList([...existing.filter(b => b.mask !== normalized.mask), normalized])
+                        : existing.filter(b => b.mask !== normalized.mask),
                     );
+                    while (banList.size > MAX_BAN_LIST_CHANNELS) {
+                      const oldest = banList.keys().next().value;
+                      if (oldest === undefined) break;
+                      banList.delete(oldest);
+                    }
                     return { banList };
                   });
                 }
@@ -12172,6 +12739,39 @@ export const store = createStore<OnyxState>()(
           if (setnameNick && newRealname) {
             get().setUserProfile(setnameNick, { realname: newRealname });
           }
+          break;
+        }
+
+        // ── ACTIVITY SUBSCRIBE stream (#33 typing/react) ───────────────────
+        case 'ACTIVITY': {
+          const parsed = parseActivityStream(msg);
+          if (!parsed) break;
+          if (_isHistoryReplay(tags, parsed.channel)) break;
+          if (parsed.kind === 'typing') {
+            if (parsed.nick.toLowerCase() === ourNick.toLowerCase()) break;
+            get().setTyping(parsed.channel, parsed.nick, parsed.active);
+            break;
+          }
+          const reactKey = parsed.channel.toLowerCase();
+          set(s => {
+            const apply = (messages: ChatMessage[]): ChatMessage[] =>
+              messages.map((m) => {
+                if (m.id !== parsed.msgid) return m;
+                return {
+                  ...m,
+                  reactions: parsed.op === 'remove'
+                    ? removeMessageReactor(m.reactions, parsed.reaction, parsed.nick)
+                    : addMessageReactor(m.reactions, parsed.reaction, parsed.nick),
+                };
+              });
+            const channels = new Map(s.channels);
+            const chState = channels.get(reactKey);
+            if (chState) {
+              channels.set(reactKey, { ...chState, messages: apply(chState.messages) });
+              return { channels };
+            }
+            return {};
+          });
           break;
         }
 
@@ -13067,6 +13667,12 @@ export const store = createStore<OnyxState>()(
                 if (dmAfter) for (const m of dmAfter.messages) {
                   if (m.encrypted && m.plaintext === undefined) get()._decryptDm(batchKey, m.id);
                 }
+                const channelAfter = get().channels.get(batchKey);
+                if (channelAfter) for (const m of channelAfter.messages) {
+                  if (m.encrypted && m.plaintext === undefined && isGroupEnvelope(m.text)) {
+                    _openGroupRoomMessage(set, get, batchTarget, m);
+                  }
+                }
               }
 
               // Time-travel landing: this batch answered a travelTo() AROUND
@@ -13384,6 +13990,8 @@ export const store = createStore<OnyxState>()(
             } else {
               _stopNickReclaim();
             }
+            void (authenticated.client ? _groupControlFor(authenticated.client) : null)
+              ?.setAuthenticatedAccount(account900);
           }
           break;
         }
@@ -13424,6 +14032,9 @@ export const store = createStore<OnyxState>()(
           if (!_sameOutboxOwner(previousOwner, selectDeviceMemoryOwner(get()))) {
             _replaceOwnedMonitorContacts(get, set, true);
           }
+          const loggedOutClient = get().client;
+          void (loggedOutClient ? _groupControlFor(loggedOutClient) : null)
+            ?.setAuthenticatedAccount(null);
           break;
         }
 
@@ -13618,7 +14229,7 @@ export const store = createStore<OnyxState>()(
         }
 
         case '467': { // ERR_KEYSET
-          get().addNotification({ type: 'error', text: 'Channel key already set' });
+          get().addNotification({ type: 'error', text: 'Room key already set' });
           break;
         }
 
@@ -13645,8 +14256,11 @@ export const store = createStore<OnyxState>()(
           const key367 = _normalizeBanChannel(ch367);
           // MODE +b replies are meaningful only for a channel this session is
           // actually in. Ignore unsolicited numerics instead of letting a
-          // hostile server allocate arbitrary channel buckets.
+          // hostile server allocate arbitrary channel buckets. A pending fetch
+          // from a previous epoch (disconnect / account change) is also stale.
           if (!key367 || !get().channels.has(key367)) break;
+          const pending367 = get().banListMeta.get(key367);
+          if (pending367?.status === 'loading' && pending367.epoch !== _banListEpoch) break;
           let bans367 = _banBuffer.get(key367);
           if (!bans367) {
             if (_banBuffer.size >= MAX_BAN_LIST_CHANNELS) break;
@@ -13664,6 +14278,11 @@ export const store = createStore<OnyxState>()(
           const ch368 = params[1] ?? '';
           const key368 = _normalizeBanChannel(ch368);
           if (!key368) break;
+          const pending368 = get().banListMeta.get(key368);
+          if (pending368?.status === 'loading' && pending368.epoch !== _banListEpoch) {
+            _banBuffer.delete(key368);
+            break;
+          }
           const bans368 = _banBuffer.get(key368) ?? [];
           _banBuffer.delete(key368);
           if (!get().channels.has(key368)) break;
@@ -13807,7 +14426,7 @@ export const store = createStore<OnyxState>()(
         case '474': { // ERR_BANNEDFROMCHAN
           const channel474 = params[1] ?? '';
           get().addNotification({ type: 'error', text: `You are banned from ${channel474}` });
-          get().setChannelJoinPrompt(channel474, 'You are banned from this channel');
+          get().setChannelJoinPrompt(channel474, 'You are banned from this room');
           break;
         }
 
@@ -13828,6 +14447,18 @@ export const store = createStore<OnyxState>()(
         case '482': { // ERR_CHANOPRIVSNEEDED
           const channel482 = params[1] ?? '';
           get().addNotification({ type: 'error', text: `You need operator privileges in ${channel482}` });
+          const key482 = _normalizeBanChannel(channel482);
+          if (key482) {
+            set((s) => {
+              if (!_ownedBanListRequest(s, key482)) return {};
+              return {
+                banListMeta: _writeBanListMeta(s.banListMeta, key482, {
+                  status: 'error',
+                  error: 'You need moderator permission to view this list.',
+                }),
+              };
+            });
+          }
           break;
         }
 
@@ -14228,18 +14859,45 @@ export const store = createStore<OnyxState>()(
     })(),
     showScheduledMessages: false,
     scheduleMessage: (channel, text, sendAt) => {
+      if (selectChannelEncryptionPolicy(channel)(get()) === 'required') {
+        get().addToast({
+          variant: 'error',
+          title: "Encrypted room messages can't be scheduled",
+          description: 'Protected room messages must be sealed by the live session at send time, so plaintext is never saved for later.',
+        });
+        return false;
+      }
+      // SECURITY: selectChannelEncryptionPolicy only reads channelProps, which a
+      // DM peer never has an entry in — it always resolves to 'off' for a DM, so
+      // the required-room guard above never fires here. `_persistScheduledMessages`
+      // writes the body to localStorage as plaintext, so a designated-E2EE DM must
+      // be refused the same way the offline outbox already refuses it (:7424) —
+      // never write ciphertext-only content to disk in the clear.
+      const chantypes = get().client?.isupport.CHANTYPES ?? '#&';
+      const isDm = channel.length > 0 && !chantypes.includes(channel[0]!);
+      if (isDm && isDmE2eeDesignated(get(), channel)) {
+        get().addToast({
+          variant: 'error',
+          title: "Encrypted DMs can't be scheduled",
+          description: 'Encrypted DMs must be sealed by the live session at send time, so plaintext is never saved for later.',
+        });
+        return false;
+      }
       // Defense-in-depth: pure createScheduledSend / enqueueScheduled own the
       // shape checks; owner is required so rows never dispatch under a peer.
       const owner = _scheduledMessageOwner(get());
-      if (!owner) return;
+      if (!owner) return false;
       const entry = createScheduledSend({ channel, text, sendAt, owner });
-      if (!entry) return;
+      if (!entry) return false;
+      let admitted = false;
       set(s => {
         const next = enqueueScheduled(s.scheduledMessages, entry);
         if (!next) return {};
+        admitted = true;
         _persistScheduledMessages(next);
         return { scheduledMessages: next };
       });
+      return admitted;
     },
     cancelScheduledMessage: (id) => {
       set(s => {
@@ -14258,9 +14916,27 @@ export const store = createStore<OnyxState>()(
       if (!owner) return;
       const owned = s.scheduledMessages.filter((message) => _sameScheduledMessageOwner(message.owner, owner));
       const held = s.scheduledMessages.filter((message) => !_sameScheduledMessageOwner(message.owner, owner));
-      const { due, pending: ownedPending } = selectDueMessages(owned, Date.now(), connected);
+      // channelPropsSynced (819 RPL_PROPEND) is only ever recorded for CHANNEL
+      // targets — a DM nick can never appear in it. Gate the prop-sync wait on
+      // channel targets only, or every scheduled DM on an IRCX node (isIRCX is
+      // true for every Onyx node) would sit "protected" forever and never
+      // dispatch.
+      const chantypes = s.client?.isupport.CHANTYPES ?? '#&';
+      const isChannelTarget = (target: string) => target.length > 0 && chantypes.includes(target[0]!);
+      // Legacy rows may predate the protected-room scheduling guard. Never
+      // dispatch their persisted plaintext through an encryption-required
+      // room; keep them visible for explicit user cancellation/recovery.
+      const protectedHeld = owned.filter(
+        (message) => (s.isIRCX && isChannelTarget(message.channel) && !s.channelPropsSynced.has(message.channel.toLowerCase()))
+          || selectChannelEncryptionPolicy(message.channel)(s) === 'required',
+      );
+      const dispatchable = owned.filter(
+        (message) => (!s.isIRCX || !isChannelTarget(message.channel) || s.channelPropsSynced.has(message.channel.toLowerCase()))
+          && selectChannelEncryptionPolicy(message.channel)(s) !== 'required',
+      );
+      const { due, pending: ownedPending } = selectDueMessages(dispatchable, Date.now(), connected);
       if (due.length === 0) return;
-      const pending = [...held, ...ownedPending].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
+      const pending = [...held, ...protectedHeld, ...ownedPending].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
       // Remove the due entries BEFORE sending (and persist the shrunk queue), so
       // idempotency never depends on the send succeeding: if sendMessage throws,
       // or a second tick fires, the entry is already gone and can't double-send.
@@ -14272,11 +14948,14 @@ export const store = createStore<OnyxState>()(
       // failure) must not swallow its siblings. A throw means the message never
       // reached the wire, so re-queue it for the next tick rather than lose it.
       const failed: typeof due = [];
+      const awaiting: Array<{ message: (typeof due)[number]; admission: Promise<boolean> }> = [];
       let sent = 0;
       for (const m of due) {
         try {
-          get().sendMessage(m.channel, m.text);
-          sent += 1;
+          const admission = get().sendMessage(m.channel, m.text);
+          if (admission instanceof Promise) awaiting.push({ message: m, admission });
+          else if (admission === false) failed.push(m);
+          else sent += 1;
         } catch {
           failed.push(m);
         }
@@ -14286,6 +14965,27 @@ export const store = createStore<OnyxState>()(
           const next = [...s.scheduledMessages, ...failed].sort((a, b) => a.sendAt - b.sendAt);
           _persistScheduledMessages(next);
           return { scheduledMessages: next };
+        });
+      }
+      if (awaiting.length > 0) {
+        void Promise.all(awaiting.map(async ({ message, admission }) => ({
+          message,
+          admitted: await admission.catch(() => false),
+        }))).then((results) => {
+          const rejected = results.filter((result) => !result.admitted).map((result) => result.message);
+          const admitted = results.length - rejected.length;
+          if (rejected.length > 0) {
+            set(current => {
+              const next = [...current.scheduledMessages, ...rejected].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
+              _persistScheduledMessages(next);
+              return { scheduledMessages: next };
+            });
+          }
+          if (admitted > 0) get().addToast({
+            variant: 'success',
+            title: admitted === 1 ? 'Scheduled message sent' : `${admitted} scheduled messages sent`,
+            description: 'Delivered at the time you picked.',
+          });
         });
       }
       if (sent === 0) return;
@@ -14456,6 +15156,7 @@ export const store = createStore<OnyxState>()(
       moderationLog: [{ ...entry, timestamp: Date.now() }, ...s.moderationLog].slice(0, 200),
     })),
     banList: new Map(),
+    banListMeta: new Map(),
     setBanList: (channel, bans) => set(s => {
       const key = _normalizeBanChannel(channel);
       if (!key) return {};
@@ -14469,14 +15170,72 @@ export const store = createStore<OnyxState>()(
         if (oldest === undefined) break;
         banList.delete(oldest);
       }
-      return { banList };
+      const prev = s.banListMeta.get(key);
+      const ready = prev
+        && prev.status === 'loading'
+        && prev.epoch === _banListEpoch
+        && s.connectionStatus === 'connected';
+      return {
+        banList,
+        ...(ready
+          ? {
+              banListMeta: _writeBanListMeta(s.banListMeta, key, {
+                status: 'ready',
+                updatedAt: Date.now(),
+                error: null,
+              }),
+            }
+          : {}),
+      };
     }),
     // IRCX ACCESS roles — also exposed as top-level actions near channel
     // management; initial empty maps live here so getInitialState() seeds them.
     channelAccess: new Map(),
     channelAccessLoading: new Set(),
     fetchBanList: (channel) => {
-      get().client?.sendRaw('MODE', channel, '+b');
+      const key = _normalizeBanChannel(channel);
+      const state = get();
+      if (!key) return;
+      if (
+        !state.client
+        || state.connectionStatus !== 'connected'
+        || !state.server?.connected
+        || !state.channels.has(key)
+      ) {
+        set((s) => ({
+          banListMeta: _writeBanListMeta(s.banListMeta, key, {
+            status: 'unavailable',
+            error: state.connectionStatus === 'connected'
+              ? 'Join this room before loading its block list.'
+              : 'Reconnect to refresh the block list.',
+          }),
+        }));
+        return;
+      }
+      _banBuffer.delete(key);
+      const generation = (state.banListMeta.get(key)?.generation ?? 0) + 1;
+      const epoch = _banListEpoch;
+      set((s) => ({
+        banListMeta: _writeBanListMeta(s.banListMeta, key, {
+          status: 'loading',
+          error: null,
+          generation,
+          epoch,
+        }),
+      }));
+      const sent = state.client.sendRaw('MODE', key, '+b');
+      if (sent === false) {
+        set((s) => {
+          const meta = s.banListMeta.get(key);
+          if (!meta || meta.generation !== generation || meta.epoch !== epoch) return {};
+          return {
+            banListMeta: _writeBanListMeta(s.banListMeta, key, {
+              status: 'error',
+              error: 'Could not request the block list.',
+            }),
+          };
+        });
+      }
     },
     tempBan: (channel, mask, minutes) => {
       const state = get();
@@ -16479,6 +17238,44 @@ export const selectChannelHistoryPolicy = (channel: string) => (s: OnyxState): H
   return parseHistoryPolicy(props?.[HISTORY_POLICY_PROP]);
 };
 
+export const selectBanList = (channel: string) => (s: OnyxState): BanListViewEntry[] | undefined => {
+  const key = channel.trim().toLowerCase();
+  return key ? s.banList.get(key) : undefined;
+};
+
+export const selectBanListMeta = (channel: string) => (s: OnyxState): BanListMeta => {
+  const key = channel.trim().toLowerCase();
+  return (key ? s.banListMeta.get(key) : undefined) ?? EMPTY_BAN_LIST_META;
+};
+
+export const selectBanListView = (channel: string) => (s: OnyxState): BanListView => {
+  const key = channel.trim().toLowerCase();
+  return describeBanListView({
+    entries: key ? s.banList.get(key) : undefined,
+    meta: key ? s.banListMeta.get(key) : undefined,
+    connected: s.connectionStatus === 'connected' && !!s.server?.connected,
+  });
+};
+
+export const selectRoomModerationLog = (channel: string) => (s: OnyxState) => {
+  const key = channel.trim().toLowerCase();
+  if (!key) return [];
+  return s.moderationLog.filter((entry) => entry.channel.toLowerCase() === key).slice(0, 12);
+};
+
+export const selectLastRoomUpdateAt = (channel: string) => (s: OnyxState): number | null => {
+  const key = channel.trim().toLowerCase();
+  if (!key) return null;
+  const fromList = s.banListMeta.get(key)?.updatedAt ?? null;
+  let fromLog: number | null = null;
+  for (const entry of s.moderationLog) {
+    if (entry.channel.toLowerCase() !== key) continue;
+    if (fromLog === null || entry.timestamp > fromLog) fromLog = entry.timestamp;
+  }
+  if (fromList !== null && fromLog !== null) return Math.max(fromList, fromLog);
+  return fromList ?? fromLog;
+};
+
 export const selectIsChannelOp = (channel: string) => (s: OnyxState): boolean => {
   if (s.isOper) return true;
   const ch = s.channels.get(channel.toLowerCase());
@@ -17133,18 +17930,20 @@ function _loadMessageMaxWidth(): 680 | 860 | 0 { const v = typeof window !== 'un
 function _loadGlassSidebar(): boolean { return typeof window !== 'undefined' && localStorage.getItem('onyx:glass-sidebar') === '1'; }
 
 // ── Background persistence (shared with the Appearance route, key 'onyx:bg') ──
-// NB: literals are inlined (not module-level consts) because _loadBackground is
-// invoked while the store's initial state is built — earlier in module eval
-// than any const declared down here would be initialized (TDZ).
+// The key is declared with imports, before store initialization, because this
+// loader runs while the store's initial state is being built.
 function _loadBackground(): string {
   // Default 'auto' → the background follows the active theme's signature scene
   // (see src/shell/themeBackground.ts). Legacy stored ids still pin a scene.
   if (typeof window === 'undefined') return 'auto';
-  try { return localStorage.getItem('onyx:bg') || 'auto'; } catch { return 'auto'; }
+  try {
+    const stored = localStorage.getItem(BACKGROUND_STORAGE_KEY);
+    return stored === 'auto' ? 'auto' : (resolveCatalogueBackgroundId(stored) ?? 'auto');
+  } catch { return 'auto'; }
 }
 function _saveBackground(id: string): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem('onyx:bg', id); } catch {}
+  try { localStorage.setItem(BACKGROUND_STORAGE_KEY, id); } catch {}
 }
 
 // ── High contrast mode persistence ───────────────────────────────────────────
@@ -17182,6 +17981,11 @@ function _loadDisplayFontSize(): number {
 // synchronous WS frame usually flushes during unload. This module only loads on
 // the /app route, so the listener never affects the landing page.
 if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key !== BACKGROUND_STORAGE_KEY && event.key !== null) return;
+    if (event.storageArea && event.storageArea !== localStorage) return;
+    store.setState({ backgroundId: _loadBackground() });
+  });
   window.addEventListener('pagehide', (event) => {
     if (event.persisted) return;
     try {

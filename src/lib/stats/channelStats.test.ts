@@ -46,13 +46,20 @@ describe('fetchChannelPulse', () => {
 
   it('fetches the slug file and normalizes a 24-hour histogram', async () => {
     const hours = Array.from({ length: 24 }, (_, i) => (i === 20 ? 5 : 0));
-    const fetchMock = vi.fn().mockResolvedValue(okResponse({ hours, totals: { messages: 42 } }));
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({
+      hours,
+      totals: { messages: 42 },
+      present: 6,
+      last_active: 1_784_650_000,
+    }));
     vi.stubGlobal('fetch', fetchMock);
 
     const pulse = await fetchChannelPulse('#root');
     expect(fetchMock).toHaveBeenCalledWith('/stats/data/root.json', expect.anything());
     expect(pulse?.hours).toEqual(hours);
     expect(pulse?.total).toBe(42);
+    expect(pulse?.present).toBe(6);
+    expect(pulse?.lastActive).toBe(1_784_650_000);
   });
 
   it('returns null on a non-24-length or missing histogram', async () => {

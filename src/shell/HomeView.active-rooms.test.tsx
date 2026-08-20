@@ -130,10 +130,15 @@ describe('HomeView — Active rooms open-or-join', () => {
 
     render(() => <HomeView />);
 
-    const directory = await screen.findByRole('list', { name: 'Active channel directory' });
+    const directory = await screen.findByRole('list', { name: 'Active room directory' });
     expect(directory).toHaveTextContent('7 people here now');
     expect(directory).toHaveTextContent('908 messages tracked');
     expect(directory).not.toHaveTextContent('16 chatting');
+    expect(screen.getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
+      'href',
+      '/stats/?room=%23root',
+    );
+    expect(screen.getByRole('link', { name: 'Room ledger' })).toHaveAttribute('href', '/stats/');
   });
 
   it('joins an unjoined room without navigating away from Home', async () => {

@@ -82,7 +82,7 @@ describe('IgnoredUsersControl', () => {
   it('refuses empty and self nicks', () => {
     render(() => <IgnoredUsersControl />);
     fireEvent.click(screen.getByTestId('pref-ignore-add'));
-    expect(screen.getByTestId('pref-ignore-error')).toHaveTextContent(/Enter a nick/i);
+    expect(screen.getByTestId('pref-ignore-error')).toHaveTextContent(/Enter a name/i);
 
     fireEvent.input(screen.getByTestId('pref-ignore-nick-input'), {
       target: { value: 'Self' },

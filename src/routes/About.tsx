@@ -3,15 +3,19 @@ import './landing.css';
 import './about.css';
 import { createMemo, createResource, createSignal, onCleanup } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
-import { fetchNetworkStatus, publicMeshFeedLabel, publicMeshFeedState } from '@/lib/stats/status';
+import {
+  fetchNetworkStatus,
+  publicMeshFeedLabel,
+  publicMeshFeedState,
+  type PublicMeshFeedState,
+} from '@/lib/stats/status';
 import { AccessibilityStatement } from '@/shell/AccessibilityStatement';
+import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
-import { PublicFooter } from './PublicFooter';
 
 /**
- * Onyx /about — full editorial deep-dive.
- * Deep-water dark-luxury identity; depth, azure currents,
- * bioluminescent crests. Continuous with landing.
+ * Onyx /about — protocol, media, and network essay.
+ * Room Current identity; continuous with the shared public frame.
  *
  * Technical claims grounded in:
  *   docs/planning/20-media-interop.md
@@ -20,10 +24,16 @@ import { PublicFooter } from './PublicFooter';
  *   docs/planning/09-s2s-protocol.md
  *   docs/architecture/00-overview.md
  */
+function aboutFeedDetail(state: PublicMeshFeedState): string {
+  if (state === 'loading') return 'The public network report is still being requested.';
+  if (state === 'current') return 'A current public network observation is available.';
+  return 'This report state does not establish current network availability.';
+}
+
 export default function About() {
   setPageMeta(
-    'About Onyx — open protocol, sovereign mesh',
-    'Learn how Onyx, Cadence media, and the open mesh work together without closed-platform lock-in.',
+    'About Onyx — open protocol, sovereign network',
+    'Learn how Onyx, Cadence media, and the open network work together without closed-platform lock-in.',
     '/about/',
   );
   const [status, { refetch }] = createResource(fetchNetworkStatus, { initialValue: null });
@@ -33,9 +43,22 @@ export default function About() {
     void refetch();
   }, 30_000);
   onCleanup(() => clearInterval(refreshTimer));
-  const feedState = createMemo(() => publicMeshFeedState(status.latest, nowMs()));
+  const feedState = createMemo(() => (
+    status.loading ? 'loading' : publicMeshFeedState(status.latest, nowMs())
+  ));
   return (
-    <main class="r ab-ocean">
+    <PublicFrame
+      currentPath="/about/"
+      mainLabel="About Onyx"
+      context={(
+        <p class="public-frame__current-line">
+          <span class="public-frame__current-kicker">System</span>
+          <span aria-hidden="true">·</span>
+          <span class="public-frame__current-label">Protocol, media, and network</span>
+        </p>
+      )}
+    >
+      <div class="ui-root r ab-ocean">
       {/* ── Living atmosphere (shared with landing, blue-tinted here) ── */}
       <div class="r-ground" aria-hidden="true" />
       <div class="r-flecks" aria-hidden="true" />
@@ -54,43 +77,45 @@ export default function About() {
       </svg>
       <div class="r-grain" aria-hidden="true" />
 
-      {/* ── Top status bar ── */}
-      <header class="r-status" role="banner">
-        <a class="brand" href="/" aria-label="Onyx home">
-          <Mascot variant="mark" aria-label="Onyx" />ONYX
-        </a>
-        <nav aria-label="About page navigation">
-          <a class="hideable" href="/">Home</a>
-          <a class="hideable" href="#protocol">Protocol</a>
-          <a class="hideable" href="#media">Media</a>
-          <a class="hideable" href="#mesh">Mesh</a>
-          <a class="hideable" href="#accessibility">Accessibility</a>
-          <span class="live hideable" data-feed-state={feedState()}>
-            <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
-          </span>
-          <a class="enter" href="/app/">Open Onyx</a>
-        </nav>
-      </header>
-
       {/* ── Hero ── */}
       <section class="r-wrap ab-hero" aria-labelledby="about-hero-heading">
         <p class="r-kicker">how onyx works</p>
         <h1 id="about-hero-heading">
           Open wire,<br />
-          <span class="gold">no ceilings</span>
+          <span class="ab-thesis-accent">no ceilings</span>
         </h1>
         <p class="serif-pull">
           A protocol you can read.<br />
-          A mesh that <em>belongs to no one</em>.<br />
-          A network that tells you exactly how your media is protected.
+          A network that <em>belongs to no one</em>.<br />
+          A place that tells you exactly how your media is protected.
         </p>
         <div class="ab-seam" aria-hidden="true" />
         <p class="sub">
           Onyx is the window. The window matters — but the point is everything behind
           it. This page is the underneath: the protocol, the media model, the
-          cryptography, the mesh, and what each one means for the people who live here
+          cryptography, the network fabric, and what each one means for the people who live here
           and the developers who build on it.
         </p>
+        <div
+          class="ab-feed"
+          data-feed-state={feedState()}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span class="ab-feed__mark" aria-hidden="true" />
+          <span>{publicMeshFeedLabel(feedState())}</span>
+          <span class="ab-feed__detail">{aboutFeedDetail(feedState())}</span>
+        </div>
+        <nav class="ab-topics" aria-label="About topics">
+          <a href="#protocol">Protocol</a>
+          <a href="#media">Media</a>
+          <a href="#e2ee">Encryption</a>
+          <a href="#network">Network</a>
+          <a href="#services">Services</a>
+          <a href="#developer">Build</a>
+          <a href="#accessibility">Accessibility</a>
+        </nav>
       </section>
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
@@ -100,20 +125,20 @@ export default function About() {
         <span class="r-eyebrow">01 — the protocol</span>
         <h2 id="protocol-heading" class="r-title">Open wire,<br />bring any client</h2>
         <p class="r-lede">
-          IRCv3 + IRCX over a plain WebSocket. No SDK required. The wire format is
-          documented, interoperable, and open to any tool that speaks the protocol.
+          Open wire over a plain WebSocket — documented, interoperable, and open to any
+          tool that speaks the protocol. No SDK required.
         </p>
 
         <div class="ab-proto-grid">
           <article class="ab-proto-item">
             <span class="label">Authentication</span>
-            <h3>SASL, your way</h3>
+            <h3>Sign-in, your way</h3>
             <p>
               Onyx Server advertises <b>SASL PLAIN, EXTERNAL, and SCRAM-SHA-256</b>.
               Pick whatever your client supports — SCRAM is preferred when the server
               offers it. No proprietary handshake, nothing bespoke.
             </p>
-            <span class="tag">sasl · scram-sha-256 · ircv3</span>
+            <span class="tag">sasl · scram-sha-256 · open wire</span>
           </article>
 
           <article class="ab-proto-item">
@@ -123,20 +148,20 @@ export default function About() {
               After authentication, request <b>SESSION TOKEN</b>. The server mints
               a token for your session. On reconnect — even from a different network
               — hand back <b>SESSION RESUME &lt;token&gt;</b> and you're back in without
-              re-authentication, channel-re-join, or history gaps.
+              re-authentication, room re-join, or history gaps.
             </p>
-            <span class="tag">session · resume · ircx</span>
+            <span class="tag">session · resume · open wire</span>
           </article>
 
           <article class="ab-proto-item">
             <span class="label">Message history</span>
-            <h3>CHATHISTORY</h3>
+            <h3>Message history</h3>
             <p>
-              Standard IRCv3 CHATHISTORY. Miss a conversation? Ask the server to replay
-              it — by message-id, by time window, or from where you last read.
+              Miss a conversation? Ask the server to replay it — by message-id, by time
+              window, or from where you last read.
               <b>No polling.</b> No side-channel API.
             </p>
-            <span class="tag">chathistory · ircv3 · causal order</span>
+            <span class="tag">history · causal order</span>
           </article>
 
           <article class="ab-proto-item">
@@ -144,11 +169,11 @@ export default function About() {
             <h3>Modes as real state</h3>
             <p>
               +q owner, +o operator, +v voice — these aren't cosmetic badges. They're
-              channel state: <b>the server enforces them</b>, they survive reconnects, and
-              IRCX ACCESS lets fine-grained overrides live on the channel itself.
+              room state: <b>the server enforces them</b>, they survive reconnects, and
+              Persistent access entries let fine-grained overrides live on the room itself.
               Your permissions are yours, on every client that speaks the protocol.
             </p>
-            <span class="tag">modes · ircx access · roles</span>
+            <span class="tag">modes · access · roles</span>
           </article>
         </div>
 
@@ -159,7 +184,7 @@ export default function About() {
               <i style={{ background: 'var(--gold)' }} aria-hidden="true" />
               <i style={{ background: 'var(--ok)' }} aria-hidden="true" />
             </span>
-            <span>CAP negotiation — what Onyx Server advertises on connect</span>
+            <span>Capabilities negotiated on connect</span>
           </div>
           <div class="ab-cap-row">
             <span class="key">draft/sasl</span>
@@ -206,7 +231,7 @@ export default function About() {
             class="ab-media-diagram"
             viewBox="0 0 580 320"
             role="img"
-            aria-label="Media path: clients encode with CADENCEVOX/CADENCEVIS or WASM, send Cadence frames over the mesh relay to the SFU, which forwards them without transcoding."
+            aria-label="Media path: clients encode with CADENCEVOX/CADENCEVIS or WASM, send Cadence frames over the network relay to the SFU, which forwards them without transcoding."
           >
             {/* SFU center */}
             <rect x="230" y="120" width="120" height="80" fill="none" stroke="var(--seam)" stroke-width="1.5" />
@@ -282,14 +307,14 @@ export default function About() {
             <h4>Cadence frames<br />over QUIC</h4>
             <p>
               The preferred transport path. Datagram-eligible, head-of-line-blocking
-              free, lower latency than TCP. Opaque media frames ride the mesh path,
-              so a lost media packet never stalls channel state.
+              free, lower latency than TCP. Opaque media frames ride the network path,
+              so a lost media packet never stalls room state.
             </p>
           </article>
 
           <article class="ab-transport secondary" role="listitem">
             <span class="t-label">Fallback carrier</span>
-            <h4>Mesh relay<br />over WebSocket</h4>
+            <h4>Network relay<br />over WebSocket</h4>
             <p>
               Where QUIC is not available, the browser keeps the same Cadence
               frames moving over the WebSocket relay path. Same bytes, same codec,
@@ -316,7 +341,7 @@ export default function About() {
         <span class="r-eyebrow">03 — end-to-end encryption</span>
         <h2 id="e2ee-heading" class="r-title">Client-held keys.<br />Truthful state.</h2>
         <p class="r-lede">
-          Armor protects client connections. Mooring protects server-to-server mesh
+          Armor protects client connections. Mooring protects server-to-server network
           links. A separate client-held group key protects media end to end—and the
           padlock appears only after that group converges.
         </p>
@@ -413,22 +438,22 @@ export default function About() {
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      {/* ── 4. The mesh ── */}
-      <section id="mesh" class="r-wrap ab-section" aria-labelledby="mesh-heading">
-        <span class="r-eyebrow">04 — the mesh</span>
-        <h2 id="mesh-heading" class="r-title">A network that<br />heals itself</h2>
+      {/* ── 4. The network ── */}
+      <section id="network" class="r-wrap ab-section" aria-labelledby="network-heading">
+        <span class="r-eyebrow">04 — the network</span>
+        <h2 id="network-heading" class="r-title">A network that<br />heals itself</h2>
         <p class="r-lede">
-          A self-healing server mesh that keeps the network convergent across however
+          A self-healing server fabric that keeps the network convergent across however
           many nodes, with no single point of failure.
         </p>
 
-        <div class="ab-mesh-body">
+        <div class="ab-network-body">
           {/* Mesh diagram */}
           <svg
-            class="ab-mesh-vis"
+            class="ab-network-vis"
             viewBox="0 0 600 360"
             role="img"
-            aria-label="Mesh diagram: eshmaki.me and ircx.us joined by azure current links; either node reaches the whole network"
+            aria-label="Network diagram: eshmaki.me and ircx.us joined by azure current links; either node reaches the whole network"
           >
             {/* Currents */}
             <g fill="none" stroke="var(--lapis)" stroke-width="1.3">
@@ -465,16 +490,16 @@ export default function About() {
             <text x="300" y="170" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">delta-state sync</text>
           </svg>
 
-          <div class="ab-mesh-text">
+          <div class="ab-network-text">
             <p>
               The client auto-routes to the nearest node — <b>eshmaki.me:8080</b> and
               <b> ircx.us:8080</b> are two entrances to the same network. State replicates
-              over <b>Undertow</b> (a CRDT mesh) sealed by <b>Mooring</b> (post-quantum
+              over <b>Undertow</b> (a CRDT fabric) sealed by <b>Mooring</b> (post-quantum
               secure links between servers), so a change on one node reaches the other
               without full-state floods.
             </p>
             <p>
-              Lose a node and the mesh heals: HyParView partial views maintain an active
+              Lose a node and the network heals: HyParView partial views maintain an active
               set of peers and a passive reserve. A failure promotes a reserve peer to
               active in a single hop. No hub, no coordinator, no single thing to take down.
             </p>
@@ -485,7 +510,7 @@ export default function About() {
               relay cannot forge it.
             </p>
 
-            <div class="ab-node-row" aria-label="Live mesh nodes">
+            <div class="ab-node-row" aria-label="Published network entrances">
               <div class="ab-node esh">
                 <span class="dot" aria-hidden="true" />
                 <span class="meta">
@@ -505,7 +530,7 @@ export default function About() {
         </div>
 
         {/* Mesh tech detail */}
-        <div class="ab-crdt-row" role="list" aria-label="Mesh technology details">
+        <div class="ab-crdt-row" role="list" aria-label="Network technology details">
           <article class="ab-crdt-item" role="listitem">
             <span class="k">δ-CRDTs</span>
             <span class="v">
@@ -553,7 +578,7 @@ export default function About() {
 
         <div class="ab-nobot" role="note">
           "Results arrive as standard replies — <b>NOTE</b>, <b>FAIL</b>, <b>WARN</b> —
-          not NOTICE text from a fake user. There is no bot sitting in the channel
+          not NOTICE text from a fake user. There is no bot sitting in the room
           pretending to be a person."
         </div>
 
@@ -563,7 +588,7 @@ export default function About() {
             <h3>Account creation</h3>
             <p>
               Create an account on the network. Follow with VERIFY to complete
-              registration. Supports the draft/account-registration IRCv3 capability.
+              registration. Supports the draft account-registration capability on the open wire.
             </p>
             <span class="note live">ircv3 draft · account-registration</span>
           </article>
@@ -591,9 +616,9 @@ export default function About() {
 
           <article class="ab-svc">
             <span class="cmd">CHANNEL</span>
-            <h3>Channel registration</h3>
+              <h3>Room registration</h3>
             <p>
-              Register a channel to your account so ownership and access lists persist
+              Register a room to your account so ownership and access lists persist
               even when nobody's home. Ownership survives server restarts.
             </p>
             <span class="note">persistent ownership</span>
@@ -658,7 +683,7 @@ export default function About() {
             <p>
               The network has more than one door, and any door opens onto the whole of
               it. <b>eshmaki.me</b> and <b>ircx.us</b> are entrances, not destinations —
-              the client picks the nearest one and the mesh does the rest.
+              the client picks the nearest one and the network does the rest.
             </p>
             <p>
               Run your own node and you add another gate to the same waters. There is no
@@ -695,10 +720,10 @@ export default function About() {
       {/* ── 7. Developer ── */}
       <section id="developer" class="r-wrap ab-section" aria-labelledby="developer-heading">
         <span class="r-eyebrow">07 — build on it</span>
-        <h2 id="developer-heading" class="r-title">Open protocol.<br />Sovereign mesh.</h2>
+        <h2 id="developer-heading" class="r-title">Open protocol.<br />Sovereign network.</h2>
         <p class="r-lede">
           The wire format is documented and usable outside Onyx. You can also run
-          your own Onyx Server node and peer it into the mesh — full sovereignty over your
+          your own Onyx Server node and peer it into the network — full sovereignty over your
           slice of the network.
         </p>
 
@@ -707,15 +732,15 @@ export default function About() {
             <span class="idx">build a client</span>
             <h3>Any client,<br />any language</h3>
             <p>
-              IRCv3 + IRCX over WebSocket. The protocol is public and interoperable.
+              Open wire over WebSocket. The protocol is public and interoperable.
               You don't need Onyx. Connect with a protocol-compatible tool, a custom
               bot, or a new client you build from scratch.
             </p>
             <p>
               SASL PLAIN gets you in. Add SESSION for persistent reconnect.
-              Add CHATHISTORY for message replay. IRCX PROP and ACCESS give you
-              extended channel and user properties. Media is opt-in via
-              <b>MEDIA JOIN #channel voice</b>.
+              Add history replay. PROP and ACCESS give you extended room and user
+              properties. Media is opt-in via
+              <b>MEDIA JOIN #room voice</b>.
             </p>
             <div class="code-snip" aria-label="Example connection sequence">
               <div><span class="o">→ connect wss://eshmaki.me:8080</span></div>
@@ -737,7 +762,7 @@ export default function About() {
             <p>
               Onyx Server is a pure-Zig daemon. It runs on Linux x86_64 and aarch64.
               Stand it up on your own hardware, configure it, and link it into the
-              mesh — your node becomes another door into the whole network.
+              network — your node becomes another door into the whole network.
             </p>
             <p>
               Node identity is your <b>Ed25519 signing key</b>. The NodeId is
@@ -749,6 +774,7 @@ export default function About() {
               <div><span class="o"># build from source</span></div>
               <div><span class="c">zig build -Doptimize=ReleaseFast</span></div>
               <div><span class="o"># configure onyx-server.toml:</span></div>
+              <div><span class="o"># network fabric (daemon config)</span></div>
               <div><span class="p">[mesh]</span></div>
               <div><span class="h">  peer = "eshmaki.me:7000"</span></div>
               <div><span class="h">  meshpass = "&lt;signed capability&gt;"</span></div>
@@ -770,7 +796,7 @@ export default function About() {
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      <PublicFooter />
-    </main>
+      </div>
+    </PublicFrame>
   );
 }

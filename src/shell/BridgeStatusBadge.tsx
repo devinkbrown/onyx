@@ -42,7 +42,7 @@ export function BridgeStatusBadge(props: {
   });
   const color = createMemo(() => stateColor(props.status));
   const aria = createMemo(() => {
-    if (!props.status.bridged) return 'No bridge advertised for this channel';
+    if (!props.status.bridged) return 'No bridge advertised for this room';
     const seen = props.status.lastSeen ? `, last seen ${formatLastSeen(props.status.lastSeen)}` : '';
     return `${platformLabel(props.status.platform)} bridge ${stateLabel(props.status.state).toLowerCase()}${seen}`;
   });

@@ -26,18 +26,23 @@ function boundedPushString(value, maxLength) {
   return typeof value === 'string' ? value.slice(0, maxLength) : '';
 }
 
-// E2EE DM envelopes ride ordinary PRIVMSG/memo text as `ONYXDM1 ` + b64url.
-// The service worker cannot open them (keys live in the page's IndexedDB), so
-// any envelope that reaches a push payload must fail closed to a neutral body —
-// never put ciphertext on a lock screen. Leading whitespace is also redacted:
-// crypto stays strict, but a lock-screen body must not surface a padded envelope.
-const E2EE_ENVELOPE_PREFIX = 'ONYXDM1 ';
+// E2EE envelopes ride ordinary message text (`ONYXDM1 ` / `ONYXDMN1 ` /
+// `ONYXROOM1 ` + base64url body). The service worker cannot open them (keys
+// live in the page's IndexedDB), so any envelope that reaches a push payload
+// must fail closed to a neutral body — never put ciphertext on a lock screen.
+// Leading whitespace is also redacted: crypto stays strict, but a lock-screen
+// body must not surface a padded envelope.
+const E2EE_ENVELOPE_PREFIXES = ['ONYXDM1 ', 'ONYXDMN1 ', 'ONYXROOM1 '];
 const ENCRYPTED_PUSH_BODY = 'New encrypted message';
 
+function startsWithEnvelopePrefix(text) {
+  return E2EE_ENVELOPE_PREFIXES.some((prefix) => text.startsWith(prefix));
+}
+
 function isPushEnvelope(text) {
-  if (text.startsWith(E2EE_ENVELOPE_PREFIX)) return true;
+  if (startsWithEnvelopePrefix(text)) return true;
   const trimmed = text.replace(/^\s+/u, '');
-  return trimmed !== text && trimmed.startsWith(E2EE_ENVELOPE_PREFIX);
+  return trimmed !== text && startsWithEnvelopePrefix(trimmed);
 }
 
 function pushBodyFor(text) {
@@ -111,7 +116,10 @@ function focusNotificationTarget(clientList, targetPath) {
 }
 
 function navigationFallbackPath(pathname) {
-  if (isAppPath(pathname)) return APP_PATH;
+  // Only canonical shell documents may be cached or used as offline
+  // fallbacks. In particular, /app/* must remain a real online 404 rather
+  // than becoming a cacheable 200 app shell (a soft 404).
+  if (pathname === '/app' || pathname === APP_PATH) return APP_PATH;
   if (pathname === '/') return '/';
   return null;
 }

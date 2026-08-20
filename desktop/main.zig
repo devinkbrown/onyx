@@ -11,13 +11,14 @@ pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 /// `zig build dev`) — expected exact origin `http://127.0.0.1:3000`.
 const App = struct {
     env_map: *std.process.Environ.Map,
+    dist_dir: []const u8,
 
     fn app(self: *@This()) native_sdk.App {
         return .{
             .context = self,
             .name = "onyx",
             .source = native_sdk.frontend.productionSource(.{
-                .dist = "dist",
+                .dist = self.dist_dir,
                 .entry = "index.html",
                 // Explicit: packaged origin is zero://app only (SDK default).
                 .origin = "zero://app",
@@ -29,7 +30,7 @@ const App = struct {
     fn source(context: *anyopaque) anyerror!native_sdk.WebViewSource {
         const self: *@This() = @ptrCast(@alignCast(context));
         return native_sdk.frontend.sourceFromEnv(self.env_map, .{
-            .dist = "dist",
+            .dist = self.dist_dir,
             .entry = "index.html",
             .origin = "zero://app",
             .spa_fallback = true,
@@ -37,6 +38,50 @@ const App = struct {
         });
     }
 };
+
+/// Return the packaged SPA directory implied by the executable layout.
+///
+/// Native SDK packages place Linux/Windows executables under `bin/` with
+/// `resources/dist/` beside that directory. macOS places the executable under
+/// `Contents/MacOS/` and assets under `Contents/Resources/dist/`. A bare
+/// executable layout keeps `resources/dist/` beside the executable.
+fn packagedDistCandidate(allocator: std.mem.Allocator, exe_path: []const u8) !?[]u8 {
+    const exe_dir = std.fs.path.dirname(exe_path) orelse return null;
+    const dir_name = std.fs.path.basename(exe_dir);
+
+    if (std.mem.eql(u8, dir_name, "bin")) {
+        const package_root = std.fs.path.dirname(exe_dir) orelse return null;
+        return try std.fs.path.join(allocator, &.{ package_root, "resources", "dist" });
+    }
+    if (std.mem.eql(u8, dir_name, "MacOS")) {
+        const contents_dir = std.fs.path.dirname(exe_dir) orelse return null;
+        return try std.fs.path.join(allocator, &.{ contents_dir, "Resources", "dist" });
+    }
+    return try std.fs.path.join(allocator, &.{ exe_dir, "resources", "dist" });
+}
+
+fn pathExists(io: std.Io, path: []const u8) bool {
+    const stat = std.Io.Dir.cwd().statFile(io, path, .{}) catch return false;
+    return stat.kind == .file;
+}
+
+/// Prefer assets shipped with the executable. Fall back to the repository
+/// `dist/` path for `zig build run` and other source-tree development flows.
+fn runtimeDistDir(allocator: std.mem.Allocator, io: std.Io) ![]u8 {
+    const exe_path = std.process.executablePathAlloc(io, allocator) catch
+        return try allocator.dupe(u8, "dist");
+    defer allocator.free(exe_path);
+
+    if (try packagedDistCandidate(allocator, exe_path)) |candidate| {
+        errdefer allocator.free(candidate);
+        const entry = try std.fs.path.join(allocator, &.{ candidate, "index.html" });
+        defer allocator.free(entry);
+        if (pathExists(io, entry)) return candidate;
+        allocator.free(candidate);
+    }
+
+    return try allocator.dupe(u8, "dist");
+}
 
 // Keep allowlist exact (see https://native-sdk.dev/security).
 // productionSource does not use zero://inline — do not allow it.
@@ -47,7 +92,10 @@ const allowed_origins = [_][]const u8{
 };
 
 pub fn main(init: std.process.Init) !void {
-    var app = App{ .env_map = init.environ_map };
+    const dist_dir = try runtimeDistDir(init.gpa, init.io);
+    defer init.gpa.free(dist_dir);
+
+    var app = App{ .env_map = init.environ_map, .dist_dir = dist_dir };
     try runner.runWithOptions(app.app(), .{
         .app_name = "Onyx",
         .window_title = "Onyx",
@@ -86,4 +134,49 @@ test "productionSource default origin is zero://app not zero://inline" {
     // bridge convenience origin, not required for Onyx dist/ hosting.
     const origin = "zero://app";
     try std.testing.expectEqualStrings("zero://app", origin);
+}
+
+test "packaged dist follows Linux and Windows bin layout" {
+    const allocator = std.testing.allocator;
+    const dist = (try packagedDistCandidate(allocator, "/opt/onyx/bin/onyx")) orelse unreachable;
+    defer allocator.free(dist);
+    try std.testing.expectEqualStrings("/opt/onyx/resources/dist", dist);
+}
+
+test "packaged dist follows macOS app bundle layout" {
+    const allocator = std.testing.allocator;
+    const dist = (try packagedDistCandidate(
+        allocator,
+        "/Applications/Onyx.app/Contents/MacOS/onyx",
+    )) orelse unreachable;
+    defer allocator.free(dist);
+    try std.testing.expectEqualStrings("/Applications/Onyx.app/Contents/Resources/dist", dist);
+}
+
+test "packaged dist supports a bare executable layout" {
+    const allocator = std.testing.allocator;
+    const dist = (try packagedDistCandidate(allocator, "/opt/onyx/onyx")) orelse unreachable;
+    defer allocator.free(dist);
+    try std.testing.expectEqualStrings("/opt/onyx/resources/dist", dist);
+}
+
+test "app sources use the resolved runtime dist" {
+    var env_map = std.process.Environ.Map.init(std.testing.allocator);
+    defer env_map.deinit();
+    var app = App{
+        .env_map = &env_map,
+        .dist_dir = "/opt/onyx/resources/dist",
+    };
+
+    const initial_source = app.app().source;
+    try std.testing.expectEqualStrings(
+        "/opt/onyx/resources/dist",
+        initial_source.asset_options.?.root_path,
+    );
+
+    const refreshed_source = try App.source(&app);
+    try std.testing.expectEqualStrings(
+        "/opt/onyx/resources/dist",
+        refreshed_source.asset_options.?.root_path,
+    );
 }

@@ -24,6 +24,9 @@ import {
   MAX_ACCOUNT_INFO_TEXT_LENGTH,
 } from './parser';
 
+const SRM2_LOCAL = 'srm2l.00112233445566778899aabbccddeeff.aabbccddeeff00112233445566778899';
+const SRM2_MESH = `srm2m.${'deadc0de'.repeat(8)}.bbccddeeff00112233445566778899aa`;
+
 describe('parseIRCMessage', () => {
   it('parses a bare command with a trailing param', () => {
     const m = parseIRCMessage('PING :token123');
@@ -252,6 +255,12 @@ describe('standard replies + SESSION notes', () => {
       parseIRCMessage(':srv.example NOTICE onyx :SESSION TOKEN abc123'),
     )).toEqual({ token: 'abc123' });
   });
+  it('keeps an attachment-scoped local credential byte-exact', () => {
+    expect(parseSessionTokenNote(
+      parseIRCMessage(`:srv.example NOTICE onyx :SESSION TOKEN ${SRM2_LOCAL}`),
+    )).toEqual({ token: SRM2_LOCAL });
+    expect(buildSessionResumeLine(SRM2_LOCAL)).toBe(`SESSION RESUME ${SRM2_LOCAL}\r\n`);
+  });
   it('extracts a SESSION MTOKEN (mesh)', () => {
     expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION MTOKEN :m3sh')))
       .toEqual({ token: 'm3sh' });
@@ -266,6 +275,12 @@ describe('standard replies + SESSION notes', () => {
     expect(parseSessionMeshTokenNote(
       parseIRCMessage(':srv.example NOTICE onyx :SESSION MTOKEN m3shdeadbeef expires=1800000000'),
     )).toEqual({ token: 'm3shdeadbeef', expiresAt: 1_800_000_000 });
+  });
+  it('keeps an attachment-scoped mesh credential and expiry byte-exact', () => {
+    expect(parseSessionMeshTokenNote(
+      parseIRCMessage(`:srv.example NOTICE onyx :SESSION MTOKEN ${SRM2_MESH} expires=1800000000`),
+    )).toEqual({ token: SRM2_MESH, expiresAt: 1_800_000_000 });
+    expect(buildSessionResumeLine(SRM2_MESH)).toBe(`SESSION RESUME ${SRM2_MESH}\r\n`);
   });
   it('extracts MTOKEN expires= from a standard-reply description trailer', () => {
     expect(parseSessionMeshTokenNote(
@@ -322,6 +337,8 @@ describe('standard replies + SESSION notes', () => {
   });
   it('isValidSessionCredential mirrors the parse-side fail-closed rules', () => {
     expect(isValidSessionCredential('abc123')).toBe(true);
+    expect(isValidSessionCredential(SRM2_LOCAL)).toBe(true);
+    expect(isValidSessionCredential(SRM2_MESH)).toBe(true);
     expect(isValidSessionCredential('x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH))).toBe(true);
     expect(isValidSessionCredential('')).toBe(false);
     expect(isValidSessionCredential(null)).toBe(false);

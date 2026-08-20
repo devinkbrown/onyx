@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store } from './store';
+import {
+  _reconnectDelayForTests,
+  _resetReconnectBackoffForTests,
+  _setReconnectRandomForTests,
+  BACKGROUND_STORAGE_KEY,
+  store,
+} from './store';
 
 const initialState = store.getInitialState();
 
@@ -74,6 +80,31 @@ describe('vanilla store', () => {
     expect(store.getState().theme).toBe('pearl');
     expect(localStorage.getItem('onyx:theme')).toBe('pearl');
     expect(localStorage.getItem('onyx:display-theme')).toBeNull();
+  });
+
+  it('keeps theme store and persistence aligned for an invalid request', () => {
+    store.getState().setTheme('custom:missing');
+
+    expect(store.getState().activeTheme).toBe('ocean');
+    expect(store.getState().theme).toBe('ocean');
+    expect(localStorage.getItem('onyx:theme')).toBe('ocean');
+  });
+
+  it('synchronizes background changes made in another tab', () => {
+    localStorage.setItem(BACKGROUND_STORAGE_KEY, 'starfield');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: BACKGROUND_STORAGE_KEY,
+      newValue: 'starfield',
+    }));
+
+    expect(store.getState().backgroundId).toBe('starfield');
+
+    localStorage.setItem(BACKGROUND_STORAGE_KEY, 'removed-background');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: BACKGROUND_STORAGE_KEY,
+      newValue: 'removed-background',
+    }));
+    expect(store.getState().backgroundId).toBe('auto');
   });
 
   it('notifies selector subscribers when selected state changes', () => {
@@ -389,6 +420,57 @@ describe('vanilla store', () => {
     } finally {
       store.getState().disconnect();
       vi.unstubAllGlobals();
+    }
+  });
+
+  it('applies bounded jitter to reconnect delay and keeps countdown semantics', () => {
+    vi.useFakeTimers();
+    class FakeWebSocket {
+      static readonly OPEN = 1;
+      readyState = 0;
+      binaryType = '';
+      onopen: (() => void) | null = null;
+      onmessage: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      close(): void {}
+    }
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    _setReconnectRandomForTests(() => 0);
+
+    try {
+      store.getState().connect({
+        url: 'wss://example.test',
+        nick: 'alice',
+      });
+      store.setState({ autoReconnect: true, connectionStatus: 'connected' });
+
+      const client = store.getState().client as unknown as {
+        opts: { onDisconnected?: (reason: string) => void };
+      };
+      client.opts.onDisconnected?.('network lost');
+
+      expect(store.getState().connectionStatus).toBe('reconnecting');
+      expect(store.getState().reconnectIn).toBe(4);
+      expect(_reconnectDelayForTests(1)).toBe(8);
+
+      vi.advanceTimersByTime(1_000);
+      expect(store.getState().reconnectIn).toBe(3);
+    } finally {
+      store.getState().disconnect();
+      _resetReconnectBackoffForTests();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps reconnect delay capped at 60 seconds with positive jitter', () => {
+    _setReconnectRandomForTests(() => 1);
+
+    try {
+      expect([0, 1, 2, 3, 4].map((attempt) => _reconnectDelayForTests(attempt))).toEqual([6, 12, 24, 48, 60]);
+    } finally {
+      _resetReconnectBackoffForTests();
     }
   });
 });

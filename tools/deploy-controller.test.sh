@@ -200,6 +200,7 @@ echo 'html data-theme="ocean"' >"${TMP}/staged/index.html"
 echo "spa-robots" >"${TMP}/staged/robots.txt"
 echo "landing-robots" >"${TMP}/landing/dist/robots.txt"
 echo "spa-app" >"${TMP}/staged/app/index.html"
+echo '<meta name="robots" content="noindex, nofollow" />' >"${TMP}/staged/404.html"
 echo "const CACHE_NAME = 'onyx-shell-vtest';" >"${TMP}/staged/sw.js"
 
 stage_legacy_entry "${TMP}/landing/dist" "${TMP}/staged" "guides"
@@ -267,6 +268,10 @@ cat >"${TMP}/verify/index.html" <<'HTML'
 <title>Onyx — a room for your people</title>
 HTML
 echo "app" >"${TMP}/verify/app/index.html"
+cat >"${TMP}/verify/404.html" <<'HTML'
+<title>Onyx — page not found</title>
+<meta name="robots" content="noindex, nofollow" />
+HTML
 echo "const CACHE_NAME = 'onyx-shell-vtest';" >"${TMP}/verify/sw.js"
 assert_ok "verify_live_out accepts good tree" \
   verify_live_out "${TMP}/verify" "vtest"
@@ -283,6 +288,7 @@ echo "-- automatic rollback on simulated post-sync verify failure"
 mkdir -p "${TMP}/staged-bad/app"
 echo "NEW-BAD-TITLE" >"${TMP}/staged-bad/index.html"
 echo "new-app" >"${TMP}/staged-bad/app/index.html"
+echo '<meta name="robots" content="noindex, nofollow" />' >"${TMP}/staged-bad/404.html"
 echo "const CACHE_NAME = 'onyx-shell-rollback-v';" >"${TMP}/staged-bad/sw.js"
 
 # Live currently has old-content; snapshot testver-1 already taken above.
@@ -334,6 +340,10 @@ cat >"${TMP}/staged-good/index.html" <<'HTML'
 <title>Onyx — a room for your people</title>
 HTML
 echo "app-new" >"${TMP}/staged-good/app/index.html"
+cat >"${TMP}/staged-good/404.html" <<'HTML'
+<title>Onyx — page not found</title>
+<meta name="robots" content="noindex, nofollow" />
+HTML
 echo "const CACHE_NAME = 'onyx-shell-forcev';" >"${TMP}/staged-good/sw.js"
 echo "old3" >"${TMP}/live3/out/index.html"
 echo "old3-sw" >"${TMP}/live3/out/sw.js"
@@ -363,21 +373,29 @@ echo "-- active-client asset compatibility (retain hashed assets, delete stale n
 # Live has a prior immutable hashed asset + a stale non-asset root file.
 # Staged ships a new asset + updated shared asset + good SPA shell.
 mkdir -p "${TMP}/live-compat/out/assets" "${TMP}/live-compat/out/app" \
-  "${TMP}/staged-compat/assets" "${TMP}/staged-compat/app"
+  "${TMP}/live-compat/out/onyxOS" \
+  "${TMP}/staged-compat/assets" "${TMP}/staged-compat/app" \
+  "${TMP}/staged-compat/onyxOS"
 echo "LEGACY-HASH-ASSET" >"${TMP}/live-compat/out/assets/old-chunk-aaaaaaaa.js"
 echo "SHARED-OLD" >"${TMP}/live-compat/out/assets/shared-bbbbbbbb.js"
 echo "STALE-NON-ASSET" >"${TMP}/live-compat/out/stale-page.html"
 echo "old-compat-index" >"${TMP}/live-compat/out/index.html"
 echo "old-compat-app" >"${TMP}/live-compat/out/app/index.html"
 echo "const CACHE_NAME = 'onyx-shell-oldcompat';" >"${TMP}/live-compat/out/sw.js"
+echo 'LIVE-RUNTIME-STATUS' >"${TMP}/live-compat/out/onyxOS/status.json"
 
 cat >"${TMP}/staged-compat/index.html" <<'HTML'
 <title>Onyx — a room for your people</title>
 HTML
 echo "app-compat-new" >"${TMP}/staged-compat/app/index.html"
+cat >"${TMP}/staged-compat/404.html" <<'HTML'
+<title>Onyx — page not found</title>
+<meta name="robots" content="noindex, nofollow" />
+HTML
 echo "const CACHE_NAME = 'onyx-shell-compat-v';" >"${TMP}/staged-compat/sw.js"
 echo "NEW-HASH-ASSET" >"${TMP}/staged-compat/assets/new-chunk-cccccccc.js"
 echo "SHARED-NEW" >"${TMP}/staged-compat/assets/shared-bbbbbbbb.js"
+echo 'STALE-STAGED-STATUS' >"${TMP}/staged-compat/onyxOS/status.json"
 
 backup_live_out "${TMP}/live-compat/out" "compat-v"
 assert_ok "compat success path sync" \
@@ -399,6 +417,8 @@ assert_eq "current staged asset updated byte-identical" "SHARED-NEW" \
 assert_eq "compat root index is staged content" \
   "$(cat "${TMP}/staged-compat/index.html")" \
   "$(cat "${TMP}/live-compat/out/index.html")"
+assert_eq "runtime-owned status feed survives cutover" "LIVE-RUNTIME-STATUS" \
+  "$(cat "${TMP}/live-compat/out/onyxOS/status.json")"
 assert_ok "verify_staged_in_live accepts extras under assets" \
   verify_staged_in_live "${TMP}/staged-compat" "${TMP}/live-compat/out"
 
@@ -622,7 +642,7 @@ else
 fi
 
 # Ensure allowlist does not include root documents
-for forbidden in index.html robots.txt sitemap.xml favicon.ico favicon.svg about app assets sw.js; do
+for forbidden in index.html 404.html robots.txt sitemap.xml favicon.ico favicon.svg about app assets sw.js; do
   if printf '%s\n' "${LEGACY_SUPPORT_ALLOWLIST[@]}" | grep -qx "${forbidden}"; then
     echo "  FAIL allowlist contains forbidden ${forbidden}"
     FAIL=$((FAIL + 1))

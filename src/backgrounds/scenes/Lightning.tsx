@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { For, Show } from 'solid-js';
+import { createMemo, For, Show } from 'solid-js';
 import type { SceneProps, SceneVariant } from '../engine';
 import { SceneShell, seededRand } from './SceneShell';
+import { useScenePolicy } from './scenePolicy';
 
 /* ── Thunderstorm: realistic branched bolt strikes (SMIL flash patterns),
    driving rain in three wind layers, roiling storm clouds, sheet lightning,
@@ -130,27 +131,42 @@ function LightningScene(props: SceneProps) {
   // Under reduced motion the SMIL flash patterns are omitted and the bolts
   // freeze at a modest static opacity — a long-exposure storm still.
   const still = (value: number) => (props.reducedMotion ? value : 0);
+  const policy = useScenePolicy();
+  const detail = createMemo(() => props.sceneDetail ?? policy().sceneDetail);
+  const visibleClouds = createMemo(() => clouds.slice(0, detail() === 'sparse' ? 5 : detail() === 'balanced' ? 9 : clouds.length));
+  const visibleSheets = createMemo(() => sheetFlashes.slice(0, detail() === 'balanced' ? 2 : sheetFlashes.length));
+  const visibleBolts = createMemo(() => bolts.slice(0, detail() === 'sparse' ? 2 : detail() === 'balanced' ? 4 : bolts.length));
+  const visibleRain = createMemo(() => rain.slice(0, detail() === 'sparse' ? 18 : detail() === 'balanced' ? 36 : rain.length));
+  const visibleSplashes = createMemo(() => splashes.slice(0, detail() === 'balanced' ? 12 : splashes.length));
 
   return (
-    <SceneShell reducedMotion={props.reducedMotion} base="linear-gradient(180deg, #0a0e1d 0%, #0d1326 45%, #070b16 100%)">
+    <SceneShell
+      reducedMotion={props.reducedMotion}
+      sceneDetail={detail()}
+      paused={props.paused}
+      onRuntimePaused={props.onRuntimePaused}
+      base="linear-gradient(180deg, #0a0e1d 0%, #0d1326 45%, #070b16 100%)"
+    >
       {/* Storm clouds — layered with roiling motion */}
-      <For each={clouds}>
-        {(c) => (
-          <div class="absolute rounded-full"
-            style={{
-              left: `${c.x}%`, top: `${c.y}%`,
-              width: `${c.w}px`, height: `${c.h}px`,
-              background: c.layer === 0
-                ? 'radial-gradient(ellipse, rgba(12,16,35,0.9) 0%, rgba(8,12,28,0.55) 35%, transparent 65%)'
-                : c.layer === 1
-                ? 'radial-gradient(ellipse, rgba(18,24,48,0.75) 0%, rgba(12,18,38,0.35) 40%, transparent 68%)'
-                : 'radial-gradient(ellipse, rgba(22,30,55,0.55) 0%, rgba(16,22,42,0.2) 45%, transparent 70%)',
-              filter: `blur(${12 + c.layer * 8}px)`,
-              animation: `ln-cloud ${c.dur}s ease-in-out ${c.delay}s infinite, ln-roil ${c.roilDur}s ease-in-out ${c.roilDelay}s infinite`,
-              opacity: c.opacity,
-            }} />
-        )}
-      </For>
+      <div data-scene-layer="clouds">
+        <For each={visibleClouds()}>
+          {(c) => (
+            <div class="absolute rounded-full"
+              style={{
+                left: `${c.x}%`, top: `${c.y}%`,
+                width: `${c.w}px`, height: `${c.h}px`,
+                background: c.layer === 0
+                  ? 'radial-gradient(ellipse, rgba(12,16,35,0.9) 0%, rgba(8,12,28,0.55) 35%, transparent 65%)'
+                  : c.layer === 1
+                  ? 'radial-gradient(ellipse, rgba(18,24,48,0.75) 0%, rgba(12,18,38,0.35) 40%, transparent 68%)'
+                  : 'radial-gradient(ellipse, rgba(22,30,55,0.55) 0%, rgba(16,22,42,0.2) 45%, transparent 70%)',
+                filter: `blur(${12 + c.layer * 8}px)`,
+                animation: `ln-cloud ${c.dur}s ease-in-out ${c.delay}s infinite, ln-roil ${c.roilDur}s ease-in-out ${c.roilDelay}s infinite`,
+                opacity: c.opacity,
+              }} />
+          )}
+        </For>
+      </div>
 
       {/* Cloud underside glow — ambient internal lightning */}
       <div class="absolute left-0 right-0 top-[6%] h-[22%]"
@@ -161,22 +177,26 @@ function LightningScene(props: SceneProps) {
         }} />
 
       {/* Sheet lightning — cloud-to-cloud flickers with no visible bolt */}
-      <For each={sheetFlashes}>
-        {(sf) => (
-          <div class="absolute rounded-full"
-            style={{
-              left: `${sf.x}%`, top: `${sf.y}%`,
-              width: `${sf.w}%`, height: `${sf.h}%`,
-              background: 'radial-gradient(ellipse, rgba(140,180,255,0.35), rgba(100,150,240,0.1) 40%, transparent 65%)',
-              filter: 'blur(25px)',
-              animation: `ln-sheet${sf.flashes} ${sf.cycle}s ease-out ${sf.delay}s infinite`,
-            }} />
-        )}
-      </For>
+      <Show when={detail() !== 'sparse'}>
+        <div data-scene-layer="sheet-flashes">
+          <For each={visibleSheets()}>
+            {(sf) => (
+              <div class="absolute rounded-full"
+                style={{
+                  left: `${sf.x}%`, top: `${sf.y}%`,
+                  width: `${sf.w}%`, height: `${sf.h}%`,
+                  background: 'radial-gradient(ellipse, rgba(140,180,255,0.35), rgba(100,150,240,0.1) 40%, transparent 65%)',
+                  filter: 'blur(25px)',
+                  animation: `ln-sheet${sf.flashes} ${sf.cycle}s ease-out ${sf.delay}s infinite`,
+                }} />
+            )}
+          </For>
+        </div>
+      </Show>
 
       {/* Lightning bolts via SVG */}
-      <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <For each={bolts}>
+      <svg class="absolute inset-0 w-full h-full" data-scene-layer="bolts" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <For each={visibleBolts()}>
           {(bolt) => {
             const { vals, times } = bolt.pattern;
             const c = bolt.cycle;
@@ -237,60 +257,72 @@ function LightningScene(props: SceneProps) {
       </svg>
 
       {/* Full-screen flash per bolt — whole sky illuminates */}
-      <For each={bolts}>
-        {(bolt) => (
-          <div class="absolute inset-0"
-            style={{ animation: `ln-skyflash-${bolt.flash} ${bolt.cycle}s ease-out ${bolt.delay}s infinite` }} />
-        )}
-      </For>
+      <Show when={detail() === 'full'}>
+        <div data-scene-layer="sky-flashes">
+          <For each={visibleBolts()}>
+            {(bolt) => (
+              <div class="absolute inset-0"
+                style={{ animation: `ln-skyflash-${bolt.flash} ${bolt.cycle}s ease-out ${bolt.delay}s infinite` }} />
+            )}
+          </For>
+        </div>
+      </Show>
 
       {/* Cloud illumination — localized glow near each bolt origin */}
-      <For each={bolts}>
-        {(bolt) => (
-          <div class="absolute rounded-full"
-            style={{
-              left: `${bolt.origin.x - 18}%`, top: `${bolt.origin.y - 6}%`,
-              width: '36%', height: '22%',
-              background: `radial-gradient(ellipse, rgba(140,185,255,${0.35 * bolt.intensity}), transparent 55%)`,
-              filter: 'blur(22px)',
-              animation: `ln-skyflash-${bolt.flash} ${bolt.cycle}s ease-out ${bolt.delay}s infinite`,
-            }} />
-        )}
-      </For>
+      <div data-scene-layer="bolt-glow">
+        <For each={visibleBolts()}>
+          {(bolt) => (
+            <div class="absolute rounded-full"
+              style={{
+                left: `${bolt.origin.x - 18}%`, top: `${bolt.origin.y - 6}%`,
+                width: '36%', height: '22%',
+                background: `radial-gradient(ellipse, rgba(140,185,255,${0.35 * bolt.intensity}), transparent 55%)`,
+                filter: 'blur(22px)',
+                animation: `ln-skyflash-${bolt.flash} ${bolt.cycle}s ease-out ${bolt.delay}s infinite`,
+              }} />
+          )}
+        </For>
+      </div>
 
       {/* Driving rain — three depth layers with varied angle for wind gusts */}
-      <For each={rain}>
-        {(r) => (
-          <div class="absolute"
-            style={{
-              left: `${r.x}%`, top: '-12%',
-              width: `${r.width}px`, height: `${r.len}px`,
-              background: r.layer === 0
-                ? `linear-gradient(to bottom, transparent, rgba(180,210,255,${r.opacity}))`
-                : r.layer === 1
-                ? `linear-gradient(to bottom, transparent, rgba(150,190,240,${r.opacity * 0.75}))`
-                : `linear-gradient(to bottom, transparent, rgba(130,170,230,${r.opacity * 0.5}))`,
-              transform: `rotate(${r.angle}deg)`,
-              'transform-origin': 'top left',
-              animation: `ln-rain ${r.dur}s linear ${r.delay}s infinite`,
-            }} />
-        )}
-      </For>
+      <div data-scene-layer="rain">
+        <For each={visibleRain()}>
+          {(r) => (
+            <div class="absolute"
+              style={{
+                left: `${r.x}%`, top: '-12%',
+                width: `${r.width}px`, height: `${r.len}px`,
+                background: r.layer === 0
+                  ? `linear-gradient(to bottom, transparent, rgba(180,210,255,${r.opacity}))`
+                  : r.layer === 1
+                  ? `linear-gradient(to bottom, transparent, rgba(150,190,240,${r.opacity * 0.75}))`
+                  : `linear-gradient(to bottom, transparent, rgba(130,170,230,${r.opacity * 0.5}))`,
+                transform: `rotate(${r.angle}deg)`,
+                'transform-origin': 'top left',
+                animation: `ln-rain ${r.dur}s linear ${r.delay}s infinite`,
+              }} />
+          )}
+        </For>
+      </div>
 
       {/* Rain splash at ground level */}
-      <For each={splashes}>
-        {(sp) => (
-          <div class="absolute"
-            style={{
-              left: `${sp.x}%`, bottom: '2%',
-              width: `${sp.size}px`, height: `${sp.size * 0.4}px`,
-              'border-radius': '50%',
-              background: 'rgba(160,200,255,0.3)',
-              filter: 'blur(0.5px)',
-              animation: `ln-splash ${sp.dur}s ease-out ${sp.delay}s infinite`,
-            }} />
-        )}
-      </For>
+      <Show when={detail() !== 'sparse'}>
+        <div data-scene-layer="splashes">
+          <For each={visibleSplashes()}>
+            {(sp) => (
+              <div class="absolute"
+                style={{
+                  left: `${sp.x}%`, bottom: '2%',
+                  width: `${sp.size}px`, height: `${sp.size * 0.4}px`,
+                  'border-radius': '50%',
+                  background: 'rgba(160,200,255,0.3)',
+                  filter: 'blur(0.5px)',
+                  animation: `ln-splash ${sp.dur}s ease-out ${sp.delay}s infinite`,
+                }} />
+            )}
+          </For>
+        </div>
+      </Show>
 
       {/* Low fog / mist — wind-driven */}
       <div class="absolute bottom-0 left-[-5%] right-[-5%] h-[28%]"

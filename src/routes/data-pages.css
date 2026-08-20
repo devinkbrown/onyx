@@ -50,7 +50,7 @@
   min-height: 28px;
   padding: 4px 10px;
   border: 1px solid color-mix(in oklab, var(--lapis) 42%, var(--seam-faint));
-  border-radius: var(--r-pill);
+  border-radius: 2px;
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
   color: var(--lapis-bright);
   font-family: var(--font-mono);
@@ -63,10 +63,8 @@
 
 .dl-card--soon {
   grid-column: 1 / -1;
-  border-color: color-mix(in oklab, var(--lapis) 22%, var(--seam-faint));
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--lapis) 8%, transparent), transparent 48%),
-    color-mix(in oklab, var(--stone-2) 42%, var(--ink));
+  border-color: var(--seam-faint);
+  background: var(--stone-2);
 }
 
 .dl-soon-arches {
@@ -83,8 +81,8 @@
   gap: 4px;
   padding: 12px 14px;
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--ink) 55%, transparent);
+  border-radius: 2px;
+  background: var(--ink);
 }
 
 .dl-soon-arch strong {
@@ -240,9 +238,9 @@
 .data-hero .sub {
   margin: 24px 0 0;
   max-width: 62ch;
-  font-family: var(--font-serif);
-  font-size: clamp(1.14rem, 1rem + 0.8vw, 1.6rem);
-  line-height: 1.48;
+  font-family: var(--font-sans);
+  font-size: clamp(1rem, 0.92rem + 0.35vw, 1.18rem);
+  line-height: 1.55;
   color: var(--paper-dim);
 }
 
@@ -308,10 +306,8 @@
 .stats-summary { margin-top: 20px; }
 
 .stats-primary-metric {
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--lapis) 10%, transparent), transparent 58%),
-    color-mix(in oklab, var(--stone-2) 48%, var(--ink));
-  border-color: color-mix(in oklab, var(--lapis) 28%, var(--seam-faint));
+  background: var(--stone-2);
+  border-color: var(--seam-faint);
 }
 
 .data-summary {
@@ -329,10 +325,8 @@
   gap: 18px;
   padding: clamp(20px, 2.4vw, 30px);
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 48%, transparent), color-mix(in oklab, var(--ink) 70%, transparent)),
-    color-mix(in oklab, var(--stone) 36%, var(--ink));
+  border-radius: 2px;
+  background: var(--stone);
 }
 
 .data-metric .label,
@@ -374,8 +368,8 @@
 
 .data-card {
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--stone-2) 42%, var(--ink));
+  border-radius: 2px;
+  background: var(--stone);
   padding: clamp(20px, 2.4vw, 30px);
 }
 
@@ -522,7 +516,7 @@
   margin-inline: -12px;
   padding-inline: 12px;
   border-color: color-mix(in oklab, var(--lapis) 42%, var(--seam-faint));
-  background: linear-gradient(90deg, color-mix(in oklab, var(--lapis-deep) 18%, transparent), transparent 72%);
+  background: color-mix(in oklab, var(--lapis-deep) 14%, var(--ink));
 }
 
 .data-room-numbers {
@@ -626,10 +620,8 @@
   min-height: 118px;
   padding: clamp(18px, 2vw, 24px);
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 42%, transparent), color-mix(in oklab, var(--ink) 82%, transparent)),
-    color-mix(in oklab, var(--stone) 28%, var(--ink));
+  border-radius: 2px;
+  background: var(--stone-2);
 }
 
 .invite-runway__grid strong,

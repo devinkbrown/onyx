@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { For } from 'solid-js';
+import { createMemo, For, Show } from 'solid-js';
 import type { SceneProps, SceneVariant } from '../engine';
 import { SceneShell, seededRand } from './SceneShell';
+import { useScenePolicy } from './scenePolicy';
 
 /* ── Volcanic: blazing caldera — layered heat glow, lava vein rivers, magma
    pools, smoke columns, flying debris, an ember vortex and three tiers of
@@ -103,8 +104,26 @@ const MAGMA_POOLS = [20, 50, 78].map((x, i) => ({
 }));
 
 function VolcanicScene(props: SceneProps) {
+  const policy = useScenePolicy();
+  const detail = createMemo(() => props.sceneDetail ?? policy().sceneDetail);
+  const visibleVeins = createMemo(() => LAVA_VEINS.slice(0, detail() === 'sparse' ? 4 : detail() === 'balanced' ? 7 : LAVA_VEINS.length));
+  const visibleStreams = createMemo(() => LAVA_STREAMS.slice(0, detail() === 'sparse' ? 2 : detail() === 'balanced' ? 4 : LAVA_STREAMS.length));
+  const visiblePools = createMemo(() => MAGMA_POOLS.slice(0, detail() === 'sparse' ? 1 : detail() === 'balanced' ? 2 : MAGMA_POOLS.length));
+  const visibleSmoke = createMemo(() => smoke.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 5 : smoke.length));
+  const visibleDebris = createMemo(() => debris.slice(0, detail() === 'sparse' ? 4 : detail() === 'balanced' ? 9 : debris.length));
+  const visibleVortex = createMemo(() => vortex.slice(0, detail() === 'sparse' ? 6 : detail() === 'balanced' ? 14 : vortex.length));
+  const visibleSparksSmall = createMemo(() => sparksSmall.slice(0, detail() === 'sparse' ? 8 : detail() === 'balanced' ? 18 : sparksSmall.length));
+  const visibleSparksMed = createMemo(() => sparksMed.slice(0, detail() === 'sparse' ? 5 : detail() === 'balanced' ? 12 : sparksMed.length));
+  const visibleSparksLarge = createMemo(() => sparksLarge.slice(0, detail() === 'sparse' ? 3 : detail() === 'balanced' ? 8 : sparksLarge.length));
+
   return (
-    <SceneShell reducedMotion={props.reducedMotion} base="linear-gradient(180deg, #180705 0%, #240b06 55%, #100402 100%)">
+    <SceneShell
+      reducedMotion={props.reducedMotion}
+      sceneDetail={detail()}
+      paused={props.paused}
+      onRuntimePaused={props.onRuntimePaused}
+      base="linear-gradient(180deg, #180705 0%, #240b06 55%, #100402 100%)"
+    >
       {/* Intense volcanic glow layers */}
       <div class="absolute bottom-0 left-0 right-0 h-[70%]"
         style={{ background: 'linear-gradient(to top, rgba(249,115,22,0.65), rgba(239,68,68,0.4) 40%, rgba(251,191,36,0.15) 70%, transparent)', animation: 'em-heat 3.5s ease-in-out infinite' }} />
@@ -118,7 +137,8 @@ function VolcanicScene(props: SceneProps) {
         style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(255,255,120,0.7), transparent 70%)', animation: 'em-heat 3s ease-in-out 1.8s infinite' }} />
 
       {/* Bright lava vein rivers */}
-      <For each={LAVA_VEINS}>
+      <div data-scene-layer="veins">
+      <For each={visibleVeins()}>
         {(v) => (
           <div class="absolute bottom-0"
             style={{ left: `${v.x}%`, width: `${v.w}px`, height: `${v.h}%`,
@@ -128,9 +148,11 @@ function VolcanicScene(props: SceneProps) {
               animation: `em-vein ${v.dur}s ease-in-out ${v.delay}s infinite` }} />
         )}
       </For>
+      </div>
 
       {/* Flowing lava streams */}
-      <For each={LAVA_STREAMS}>
+      <div data-scene-layer="streams">
+      <For each={visibleStreams()}>
         {(s) => (
           <div class="absolute left-0 right-0"
             style={{ bottom: `${s.bottom}%`, height: `${s.h}px`,
@@ -138,9 +160,11 @@ function VolcanicScene(props: SceneProps) {
               animation: `em-flow ${s.dur}s ease-in-out ${s.delay}s infinite` }} />
         )}
       </For>
+      </div>
 
       {/* Glowing magma pools */}
-      <For each={MAGMA_POOLS}>
+      <div data-scene-layer="pools">
+      <For each={visiblePools()}>
         {(p) => (
           <div class="absolute bottom-0"
             style={{ left: `${p.left}%`, width: '24%', height: '10%',
@@ -150,13 +174,15 @@ function VolcanicScene(props: SceneProps) {
               animation: `em-pool ${p.dur}s ease-in-out ${p.delay}s infinite` }} />
         )}
       </For>
+      </div>
 
       {/* Visible heat shimmer */}
       <div class="absolute bottom-0 left-0 right-0 h-[45%]"
         style={{ background: 'linear-gradient(to top, rgba(255,200,100,0.25), rgba(255,160,50,0.15) 50%, transparent)', filter: 'blur(3px)', animation: 'em-shimmer 1.8s ease-in-out infinite' }} />
 
       {/* Dense smoke columns */}
-      <For each={smoke}>
+      <div data-scene-layer="smoke">
+      <For each={visibleSmoke()}>
         {(s) => (
           <div class="absolute bottom-[3%]"
             style={{ left: `${s.x}%`, width: `${s.w}px`, height: '75%',
@@ -164,9 +190,12 @@ function VolcanicScene(props: SceneProps) {
               filter: 'blur(12px)', animation: `em-smoke ${s.dur}s ease-in-out ${s.delay}s infinite` }} />
         )}
       </For>
+      </div>
 
       {/* Flying rock debris */}
-      <For each={debris}>
+      <Show when={detail() !== 'sparse'}>
+      <div data-scene-layer="debris">
+      <For each={visibleDebris()}>
         {(d) => (
           <div class="absolute"
             style={{ left: `${d.x}%`, bottom: '0', width: `${d.size}px`, height: `${d.size * 0.8}px`,
@@ -176,10 +205,12 @@ function VolcanicScene(props: SceneProps) {
               animation: `em-debris ${d.dur}s ease-out ${d.delay}s infinite` }} />
         )}
       </For>
+      </div>
+      </Show>
 
       {/* Ember vortex swirl */}
-      <div class="absolute" style={{ left: '50%', bottom: '18%', width: '0', height: '0' }}>
-        <For each={vortex}>
+      <div class="absolute" data-scene-layer="vortex" style={{ left: '50%', bottom: '18%', width: '0', height: '0' }}>
+        <For each={visibleVortex()}>
           {(v) => (
             <div class="absolute rounded-full"
               style={{ left: `${v.px}px`, top: `${v.py}px`, width: `${v.size}px`, height: `${v.size}px`,
@@ -191,7 +222,8 @@ function VolcanicScene(props: SceneProps) {
       </div>
 
       {/* Bright rising sparks */}
-      <For each={sparksSmall}>
+      <div data-scene-layer="sparks">
+      <For each={visibleSparksSmall()}>
         {(s) => (
           <div class="absolute rounded-full"
             style={{ left: `${s.x}%`, bottom: '0', width: `${s.size}px`, height: `${s.size}px`,
@@ -203,7 +235,7 @@ function VolcanicScene(props: SceneProps) {
       </For>
 
       {/* Medium ember particles */}
-      <For each={sparksMed}>
+      <For each={visibleSparksMed()}>
         {(s) => (
           <div class="absolute rounded-full"
             style={{ left: `${s.x}%`, bottom: '0', width: `${s.size}px`, height: `${s.size}px`,
@@ -215,7 +247,7 @@ function VolcanicScene(props: SceneProps) {
       </For>
 
       {/* Large glowing cinders */}
-      <For each={sparksLarge}>
+      <For each={visibleSparksLarge()}>
         {(s) => (
           <div class="absolute rounded-full"
             style={{ left: `${s.x}%`, bottom: '0', width: `${s.size}px`, height: `${s.size}px`,
@@ -225,6 +257,7 @@ function VolcanicScene(props: SceneProps) {
               ['--dr' as string]: `${s.drift}px` }} />
         )}
       </For>
+      </div>
 
       <style>{`
         @keyframes em-heat { 0%,100%{opacity:1} 50%{opacity:1.4} }

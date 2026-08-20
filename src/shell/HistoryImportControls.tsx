@@ -270,7 +270,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
       }
       setPending({ ownerScope, fileNames, snapshots, channels: targets.size, messages, skipped, droppedOverCap, guild, oldest, newest });
       const rejectedNote = rejected > 0 ? ` ${countLabel(rejected, 'file')} skipped as unreadable.` : '';
-      setStatus(`Ready to import ${countLabel(messages, 'message')} across ${countLabel(targets.size, 'channel')}${guild ? ` from ${guild}` : ''}.${rejectedNote}`);
+      setStatus(`Ready to import ${countLabel(messages, 'message')} across ${countLabel(targets.size, 'room')}${guild ? ` from ${guild}` : ''}.${rejectedNote}`);
       focusSoon(() => reviewHeading);
     } catch {
       if (!importOwner.isActive(ownerScope)) return;
@@ -299,7 +299,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
         imported += result.messages;
       }
       setPending(null);
-      setStatus(`Imported ${countLabel(imported, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+      setStatus(`Imported ${countLabel(imported, 'message')} into ${countLabel(job.channels, 'room')}. Open a room to read the history, or search it from anywhere.`);
       focusSoon(() => fileInput);
     } catch {
       if (!importOwner.isActive(job.ownerScope)) return;
@@ -333,11 +333,11 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
           <div class="pref-import-review" role="group" aria-labelledby={`pref-${props.id}-review-title`}>
             <h4 id={`pref-${props.id}-review-title`} tabindex={-1} ref={reviewHeading}>Review import</h4>
             <p>
-              {countLabel(job().fileNames.length, 'file')}: {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
+              {countLabel(job().fileNames.length, 'file')}: {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'room')}
               {job().guild ? ` from ${job().guild}` : ''}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
-              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-room limit dropped.` : ''}
               {' '}Existing local history is merged, not replaced.
             </p>
             <div class="pref-import-review__actions">
@@ -375,13 +375,13 @@ export function DiscordImportControls(): JSX.Element {
       id="discord"
       title="Import from Discord"
       chooseLabel="Choose Discord JSON"
-      rejectMessage="No Discord export recognized. Export channels from DiscordChatExporter in JSON mode, then choose those .json files."
+      rejectMessage="No Discord export recognized. Export with DiscordChatExporter in JSON mode, then choose those .json files."
       loadParse={loadDiscordExportParser}
       description={
         <>
-          Leaving Discord? Export your channels with{' '}
+          Leaving Discord? Export your Discord rooms with{' '}
           <a href="https://github.com/Tyrrrz/DiscordChatExporter" target="_blank" rel="noreferrer noopener">DiscordChatExporter</a>{' '}
-          in <strong>JSON</strong> mode, then choose the files here. Everything happens on this device — no bot token, no upload, nothing sent to Discord. Imported history becomes searchable, time-travellable scrollback merged into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
+          in <strong>JSON</strong> mode, then choose the files here. Everything happens on this device — no bot token, no upload, nothing sent to Discord. Imported history becomes searchable, time-travellable scrollback merged into this device's vault (up to the newest {VAULT_KEEP} messages per room).
         </>
       }
     />
@@ -423,7 +423,7 @@ function discordPackageLimitMessage(failure: ImportFileLimitFailure): string {
     return `That folder contains more than ${failure.maxFiles} selected files. Choose a smaller unzipped Discord package folder.`;
   }
   if (failure.kind === 'file') {
-    return `${failure.fileName} exceeds the ${formatImportMib(failure.maxFileBytes)} per-file Discord package limit. Remove that channel export or choose a smaller package.`;
+    return `${failure.fileName} exceeds the ${formatImportMib(failure.maxFileBytes)} per-file Discord package limit. Remove that Discord export file or choose a smaller package.`;
   }
   return `Recognized Discord package files exceed the ${formatImportMib(failure.maxAggregateBytes)} total import limit. Choose a smaller package folder.`;
 }
@@ -507,7 +507,7 @@ export function DiscordPackageImportControls(): JSX.Element {
         oldest: s.oldest,
         newest: s.newest,
       });
-      setStatus(`Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'channel')}${s.guild ? ` from ${s.guild}` : ''}.`);
+      setStatus(`Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'room')}${s.guild ? ` from ${s.guild}` : ''}.`);
       focusSoon(() => reviewHeading);
     } catch {
       if (!importOwner.isActive(ownerScope)) return;
@@ -532,7 +532,7 @@ export function DiscordPackageImportControls(): JSX.Element {
       });
       if (!importOwner.isActive(job.ownerScope)) return;
       setPending(null);
-      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'room')}. Open a room to read the history, or search it from anywhere.`);
       focusSoon(() => packageInput);
     } catch {
       if (!importOwner.isActive(job.ownerScope)) return;
@@ -548,7 +548,7 @@ export function DiscordPackageImportControls(): JSX.Element {
         <h3 id="pref-discord-package-import-title" class="pref-label">Import a Discord data package</h3>
       </div>
       <p class="pref-desc">
-        No third-party tool? In Discord go to <strong>Settings → Privacy &amp; Safety → Request all of my Data</strong>. When the package arrives, unzip it and choose the folder here. Everything happens on this device — nothing is sent to Discord. Note that Discord's package only contains <em>your own</em> messages. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
+        No third-party tool? In Discord go to <strong>Settings → Privacy &amp; Safety → Request all of my Data</strong>. When the package arrives, unzip it and choose the folder here. Everything happens on this device — nothing is sent to Discord. Note that Discord's package only contains <em>your own</em> messages. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per room).
       </p>
       <div class="pref-vault-actions">
         <label class="pref-file">
@@ -570,11 +570,11 @@ export function DiscordPackageImportControls(): JSX.Element {
           <div class="pref-import-review" role="group" aria-labelledby="pref-discord-package-review-title">
             <h4 id="pref-discord-package-review-title" tabindex={-1} ref={reviewHeading}>Review import</h4>
             <p>
-              {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
+              {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'room')}
               {job().guild ? ` from ${job().guild}` : ''}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
-              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-room limit dropped.` : ''}
               {' '}Existing local history is merged, not replaced.
             </p>
             <div class="pref-import-review__actions">
@@ -699,7 +699,7 @@ export function DiscordBotImportControls(): JSX.Element {
         onProgress: (p) => {
           if (importOwner.isActive(ownerScope)) {
             setStatus(
-              `Importing ${p.channelName} (channel ${p.channelIndex} of ${p.channelCount})… ${countLabel(p.fetched, 'message')} so far.`,
+              `Importing ${p.channelName} (room ${p.channelIndex} of ${p.channelCount})… ${countLabel(p.fetched, 'message')} so far.`,
             );
           }
         },
@@ -723,7 +723,7 @@ export function DiscordBotImportControls(): JSX.Element {
         channelsFailed: res.channelsFailed,
       });
       setStatus(
-        `Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'channel')}${s.guild ? ` from ${s.guild}` : ''}.`,
+        `Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'room')}${s.guild ? ` from ${s.guild}` : ''}.`,
       );
       focusSoon(() => reviewHeading);
     } catch (err) {
@@ -759,7 +759,7 @@ export function DiscordBotImportControls(): JSX.Element {
       });
       if (!importOwner.isActive(job.ownerScope)) return;
       setPending(null);
-      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'room')}. Open a room to read the history, or search it from anywhere.`);
       focusSoon(() => tokenInput);
     } catch {
       if (!importOwner.isActive(job.ownerScope)) return;
@@ -775,7 +775,7 @@ export function DiscordBotImportControls(): JSX.Element {
         <h3 id="pref-discord-bot-import-title" class="pref-label">Import from a Discord server (bot token)</h3>
       </div>
       <p class="pref-desc">
-        Own a Discord server? Create a bot, invite it, and pull the <strong>whole server's</strong> history straight in — every text, announcement, and forum channel, plus pins.
+        Own a Discord server? Create a bot, invite it, and pull the <strong>whole server's</strong> history straight in — every text, announcement, and forum room, plus pins.
       </p>
       <p class="pref-desc" id="pref-discord-bot-proxy-disclosure">
         Your bot token is sent to this Onyx deployment's same-origin import proxy, which contacts Discord's API on your behalf. The token is used only for this request and is not stored in the portable vault or local history.
@@ -784,7 +784,7 @@ export function DiscordBotImportControls(): JSX.Element {
         <li>Create an application at <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer noopener">discord.com/developers</a>, then add a <strong>Bot</strong> to it.</li>
         <li><strong>Enable the “MESSAGE CONTENT INTENT” toggle</strong> under Bot → Privileged Gateway Intents. Without it, Discord returns messages with no text.</li>
         <li>Under Bot, <strong>Reset Token</strong> and copy the token.</li>
-        <li>Invite the bot to your server (OAuth2 → URL Generator) with the <strong>View Channels</strong> and <strong>Read Message History</strong> permissions.</li>
+        <li>Invite the bot to your server (OAuth2 → URL Generator) with Discord's channel-view and message-history permissions (Discord labels them <strong>View Channels</strong> and <strong>Read Message History</strong>).</li>
         <li>Paste the token and the numeric Server ID below, then fetch. Categories and roles have no home here and are skipped.</li>
       </ol>
       <div class="pref-vault-actions pref-discord-bot-inputs">
@@ -851,16 +851,16 @@ export function DiscordBotImportControls(): JSX.Element {
           <div class="pref-import-review" role="group" aria-labelledby="pref-discord-bot-review-title">
             <h4 id="pref-discord-bot-review-title" tabindex={-1} ref={reviewHeading}>Review import</h4>
             <p>
-              {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
+              {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'room')}
               {job().guild ? ` from ${job().guild}` : ''}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().pins > 0 ? ` ${countLabel(job().pins, 'pinned message')} included.` : ''}
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
-              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-room limit dropped.` : ''}
               {job().rolesSkipped > 0 || job().categoriesSkipped > 0
                 ? ` ${countLabel(job().rolesSkipped, 'role')} and ${countLabel(job().categoriesSkipped, 'category')} have no home here and were skipped.`
                 : ''}
-              {job().channelsFailed > 0 ? ` ${countLabel(job().channelsFailed, 'channel')} could not be read and was skipped.` : ''}
+              {job().channelsFailed > 0 ? ` ${countLabel(job().channelsFailed, 'room')} could not be read and was skipped.` : ''}
               {' '}Existing local history is merged, not replaced.
             </p>
             <div class="pref-import-review__actions">
@@ -896,11 +896,11 @@ export function SlackImportControls(): JSX.Element {
       id="slack"
       title="Import from Slack"
       chooseLabel="Choose Slack JSON"
-      rejectMessage="No Slack export recognized. Unzip your Slack workspace export and choose its per-channel .json files."
+      rejectMessage="No Slack export recognized. Unzip your Slack workspace export and choose its channel .json files (Slack's layout)."
       loadParse={loadSlackExportParser}
       description={
         <>
-          Leaving Slack? Request your workspace export (Slack → Settings & administration → Workspace settings → Import/Export Data), unzip it, and choose the per-channel <strong>JSON</strong> files here. Everything happens on this device — nothing is uploaded. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
+          Leaving Slack? Request your workspace export (Slack → Settings & administration → Workspace settings → Import/Export Data), unzip it, and choose the channel <strong>JSON</strong> files Slack exports here. Everything happens on this device — nothing is uploaded. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per room).
         </>
       }
     />
@@ -951,11 +951,11 @@ export function IrcLogImportControls(): JSX.Element {
     if (limitFailure) {
       setPending(null);
       if (limitFailure.kind === 'count') {
-        setStatus('Choose one IRC log at a time.');
+        setStatus('Choose one classic client log at a time.');
       } else if (limitFailure.kind === 'file') {
-        setStatus(`${limitFailure.fileName} exceeds the ${formatImportMib(limitFailure.maxFileBytes)} IRC log limit. Split the log and import each part separately.`);
+        setStatus(`${limitFailure.fileName} exceeds the ${formatImportMib(limitFailure.maxFileBytes)} classic log limit. Split the log and import each part separately.`);
       } else {
-        setStatus(`That IRC log exceeds the ${formatImportMib(limitFailure.maxAggregateBytes)} total import limit. Split it and import each part separately.`);
+        setStatus(`That classic log exceeds the ${formatImportMib(limitFailure.maxAggregateBytes)} total import limit. Split it and import each part separately.`);
       }
       return;
     }
@@ -963,7 +963,7 @@ export function IrcLogImportControls(): JSX.Element {
     if (!file) return;
     const requestedChannel = channel();
     if (!requestedChannel.trim()) {
-      setStatus('Enter the channel these logs belong to first (e.g. #dev).');
+      setStatus('Enter the room these logs belong to first (e.g. #dev).');
       return;
     }
     const ownerScope = importOwner.capture();
@@ -979,7 +979,7 @@ export function IrcLogImportControls(): JSX.Element {
       const normalizedTarget = normalizeIrcChannelTarget(requestedChannel);
       if (!normalizedTarget) {
         setPending(null);
-        setStatus(`The requested channel "${requestedChannel}" does not normalize to a safe destination. Enter a channel containing letters or numbers (for example, #dev).`);
+        setStatus(`The requested room "${requestedChannel}" does not normalize to a safe destination. Enter a room name containing letters or numbers (for example, #dev).`);
         return;
       }
       const result = await parseIrcLogFile(file, { channel: requestedChannel });
@@ -997,7 +997,7 @@ export function IrcLogImportControls(): JSX.Element {
         && snapshotTarget?.messages.every(message => message.target === actualTarget);
       if (!targetIsConsistent) {
         setPending(null);
-        setStatus('Import rejected because the IRC log did not produce one safe, consistent destination. Enter a different channel and try again.');
+        setStatus('Import rejected because the classic log did not produce one safe, consistent destination. Enter a different room and try again.');
         return;
       }
       const s = result.summary;
@@ -1055,14 +1055,14 @@ export function IrcLogImportControls(): JSX.Element {
   return (
     <section class="pref-group pref-vault-portable pref-irclog-import" aria-labelledby="pref-irclog-import-title">
       <div class="pref-group-head">
-        <h3 id="pref-irclog-import-title" class="pref-label">Import an IRC log</h3>
+        <h3 id="pref-irclog-import-title" class="pref-label">Import a classic client log</h3>
       </div>
       <p class="pref-desc">
-        Have a plain-text log from another client (weechat, irssi, mIRC)? Name the channel it belongs to, then choose the log file. It's parsed on-device and merged into this device's vault (up to the newest {VAULT_KEEP} messages).
+        Have a plain-text log from another client (weechat, irssi, mIRC)? Name the room it belongs to, then choose the log file. It's parsed on-device and merged into this device's vault (up to the newest {VAULT_KEEP} messages).
       </p>
       <div class="pref-vault-actions">
         <label class="pref-file pref-irclog-channel">
-          <span>Channel</span>
+          <span>Room</span>
           <input
             type="text"
             inputmode="text"
@@ -1091,12 +1091,12 @@ export function IrcLogImportControls(): JSX.Element {
               {job().fileName}: {countLabel(job().messages, 'message')} into {job().target}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'unparseable/filtered line')} skipped.` : ''}
-              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-room limit dropped.` : ''}
               {' '}Existing local history is merged, not replaced.
             </p>
             <Show when={job().targetChanged}>
               <p class="pref-status" role="alert">
-                Channel destination changed. Requested "{job().requestedChannel}"; import destination: {job().target}. Confirm only if this is the intended room.
+                Room destination changed. Requested "{job().requestedChannel}"; import destination: {job().target}. Confirm only if this is the intended room.
               </p>
             </Show>
             <div class="pref-import-review__actions">
