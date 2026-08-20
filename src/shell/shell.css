@@ -48,9 +48,9 @@
   overflow: hidden;
   font-family: var(--font-sans);
   color: var(--paper);
-  /* Quiet legibility wash — let the Background canvas (page layer 0) read through
-     without a top glow spectacle. Soft bottom fade only. */
-  background: color-mix(in oklab, var(--ink) 22%, transparent);
+  /* Hard product strata sit on opaque chrome; keep only a faint canvas wash so
+     the page-layer Background still breathes without softening column planes. */
+  background: color-mix(in oklab, var(--ink) 72%, transparent);
 }
 
 .shell > * {
@@ -112,8 +112,8 @@
   align-items: center;
   gap: 6px;
   padding: 10px 0 12px;
-  background: color-mix(in oklab, var(--stone) 28%, var(--ink));
-  border-right: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--stone) 42%, var(--ink));
+  border-right: 1px solid var(--seam);
   overflow: hidden;
   width: var(--shell-rail-w, 72px);
 }
@@ -284,8 +284,8 @@
   grid-column: 2;
   display: flex;
   flex-direction: column;
-  background: color-mix(in oklab, var(--ink) 64%, transparent);
-  border-right: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 94%, var(--stone));
+  border-right: 1px solid var(--seam);
   overflow: hidden;
   overflow: clip;
 }
@@ -992,10 +992,10 @@
   gap: 6px;
   width: 100%;
   content-visibility: auto;
-  contain-intrinsic-size: auto 32px;
-  min-height: 32px;
-  padding: 4px 8px;
-  border-radius: 4px;
+  contain-intrinsic-size: auto 34px;
+  min-height: 34px;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
   border: 1px solid transparent;
   cursor: pointer;
   font-size: 0.84rem;
@@ -1013,26 +1013,27 @@
 
 .shell-channel-item:hover {
   color: var(--paper);
-  background: color-mix(in oklab, var(--lapis-deep) 12%, transparent);
+  background: color-mix(in oklab, var(--lapis-deep) 16%, var(--stone-2));
   border-color: var(--seam-faint);
 }
 
 .shell-channel-item--active {
   color: var(--paper);
-  background: color-mix(in oklab, var(--lapis-deep) 22%, var(--stone-2));
-  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 34%, var(--stone-2));
+  border-color: color-mix(in oklab, var(--lapis) 28%, var(--seam));
 }
 
-/* Active room: a bioluminescent current runs down its leading edge. */
+/* Active room: full-height matte bar — platform density, not a soft pip. */
 .shell-channel-item--active::before {
   content: '';
   position: absolute;
-  left: -1px;
-  top: 6px;
-  bottom: 6px;
-  width: 2px;
-  border-radius: 999px;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 0;
   background: var(--lapis-bright);
+  box-shadow: none;
 }
 
 .shell-channel-item--active .shell-channel-sigil {
@@ -1191,11 +1192,13 @@
   container-name: conversation;
   container-type: inline-size;
   min-width: 0;
-  margin: 10px 12px;
-  border: 1px solid color-mix(in oklab, var(--paper) 8%, var(--seam-faint));
-  border-radius: var(--r-lg);
-  box-shadow: var(--elev-2);
-  background: color-mix(in oklab, var(--ink) 52%, transparent);
+  /* Full-bleed stage — no inset SaaS card on desktop. */
+  margin: 0;
+  border: 0;
+  border-left: 1px solid var(--seam);
+  border-radius: 0;
+  box-shadow: none;
+  background: color-mix(in oklab, var(--ink) 96%, var(--stone));
   overflow: hidden;
 }
 
@@ -1786,14 +1789,14 @@
   gap: var(--space-3);
   padding: 0 clamp(12px, 1.8vw, 20px);
   /* Commercial header budget — primary Call/People/More targets ≥40px desktop. */
-  height: 52px;
-  background: color-mix(in oklab, var(--surface-void, var(--ink)) 88%, var(--surface-face, var(--stone)));
+  height: 48px;
+  background: color-mix(in oklab, var(--surface-void, var(--ink)) 96%, var(--surface-face, var(--stone)));
   border-bottom: 1px solid var(--seam);
   overflow: hidden;
 }
 
 .shell[data-room-identity] .shell-ribbon {
-  background: color-mix(in oklab, var(--room-accent-wash) 14%, var(--ink));
+  background: color-mix(in oklab, var(--room-accent-wash) 22%, var(--ink));
   border-bottom-color: var(--room-accent-border);
   box-shadow: inset 0 -1px 0 var(--room-accent-soft);
 }
@@ -1815,7 +1818,7 @@
     color-mix(in oklab, var(--lapis) 16%, transparent) 88%,
     transparent 100%
   );
-  opacity: 0;
+  opacity: 0.72;
   pointer-events: none;
 }
 
@@ -1829,7 +1832,7 @@
     var(--room-accent-border) 72%,
     transparent 100%
   );
-  opacity: 0;
+  opacity: 0.9;
 }
 
 /* Inner row carries the reading measure; the ribbon itself stays full-bleed
@@ -1934,7 +1937,7 @@
   height: 28px;
   padding: 0 9px;
   border: 1px solid color-mix(in oklab, var(--gold) 48%, var(--line));
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--gold) 14%, var(--stone) 48%);
   color: var(--paper);
   cursor: pointer;
@@ -2008,7 +2011,7 @@
   height: 28px;
   padding: 0 9px;
   border: 1px solid color-mix(in oklab, var(--lapis) 38%, var(--line));
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--lapis) 14%, var(--stone) 48%);
   color: var(--paper);
   font-family: var(--font-mono);
@@ -4569,9 +4572,9 @@
 .shell-composer {
   position: relative;
   flex: none;
-  padding: var(--space-3) var(--space-4) var(--space-4);
-  background: color-mix(in oklab, var(--ink) 82%, var(--stone));
-  border-top: 1px solid var(--seam-faint);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  background: color-mix(in oklab, var(--ink) 96%, var(--stone));
+  border-top: 1px solid var(--seam);
 }
 
 /* Content column shares the conversation reading measure so the input lines up
@@ -5120,9 +5123,9 @@
   align-items: flex-end;
   min-width: 0;
   padding: 3px;
-  background: color-mix(in oklab, var(--ink) 70%, var(--stone-2));
-  border: 1px solid var(--seam-faint);
-  border-radius: calc(var(--r-md) + 2px);
+  background: color-mix(in oklab, var(--ink) 82%, var(--stone-2));
+  border: 1px solid var(--seam);
+  border-radius: var(--r-sm);
   transition:
     border-color var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease),
@@ -5141,7 +5144,7 @@
 }
 
 .shell-composer-textarea {
-  --composer-field-height: 38px;
+  --composer-field-height: 42px;
   --composer-line-box: 1.52em;
   flex: 1 1 auto;
   min-width: 0;
@@ -5487,8 +5490,8 @@
   /* Allow the grid item to shrink below content height so .shell-members-scroll
      owns overflow for dense rosters (grid default min-height:auto prevents it). */
   min-height: 0;
-  background: color-mix(in oklab, var(--ink) 65%, transparent);
-  border-left: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 94%, var(--stone));
+  border-left: 1px solid var(--seam);
   overflow: hidden;
   overflow: clip;
   /* No explicit width: a grid item stretches to fill its track by default,
