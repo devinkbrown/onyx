@@ -17,7 +17,7 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type CommandSection = 'Channels' | 'DMs' | 'People' | 'Actions';
+export type CommandSection = 'Rooms' | 'DMs' | 'People' | 'Actions';
 
 /**
  * A single palette entry. The registry stores these; the palette displays them.
@@ -109,7 +109,9 @@ function purgeOwnerlessRecents(): void {
 
 function parseRecentTarget(value: unknown): RecentTarget | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const { id, label, section, at } = value as Record<string, unknown>;
+  const { id, label, section: rawSection, at } = value as Record<string, unknown>;
+  // Legacy palette recents stored section as `Channels`; normalize to `Rooms`.
+  const section = rawSection === 'Channels' ? 'Rooms' : rawSection;
   if (
     typeof id !== 'string'
     || id.length === 0
@@ -119,7 +121,7 @@ function parseRecentTarget(value: unknown): RecentTarget | null {
     || label.length === 0
     || label.length > MAX_RECENT_LABEL_LENGTH
     || CONTROL_CHARACTERS.test(label)
-    || (section !== 'Channels' && section !== 'DMs' && section !== 'People' && section !== 'Actions')
+    || (section !== 'Rooms' && section !== 'DMs' && section !== 'People' && section !== 'Actions')
     || typeof at !== 'string'
     || at.length === 0
     || at.length > MAX_RECENT_TIMESTAMP_LENGTH

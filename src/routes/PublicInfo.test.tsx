@@ -30,7 +30,7 @@ const PAGES = [
     mainLabel: 'Onyx glossary',
     title: 'Glossary',
     lede: 'Words should make the network easier to use.',
-    body: 'Onyx is the network and client. Onyx Server is the engine. Cadence is the media system. Mooring is the secured mesh channel.',
+    body: 'Onyx is the network and client. Onyx Server is the engine. Cadence is the media system. Mooring is the secured peer channel.',
   },
   {
     page: 'integrations',

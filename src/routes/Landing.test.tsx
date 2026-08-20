@@ -97,7 +97,7 @@ describe('Landing', () => {
     expect(container.querySelector('.home-telemetry-link')).toHaveAttribute('href', '/status/');
   });
 
-  it('maps a complete current public mesh observation to a text and glyph verified receipt', async () => {
+  it('maps a complete current public network observation to a text and glyph verified receipt', async () => {
     vi.stubGlobal('fetch', vi.fn(statusResponse(meshStatus())));
     const { getByRole, container } = render(() => <Landing />);
     await waitFor(() => expect(container.querySelector('[data-ui="proof-receipt"]')).toHaveAttribute('data-ui-truth', 'verified'));
@@ -108,7 +108,7 @@ describe('Landing', () => {
     expect(container.textContent).toMatch(/complete, non-partitioned quorum observation/i);
   });
 
-  it('does not overclaim degraded, stale, future, or undated public mesh reports', async () => {
+  it('does not overclaim degraded, stale, future, or undated public network reports', async () => {
     const cases = [
       { source: meshStatus({ mesh: { quorum: false, partitioned: true, components: 2 } }), truth: 'partial', copy: 'Partial' },
       { source: meshStatus({ generated_at: NOW - 10 * 60 }), truth: 'reconnecting', copy: 'Reconnecting' },

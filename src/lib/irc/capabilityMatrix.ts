@@ -19,7 +19,7 @@ export const PRODUCT_CAPS: readonly { id: string; label: string; hint: string }[
   { id: 'message-tags', label: 'Message tags', hint: 'msgid, replies, labels' },
   { id: 'server-time', label: 'Server time', hint: 'Authoritative timestamps' },
   { id: 'echo-message', label: 'Echo message', hint: 'Server echoes your sends' },
-  { id: 'draft/chathistory', label: 'Chat history', hint: 'CHATHISTORY / history sync' },
+  { id: 'draft/chathistory', label: 'Chat history', hint: 'Message history sync' },
   { id: 'draft/read-marker', label: 'Read markers', hint: 'Multi-device read position' },
   { id: 'draft/multiline', label: 'Multiline', hint: 'Long messages as batches' },
   { id: 'onyx/e2ee', label: 'Onyx E2EE', hint: 'Encrypted DM tags' },

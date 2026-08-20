@@ -108,9 +108,9 @@ describe('buildCommands', () => {
 
     const commands = buildCommands(getState());
 
-    expect(commands.some((command) => command.section === 'Channels' && command.title === 'Go to #lapis')).toBe(true);
+    expect(commands.some((command) => command.section === 'Rooms' && command.title === 'Go to #lapis')).toBe(true);
     expect(commands.some((command) => command.section === 'DMs' && command.title === 'Open DM with aoi')).toBe(true);
-    expect(commands.some((command) => command.section === 'Actions' && command.title === 'Join channel...')).toBe(true);
+    expect(commands.some((command) => command.section === 'Actions' && command.title === 'Join room...')).toBe(true);
     expect(commands.some((command) => command.title === 'Copy node address' && command.hint === 'ircs://ircx.us:6697')).toBe(true);
   });
 
@@ -1100,7 +1100,7 @@ describe('buildCommands', () => {
 
     const command = buildCommands(getState()).find((entry) => entry.id === 'action:copy-channel-link');
     expect(command?.section).toBe('Actions');
-    expect(command?.title).toBe('Copy channel link');
+    expect(command?.title).toBe('Copy room link');
     // The channel sigil is percent-encoded so the link round-trips unambiguously.
     expect(command?.hint).toBe('ircs://ircx.us:6697/%23lapis');
     expect(command?.keywords).toContain('share');

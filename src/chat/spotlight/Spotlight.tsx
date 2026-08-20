@@ -28,13 +28,13 @@ type CommandGroup = {
 
 export type SpotlightProps = JSX.HTMLAttributes<HTMLDivElement>;
 
-const SECTION_ORDER: SpotlightSection[] = ['Channels', 'DMs', 'People', 'Actions'];
+const SECTION_ORDER: SpotlightSection[] = ['Rooms', 'DMs', 'People', 'Actions'];
 const LISTBOX_ID = 'onyx-spotlight-listbox';
 const INPUT_ID = 'onyx-spotlight-input';
 
 // Token-tinted leading glyphs, one per section (CSS tints them per data-section).
 const SECTION_ICON: Record<SpotlightSection, string> = {
-  Channels: '#',
+  Rooms: '#',
   DMs: '@',
   People: '◇',
   Actions: '→',

@@ -68,16 +68,16 @@ export default function Landing() {
   });
   const proofDetail = createMemo(() => {
     switch (feedState()) {
-      case 'current': return 'A current public mesh report confirms a complete, non-partitioned quorum observation.';
-      case 'degraded': return 'The public mesh report is current, but its observation is incomplete or degraded.';
-      case 'stale': return 'The last public mesh report is stale; a fresh observation is being awaited.';
-      case 'future': return 'The public mesh report has a future timestamp, so it cannot support a current claim.';
-      case 'unknown': return 'The public mesh report has no usable timestamp, so no current claim can be made.';
-      case 'loading': return 'The public mesh report is still being requested.';
-      default: return 'No public mesh report is available.';
+      case 'current': return 'A current public network report confirms a complete, non-partitioned quorum observation.';
+      case 'degraded': return 'The public network report is current, but its observation is incomplete or degraded.';
+      case 'stale': return 'The last public network report is stale; a fresh observation is being awaited.';
+      case 'future': return 'The public network report has a future timestamp, so it cannot support a current claim.';
+      case 'unknown': return 'The public network report has no usable timestamp, so no current claim can be made.';
+      case 'loading': return 'The public network report is still being requested.';
+      default: return 'No public network report is available.';
     }
   });
-  const meshState = createMemo(() => {
+  const networkState = createMemo(() => {
     switch (feedState()) {
       case 'current': return 'operational';
       case 'degraded': return 'degraded';
@@ -148,10 +148,10 @@ export default function Landing() {
       >
         <ProofRail
           state={proofState()}
-          label="Public mesh report"
+          label="Public network report"
           detail={proofDetail()}
           evidenceType="Public status feed"
-          ariaLabel="Public mesh report evidence"
+          ariaLabel="Public network report evidence"
         />
         <dl class="home-evidence-rail" data-home-evidence data-feed-state={feedState()}>
           <div class="home-evidence-item">
@@ -160,7 +160,7 @@ export default function Landing() {
           </div>
           <div class="home-evidence-item">
             <dt>State</dt>
-            <dd><strong data-state={meshState()}>{meshState()}</strong></dd>
+            <dd><strong data-state={networkState()}>{networkState()}</strong></dd>
           </div>
           <div class="home-evidence-item home-evidence-scope">
             <dt>Scope</dt>
@@ -176,7 +176,7 @@ export default function Landing() {
         <div class="home-telemetry-strip" data-feed-state={feedState()}>
           <span class="home-telemetry-item">
             <span class="k">network</span>
-            <strong data-state={meshState()}>{meshState()}</strong>
+            <strong data-state={networkState()}>{networkState()}</strong>
           </span>
           <span class="home-telemetry-sep" aria-hidden="true">·</span>
           <span class="home-telemetry-item">

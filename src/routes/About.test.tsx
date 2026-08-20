@@ -476,7 +476,7 @@ describe('About page — DOM rendering', () => {
     cleanup();
   });
 
-  it.skipIf(!renderAvailable)('announces a bounded public mesh report without inventing availability', () => {
+  it.skipIf(!renderAvailable)('announces a bounded public network report without inventing availability', () => {
     const { cleanup } = renderAbout!();
     const report = document.querySelector<HTMLElement>('.ab-feed[role="status"]');
     expect(report).not.toBeNull();

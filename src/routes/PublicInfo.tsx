@@ -14,7 +14,7 @@ export { NotFoundPage };
 
 const content = {
   accessibility: ['Accessibility', 'Access is a product requirement.', 'Keyboard navigation, focus recovery, motion controls, contrast variants, and live-status announcements are tested in the client. Report a gap in #accessibility.'],
-  glossary: ['Glossary', 'Words should make the network easier to use.', 'Onyx is the network and client. Onyx Server is the engine. Cadence is the media system. Mooring is the secured mesh channel.'],
+  glossary: ['Glossary', 'Words should make the network easier to use.', 'Onyx is the network and client. Onyx Server is the engine. Cadence is the media system. Mooring is the secured peer channel.'],
   integrations: ['Integrations', 'Useful actions, constrained by design.', 'Onyx renders reviewed Block-Kit-lite content and uses capability-scoped action manifests. It never executes a message as a command.'],
   agents: ['Agent safety', 'Automation has a boundary.', 'Agent-visible actions are reviewed, capability-scoped, and labelled with their source. Local data stays local unless you explicitly choose otherwise.'],
 } as const;

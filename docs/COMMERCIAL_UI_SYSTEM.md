@@ -1,6 +1,6 @@
 # Onyx commercial UI system
 
-**Status:** Complete — rooms/network language locked; experience mode id is `network-ops` (migrates legacy `irc-ops`); protocol essays keep real CAP/config tokens under open-wire framing.
+**Status:** Complete — rooms/network language locked; experience mode id is `network-ops` (migrates legacy `irc-ops`); public surfaces say network report / peer channel; protocol essays keep real CAP/config tokens under open-wire framing.
 **Scope:** Presentation and information hierarchy only. Kernel frozen.
 **Slice 1 (implemented here):** Room header commercial chrome — `PresenceRibbon` + ribbon CSS + focused tests.
 **Reviewer:** Codex · **Writer (this tree):** implementer lane · **Claude:** off for this pass.
