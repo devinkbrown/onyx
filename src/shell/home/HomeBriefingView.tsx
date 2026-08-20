@@ -937,7 +937,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                     <div class="home-pulse">
                       <div class="home-pulse-tile">
                         <span class="home-pulse-num">{data().channels.length}</span>
-                        <span class="home-pulse-label">channels</span>
+                        <span class="home-pulse-label">rooms</span>
                       </div>
                       <div class="home-pulse-tile">
                         <span class="home-pulse-num">{props.more().totalMessages.toLocaleString('en-US')}</span>

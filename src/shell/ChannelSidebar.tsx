@@ -709,7 +709,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
           <p class="shell-sidebar-filter-empty" data-testid="sidebar-filter-empty" role="status">
             {unreadOnly() && !listFilter().trim()
               ? 'Nothing unread right now.'
-              : `No channels or DMs match “${listFilter().trim() || 'unread'}”.`}
+              : `No rooms or messages match “${listFilter().trim() || 'unread'}”.`}
           </p>
         </Show>
 
@@ -769,7 +769,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                   }
                 >
                   <p class="shell-sidebar-section-label" id="sidebar-channels-label">
-                    channels
+                    rooms
                   </p>
                 </Show>
                 <ul
@@ -811,11 +811,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         <Show when={showMessages()}>
           <div class="shell-sidebar-section">
             <p class="shell-sidebar-section-label" id="sidebar-dms-label">
-              direct messages
+              messages
             </p>
             <Show
               when={sortedDms().length > 0}
-              fallback={<p class="shell-sidebar-empty">No direct messages yet.</p>}
+              fallback={<p class="shell-sidebar-empty">No messages yet. Start one from People or search.</p>}
             >
               <ul
                 class="shell-dm-list"
@@ -884,27 +884,27 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
       <form
         class="shell-join-form"
         onSubmit={handleJoin}
-        aria-label="Join a channel"
+        aria-label="Join a room"
       >
         <label for="shell-join-input" class="sr-only">
-          Channel name
+          Room name
         </label>
         <input
           id="shell-join-input"
           class="shell-join-input"
           type="text"
-          placeholder="join #channel"
+          placeholder="join #room"
           autocomplete="off"
           spellcheck={false}
           value={joinInput()}
           onInput={(e) => setJoinInput(e.currentTarget.value)}
-          aria-label="Channel name to join"
+          aria-label="Room name to join"
         />
         <button
           type="submit"
           class="shell-join-btn"
           disabled={!joinInput().trim()}
-          aria-label={joinTarget() ? `Join ${joinTarget()}` : 'Join channel'}
+          aria-label={joinTarget() ? `Join ${joinTarget()}` : 'Join room'}
         >
           <span aria-hidden="true">+</span>
         </button>

@@ -160,7 +160,7 @@ async function goHome(page: Page): Promise<void> {
 }
 
 async function joinRoom(page: Page, room: string): Promise<void> {
-  const input = page.locator('#shell-join-input').or(page.getByRole('textbox', { name: /Channel name to join/i }));
+  const input = page.locator('#shell-join-input').or(page.getByRole('textbox', { name: /Room name to join/i }));
   await expect(input.first()).toBeVisible({ timeout: 20_000 });
   await input.first().fill(room);
   const namedJoin = page.getByRole('button', { name: `Join ${room}` });

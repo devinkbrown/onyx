@@ -348,9 +348,10 @@ export function GuestClaimPrompt(): JSX.Element {
               variant="primary"
               size="sm"
               data-testid="guest-claim-open"
+              aria-label="Keep this nick"
               onClick={openSheetFromChip}
             >
-              Keep this nick
+              Keep
             </Button>
             <button
               type="button"

@@ -347,7 +347,7 @@ describe('ChannelSidebar accessibility', () => {
 
     const { getByLabelText, getByRole } = render(() => <ChannelSidebar />);
 
-    fireEvent.input(getByLabelText('Channel name to join'), {
+    fireEvent.input(getByLabelText('Room name to join'), {
       target: { value: 'harbor' },
     });
 
@@ -358,7 +358,7 @@ describe('ChannelSidebar accessibility', () => {
     seed();
 
     const { getByLabelText, getByRole } = render(() => <ChannelSidebar />);
-    const joinInput = getByLabelText('Channel name to join');
+    const joinInput = getByLabelText('Room name to join');
 
     fireEvent.input(joinInput, { target: { value: '&ops' } });
     expect(getByRole('button', { name: 'Join &ops' })).toBeInTheDocument();
