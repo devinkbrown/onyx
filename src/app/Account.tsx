@@ -64,6 +64,7 @@ import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { openGuestClaimSheet } from '@/shell/guestClaimState';
+import { openPreferences } from '@/lib/prefs/preferences';
 
 export interface AccountPanelProps {
   open: boolean;
@@ -509,11 +510,42 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     <ModalShell
       open={local.open}
       onOpenChange={local.onOpenChange}
-      title="Account"
+      title="You"
       description={isGuest() ? 'You are browsing as a guest.' : `Signed in as ${account()}`}
       closeLabel="Close account panel"
     >
       <div class="acct" data-testid="account-panel" data-guest={isGuest() ? 'true' : 'false'}>
+        <nav class="acct-hub" aria-label="You workspace">
+          <button
+            type="button"
+            class="acct-hub-link acct-hub-link--current"
+            aria-current="page"
+          >
+            Account
+          </button>
+          <button
+            type="button"
+            class="acct-hub-link"
+            data-testid="you-open-appearance"
+            onClick={() => {
+              local.onOpenChange(false);
+              queueMicrotask(() => getState().openAppearance());
+            }}
+          >
+            Appearance
+          </button>
+          <button
+            type="button"
+            class="acct-hub-link"
+            data-testid="you-open-preferences"
+            onClick={() => {
+              local.onOpenChange(false);
+              queueMicrotask(() => openPreferences());
+            }}
+          >
+            Preferences
+          </button>
+        </nav>
         <p class="acct-context-cue" role="note">
           <span>Next</span>
           <Show
@@ -886,20 +918,27 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
           {/* Sessions & devices — current browser + Era 2 (B8) remote list skeleton */}
           <SessionsDevicesSection account={account()} />
-          <OperEventConsole />
-          <CapabilityMatrixSection />
-          <ChannelOrganizationSection owner={memoryOwner()} />
-          <SmartMuteSection owner={memoryOwner()} />
-          <PortableIdentitySection
-            owner={memoryOwner()}
-            networkHint={networkName() || undefined}
-          />
 
           {/* Offline recovery codes — B8 remainder */}
           <RecoveryCodesSection account={account()} />
 
           {/* Passkeys — WebAuthn passwordless login: register, list, rename, remove */}
           <PasskeysSection account={account()} owner={memoryOwner()} active={local.open} />
+
+          <details class="acct-advanced" data-testid="you-advanced">
+            <summary class="acct-advanced-summary">
+              <span class="acct-advanced-title">Advanced</span>
+              <span class="acct-advanced-hint">Ops tools, room organization, device keys, and personas</span>
+            </summary>
+            <div class="acct-advanced-body">
+              <OperEventConsole />
+              <CapabilityMatrixSection />
+              <ChannelOrganizationSection owner={memoryOwner()} />
+              <SmartMuteSection owner={memoryOwner()} />
+              <PortableIdentitySection
+                owner={memoryOwner()}
+                networkHint={networkName() || undefined}
+              />
 
           <Section
             title="Device encryption keys"
@@ -1013,6 +1052,8 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               </Show>
             </div>
           </Section>
+            </div>
+          </details>
 
           {/* Recover nick */}
           <Section title="Recover a nick" hint="Force an unauthenticated holder off your registered nick.">

@@ -10,28 +10,74 @@
 
 /* ── Message density ─────────────────────────────────────────────────────────
    Adjust the vertical rhythm of the feed without touching the grid. Cozy is the
-   shell default, so it carries no overrides. */
+   shell default, so it carries no overrides. Compact leans Discord/Twitch-dense;
+   roomy keeps a reading-room cadence. */
 
 :root[data-density='compact'] .shell-msg-group {
-  padding-block: var(--space-1) 0;
-  margin-top: var(--space-1);
+  grid-template-columns: 32px 1fr;
+  gap: 0 8px;
+  padding-block: 2px 0;
+  padding-inline: var(--space-4);
+  margin-top: 2px;
+}
+:root[data-density='compact'] .shell-msg-group--system {
+  padding-left: calc(32px + 8px + var(--space-4));
+  padding-block: 0;
 }
 :root[data-density='compact'] .shell-msg-cont {
   padding-block: 0;
+  padding-inline: var(--space-4);
+  margin-top: 0;
 }
 :root[data-density='compact'] .shell-msg-system {
   padding-block: 0;
 }
+:root[data-density='compact'] .shell-msg-meta {
+  margin-bottom: 0;
+  gap: 6px;
+}
+:root[data-density='compact'] .shell-msg-author {
+  font-size: 0.84rem;
+}
+:root[data-density='compact'] .shell-msg-ts,
+:root[data-density='compact'] .shell-msg-cont-ts {
+  font-size: 0.58rem;
+}
+:root[data-density='compact'] .shell-msg-text {
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+:root[data-density='compact'] .shell-msg-avatar .onyx-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.7rem;
+}
 
 :root[data-density='roomy'] .shell-msg-group {
+  grid-template-columns: 48px 1fr;
+  gap: 0 var(--space-4);
   padding-block: var(--space-4) var(--space-2);
   margin-top: var(--space-4);
+}
+:root[data-density='roomy'] .shell-msg-group--system {
+  padding-left: calc(48px + var(--space-4) + var(--space-5));
+  padding-block: var(--space-2);
 }
 :root[data-density='roomy'] .shell-msg-cont {
   padding-block: var(--space-1);
 }
 :root[data-density='roomy'] .shell-msg-system {
   padding-block: var(--space-2);
+}
+:root[data-density='roomy'] .shell-msg-meta {
+  margin-bottom: var(--space-2);
+}
+:root[data-density='roomy'] .shell-msg-text {
+  line-height: 1.55;
+}
+:root[data-density='roomy'] .shell-msg-avatar .onyx-avatar {
+  width: 40px;
+  height: 40px;
 }
 
 /* ── Font scale ──────────────────────────────────────────────────────────────
@@ -798,10 +844,10 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  min-height: 58px;
+  min-height: 52px;
   padding: var(--space-3);
-  border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, var(--line));
-  border-radius: var(--r-md);
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
   background: color-mix(in oklab, var(--ink) 48%, transparent);
   color: var(--paper);
   cursor: pointer;
@@ -811,7 +857,7 @@
 }
 
 .pref-action-card:hover {
-  border-color: color-mix(in oklab, var(--lapis-bright) 58%, var(--line));
+  border-color: color-mix(in oklab, var(--lapis-bright) 45%, var(--line));
   background: color-mix(in oklab, var(--ink) 54%, transparent);
 }
 
@@ -824,12 +870,12 @@
   display: inline-grid;
   place-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--line);
-  border-radius: var(--r-pill);
+  border-radius: 4px;
   color: var(--lapis-bright);
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
 
 .pref-action-card__body {

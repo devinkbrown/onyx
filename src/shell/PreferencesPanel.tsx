@@ -3503,7 +3503,7 @@ export function PreferencesPanel(): JSX.Element {
             <AppearanceLauncher />
             <Segmented
               legend="Message density"
-              description="Vertical rhythm of the message feed."
+              description="Compact packs the feed like a live room. Cozy is the default. Roomy opens reading space."
               options={DENSITIES}
               labels={DENSITY_LABELS}
               value={() => preferences().density}

@@ -343,6 +343,27 @@ describe('Account panel — signed in', () => {
     expect(screen.getByRole('region', { name: 'Delete account' })).toBeInTheDocument();
   });
 
+  it('exposes a You workspace rail into Appearance', async () => {
+    const openAppearance = vi.spyOn(getState(), 'openAppearance');
+    const closeSpy = vi.fn();
+    store.setState({
+      client: makeClient() as never,
+      server: seedServer('alice'),
+    });
+    render(() => <AccountPanel open={true} onOpenChange={closeSpy} />);
+
+    expect(screen.getByRole('navigation', { name: 'You workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Account' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('you-advanced')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'You' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('you-open-appearance'));
+    expect(closeSpy).toHaveBeenCalledWith(false);
+    await waitFor(() => {
+      expect(openAppearance).toHaveBeenCalled();
+    });
+  });
+
   it('renders structured account facts from accountInfo', () => {
     store.setState({
       accountInfo: {
