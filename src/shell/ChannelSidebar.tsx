@@ -761,8 +761,16 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                     when={group.channels.length > 0}
                     fallback={
                       <Show when={isUncategorized() && sortedChannels().length === 0}>
-                        <li style={{ padding: '4px 10px', color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
-                          No rooms yet
+                        <li class="shell-sidebar-zero">
+                          <p class="shell-sidebar-empty">No rooms yet.</p>
+                          <button
+                            type="button"
+                            class="shell-sidebar-browse"
+                            data-testid="sidebar-browse-rooms"
+                            onClick={() => getState().openChannelBrowser()}
+                          >
+                            Browse rooms
+                          </button>
                         </li>
                       </Show>
                     }

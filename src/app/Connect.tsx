@@ -1157,13 +1157,57 @@ export function Connect(props: ConnectProps): JSX.Element {
                 </p>
               </header>
 
-              {/* Invite preview — a calm welcome when arriving via an invite link */}
+              {/* Invite preview — mini-shell glimpse of the room you're entering */}
               <Show when={inviteCard} keyed>
                 {(card) => (
                   <div class="conn-invite" role="note" aria-label="Invite preview">
                     <span class="conn-invite-eyebrow">You're invited</span>
+                    <div class="conn-invite-shell" aria-hidden="true">
+                      <div class="conn-invite-rail">
+                        <span class="conn-invite-room is-active">
+                          {card.channel ?? 'Onyx'}
+                        </span>
+                        <Show when={card.channel}>
+                          <span class="conn-invite-room">#root</span>
+                        </Show>
+                      </div>
+                      <div class="conn-invite-pane">
+                        <div class="conn-invite-pane-head">
+                          <span class="conn-invite-hash">#</span>
+                          <span class="conn-invite-pane-name">
+                            {(card.channel ?? 'public room').replace(/^#/, '')}
+                          </span>
+                          <Show when={card.readerMode}>
+                            <span class="conn-invite-chip">Reader</span>
+                          </Show>
+                        </div>
+                        <div class="conn-invite-lines">
+                          <span class="conn-invite-line is-mute" />
+                          <span class="conn-invite-line" />
+                          <span class="conn-invite-line is-short" />
+                        </div>
+                      </div>
+                    </div>
                     <h2 class="conn-invite-title">{inviteTitle(card)}</h2>
                     <p class="conn-invite-desc">{inviteDescription(card)}</p>
+                    <Show when={card.guestName || card.topic}>
+                      <ul class="conn-invite-meta">
+                        <Show when={card.guestName}>
+                          {(name) => (
+                            <li>
+                              Continue as <span class="mono">{name()}</span>
+                            </li>
+                          )}
+                        </Show>
+                        <Show when={card.topic}>
+                          {(topic) => (
+                            <li>
+                              Topic focus: <span class="mono">{topic()}</span>
+                            </li>
+                          )}
+                        </Show>
+                      </ul>
+                    </Show>
                   </div>
                 )}
               </Show>

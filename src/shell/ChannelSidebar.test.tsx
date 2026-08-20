@@ -626,4 +626,25 @@ describe('ChannelSidebar accessibility', () => {
     fireEvent.click(getByRole('button', { name: '#alpha' }));
     expect(onConversationOpen).toHaveBeenCalledTimes(1);
   });
+
+  it('offers Browse rooms when the room list is empty', () => {
+    store.setState({
+      ...initialState,
+      channels: new Map(),
+      dms: new Map(),
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+      showChannelBrowser: false,
+    }, true);
+
+    const { getByTestId, getByText } = render(() => (
+      <ChannelSidebar mode="rooms" activeSection="rooms" />
+    ));
+
+    expect(getByText('No rooms yet.')).toBeInTheDocument();
+    fireEvent.click(getByTestId('sidebar-browse-rooms'));
+    expect(store.getState().showChannelBrowser).toBe(true);
+  });
 });

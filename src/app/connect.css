@@ -743,15 +743,15 @@
   line-height: 1.35;
 }
 
-/* ── Invite preview — a calm welcome when arriving via an invite link ── */
+/* ── Invite preview — mini-shell handoff when arriving via an invite link ── */
 .conn-invite {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 15px 17px;
-  border-radius: var(--r-sm);
+  gap: 10px;
+  padding: 14px 14px 16px;
+  border-radius: 6px;
   border: 1px solid var(--seam-faint);
-  background: color-mix(in oklab, var(--ink) 52%, var(--stone));
+  background: color-mix(in oklab, var(--ink) 62%, var(--stone));
   box-shadow: none;
 }
 
@@ -761,6 +761,110 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--paper-mute);
+}
+
+.conn-invite-shell {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  min-height: 5.5rem;
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--ink) 88%, black);
+}
+
+.conn-invite-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 6px;
+  border-right: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 70%, var(--stone));
+}
+
+.conn-invite-room {
+  display: block;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  color: var(--paper-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conn-invite-room.is-active {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--lapis-deep, #2a4a7a) 34%, transparent);
+}
+
+.conn-invite-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 8px 10px 10px;
+  gap: 8px;
+}
+
+.conn-invite-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.conn-invite-hash {
+  color: var(--paper-mute);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.conn-invite-pane-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--paper);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conn-invite-chip {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lapis-bright, #7eb6ff);
+  border: 1px solid color-mix(in oklab, var(--lapis, #4a7ab8) 40%, transparent);
+  border-radius: 3px;
+  padding: 2px 5px;
+}
+
+.conn-invite-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.conn-invite-line {
+  display: block;
+  height: 6px;
+  width: 88%;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--paper) 14%, transparent);
+}
+
+.conn-invite-line.is-mute {
+  width: 62%;
+  background: color-mix(in oklab, var(--paper) 8%, transparent);
+}
+
+.conn-invite-line.is-short {
+  width: 44%;
 }
 
 .conn-invite-title {
@@ -779,6 +883,22 @@
   font-style: italic;
   font-size: 0.9rem;
   line-height: 1.5;
+  color: var(--paper-dim);
+}
+
+.conn-invite-meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--paper-mute);
+}
+
+.conn-invite-meta .mono {
+  font-family: var(--font-mono);
   color: var(--paper-dim);
 }
 
