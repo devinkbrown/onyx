@@ -80,7 +80,7 @@ export default function ChannelBrowser(): JSX.Element {
         if (!next) close();
       }}
       title="Browse rooms"
-      description="Public rooms on the network, live from LIST — busiest first."
+      description="Public rooms on the network — busiest first."
     >
       <div class="chb">
         <div class="chb-toolbar" role="search" aria-label="Room directory search">
