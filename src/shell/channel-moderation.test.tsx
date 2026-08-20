@@ -225,7 +225,7 @@ describe('MemberList moderation', () => {
 
   it('clicking Op dispatches MODE +o through the client', () => {
     // Arrange
-    setPreference('experienceMode', 'irc-ops');
+    setPreference('experienceMode', 'network-ops');
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
 
     // Act
@@ -240,7 +240,7 @@ describe('MemberList moderation', () => {
   });
 
   it('shows role controls only in Network Ops', () => {
-    setPreference('experienceMode', 'irc-ops');
+    setPreference('experienceMode', 'network-ops');
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
 
     const { getAllByRole } = render(() => <MemberList />);

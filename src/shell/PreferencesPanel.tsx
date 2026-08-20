@@ -181,7 +181,7 @@ const WIDTH_LABELS: Record<Width, string> = { measured: 'Measured', full: 'Full-
 const EXPERIENCE_MODE_LABELS: Record<ExperienceMode, string> = {
   standard: 'Standard',
   advanced: 'Advanced',
-  'irc-ops': 'Network Ops',
+  'network-ops': 'Network Ops',
 };
 /** Labels avoid "Compact" so they never collide with Message density radios. */
 const REACTION_DENSITY_LABELS: Record<ReactionDensityPref, string> = {

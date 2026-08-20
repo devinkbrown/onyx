@@ -1967,7 +1967,7 @@ describe('AppShell', () => {
       expect(within(screen.getByRole('dialog', { name: 'Menu' })).queryByRole('button', { name: /Room control desk/i })).toBeNull();
       unmount();
 
-      setPreference('experienceMode', 'irc-ops');
+      setPreference('experienceMode', 'network-ops');
       store.setState({ isOper: true });
       render(() => <AppShell />);
       fireEvent.click(screen.getByRole('button', { name: 'Open Menu' }));

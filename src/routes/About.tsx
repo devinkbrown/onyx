@@ -125,8 +125,8 @@ export default function About() {
         <span class="r-eyebrow">01 — the protocol</span>
         <h2 id="protocol-heading" class="r-title">Open wire,<br />bring any client</h2>
         <p class="r-lede">
-          IRCv3 + IRCX over a plain WebSocket. No SDK required. The wire format is
-          documented, interoperable, and open to any tool that speaks the protocol.
+          Open wire over a plain WebSocket — documented, interoperable, and open to any
+          tool that speaks the protocol. No SDK required.
         </p>
 
         <div class="ab-proto-grid">
@@ -138,7 +138,7 @@ export default function About() {
               Pick whatever your client supports — SCRAM is preferred when the server
               offers it. No proprietary handshake, nothing bespoke.
             </p>
-            <span class="tag">sasl · scram-sha-256 · ircv3</span>
+            <span class="tag">sasl · scram-sha-256 · open wire</span>
           </article>
 
           <article class="ab-proto-item">
@@ -150,18 +150,18 @@ export default function About() {
               — hand back <b>SESSION RESUME &lt;token&gt;</b> and you're back in without
               re-authentication, room re-join, or history gaps.
             </p>
-            <span class="tag">session · resume · ircx</span>
+            <span class="tag">session · resume · open wire</span>
           </article>
 
           <article class="ab-proto-item">
             <span class="label">Message history</span>
-            <h3>CHATHISTORY</h3>
+            <h3>Message history</h3>
             <p>
-              Standard IRCv3 CHATHISTORY. Miss a conversation? Ask the server to replay
-              it — by message-id, by time window, or from where you last read.
+              Miss a conversation? Ask the server to replay it — by message-id, by time
+              window, or from where you last read.
               <b>No polling.</b> No side-channel API.
             </p>
-            <span class="tag">chathistory · ircv3 · causal order</span>
+            <span class="tag">history · causal order</span>
           </article>
 
           <article class="ab-proto-item">
@@ -184,7 +184,7 @@ export default function About() {
               <i style={{ background: 'var(--gold)' }} aria-hidden="true" />
               <i style={{ background: 'var(--ok)' }} aria-hidden="true" />
             </span>
-            <span>CAP negotiation — what Onyx Server advertises on connect</span>
+            <span>Capabilities negotiated on connect</span>
           </div>
           <div class="ab-cap-row">
             <span class="key">draft/sasl</span>
@@ -588,7 +588,7 @@ export default function About() {
             <h3>Account creation</h3>
             <p>
               Create an account on the network. Follow with VERIFY to complete
-              registration. Supports the draft/account-registration IRCv3 capability.
+              registration. Supports the draft account-registration capability on the open wire.
             </p>
             <span class="note live">ircv3 draft · account-registration</span>
           </article>
@@ -732,14 +732,14 @@ export default function About() {
             <span class="idx">build a client</span>
             <h3>Any client,<br />any language</h3>
             <p>
-              IRCv3 + IRCX over WebSocket. The protocol is public and interoperable.
+              Open wire over WebSocket. The protocol is public and interoperable.
               You don't need Onyx. Connect with a protocol-compatible tool, a custom
               bot, or a new client you build from scratch.
             </p>
             <p>
               SASL PLAIN gets you in. Add SESSION for persistent reconnect.
-              Add CHATHISTORY for message replay. IRCX PROP and ACCESS give you
-              extended room and user properties. Media is opt-in via
+              Add history replay. PROP and ACCESS give you extended room and user
+              properties. Media is opt-in via
               <b>MEDIA JOIN #room voice</b>.
             </p>
             <div class="code-snip" aria-label="Example connection sequence">
@@ -774,6 +774,7 @@ export default function About() {
               <div><span class="o"># build from source</span></div>
               <div><span class="c">zig build -Doptimize=ReleaseFast</span></div>
               <div><span class="o"># configure onyx-server.toml:</span></div>
+              <div><span class="o"># network fabric (daemon config)</span></div>
               <div><span class="p">[mesh]</span></div>
               <div><span class="h">  peer = "eshmaki.me:7000"</span></div>
               <div><span class="h">  meshpass = "&lt;signed capability&gt;"</span></div>

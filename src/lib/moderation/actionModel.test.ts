@@ -116,7 +116,7 @@ describe('validateModerationAction', () => {
   it('exposes Advanced kick/ban controls and keeps role changes in Network Ops', () => {
     expect(memberModerationKindsForMode('standard')).toEqual([]);
     expect(memberModerationKindsForMode('advanced')).toEqual(['kick', 'ban']);
-    expect(memberModerationKindsForMode('irc-ops')).toEqual([
+    expect(memberModerationKindsForMode('network-ops')).toEqual([
       'kick', 'ban', 'op', 'deop', 'voice', 'devoice',
     ]);
   });

@@ -31,7 +31,7 @@ export const REACTION_DENSITIES = ['full', 'compact', 'counts-only', 'hidden'] a
 export type ReactionDensityPref = (typeof REACTION_DENSITIES)[number];
 
 /** How much operational detail the authenticated client intentionally exposes. */
-export const EXPERIENCE_MODES = ['standard', 'advanced', 'irc-ops'] as const;
+export const EXPERIENCE_MODES = ['standard', 'advanced', 'network-ops'] as const;
 export type ExperienceMode = (typeof EXPERIENCE_MODES)[number];
 
 export const PREFERENCE_CATEGORY_IDS = [
@@ -205,9 +205,11 @@ function preferencesFromRecord(raw: Record<string, unknown>): Preferences {
     reactionDensity: isOneOf(raw.reactionDensity, REACTION_DENSITIES)
       ? raw.reactionDensity
       : DEFAULT_PREFERENCES.reactionDensity,
-    experienceMode: isOneOf(raw.experienceMode, EXPERIENCE_MODES)
-      ? raw.experienceMode
-      : DEFAULT_PREFERENCES.experienceMode,
+    experienceMode: (() => {
+      // Legacy storage id `irc-ops` migrates to `network-ops`.
+      const mode = raw.experienceMode === 'irc-ops' ? 'network-ops' : raw.experienceMode;
+      return isOneOf(mode, EXPERIENCE_MODES) ? mode : DEFAULT_PREFERENCES.experienceMode;
+    })(),
   };
 }
 

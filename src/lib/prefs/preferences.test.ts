@@ -251,7 +251,9 @@ describe('preferences store', () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ experienceMode: 'raw-everything' }));
       expect(loadPreferences().experienceMode).toBe('standard');
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ experienceMode: 'irc-ops' }));
-      expect(loadPreferences().experienceMode).toBe('irc-ops');
+      expect(loadPreferences().experienceMode).toBe('network-ops');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ experienceMode: 'network-ops' }));
+      expect(loadPreferences().experienceMode).toBe('network-ops');
     });
   });
 

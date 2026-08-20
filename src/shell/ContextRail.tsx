@@ -93,10 +93,10 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
           <Show when={experienceMode() !== 'standard'}>
             <>
               <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
-              <Show when={experienceMode() === 'irc-ops' && isOper()}>
+              <Show when={experienceMode() === 'network-ops' && isOper()}>
                 <OperEventConsole />
               </Show>
-              <Show when={experienceMode() === 'irc-ops' && !isOper()}>
+              <Show when={experienceMode() === 'network-ops' && !isOper()}>
                 <p class="shell-context-rail__empty" role="status">Operator tools appear here after this account is granted access.</p>
               </Show>
             </>

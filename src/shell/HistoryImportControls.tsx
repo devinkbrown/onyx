@@ -784,7 +784,7 @@ export function DiscordBotImportControls(): JSX.Element {
         <li>Create an application at <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer noopener">discord.com/developers</a>, then add a <strong>Bot</strong> to it.</li>
         <li><strong>Enable the “MESSAGE CONTENT INTENT” toggle</strong> under Bot → Privileged Gateway Intents. Without it, Discord returns messages with no text.</li>
         <li>Under Bot, <strong>Reset Token</strong> and copy the token.</li>
-        <li>Invite the bot to your server (OAuth2 → URL Generator) with Discord's <strong>View Channels</strong> and <strong>Read Message History</strong> permissions.</li>
+        <li>Invite the bot to your server (OAuth2 → URL Generator) with Discord's channel-view and message-history permissions (Discord labels them <strong>View Channels</strong> and <strong>Read Message History</strong>).</li>
         <li>Paste the token and the numeric Server ID below, then fetch. Categories and roles have no home here and are skipped.</li>
       </ol>
       <div class="pref-vault-actions pref-discord-bot-inputs">

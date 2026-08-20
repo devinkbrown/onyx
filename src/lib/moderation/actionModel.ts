@@ -285,7 +285,7 @@ export function isDangerousBanMask(mask: string): boolean {
 }
 
 export function memberModerationKindsForMode(mode: string): readonly ModerationActionKind[] {
-  if (mode === 'irc-ops') return ['kick', 'ban', 'op', 'deop', 'voice', 'devoice'];
+  if (mode === 'network-ops') return ['kick', 'ban', 'op', 'deop', 'voice', 'devoice'];
   if (mode === 'advanced') return ['kick', 'ban'];
   return [];
 }
