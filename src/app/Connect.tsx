@@ -2,7 +2,7 @@
 /**
  * Connect.tsx — Onyx connect screen (deep-water dark-luxury).
  *
- * The front door to the Onyx Server mesh. A segmented mode switch routes between
+ * The front door to Onyx. A segmented mode switch routes between
  * three auth surfaces, all on the same deep-water atmosphere:
  *
  *   • Guest    — nick only; drifts in anonymously (or with a saved SESSION).
@@ -16,7 +16,7 @@
  *   • GHOST reclaim — when a nick is in use, offer to evict the stale session.
  *   • Session resume — a one-tap "welcome back" when a remembered identity exists.
  *
- * The network is a single mesh, so the client does NOT expose a server picker:
+ * The network is one place, so the client does NOT expose a server picker:
  * it measures latency to each node and attaches to the fastest (nearest) one
  * automatically. Which node is used is never surfaced in the UI.
  *

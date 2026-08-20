@@ -72,7 +72,7 @@ Shell-local surface state (`primarySurface`, `sidebarMode`, mobile bottom nav) a
 | Oper / capability matrix as product chrome | Status / You → Advanced |
 | Sidebar “unread only” + dense filters as primary | Collapsed Filter disclosure |
 | Guest claim **expanded form** in first mobile viewport | Compact chip → sheet |
-| Dual Appearance + Preferences + Account as three ribbon doors | **You** hub (later slice); temporary Workspace group in More |
+| Dual Appearance + Preferences + Account as three ribbon doors | **You** hub (Account rail + More/Menu You entry) |
 
 ### Merge
 

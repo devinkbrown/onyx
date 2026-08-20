@@ -587,7 +587,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const [mobileMembersOpen, setMobileMembersOpen] = createSignal(false);
   const [mobileMoreOpen, setMobileMoreOpen] = createSignal(false);
   const [mobileMoreView, setMobileMoreView] = createSignal<'destinations' | 'room-controls'>('destinations');
-  const [mobileMenuReturnSurface, setMobileMenuReturnSurface] = createSignal<'appearance' | 'preferences' | null>(null);
+  const [mobileMenuReturnSurface, setMobileMenuReturnSurface] = createSignal<'appearance' | 'preferences' | 'you' | null>(null);
   let mobileMembersTarget: string | null = null;
   let mobileRoomControlsTarget: string | null = null;
   let sidebarDrawerRef: HTMLDivElement | undefined;
@@ -918,41 +918,28 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
     });
   }
 
-  function selectMobileMore(destination: 'calls' | 'you' | 'appearance' | 'preferences'): void {
-    if (destination === 'appearance' || destination === 'preferences') {
+  function selectMobileMore(destination: 'calls' | 'you'): void {
+    if (destination === 'you') {
       closeMobileMoreForSurface();
-      if (destination === 'appearance') getState().openAppearance();
-      else openPreferences();
-      // Arm focus return only after the destination is observably open. If it
-      // is armed first, the lifecycle effect can mistake the pre-open state for
-      // an immediate close and discard the return target.
-      setMobileMenuReturnSurface(destination);
+      getState().openAccount();
+      // Arm after open so the lifecycle effect does not treat the pre-open
+      // state as an immediate close.
+      setMobileMenuReturnSurface('you');
       return;
     }
     closeMobileMore();
-    if (destination === 'calls') openCalls();
-    else openYou();
+    openCalls();
   }
 
   function mobileMoreDialogLabel(): string {
     const view = activeView();
     return mobileMoreView() === 'room-controls' && view.kind === 'channel'
       ? `Room controls for ${view.channel}`
-      : 'Workspace menu';
+      : 'Menu';
   }
 
-  // Appearance and Preferences are portaled Sheets. Observe their shared
-  // state rather than relying on one close button so Escape, backdrop clicks,
-  // and nested panel transitions all return focus through the same contract.
-  createEffect(() => {
-    const appearanceOpen = showAppearance();
-    const preferencesOpen = isPreferencesOpen();
-    const returnSurface = mobileMenuReturnSurface();
-    if (!returnSurface) return;
-    if ((returnSurface === 'appearance' && appearanceOpen)
-      || (returnSurface === 'preferences' && preferencesOpen)) return;
+  function restoreMobileMenuTriggerFocus(): void {
     const returnToMobile = isMobile();
-    setMobileMenuReturnSurface(null);
     queueMicrotask(() => {
       const mobileFallback = document.querySelector<HTMLElement>(
         '[data-primary-navigation-variant="mobile"] [aria-label="Open Menu"]',
@@ -968,6 +955,48 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
       const target = returnToMobile ? mobileTarget : desktopFallback;
       target?.focus({ preventScroll: true });
     });
+  }
+
+  // You / Appearance / Preferences are portaled Sheets. Observe their shared
+  // state rather than relying on one close button so Escape, backdrop clicks,
+  // and You-hub handoffs all return focus through the same contract.
+  createEffect(() => {
+    const appearanceOpen = showAppearance();
+    const preferencesOpen = isPreferencesOpen();
+    const youOpen = showAccount();
+    const returnSurface = mobileMenuReturnSurface();
+    if (!returnSurface) return;
+
+    if (returnSurface === 'you') {
+      if (youOpen) return;
+      // Account closes itself, then opens Appearance/Preferences in a sibling
+      // microtask. Defer two ticks so that handoff can land before we treat
+      // the Account close as a Menu-return (a single microtask races and clears
+      // the armed surface while the nested sheet is still opening).
+      const armed = returnSurface;
+      queueMicrotask(() => {
+        queueMicrotask(() => {
+          if (mobileMenuReturnSurface() !== armed) return;
+          if (showAppearance()) {
+            setMobileMenuReturnSurface('appearance');
+            return;
+          }
+          if (isPreferencesOpen()) {
+            setMobileMenuReturnSurface('preferences');
+            return;
+          }
+          if (showAccount()) return;
+          setMobileMenuReturnSurface(null);
+          restoreMobileMenuTriggerFocus();
+        });
+      });
+      return;
+    }
+
+    if ((returnSurface === 'appearance' && appearanceOpen)
+      || (returnSurface === 'preferences' && preferencesOpen)) return;
+    setMobileMenuReturnSurface(null);
+    restoreMobileMenuTriggerFocus();
   });
 
   // The room-controls transition removes the focused launcher. Move focus only
@@ -1389,9 +1418,13 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
           <p class="shell-mobile-more-sheet__group-label">Navigate</p>
           <button type="button" onClick={() => selectMobileMore('calls')}>Calls</button>
           <p class="shell-mobile-more-sheet__group-label">You</p>
-          <button type="button" onClick={() => selectMobileMore('you')}>You</button>
-          <button type="button" onClick={() => selectMobileMore('appearance')}>Appearance</button>
-          <button type="button" onClick={() => selectMobileMore('preferences')}>Preferences</button>
+          <button
+            type="button"
+            aria-label="You — account, appearance, and preferences"
+            onClick={() => selectMobileMore('you')}
+          >
+            You
+          </button>
           <button type="button" onClick={closeMobileMore}>Close</button>
         </Show>
       </div>

@@ -191,7 +191,7 @@ test('keeps the Advanced room control desk reachable at 400% short reflow', asyn
   const moreTrigger = page.getByRole('button', { name: 'Open Menu' });
   await moreTrigger.focus();
   await moreTrigger.click();
-  const more = page.getByRole('dialog', { name: 'Workspace menu' });
+  const more = page.getByRole('dialog', { name: 'Menu' });
   const appearance = more.getByRole('button', { name: 'Appearance' });
   const preferences = more.getByRole('button', { name: 'Preferences' });
   await expect(appearance).toBeVisible();

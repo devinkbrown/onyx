@@ -92,8 +92,8 @@ describe('ConnectPulse node probes', () => {
 
     render(() => <ConnectPulse />);
 
-    expect(await screen.findByRole('link', { name: 'Channel ledger' })).toHaveAttribute('href', '/stats/');
-    expect(screen.getByRole('link', { name: 'Channel ledger for #root' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Room ledger' })).toHaveAttribute('href', '/stats/');
+    expect(screen.getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
       'href',
       '/stats/?room=%23root',
     );
@@ -108,7 +108,7 @@ describe('ConnectPulse node probes', () => {
     );
     expect(screen.getByTestId('pulse-deeplink-ledger')).toHaveAttribute(
       'aria-label',
-      'Channel ledger for #lobby',
+      'Room ledger for #lobby',
     );
   });
 

@@ -32,7 +32,7 @@ type NodePing = { host: string; ms: number };
     nothing to configure — enforced by Connect tests). Nodes show as roles. */
 const NODE_ROLE: Record<string, string> = {
   'eshmaki.me': 'home node',
-  'ircx.us': 'mesh peer',
+  'ircx.us': 'peer node',
 };
 
 async function pingAll(signal?: AbortSignal): Promise<NodePing[]> {
@@ -93,7 +93,7 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
           fallback={
             <p class="cpulse-wire">
               <span class="cpulse-wire-live" aria-hidden="true" />
-              <span class="cpulse-wire-body">the mesh is listening</span>
+              <span class="cpulse-wire-body">the network is listening</span>
             </p>
           }
         >
@@ -101,11 +101,11 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
             <p class="cpulse-wire" aria-live="polite">
               <span class="cpulse-wire-live" aria-hidden="true" />
               <span class="cpulse-wire-body">
-                <b>{data().channels.length}</b> channel{data().channels.length === 1 ? '' : 's'}
+                <b>{data().channels.length}</b> room{data().channels.length === 1 ? '' : 's'}
                 <span class="cpulse-wire-sep">·</span>
                 <b>{totalMessages().toLocaleString('en-US')}</b> messages
                 <span class="cpulse-wire-sep">·</span>
-                <a class="cpulse-wire-ledger" href="/stats/">Channel ledger</a>
+                <a class="cpulse-wire-ledger" href="/stats/">Room ledger</a>
                 <span class="cpulse-wire-sep">·</span>
                 updated {relTime(data().generated_at, nowMs())}
                 <Show when={!data().channels_complete}>
@@ -129,7 +129,7 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
               <a
                 class="cpulse-deeplink-chan"
                 href={statsRoomHref(target())}
-                aria-label={`Channel ledger for ${target()}`}
+                aria-label={`Room ledger for ${target()}`}
                 data-testid="pulse-deeplink-ledger"
               >
                 {target()}
@@ -140,7 +140,7 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
       </Show>
 
       <Show when={rooms().length > 0}>
-        <ul class="cpulse-rooms" role="list" aria-label="Active channels right now">
+        <ul class="cpulse-rooms" role="list" aria-label="Active rooms right now">
           <For each={rooms()}>
             {(room) => (
               <li class="cpulse-room">
@@ -148,7 +148,7 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
                   <a
                     class="cpulse-room-name"
                     href={statsRoomHref(room.channel)}
-                    aria-label={`Channel ledger for ${room.channel}`}
+                    aria-label={`Room ledger for ${room.channel}`}
                     data-testid="pulse-room-ledger"
                   >
                     {room.channel}
@@ -166,7 +166,7 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
         </ul>
       </Show>
 
-      <footer class="cpulse-nodes" aria-label="Mesh nodes">
+      <footer class="cpulse-nodes" aria-label="Network nodes">
         <For each={NODES}>
           {(node) => {
             const ping = createMemo(() => pings.latest?.find((p) => p.host === node.host));
