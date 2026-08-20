@@ -89,7 +89,7 @@ describe('About page — source structure', () => {
     expect(srcContains('import { PublicFrame }')).toBe(true);
     expect(srcContains('currentPath="/about/"')).toBe(true);
     expect(srcContains('mainLabel="About Onyx"')).toBe(true);
-    expect(srcContains('Protocol, media, and mesh')).toBe(true);
+    expect(srcContains('Protocol, media, and network')).toBe(true);
     expect(srcContains('aria-hidden="true">·</span>')).toBe(true);
     expect(srcContains('class="ui-root r ab-ocean"')).toBe(true);
   });
@@ -105,7 +105,7 @@ describe('About page — source structure', () => {
     expect(srcContains('publicMeshFeedLabel')).toBe(true);
     expect(srcContains('aboutFeedDetail')).toBe(true);
     expect(srcContains('data-feed-state={feedState()}')).toBe(true);
-    expect(srcContains('The public mesh report is still being requested.')).toBe(true);
+    expect(srcContains('The public network report is still being requested.')).toBe(true);
     expect(src).not.toMatch(/>mesh online<\/span>/);
   });
 
@@ -170,7 +170,7 @@ describe('About page — source structure', () => {
   });
 
   it('mentions mesh relay as the browser fallback carrier', () => {
-    expect(srcContains('Mesh relay')).toBe(true);
+    expect(srcContains('Network relay')).toBe(true);
   });
 
   it('does not use WebRTC framing in the main website copy', () => {
@@ -193,12 +193,12 @@ describe('About page — source structure', () => {
 
   it('calls out Mooring as the server-to-server secure channel', () => {
     expect(srcContains('Mooring')).toBe(true);
-    expect(srcContains('server-to-server mesh')).toBe(true);
+    expect(srcContains('server-to-server network')).toBe(true);
   });
 
   it('does not present static node addresses as a live mesh observation', () => {
     expect(srcContains('Live mesh nodes')).toBe(false);
-    expect(srcContains('Published mesh entrances')).toBe(true);
+    expect(srcContains('Published network entrances')).toBe(true);
   });
 
   it('includes eshmaki.me node address with port 8080', () => {
@@ -463,7 +463,7 @@ describe('About page — DOM rendering', () => {
     const { cleanup } = renderAbout!();
     expect(document.querySelectorAll('header.public-frame__header')).toHaveLength(1);
     expect(document.querySelector('a[href="/about/"][aria-current="page"]')).not.toBeNull();
-    expect(document.querySelector('.public-frame__context')?.textContent).toMatch(/System\s*·\s*Protocol, media, and mesh/);
+    expect(document.querySelector('.public-frame__context')?.textContent).toMatch(/System\s*·\s*Protocol, media, and network/);
     cleanup();
   });
 

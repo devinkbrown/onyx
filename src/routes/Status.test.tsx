@@ -51,7 +51,7 @@ describe('StatusRoute', () => {
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' });
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');
-    expect(screen.getByRole('heading', { name: /mesh health/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /network health/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /vault backups/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open stats/i })).toHaveAttribute('href', '/stats/');
     expect(screen.getByRole('link', { name: /open roadmap/i })).toHaveAttribute('href', '/roadmap/');
@@ -70,7 +70,7 @@ describe('StatusRoute', () => {
       </Suspense>
     ));
 
-    expect(screen.getByRole('heading', { name: /mesh health/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /network health/i })).toBeInTheDocument();
     expect(screen.queryByTestId('status-suspended')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveAttribute('data-feed-state', 'loading');
     expect(screen.getByRole('status')).toHaveTextContent('checking mesh');

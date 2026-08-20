@@ -649,7 +649,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   when={isConnected()}
                   fallback="Offline: topic changes stay drafted on this device and can be saved after reconnect."
                 >
-                  <Show when={topicLocked()} fallback="Press Save to update the channel topic.">
+                  <Show when={topicLocked()} fallback="Press Save to update the room topic.">
                     Topic-locked (+t): your op rank lets you edit it.
                   </Show>
                 </Show>

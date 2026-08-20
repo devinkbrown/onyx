@@ -71,8 +71,8 @@ export function connectionBanner(input: {
       ) {
         return {
           kind: 'mesh-partition',
-          title: 'Mesh partially connected',
-          detail: `S2S links ${active}/${expected} — some remote rooms may lag.`,
+          title: 'Network partially connected',
+          detail: `Peer links ${active}/${expected} — some remote rooms may lag.`,
           tone: 'warn',
         };
       }

@@ -37,8 +37,8 @@ function feedDetail(state: PublicMeshFeedState): string {
 
 export default function StatusRoute() {
   setPageMeta(
-    'Onyx status — mesh health',
-    'Public Onyx mesh health, node uptime, peer latency, users online, and backup readiness.',
+    'Onyx status — network health',
+    'Public Onyx network health, node uptime, peer latency, users online, and backup readiness.',
     '/status/',
   );
   const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus, { initialValue: null });
@@ -70,7 +70,7 @@ export default function StatusRoute() {
       <div class="ui-root r data-page status-route">
         <section class="r-wrap data-hero status-hero" aria-labelledby="status-heading">
           <p class="r-kicker">network status</p>
-          <h1 id="status-heading">Mesh health,<br /><span class="status-title-accent">in public</span></h1>
+          <h1 id="status-heading">Network health,<br /><span class="status-title-accent">in public</span></h1>
           <p class="sub">
             Node uptime, quorum, peer links, and latency from the exported public
             observation — including when that observation cannot support a health claim.
@@ -123,7 +123,7 @@ export default function StatusRoute() {
 
         <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-        <section class="r-wrap r-section data-grid" aria-label="Mesh detail">
+        <section class="r-wrap r-section data-grid" aria-label="Network detail">
           <article class="data-card">
             <span class="label">quorum observation</span>
             <Show when={status.latest} fallback={<h2>No report available</h2>}>
@@ -132,7 +132,7 @@ export default function StatusRoute() {
                   <h2>{data().mesh.quorum ? 'Majority side' : 'Minority side'}</h2>
                   <p>
                     {data().mesh.partitioned
-                      ? `The report contains ${data().mesh.components} visible components. It does not establish whole-mesh availability.`
+                      ? `The report contains ${data().mesh.components} visible components. It does not establish whole-network availability.`
                       : 'The report contains one component. Freshness and peer completeness still determine whether it supports a current health claim.'}
                   </p>
                 </>

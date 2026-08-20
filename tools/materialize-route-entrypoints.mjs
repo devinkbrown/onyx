@@ -17,13 +17,13 @@ const NOT_FOUND_ENTRYPOINT = {
 export const ROUTE_ENTRYPOINTS = [
   {
     route: 'app',
-    title: 'Open Onyx — chat on the open mesh',
+    title: 'Open Onyx — chat on the open network',
     description: 'Open Onyx in your browser for local-first rooms, honest media security, live network context, and an identity you control.',
   },
   {
     route: 'about',
-    title: 'About Onyx — open protocol, sovereign mesh',
-    description: 'Learn how Onyx, Cadence media, and the open mesh work together without closed-platform lock-in.',
+    title: 'About Onyx — open protocol, sovereign network',
+    description: 'Learn how Onyx, Cadence media, and the open network work together without closed-platform lock-in.',
   },
   {
     route: 'appearance',
@@ -33,12 +33,12 @@ export const ROUTE_ENTRYPOINTS = [
   {
     route: 'stats',
     title: 'Onyx stats — live room activity',
-    description: 'See public Onyx room activity, network message trends, people online, and channel sparklines.',
+    description: 'See public Onyx room activity, network message trends, people online, and room sparklines.',
   },
   {
     route: 'status',
-    title: 'Onyx status — mesh health',
-    description: 'Public Onyx mesh health, node uptime, peer latency, users online, and backup readiness.',
+    title: 'Onyx status — network health',
+    description: 'Public Onyx network health, node uptime, peer latency, users online, and backup readiness.',
   },
   {
     route: 'roadmap',
@@ -74,8 +74,8 @@ export const ROUTE_ENTRYPOINTS = [
   },
   {
     route: 'glossary',
-    title: 'Onyx glossary — names used across the mesh',
-    description: 'A concise guide to Onyx, Onyx Server, Cadence, Mooring, Armor, and the open mesh.',
+    title: 'Onyx glossary — names used across the network',
+    description: 'A concise guide to Onyx, Onyx Server, Cadence, Mooring, Armor, and the open network.',
   },
   {
     route: 'integrations',

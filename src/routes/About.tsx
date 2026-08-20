@@ -25,15 +25,15 @@ import { setPageMeta } from './pageMeta';
  *   docs/architecture/00-overview.md
  */
 function aboutFeedDetail(state: PublicMeshFeedState): string {
-  if (state === 'loading') return 'The public mesh report is still being requested.';
-  if (state === 'current') return 'A current public mesh observation is available.';
+  if (state === 'loading') return 'The public network report is still being requested.';
+  if (state === 'current') return 'A current public network observation is available.';
   return 'This report state does not establish current network availability.';
 }
 
 export default function About() {
   setPageMeta(
-    'About Onyx — open protocol, sovereign mesh',
-    'Learn how Onyx, Cadence media, and the open mesh work together without closed-platform lock-in.',
+    'About Onyx — open protocol, sovereign network',
+    'Learn how Onyx, Cadence media, and the open network work together without closed-platform lock-in.',
     '/about/',
   );
   const [status, { refetch }] = createResource(fetchNetworkStatus, { initialValue: null });
@@ -54,7 +54,7 @@ export default function About() {
         <p class="public-frame__current-line">
           <span class="public-frame__current-kicker">System</span>
           <span aria-hidden="true">·</span>
-          <span class="public-frame__current-label">Protocol, media, and mesh</span>
+          <span class="public-frame__current-label">Protocol, media, and network</span>
         </p>
       )}
     >
@@ -111,7 +111,7 @@ export default function About() {
           <a href="#protocol">Protocol</a>
           <a href="#media">Media</a>
           <a href="#e2ee">Encryption</a>
-          <a href="#mesh">Mesh</a>
+          <a href="#mesh">Network</a>
           <a href="#services">Services</a>
           <a href="#developer">Build</a>
           <a href="#accessibility">Accessibility</a>
@@ -314,7 +314,7 @@ export default function About() {
 
           <article class="ab-transport secondary" role="listitem">
             <span class="t-label">Fallback carrier</span>
-            <h4>Mesh relay<br />over WebSocket</h4>
+            <h4>Network relay<br />over WebSocket</h4>
             <p>
               Where QUIC is not available, the browser keeps the same Cadence
               frames moving over the WebSocket relay path. Same bytes, same codec,
@@ -341,7 +341,7 @@ export default function About() {
         <span class="r-eyebrow">03 — end-to-end encryption</span>
         <h2 id="e2ee-heading" class="r-title">Client-held keys.<br />Truthful state.</h2>
         <p class="r-lede">
-          Armor protects client connections. Mooring protects server-to-server mesh
+          Armor protects client connections. Mooring protects server-to-server network
           links. A separate client-held group key protects media end to end—and the
           padlock appears only after that group converges.
         </p>
@@ -440,10 +440,10 @@ export default function About() {
 
       {/* ── 4. The mesh ── */}
       <section id="mesh" class="r-wrap ab-section" aria-labelledby="mesh-heading">
-        <span class="r-eyebrow">04 — the mesh</span>
+        <span class="r-eyebrow">04 — the network</span>
         <h2 id="mesh-heading" class="r-title">A network that<br />heals itself</h2>
         <p class="r-lede">
-          A self-healing server mesh that keeps the network convergent across however
+          A self-healing server fabric that keeps the network convergent across however
           many nodes, with no single point of failure.
         </p>
 
@@ -453,7 +453,7 @@ export default function About() {
             class="ab-mesh-vis"
             viewBox="0 0 600 360"
             role="img"
-            aria-label="Mesh diagram: eshmaki.me and ircx.us joined by azure current links; either node reaches the whole network"
+            aria-label="Network diagram: eshmaki.me and ircx.us joined by azure current links; either node reaches the whole network"
           >
             {/* Currents */}
             <g fill="none" stroke="var(--lapis)" stroke-width="1.3">
@@ -510,7 +510,7 @@ export default function About() {
               relay cannot forge it.
             </p>
 
-            <div class="ab-node-row" aria-label="Published mesh entrances">
+            <div class="ab-node-row" aria-label="Published network entrances">
               <div class="ab-node esh">
                 <span class="dot" aria-hidden="true" />
                 <span class="meta">
@@ -530,7 +530,7 @@ export default function About() {
         </div>
 
         {/* Mesh tech detail */}
-        <div class="ab-crdt-row" role="list" aria-label="Mesh technology details">
+        <div class="ab-crdt-row" role="list" aria-label="Network technology details">
           <article class="ab-crdt-item" role="listitem">
             <span class="k">δ-CRDTs</span>
             <span class="v">

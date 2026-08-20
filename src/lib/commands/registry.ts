@@ -204,14 +204,14 @@ export type SlashCommand = {
 
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: 'me', usage: '/me <action>', description: 'Send an action message.', kind: 'irc' },
-  { name: 'topic', usage: '/topic <text>', description: 'Set or view the channel topic.', kind: 'irc' },
+  { name: 'topic', usage: '/topic <text>', description: 'Set or view the room topic.', kind: 'irc' },
   { name: 'nick', usage: '/nick <nick>', description: 'Change your nick.', kind: 'irc' },
-  { name: 'join', usage: '/join #channel', description: 'Join a channel.', kind: 'irc', aliases: ['j'] },
-  { name: 'part', usage: '/part [#channel]', description: 'Leave the current or named channel.', kind: 'irc', aliases: ['leave'] },
+  { name: 'join', usage: '/join #room', description: 'Join a room.', kind: 'irc', aliases: ['j'] },
+  { name: 'part', usage: '/part [#room]', description: 'Leave the current or named room.', kind: 'irc', aliases: ['leave'] },
   { name: 'msg', usage: '/msg <nick> <text>', description: 'Send a private message.', kind: 'irc', aliases: ['query'] },
-  { name: 'whois', usage: '/whois <nick>', description: 'Request user information.', kind: 'irc' },
-  { name: 'invite', usage: '/invite <nick>', description: 'Invite someone into the channel.', kind: 'irc' },
-  { name: 'event', usage: '/event <YYYY-MM-DDThh:mmZ> <title>', description: 'Schedule a channel event (ops); /event clear to remove.', kind: 'irc' },
+  { name: 'whois', usage: '/whois <nick>', description: 'Request profile details.', kind: 'irc' },
+  { name: 'invite', usage: '/invite <nick>', description: 'Invite someone into the room.', kind: 'irc' },
+  { name: 'event', usage: '/event <YYYY-MM-DDThh:mmZ> <title>', description: 'Schedule a room event (ops); /event clear to remove.', kind: 'irc' },
   { name: 'webhook', usage: '/webhook <create|list|delete> ...', description: 'Manage Discord-compatible incoming webhooks (ops).', kind: 'irc' },
   // Platform expansion (Era 3 wave)
   { name: 'notice', usage: '/notice <target> <text>', description: 'Send a notice (no auto-reply expectation).', kind: 'irc' },

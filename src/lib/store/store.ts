@@ -3177,10 +3177,10 @@ function _humanizeMeshSendFail(command: string, code: string, description?: stri
   const desc = (description || '').trim();
   if (code === 'TEMPORARILY_UNAVAILABLE' && _isMessagingCommand(command)) {
     if (/mesh durable admit failed/i.test(desc) || /could not durably admit/i.test(desc)) {
-      return desc || 'Mesh is busy or peers are down — message was not sent. Retry in a moment.';
+      return desc || 'The network is busy or peers are down — message was not sent. Retry in a moment.';
     }
     if (/mesh authority rejected/i.test(desc) || /authority rejected/i.test(desc)) {
-      return desc || 'Mesh rejected the message — it was not delivered.';
+      return desc || 'The network rejected the message — it was not delivered.';
     }
     if (desc) return desc;
     return 'Server temporarily unavailable — message not sent. Retry shortly.';
