@@ -830,13 +830,13 @@ describe('VoiceBar', () => {
         expect(cascade.getAttribute('data-sfu-cascade-mode')).toBe('local');
       });
       expect(cascade.textContent?.toLowerCase()).toContain('local sfu');
-      expect(cascade.textContent?.toLowerCase()).toContain('this mesh node');
+      expect(cascade.textContent?.toLowerCase()).toContain('this network node');
     } finally {
       setMountedCadenceMediaEngine(null);
     }
   });
 
-  it('surfaces mesh cascade hops from room STATS advertisement', async () => {
+  it('surfaces network relay hops from room STATS advertisement', async () => {
     const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
     setMountedCadenceMediaEngine({
       getLocalMediaE2eeFingerprint: vi.fn().mockResolvedValue(''),
@@ -869,7 +869,7 @@ describe('VoiceBar', () => {
       fireEvent.click(getByTestId('call-security-chip'));
       const cascade = await screen.findByTestId('call-privacy-sfu-cascade');
       expect(cascade.getAttribute('data-sfu-cascade-mode')).toBe('cascade');
-      expect(cascade.textContent?.toLowerCase()).toContain('mesh cascade');
+      expect(cascade.textContent?.toLowerCase()).toContain('network relay');
     } finally {
       setMountedCadenceMediaEngine(null);
     }

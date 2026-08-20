@@ -148,7 +148,7 @@ export default function About() {
               After authentication, request <b>SESSION TOKEN</b>. The server mints
               a token for your session. On reconnect — even from a different network
               — hand back <b>SESSION RESUME &lt;token&gt;</b> and you're back in without
-              re-authentication, channel-re-join, or history gaps.
+              re-authentication, room re-join, or history gaps.
             </p>
             <span class="tag">session · resume · ircx</span>
           </article>
@@ -169,8 +169,8 @@ export default function About() {
             <h3>Modes as real state</h3>
             <p>
               +q owner, +o operator, +v voice — these aren't cosmetic badges. They're
-              channel state: <b>the server enforces them</b>, they survive reconnects, and
-              IRCX ACCESS lets fine-grained overrides live on the channel itself.
+              room state: <b>the server enforces them</b>, they survive reconnects, and
+              IRCX ACCESS lets fine-grained overrides live on the room itself.
               Your permissions are yours, on every client that speaks the protocol.
             </p>
             <span class="tag">modes · ircx access · roles</span>
@@ -308,7 +308,7 @@ export default function About() {
             <p>
               The preferred transport path. Datagram-eligible, head-of-line-blocking
               free, lower latency than TCP. Opaque media frames ride the network path,
-              so a lost media packet never stalls channel state.
+              so a lost media packet never stalls room state.
             </p>
           </article>
 
@@ -578,7 +578,7 @@ export default function About() {
 
         <div class="ab-nobot" role="note">
           "Results arrive as standard replies — <b>NOTE</b>, <b>FAIL</b>, <b>WARN</b> —
-          not NOTICE text from a fake user. There is no bot sitting in the channel
+          not NOTICE text from a fake user. There is no bot sitting in the room
           pretending to be a person."
         </div>
 
@@ -616,9 +616,9 @@ export default function About() {
 
           <article class="ab-svc">
             <span class="cmd">CHANNEL</span>
-            <h3>Channel registration</h3>
+              <h3>Room registration</h3>
             <p>
-              Register a channel to your account so ownership and access lists persist
+              Register a room to your account so ownership and access lists persist
               even when nobody's home. Ownership survives server restarts.
             </p>
             <span class="note">persistent ownership</span>

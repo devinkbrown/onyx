@@ -14426,7 +14426,7 @@ export const store = createStore<OnyxState>()(
         case '474': { // ERR_BANNEDFROMCHAN
           const channel474 = params[1] ?? '';
           get().addNotification({ type: 'error', text: `You are banned from ${channel474}` });
-          get().setChannelJoinPrompt(channel474, 'You are banned from this channel');
+          get().setChannelJoinPrompt(channel474, 'You are banned from this room');
           break;
         }
 

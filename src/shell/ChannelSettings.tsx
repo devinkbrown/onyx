@@ -117,7 +117,7 @@ const HISTORY_POLICIES: ReadonlyArray<{ value: HistoryPolicy; label: string; hin
   {
     value: 'public',
     label: 'Public',
-    hint: 'Anyone who can open CHATHISTORY may read this room’s history (server default).',
+    hint: 'Anyone who can request room history may read this room’s history (server default).',
   },
   {
     value: 'members',
@@ -1037,7 +1037,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   <p class="shell-chset-hint" data-testid="chset-access-empty">
                     {accessLoading()
                       ? 'Loading access entries…'
-                      : 'No ACCESS entries yet. Add a nick or hostmask below.'}
+                      : 'No access entries yet. Add a nick or hostmask below.'}
                   </p>
                 }
               >

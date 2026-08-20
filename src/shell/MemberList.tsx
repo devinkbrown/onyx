@@ -152,7 +152,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     getState().addToast({
       variant: 'info',
       title: `Mention ${local.user.nick}`,
-      description: 'Inserted into the composer for this channel.',
+      description: 'Inserted into the composer for this room.',
     });
     queueMicrotask(() => {
       document.querySelector<HTMLElement>('[data-composer-input]')?.focus();

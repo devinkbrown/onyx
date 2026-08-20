@@ -1112,7 +1112,7 @@ describe('WatchTogetherActivity accessibility', () => {
 
     expect(publishWatchTogether).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Could not join the activity because the active channel changed',
+      'Could not join the activity because the active room changed',
     );
   });
 

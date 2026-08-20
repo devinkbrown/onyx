@@ -632,7 +632,7 @@ describe('AppShell', () => {
 
       const digest = screen.getByRole('region', { name: 'Since you left' });
       expect(within(digest).getByText('Since you left')).toBeInTheDocument();
-      expect(within(digest).getByText('2 messages across 1 channel · 1 mention')).toBeInTheDocument();
+      expect(within(digest).getByText('2 messages across 1 room · 1 mention')).toBeInTheDocument();
       expect(within(digest).getByText('Read from here: bob and carol added 2 lines.')).toBeInTheDocument();
       expect(within(digest).getByText('bob')).toBeInTheDocument();
       expect(within(digest).getByText('carol')).toBeInTheDocument();
@@ -786,7 +786,7 @@ describe('AppShell', () => {
       render(() => <AppShell />);
 
       const digest = screen.getByRole('region', { name: 'Since you left' });
-      expect(within(digest).getByText('1 message across 1 channel')).toBeInTheDocument();
+      expect(within(digest).getByText('1 message across 1 room')).toBeInTheDocument();
       fireEvent.click(within(digest).getByRole('button', { name: 'Review new messages' }));
       await waitFor(() => {
         expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
@@ -2816,7 +2816,7 @@ describe('AppShell', () => {
       render(() => <AppShell />);
 
       const rhythm = await screen.findByLabelText('Room rhythm');
-      const directory = screen.getByRole('list', { name: 'Active channel directory' });
+      const directory = screen.getByRole('list', { name: 'Active room directory' });
       expect(within(directory).getAllByRole('listitem')).toHaveLength(2);
       expect(within(rhythm).getByText('#general')).toBeInTheDocument();
       expect(within(rhythm).getByText('3 people here now')).toBeInTheDocument();

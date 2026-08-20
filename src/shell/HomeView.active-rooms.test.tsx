@@ -130,7 +130,7 @@ describe('HomeView — Active rooms open-or-join', () => {
 
     render(() => <HomeView />);
 
-    const directory = await screen.findByRole('list', { name: 'Active channel directory' });
+    const directory = await screen.findByRole('list', { name: 'Active room directory' });
     expect(directory).toHaveTextContent('7 people here now');
     expect(directory).toHaveTextContent('908 messages tracked');
     expect(directory).not.toHaveTextContent('16 chatting');

@@ -73,7 +73,7 @@ export function SessionsDevicesSection(props: SessionsDevicesSectionProps): JSX.
               Sessions &amp; devices
             </h3>
             <p class="acct-section-hint" id="acct-sessions-hint">
-              Where <strong>{account()}</strong> is signed in across the mesh.
+              Where <strong>{account()}</strong> is signed in across the network.
               Revoke another connection here; manage passkeys in the section below.
             </p>
           </div>

@@ -144,7 +144,7 @@ describe('HomeView — commercial public hierarchy', () => {
     expect(within(needs).getByRole('heading', { name: 'Needs you' })).toBeInTheDocument();
     expect(within(needs).queryByRole('heading', { name: 'Needs you', level: 4 })).not.toBeInTheDocument();
     expect(within(needs).getByRole('group', { name: 'Mentions and direct messages' })).toBeInTheDocument();
-    expect(within(cont).getByRole('group', { name: 'Followed channels' })).toBeInTheDocument();
+    expect(within(cont).getByRole('group', { name: 'Followed rooms' })).toBeInTheDocument();
     expect(within(cont).getByRole('region', { name: 'Resume where you left off' })).toBeInTheDocument();
   });
 

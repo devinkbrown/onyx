@@ -155,7 +155,7 @@ export function digestHeadline(d: SinceDigest): string {
   }
 
   const messageSummary = `${d.totalMessages} ${pluralize(d.totalMessages, 'message')}`;
-  const channelSummary = `${d.activeChannels} ${pluralize(d.activeChannels, 'channel')}`;
+  const channelSummary = `${d.activeChannels} ${pluralize(d.activeChannels, 'room')}`;
 
   if (d.totalMentions === 0) {
     return `${messageSummary} across ${channelSummary}`;

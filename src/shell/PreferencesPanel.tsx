@@ -2098,7 +2098,7 @@ function DiscardLocalDraftsControls(): JSX.Element {
         </span>
       </div>
       <p class="pref-desc">
-        Discard unsent room composer drafts and channel-topic drafts stored on this device. This
+        Discard unsent room composer drafts and room-topic drafts stored on this device. This
         does not change messages, vault history, queued sends, reviewed anchors, topic read
         positions, saved searches, followed topics, or sign-in data.
       </p>

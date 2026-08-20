@@ -38,7 +38,7 @@ export type CatchUpSummaryProps = {
 };
 
 function rowAriaLabel(row: CatchUpRow, relative: string): string {
-  const kind = row.kind === 'dm' ? 'direct messages from' : 'channel';
+  const kind = row.kind === 'dm' ? 'direct messages from' : 'room';
   const unread = `${row.unread} unread ${row.unread === 1 ? 'message' : 'messages'}`;
   const mentions = row.highlights > 0 ? `, ${row.highlights} mentioning you` : '';
   const when = relative ? `, last active ${relative}` : '';

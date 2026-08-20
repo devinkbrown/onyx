@@ -129,7 +129,7 @@ export function sfuCascadeView(input: SfuCascadeViewInput): SfuCascadeView {
     return {
       mode: 'cascade',
       hops: forwarders + 1,
-      label: `Mesh cascade · ${forwarders + 1} hops`,
+      label: `Network relay · ${forwarders + 1} hops`,
       detail: `Relayed through ${forwarders} remote SFU forwarder(s).`,
     };
   }
@@ -138,7 +138,7 @@ export function sfuCascadeView(input: SfuCascadeViewInput): SfuCascadeView {
       mode: 'local',
       hops: 1,
       label: 'Local SFU',
-      detail: 'All media stays on this mesh node.',
+      detail: 'All media stays on this network node.',
     };
   }
   return {

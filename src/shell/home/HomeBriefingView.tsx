@@ -691,7 +691,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                       class="home-catchup-tier home-catchup-tier--followed"
                       data-home-stratum="followed"
                       role="group"
-                      aria-label="Followed channels"
+                      aria-label="Followed rooms"
                     >
                       <h3 class="home-catchup-tier-label">Followed</h3>
                       <ul class="home-catchup-list">
@@ -801,9 +801,9 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
           </div>
 
           <Show when={props.briefing().directory.length > 0}>
-            <div class="home-directory" aria-label="Active channels">
+            <div class="home-directory" aria-label="Active rooms">
               <p class="home-explore-kicker">Active rooms</p>
-              <div class="home-grid" role="list" aria-label="Active channel directory">
+              <div class="home-grid" role="list" aria-label="Active room directory">
                 <For each={props.briefing().directory}>
                   {(channel) => (
                     <DirectoryCard

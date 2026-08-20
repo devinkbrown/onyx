@@ -143,16 +143,16 @@ describe('digestHeadline', () => {
   });
 
   it('omits the mentions clause when there are no mentions', () => {
-    expect(digestHeadline(digestWithTotals(1, 0, 1))).toBe('1 message across 1 channel');
-    expect(digestHeadline(digestWithTotals(2, 0, 3))).toBe('2 messages across 3 channels');
+    expect(digestHeadline(digestWithTotals(1, 0, 1))).toBe('1 message across 1 room');
+    expect(digestHeadline(digestWithTotals(2, 0, 3))).toBe('2 messages across 3 rooms');
   });
 
   it('pluralizes messages, channels, and mentions', () => {
     expect(digestHeadline(digestWithTotals(1, 1, 1))).toBe(
-      '1 message across 1 channel · 1 mention',
+      '1 message across 1 room · 1 mention',
     );
     expect(digestHeadline(digestWithTotals(42, 3, 5))).toBe(
-      '42 messages across 5 channels · 3 mentions',
+      '42 messages across 5 rooms · 3 mentions',
     );
   });
 });

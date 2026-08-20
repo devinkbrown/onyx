@@ -1376,7 +1376,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         />
 
         <label for="shell-composer-input" class="sr-only">
-          <Show when={target()} fallback="Message input (no active channel)">
+          <Show when={target()} fallback="Message input (no active room)">
             {(t) => `Message ${t()}`}
           </Show>
         </label>

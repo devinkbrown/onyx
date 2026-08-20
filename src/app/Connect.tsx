@@ -191,7 +191,7 @@ export function validateNick(value: string): string | undefined {
   if (!v) return 'Nick is required.';
   if (v.length > 64) return 'Nick must be 64 characters or fewer.';
   if (!/^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/.test(v)) {
-    return 'Nick must start with a letter or IRC special char and contain only letters, numbers, or -[]\\`_^{|}.';
+    return 'Nick must start with a letter or allowed special character and contain only letters, numbers, or -[]\\`_^{|}.';
   }
   return undefined;
 }
@@ -557,7 +557,7 @@ export function Connect(props: ConnectProps): JSX.Element {
     }
     switch (formPhase()) {
       case 'connecting':
-        return 'Opening an encrypted channel…';
+        return 'Opening a secure connection…';
       case 'error':
         if (registeredNickNeedsSignIn()) {
           return 'That name belongs to an account. Sign in to use it; Onyx will not connect it as a guest.';
@@ -1421,7 +1421,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                 <form
                   onSubmit={handleSubmit}
                   noValidate
-                  aria-label="IRC connection form"
+                  aria-label="Connect form"
                 >
                   <div class="conn-fields">
                     <FormField
@@ -1675,7 +1675,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                     <div class="conn-auth-required" role="alert" data-testid="conn-auth-required">
                       <div>
                         <strong>This nick is protected</strong>
-                        <span>Authenticate before Onyx can present it on IRC.</span>
+                        <span>Authenticate before Onyx can use it on the network.</span>
                       </div>
                       <button type="button" onClick={() => switchMode('signin')}>
                         Sign in as {nickTrimmed() || 'this account'}
