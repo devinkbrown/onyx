@@ -512,7 +512,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   );
 
   return (
-    <header class="shell-ribbon" role="banner" aria-label="Channel information">
+    <header class="shell-ribbon" role="banner" aria-label="Room information">
       {/* Inner row shares the conversation reading measure so the title and
           place strip stay aligned to the conversation column chrome. */}
       <div class="shell-ribbon-inner">
@@ -810,7 +810,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       type="button"
                       class="shell-ribbon-more-item"
                       role="menuitem"
-                      aria-label={`Channel settings for ${settingsChannel()}`}
+                      aria-label={`Room settings for ${settingsChannel()}`}
                       aria-haspopup="dialog"
                       data-testid="ribbon-settings-gear"
                       onClick={() => closeMoreThen(() => setSettingsOpen(true))}
@@ -821,7 +821,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                         <circle cx="12" cy="12" r="3" />
                         <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7.1 4l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1Z" />
                       </svg>
-                      <span>Channel settings</span>
+                      <span>Room settings</span>
                     </button>
                     <a
                       class="shell-ribbon-more-item"

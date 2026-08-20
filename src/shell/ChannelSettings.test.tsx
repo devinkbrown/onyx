@@ -479,7 +479,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     renderPanel();
 
     expect(sendRaw).toHaveBeenCalledWith('ACCESS', '#general', 'LIST');
-    const list = screen.getByRole('list', { name: 'Channel access entries' });
+    const list = screen.getByRole('list', { name: 'Room access entries' });
     expect(list).toBeInTheDocument();
     expect(list).toHaveTextContent('bob!*@*');
     expect(list).toHaveTextContent('*!*@spam.example');
@@ -569,7 +569,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
       ]),
     });
 
-    const list = screen.getByRole('list', { name: 'Channel access entries' });
+    const list = screen.getByRole('list', { name: 'Room access entries' });
     expect(list).toHaveTextContent('dana!*@*');
     expect(list).toHaveTextContent('Owner');
   });

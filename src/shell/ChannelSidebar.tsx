@@ -566,7 +566,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   }
 
   return (
-    <aside class="shell-sidebar" aria-label="Channel navigation">
+    <aside class="shell-sidebar" aria-label="Room navigation">
       {/* Header */}
       <div class="shell-sidebar-head" aria-hidden="false">
         <span class="shell-sidebar-network">

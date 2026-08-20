@@ -221,7 +221,7 @@ const VAULT_AGE_LABELS: Record<VaultAgeOption, string> = {
 
 const PREFERENCE_CATEGORIES = [
   { id: 'display', label: 'Display', summary: 'Reading and rhythm' },
-  { id: 'conversation', label: 'Conversation', summary: 'Channel surfaces' },
+  { id: 'conversation', label: 'Conversation', summary: 'Room surfaces' },
   { id: 'history', label: 'History & data', summary: 'Local vault' },
   { id: 'transfer', label: 'Import & export', summary: 'Move conversation data' },
   { id: 'tools', label: 'App & tools', summary: 'Install and extensions' },
@@ -262,7 +262,7 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Keyboard send/edit paths and visible focus.',
   },
   {
-    surface: 'Channel settings',
+    surface: 'Room settings',
     status: 'checked',
     note: 'Labelled Sheet, topic form, switch-mode flags, read-only non-op fallbacks.',
   },
@@ -279,7 +279,7 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Home catch-up',
     status: 'checked',
-    note: 'Catch-up recaps, reviewed ranges, and channel directory cards expose list semantics and labelled actions.',
+    note: 'Catch-up recaps, reviewed ranges, and room directory cards expose list semantics and labelled actions.',
   },
   {
     surface: 'Message search',
@@ -292,9 +292,9 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Named inbox dialog, labelled notification list, and row-specific open/dismiss actions.',
   },
   {
-    surface: 'Channel browser',
+    surface: 'Room browser',
     status: 'checked',
-    note: 'Sheet dialog, named directory search, labelled public-channel list, and target-specific Join/Open actions.',
+    note: 'Sheet dialog, named directory search, labelled public-room list, and target-specific Join/Open actions.',
   },
   {
     surface: 'Account panel',
@@ -302,9 +302,9 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Named account-management regions, alert/status feedback, and target-specific persona actions.',
   },
   {
-    surface: 'Channel sidebar',
+    surface: 'Room sidebar',
     status: 'checked',
-    note: 'Complementary navigation landmark, roving channel/DM rows, unread/mention names, and target-specific join action.',
+    note: 'Complementary navigation landmark, roving room/DM rows, unread/mention names, and target-specific join action.',
   },
   {
     surface: 'Keyboard shortcuts',
@@ -319,7 +319,7 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Pinned messages',
     status: 'checked',
-    note: 'Named pins dialog, channel-specific pins list, target-specific jump buttons, and real unpin controls.',
+    note: 'Named pins dialog, room-specific pins list, target-specific jump buttons, and real unpin controls.',
   },
   {
     surface: 'Theme import',
@@ -349,7 +349,7 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Member list',
     status: 'checked',
-    note: 'Channel-scoped member landmark, labelled role groups, named detail dialogs, target-specific member actions, decorative avatars, and focus retention across MODE/PART.',
+    note: 'Room-scoped member landmark, labelled role groups, named detail dialogs, target-specific member actions, decorative avatars, and focus retention across MODE/PART.',
   },
   {
     surface: 'Notification controls',
@@ -359,7 +359,7 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Time scrubber',
     status: 'checked',
-    note: 'Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.',
+    note: 'Room-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.',
   },
   {
     surface: 'Jump to date',

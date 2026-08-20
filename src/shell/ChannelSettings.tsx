@@ -601,10 +601,10 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   return (
     <Sheet
       open={local.open}
-      title="Channel settings"
+      title="Room settings"
       description={channel()?.name ?? local.channel}
       onOpenChange={local.onOpenChange}
-      closeLabel="Close channel settings"
+      closeLabel="Close room settings"
       data-testid="channel-settings"
     >
       <div class="shell-chset">
@@ -902,7 +902,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             }
           >
             {/* Flag toggles */}
-            <ul class="shell-chset-flags" role="group" aria-label="Channel mode flags">
+            <ul class="shell-chset-flags" role="group" aria-label="Room mode flags">
               <For each={FLAG_TOGGLES}>
                 {(flag) => {
                   const on = createMemo(() => modeState().flags.has(flag.letter));
@@ -1042,7 +1042,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   </p>
                 }
               >
-                <ul class="shell-chset-access-list" aria-label="Channel access entries">
+                <ul class="shell-chset-access-list" aria-label="Room access entries">
                   <For each={accessEntries()}>
                     {(entry) => (
                       <li class="shell-chset-access-row">

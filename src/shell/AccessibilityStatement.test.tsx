@@ -15,15 +15,15 @@ describe('AccessibilityStatement', () => {
     expect(screen.getByRole('heading', { level: 4, name: 'Standard' })).toBeInTheDocument();
     expect(document.querySelector('h1')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Current client audit' })).toBeInTheDocument();
-    expect(screen.getByText(/Channel settings uses a labelled Sheet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Room settings uses a labelled Sheet/i)).toBeInTheDocument();
     expect(screen.getByText(/Voice controls use a toolbar/i)).toBeInTheDocument();
     expect(screen.getByText(/Appearance uses radio groups/i)).toBeInTheDocument();
     expect(screen.getByText(/Home catch-up exposes recaps/i)).toBeInTheDocument();
     expect(screen.getByText(/Message search uses a search landmark/i)).toBeInTheDocument();
     expect(screen.getByText(/Notification center uses a named inbox dialog/i)).toBeInTheDocument();
-    expect(screen.getByText(/Channel browser uses a Sheet dialog/i)).toBeInTheDocument();
+    expect(screen.getByText(/Room browser uses a Sheet dialog/i)).toBeInTheDocument();
     expect(screen.getByText(/Account panel groups account management/i)).toBeInTheDocument();
-    expect(screen.getByText(/Channel sidebar uses a complementary navigation landmark/i)).toBeInTheDocument();
+    expect(screen.getByText(/Room sidebar uses a complementary navigation landmark/i)).toBeInTheDocument();
     expect(screen.getByText(/Keyboard shortcuts uses a named Sheet dialog/i)).toBeInTheDocument();
     expect(screen.getByText(/Command palette uses a named dialog/i)).toBeInTheDocument();
     expect(screen.getByText(/Pinned messages uses a named Sheet dialog/i)).toBeInTheDocument();

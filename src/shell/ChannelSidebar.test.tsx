@@ -122,7 +122,7 @@ describe('ChannelSidebar accessibility', () => {
     const { getByRole } = render(() => <ChannelSidebar />);
 
     // Assert
-    expect(getByRole('complementary', { name: 'Channel navigation' })).toBeDefined();
+    expect(getByRole('complementary', { name: 'Room navigation' })).toBeDefined();
   });
 
   it('keeps the retired IRCXNet wire label out of the public sidebar', () => {

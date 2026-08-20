@@ -63,7 +63,7 @@ function seedChannel(opts: { ourNick: string; users: ChannelUser[]; modes?: stri
     ourNick: opts.ourNick,
     server: {
       id: 'channel-settings',
-      name: 'Channel settings test',
+      name: 'Room settings test',
       network: 'channel-settings',
       url: MEMORY_OWNER.serverUrl,
       icon: 'C',
@@ -273,9 +273,9 @@ describe('ChannelSettings panel', () => {
     openSettings();
 
     // Assert — both sections render; op sees mode toggles
-    expect(screen.getByRole('dialog', { name: 'Channel settings' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Room settings' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Topic' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Channel mode flags' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Room mode flags' })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Moderated/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Encryption' })).toBeInTheDocument();
@@ -289,7 +289,7 @@ describe('ChannelSettings panel', () => {
     openSettings();
 
     // Assert — no toggle group; read-only notice present
-    expect(screen.queryByRole('group', { name: 'Channel mode flags' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Room mode flags' })).toBeNull();
     expect(screen.getByText('Only ops can change channel modes.')).toBeInTheDocument();
   });
 

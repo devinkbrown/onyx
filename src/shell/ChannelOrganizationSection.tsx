@@ -61,7 +61,7 @@ export function ChannelOrganizationSection(props: ChannelOrganizationSectionProp
       >
         <div class="acct-section-head">
           <h3 class="acct-section-title" id="acct-org-title">
-            Channel folders
+            Room folders
           </h3>
           <p class="acct-section-hint" id="acct-org-hint">
             Local folders for the sidebar (this device). Star rooms in the sidebar for
@@ -108,7 +108,7 @@ export function ChannelOrganizationSection(props: ChannelOrganizationSectionProp
               value={assignTarget()}
               onChange={(e) => setAssignTarget(e.currentTarget.value)}
             >
-              <option value="">Channel…</option>
+              <option value="">Room…</option>
               <For each={channelNames()}>
                 {(name) => <option value={name}>{name}</option>}
               </For>
@@ -122,13 +122,13 @@ export function ChannelOrganizationSection(props: ChannelOrganizationSectionProp
             when={customFolders().length > 0}
             fallback={<p class="acct-section-hint">No custom folders yet — create one above.</p>}
           >
-            <ul class="acct-cert-list" aria-label="Channel folders">
+            <ul class="acct-cert-list" aria-label="Room folders">
               <For each={customFolders()}>
                 {(cat) => (
                   <li class="acct-cert-item" data-testid="org-folder-row">
                     <strong>{cat.name}</strong>
                     {' '}
-                    <span class="acct-persona-src">{cat.channels.length} channel(s)</span>
+                    <span class="acct-persona-src">{cat.channels.length} room(s)</span>
                     <Show when={cat.channels.length > 0}>
                       <ul>
                         <For each={cat.channels}>

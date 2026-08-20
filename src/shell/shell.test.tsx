@@ -186,7 +186,7 @@ describe('AppShell', () => {
       const { getByRole } = render(() => <AppShell />);
 
       // Assert — sidebar should list the channel name
-      const nav = getByRole('complementary', { name: 'Channel navigation' });
+      const nav = getByRole('complementary', { name: 'Room navigation' });
       expect(nav.textContent).toContain('general');
     });
 
@@ -1266,7 +1266,7 @@ describe('AppShell', () => {
 
       const { getByRole } = render(() => <AppShell />);
 
-      const ribbon = getByRole('banner', { name: 'Channel information' });
+      const ribbon = getByRole('banner', { name: 'Room information' });
       expect(ribbon.textContent).toContain('Home');
       expect(ribbon.textContent).not.toContain('Onyx');
     });
@@ -1279,7 +1279,7 @@ describe('AppShell', () => {
       const { getByRole } = render(() => <AppShell />);
 
       // Assert
-      const ribbon = getByRole('banner', { name: 'Channel information' });
+      const ribbon = getByRole('banner', { name: 'Room information' });
       expect(ribbon.textContent).toContain('general');
       expect(ribbon.textContent).toContain('Welcome to #general');
     });
@@ -1303,7 +1303,7 @@ describe('AppShell', () => {
       const { getByRole } = render(() => <AppShell />);
 
       // Assert
-      const ribbon = getByRole('banner', { name: 'Channel information' });
+      const ribbon = getByRole('banner', { name: 'Room information' });
       expect(ribbon.textContent).toContain('general');
       expect(ribbon.textContent).not.toContain('testuser');
     });
