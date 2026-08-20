@@ -7631,8 +7631,8 @@ export const store = createStore<OnyxState>()(
           if (!ch || !(client.isupport.CHANTYPES ?? '#&').includes(ch[0]!)) {
             get().addToast({
               variant: 'warning',
-              title: 'Star a channel',
-              description: 'Use /star in a channel, or /star #room.',
+              title: 'Star a room',
+              description: 'Use /star in a room, or /star #room.',
             });
             return;
           }
@@ -7650,8 +7650,8 @@ export const store = createStore<OnyxState>()(
           if (!ch || !(client.isupport.CHANTYPES ?? '#&').includes(ch[0]!)) {
             get().addToast({
               variant: 'warning',
-              title: 'Mute a channel',
-              description: 'Use /mute in a channel, or /mute #room.',
+              title: 'Mute a room',
+              description: 'Use /mute in a room, or /mute #room.',
             });
             return;
           }
@@ -7667,7 +7667,7 @@ export const store = createStore<OnyxState>()(
             get().addToast({
               variant: 'info',
               title: `Unmuted ${ch}`,
-              description: 'Room notifications resume (mentions still follow channel notify mode).',
+              description: 'Room notifications resume (mentions still follow this room notify mode).',
             });
           }
           return;
@@ -7678,7 +7678,7 @@ export const store = createStore<OnyxState>()(
             get().addToast({
               variant: 'warning',
               title: 'Auto-join',
-              description: 'Use /autojoin in a channel, or /autojoin #room.',
+              description: 'Use /autojoin in a room, or /autojoin #room.',
             });
             return;
           }
@@ -7772,8 +7772,8 @@ export const store = createStore<OnyxState>()(
           if (!targetIsChannel) {
             get().addToast({
               variant: 'warning',
-              title: 'Channel color',
-              description: 'Use /color #hex in a channel.',
+              title: 'Room color',
+              description: 'Use /color #hex in a room.',
             });
             return;
           }
@@ -7782,7 +7782,7 @@ export const store = createStore<OnyxState>()(
             get().setChannelColor(target, '');
             get().addToast({
               variant: 'info',
-              title: 'Channel color cleared',
+              title: 'Room color cleared',
               description: `${target} uses the default accent again.`,
             });
             return;
@@ -7790,7 +7790,7 @@ export const store = createStore<OnyxState>()(
           get().setChannelColor(target, color);
           get().addToast({
             variant: 'info',
-            title: 'Channel color set',
+            title: 'Room color set',
             description: `${target} accent updated on this device.`,
           });
           return;
@@ -7815,7 +7815,7 @@ export const store = createStore<OnyxState>()(
             get().addToast({
               variant: 'warning',
               title: 'Share a room',
-              description: 'Open a channel, then use /share to copy a deep link.',
+              description: 'Open a room, then use /share to copy a deep link.',
             });
             return;
           }
@@ -7851,8 +7851,8 @@ export const store = createStore<OnyxState>()(
           if (!targetIsChannel) {
             get().addToast({
               variant: 'warning',
-              title: 'Channel notifications',
-              description: 'Use /notify all|mentions|mute inside a channel.',
+              title: 'Room notifications',
+              description: 'Use /notify all|mentions|mute inside a room.',
             });
             return;
           }

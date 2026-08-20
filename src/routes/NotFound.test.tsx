@@ -29,13 +29,13 @@ describe('NotFoundRoute', () => {
   });
 
   it('removes route-truth claims and lets the next known route restore them', () => {
-    setPageMeta('Onyx status', 'Mesh health.', '/status');
+    setPageMeta('Onyx status', 'Network health.', '/status');
     setNotFoundPageMeta();
     expect(document.querySelector('link[rel="canonical"]')).toBeNull();
     expect(document.querySelector('meta[property="og:url"]')).toBeNull();
     expect(document.querySelector('script[data-onyx-route-jsonld]')).toBeNull();
 
-    setPageMeta('Onyx status', 'Mesh health.', '/status');
+    setPageMeta('Onyx status', 'Network health.', '/status');
     expect(document.querySelector('meta[data-onyx-route-robots]')).toBeNull();
     expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', `${window.location.origin}/status/`);
   });
@@ -51,7 +51,7 @@ describe('NotFoundRoute', () => {
     setNotFoundPageMeta();
     expect(document.querySelectorAll('meta[name="robots"]')).toHaveLength(1);
 
-    setPageMeta('Onyx status', 'Mesh health.', '/status');
+    setPageMeta('Onyx status', 'Network health.', '/status');
     expect(document.querySelectorAll('meta[name="robots"]')).toHaveLength(0);
   });
 });

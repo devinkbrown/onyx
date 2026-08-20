@@ -123,17 +123,17 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
   }),
   descriptorFromRegistry('navigation.channel.previous', {
     keys: 'Alt+↑',
-    description: 'Previous channel / DM',
+    description: 'Previous room / DM',
     group: 'Navigation',
   }),
   descriptorFromRegistry('navigation.channel.next', {
     keys: 'Alt+↓',
-    description: 'Next channel / DM',
+    description: 'Next room / DM',
     group: 'Navigation',
   }),
   descriptorFromRegistry('navigation.unread.next', {
     keys: 'N',
-    description: 'Jump to next unread channel / DM',
+    description: 'Jump to next unread room / DM',
     group: 'Navigation',
   }),
   {
@@ -158,7 +158,7 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
   },
   descriptorFromRegistry('conversation.follow.toggle', {
     keys: 'U',
-    description: 'Follow current channel / DM',
+    description: 'Follow current room / DM',
     group: 'Chat',
   }),
   descriptorFromRegistry('members.toggle', {
@@ -167,7 +167,7 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
     group: 'View',
   }),
   descriptorFromRegistry('sidebar.focus', {
-    description: 'Focus channel sidebar',
+    description: 'Focus room sidebar',
     group: 'View',
   }),
   descriptorFromRegistry('reader.mode.toggle', {
@@ -193,7 +193,7 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
     group: 'Chat',
   }),
   descriptorFromRegistry('star.channel', {
-    description: 'Star / unstar channel',
+    description: 'Star / unstar room',
     group: 'Chat',
   }),
   descriptorFromRegistry('dnd.toggle', {
@@ -201,7 +201,7 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
     group: 'View',
   }),
   descriptorFromRegistry('mute.channel', {
-    description: 'Mute / unmute channel',
+    description: 'Mute / unmute room',
     group: 'Chat',
   }),
   descriptorFromRegistry('export.transcript', {

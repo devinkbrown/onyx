@@ -53,13 +53,13 @@ export const SHORTCUTS: readonly Shortcut[] = [
   {
     id: 'navigation.channel.next',
     chord: { key: 'ArrowDown', alt: true },
-    label: 'Next channel',
+    label: 'Next room',
     group: 'Navigation',
   },
   {
     id: 'navigation.channel.previous',
     chord: { key: 'ArrowUp', alt: true },
-    label: 'Previous channel',
+    label: 'Previous room',
     group: 'Navigation',
   },
   {
@@ -107,7 +107,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   {
     id: 'sidebar.focus',
     chord: { key: 's', alt: true },
-    label: 'Focus channel sidebar',
+    label: 'Focus room sidebar',
     group: 'Navigation',
   },
   {
@@ -137,13 +137,13 @@ export const SHORTCUTS: readonly Shortcut[] = [
   {
     id: 'star.channel',
     chord: { key: 'b', mod: true },
-    label: 'Star / unstar channel',
+    label: 'Star / unstar room',
     group: 'Reading',
   },
   {
     id: 'mute.channel',
     chord: { key: 'm', mod: true, shift: true },
-    label: 'Mute / unmute channel',
+    label: 'Mute / unmute room',
     group: 'Reading',
   },
   {

@@ -130,10 +130,10 @@ describe('SHORTCUTS descriptor', () => {
     expect(found!.group).toBe('Chat');
   });
 
-  it('includes Cmd/Ctrl+B for starring the current channel', () => {
+  it('includes Cmd/Ctrl+B for starring the current room', () => {
     const found = SHORTCUTS.find((s) => s.keys.includes('Ctrl+B'));
     expect(found).toBeDefined();
-    expect(found!.description).toBe('Star / unstar channel');
+    expect(found!.description).toBe('Star / unstar room');
     expect(found!.group).toBe('Chat');
   });
 
@@ -171,9 +171,9 @@ describe('SHORTCUTS descriptor', () => {
     expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+F'))?.description).toBe('Search messages');
     expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+A'))?.description).toBe('Open account');
     expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+E'))?.description).toBe('Mark conversation read');
-    expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+B'))?.description).toBe('Star / unstar channel');
+    expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+B'))?.description).toBe('Star / unstar room');
     expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+D'))?.description).toBe('Toggle do not disturb');
-    expect(SHORTCUTS.find((s) => s.keys.includes('Alt+S'))?.description).toBe('Focus channel sidebar');
+    expect(SHORTCUTS.find((s) => s.keys.includes('Alt+S'))?.description).toBe('Focus room sidebar');
     expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+U'))?.description).toBe('Attach a file');
     expect(SHORTCUTS.find((s) => s.keys.includes('Ctrl+Shift+L'))?.description).toBe(
       'Schedule message to send later',
@@ -777,7 +777,7 @@ describe('SHORTCUTS descriptor', () => {
     dispose();
   });
 
-  it('focuses the channel sidebar with Alt+S', () => {
+  it('focuses the room sidebar with Alt+S', () => {
     const dispose = mountKeyboardHarness();
     const item = document.createElement('button');
     item.type = 'button';

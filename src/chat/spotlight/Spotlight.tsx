@@ -364,7 +364,7 @@ export function Spotlight(props: SpotlightProps) {
               aria-expanded="true"
               aria-controls={LISTBOX_ID}
               aria-activedescendant={activeOptionId()}
-              placeholder="Search channels, people, and actions"
+              placeholder="Search rooms, people, and actions"
               onInput={handleInput}
               onCompositionEnd={handleCompositionEnd}
               onKeyDown={handleKeyDown}
@@ -434,7 +434,7 @@ export function Spotlight(props: SpotlightProps) {
                 <div class="onyx-spotlight__empty">
                   <span class="onyx-spotlight__empty-mark" aria-hidden="true">⌕</span>
                   <span class="onyx-spotlight__empty-text">Nothing surfaces yet</span>
-                  <span class="onyx-spotlight__empty-sub">Try a channel, a name, or an action</span>
+                  <span class="onyx-spotlight__empty-sub">Try a room, a name, or an action</span>
                 </div>
               }
             >
