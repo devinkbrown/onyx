@@ -181,7 +181,7 @@ const WIDTH_LABELS: Record<Width, string> = { measured: 'Measured', full: 'Full-
 const EXPERIENCE_MODE_LABELS: Record<ExperienceMode, string> = {
   standard: 'Standard',
   advanced: 'Advanced',
-  'irc-ops': 'IRC Ops',
+  'irc-ops': 'Network Ops',
 };
 /** Labels avoid "Compact" so they never collide with Message density radios. */
 const REACTION_DENSITY_LABELS: Record<ReactionDensityPref, string> = {
@@ -237,7 +237,7 @@ const TRANSFER_TOOLS = [
   { id: 'discord-package', label: 'Discord package', summary: 'Official data request' },
   { id: 'discord-bot', label: 'Discord bot', summary: 'Import through this deployment' },
   { id: 'slack', label: 'Slack JSON', summary: 'Workspace export files' },
-  { id: 'irc-log', label: 'IRC log', summary: 'Plain-text client logs' },
+  { id: 'irc-log', label: 'Classic log', summary: 'weechat / irssi / mIRC text logs' },
 ] as const satisfies ReadonlyArray<{ id: TransferTool; label: string; summary: string }>;
 
 function resetAllPreferences(): void {
@@ -3534,7 +3534,7 @@ export function PreferencesPanel(): JSX.Element {
             />
             <Segmented
               legend="Experience level"
-              description="Standard keeps chat calm. Advanced adds room-management details when you have permission. IRC Ops also shows live server operations when your account is an operator."
+              description="Standard keeps chat calm. Advanced adds room-management details when you have permission. Network Ops also shows live server operations when your account is an operator."
               options={EXPERIENCE_MODES}
               labels={EXPERIENCE_MODE_LABELS}
               value={() => preferences().experienceMode}

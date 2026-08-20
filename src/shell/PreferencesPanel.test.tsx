@@ -181,7 +181,7 @@ type TransferToolLabel =
   | 'Discord package'
   | 'Discord bot'
   | 'Slack JSON'
-  | 'IRC log';
+  | 'Classic log';
 
 function selectPreferenceCategory(category: PreferenceCategoryLabel): HTMLElement {
   const tab = screen.getByRole('tab', { name: new RegExp(`^${category}`) });
@@ -317,7 +317,7 @@ describe('PreferencesPanel', () => {
       'Discord package',
       'Discord bot',
       'Slack JSON',
-      'IRC log',
+      'Classic log',
     ]);
     expect(screen.getByRole('button', { name: 'Portable vault' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('button', { name: 'Portable vault' })).toHaveAttribute('tabindex', '0');
@@ -406,7 +406,7 @@ describe('PreferencesPanel', () => {
 
     fireEvent.keyDown(portable, { key: 'End' });
 
-    const ircLog = screen.getByRole('button', { name: 'IRC log' });
+    const ircLog = screen.getByRole('button', { name: 'Classic log' });
     expect(ircLog).toHaveFocus();
     expect(ircLog).toHaveAttribute('aria-expanded', 'true');
     expect(ircLog).toHaveAttribute('aria-controls', 'pref-transfer-panel-irc-log');

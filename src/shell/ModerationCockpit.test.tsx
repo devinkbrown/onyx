@@ -49,7 +49,7 @@ describe('ModerationCockpit', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Moderated/ }));
     expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#garden', '+m');
-    expect(screen.getByText('IRC details')).toBeInTheDocument();
+    expect(screen.getByText('Open-wire details')).toBeInTheDocument();
 
     fireEvent.input(screen.getByLabelText('Invite someone'), { target: { value: 'ada' } });
     fireEvent.submit(screen.getByLabelText('Invite someone').closest('form')!);

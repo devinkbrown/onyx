@@ -113,7 +113,7 @@ describe('validateModerationAction', () => {
     expect(liftWildcard.ok).toBe(true);
   });
 
-  it('exposes Advanced kick/ban controls and keeps role changes in IRC Ops', () => {
+  it('exposes Advanced kick/ban controls and keeps role changes in Network Ops', () => {
     expect(memberModerationKindsForMode('standard')).toEqual([]);
     expect(memberModerationKindsForMode('advanced')).toEqual(['kick', 'ban']);
     expect(memberModerationKindsForMode('irc-ops')).toEqual([

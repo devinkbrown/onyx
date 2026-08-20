@@ -296,7 +296,7 @@ describe('IrcLogImportControls', () => {
 
     chooseFile('Choose log file', oversized.file);
 
-    await screen.findByText('huge.log exceeds the 128 MiB IRC log limit. Split the log and import each part separately.');
+    await screen.findByText('huge.log exceeds the 128 MiB classic log limit. Split the log and import each part separately.');
     expect(oversized.text).not.toHaveBeenCalled();
   });
 });
@@ -393,7 +393,7 @@ describe('DiscordPackageImportControls — a11y contracts', () => {
 
     chooseFiles('Choose package folder', [metadata.file, oversized.file]);
 
-    await screen.findByText('messages/c100/messages.json exceeds the 128 MiB per-file Discord package limit. Remove that channel export or choose a smaller package.');
+    await screen.findByText('messages/c100/messages.json exceeds the 128 MiB per-file Discord package limit. Remove that Discord export file or choose a smaller package.');
     expect(metadata.text).not.toHaveBeenCalled();
     expect(oversized.text).not.toHaveBeenCalled();
   });

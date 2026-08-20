@@ -233,7 +233,7 @@ export function OperEventConsole(): JSX.Element {
         </Show>
 
         <details class="moderation-cockpit__protocol">
-          <summary>IRC details</summary>
+          <summary>Open-wire details</summary>
           <p>Raw command used to refresh the structured feed. This does not send extra server commands when you filter locally.</p>
           <code data-testid="oper-event-replay-wire">EVENT REPLAY JSON ALL {limit()}</code>
         </details>

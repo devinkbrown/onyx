@@ -257,7 +257,7 @@ disconnecting, without blocking the composer, and without false product claims.
 | **3** | Home Needs you / Continue hierarchy | `HomeView.*`, `home-view.css`, `HomeView*.test.tsx`, this doc | **This slice** |
 | **4** | Composer public default (+ tray) | `Composer.tsx`, `Composer.test.tsx`, composer CSS in `shell.css`, this doc | **Done** (denser More tools tray) |
 | **5** | You hub tiers | AppShell you surface, Preferences structure, Appearance, Account | **Done** (You + Account; ops matrix off Activity in Standard) |
-| **6** | Rooms/Messages collection polish | `ChannelSidebar.*`, sidebar CSS + shell/landing copy | **Done** (rooms/network language on public surfaces; IRC honesty retained where intentional) |
+| **6** | Rooms/Messages collection polish | `ChannelSidebar.*`, sidebar CSS + shell/landing copy | **Done** (rooms/network language; Network Ops / Classic log / open-wire details; intentional wire honesty) |
 
 **Deferred beyond top 6:** transcript type density; default-off TimeScrubber/Watch; Connect copy; Landing claim alignment when packaging ledger green; **member-column persistence**.
 

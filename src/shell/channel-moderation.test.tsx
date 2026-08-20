@@ -239,7 +239,7 @@ describe('MemberList moderation', () => {
     expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#general', '+o', 'bob');
   });
 
-  it('shows role controls only in IRC Ops', () => {
+  it('shows role controls only in Network Ops', () => {
     setPreference('experienceMode', 'irc-ops');
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
 

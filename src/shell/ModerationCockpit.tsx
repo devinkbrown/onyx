@@ -278,7 +278,7 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
         </section>
       </Show>
       <details class="moderation-cockpit__protocol">
-        <summary>IRC details</summary>
+        <summary>Open-wire details</summary>
         <p>This is a read-only view of the room’s last known mode state. Changes above wait for a server reply before the interface updates.</p>
         <code>MODE {local.channel} {rawModes() || '(no modes set)'}</code>
       </details>
