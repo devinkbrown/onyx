@@ -807,7 +807,7 @@ export function Connect(props: ConnectProps): JSX.Element {
     // join (same path as the website's ?join= deep link).
     const normalizedRoom = normalizeRoom(room());
     if (normalizedRoom === undefined) {
-      setRoomError('Channel names are like #lounge — no spaces or commas.');
+      setRoomError('Room names look like #lounge — no spaces or commas.');
       return;
     }
     setRoomError(undefined);
@@ -1446,7 +1446,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                     <Show when={mode() !== 'register'}>
                       <FormField
                         id="conn-room"
-                        label="Channel"
+                        label="Room"
                         description="Optional — join a room right away, or browse from Home"
                         type="text"
                         placeholder="#root"

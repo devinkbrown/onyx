@@ -337,7 +337,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
               {job().guild ? ` from ${job().guild}` : ''}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
-              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-room limit dropped.` : ''}
               {' '}Existing local history is merged, not replaced.
             </p>
             <div class="pref-import-review__actions">
@@ -381,7 +381,7 @@ export function DiscordImportControls(): JSX.Element {
         <>
           Leaving Discord? Export your channels with{' '}
           <a href="https://github.com/Tyrrrz/DiscordChatExporter" target="_blank" rel="noreferrer noopener">DiscordChatExporter</a>{' '}
-          in <strong>JSON</strong> mode, then choose the files here. Everything happens on this device — no bot token, no upload, nothing sent to Discord. Imported history becomes searchable, time-travellable scrollback merged into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
+          in <strong>JSON</strong> mode, then choose the files here. Everything happens on this device — no bot token, no upload, nothing sent to Discord. Imported history becomes searchable, time-travellable scrollback merged into this device's vault (up to the newest {VAULT_KEEP} messages per room).
         </>
       }
     />
@@ -548,7 +548,7 @@ export function DiscordPackageImportControls(): JSX.Element {
         <h3 id="pref-discord-package-import-title" class="pref-label">Import a Discord data package</h3>
       </div>
       <p class="pref-desc">
-        No third-party tool? In Discord go to <strong>Settings → Privacy &amp; Safety → Request all of my Data</strong>. When the package arrives, unzip it and choose the folder here. Everything happens on this device — nothing is sent to Discord. Note that Discord's package only contains <em>your own</em> messages. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
+        No third-party tool? In Discord go to <strong>Settings → Privacy &amp; Safety → Request all of my Data</strong>. When the package arrives, unzip it and choose the folder here. Everything happens on this device — nothing is sent to Discord. Note that Discord's package only contains <em>your own</em> messages. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per room).
       </p>
       <div class="pref-vault-actions">
         <label class="pref-file">
@@ -574,7 +574,7 @@ export function DiscordPackageImportControls(): JSX.Element {
               {job().guild ? ` from ${job().guild}` : ''}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
-              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-room limit dropped.` : ''}
               {' '}Existing local history is merged, not replaced.
             </p>
             <div class="pref-import-review__actions">
@@ -856,7 +856,7 @@ export function DiscordBotImportControls(): JSX.Element {
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().pins > 0 ? ` ${countLabel(job().pins, 'pinned message')} included.` : ''}
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
-              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-room limit dropped.` : ''}
               {job().rolesSkipped > 0 || job().categoriesSkipped > 0
                 ? ` ${countLabel(job().rolesSkipped, 'role')} and ${countLabel(job().categoriesSkipped, 'category')} have no home here and were skipped.`
                 : ''}
@@ -900,7 +900,7 @@ export function SlackImportControls(): JSX.Element {
       loadParse={loadSlackExportParser}
       description={
         <>
-          Leaving Slack? Request your workspace export (Slack → Settings & administration → Workspace settings → Import/Export Data), unzip it, and choose the per-channel <strong>JSON</strong> files here. Everything happens on this device — nothing is uploaded. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
+          Leaving Slack? Request your workspace export (Slack → Settings & administration → Workspace settings → Import/Export Data), unzip it, and choose the per-channel <strong>JSON</strong> files here. Everything happens on this device — nothing is uploaded. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per room).
         </>
       }
     />
@@ -979,7 +979,7 @@ export function IrcLogImportControls(): JSX.Element {
       const normalizedTarget = normalizeIrcChannelTarget(requestedChannel);
       if (!normalizedTarget) {
         setPending(null);
-        setStatus(`The requested channel "${requestedChannel}" does not normalize to a safe destination. Enter a channel containing letters or numbers (for example, #dev).`);
+        setStatus(`The requested room "${requestedChannel}" does not normalize to a safe destination. Enter a room name containing letters or numbers (for example, #dev).`);
         return;
       }
       const result = await parseIrcLogFile(file, { channel: requestedChannel });
@@ -1058,11 +1058,11 @@ export function IrcLogImportControls(): JSX.Element {
         <h3 id="pref-irclog-import-title" class="pref-label">Import an IRC log</h3>
       </div>
       <p class="pref-desc">
-        Have a plain-text log from another client (weechat, irssi, mIRC)? Name the channel it belongs to, then choose the log file. It's parsed on-device and merged into this device's vault (up to the newest {VAULT_KEEP} messages).
+        Have a plain-text log from another client (weechat, irssi, mIRC)? Name the room it belongs to, then choose the log file. It's parsed on-device and merged into this device's vault (up to the newest {VAULT_KEEP} messages).
       </p>
       <div class="pref-vault-actions">
         <label class="pref-file pref-irclog-channel">
-          <span>Channel</span>
+          <span>Room</span>
           <input
             type="text"
             inputmode="text"
@@ -1091,12 +1091,12 @@ export function IrcLogImportControls(): JSX.Element {
               {job().fileName}: {countLabel(job().messages, 'message')} into {job().target}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'unparseable/filtered line')} skipped.` : ''}
-              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-room limit dropped.` : ''}
               {' '}Existing local history is merged, not replaced.
             </p>
             <Show when={job().targetChanged}>
               <p class="pref-status" role="alert">
-                Channel destination changed. Requested "{job().requestedChannel}"; import destination: {job().target}. Confirm only if this is the intended room.
+                Room destination changed. Requested "{job().requestedChannel}"; import destination: {job().target}. Confirm only if this is the intended room.
               </p>
             </Show>
             <div class="pref-import-review__actions">

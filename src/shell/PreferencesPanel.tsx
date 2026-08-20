@@ -1139,7 +1139,7 @@ function PortableVaultControls(): JSX.Element {
         <h3 id="pref-vault-portable-title" class="pref-label">Portable vault</h3>
       </div>
       <p class="pref-desc">
-        Export or merge this device's local history, reviewed catch-up state, room composer drafts, channel topic drafts, followed rooms/topics, named-conversation read cursors, saved searches, saved sign-in targets, retention policy, and Preferences switches. Read cursors contain only room/topic, message ID, and timestamp metadata. Saved query text is included. Passwords, session tokens, mesh tokens, and decrypted DM plaintext are not exported automatically.
+        Export or merge this device's local history, reviewed catch-up state, room composer drafts, room topic drafts, followed rooms/topics, named-conversation read cursors, saved searches, saved sign-in targets, retention policy, and Preferences switches. Read cursors contain only room/topic, message ID, and timestamp metadata. Saved query text is included. Passwords, session tokens, network tokens, and decrypted DM plaintext are not exported automatically.
       </p>
       <div class="pref-vault-actions">
         <button

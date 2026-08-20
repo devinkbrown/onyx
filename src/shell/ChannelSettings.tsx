@@ -936,8 +936,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             <form onSubmit={applyKey} class="shell-chset-param">
               <FormField
                 id="chset-key"
-                label="Channel key (+k)"
-                description="Members must supply this key to join. Leave blank to remove."
+                label="Room key (+k)"
+                description="People must supply this key to join. Leave blank to remove."
                 type="text"
                 value={keyDraft()}
                 autocomplete="off"

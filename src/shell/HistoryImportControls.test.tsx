@@ -221,7 +221,7 @@ describe('IrcLogImportControls', () => {
 
   it('imports a plain-text IRC log into the named channel', async () => {
     render(() => <IrcLogImportControls />);
-    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '#dev' } });
+    fireEvent.input(screen.getByLabelText('Room'), { target: { value: '#dev' } });
     const chooser = screen.getByLabelText('Choose log file') as HTMLInputElement;
     const log = trackedFile(
       'log.txt',
@@ -248,12 +248,12 @@ describe('IrcLogImportControls', () => {
 
   it('warns when normalization changes the requested label and confirms only the exact displayed target', async () => {
     render(() => <IrcLogImportControls />);
-    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '  #Ops Room!  ' } });
+    fireEvent.input(screen.getByLabelText('Room'), { target: { value: '  #Ops Room!  ' } });
     chooseFile('Choose log file', fakeFile('ops.log', '2025-01-01 10:00:00\t<alice>\tship it'));
 
     await screen.findByText(/Ready to import 1 message into #ops-room/);
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Channel destination changed. Requested " #Ops Room! "; import destination: #ops-room. Confirm only if this is the intended room.',
+      'Room destination changed. Requested " #Ops Room! "; import destination: #ops-room. Confirm only if this is the intended room.',
     );
     expect(await loadRecent('#ops-room', 400, MEMORY_OWNER)).toHaveLength(0);
 
@@ -266,7 +266,7 @@ describe('IrcLogImportControls', () => {
 
   it('makes a collision-looking label explicit before any merge', async () => {
     render(() => <IrcLogImportControls />);
-    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '#ops---room!' } });
+    fireEvent.input(screen.getByLabelText('Room'), { target: { value: '#ops---room!' } });
     chooseFile('Choose log file', fakeFile('ops.log', '2025-01-01 10:00:00\t<alice>\tship it'));
 
     await screen.findByText(/Ready to import 1 message into #ops-room/);
@@ -280,11 +280,11 @@ describe('IrcLogImportControls', () => {
   it('rejects a requested label that normalizes to an unsafe target before reading the log', async () => {
     const unsafe = trackedFile('unsafe.log', '2025-01-01 10:00:00\t<alice>\tignored');
     render(() => <IrcLogImportControls />);
-    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '___' } });
+    fireEvent.input(screen.getByLabelText('Room'), { target: { value: '___' } });
 
     chooseFile('Choose log file', unsafe.file);
 
-    await screen.findByText('The requested channel "___" does not normalize to a safe destination. Enter a channel containing letters or numbers (for example, #dev).');
+    await screen.findByText('The requested room "___" does not normalize to a safe destination. Enter a room name containing letters or numbers (for example, #dev).');
     expect(unsafe.text).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: 'Review import' })).not.toBeInTheDocument();
   });
@@ -292,7 +292,7 @@ describe('IrcLogImportControls', () => {
   it('rejects an oversized IRC log before reading it', async () => {
     const oversized = trackedFile('huge.log', 'ignored', IRC_LOG_MAX_FILE_BYTES + 1);
     render(() => <IrcLogImportControls />);
-    fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '#dev' } });
+    fireEvent.input(screen.getByLabelText('Room'), { target: { value: '#dev' } });
 
     chooseFile('Choose log file', oversized.file);
 

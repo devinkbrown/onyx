@@ -14229,7 +14229,7 @@ export const store = createStore<OnyxState>()(
         }
 
         case '467': { // ERR_KEYSET
-          get().addNotification({ type: 'error', text: 'Channel key already set' });
+          get().addNotification({ type: 'error', text: 'Room key already set' });
           break;
         }
 

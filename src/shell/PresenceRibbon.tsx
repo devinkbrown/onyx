@@ -529,7 +529,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               title="Click to copy name"
               aria-label={
                 activeView().kind === 'channel'
-                  ? `Channel ${name()}. Click to copy name.`
+                  ? `Room ${name()}. Click to copy name.`
                   : activeView().kind === 'dm'
                     ? `Direct message ${name()}. Click to copy nick.`
                     : `${name()}. Click to copy.`

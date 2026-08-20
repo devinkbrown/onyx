@@ -1540,10 +1540,10 @@ describe('Node name is never shown', () => {
 
 describe('optional room to join (no autojoin)', () => {
   function roomField() {
-    return screen.getByRole('textbox', { name: 'Channel' });
+    return screen.getByRole('textbox', { name: 'Room' });
   }
 
-  it('renders the optional Channel field in guest mode', () => {
+  it('renders the optional Room field in guest mode', () => {
     render(() => <Connect />);
     expect(roomField()).toBeInTheDocument();
   });
