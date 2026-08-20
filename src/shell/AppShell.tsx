@@ -1398,7 +1398,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                   <OperEventConsole />
                 </Show>
                 <Show when={preferences().experienceMode === 'irc-ops' && !isOper()}>
-                  <p class="shell-context-rail__empty" role="status">IRC Ops tools appear here after this account is granted operator access.</p>
+                  <p class="shell-context-rail__empty" role="status">Operator tools appear here after this account is granted access.</p>
                 </Show>
               </section>
             </Show>

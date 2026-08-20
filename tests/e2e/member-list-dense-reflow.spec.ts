@@ -169,7 +169,7 @@ test('dense mobile nicklist stays contained, scrollable, and keyboard-reachable 
   // Count badge is user-observable proof the full dense roster landed.
   await expect(page.getByLabel(`${DENSE_MEMBER_COUNT} members`, { exact: true })).toBeVisible();
 
-  const roster = page.getByRole('region', { name: `Channel members in ${CHANNEL}` });
+  const roster = page.getByRole('region', { name: `People in ${CHANNEL}` });
   await expect(roster).toBeVisible();
 
   // First peer must be in the DOM (MemberList is not virtualized today — if it
@@ -303,7 +303,7 @@ test('dense desktop nicklist column scrolls without expanding the page', async (
   await expect(column).toBeVisible();
   await expect(page.getByLabel(`${DENSE_MEMBER_COUNT} members`, { exact: true })).toBeVisible();
 
-  const roster = page.getByRole('region', { name: `Channel members in ${CHANNEL}` });
+  const roster = page.getByRole('region', { name: `People in ${CHANNEL}` });
   await expect(roster).toBeVisible();
 
   const lastMember = page.getByRole('button', {

@@ -1788,7 +1788,7 @@ describe('AppShell', () => {
       await waitFor(() => {
         expect(screen.queryByTestId('shell-suspended')).not.toBeInTheDocument();
         expect(container.querySelector('[data-testid="app-shell"]')).toBeInTheDocument();
-        const roster = screen.getByRole('region', { name: 'Channel members in #general' });
+        const roster = screen.getByRole('region', { name: 'People in #general' });
         expect(roster).toBeInTheDocument();
         expect(within(roster).getByText('alice', { exact: true })).toBeInTheDocument();
         expect(within(roster).getByText('bob', { exact: true })).toBeInTheDocument();
@@ -2100,7 +2100,7 @@ describe('AppShell', () => {
       expect(sidebar).not.toHaveAttribute('inert');
       expect(conversation).not.toHaveAttribute('inert');
       expect(mobileNav).not.toHaveAttribute('inert');
-      expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'People in #general' })).toBeNull();
       for (const trigger of memberList!.querySelectorAll<HTMLButtonElement>('.onyx-popover__trigger')) {
         expect(trigger).toBeDisabled();
       }
@@ -2130,7 +2130,7 @@ describe('AppShell', () => {
         expect(mobileNav).not.toHaveAttribute('inert');
         expect(membersButton).toHaveFocus();
       });
-      expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'People in #general' })).toBeNull();
     });
 
     it('closes member details before closing the mobile member drawer on Escape', async () => {
@@ -2266,14 +2266,14 @@ describe('AppShell', () => {
       expect(memberList).not.toBeNull();
       expect(memberList).toHaveAttribute('aria-hidden', 'true');
       expect(memberList).toHaveAttribute('inert');
-      expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'People in #general' })).toBeNull();
 
       fireEvent.click(screen.getByRole('button', { name: /3 members — toggle member list/i }));
 
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'false');
         expect(memberList).not.toHaveAttribute('inert');
-        expect(screen.getByRole('region', { name: 'Channel members in #general' })).toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'People in #general' })).toBeInTheDocument();
       });
     });
 
@@ -2506,7 +2506,7 @@ describe('AppShell', () => {
 
       expect(container.querySelector('[data-testid="app-shell"]')).toHaveAttribute('data-shell-aside', 'none');
       expect(container.querySelector('aside.shell-members')).toHaveAttribute('inert');
-      expect(screen.queryByRole('region', { name: /Channel members/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: /People/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /members — toggle member list/i })).not.toBeInTheDocument();
     });
 

@@ -619,7 +619,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
 
   const rosterLabel = createMemo(() => {
     const channel = activeChannel();
-    return channel ? `Channel members in ${channel.name}` : 'Channel members';
+    return channel ? `People in ${channel.name}` : 'People';
   });
 
   const channelLedger = createMemo(() => {
@@ -653,7 +653,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
       tabindex={!local.hidden ? -1 : undefined}
     >
       <div class="shell-members-head">
-        <span class="shell-members-title">members</span>
+        <span class="shell-members-title">People</span>
         {/*
           Not a live region: on a busy channel the count churns on every
           join/leave (and on history replay / ?at= time-travel / roster

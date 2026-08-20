@@ -96,7 +96,7 @@ describe('MemberList moderation', () => {
     render(() => <MemberList />);
 
     expect(screen.getByRole('complementary', { name: 'Member list for #general' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Channel members in #general' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'People in #general' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: /Voice/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Open member details for bob, Voice/ }));

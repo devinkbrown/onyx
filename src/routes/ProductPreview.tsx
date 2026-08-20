@@ -71,13 +71,13 @@ const PANELS: readonly PreviewPanel[] = [
       { name: 'You' },
     ],
     messages: [
-      { nick: 'status', text: 'Connection labeled separately from room crypto', time: 'now' },
+      { nick: 'status', text: 'Connection labeled separately from room message protection', time: 'now' },
       { nick: 'media', text: 'Call protection shown when a stage is open', time: 'now' },
     ],
     stage: null,
     proof: [
       { label: 'Connection', value: 'protected', tone: 'ok' },
-      { label: 'Room crypto', value: 'not assumed', tone: 'warn' },
+      { label: 'Room messages', value: 'not end-to-end', tone: 'warn' },
     ],
   },
 ];

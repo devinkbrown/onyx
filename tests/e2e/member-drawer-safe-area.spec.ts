@@ -41,7 +41,7 @@ test('keeps mobile member drawer content outside the right safe area', async ({ 
     <main class="shell">
       <aside class="shell-members" aria-label="Member list for #root">
         <div class="shell-members-head">
-          <span>members</span>
+          <span>People</span>
           <span class="shell-members-count" data-edge-control>6</span>
         </div>
         <div class="shell-members-scroll">
@@ -107,7 +107,7 @@ test('keeps the modal close reachable and contained at 400% text in forced color
     <main class="shell">
       <aside class="shell-members" role="dialog" aria-modal="true" aria-label="Member list for #root">
         <div class="shell-members-head">
-          <span class="shell-members-title">members</span>
+          <span class="shell-members-title">People</span>
           <span class="shell-members-head-actions">
             <span class="shell-members-head-meta">
               <span class="shell-members-count" aria-label="6 members">6</span>
@@ -117,7 +117,7 @@ test('keeps the modal close reachable and contained at 400% text in forced color
             </button>
           </span>
         </div>
-        <div class="shell-members-scroll" role="region" aria-label="Channel members in #root">
+        <div class="shell-members-scroll" role="region" aria-label="People in #root">
           <button type="button" class="onyx-popover__trigger">Member action</button>
         </div>
       </aside>

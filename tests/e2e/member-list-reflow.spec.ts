@@ -23,13 +23,13 @@ test('keeps the member drawer dense and keyboard-scrollable at 400% zoom', async
     <main class="shell">
       <aside class="shell-members" role="dialog" aria-label="Member list for root" data-testid="members">
         <div class="shell-members-head" data-testid="members-head">
-          <span class="shell-members-title">members</span>
+          <span class="shell-members-title">People</span>
           <span class="shell-members-head-actions">
             <span class="shell-members-head-meta"><span class="shell-members-count" aria-label="5 members">5</span></span>
             <button class="onyx-icon-button onyx-icon-button--sm shell-members-close" aria-label="Close member list">×</button>
           </span>
         </div>
-        <div class="shell-members-scroll" role="region" aria-label="Channel members in root" data-testid="member-scroll">
+        <div class="shell-members-scroll" role="region" aria-label="People in root" data-testid="member-scroll">
           <section aria-labelledby="operators-label">
             <p class="shell-members-group-label" id="operators-label">Operators — 5</p>
             <ul class="shell-members-group-list" role="list">

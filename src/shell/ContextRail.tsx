@@ -28,7 +28,7 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
     const view = activeView();
     if (view.kind === 'channel') return view.channel;
     if (view.kind === 'dm') return view.nick;
-    return 'Workspace';
+    return 'Room';
   });
   const channelLedger = createMemo(() => {
     const view = activeView();
@@ -97,7 +97,7 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
                 <OperEventConsole />
               </Show>
               <Show when={experienceMode() === 'irc-ops' && !isOper()}>
-                <p class="shell-context-rail__empty" role="status">IRC Ops tools appear here after this account is granted operator access.</p>
+                <p class="shell-context-rail__empty" role="status">Operator tools appear here after this account is granted access.</p>
               </Show>
             </>
           </Show>

@@ -129,7 +129,7 @@ describe('MemberList accessibility', () => {
     expect(memberList).not.toBeNull();
     expect(memberList).toHaveAttribute('aria-hidden', 'true');
     expect(memberList).toHaveAttribute('inert');
-    expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'People in #general' })).toBeNull();
 
     const triggers = container.querySelectorAll<HTMLButtonElement>('.shell-members .onyx-popover__trigger');
     expect(triggers).toHaveLength(2);
@@ -188,7 +188,7 @@ describe('MemberList accessibility', () => {
     render(() => <MemberList />);
 
     expect(screen.getByRole('complementary', { name: 'Member list for &ops' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Channel members in &ops' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'People in &ops' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Open member details for bob, Voice/ })).toBeInTheDocument();
   });
 
