@@ -963,7 +963,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                     getState().addToast({
                       variant: 'info',
                       title: `Unignored ${nick}`,
-                      description: 'Messages and notifications from this nick resume on this device.',
+                      description: 'Messages and notifications from this name resume on this device.',
                     });
                   } else {
                     getState().ignoreUser(nick);

@@ -1200,7 +1200,7 @@ export function Composer(props: ComposerProps): JSX.Element {
             id="shell-nick-menu"
             class="shell-command-menu shell-nick-menu"
             role="listbox"
-            aria-label="Nick completions"
+            aria-label="Name completions"
             data-testid="composer-nick-menu"
           >
             <For each={nickMatches()}>

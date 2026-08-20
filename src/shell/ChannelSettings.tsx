@@ -525,7 +525,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     const level = parseAccessLevel(accessLevelDraft());
     const mask = normalizeAccessMask(accessMaskDraft());
     if (!level || !mask) {
-      setAccessFormError('Enter a nick or hostmask (e.g. alice or alice!*@*).');
+      setAccessFormError('Enter a name or hostmask (e.g. alice or alice!*@*).');
       return;
     }
     const rawTimeout = accessTimeoutDraft().trim();
@@ -1097,7 +1097,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
                 <FormField
                   id="chset-access-mask"
-                  label="Nick or hostmask"
+                  label="Name or hostmask"
                   description="Bare nicks expand to nick!*@*. Full masks use nick!user@host."
                   type="text"
                   value={accessMaskDraft()}

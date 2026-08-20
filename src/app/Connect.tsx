@@ -188,10 +188,10 @@ const NETWORK_NAME = 'Onyx';
 /** IRC nick rules — start with a letter / special char, no leading digit. */
 export function validateNick(value: string): string | undefined {
   const v = value.trim();
-  if (!v) return 'Nick is required.';
-  if (v.length > 64) return 'Nick must be 64 characters or fewer.';
+  if (!v) return 'Name is required.';
+  if (v.length > 64) return 'Name must be 64 characters or fewer.';
   if (!/^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/.test(v)) {
-    return 'Nick must start with a letter or allowed special character and contain only letters, numbers, or -[]\\`_^{|}.';
+    return 'Name must start with a letter or allowed special character and contain only letters, numbers, or -[]\\`_^{|}.';
   }
   return undefined;
 }
@@ -1121,8 +1121,8 @@ export function Connect(props: ConnectProps): JSX.Element {
       return 'Use your passkey to sign in, or choose a password or recovery code below.';
     }
     if (mode() === 'register') return 'Create the account, then verify it before entering Home.';
-    if (mode() === 'signin') return 'Sign in with the account password for this nick.';
-    return 'Choose a guest nick, then continue to Home or the optional room above.';
+    if (mode() === 'signin') return 'Sign in with the account password for this name.';
+    return 'Choose a guest name, then continue to Home or the optional room above.';
   });
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -1426,9 +1426,9 @@ export function Connect(props: ConnectProps): JSX.Element {
                   <div class="conn-fields">
                     <FormField
                       id="conn-nick"
-                      label={mode() === 'register' ? 'Desired account / nick' : mode() === 'guest' ? 'Guest nick' : 'Nick'}
+                      label={mode() === 'register' ? 'Desired account name' : mode() === 'guest' ? 'Guest name' : 'Name'}
                       type="text"
-                      placeholder="your-nick"
+                      placeholder="your-name"
                       autocomplete="username"
                       maxlength={64}
                       required
@@ -1632,7 +1632,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                         </label>
                         <p class="conn-toggle-description" id="conn-session-desc">
                           {mode() === 'guest'
-                            ? 'Off by default. Onyx keeps a resumable session token when the network provides one. This does not reserve your nick or create an account.'
+                            ? 'Off by default. Onyx keeps a resumable session token when the network provides one. This does not reserve your name or create an account.'
                             : 'Off by default. When enabled, Onyx stores your account password in this browser so it can sign in and request a SESSION token on reconnect. Use only on a private device.'}
                         </p>
                       </div>
@@ -1674,7 +1674,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                   <Show when={registeredNickNeedsSignIn() && mode() === 'guest'}>
                     <div class="conn-auth-required" role="alert" data-testid="conn-auth-required">
                       <div>
-                        <strong>This nick is protected</strong>
+                        <strong>This name is protected</strong>
                         <span>Authenticate before Onyx can use it on the network.</span>
                       </div>
                       <button type="button" onClick={() => switchMode('signin')}>

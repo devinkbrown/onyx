@@ -26,11 +26,11 @@ export function IgnoredUsersControl(): JSX.Element {
   function addNick(): void {
     const nick = draft().trim();
     if (!nick) {
-      setError('Enter a nick to ignore on this device.');
+      setError('Enter a name to ignore on this device.');
       return;
     }
     if (nick.length > MAX_IGNORED_NICK_LENGTH) {
-      setError(`Nick is too long (max ${MAX_IGNORED_NICK_LENGTH} characters).`);
+      setError(`Name is too long (max ${MAX_IGNORED_NICK_LENGTH} characters).`);
       return;
     }
     const self = getState().ourNick?.toLowerCase();
@@ -53,7 +53,7 @@ export function IgnoredUsersControl(): JSX.Element {
     getState().addToast({
       variant: 'info',
       title: `Unignored ${nick}`,
-      description: 'Messages and notifications from this nick resume on this device.',
+      description: 'Messages and notifications from this name resume on this device.',
     });
   }
 
@@ -64,18 +64,18 @@ export function IgnoredUsersControl(): JSX.Element {
       data-testid="pref-ignored-users"
     >
       <div class="pref-group-head">
-        <h3 id="pref-ignored-users-title" class="pref-label">Ignored nicks</h3>
+        <h3 id="pref-ignored-users-title" class="pref-label">Ignored names</h3>
         <span class="pref-count" data-testid="pref-ignored-users-count">
           {list().length === 0 ? 'None' : `${list().length}`}
         </span>
       </div>
       <p class="pref-desc">
-        Device-only hide list. Ignored nicks&apos; messages and notifications stay silent here;
+        Device-only hide list. Ignored names&apos; messages and notifications stay silent here;
         the network is not told. Message menu Ignore and /ignore share this list.
       </p>
 
-      <div class="ignored-users-add" role="group" aria-label="Add nick to ignore list">
-        <label class="sr-only" for="pref-ignore-nick-input">Nick to ignore</label>
+      <div class="ignored-users-add" role="group" aria-label="Add name to ignore list">
+        <label class="sr-only" for="pref-ignore-nick-input">Name to ignore</label>
         <input
           id="pref-ignore-nick-input"
           class="pref-text-input"
@@ -84,7 +84,7 @@ export function IgnoredUsersControl(): JSX.Element {
           spellcheck={false}
           autocomplete="off"
           maxlength={MAX_IGNORED_NICK_LENGTH}
-          placeholder="nick"
+          placeholder="name"
           value={draft()}
           onInput={(e) => {
             setDraft(e.currentTarget.value);

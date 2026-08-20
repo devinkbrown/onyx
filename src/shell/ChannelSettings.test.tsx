@@ -494,7 +494,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
 
     renderPanel();
     fireEvent.change(screen.getByLabelText('Role level'), { target: { value: 'VOICE' } });
-    fireEvent.input(screen.getByLabelText('Nick or hostmask'), { target: { value: 'carol' } });
+    fireEvent.input(screen.getByLabelText('Name or hostmask'), { target: { value: 'carol' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add access entry' }));
 
     expect(addSpy).toHaveBeenCalledWith('#general', 'VOICE', 'carol!*@*', undefined);
@@ -507,7 +507,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
 
     renderPanel();
     fireEvent.change(screen.getByLabelText('Role level'), { target: { value: 'DENY' } });
-    fireEvent.input(screen.getByLabelText('Nick or hostmask'), {
+    fireEvent.input(screen.getByLabelText('Name or hostmask'), {
       target: { value: 'bad!*@spam.example' },
     });
     fireEvent.input(screen.getByLabelText('Timeout seconds (optional)'), {
@@ -527,7 +527,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     sendRaw.mockClear();
     fireEvent.click(screen.getByRole('button', { name: 'Add access entry' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/nick or hostmask/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/name or hostmask/i);
     expect(addSpy).not.toHaveBeenCalled();
     // Opening the panel issues ACCESS LIST once; the invalid submit must not.
     expect(sendRaw).not.toHaveBeenCalled();

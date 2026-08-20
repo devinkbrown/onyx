@@ -101,8 +101,8 @@ function clickMode(name: RegExp): void {
 }
 
 function nickField(): HTMLElement {
-  // Both "Nick" (guest/sign-in) and "Desired account / nick" (register) match.
-  return screen.getByLabelText(/nick/i);
+  // Guest / sign-in / register all use one id; labels are Name / Guest name / Desired account name.
+  return screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i });
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
@@ -180,7 +180,7 @@ describe('Connect screen rendering', () => {
   it('renders the stay signed in toggle in Guest mode', () => {
     render(() => <Connect />);
     expect(screen.getByRole('switch')).toBeInTheDocument();
-    expect(screen.getByText(/does not reserve your nick or create an account/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not reserve your name or create an account/i)).toBeInTheDocument();
   });
 
   it('renders the connect button', () => {
@@ -344,7 +344,7 @@ describe('Passkey sign-in', () => {
     clickMode(/sign in/i);
 
     fireEvent.click(screen.getByTestId('conn-passkey-submit'));
-    expect(screen.getByText(/nick is required/i)).toBeInTheDocument();
+    expect(screen.getByText(/name is required/i)).toBeInTheDocument();
     expect(connectSpy).not.toHaveBeenCalled();
 
     fireEvent.input(nickField(), { target: { value: '1bad' } });
@@ -631,7 +631,7 @@ describe('Nick validation', () => {
   it('shows an error when the nick field is empty on submit', async () => {
     render(() => <Connect />);
     fireEvent.submit(document.querySelector('form')!);
-    await waitFor(() => expect(screen.getByText(/nick is required/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/name is required/i)).toBeInTheDocument());
   });
 
   it('shows an error when the nick starts with a digit', async () => {
@@ -651,9 +651,9 @@ describe('Nick validation', () => {
   it('clears the nick error when the user types again', async () => {
     render(() => <Connect />);
     fireEvent.submit(document.querySelector('form')!);
-    await waitFor(() => expect(screen.getByText(/nick is required/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/name is required/i)).toBeInTheDocument());
     fireEvent.input(nickField(), { target: { value: 'kain' } });
-    await waitFor(() => expect(screen.queryByText(/nick is required/i)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/name is required/i)).not.toBeInTheDocument());
   });
 });
 
@@ -1551,7 +1551,7 @@ describe('optional room to join (no autojoin)', () => {
   it('a filled room normalizes (# added) and queues the pending join on submit', () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
-    fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i }), { target: { value: 'tester' } });
     fireEvent.input(roomField(), { target: { value: 'lounge' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(store.getState().pendingDeepLinkJoin).toBe('#lounge');
@@ -1565,7 +1565,7 @@ describe('optional room to join (no autojoin)', () => {
   ])('normalizes room "$entered" to "$expected" in destination and pending join', ({ entered, expected }) => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
-    fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i }), { target: { value: 'tester' } });
     fireEvent.input(roomField(), { target: { value: entered } });
 
     const summary = screen.getByRole('region', { name: /arrive without an account/i });
@@ -1579,7 +1579,7 @@ describe('optional room to join (no autojoin)', () => {
   it('an empty room leaves no pending join — landing on Home is the default', () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
-    fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i }), { target: { value: 'tester' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(store.getState().pendingDeepLinkJoin).toBeNull();
     connectSpy.mockRestore();
@@ -1587,7 +1587,7 @@ describe('optional room to join (no autojoin)', () => {
 
   it('a malformed room blocks submit with an error', () => {
     render(() => <Connect />);
-    fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i }), { target: { value: 'tester' } });
     fireEvent.input(roomField(), { target: { value: '#bad channel' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(screen.getByText(/no spaces or commas/i)).toBeInTheDocument();
@@ -1599,7 +1599,7 @@ describe('optional room to join (no autojoin)', () => {
     render(() => <Connect />);
 
     expect(screen.getByRole('note', { name: /invite preview/i })).toHaveTextContent('Join #general');
-    expect(screen.getByLabelText(/nick/i)).toHaveValue('yuki');
+    expect(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i })).toHaveValue('yuki');
     expect(roomField()).toHaveValue('#general');
   });
 
@@ -1652,7 +1652,7 @@ describe('optional room to join (no autojoin)', () => {
 
     render(() => <Connect />);
 
-    expect(screen.getByLabelText(/nick/i)).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i })).toHaveValue('');
     expect(roomField()).toHaveValue('#general');
   });
 });

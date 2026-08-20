@@ -552,7 +552,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
             when={isGuest()}
             fallback="Review account protection and recovery on this device. Device keys remain separate from sign-in safeguards."
           >
-            Keep this nick if you want to protect it without disconnecting.
+            Keep this name if you want to protect it without disconnecting.
           </Show>
         </p>
         {/* ── Guest state ── */}
@@ -564,12 +564,12 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
             </svg>
             <h3 class="acct-guest-title">You're browsing as a guest</h3>
             <p class="acct-guest-body">
-              Register the nick you are using on this connection to protect it with a
+              Register the name you are using on this connection to protect it with a
               password. You stay connected. Passkeys, recovery codes, certificates,
               and multi-device encryption tools are available after the account exists.
             </p>
             <ol class="acct-guest-steps" aria-label="Account claim steps">
-              <li>Keep the nick you are using — register it without reconnecting.</li>
+              <li>Keep the name you are using — register it without reconnecting.</li>
               <li>Add an optional recovery email if the server asks for verification.</li>
               <li>After sign-in, bind a passkey or client certificate from this panel.</li>
               <li>After sign-in, publish an E2EE device key if you use more than one browser.</li>
@@ -581,7 +581,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               data-testid="guest-open-claim"
               onClick={openClaimWithoutDisconnect}
             >
-              Keep this nick
+              Keep this name
             </Button>
           </div>
         </Show>
@@ -734,7 +734,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Section>
 
           {/* Protection */}
-          <Section title="Protection" hint="Nick + login protection. Toggling these requires your password.">
+          <Section title="Protection" hint="Name + login protection. Toggling these requires your password.">
             <PasswordField
               id="acct-protect-password"
               label="Account password (to change protection)"
@@ -764,7 +764,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
             <div class="acct-toggle-row">
               <div class="acct-toggle-body">
                 <span class="acct-toggle-label">Enforce</span>
-                <p class="acct-toggle-desc">Protect your registered nick — unauthenticated holders get force-renamed.</p>
+                <p class="acct-toggle-desc">Protect your registered name — unauthenticated holders get force-renamed.</p>
               </div>
               <label class="acct-switch">
                 <input
@@ -1055,14 +1055,14 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
             </div>
           </details>
 
-          {/* Recover nick */}
-          <Section title="Recover a nick" hint="Force an unauthenticated holder off your registered nick.">
-            <form onSubmit={submitRecover} noValidate aria-label="Recover a nick">
+          {/* Recover name */}
+          <Section title="Recover a name" hint="Force an unauthenticated holder off your registered name.">
+            <form onSubmit={submitRecover} noValidate aria-label="Recover a name">
               <FormField
                 id="acct-recover-nick"
-                label="Nick"
+                label="Name"
                 type="text"
-                placeholder="your-registered-nick"
+                placeholder="your-registered-name"
                 maxlength={RECOVER_NICK_MAX_LENGTH}
                 value={recoverNick()}
                 onInput={(e) => setRecoverNick(boundedAccountInput(
@@ -1080,7 +1080,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                 onInput={setRecoverPassword}
               />
               <Button type="submit" variant="ghost" size="sm" disabled={!recoverNick().trim()}>
-                Recover nick
+                Recover name
               </Button>
             </form>
           </Section>

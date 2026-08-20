@@ -7612,7 +7612,7 @@ export const store = createStore<OnyxState>()(
             get().addToast({
               variant: 'info',
               title: `Unignored ${nick}`,
-              description: 'Messages and notifications from this nick resume on this device.',
+              description: 'Messages and notifications from this name resume on this device.',
             });
           }
           return;
