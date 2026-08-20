@@ -31,7 +31,7 @@ test.describe('public route lifecycle announcer', () => {
   });
 
   test('keeps one persistent live region, stays silent on first paint, and announces one settled route', async ({ page }) => {
-    const titleOnLanding = 'Onyx — a room for your people';
+    const titleOnLanding = 'Onyx — live rooms, messages, and calls';
     await page.goto('/');
     await expect(page).toHaveTitle(titleOnLanding);
 
@@ -107,7 +107,7 @@ test.describe('public route lifecycle announcer', () => {
     await expect(page.locator(LIVE_REGION)).toHaveCount(1);
   });
 
-  test('treats /install as the download identity and stays silent on unknown paths', async ({ page }) => {
+  test('treats /install as the download identity and announces unknown paths', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Downloads', exact: true }).click();
     await expect(page).toHaveURL(/\/download\/?/);
@@ -121,7 +121,7 @@ test.describe('public route lifecycle announcer', () => {
 
     await clickInjected(page, '/not-a-public-lifecycle-route', 'Unknown');
     await expect(page).toHaveURL(/not-a-public-lifecycle-route/);
-    await expect(page.locator(LIVE_REGION)).toHaveText('Downloads');
+    await expect(page.locator(LIVE_REGION)).toHaveText('Route not found');
     await expect(page.locator(LIVE_REGION)).toHaveCount(1);
   });
 
@@ -139,7 +139,7 @@ test.describe('public route lifecycle announcer', () => {
     }));
     expect(active.ui).not.toBe('route-announcer');
     expect(active.tag).not.toBeUndefined();
-    await expect(page).toHaveTitle('About Onyx — open protocol, sovereign mesh');
+    await expect(page).toHaveTitle('About Onyx — open protocol, sovereign network');
     expect(await page.locator(LIVE_REGION).textContent()).toBe('About');
   });
 });

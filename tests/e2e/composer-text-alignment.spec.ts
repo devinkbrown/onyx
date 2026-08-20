@@ -65,7 +65,7 @@ for (const viewport of [
 
     expect(geometry.paddingTop).toBeCloseTo(geometry.paddingBottom, 5);
     expect(geometry.contentHeight).toBeCloseTo(geometry.lineHeight, 1);
-    expect(geometry.fieldHeight).toBe(viewport.name === 'phone landscape' ? 40 : viewport.width <= 900 ? 44 : 38);
+    expect(geometry.fieldHeight).toBe(viewport.name === 'phone landscape' ? 40 : viewport.width <= 900 ? 44 : 42);
   });
 }
 

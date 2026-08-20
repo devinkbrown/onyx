@@ -299,7 +299,7 @@ test('connected Current Ledger covers busy, caught-up, offline, and failed-outbo
     await expect(page.getByRole('searchbox', { name: 'Search messages' })).toBeFocused();
     await page.keyboard.press('Escape');
     await home.getByRole('button', { name: 'Browse rooms' }).click();
-    await expect(page.getByRole('dialog').or(page.getByLabel(/channel|rooms/i)).first()).toBeVisible();
+    await expect(page.locator('[role="dialog"]:visible').first()).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('video')).toHaveCount(0);
 

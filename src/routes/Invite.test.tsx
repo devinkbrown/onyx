@@ -69,7 +69,7 @@ describe('InviteRoute', () => {
 
     render(() => <InviteRoute />);
 
-    expect(screen.getByRole('heading', { name: /join\s+#general/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /join\s+#general/i })).toBeInTheDocument();
     expect(screen.getAllByText('Onyx').length).toBeGreaterThan(0);
     expect(screen.getAllByText('#general').length).toBeGreaterThan(1);
     expect(screen.getAllByText('release train').length).toBeGreaterThan(0);
@@ -93,7 +93,7 @@ describe('InviteRoute', () => {
 
     render(() => <InviteRoute />);
 
-    expect(screen.getByRole('heading', { name: /join\s+onyx/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /join\s+onyx/i })).toBeInTheDocument();
     expect(screen.getByText('Choose a room from Home')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open invite in onyx/i })).toHaveAttribute('href', '/app/');
     expect(screen.queryByTestId('invite-hero-ledger')).toBeNull();
@@ -105,7 +105,7 @@ describe('InviteRoute', () => {
 
     render(() => <InviteRoute />);
 
-    expect(screen.getByRole('heading', { name: /join\s+onyx/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /join\s+onyx/i })).toBeInTheDocument();
     expect(screen.queryByText(/evil/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open invite in onyx/i })).toHaveAttribute('href', '/app/');
   });

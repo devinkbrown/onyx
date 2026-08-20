@@ -111,6 +111,8 @@ describe('recents', () => {
 
   it('migrates legacy Channels section labels to Rooms on load', () => {
     const key = deviceMemoryStorageKey(PALETTE_RECENTS_STORAGE_KEY, ALICE);
+    expect(key).not.toBeNull();
+    if (key === null) throw new Error('expected an owner-scoped recents storage key');
     localStorage.setItem(key, JSON.stringify([
       { id: 'channel:#legacy', label: 'Go to #legacy', section: 'Channels', at: new Date().toISOString() },
     ]));

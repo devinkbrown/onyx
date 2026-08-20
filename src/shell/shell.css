@@ -5605,6 +5605,7 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overflow-anchor: none;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--seam-faint) transparent;
@@ -7630,6 +7631,14 @@
 
   .shell-members-scroll .onyx-popover__trigger {
     min-height: 44px;
+  }
+
+  /* Stable row geometry matters more than paint skipping in the tiny 400%
+     reflow viewport; deferred intrinsic sizes can leave focused rows outside
+     the roster scrollport while Chromium resolves them. */
+  .shell-members-group-list > li {
+    content-visibility: visible;
+    contain-intrinsic-size: none;
   }
 
   .shell-member-row {

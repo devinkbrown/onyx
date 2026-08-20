@@ -5,12 +5,12 @@ import { stubPublicFeeds } from './public-feed-fixture';
 test.describe('Onyx landing', () => {
   test('hero loads with the current headline', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toHaveText('Make room for the conversations that matter.');
+    await expect(page.locator('h1')).toHaveText('Onyx is on. Open a room.');
   });
 
   test('kicker + primary CTAs render', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText(/public communication · powered by onyx server/i)).toBeVisible();
+    await expect(page.getByText(/live service · rooms · messages · calls/i)).toBeVisible();
     await expect(page.getByRole('link', { name: /open onyx/i }).first()).toBeVisible();
   });
 

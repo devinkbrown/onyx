@@ -9,7 +9,7 @@ const routes = [
   },
   {
     path: '/status/',
-    heading: 'Mesh health, in public',
+    heading: 'Network health, in public',
     heroSelector: '.data-hero h1',
     copySelector: '.data-card p',
   },

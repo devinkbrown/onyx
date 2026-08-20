@@ -110,7 +110,7 @@ export default function InviteRoute() {
 
       <section class="r-wrap data-hero" aria-labelledby="invite-heading">
         <p class="r-kicker">invite</p>
-        <h1 id="invite-heading">
+        <h1 id="invite-heading" aria-label={card().channel ? `Join ${card().channel}` : `Join ${NETWORK_NAME}`}>
           <Show when={card().channel} fallback={<>Join<br /><span class="invite-title-accent">{NETWORK_NAME}</span></>}>
             {(channel) => (
               <>

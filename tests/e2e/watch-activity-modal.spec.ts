@@ -26,6 +26,9 @@ interface Box {
 }
 
 async function seedWatchRoom(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    localStorage.setItem('onyx:preferences', JSON.stringify({ watchTogether: true }));
+  });
   await page.goto(APP, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
     (globalName) => Boolean((window as unknown as WindowWithStore)[globalName]?.store?.setState),
@@ -153,7 +156,7 @@ for (const viewport of [
       `https://example.test/${'unbroken-private-path-'.repeat(24)}`,
     );
     await page.getByRole('spinbutton', { name: 'Duration in seconds (optional)' }).fill('120');
-    await page.getByRole('button', { name: 'Review activity' }).click();
+    await editorDialog.getByRole('button', { name: 'Review activity' }).click();
 
     const reviewDialog = page.getByRole('dialog', { name: 'Review room-wide activity' });
     await expect(reviewDialog).toBeVisible();

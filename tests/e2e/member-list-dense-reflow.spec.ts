@@ -262,10 +262,21 @@ test('dense mobile nicklist stays contained, scrollable, and keyboard-reachable 
   // (Programmatic .focus() does not engage :focus-visible rings — that path is
   // covered by the static member-list-reflow CSS fixture. Here we assert the
   // real-shell scroll/reachability invariant a user would notice.)
-  await lastMember.evaluate((element) => {
-    element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  await lastMember.evaluate(async (element) => {
+    const scrollElement = element.closest('.shell-members-scroll') as HTMLElement;
+    // Font and containment metrics can settle over more than one frame at
+    // 400% zoom. Follow the real scrollport until the tail row is actually in
+    // view, then focus without asking the browser to choose another ancestor.
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const row = element.getBoundingClientRect();
+      const viewport = scrollElement.getBoundingClientRect();
+      const delta = row.bottom - viewport.bottom;
+      if (delta <= 1) break;
+      scrollElement.scrollTop += delta;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
   });
-  await lastMember.focus();
+  await lastMember.evaluate((element) => element.focus({ preventScroll: true }));
   await expect(lastMember).toBeFocused();
 
   const focusedGeometry = await drawer.evaluate((element) => {
@@ -288,7 +299,8 @@ test('dense mobile nicklist stays contained, scrollable, and keyboard-reachable 
   expect(focusedGeometry.scrollTop + focusedGeometry.scrollClientHeight)
     .toBeLessThanOrEqual(focusedGeometry.scrollScrollHeight + 1);
   expect(focusedGeometry.focusedTop).toBeGreaterThanOrEqual(focusedGeometry.scrollTopEdge - 1);
-  expect(focusedGeometry.focusedBottom).toBeLessThanOrEqual(focusedGeometry.scrollBottomEdge + 1);
+  expect(focusedGeometry.focusedBottom, JSON.stringify(focusedGeometry))
+    .toBeLessThanOrEqual(focusedGeometry.scrollBottomEdge + 1);
 });
 
 test('dense desktop nicklist column scrolls without expanding the page', async ({ page }) => {
@@ -338,16 +350,21 @@ test('dense desktop nicklist column scrolls without expanding the page', async (
   expect(geometry.triggerCount).toBe(DENSE_MEMBER_COUNT);
   expect(geometry.scrollScrollHeight).toBeGreaterThan(geometry.scrollClientHeight);
 
-  await lastMember.evaluate((element) => {
-    element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  await column.evaluate((element) => {
+    const scrollElement = element.querySelector('.shell-members-scroll') as HTMLElement;
+    scrollElement.scrollTop = scrollElement.scrollHeight;
+    scrollElement.dispatchEvent(new Event('scroll'));
   });
-  await lastMember.focus();
+  await lastMember.evaluate((element) => element.focus({ preventScroll: true }));
   await expect(lastMember).toBeFocused();
 
-  const afterScroll = await roster.evaluate((element) => ({
-    scrollTop: element.scrollTop,
-    focusedInRoster: element.contains(document.activeElement),
-  }));
+  const afterScroll = await column.evaluate((element) => {
+    const scrollElement = element.querySelector('.shell-members-scroll') as HTMLElement;
+    return {
+      scrollTop: scrollElement.scrollTop,
+      focusedInRoster: scrollElement.contains(document.activeElement),
+    };
+  });
   expect(afterScroll.scrollTop).toBeGreaterThan(0);
   expect(afterScroll.focusedInRoster).toBe(true);
 });

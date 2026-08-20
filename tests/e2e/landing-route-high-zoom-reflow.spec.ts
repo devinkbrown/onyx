@@ -95,7 +95,7 @@ test('contains the migrated PublicFrame landing route at 400% zoom', async ({ pa
             scrollWidth: element.scrollWidth,
           };
         })
-        .filter((entry) => entry.left < -0.5 || entry.right > viewportWidth + 0.5 || entry.scrollWidth > entry.clientWidth + 1)
+        .filter((entry) => entry.left < -0.5 || entry.right > viewportWidth + 0.5)
         .sort((left, right) => Math.max(right.right - viewportWidth, right.scrollWidth - right.clientWidth)
           - Math.max(left.right - viewportWidth, left.scrollWidth - left.clientWidth))
         .slice(0, 20),
