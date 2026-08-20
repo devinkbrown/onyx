@@ -14,7 +14,7 @@ import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
 
 /**
- * Onyx /about — protocol, media, and mesh essay.
+ * Onyx /about — protocol, media, and network essay.
  * Room Current identity; continuous with the shared public frame.
  *
  * Technical claims grounded in:
@@ -111,7 +111,7 @@ export default function About() {
           <a href="#protocol">Protocol</a>
           <a href="#media">Media</a>
           <a href="#e2ee">Encryption</a>
-          <a href="#mesh">Network</a>
+          <a href="#network">Network</a>
           <a href="#services">Services</a>
           <a href="#developer">Build</a>
           <a href="#accessibility">Accessibility</a>
@@ -170,10 +170,10 @@ export default function About() {
             <p>
               +q owner, +o operator, +v voice — these aren't cosmetic badges. They're
               room state: <b>the server enforces them</b>, they survive reconnects, and
-              IRCX ACCESS lets fine-grained overrides live on the room itself.
+              Persistent access entries let fine-grained overrides live on the room itself.
               Your permissions are yours, on every client that speaks the protocol.
             </p>
-            <span class="tag">modes · ircx access · roles</span>
+            <span class="tag">modes · access · roles</span>
           </article>
         </div>
 
@@ -438,19 +438,19 @@ export default function About() {
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      {/* ── 4. The mesh ── */}
-      <section id="mesh" class="r-wrap ab-section" aria-labelledby="mesh-heading">
+      {/* ── 4. The network ── */}
+      <section id="network" class="r-wrap ab-section" aria-labelledby="network-heading">
         <span class="r-eyebrow">04 — the network</span>
-        <h2 id="mesh-heading" class="r-title">A network that<br />heals itself</h2>
+        <h2 id="network-heading" class="r-title">A network that<br />heals itself</h2>
         <p class="r-lede">
           A self-healing server fabric that keeps the network convergent across however
           many nodes, with no single point of failure.
         </p>
 
-        <div class="ab-mesh-body">
+        <div class="ab-network-body">
           {/* Mesh diagram */}
           <svg
-            class="ab-mesh-vis"
+            class="ab-network-vis"
             viewBox="0 0 600 360"
             role="img"
             aria-label="Network diagram: eshmaki.me and ircx.us joined by azure current links; either node reaches the whole network"
@@ -490,7 +490,7 @@ export default function About() {
             <text x="300" y="170" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--paper-mute)" text-anchor="middle">delta-state sync</text>
           </svg>
 
-          <div class="ab-mesh-text">
+          <div class="ab-network-text">
             <p>
               The client auto-routes to the nearest node — <b>eshmaki.me:8080</b> and
               <b> ircx.us:8080</b> are two entrances to the same network. State replicates

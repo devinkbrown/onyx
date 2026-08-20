@@ -529,7 +529,7 @@
 }
 
 /* ───────── Cadence mesh section ───────── */
-.ab-mesh-body {
+.ab-network-body {
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   gap: clamp(28px, 4vw, 68px);
@@ -538,12 +538,12 @@
 }
 
 @media (max-width: 860px) {
-  .ab-mesh-body {
+  .ab-network-body {
     grid-template-columns: 1fr;
   }
 }
 
-.ab-mesh-vis {
+.ab-network-vis {
   width: 100%;
   height: auto;
   display: block;
@@ -553,13 +553,13 @@
   background: color-mix(in oklab, var(--stone-2) 32%, var(--ink));
 }
 
-.ab-mesh-text {
+.ab-network-text {
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
 
-.ab-mesh-text p {
+.ab-network-text p {
   margin: 0;
   font-family: var(--font-sans);
   font-size: 0.99rem;
@@ -568,7 +568,7 @@
   text-wrap: pretty;
 }
 
-.ab-mesh-text p b {
+.ab-network-text p b {
   color: var(--paper);
   font-weight: 600;
 }
@@ -1148,7 +1148,7 @@
 
   .ab-media-diagram,
   .ab-e2ee-visual,
-  .ab-mesh-vis {
+  .ab-network-vis {
     width: 100%;
     min-width: 0;
     overflow: hidden;
@@ -1171,7 +1171,7 @@
   .ab-media-header > *,
   .ab-transport-row > *,
   .ab-e2ee-split > *,
-  .ab-mesh-body > *,
+  .ab-network-body > *,
   .ab-crdt-row > *,
   .ab-svc-grid > *,
   .ab-mythos-grid > *,

@@ -1,6 +1,6 @@
 # Onyx commercial UI system
 
-**Status:** Locked design contract for general-public shell redesign.
+**Status:** Complete — general-public shell + landing copy locked to rooms/network language (wire honesty retained in Advanced/Network Ops, guides commands, and protocol essays).
 **Scope:** Presentation and information hierarchy only. Kernel frozen.
 **Slice 1 (implemented here):** Room header commercial chrome — `PresenceRibbon` + ribbon CSS + focused tests.
 **Reviewer:** Codex · **Writer (this tree):** implementer lane · **Claude:** off for this pass.
@@ -257,7 +257,7 @@ disconnecting, without blocking the composer, and without false product claims.
 | **3** | Home Needs you / Continue hierarchy | `HomeView.*`, `home-view.css`, `HomeView*.test.tsx`, this doc | **This slice** |
 | **4** | Composer public default (+ tray) | `Composer.tsx`, `Composer.test.tsx`, composer CSS in `shell.css`, this doc | **Done** (denser More tools tray) |
 | **5** | You hub tiers | AppShell you surface, Preferences structure, Appearance, Account | **Done** (You + Account; ops matrix off Activity in Standard) |
-| **6** | Rooms/Messages collection polish | `ChannelSidebar.*`, sidebar CSS + shell/landing copy | **Done** (rooms/network language; Network Ops / Classic log / open-wire details; intentional wire honesty) |
+| **6** | Rooms/Messages collection polish | `ChannelSidebar.*`, sidebar CSS + shell/landing copy | **Done** |
 
 **Deferred beyond top 6:** transcript type density; default-off TimeScrubber/Watch; Connect copy; Landing claim alignment when packaging ledger green; **member-column persistence**.
 

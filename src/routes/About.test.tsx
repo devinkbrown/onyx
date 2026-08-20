@@ -113,7 +113,7 @@ describe('About page — source structure', () => {
     expect(srcContains('aria-label="About topics"')).toBe(true);
     expect(srcContains('href="#protocol"')).toBe(true);
     expect(srcContains('href="#media"')).toBe(true);
-    expect(srcContains('href="#mesh"')).toBe(true);
+    expect(srcContains('href="#network"')).toBe(true);
   });
 
   it('has an h1 heading in the hero', () => {
@@ -136,8 +136,8 @@ describe('About page — source structure', () => {
     expect(srcContains('id="e2ee"')).toBe(true);
   });
 
-  it('has a mesh section with id="mesh"', () => {
-    expect(srcContains('id="mesh"')).toBe(true);
+  it('has a network section with id="network"', () => {
+    expect(srcContains('id="network"')).toBe(true);
   });
 
   it('has a services section with id="services"', () => {
@@ -311,7 +311,7 @@ describe('About page — source structure', () => {
   it('nav links include in-page anchors for protocol, media, mesh', () => {
     expect(srcContains('href="#protocol"')).toBe(true);
     expect(srcContains('href="#media"')).toBe(true);
-    expect(srcContains('href="#mesh"')).toBe(true);
+    expect(srcContains('href="#network"')).toBe(true);
   });
 
   it('atmosphere layers are aria-hidden', () => {
@@ -372,8 +372,8 @@ describe('About page — CSS source', () => {
     expect(css.includes('.ab-e2ee-split')).toBe(true);
   });
 
-  it('defines .ab-mesh-body for the mesh layout', () => {
-    expect(css.includes('.ab-mesh-body')).toBe(true);
+  it('defines .ab-network-body for the network layout', () => {
+    expect(css.includes('.ab-network-body')).toBe(true);
   });
 
   it('defines .ab-svc for service command cards', () => {
@@ -510,7 +510,7 @@ describe('About page — DOM rendering', () => {
 
   it.skipIf(!renderAvailable)('all seven section ids are present', () => {
     const { cleanup } = renderAbout!();
-    const ids = ['protocol', 'media', 'e2ee', 'mesh', 'services', 'mythos', 'developer'];
+    const ids = ['protocol', 'media', 'e2ee', 'network', 'services', 'mythos', 'developer'];
     for (const id of ids) {
       expect(document.getElementById(id)).not.toBeNull();
     }

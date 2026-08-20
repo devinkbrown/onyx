@@ -337,7 +337,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
         </Show>
       </div>
 
-      {/* Advanced / IRC Ops only — never against yourself, never in Standard. */}
+      {/* Advanced / Network Ops only — never against yourself, never in Standard. */}
       <Show when={showRoomModeration()}>
         <div
           class="shell-member-card-mod"
