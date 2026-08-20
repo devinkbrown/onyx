@@ -126,7 +126,7 @@ describe('PresenceRibbon commercial room header', () => {
 
   it.each([
     { label: 'Home', activeView: { kind: 'home' as const } },
-    { label: 'Status', activeView: { kind: 'status' as const } },
+    { label: 'Activity', activeView: { kind: 'status' as const } },
     { label: 'a stale resumed channel', activeView: { kind: 'channel' as const, channel: '#missing' } },
   ])('hides context-only actions on $label when no live conversation context exists', ({ activeView }) => {
     store.setState({

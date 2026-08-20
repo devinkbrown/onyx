@@ -5240,9 +5240,9 @@
   bottom: calc(100% + 8px);
   z-index: 6;
   display: grid;
-  gap: 6px;
-  width: min(280px, calc(100vw - 24px));
-  padding: 8px;
+  gap: 4px;
+  width: min(260px, calc(100vw - 24px));
+  padding: 6px;
   border: 1px solid var(--seam);
   border-radius: 2px;
   background: var(--ink);
@@ -5252,10 +5252,10 @@
 .shell-composer-tools-item,
 .shell-composer-tools-action {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   width: 100%;
-  min-height: 44px;
-  padding: 8px 10px;
+  min-height: 40px;
+  padding: 7px 9px;
   border: 1px solid var(--seam-faint);
   border-radius: 2px;
   cursor: pointer;

@@ -1551,7 +1551,7 @@ export function Composer(props: ComposerProps): JSX.Element {
               <div class="shell-composer-tools-tip" role="note">
                 <p class="shell-composer-tools-item-title">Slash commands</p>
                 <p class="shell-composer-tools-item-desc">
-                  Type <kbd class="shell-composer-tools-kbd">/</kbd> in the message field for commands. Nothing runs until you send.
+                  Type <kbd class="shell-composer-tools-kbd">/</kbd> for commands. Nothing runs until you send.
                 </p>
                 <button
                   type="button"

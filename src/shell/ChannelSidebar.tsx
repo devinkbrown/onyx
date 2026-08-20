@@ -694,11 +694,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                   tabindex={rovingKey() === 'status' ? 0 : -1}
                   class={`shell-channel-item${activeView().kind === 'status' ? ' shell-channel-item--active' : ''}`}
                   aria-current={activeView().kind === 'status' ? 'page' : undefined}
-                  aria-label="Server status"
+                  aria-label="Network activity"
                   onClick={handleStatusClick}
                 >
                   <span class="shell-channel-sigil" aria-hidden="true">✦</span>
-                  <span class="shell-channel-name">Status</span>
+                  <span class="shell-channel-name">Activity</span>
                 </button>
               </li>
             </ul>

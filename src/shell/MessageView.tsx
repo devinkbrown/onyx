@@ -1960,9 +1960,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     </p>
                   </Show>
                   <Show when={activeView().kind === 'status'}>
-                    <p class="shell-feed-empty-title">Status log</p>
+                    <p class="shell-feed-empty-title">Activity</p>
                     <p class="shell-feed-empty-body">
-                      Server notices and connection detail will land here.
+                      Connection notices and network detail will land here.
                     </p>
                   </Show>
                 </div>

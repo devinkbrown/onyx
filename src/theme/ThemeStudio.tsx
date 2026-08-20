@@ -176,7 +176,7 @@ function StudioPreview() {
           <div class="ts-pv-side__server">
             <span class="ts-pv-side__sigil">◆</span>onyx
           </div>
-          <div class="ts-pv-side__group">channels</div>
+          <div class="ts-pv-side__group">rooms</div>
           <div class="ts-pv-chan" data-active="true">
             <span class="ts-pv-chan__hash">#</span>general
           </div>
@@ -191,7 +191,7 @@ function StudioPreview() {
           <div class="ts-pv-chan ts-pv-chan--muted">
             <span class="ts-pv-chan__hash">#</span>abyss
           </div>
-          <div class="ts-pv-side__group">voice</div>
+          <div class="ts-pv-side__group">calls</div>
           <div class="ts-pv-chan">
             <span class="ts-pv-chan__hash ts-pv-chan__hash--voice">◉</span>tide-pool
           </div>
@@ -222,7 +222,7 @@ function StudioPreview() {
             <div class="ts-pv-msg">
               <span class="ts-pv-msg__time">21:07</span>
               <span class="ts-pv-msg__nick" style={{"color":"var(--ok)"}}>onyx</span>
-              <span class="ts-pv-msg__text ts-pv-msg__text--dim">→ mesh: 2 shards linked, quorum ok</span>
+              <span class="ts-pv-msg__text ts-pv-msg__text--dim">→ network: 2 homes linked, quorum ok</span>
             </div>
             <div class="ts-pv-msg">
               <span class="ts-pv-msg__time">21:09</span>
@@ -232,7 +232,7 @@ function StudioPreview() {
           </div>
 
           <div class="ts-pv-actions">
-            <button class="ts-pv-btn ts-pv-btn--primary" type="button" tabIndex={-1}>join voice</button>
+            <button class="ts-pv-btn ts-pv-btn--primary" type="button" tabIndex={-1}>join call</button>
             <button class="ts-pv-btn ts-pv-btn--danger" type="button" tabIndex={-1}>leave</button>
           </div>
 
@@ -246,7 +246,7 @@ function StudioPreview() {
 
         {/* Member list with role sigils */}
         <div class="ts-pv-members">
-          <div class="ts-pv-members__head">online — 4</div>
+          <div class="ts-pv-members__head">people — 4</div>
           <div class="ts-pv-member">
             <span class="ts-pv-member__sigil" style={{"color":"var(--gold-bright)"}}>!</span>aoi
             <span class="ts-pv-member__dot" style={{"background":"var(--ok)"}} />

@@ -476,7 +476,7 @@ describe('ChannelSidebar accessibility', () => {
     fireEvent.click(status);
 
     // Assert
-    expect(status.getAttribute('aria-label')).toBe('Server status');
+    expect(status.getAttribute('aria-label')).toBe('Network activity');
     expect(navigateSpy).toHaveBeenCalledWith({ kind: 'status' });
     navigateSpy.mockRestore();
   });

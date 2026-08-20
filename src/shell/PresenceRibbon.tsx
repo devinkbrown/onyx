@@ -209,7 +209,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     const view = activeView();
     if (view.kind === 'channel') return view.channel;
     if (view.kind === 'dm') return view.nick;
-    if (view.kind === 'status') return 'Status';
+    if (view.kind === 'status') return 'Activity';
     return null;
   });
 
