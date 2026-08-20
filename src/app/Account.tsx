@@ -782,7 +782,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Section>
 
           {/* Certificates */}
-          <Section title="Certificates" hint="Bind a TLS client-certificate fingerprint for password-less login (SASL EXTERNAL).">
+          <Section title="Certificates" hint="Bind a TLS client-certificate fingerprint for password-less login (certificate auth).">
             <div class="acct-cert-actions">
               <Button type="button" variant="ghost" size="sm" onClick={bindThisCert}>
                 Bind this connection's certificate

@@ -1690,6 +1690,27 @@ describe('AppShell', () => {
   });
 
   describe('home state', () => {
+    it('hides the Status capability matrix in Standard experience', () => {
+      seedStore('#general');
+      setPreference('experienceMode', 'standard');
+      store.setState({ activeView: { kind: 'status' } });
+
+      render(() => <AppShell />);
+
+      expect(screen.getByTestId('status-stack')).toBeInTheDocument();
+      expect(screen.queryByTestId('capability-matrix-section')).toBeNull();
+    });
+
+    it('shows the Status capability matrix in Advanced experience', () => {
+      seedStore('#general');
+      setPreference('experienceMode', 'advanced');
+      store.setState({ activeView: { kind: 'status' } });
+
+      render(() => <AppShell />);
+
+      expect(screen.getByTestId('capability-matrix-section')).toBeInTheDocument();
+    });
+
     it('renders the home view when activeView is home', () => {
       // Arrange
       store.setState({

@@ -1296,7 +1296,9 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                 </Show>
                 }>
                   <div class="shell-status-stack" data-testid="status-stack">
-                    <CapabilityMatrixSection />
+                    <Show when={preferences().experienceMode !== 'standard'}>
+                      <CapabilityMatrixSection />
+                    </Show>
                     <MessageView selfNick={displayNick()} />
                   </div>
                 </Show>
