@@ -47,7 +47,9 @@ describe('StatusRoute', () => {
     expect(container.querySelector('.ui-root.status-route')).toBeTruthy();
     expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Ledger.*Status/);
     expect(within(screen.getByRole('navigation', { name: 'Primary navigation' }))
-      .getByRole('link', { name: 'Status' })).toHaveAttribute('aria-current', 'page');
+      .queryByRole('link', { name: 'Status' })).toBeNull();
+    expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))
+      .getByRole('link', { name: 'Status' })).toHaveAttribute('href', '/status/');
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' });
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');

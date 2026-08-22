@@ -19,8 +19,8 @@ const expected = {
     description: 'Open Onyx in your browser for local-first rooms, honest media security, live network context, and an identity you control.',
   },
   about: {
-    title: 'About Onyx — open protocol, sovereign network',
-    description: 'Learn how Onyx, Cadence media, and the open network work together without closed-platform lock-in.',
+    title: 'About Onyx — rooms for your people',
+    description: 'Onyx is a community for rooms, messages, and calls. Private DMs when you want them. No ads. Open in your browser, or invite people you already know.',
   },
   appearance: {
     title: 'Onyx appearance — look, text size, and motion',
@@ -47,14 +47,14 @@ const expected = {
     description: 'Open an Onyx invite to join a room as a guest or with your account, carrying its topic, moment, and reading context.',
   },
   download: {
-    title: 'Download Onyx — unsigned native packages',
+    title: 'Get Onyx on this device — browser first',
     description:
-      'Download unsigned Onyx v0.1.3 Windows zip and Linux/FreeBSD/OpenBSD tar.gz packages with SHA-256 sidecars. macOS Intel and Apple Silicon native packages are coming soon. Not signed or notarized. Browser and PWA remain the primary paths.',
+      'Get Onyx on this device in your browser. Keep it here from a supporting browser. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
   },
   install: {
-    title: 'Install Onyx — native packages and browser app',
+    title: 'Install Onyx on this device — browser first',
     description:
-      'Install Onyx from the browser or download unsigned Windows, Linux, FreeBSD, and OpenBSD packages with runtimes, install steps, and SHA-256 verification.',
+      'Install Onyx in your browser, or keep it on this device. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
   },
   accessibility: {
     title: 'Onyx accessibility — access is a requirement',

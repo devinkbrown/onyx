@@ -11,7 +11,7 @@ test('keeps the PublicFrame Download route usable at 400% zoom', async ({ page }
   const frame = page.locator('.public-frame');
   const header = frame.locator('.public-frame__header');
   const footer = frame.locator('.public-frame__footer');
-  const main = frame.getByRole('main', { name: 'Onyx downloads' });
+  const main = frame.getByRole('main', { name: 'Get Onyx' });
   const skip = frame.getByRole('link', { name: 'Skip to content' });
   const menuToggle = header.locator('.public-frame__menu-toggle');
   const primaryAction = header.getByRole('link', { name: 'Open Onyx', exact: true });
@@ -20,7 +20,7 @@ test('keeps the PublicFrame Download route usable at 400% zoom', async ({ page }
   await expect(frame.locator('header.public-frame__header')).toHaveCount(1);
   await expect(frame.locator('footer.public-frame__footer')).toHaveCount(1);
   await expect(header.locator('a[href="/download/"]')).toHaveAttribute('aria-current', 'page');
-  await expect(main.getByRole('heading', { name: /Windows, Linux,\s*FreeBSD & OpenBSD/i })).toBeVisible();
+  await expect(main.getByRole('heading', { name: /Get Onyx on this device/i })).toBeVisible();
   await expect(main.getByRole('heading', { name: 'What this is — and is not' })).toBeVisible();
   await expect(main.getByTestId('dl-card-windows')).toBeVisible();
   await expect(main.getByTestId('dl-card-macos')).toHaveAttribute('data-state', 'coming-soon');
@@ -139,8 +139,8 @@ test('keeps the /install/ alias on the same PublicFrame download surface', async
   await page.goto('/install/');
 
   await expect(page).toHaveTitle(/Install Onyx/);
-  await expect(page.getByRole('main', { name: 'Onyx downloads' })).toHaveCount(1);
-  await expect(page.getByRole('heading', { name: 'Install Onyx' })).toBeVisible();
+  await expect(page.getByRole('main', { name: 'Get Onyx' })).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Install Onyx on this device' })).toBeVisible();
   await expect(page.locator('.public-frame__header a[href="/download/"]')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('dl-card-linux')).toBeVisible();
   await expect(page.getByTestId('dl-install-linux')).toContainText('install.sh');

@@ -347,19 +347,19 @@ function MacosComingSoonCard(): JSX.Element {
 }
 
 /**
- * Public /download — unsigned Windows/Linux/FreeBSD/OpenBSD native packages.
- * macOS Intel + Apple Silicon: combined coming-soon (no fake DMG controls). Browser remains primary.
+ * Public /download — browser and PWA first; unsigned native packages below.
+ * macOS Intel + Apple Silicon: combined coming-soon (no fake DMG controls).
  */
 export default function Download(): JSX.Element {
   const installGuide = typeof window !== 'undefined'
     && /^\/install(?:\/|$)/.test(window.location.pathname);
   setPageMeta(
     installGuide
-      ? 'Install Onyx — native packages and browser app'
-      : 'Download Onyx — unsigned native packages',
+      ? 'Install Onyx on this device — browser first'
+      : 'Get Onyx on this device — browser first',
     installGuide
-      ? 'Install Onyx from the browser or use unsigned Windows, Linux, FreeBSD, and OpenBSD packages with runtimes, install steps, and SHA-256 verification.'
-      : 'Download unsigned Onyx v0.1.3 Windows zip and Linux/FreeBSD/OpenBSD tar.gz packages with SHA-256 sidecars. macOS Intel and Apple Silicon native packages are coming soon. Not signed or notarized. Browser and PWA remain the primary paths.',
+      ? 'Install Onyx in your browser, or keep it on this device. Desktop packages are optional and unsigned. macOS native packages are coming soon.'
+      : 'Get Onyx on this device in your browser. Keep it here from a supporting browser. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
     installGuide ? '/install/' : '/download/',
   );
 
@@ -381,63 +381,63 @@ export default function Download(): JSX.Element {
   return (
     <PublicFrame
       currentPath="/download/"
-      mainLabel="Onyx downloads"
+      mainLabel="Get Onyx"
       context={(
         <p class="public-frame__current-line">
-          <span class="public-frame__current-kicker">Artifacts</span>
+          <span class="public-frame__current-kicker">This device</span>
           <span aria-hidden="true">·</span>
-          <span class="public-frame__current-label">Downloads</span>
+          <span class="public-frame__current-label">Browser first</span>
         </p>
       )}
     >
       <div class="ui-root r data-page dl-page" data-testid="download-page">
         <div class="r-ground" aria-hidden="true" />
-        <div class="r-flecks" aria-hidden="true" />
         <div class="r-grain" aria-hidden="true" />
 
         <section class="r-wrap data-hero dl-hero" aria-labelledby="download-heading">
-          <p class="r-kicker">
-            {installGuide ? 'Install guide' : `v${DOWNLOAD_PRODUCT_VERSION} · unsigned native packages`}
-          </p>
+          <p class="dl-kicker">{installGuide ? 'Install guide' : 'This device'}</p>
           <h1 id="download-heading">
-            {installGuide
-              ? 'Install Onyx'
-              : <>Windows, Linux, <br /><span class="dl-title-accent">FreeBSD & OpenBSD</span></>}
+            {installGuide ? 'Install Onyx on this device' : 'Get Onyx on this device'}
           </h1>
+          <p class="serif-pull">Open it in the browser. That is the main door.</p>
           <p class="sub">
-            Operator packages now: Windows zip, Linux tar.gz, and FreeBSD/OpenBSD hosts with
-            {' '}
-            <code>install.sh</code>
-            . Every published artifact is
-            {' '}
-            <strong>unsigned</strong>
-            , carries a SHA-256 sidecar and honesty notice, and is site-local under
-            {' '}
-            <code>/downloads/v{DOWNLOAD_PRODUCT_VERSION}/</code>
-            .
-            {' '}
-            <strong>macOS</strong>
-            {' '}
-            Intel and Apple Silicon native packages are
-            {' '}
-            <strong>coming soon</strong>
-            {' '}
-            (built on real Macs only — never fabricated here). Until then, use the browser or PWA.
+            Supporting browsers can keep Onyx here as an installed app — same rooms,
+            messages, and calls. Desktop packages exist if you want them. They stay
+            further down this page, unsigned and honest.
           </p>
-          <div
-            class="dl-catalog-receipt"
-            data-catalog-state={catalogState()}
-            role="status"
-            aria-label="Download catalog status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <span class="dl-catalog-receipt__marker" aria-hidden="true" />
-            <span>{catalogReceipt()}</span>
+          <div class="dl-cta">
+            <a class="r-btn primary" href="/app/" data-testid="dl-open-browser">
+              Open Onyx in the browser
+            </a>
+            <a class="r-btn ghost" href="#keep-here">
+              Keep it on this device
+            </a>
           </div>
         </section>
 
         <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
+
+        <section id="keep-here" class="r-wrap r-section" aria-labelledby="browser-heading">
+          <h2 id="browser-heading" class="dl-section-title">Keep Onyx on this device</h2>
+          <div class="dl-browser data-card">
+            <p>
+              Open Onyx, then use your browser&apos;s
+              {' '}
+              <strong>Install app</strong>
+              {' '}
+              or
+              {' '}
+              <strong>Add to Home Screen</strong>
+              {' '}
+              control. You get the same rooms, people, and calls — no store badge required.
+            </p>
+            <p>
+              Safari on iPhone uses Add to Home Screen. Chrome, Edge, and other
+              supporting browsers offer an install prompt once the app is open.
+            </p>
+            <a class="r-btn primary" href="/app/">Join in the browser</a>
+          </div>
+        </section>
 
         <section class="r-wrap r-section" aria-labelledby="honesty-heading">
           <h2 id="honesty-heading" class="dl-section-title">What this is — and is not</h2>
@@ -484,7 +484,23 @@ export default function Download(): JSX.Element {
         </section>
 
         <section class="r-wrap r-section" aria-labelledby="download-lanes-heading">
-          <h2 id="download-lanes-heading" class="dl-section-title">Native packages</h2>
+          <h2 id="download-lanes-heading" class="dl-section-title">Desktop packages</h2>
+          <p class="dl-below-fold">
+            Optional native builds for Windows, Linux, FreeBSD, and OpenBSD.
+            Every published artifact is unsigned. macOS Intel and Apple Silicon
+            packages are coming soon — built on real Macs only, never fabricated here.
+          </p>
+          <div
+            class="dl-catalog-receipt"
+            data-catalog-state={catalogState()}
+            role="status"
+            aria-label="Download catalog status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <span class="dl-catalog-receipt__marker" aria-hidden="true" />
+            <span>{catalogReceipt()}</span>
+          </div>
           <div class="dl-grid" aria-label="Native download cards">
             <For each={[...DOWNLOAD_CARDS]}>
               {(card) => (

@@ -109,14 +109,14 @@ test.describe('public route lifecycle announcer', () => {
 
   test('treats /install as the download identity and announces unknown paths', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Downloads', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Download', exact: true }).click();
     await expect(page).toHaveURL(/\/download\/?/);
-    await expect(page.locator(LIVE_REGION)).toHaveText('Downloads');
+    await expect(page.locator(LIVE_REGION)).toHaveText('Download');
     await markLiveRegion(page);
 
     await clickInjected(page, '/install/', 'Install');
     await expect(page).toHaveURL(/\/install\/?/);
-    await expect(page.locator(LIVE_REGION)).toHaveText('Downloads');
+    await expect(page.locator(LIVE_REGION)).toHaveText('Download');
     await expect(page.locator(LIVE_REGION)).toHaveAttribute('data-lifecycle-probe', 'persistent');
 
     await clickInjected(page, '/not-a-public-lifecycle-route', 'Unknown');
@@ -139,7 +139,7 @@ test.describe('public route lifecycle announcer', () => {
     }));
     expect(active.ui).not.toBe('route-announcer');
     expect(active.tag).not.toBeUndefined();
-    await expect(page).toHaveTitle('About Onyx — open protocol, sovereign network');
+    await expect(page).toHaveTitle('About Onyx — rooms for your people');
     expect(await page.locator(LIVE_REGION).textContent()).toBe('About');
   });
 });

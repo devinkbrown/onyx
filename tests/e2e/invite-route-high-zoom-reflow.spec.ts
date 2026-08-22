@@ -19,7 +19,7 @@ test('keeps the PublicFrame Invite route usable at 400% zoom', async ({ page }) 
   await expect(frame.locator('main#public-main')).toHaveCount(1);
   await expect(frame.locator('header.public-frame__header')).toHaveCount(1);
   await expect(frame.locator('footer.public-frame__footer')).toHaveCount(1);
-  await expect(header.locator('a[href="/invite/"]')).toHaveCount(0);
+  await expect(header.locator('a[href="/invite/"]')).toHaveAttribute('aria-current', 'page');
   await expect(main.getByRole('heading', { name: 'Join #root', exact: true })).toBeVisible();
   await expect(main.getByRole('heading', { name: 'What Onyx keeps from this link' })).toBeVisible();
   await expect(main.getByRole('link', { name: 'Open invite in Onyx' })).toHaveAttribute(
@@ -42,15 +42,15 @@ test('keeps the PublicFrame Invite route usable at 400% zoom', async ({ page }) 
   await expect(menuToggle).toHaveAccessibleName('Close navigation menu');
   const primary = header.getByRole('navigation', { name: 'Primary navigation' });
   await expect(primary).toBeVisible();
-  await expect(primary.getByRole('link', { name: 'Invite' })).toHaveCount(0);
-  await expect(primary.getByRole('link', { name: 'Status' })).toBeVisible();
+  await expect(primary.getByRole('link', { name: 'Join' })).toBeVisible();
+  await expect(primary.getByRole('link', { name: 'Status' })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(menuToggle).toHaveAttribute('aria-expanded', 'false');
   await expect(menuToggle).toBeFocused();
 
   await footer.scrollIntoViewIfNeeded();
   await expect(footer.getByRole('navigation', { name: 'Footer navigation' })).toBeVisible();
-  await expect(footer.getByRole('link', { name: 'Invite' })).toHaveCount(0);
+  await expect(footer.getByRole('link', { name: 'Join' })).toBeVisible();
   await primaryAction.focus();
   await expect(primaryAction).toBeFocused();
 

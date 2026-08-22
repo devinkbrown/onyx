@@ -42,8 +42,9 @@ describe('InviteRoute', () => {
     expect(container.querySelector('.r-veins')).toBeTruthy();
     expect(container.querySelector('.r-grain')).toBeTruthy();
     const primary = screen.getByRole('navigation', { name: 'Primary navigation' });
-    expect(within(primary).queryByRole('link', { name: 'Invite' })).toBeNull();
-    expect(within(primary).getByRole('link', { name: 'Status' })).toHaveAttribute('href', '/status/');
+    expect(within(primary).getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/invite/');
+    expect(within(primary).getByRole('link', { name: 'Join' })).toHaveAttribute('aria-current', 'page');
+    expect(within(primary).queryByRole('link', { name: 'Status' })).toBeNull();
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' })
       .filter((link) => link.classList.contains('public-frame__open'));
     expect(openOnyx).toHaveLength(1);

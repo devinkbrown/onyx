@@ -1,7 +1,7 @@
 {
   "name": "Onyx",
   "short_name": "Onyx",
-  "description": "Rooms, calls, and private DMs on the Onyx mesh — without ads.",
+  "description": "Rooms, messages, and calls for your people. Open in the browser or keep it on this device.",
   "id": "/app",
   "start_url": "/app/",
   "scope": "/",
@@ -11,8 +11,8 @@
     "client_mode": ["navigate-existing", "auto"]
   },
   "orientation": "any",
-  "background_color": "#000306",
-  "theme_color": "#000306",
+  "background_color": "#05070a",
+  "theme_color": "#05070a",
   "categories": ["social", "productivity", "utilities"],
   "shortcuts": [
     {
@@ -24,7 +24,7 @@
     {
       "name": "Network status",
       "short_name": "Status",
-      "description": "View live mesh node and backup status.",
+      "description": "Check whether Onyx is up.",
       "url": "/status/"
     },
     {

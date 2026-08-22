@@ -2,7 +2,7 @@
 import { For, type JSX } from 'solid-js';
 import { publicRouteById, type PublicRouteId } from '@/ui/navigation/publicRouteManifest';
 
-const FOOTER_ROUTE_IDS = ['about', 'onyxos', 'roadmap', 'status', 'download', 'accessibility'] as const satisfies readonly PublicRouteId[];
+const FOOTER_ROUTE_IDS = ['about', 'invite', 'download', 'status', 'roadmap', 'onyxos', 'accessibility'] as const satisfies readonly PublicRouteId[];
 const FOOTER_ROUTES = FOOTER_ROUTE_IDS.map(publicRouteById);
 
 export function PublicFooter(): JSX.Element {
@@ -11,7 +11,7 @@ export function PublicFooter(): JSX.Element {
       <div class="public-frame__footer-inner">
         <div>
           <a class="public-frame__footer-brand" href={publicRouteById('home').href}>Onyx</a>
-          <p>A room for friends, clubs, and the people you actually want to talk to — without ads.</p>
+          <p>Rooms, messages, and calls for friends, clubs, and creators.</p>
         </div>
         <nav aria-label="Footer navigation">
           <For each={FOOTER_ROUTES}>

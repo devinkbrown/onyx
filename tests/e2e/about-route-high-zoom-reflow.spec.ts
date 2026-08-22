@@ -19,8 +19,7 @@ test('keeps the PublicFrame About route usable at 400% zoom', async ({ page }) =
   await expect(frame.locator('header.public-frame__header')).toHaveCount(1);
   await expect(frame.locator('footer.public-frame__footer')).toHaveCount(1);
   await expect(header.locator('a[href="/about/"]')).toHaveAttribute('aria-current', 'page');
-  await expect(frame.getByRole('status')).toContainText(/checking mesh|status unavailable/i);
-  await expect(frame.getByRole('status')).toContainText('does not establish current network availability');
+  await expect(main.getByRole('heading', { level: 1, name: /rooms for people you already like/i })).toBeVisible();
 
   await page.keyboard.press('Tab');
   await expect(skip).toBeFocused();
@@ -39,7 +38,8 @@ test('keeps the PublicFrame About route usable at 400% zoom', async ({ page }) =
 
   const topics = frame.getByRole('navigation', { name: 'About topics' });
   await topics.scrollIntoViewIfNeeded();
-  await expect(topics.getByRole('link', { name: 'Protocol' })).toHaveAttribute('href', '#protocol');
+  await expect(topics.getByRole('link', { name: 'Rooms' })).toHaveAttribute('href', '#rooms');
+  await expect(topics.getByRole('link', { name: 'Join' })).toHaveAttribute('href', '#join');
   await footer.scrollIntoViewIfNeeded();
   await expect(footer.getByRole('navigation', { name: 'Footer navigation' })).toBeVisible();
 
@@ -64,7 +64,7 @@ test('keeps the PublicFrame About route usable at 400% zoom', async ({ page }) =
       skipTargetCount: document.querySelectorAll('main#public-main').length,
       toggle: bounds(toggleElement),
       controls: Array.from(document.querySelectorAll<HTMLElement>(
-        '.public-frame__header a, .public-frame__header button, .public-frame__footer a, .ab-topics a, .ab-dev-card a.more',
+        '.public-frame__header a, .public-frame__header button, .public-frame__footer a, .ab-topics a, .ab-cta a',
       )).filter(visible).map(bounds),
       reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
       forcedColors: matchMedia('(forced-colors: active)').matches,

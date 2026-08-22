@@ -19,7 +19,8 @@ test('keeps the PublicFrame Roadmap route usable at 400% zoom', async ({ page })
   await expect(frame.locator('main#public-main')).toHaveCount(1);
   await expect(frame.locator('header.public-frame__header')).toHaveCount(1);
   await expect(frame.locator('footer.public-frame__footer')).toHaveCount(1);
-  await expect(header.locator('a[href="/roadmap/"]')).toHaveAttribute('aria-current', 'page');
+  await expect(header.locator('a[href="/roadmap/"]')).toHaveCount(0);
+  await expect(footer.locator('a[href="/roadmap/"]')).toBeVisible();
   await expect(main.getByRole('heading', { name: /a place for your people\s*that you can trust/i })).toBeVisible();
   await expect(main.getByRole('heading', { name: 'Proof before promise' })).toBeVisible();
 

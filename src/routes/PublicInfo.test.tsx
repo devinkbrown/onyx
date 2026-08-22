@@ -6,10 +6,8 @@ import { PublicInfo, resolvePublicInfoPage, type PublicInfoPage } from './Public
 /** Manifest order for the shared primary navigation. */
 const PRIMARY_LINKS = [
   ['About', '/about/'],
-  ['Downloads', '/download/'],
-  ['Status', '/status/'],
-  ['Roadmap', '/roadmap/'],
-  ['OnyxOS', '/onyxos/'],
+  ['Join', '/invite/'],
+  ['Download', '/download/'],
 ] as const;
 
 /**

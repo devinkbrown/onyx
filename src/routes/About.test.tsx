@@ -1,27 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * Tests for /about — Onyx's editorial deep-dive page.
- *
- * Strategy: static source + runtime DOM assertions.
- *
- * The About page is editorial except for its bounded public mesh-health badge.
- * Its source is the single source of truth for content and structure. We test
- * two ways:
- *
- *  1. Source analysis (fast, env-agnostic): read About.tsx and scan for
- *     required content strings, class names, and structural markers. This
- *     works regardless of test environment and is robust to renderer issues.
- *
- *  2. DOM rendering via @solidjs/testing-library (when the environment
- *     has vite-plugin-solid available). Tests are skipped gracefully if
- *     the SolidJS client renderer is not available in the current env.
+ * Tests for /about — community story, not a protocol desk.
  */
-
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it, beforeAll } from 'vitest';
 
-// ── Source file ──────────────────────────────────────────────────────────────
 const ABOUT_SRC_PATH = resolve(__dirname, 'About.tsx');
 const CSS_SRC_PATH = resolve(__dirname, 'about.css');
 
@@ -33,18 +17,12 @@ beforeAll(() => {
   css = readFileSync(CSS_SRC_PATH, 'utf-8');
 });
 
-// ── Attempt DOM rendering (graceful skip if env is unavailable) ───────────────
 let renderAvailable = false;
 let renderAbout: (() => { cleanup: () => void }) | null = null;
 
 try {
-  // This dynamic require will succeed or fail at import time in the test runner.
-  // We wrap it so failures don't crash the whole test file.
   const solidLib = await import('@solidjs/testing-library');
   const AboutComponent = (await import('./About')).default;
-
-  // Quick canary: try rendering into a detached DOM node.
-  // If it throws "Client-only API called on server side", we skip DOM tests.
   const container = document.createElement('div');
   document.body.appendChild(container);
 
@@ -70,27 +48,18 @@ try {
   // testing-library not importable — skip DOM tests
 }
 
-// ── Helper: check source contains a string ──────────────────────────────────
 function srcContains(needle: string): boolean {
   return src.includes(needle);
 }
 
-// ── Source-analysis tests (always run) ──────────────────────────────────────
 describe('About page — source structure', () => {
-  it('imports landing.css for shared atmosphere classes', () => {
+  it('imports landing.css and about.css and uses PublicFrame', () => {
     expect(srcContains("import './landing.css'")).toBe(true);
-  });
-
-  it('imports about.css for page-specific styles', () => {
     expect(srcContains("import './about.css'")).toBe(true);
-  });
-
-  it('uses PublicFrame with an About-labelled main and a deep-water content root', () => {
     expect(srcContains('import { PublicFrame }')).toBe(true);
     expect(srcContains('currentPath="/about/"')).toBe(true);
     expect(srcContains('mainLabel="About Onyx"')).toBe(true);
-    expect(srcContains('Protocol, media, and network')).toBe(true);
-    expect(srcContains('aria-hidden="true">·</span>')).toBe(true);
+    expect(srcContains('Rooms, messages, and calls')).toBe(true);
     expect(srcContains('class="ui-root r ab-ocean"')).toBe(true);
   });
 
@@ -100,352 +69,99 @@ describe('About page — source structure', () => {
     expect(srcContains('<PublicFooter')).toBe(false);
   });
 
-  it('derives the mesh badge from bounded public feed state', () => {
-    expect(srcContains('publicMeshFeedState')).toBe(true);
-    expect(srcContains('publicMeshFeedLabel')).toBe(true);
-    expect(srcContains('aboutFeedDetail')).toBe(true);
-    expect(srcContains('data-feed-state={feedState()}')).toBe(true);
-    expect(srcContains('The public network report is still being requested.')).toBe(true);
-    expect(src).not.toMatch(/>mesh online<\/span>/);
-  });
-
-  it('preserves local topic anchors without duplicating primary navigation', () => {
-    expect(srcContains('aria-label="About topics"')).toBe(true);
-    expect(srcContains('href="#protocol"')).toBe(true);
-    expect(srcContains('href="#media"')).toBe(true);
-    expect(srcContains('href="#network"')).toBe(true);
-  });
-
-  it('has an h1 heading in the hero', () => {
-    expect(/<h1/.test(src)).toBe(true);
-  });
-
-  it('hero contains "open wire" text', () => {
-    expect(/[Oo]pen wire/i.test(src)).toBe(true);
-  });
-
-  it('has a protocol section with id="protocol"', () => {
-    expect(srcContains('id="protocol"')).toBe(true);
-  });
-
-  it('has a media section with id="media"', () => {
-    expect(srcContains('id="media"')).toBe(true);
-  });
-
-  it('has an e2ee section with id="e2ee"', () => {
-    expect(srcContains('id="e2ee"')).toBe(true);
-  });
-
-  it('has a network section with id="network"', () => {
-    expect(srcContains('id="network"')).toBe(true);
-  });
-
-  it('has a services section with id="services"', () => {
-    expect(srcContains('id="services"')).toBe(true);
-  });
-
-  it('has a mythos section with id="mythos"', () => {
-    expect(srcContains('id="mythos"')).toBe(true);
-  });
-
-  it('has a developer section with id="developer"', () => {
-    expect(srcContains('id="developer"')).toBe(true);
-  });
-
-  it('mentions CadenceVox (audio codec)', () => {
-    expect(/cadencevox/i.test(src)).toBe(true);
-  });
-
-  it('mentions CadenceVis (video codec)', () => {
-    expect(/cadencevis/i.test(src)).toBe(true);
-  });
-
-  it('does not mention old transport branding in the main website copy', () => {
-    const oldTransportBrand = ['la', 'don media'].join('');
-    expect(src.toLowerCase()).not.toContain(oldTransportBrand);
-  });
-
-  it('mentions Cadence frames as the primary/default transport framing', () => {
-    expect(srcContains('Cadence frames')).toBe(true);
-  });
-
-  it('mentions mesh relay as the browser fallback carrier', () => {
-    expect(srcContains('Network relay')).toBe(true);
-  });
-
-  it('does not use WebRTC framing in the main website copy', () => {
-    expect(/webrtc/i.test(src)).toBe(false);
-  });
-
-  it('does not frame Onyx as an IRC client in the main website copy', () => {
-    expect(/irc client/i.test(src)).toBe(false);
-  });
-
-  it('does not claim unfinished media group-key cryptography', () => {
-    expect(srcContains('TreeKEM')).toBe(false);
-    expect(srcContains('HPKE')).toBe(false);
-  });
-
-  it('describes negotiated media E2EE without overstating transport protection', () => {
-    expect(srcContains('client-held room key')).toBe(true);
-    expect(srcContains('No key, no media frame, no padlock')).toBe(true);
-  });
-
-  it('calls out Mooring as the server-to-server secure channel', () => {
-    expect(srcContains('Mooring')).toBe(true);
-    expect(srcContains('server-to-server network')).toBe(true);
-  });
-
-  it('does not present static node addresses as a live mesh observation', () => {
-    expect(srcContains('Live mesh nodes')).toBe(false);
-    expect(srcContains('Published network entrances')).toBe(true);
-  });
-
-  it('includes eshmaki.me node address with port 8080', () => {
-    expect(srcContains('eshmaki.me')).toBe(true);
-    expect(srcContains('8080')).toBe(true);
-  });
-
-  it('includes ircx.us node address', () => {
-    expect(srcContains('ircx.us')).toBe(true);
-  });
-
-  it('mentions CRDT or delta-state convergence for the mesh', () => {
-    expect(/crdt|delta-state|convergent/i.test(src)).toBe(true);
-  });
-
-  it('mentions HyParView for mesh membership', () => {
-    expect(srcContains('HyParView')).toBe(true);
-  });
-
-  it('mentions Plumtree for epidemic broadcast', () => {
-    expect(srcContains('Plumtree')).toBe(true);
-  });
-
-  it('contains the REGISTER service command', () => {
-    expect(srcContains('REGISTER')).toBe(true);
-  });
-
-  it('contains the GHOST service command', () => {
-    expect(srcContains('GHOST')).toBe(true);
-  });
-
-  it('contains the CHANNEL service command', () => {
-    expect(srcContains('CHANNEL')).toBe(true);
-  });
-
-  it('contains the MEMO service command', () => {
-    expect(srcContains('MEMO')).toBe(true);
-  });
-
-  it('has a no-bot manifesto (.ab-nobot)', () => {
-    expect(srcContains('ab-nobot')).toBe(true);
-  });
-
-  it('references NickServ or bot in the no-bot context', () => {
-    expect(/NickServ|ChanServ|bot|fake/i.test(src)).toBe(true);
-  });
-
-  it('frames Onyx Server as the engine in the stack section (no kanji lore)', () => {
-    expect(srcContains('Onyx Server · the engine')).toBe(true);
-    expect(srcContains('大蛇')).toBe(false);
-  });
-
-  it('frames the gate as the open network entrance — no devil/Aēšma lore', () => {
-    // Onyx reframe: the middle stack card is "the gate · where you enter".
-    expect(srcContains('the gate · where you enter')).toBe(true);
-    // Devil/Zoroastrian lore must be fully removed.
-    expect(srcContains('Aēšma')).toBe(false);
-    expect(srcContains('ეშმაკი')).toBe(false);
-    expect(/\bdevil\b/i.test(src)).toBe(false);
-    expect(/\bwrath\b/i.test(src)).toBe(false);
-    expect(/\bAvesta\b|Zoroastrian|daeva/i.test(src)).toBe(false);
-  });
-
-  it('keeps eshmaki.me only as a plain node/domain name (no demonic framing)', () => {
-    // The node address is still a real entrance to the mesh.
-    expect(srcContains('eshmaki.me')).toBe(true);
-    // The old "eshmaki · the gate" devil glyph card label is gone.
-    expect(srcContains('eshmaki · the gate')).toBe(false);
-  });
-
-  it('frames Onyx as the client (no Japanese jewel lore)', () => {
-    expect(srcContains('Onyx · the client')).toBe(true);
-    expect(srcContains('瑠璃')).toBe(false);
-  });
-
-  it('has three stack article classes: serpent, tide, jewel (no devil class)', () => {
-    expect(srcContains('ab-myth serpent')).toBe(true);
-    expect(srcContains('ab-myth tide')).toBe(true);
-    expect(srcContains('ab-myth jewel')).toBe(true);
-    expect(srcContains('ab-myth devil')).toBe(false);
-  });
-
-  it('has three transport card classes: primary, secondary, fallback', () => {
-    expect(srcContains('ab-transport primary')).toBe(true);
-    expect(srcContains('ab-transport secondary')).toBe(true);
-    expect(srcContains('ab-transport fallback')).toBe(true);
-  });
-
-  it('developer section mentions SASL PLAIN for client connection', () => {
-    expect(srcContains('SASL')).toBe(true);
-  });
-
-  it('developer section mentions Ed25519 for node identity', () => {
-    expect(srcContains('Ed25519')).toBe(true);
-  });
-
-  it('developer section mentions BLAKE3-160 as NodeId derivation', () => {
-    expect(srcContains('BLAKE3-160')).toBe(true);
-  });
-
-  it('delegates the home brand link to PublicFrame', () => {
-    expect(srcContains('<PublicFrame')).toBe(true);
-    expect(srcContains('<header')).toBe(false);
-  });
-
-  it('Open Onyx links point to the canonical app route', () => {
+  it('tells the community story before operators', () => {
+    expect(srcContains('id="rooms"')).toBe(true);
+    expect(srcContains('id="people"')).toBe(true);
+    expect(srcContains('id="join"')).toBe(true);
+    expect(srcContains('id="hosting"')).toBe(true);
+    expect(src.indexOf('id="rooms"')).toBeLessThan(src.indexOf('id="hosting"'));
+    expect(src.indexOf('id="join"')).toBeLessThan(src.indexOf('id="hosting"'));
+    expect(srcContains('No ads')).toBe(true);
+    expect(srcContains('Private DMs')).toBe(true);
+    expect(srcContains('Friends, clubs, and creators')).toBe(true);
+    expect(srcContains('href="/invite/"')).toBe(true);
     expect(srcContains('href="/app/"')).toBe(true);
   });
 
-  it('nav links include in-page anchors for protocol, media, mesh', () => {
-    expect(srcContains('href="#protocol"')).toBe(true);
-    expect(srcContains('href="#media"')).toBe(true);
-    expect(srcContains('href="#network"')).toBe(true);
+  it('keeps local topic anchors without duplicating primary navigation', () => {
+    expect(srcContains('aria-label="About topics"')).toBe(true);
+    expect(srcContains('href="#rooms"')).toBe(true);
+    expect(srcContains('href="#people"')).toBe(true);
+    expect(srcContains('href="#join"')).toBe(true);
+    expect(srcContains('href="#accessibility"')).toBe(true);
   });
 
-  it('atmosphere layers are aria-hidden', () => {
-    expect(srcContains('aria-hidden="true"')).toBe(true);
+  it('has a single community h1', () => {
+    expect((src.match(/<h1/g) ?? []).length).toBe(1);
+    expect(srcContains('Rooms for people you already like.')).toBe(true);
   });
 
-  it('SVG diagrams have role="img" and aria-label', () => {
-    expect(srcContains('role="img"')).toBe(true);
-    expect(srcContains('aria-label=')).toBe(true);
+  it('does not use operator or protocol jargon on the public page', () => {
+    expect(/\bmesh\b/i.test(src)).toBe(false);
+    expect(/\bnode\b/i.test(src)).toBe(false);
+    expect(/\bhandshake\b/i.test(src)).toBe(false);
+    expect(/claim path/i.test(src)).toBe(false);
+    expect(/\bIRCv?3?\b/i.test(src)).toBe(false);
+    expect(/\bCAP\b/.test(src)).toBe(false);
+    expect(/\bSASL\b/.test(src)).toBe(false);
+    expect(/nobody.?s product/i.test(src)).toBe(false);
+    expect(/product sauce/i.test(src)).toBe(false);
+    expect(/discord killer/i.test(src)).toBe(false);
+    expect(/fully encrypted/i.test(src)).toBe(false);
+    expect(/passkeys?/i.test(src)).toBe(false);
+    expect(/irc client/i.test(src)).toBe(false);
   });
 
-  it('delegates branded footer ownership to PublicFrame and contains no kanji', () => {
-    expect(srcContains('<PublicFrame')).toBe(true);
+  it('does not invent member counts, store badges, or legal pages', () => {
+    expect(/\d[\d,]+\s+(members|users|people online)/i.test(src)).toBe(false);
+    expect(/app store|play store|microsoft store/i.test(src)).toBe(false);
+    expect(/href="\/terms\/"|href="\/privacy\/"/.test(src)).toBe(false);
+  });
+
+  it('keeps retired lore and unfinished crypto claims out', () => {
+    expect(srcContains('大蛇')).toBe(false);
     expect(srcContains('瑠璃')).toBe(false);
-  });
-
-  it('CAP listing contains sasl, ircx, session, chathistory entries', () => {
-    expect(srcContains('sasl')).toBe(true);
-    expect(srcContains('ircx')).toBe(true);
-    expect(srcContains('session')).toBe(true);
-    expect(srcContains('chathistory')).toBe(true);
-  });
-
-  it('contains zero devil/demonic references anywhere on the page', () => {
-    expect(/\bdevil\b/i.test(src)).toBe(false);
     expect(srcContains('Aēšma')).toBe(false);
-    expect(srcContains('ეშმაკი')).toBe(false);
-    expect(/Zoroastrian|Avesta|daeva|\bwrath\b/i.test(src)).toBe(false);
+    expect(/\bdevil\b/i.test(src)).toBe(false);
+    expect(srcContains('TreeKEM')).toBe(false);
+    expect(/webrtc/i.test(src)).toBe(false);
   });
 
-  it('imports the Onyx brand Mascot and uses it', () => {
-    expect(srcContains("import { Mascot } from '@/components/brand/Mascot'")).toBe(true);
-    expect(/<Mascot\b/.test(src)).toBe(true);
-  });
-
-  it('roots route content in the deep-water aesthetic (ab-ocean root class)', () => {
-    expect(srcContains('class="ui-root r ab-ocean"')).toBe(true);
+  it('keeps accessibility after the community story', () => {
+    expect(srcContains('AccessibilityStatement')).toBe(true);
+    expect(srcContains('id="accessibility"')).toBe(true);
+    expect(src.indexOf('id="join"')).toBeLessThan(src.indexOf('id="accessibility"'));
   });
 });
 
-// ── CSS source tests ─────────────────────────────────────────────────────────
 describe('About page — CSS source', () => {
-  it('defines .ab-hero class', () => {
+  it('defines community layout classes', () => {
     expect(css.includes('.ab-hero')).toBe(true);
+    expect(css.includes('.ab-ocean')).toBe(true);
+    expect(css.includes('.ab-seam')).toBe(true);
+    expect(css.includes('.ab-who')).toBe(true);
+    expect(css.includes('.ab-pillars')).toBe(true);
   });
 
-  it('defines .ab-proto-grid class', () => {
-    expect(css.includes('.ab-proto-grid')).toBe(true);
-  });
-
-  it('defines .ab-transport class with primary/secondary/fallback variants', () => {
-    expect(css.includes('.ab-transport.primary')).toBe(true);
-    expect(css.includes('.ab-transport.secondary')).toBe(true);
-    expect(css.includes('.ab-transport.fallback')).toBe(true);
-  });
-
-  it('defines .ab-e2ee-split for the E2EE layout', () => {
-    expect(css.includes('.ab-e2ee-split')).toBe(true);
-  });
-
-  it('defines .ab-network-body for the network layout', () => {
-    expect(css.includes('.ab-network-body')).toBe(true);
-  });
-
-  it('defines .ab-svc for service command cards', () => {
-    expect(css.includes('.ab-svc')).toBe(true);
-  });
-
-  it('defines .ab-mythos-grid for the three-column mythic layout', () => {
-    expect(css.includes('.ab-mythos-grid')).toBe(true);
-  });
-
-  it('defines .ab-dev-grid for the developer section layout', () => {
-    expect(css.includes('.ab-dev-grid')).toBe(true);
-  });
-
-  it('uses Room Current and existing mineral tokens, not gold shouting', () => {
-    const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(cssNoComments.includes('var(--ab-current')).toBe(true);
-    expect(cssNoComments.includes('var(--lapis')).toBe(true);
-    expect(cssNoComments.includes('var(--shu)')).toBe(true);
-    expect(cssNoComments.includes('var(--gold)')).toBe(false);
-    expect(cssNoComments.includes('var(--gold-bright)')).toBe(false);
-  });
-
-  it('uses font tokens (var(--font-mono), var(--font-display), var(--font-serif))', () => {
-    expect(css.includes('var(--font-mono)')).toBe(true);
-    expect(css.includes('var(--font-display)')).toBe(true);
+  it('uses Instrument Sans and at most one Fraunces line, not Anton or gold', () => {
+    expect(css.includes('var(--font-sans)')).toBe(true);
     expect(css.includes('var(--font-serif)')).toBe(true);
-  });
-
-  it('uses clamp() for responsive sizing', () => {
-    expect(css.includes('clamp(')).toBe(true);
-  });
-
-  it('has a prefers-reduced-motion rule for the vein animation', () => {
-    expect(css.includes('prefers-reduced-motion')).toBe(true);
-  });
-
-  it('does not use backdrop-filter (glassmorphism banned)', () => {
-    // The page-level about.css must not add backdrop-filter; landing.css handles the status bar separately
-    expect(css.includes('backdrop-filter')).toBe(false);
-  });
-
-  it('does not use purple or indigo as color values (brand constraint)', () => {
-    // Strip CSS comments first, then check for color usage
+    expect((css.match(/var\(--font-serif\)/g) ?? []).length).toBe(1);
+    expect(css.replace(/\/\*[\s\S]*?\*\//g, '').includes('Anton')).toBe(false);
     const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(cssNoComments.includes('var(--gold)')).toBe(false);
     expect(/\bpurple\b|\bindigo\b/.test(cssNoComments)).toBe(false);
   });
 
-  it('defines the .ab-seam seam divider', () => {
-    expect(css.includes('.ab-seam')).toBe(true);
-  });
-
-  it('defines responsive breakpoints via @media (max-width)', () => {
-    expect(css.includes('@media (max-width')).toBe(true);
-  });
-
-  it('re-tints the shared atmosphere to azure bioluminescence (.ab-ocean scope)', () => {
-    expect(css.includes('.ab-ocean')).toBe(true);
-    expect(css.includes('.ab-ocean .r-veins path')).toBe(true);
-  });
-
-  it('renames the devil mythos card to a neutral .ab-myth.tide', () => {
-    expect(css.includes('.ab-myth.tide')).toBe(true);
-    expect(css.includes('.ab-myth.devil')).toBe(false);
-  });
-
-  it('uses fluid radii tokens (var(--r-md) / var(--r-sm)) for the deep-water cut', () => {
-    expect(css.includes('var(--r-md)') || css.includes('var(--r-sm)')).toBe(true);
+  it('keeps 44px targets, reduced motion, and no glass', () => {
+    expect(css.includes('var(--target-min, 44px)')).toBe(true);
+    expect(css.includes('prefers-reduced-motion')).toBe(true);
+    expect(css.includes('forced-colors')).toBe(true);
+    expect(css.includes('clamp(')).toBe(true);
+    expect(css.includes('backdrop-filter')).toBe(false);
   });
 });
 
-// ── DOM rendering tests (run only if the SolidJS client renderer is available) ─
 describe('About page — DOM rendering', () => {
   it.skipIf(!renderAvailable)('renders without throwing', () => {
     const { cleanup } = renderAbout!();
@@ -463,7 +179,8 @@ describe('About page — DOM rendering', () => {
     const { cleanup } = renderAbout!();
     expect(document.querySelectorAll('header.public-frame__header')).toHaveLength(1);
     expect(document.querySelector('a[href="/about/"][aria-current="page"]')).not.toBeNull();
-    expect(document.querySelector('.public-frame__context')?.textContent).toMatch(/System\s*·\s*Protocol, media, and network/);
+    expect(document.querySelector('.public-frame__context')?.textContent)
+      .toMatch(/Community\s*·\s*Rooms, messages, and calls/);
     cleanup();
   });
 
@@ -472,29 +189,7 @@ describe('About page — DOM rendering', () => {
     expect(document.querySelectorAll('main#public-main')).toHaveLength(1);
     expect(document.querySelector('a.public-frame__skip[href="#public-main"]')).not.toBeNull();
     expect(document.querySelectorAll('a.public-frame__open[href="/app/"]')).toHaveLength(1);
-    expect(document.querySelector('nav.ab-topics[aria-label="About topics"] a[href="#accessibility"]')).not.toBeNull();
-    cleanup();
-  });
-
-  it.skipIf(!renderAvailable)('announces a bounded public network report without inventing availability', () => {
-    const { cleanup } = renderAbout!();
-    const report = document.querySelector<HTMLElement>('.ab-feed[role="status"]');
-    expect(report).not.toBeNull();
-    expect(report?.dataset.feedState).toMatch(/loading|unavailable/u);
-    if (report?.dataset.feedState === 'loading') {
-      expect(report?.textContent).toContain('still being requested');
-      expect(report?.textContent).not.toContain('does not establish current network availability');
-    } else {
-      expect(report?.textContent).toContain('does not establish current network availability');
-      expect(report?.textContent).not.toContain('still being requested');
-    }
-    cleanup();
-  });
-
-  it.skipIf(!renderAvailable)('has exactly one canonical footer', () => {
-    const { cleanup } = renderAbout!();
-    expect(document.querySelectorAll('footer')).toHaveLength(1);
-    expect(document.querySelector('footer.public-frame__footer')).not.toBeNull();
+    expect(document.querySelector('nav.ab-topics[aria-label="About topics"] a[href="#join"]')).not.toBeNull();
     cleanup();
   });
 
@@ -502,39 +197,26 @@ describe('About page — DOM rendering', () => {
     const { cleanup } = renderAbout!();
     const headings = document.querySelectorAll('h1');
     expect(headings).toHaveLength(1);
-    const h1 = headings.item(0);
-    expect(h1).not.toBeNull();
-    expect(h1!.textContent?.toLowerCase()).toContain('open wire');
+    expect(headings.item(0)!.textContent).toContain('Rooms for people you already like');
     cleanup();
   });
 
-  it.skipIf(!renderAvailable)('all seven section ids are present', () => {
+  it.skipIf(!renderAvailable)('leads with rooms, people, and join before hosting', () => {
     const { cleanup } = renderAbout!();
-    const ids = ['protocol', 'media', 'e2ee', 'network', 'services', 'mythos', 'developer'];
-    for (const id of ids) {
-      expect(document.getElementById(id)).not.toBeNull();
-    }
+    expect(document.getElementById('rooms')).not.toBeNull();
+    expect(document.getElementById('people')).not.toBeNull();
+    expect(document.getElementById('join')).not.toBeNull();
+    expect(document.getElementById('hosting')).not.toBeNull();
+    expect(document.body.textContent).toMatch(/no ads/i);
+    expect(document.body.textContent).toMatch(/private DMs/i);
     cleanup();
   });
 
-  it.skipIf(!renderAvailable)('three myth articles render in the DOM', () => {
+  it.skipIf(!renderAvailable)('has exactly one canonical footer', () => {
     const { cleanup } = renderAbout!();
-    expect(document.querySelector('.ab-myth.serpent')).not.toBeNull();
-    expect(document.querySelector('.ab-myth.tide')).not.toBeNull();
-    expect(document.querySelector('.ab-myth.jewel')).not.toBeNull();
-    cleanup();
-  });
-
-  it.skipIf(!renderAvailable)('three transport cards render in the DOM', () => {
-    const { cleanup } = renderAbout!();
-    expect(document.querySelectorAll('.ab-transport').length).toBe(3);
-    cleanup();
-  });
-
-  it.skipIf(!renderAvailable)('shared footer contains the canonical brand and accessibility link', () => {
-    const { cleanup } = renderAbout!();
-    const footer = document.querySelector('footer.public-frame__footer');
-    const t = footer?.textContent ?? '';
+    expect(document.querySelectorAll('footer')).toHaveLength(1);
+    expect(document.querySelector('footer.public-frame__footer')).not.toBeNull();
+    const t = document.querySelector('footer.public-frame__footer')?.textContent ?? '';
     expect(t).toContain('Onyx');
     expect(t).toContain('Accessibility');
     cleanup();

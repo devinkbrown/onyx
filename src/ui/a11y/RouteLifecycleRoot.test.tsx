@@ -148,8 +148,11 @@ describe('route lifecycle identity helpers', () => {
     ]);
     expect(resolveRouteLifecycleIdentity('/download/')).toBe('download');
     expect(resolveRouteLifecycleIdentity('/install/')).toBe('download');
-    expect(resolveRouteLifecycleLabel('/install/?src=alias')).toBe('Downloads');
-    expect(resolveRouteLifecycleLabel('/download')).toBe('Downloads');
+    expect(resolveRouteLifecycleLabel('/install/?src=alias')).toBe('Download');
+    expect(resolveRouteLifecycleLabel('/download')).toBe('Download');
+    expect(resolveRouteLifecycleLabel('/invite/')).toBe('Join');
+    expect(resolveRouteLifecycleEntry('/invite')?.publicNavigation).toBe(true);
+    expect(resolveRouteLifecycleEntry('/status')?.publicNavigation).toBe(false);
     expect(resolveRouteLifecycleLabel('/app/')).toBe(ROUTE_LIFECYCLE_APP_LABEL);
     expect(resolveRouteLifecycleEntry('/app')?.publicNavigation).toBe(false);
     expect(resolveRouteLifecycleEntry('/download')?.publicNavigation).toBe(true);
@@ -220,19 +223,19 @@ describe('RouteLifecycleRoot', () => {
     await awaitLifecycleReady();
 
     history.set({ value: '/download', scroll: false });
-    await expectAnnouncement('Downloads');
+    await expectAnnouncement('Download');
 
     history.set({ value: '/download/', scroll: false });
     await Promise.resolve();
-    expect(liveRegion()).toHaveTextContent('Downloads');
+    expect(liveRegion()).toHaveTextContent('Download');
 
     history.set({ value: '/install', scroll: false });
     await Promise.resolve();
-    expect(liveRegion()).toHaveTextContent('Downloads');
+    expect(liveRegion()).toHaveTextContent('Download');
 
     history.set({ value: '/install/', scroll: false });
     await Promise.resolve();
-    expect(liveRegion()).toHaveTextContent('Downloads');
+    expect(liveRegion()).toHaveTextContent('Download');
     expect(document.querySelectorAll('[data-ui="route-announcer"]')).toHaveLength(1);
   });
 

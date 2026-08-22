@@ -1,15 +1,18 @@
 import { expect, test, type Page } from '@playwright/test';
 
 type HealthScenario = {
-  path: '/about/';
-  state: 'future' | 'unavailable';
+  path: '/status/';
+  state: 'current' | 'degraded' | 'stale' | 'future' | 'unavailable';
   label: string;
   selector: string;
 };
 
 const scenarios: HealthScenario[] = [
-  { path: '/about/', state: 'future', label: 'status time mismatch', selector: '.ab-feed' },
-  { path: '/about/', state: 'unavailable', label: 'status unavailable', selector: '.ab-feed' },
+  { path: '/status/', state: 'current', label: 'network online', selector: '.status-observation' },
+  { path: '/status/', state: 'degraded', label: 'network degraded', selector: '.status-observation' },
+  { path: '/status/', state: 'stale', label: 'status stale', selector: '.status-observation' },
+  { path: '/status/', state: 'future', label: 'status time mismatch', selector: '.status-observation' },
+  { path: '/status/', state: 'unavailable', label: 'status unavailable', selector: '.status-observation' },
 ];
 
 async function mockPublicStatus(page: Page, state: HealthScenario['state']): Promise<void> {
