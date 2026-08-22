@@ -51,6 +51,7 @@ describe('PublicFrame', () => {
       expect(within(primary).getByRole('link', { name: 'Download' })).toHaveAttribute('href', '/download/');
       expect(within(primary).queryByRole('link', { name: 'OnyxOS' })).toBeNull();
       expect(within(primary).queryByRole('link', { name: 'Status' })).toBeNull();
+      expect(view.container.querySelector('a[href="/onyxos/"], a[href="/onyxos"]')).toBeNull();
       expect(screen.getByRole('link', { name: 'Open Onyx' })).toHaveAttribute('href', '/app/');
       expect(screen.getAllByRole('navigation', { name: /navigation/i })).toHaveLength(2);
       const footer = screen.getByRole('navigation', { name: 'Footer navigation' });
@@ -64,7 +65,6 @@ describe('PublicFrame', () => {
         { label: 'Guides', href: '/guides/' },
         { label: 'Status', href: '/status/' },
         { label: 'Roadmap', href: '/roadmap/' },
-        { label: 'OnyxOS', href: '/onyxos/' },
         { label: 'Accessibility', href: '/accessibility/' },
       ]);
       view.unmount();

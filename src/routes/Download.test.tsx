@@ -155,6 +155,9 @@ describe('Download page', () => {
     expect(screen.getByRole('heading', { name: 'Desktop packages' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Verify a download' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Planned macOS architectures' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'OnyxOS' })).toBeNull();
+    expect(container.querySelector('a[href="/onyxos/"], a[href="/onyxos"]')).toBeNull();
+    expect(container.textContent).not.toMatch(/onyxos/i);
   });
 
   it('keeps the canonical mobile disclosure keyboard operable', () => {

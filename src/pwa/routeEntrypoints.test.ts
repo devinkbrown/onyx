@@ -242,6 +242,7 @@ describe('SPA route entrypoint materializer', () => {
 
     expect(locations.length).toBeGreaterThan(1);
     expect(new Set(locations).size).toBe(locations.length);
+    expect(locations).not.toContain('https://eshmaki.me/onyxos/');
     for (const location of locations) {
       const url = new URL(location);
       expect(url.origin, location).toBe('https://eshmaki.me');

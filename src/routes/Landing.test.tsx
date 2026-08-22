@@ -89,6 +89,13 @@ describe('Landing', () => {
     expect(container.textContent).not.toMatch(/unavailable|quorum|no stats export|mesh|node|IRC|SHA-256|Onyx is on/i);
   });
 
+  it('never mentions OnyxOS in the public home story', () => {
+    const { container, queryByRole } = render(() => <Landing />);
+    expect(container.textContent).not.toMatch(/onyxos/i);
+    expect(container.querySelector('a[href="/onyxos/"], a[href="/onyxos"]')).toBeNull();
+    expect(queryByRole('link', { name: 'OnyxOS' })).toBeNull();
+  });
+
   it('keeps mobile navigation as a semantic, keyboard-operable disclosure', () => {
     const { getByRole } = render(() => <Landing />);
     const toggle = getByRole('button', { name: 'Open navigation menu' });

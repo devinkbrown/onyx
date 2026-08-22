@@ -11,10 +11,8 @@ import {
 
 const PRIMARY_LINKS = [
   ['About', '/about/'],
-  ['OnyxOS', '/onyxos/'],
-  ['Roadmap', '/roadmap/'],
-  ['Status', '/status/'],
-  ['Downloads', '/download/'],
+  ['Join', '/invite/'],
+  ['Download', '/download/'],
 ] as const;
 
 const FORBIDDEN = /WeeChat|weechat|irssi|mIRC|\bmirc\b|IRCv3|\bIRC\b|Discord killer|\bmesh\b|handshake|claim path|group E2EE|passkey as/i;

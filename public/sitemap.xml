@@ -51,11 +51,6 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://eshmaki.me/onyxos/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://eshmaki.me/invite/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

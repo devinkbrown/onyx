@@ -83,6 +83,10 @@ describe('About page — source structure', () => {
     expect(srcContains('href="/app/"')).toBe(true);
   });
 
+  it('does not mention OnyxOS in the public About story', () => {
+    expect(src).not.toMatch(/onyxos/i);
+  });
+
   it('keeps local topic anchors without duplicating primary navigation', () => {
     expect(srcContains('aria-label="About topics"')).toBe(true);
     expect(srcContains('href="#rooms"')).toBe(true);
@@ -181,6 +185,8 @@ describe('About page — DOM rendering', () => {
     expect(document.querySelector('a[href="/about/"][aria-current="page"]')).not.toBeNull();
     expect(document.querySelector('.public-frame__context')?.textContent)
       .toMatch(/Community\s*·\s*Rooms, messages, and calls/);
+    expect(document.querySelector('a[href="/onyxos/"], a[href="/onyxos"]')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/onyxos/i);
     cleanup();
   });
 
@@ -219,6 +225,7 @@ describe('About page — DOM rendering', () => {
     const t = document.querySelector('footer.public-frame__footer')?.textContent ?? '';
     expect(t).toContain('Onyx');
     expect(t).toContain('Accessibility');
+    expect(t).not.toMatch(/onyxos/i);
     cleanup();
   });
 });

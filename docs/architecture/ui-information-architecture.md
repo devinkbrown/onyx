@@ -15,14 +15,15 @@ ignores trailing slashes, query strings, and fragments before matching a path.
 The router may retain compatibility aliases; `/install` remains an alias of
 `/download`, not a second public destination. Visibility mirrors the existing
 public header:
-About, Downloads, Status, Roadmap, and OnyxOS are shown at both breakpoints;
+About, Join, and Download are shown at both breakpoints;
 Home is the brand link. Other routable/supporting surfaces remain in the
-manifest but are not public-navigation links.
+manifest but are not public-navigation links. `/onyxos/` stays a working
+unlisted deep URL — no header, footer, Home, or sitemap promotion.
 
 Header placement is explicit metadata: `brand` is the Home brand link,
 `primary` identifies links inside the `Primary navigation` landmark, and `none`
 keeps supporting routes out of the shared header. `navigationOrder` preserves
-the current About, Downloads, Status, Roadmap, OnyxOS order independently from
+the current About, Join, Download order independently from
 the manifest's product/trust/resources grouping.
 
 `PublicFrame` remains the only public document frame: one banner, one main, one

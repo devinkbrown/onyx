@@ -158,6 +158,7 @@ describe('route lifecycle identity helpers', () => {
     expect(resolveRouteLifecycleLabel('/app/')).toBe(ROUTE_LIFECYCLE_APP_LABEL);
     expect(resolveRouteLifecycleEntry('/app')?.publicNavigation).toBe(false);
     expect(resolveRouteLifecycleEntry('/download')?.publicNavigation).toBe(true);
+    expect(resolveRouteLifecycleEntry('/onyxos')?.publicNavigation).toBe(false);
     expect(resolveRouteLifecycleEntry('/missing')).toBeUndefined();
     expect(resolveRouteLifecycleLabel('/not-a-route/')).toBeUndefined();
     expect(resolveNotFoundRouteLifecycleEntry('/not-a-route/')?.label).toBe(ROUTE_LIFECYCLE_NOT_FOUND_LABEL);
