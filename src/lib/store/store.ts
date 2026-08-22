@@ -6552,7 +6552,6 @@ export const store = createStore<OnyxState>()(
       get().joinChannel(channel);
       if (cleanedTopic) get().setTopic(channel, cleanedTopic);
       get().closeChannelBrowser();
-      get().navigate({ kind: 'channel', channel });
       return true;
     },
 

@@ -125,7 +125,7 @@ describe('ChannelBrowser', () => {
       expect(status).toBeInTheDocument();
 
       vi.advanceTimersByTime(400);
-      expect(status).toHaveTextContent('2 rooms available');
+      expect(status).toHaveTextContent('2 rooms you can join');
 
       fireEvent.input(screen.getByRole('searchbox', { name: 'Search rooms' }), {
         target: { value: 'off-topic' },

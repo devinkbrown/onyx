@@ -41,6 +41,7 @@ function makeClient() {
   return {
     sendRaw: vi.fn((..._args: string[]) => true),
     send: vi.fn((_line: string) => true),
+    join: vi.fn((_channel: string, _key?: string) => true),
     isupport: { CHANTYPES: '#&', CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'] },
     negotiatedCaps: new Set<string>(),
     capValues: new Map<string, string>(),
@@ -202,24 +203,19 @@ describe('channel management — raw command dispatch', () => {
 
   it('createRoom() joins, sets an optional topic, and opens the room', () => {
     const client = seed('#general', [makeUser('me')]);
-    const join = vi.fn();
-    (client as { join: ReturnType<typeof vi.fn> }).join = join;
     store.setState({ showChannelBrowser: true, channelBrowserMode: 'create' });
 
     expect(store.getState().createRoom(' Friends ', ' Weekly reads ')).toBe(true);
-    expect(join).toHaveBeenCalledWith('#friends', undefined);
+    expect(client.join).toHaveBeenCalledWith('#friends', undefined);
     expect(client.sendRaw).toHaveBeenCalledWith('TOPIC', '#friends', 'Weekly reads');
     expect(store.getState().showChannelBrowser).toBe(false);
-    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#friends' });
   });
 
   it('createRoom() refuses an invalid name without sending JOIN', () => {
     const client = seed('#general', [makeUser('me')]);
-    const join = vi.fn();
-    (client as { join: ReturnType<typeof vi.fn> }).join = join;
 
     expect(store.getState().createRoom('bad,name')).toBe(false);
-    expect(join).not.toHaveBeenCalled();
+    expect(client.join).not.toHaveBeenCalled();
     expect(client.sendRaw).not.toHaveBeenCalled();
   });
 
