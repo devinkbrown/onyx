@@ -28,28 +28,29 @@ describe('Transcript and composer commercial chrome', () => {
     expect(css).not.toMatch(/\.shell-composer-textarea\s*\{[^}]*max-height:\s*200px/s);
   });
 
-  it('uses quiet Instrument Sans row type — author 600, body ~16px, timestamp not tracked mono', () => {
+  it('uses quiet Instrument Sans row type — author 600, body 15px, timestamp 12px paper-dim mono', () => {
     expect(css).toMatch(/\.shell-unread-divider\s*\{[^}]*font-family:\s*var\(--font-sans\)/s);
     expect(css).toMatch(/\.shell-unread-divider\s*\{[^}]*text-transform:\s*none/s);
     expect(css).toMatch(/\.shell-day-divider-label\s*\{[^}]*font-family:\s*var\(--font-sans\)/s);
     expect(css).toMatch(/\.shell-day-divider-label\s*\{[^}]*text-transform:\s*none/s);
     expect(css).toMatch(/\.shell-msg-author\s*\{[^}]*font-weight:\s*600/s);
-    expect(css).toMatch(/\.shell-msg-text\s*\{[^}]*font-size:\s*1rem/s);
-    expect(css).toMatch(/\.shell-msg-ts\s*\{[^}]*font-family:\s*var\(--font-sans\)/s);
-    expect(css).toMatch(/\.shell-msg-ts\s*\{[^}]*font-size:\s*0\.75rem/s);
-    expect(css).toMatch(/\.shell-msg-ts\s*\{[^}]*color:\s*var\(--paper-mute\)/s);
-    expect(css).not.toMatch(/\.shell-msg-ts\s*\{[^}]*font-family:\s*var\(--font-mono\)/s);
+    expect(css).toMatch(/\.shell-msg-text\s*\{[^}]*font-size:\s*var\(--text-md\)/s);
+    expect(css).toMatch(/\.shell-msg-text\s*\{[^}]*line-height:\s*var\(--leading-body\)/s);
+    expect(css).toMatch(/\.shell-msg-ts\s*\{[^}]*font-family:\s*var\(--font-mono\)/s);
+    expect(css).toMatch(/\.shell-msg-ts\s*\{[^}]*font-size:\s*var\(--text-2xs\)/s);
+    expect(css).toMatch(/\.shell-msg-ts\s*\{[^}]*color:\s*var\(--paper-dim\)/s);
+    expect(css).not.toMatch(/\.shell-msg-ts\s*\{[^}]*color:\s*var\(--paper-mute\)/s);
     expect(css).toMatch(/\.shell-jump-latest\s*\{[^}]*font-family:\s*var\(--font-sans\)/s);
     expect(css).toMatch(/\.shell-jump-latest\s*\{[^}]*border-radius:\s*var\(--r-pill\)/s);
   });
 
-  it('keeps people circular and the composer a 48px vessel with 40px tools', () => {
+  it('keeps people circular and the composer a 48px vessel with 44px tools', () => {
     expect(css).toMatch(/\.shell-msg-avatar\s+\.onyx-avatar\s*\{[^}]*border-radius:\s*var\(--r-pill\)/s);
     expect(css).toMatch(/\.shell-composer-inner\s*\{[^}]*min-height:\s*48px/s);
-    expect(css).toMatch(/\.shell-composer-inner\s*\{[^}]*border-radius:\s*var\(--r-lg\)/s);
+    expect(css).toMatch(/\.shell-composer-inner\s*\{[^}]*border-radius:\s*var\(--composer-radius, var\(--r-lg\)\)/s);
     expect(css).toMatch(/\.shell-composer-inner\s*\{[^}]*box-shadow:\s*none/s);
-    expect(css).toMatch(/\.shell-composer-tool\s*\{[^}]*width:\s*40px/s);
-    expect(css).toMatch(/\.shell-composer-send\s*\{[^}]*width:\s*40px/s);
+    expect(css).toMatch(/\.shell-composer-tool\s*\{[^}]*width:\s*var\(--target-min, 44px\)/s);
+    expect(css).toMatch(/\.shell-composer-send\s*\{[^}]*width:\s*var\(--target-min, 44px\)/s);
     expect(css).toMatch(/\.shell-composer-send:not\(:disabled\)\s*\{[^}]*background:\s*var\(--lapis\)/s);
     expect(css).toMatch(/\.shell-composer-context\s*\{[^}]*border-left:\s*3px\s+solid\s+var\(--lapis\)/s);
     expect(css).toMatch(/\.shell-msg-pending-mark\s*\{/s);
