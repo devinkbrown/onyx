@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { cleanup, render, screen } from '@solidjs/testing-library';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { store } from '@/lib/store/store';
 import { Facepile } from './Facepile';
 import type { FacepileMemberInput } from './facepile';
+
+const initialState = store.getInitialState();
+
+beforeEach(() => {
+  store.setState(initialState, true);
+});
 
 afterEach(cleanup);
 
@@ -67,5 +74,23 @@ describe('Facepile', () => {
     );
     expect(awayFace).toBeTruthy();
     expect(awayFace?.querySelector('.shell-facepile-avatar--away')).toBeTruthy();
+  });
+
+  it('opens a consumer people card from a face', () => {
+    store.setState({
+      ...initialState,
+      ourNick: 'me',
+      activeView: { kind: 'channel', channel: '#general' },
+    }, true);
+
+    render(() => <Facepile members={() => [member('ada')]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open profile for ada' }));
+
+    expect(screen.getByRole('dialog', { name: 'Profile for ada' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'ada' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send DM to ada' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mention ada in the composer' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ignore ada on this device' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Report/i })).toBeNull();
   });
 });

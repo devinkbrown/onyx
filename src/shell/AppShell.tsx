@@ -1045,7 +1045,11 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
 
   function openMemberWhois(nick: string, returnFocus: HTMLElement): void {
     setWhoisReturnFocus(returnFocus);
-    setWhoisReturnFocusFallback(returnFocus.closest<HTMLElement>('.shell-members'));
+    setWhoisReturnFocusFallback(
+      returnFocus.closest<HTMLElement>('.shell-members')
+      ?? returnFocus.closest<HTMLElement>('.shell-ribbon-facepile')
+      ?? returnFocus,
+    );
     getState().whois(nick);
   }
 
@@ -1224,6 +1228,8 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
             membersOpen={asideOccupant() === 'members'}
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
+            onOpenDm={openMemberDm}
+            onOpenWhois={openMemberWhois}
           />
           <div
             class="shell-room-current"

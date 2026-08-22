@@ -38,19 +38,18 @@ test('contains member details and actions at 200% text', async ({ page, browserN
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <span class="onyx-popover">
       <div class="onyx-popover__panel" role="dialog" aria-label="Member details for alice">
-        <div class="shell-member-card">
-          <div class="shell-member-card-head">
-            <div class="onyx-avatar onyx-avatar--md onyx-avatar--owner" aria-hidden="true">AL</div>
-            <div>
-              <p class="shell-member-card-nick">alice</p>
-              <p class="shell-member-card-role">Owner in #general</p>
-              <p class="shell-member-card-account">~alice-account-with-an-extremely-long-unbroken-identity</p>
+        <div class="shell-member-card shell-people-card">
+          <div class="shell-people-card-identity">
+            <div class="onyx-avatar onyx-avatar--md shell-people-card-avatar" aria-hidden="true">AL</div>
+            <div class="shell-people-card-copy">
+              <p class="shell-people-card-name">alice</p>
+              <p class="shell-people-card-about">Keeps an extremely-long-unbroken-identity on this device without inventing a bio.</p>
             </div>
           </div>
-          <div class="shell-member-card-badges">Owner</div>
-          <div class="shell-member-card-actions">
-            <button class="onyx-button onyx-button--ghost onyx-button--sm" type="button">Message</button>
-            <button class="onyx-button onyx-button--ghost onyx-button--sm" type="button">Profile</button>
+          <div class="shell-member-card-actions shell-people-card-actions">
+            <button class="onyx-button onyx-button--primary onyx-button--sm" type="button">Message</button>
+            <button class="onyx-button onyx-button--ghost onyx-button--sm" type="button">Mention</button>
+            <button class="onyx-button onyx-button--ghost onyx-button--sm" type="button">Ignore</button>
           </div>
         </div>
       </div>
@@ -126,19 +125,18 @@ test('keeps member details above mobile navigation at 400% short reflow', async 
     <main class="shell">
       <span class="onyx-popover">
         <div class="onyx-popover__panel" role="dialog" aria-label="Member details for alice">
-          <div class="shell-member-card">
-            <div class="shell-member-card-head">
-              <div class="onyx-avatar onyx-avatar--md onyx-avatar--owner" aria-hidden="true">AL</div>
-              <div>
-                <p class="shell-member-card-nick">alice</p>
-                <p class="shell-member-card-role">Owner in #general</p>
-                <p class="shell-member-card-account">~alice-account-with-an-extremely-long-unbroken-identity</p>
+          <div class="shell-member-card shell-people-card">
+            <div class="shell-people-card-identity">
+              <div class="onyx-avatar onyx-avatar--md shell-people-card-avatar" aria-hidden="true">AL</div>
+              <div class="shell-people-card-copy">
+                <p class="shell-people-card-name">alice</p>
+                <p class="shell-people-card-about">Keeps an extremely-long-unbroken-identity on this device without inventing a bio.</p>
               </div>
             </div>
-            <div class="shell-member-card-badges">Owner</div>
-            <div class="shell-member-card-actions">
-              <button class="onyx-button onyx-button--ghost onyx-button--sm" type="button">Message</button>
-              <button class="onyx-button onyx-button--ghost onyx-button--sm" type="button">Profile</button>
+            <div class="shell-member-card-actions shell-people-card-actions">
+              <button class="onyx-button onyx-button--primary onyx-button--sm" type="button">Message</button>
+              <button class="onyx-button onyx-button--ghost onyx-button--sm" type="button">Mention</button>
+              <button class="onyx-button onyx-button--ghost onyx-button--sm" type="button">Ignore</button>
             </div>
           </div>
         </div>
@@ -184,9 +182,9 @@ test('keeps member details above mobile navigation at 400% short reflow', async 
   });
 
   const panel = page.getByRole('dialog', { name: 'Member details for alice' });
-  const profile = panel.getByRole('button', { name: 'Profile' });
-  await profile.focus();
-  await expect(profile).toBeFocused();
+  const mention = panel.getByRole('button', { name: 'Mention' });
+  await mention.focus();
+  await expect(mention).toBeFocused();
 
   const geometry = await panel.evaluate((element) => {
     const panelRect = element.getBoundingClientRect();

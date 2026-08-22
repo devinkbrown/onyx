@@ -286,7 +286,8 @@ describe('MemberList accessibility', () => {
     expect(bob.querySelector('.shell-member-row')).toHaveClass('shell-member-row--away');
 
     fireEvent.click(bob);
-    expect(screen.getByText('~bob-account')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
+    expect(screen.getByText('Account bob-account')).toBeInTheDocument();
   });
 
   it('keeps the member-card avatar decorative so the nick is announced once', () => {
@@ -298,8 +299,7 @@ describe('MemberList accessibility', () => {
     const avatar = card.querySelector('.onyx-avatar');
     expect(avatar).not.toBeNull();
     expect(avatar).toHaveAttribute('aria-hidden', 'true');
-    // Role text is the description, not a second name on the avatar.
-    expect(card).toHaveAccessibleDescription(/Voice in #general/);
+    expect(card).not.toHaveAccessibleDescription(/Voice in #general/);
   });
 
   it('opens a member dialog from a keyboard-operable button and closes on Escape', () => {
@@ -330,6 +330,7 @@ describe('MemberList accessibility', () => {
 
     const trigger = screen.getByRole('button', { name: /Open member details for bob, Voice/ });
     fireEvent.click(trigger);
+    fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
     fireEvent.click(screen.getByRole('button', { name: 'View profile of bob' }));
 
     expect(screen.queryByRole('dialog', { name: 'Member details for bob' })).toBeNull();

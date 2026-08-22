@@ -102,8 +102,11 @@ describe('MemberList moderation', () => {
     fireEvent.click(screen.getByRole('button', { name: /Open member details for bob, Voice/ }));
 
     expect(screen.getByRole('dialog', { name: 'Member details for bob' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'bob', description: 'Voice in #general' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'bob' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send DM to bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mention bob in the composer' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ignore bob on this device' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
     expect(screen.getByRole('button', { name: 'View profile of bob' })).toBeInTheDocument();
   });
 
@@ -155,6 +158,7 @@ describe('MemberList moderation', () => {
     fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('bob'))!);
 
     expect(screen.getByRole('button', { name: 'Send DM to bob' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
     expect(screen.getByRole('button', { name: 'View profile of bob' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Moderate bob' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Kick bob from #general' })).toBeNull();
