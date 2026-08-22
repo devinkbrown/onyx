@@ -88,7 +88,7 @@ describe('Transcript and composer commercial chrome', () => {
     const gesture = stripComments(gestureCss);
     expect(css).toMatch(/\.shell-msg-group\s*\{[^}]*display:\s*grid/s);
     expect(css).toMatch(/\.shell-msg-group\s*\{[^}]*grid-template-columns:\s*40px 1fr/s);
-    expect(gesture).toMatch(/touch-action:\s*pan-y/);
+    expect(gesture).toMatch(/\.shell-msg--swiping\s*\{[^}]*touch-action:\s*none/s);
     expect(gesture).toMatch(/transform:\s*translateX\(var\(--row-swipe-x/);
     expect(gesture).toMatch(/prefers-reduced-motion:\s*reduce/);
     expect(gesture).not.toMatch(/backdrop-filter/);

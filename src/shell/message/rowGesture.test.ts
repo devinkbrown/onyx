@@ -39,15 +39,15 @@ function pointer(
 
 describe('createRowGesture', () => {
   let row: HTMLElement;
-  let onSwipeReply: ReturnType<typeof vi.fn>;
-  let onLongPressMenu: ReturnType<typeof vi.fn>;
+  let swipeCalls = 0;
+  let menuCalls = 0;
 
   beforeEach(() => {
     vi.useFakeTimers();
     row = document.createElement('article');
     document.body.append(row);
-    onSwipeReply = vi.fn();
-    onLongPressMenu = vi.fn();
+    swipeCalls = 0;
+    menuCalls = 0;
     vi.spyOn(window, 'getSelection').mockReturnValue({
       isCollapsed: true,
     } as Selection);
@@ -61,7 +61,14 @@ describe('createRowGesture', () => {
   });
 
   function makeGesture(overrides: Parameters<typeof createRowGesture>[1] = {}) {
-    return createRowGesture({ onSwipeReply, onLongPressMenu }, overrides);
+    return createRowGesture({
+      onSwipeReply: () => {
+        swipeCalls += 1;
+      },
+      onLongPressMenu: () => {
+        menuCalls += 1;
+      },
+    }, overrides);
   }
 
   it('arms reply after a right swipe past the commit threshold', () => {
@@ -70,8 +77,8 @@ describe('createRowGesture', () => {
     gesture.onPointerMove(pointer('pointermove', row, { clientX: 20 + ROW_GESTURE.swipeArmPx, clientY: 42 }));
     expect(gesture.getPhase()).toBe('armed');
     gesture.onPointerUp(pointer('pointerup', row, { clientX: 20 + ROW_GESTURE.swipeArmPx, clientY: 42 }));
-    expect(onSwipeReply).toHaveBeenCalledOnce();
-    expect(onLongPressMenu).not.toHaveBeenCalled();
+    expect(swipeCalls).toBe(1);
+    expect(menuCalls).toBe(0);
     expect(gesture.getPhase()).toBe('idle');
   });
 
@@ -80,7 +87,7 @@ describe('createRowGesture', () => {
     gesture.onPointerDown(pointer('pointerdown', row, { clientX: 20, clientY: 40 }));
     gesture.onPointerMove(pointer('pointermove', row, { clientX: 20 + ROW_GESTURE.swipeArmPx - 8, clientY: 40 }));
     gesture.onPointerUp(pointer('pointerup', row, { clientX: 50, clientY: 40 }));
-    expect(onSwipeReply).not.toHaveBeenCalled();
+    expect(swipeCalls).toBe(0);
     expect(gesture.getPhase()).toBe('idle');
   });
 
@@ -89,7 +96,7 @@ describe('createRowGesture', () => {
     gesture.onPointerDown(pointer('pointerdown', row, { clientX: 80, clientY: 40 }));
     gesture.onPointerMove(pointer('pointermove', row, { clientX: 10, clientY: 40 }));
     gesture.onPointerUp(pointer('pointerup', row, { clientX: 10, clientY: 40 }));
-    expect(onSwipeReply).not.toHaveBeenCalled();
+    expect(swipeCalls).toBe(0);
   });
 
   it('uses the platform-natural swipe in RTL (swipe toward start)', () => {
@@ -98,7 +105,7 @@ describe('createRowGesture', () => {
     gesture.onPointerDown(pointer('pointerdown', row, { clientX: 100, clientY: 40 }));
     gesture.onPointerMove(pointer('pointermove', row, { clientX: 100 - ROW_GESTURE.swipeArmPx, clientY: 40 }));
     gesture.onPointerUp(pointer('pointerup', row, { clientX: 28, clientY: 40 }));
-    expect(onSwipeReply).toHaveBeenCalledOnce();
+    expect(swipeCalls).toBe(1);
   });
 
   it('lets a vertical-dominant move stay a scroll (no reply, no menu)', () => {
@@ -107,8 +114,8 @@ describe('createRowGesture', () => {
     gesture.onPointerMove(pointer('pointermove', row, { clientX: 28, clientY: 80 }));
     expect(gesture.getPhase()).toBe('idle');
     gesture.onPointerUp(pointer('pointerup', row, { clientX: 28, clientY: 80 }));
-    expect(onSwipeReply).not.toHaveBeenCalled();
-    expect(onLongPressMenu).not.toHaveBeenCalled();
+    expect(swipeCalls).toBe(0);
+    expect(menuCalls).toBe(0);
   });
 
   it('opens actions after a still long-press', () => {
@@ -116,8 +123,8 @@ describe('createRowGesture', () => {
     gesture.onPointerDown(pointer('pointerdown', row, { clientX: 24, clientY: 24 }));
     expect(gesture.getPhase()).toBe('long-pressing');
     vi.advanceTimersByTime(ROW_GESTURE.longPressMs);
-    expect(onLongPressMenu).toHaveBeenCalledOnce();
-    expect(onSwipeReply).not.toHaveBeenCalled();
+    expect(menuCalls).toBe(1);
+    expect(swipeCalls).toBe(0);
     expect(gesture.getPhase()).toBe('done');
     gesture.onPointerUp(pointer('pointerup', row, { clientX: 24, clientY: 24 }));
     expect(gesture.getPhase()).toBe('idle');
@@ -131,14 +138,14 @@ describe('createRowGesture', () => {
       clientY: 24,
     }));
     vi.advanceTimersByTime(ROW_GESTURE.longPressMs + 50);
-    expect(onLongPressMenu).not.toHaveBeenCalled();
+    expect(menuCalls).toBe(0);
   });
 
   it('does not fire for a non-primary pointer', () => {
     const gesture = makeGesture();
     gesture.onPointerDown(pointer('pointerdown', row, { isPrimary: false, clientX: 20, clientY: 20 }));
     vi.advanceTimersByTime(ROW_GESTURE.longPressMs);
-    expect(onLongPressMenu).not.toHaveBeenCalled();
+    expect(menuCalls).toBe(0);
     expect(gesture.getPhase()).toBe('idle');
   });
 
@@ -160,8 +167,8 @@ describe('createRowGesture', () => {
       clientY: 40,
     }));
     vi.advanceTimersByTime(ROW_GESTURE.longPressMs);
-    expect(onSwipeReply).not.toHaveBeenCalled();
-    expect(onLongPressMenu).not.toHaveBeenCalled();
+    expect(swipeCalls).toBe(0);
+    expect(menuCalls).toBe(0);
   });
 
   it('ignores pointerdown on an interactive child', () => {
@@ -170,7 +177,7 @@ describe('createRowGesture', () => {
     const gesture = makeGesture();
     gesture.onPointerDown(pointer('pointerdown', row, { clientX: 20, clientY: 20, target: button }));
     vi.advanceTimersByTime(ROW_GESTURE.longPressMs);
-    expect(onLongPressMenu).not.toHaveBeenCalled();
+    expect(menuCalls).toBe(0);
   });
 
   it('ignores pointerdown when text is already selected', () => {
@@ -180,15 +187,17 @@ describe('createRowGesture', () => {
     const gesture = makeGesture();
     gesture.onPointerDown(pointer('pointerdown', row, { clientX: 20, clientY: 20 }));
     vi.advanceTimersByTime(ROW_GESTURE.longPressMs);
-    expect(onLongPressMenu).not.toHaveBeenCalled();
+    expect(menuCalls).toBe(0);
   });
 
   it('still arms reply under reduced motion (no visual, same action)', () => {
     const gesture = makeGesture({ prefersReducedMotion: () => true });
     gesture.onPointerDown(pointer('pointerdown', row, { clientX: 16, clientY: 16 }));
     gesture.onPointerMove(pointer('pointermove', row, { clientX: 16 + ROW_GESTURE.swipeArmPx, clientY: 16 }));
+    expect(row.style.getPropertyValue('--row-swipe-x')).toBe('0px');
+    expect(row.style.getPropertyValue('--row-swipe-progress')).toBe('0');
     gesture.onPointerUp(pointer('pointerup', row, { clientX: 16 + ROW_GESTURE.swipeArmPx, clientY: 16 }));
-    expect(onSwipeReply).toHaveBeenCalledOnce();
+    expect(swipeCalls).toBe(1);
     expect(row.style.getPropertyValue('--row-swipe-x')).toBe('');
   });
 
@@ -197,7 +206,7 @@ describe('createRowGesture', () => {
     gesture.onPointerDown(pointer('pointerdown', row, { clientX: 20, clientY: 40 }));
     gesture.onPointerMove(pointer('pointermove', row, { clientX: 20 + ROW_GESTURE.swipeArmPx, clientY: 40 }));
     gesture.onPointerCancel(pointer('pointercancel', row, { clientX: 20 + ROW_GESTURE.swipeArmPx, clientY: 40 }));
-    expect(onSwipeReply).not.toHaveBeenCalled();
+    expect(swipeCalls).toBe(0);
     expect(gesture.getPhase()).toBe('idle');
   });
 
@@ -211,5 +220,16 @@ describe('createRowGesture', () => {
     expect(shouldIgnoreRowGestureClick(click)).toBe(true);
     row.dispatchEvent(click);
     expect(click.defaultPrevented).toBe(true);
+  });
+
+  it('also suppresses the ghost click after a short committed swipe that does not arm', () => {
+    const gesture = makeGesture();
+    gesture.onPointerDown(pointer('pointerdown', row, { clientX: 20, clientY: 40 }));
+    gesture.onPointerMove(pointer('pointermove', row, { clientX: 20 + ROW_GESTURE.swipeCommitPx + 4, clientY: 40 }));
+    gesture.onPointerUp(pointer('pointerup', row, { clientX: 36, clientY: 40 }));
+    expect(swipeCalls).toBe(0);
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    Object.defineProperty(click, 'currentTarget', { value: row });
+    expect(shouldIgnoreRowGestureClick(click)).toBe(true);
   });
 });

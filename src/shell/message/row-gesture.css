@@ -6,11 +6,6 @@
  * Desktop hover toolbar is unchanged (this file only adds swipe chrome).
  */
 
-.shell-msg-group,
-.shell-msg-cont {
-  touch-action: pan-y;
-}
-
 .shell-msg-swipe-affordance {
   position: absolute;
   inset-inline-start: 8px;
@@ -35,6 +30,8 @@
 
 .shell-msg-group.shell-msg--swiping,
 .shell-msg-cont.shell-msg--swiping {
+  /* Lock the row only after horizontal intent is committed so nested
+     horizontal scroll (code blocks, overflow toolbar) stays possible. */
   touch-action: none;
   transform: translateX(var(--row-swipe-x, 0px));
   transition: none;
@@ -72,5 +69,10 @@
   .shell-msg--swiping .shell-msg-swipe-affordance {
     transform: none;
     transition: none;
+  }
+
+  .shell-msg-swipe-affordance,
+  .shell-msg--swiping .shell-msg-swipe-affordance {
+    opacity: 0;
   }
 }

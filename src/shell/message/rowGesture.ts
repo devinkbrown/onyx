@@ -149,7 +149,7 @@ function applySwipeVisual(
 ): void {
   const visual = reducedMotion ? 0 : signedPx;
   el.style.setProperty('--row-swipe-x', `${visual}px`);
-  el.style.setProperty('--row-swipe-progress', String(progress));
+  el.style.setProperty('--row-swipe-progress', reducedMotion ? '0' : String(progress));
   el.classList.add(SWIPING_CLASS);
   el.classList.toggle(ARMED_CLASS, armed);
   el.classList.remove(SPRING_CLASS);
@@ -340,7 +340,7 @@ export function createRowGesture(
     const el = surface;
     const shouldReply = phase === 'armed';
     const spring = phase === 'swiping' || phase === 'armed';
-    if (shouldReply && el) suppressFollowingClick(el);
+    if ((shouldReply || spring) && el) suppressFollowingClick(el);
     reset(spring);
     if (shouldReply) handlers.onSwipeReply();
   }
