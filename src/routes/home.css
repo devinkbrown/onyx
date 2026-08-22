@@ -92,9 +92,10 @@
 
 .r-landing.home .home-h1 {
   margin: 0 0 16px;
-  font-family: var(--mn-sans);
+  font-family: var(--mn-serif);
+  font-optical-sizing: auto;
   font-size: clamp(2.1rem, 4.6vw, 3.25rem);
-  font-weight: 650;
+  font-weight: 520;
   line-height: var(--leading-tight, 1.12);
   letter-spacing: var(--tracking-title, -0.022em);
   text-transform: none;
@@ -104,10 +105,9 @@
 .r-landing.home .home-lede {
   margin: 0 0 26px;
   max-width: 38ch;
-  font-family: var(--mn-serif);
-  font-optical-sizing: auto;
+  font-family: var(--mn-sans);
   font-size: clamp(1.08rem, 1.8vw, 1.28rem);
-  font-weight: 380;
+  font-weight: 400;
   line-height: var(--leading-body, 1.5);
   color: color-mix(in oklab, var(--mn-text) 86%, var(--mn-mute));
 }

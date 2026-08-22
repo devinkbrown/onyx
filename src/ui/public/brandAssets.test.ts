@@ -26,6 +26,7 @@ describe('locked public identity assets', () => {
       'public/og.png',
       'public/icon-192.png',
       'public/icon-512.png',
+      'public/icon-512-maskable.png',
       'public/apple-touch-icon.png',
       'public/favicon-32.png',
       'public/favicon.ico',
@@ -39,6 +40,7 @@ describe('locked public identity assets', () => {
     expect(pngSize('public/og.png')).toEqual({ width: 1200, height: 630 });
     expect(pngSize('public/brand/og.png')).toEqual({ width: 1200, height: 630 });
     expect(pngSize('public/icon-512.png')).toEqual({ width: 512, height: 512 });
+    expect(pngSize('public/icon-512-maskable.png')).toEqual({ width: 512, height: 512 });
     expect(pngSize('public/apple-touch-icon.png')).toEqual({ width: 180, height: 180 });
 
     const home = readFileSync(join(root, 'src', 'routes', 'Landing.tsx'), 'utf8');

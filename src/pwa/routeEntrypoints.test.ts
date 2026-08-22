@@ -52,9 +52,22 @@ const expected = {
       'Get Onyx on this device in your browser. Keep it here from a supporting browser. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
   },
   install: {
-    title: 'Install Onyx on this device — browser first',
+    title: 'Get Onyx on this device — browser first',
     description:
-      'Install Onyx in your browser, or keep it on this device. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
+      'Get Onyx on this device in your browser. Keep it here from a supporting browser. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
+    canonical: 'https://eshmaki.me/download/',
+  },
+  privacy: {
+    title: 'Onyx privacy — what stays here',
+    description: 'Short facts about what the server stores, history on this device, and that this site does not sell ads.',
+  },
+  guidelines: {
+    title: 'Onyx house rules',
+    description: 'How we treat each other in the rooms, how to report harm, and that Onyx is not 911.',
+  },
+  contact: {
+    title: 'Onyx contact',
+    description: 'How to reach the project for ordinary questions and security reports. No invented mailbox.',
   },
   accessibility: {
     title: 'Onyx accessibility — access is a requirement',
@@ -196,7 +209,9 @@ describe('SPA route entrypoint materializer', () => {
     for (const [route, meta] of Object.entries(expected)) {
       const html = readFileSync(join(dist, route, 'index.html'), 'utf8');
       const document = new DOMParser().parseFromString(html, 'text/html');
-      const canonical = `https://eshmaki.me/${route}/`;
+      const canonical = 'canonical' in meta && typeof meta.canonical === 'string'
+        ? meta.canonical
+        : `https://eshmaki.me/${route}/`;
 
       expect(html, route).not.toMatch(/IRCXNet/i);
       expect(document.title, route).toBe(meta.title);

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 const DEFAULT_ORIGIN = 'https://eshmaki.me';
 
+/** Home / share description: 110–160 characters, local history + no ads. */
+export const PUBLIC_HOME_DESCRIPTION =
+  'Rooms, calls, and private DMs. History stays on this device — about 400 messages per room. No ads. Open it in your browser.';
+
 function upsertMeta(selector: string, attrs: Record<string, string>): HTMLMetaElement {
   let meta = document.querySelector<HTMLMetaElement>(selector);
   if (!meta) {
@@ -86,14 +90,35 @@ export function setPageMeta(title: string, description: string, path = '/'): voi
   }
   json.textContent = JSON.stringify({
     '@context': 'https://schema.org',
-    '@type': 'WebPage',
-    name: title,
-    description,
-    url,
-    isPartOf: {
-      '@type': 'WebSite',
-      name: 'Onyx',
-      url: canonicalUrl('/'),
-    },
+    '@graph': [
+      {
+        '@type': 'Organization',
+        name: 'Onyx',
+        url: canonicalUrl('/'),
+      },
+      {
+        '@type': 'SoftwareApplication',
+        name: 'Onyx',
+        applicationCategory: 'CommunicationApplication',
+        operatingSystem: 'Web',
+        url: canonicalUrl('/app/'),
+        offers: {
+          '@type': 'Offer',
+          price: 0,
+          priceCurrency: 'USD',
+        },
+      },
+      {
+        '@type': 'WebPage',
+        name: title,
+        description,
+        url,
+        isPartOf: {
+          '@type': 'WebSite',
+          name: 'Onyx',
+          url: canonicalUrl('/'),
+        },
+      },
+    ],
   });
 }

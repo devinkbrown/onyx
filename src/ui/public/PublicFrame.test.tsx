@@ -47,7 +47,7 @@ describe('PublicFrame', () => {
       const view = render(() => <PublicFrame currentPath={currentPath}>Content</PublicFrame>);
       const primary = screen.getByRole('navigation', { name: 'Primary navigation' });
       expect(primary).toContainElement(within(primary).getByRole('link', { name: 'About' }));
-      expect(within(primary).getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/invite/');
+      expect(within(primary).queryByRole('link', { name: 'Join' })).toBeNull();
       expect(within(primary).getByRole('link', { name: 'Download' })).toHaveAttribute('href', '/download/');
       expect(within(primary).queryByRole('link', { name: 'OnyxOS' })).toBeNull();
       expect(within(primary).queryByRole('link', { name: 'Status' })).toBeNull();
@@ -59,13 +59,11 @@ describe('PublicFrame', () => {
         label: link.textContent,
         href: link.getAttribute('href'),
       }))).toEqual([
-        { label: 'About', href: '/about/' },
-        { label: 'Join', href: '/invite/' },
-        { label: 'Download', href: '/download/' },
-        { label: 'Guides', href: '/guides/' },
+        { label: 'House rules', href: '/guidelines/' },
+        { label: 'Privacy', href: '/privacy/' },
+        { label: 'Contact', href: '/contact/' },
         { label: 'Status', href: '/status/' },
-        { label: 'Roadmap', href: '/roadmap/' },
-        { label: 'Accessibility', href: '/accessibility/' },
+        { label: 'Guides', href: '/guides/' },
       ]);
       view.unmount();
     }

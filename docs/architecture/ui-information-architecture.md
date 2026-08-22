@@ -15,26 +15,27 @@ ignores trailing slashes, query strings, and fragments before matching a path.
 The router may retain compatibility aliases; `/install` remains an alias of
 `/download`, not a second public destination. Visibility mirrors the existing
 public header:
-About, Join, and Download are shown at both breakpoints;
-Home is the brand link. Other routable/supporting surfaces remain in the
-manifest but are not public-navigation links. `/onyxos/` stays a working
-unlisted deep URL — no header, footer, Home, or sitemap promotion.
+About and Download are shown at both breakpoints; **Open Onyx** is the header
+handoff to `/app/`. Home is the brand link. Other routable/supporting surfaces
+remain in the manifest but are not public-navigation links. `/onyxos/` stays a
+working unlisted deep URL — no header, footer, Home, or sitemap promotion.
 
 Header placement is explicit metadata: `brand` is the Home brand link,
 `primary` identifies links inside the `Primary navigation` landmark, and `none`
 keeps supporting routes out of the shared header. `navigationOrder` preserves
-the current About, Join, Download order independently from
-the manifest's product/trust/resources grouping.
+the current About, Download order independently from
+the manifest's product/trust/resources grouping. The footer is House rules,
+Privacy, Contact, Status, and Guides.
 
 `PublicFrame` remains the only public document frame: one banner, one main, one
 footer, a skip link, and manifest-derived current-path navigation. An optional
 `context` current-line may sit between header and main when a route supplies
 it; existing route calls omit the slot and must keep working. Home uses that
-slot as `Community · Home`. The frame does not invent routes, slash aliases,
-or a second header CTA. Home composition is a community invitation and labeled
-static room preview, then a trust strip, community prose, and a quiet extras
-shelf below the fold. Live telemetry stays on Status/Stats, not Home. This is
-a no-cut lock for public destinations.
+slot when a route supplies context; Home omits it. The frame does not invent
+routes, slash aliases, or a second header CTA. Home composition is a community
+invitation and labeled static room preview, then a trust strip, community
+prose, and a quiet extras shelf below the fold. Live telemetry stays on
+Status/Stats, not Home. This is a no-cut lock for public destinations.
 
 ## Shell navigation invariants
 

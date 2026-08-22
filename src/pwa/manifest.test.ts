@@ -57,14 +57,20 @@ describe('PWA manifest', () => {
     const entryMetadata = [title, description, ogDescription, twitterDescription].join('\n');
 
     expect(title).toBe('Onyx — a room for your people');
-    expect(description).toMatch(/Open Onyx in your browser/i);
-    expect(description).toMatch(/rooms, messages, calls/i);
-    expect(description).toMatch(/private DMs/i);
-    expect(description).toMatch(/without ads/i);
-    expect(description).toMatch(/desktop and mobile/i);
-    expect(description).toMatch(/native download/i);
+    expect(title.length).toBeLessThanOrEqual(60);
+    expect(description.length).toBeGreaterThanOrEqual(110);
+    expect(description.length).toBeLessThanOrEqual(160);
+    expect(description).toMatch(/Rooms, calls, and private DMs/i);
+    expect(description).toMatch(/this device/i);
+    expect(description).toMatch(/400/);
+    expect(description).toMatch(/No ads/i);
+    expect(description).toMatch(/browser/i);
+    expect(description).not.toMatch(/mesh telemetry|fully encrypted|cloud history/i);
     expect(ogDescription).toBe(description);
     expect(twitterDescription).toBe(description);
+    expect(document.querySelector('a.html-shell-skip')?.getAttribute('href')).toBe('#root');
+    expect(entryDocument).not.toMatch(/googletagmanager|gtag\(|facebook\.net|adsbygoogle|plausible\.io|analytics\.js/i);
+    expect(entryDocument).not.toMatch(/aggregateRating/i);
 
     // Premature native-ship promises must stay out of entry/share metadata.
     // Keep patterns specific so form-factor labels like "desktop room"
@@ -101,7 +107,9 @@ describe('PWA manifest', () => {
       '4c4b218173b70b15e7f16ba9e52be8b390f77d0f6da45e2f05d4837c849ed640',
     ]);
 
-    expect(manifest.shortcuts?.map((shortcut) => shortcut.url)).toEqual(['/app/', '/status/', '/stats/']);
+    expect(manifest.shortcuts?.map((shortcut) => shortcut.url)).toEqual(['/app/', '/status/', '/guidelines/']);
+    expect(manifest.description).not.toMatch(/mesh telemetry/i);
+    expect(manifest.screenshots?.every((shot) => !/connect/i.test(shot.label))).toBe(true);
     expect(manifest.screenshots?.map((shot) => shot.form_factor).sort()).toEqual(['narrow', 'wide']);
 
     for (const screenshot of manifest.screenshots ?? []) {
@@ -124,8 +132,10 @@ describe('PWA manifest', () => {
     expect(manifest.icons).toEqual([
       expect.objectContaining({ src: '/icon-192.png', sizes: '192x192', purpose: 'any' }),
       expect.objectContaining({ src: '/icon-512.png', sizes: '512x512', purpose: 'any' }),
+      expect.objectContaining({ src: '/icon-512-maskable.png', sizes: '512x512', purpose: 'maskable' }),
     ]);
-    expect(manifest.icons?.some((icon) => icon.purpose.split(/\s+/).includes('maskable'))).toBe(false);
+    expect(manifest.icons?.some((icon) => icon.purpose.split(/\s+/).includes('maskable'))).toBe(true);
+    expect(existsSync(join(root, 'public', 'icon-512-maskable.png'))).toBe(true);
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content'))
       .toBe(manifest.theme_color);
     expect(manifest.background_color).toBe(manifest.theme_color);
@@ -231,14 +241,17 @@ describe('PWA manifest', () => {
       'brand',
       'codecs',
       'community',
+      'contact',
       'download',
       'downloads',
       'favicon-32.png',
       'favicon.ico',
       'favicon.svg',
       'glossary',
+      'guidelines',
       'guides',
       'icon-192.png',
+      'icon-512-maskable.png',
       'icon-512.png',
       'index.html',
       'install',
@@ -248,6 +261,7 @@ describe('PWA manifest', () => {
       'og.png',
       'opcodec_wasm.js',
       'opcodec_wasm.wasm',
+      'privacy',
       'roadmap',
       'robots.txt',
       'screenshots',

@@ -88,12 +88,16 @@ SPA_OWNED_BLOCKLIST=(
   agents
   guides
   community
+  privacy
+  guidelines
+  contact
   downloads
   assets
   manifest.json
   sw.js
   icon-192.png
   icon-512.png
+  icon-512-maskable.png
   apple-touch-icon.png
   favicon-32.png
   og.png

@@ -19,7 +19,9 @@ describe('RoadmapRoute', () => {
     expect(within(screen.getByRole('navigation', { name: 'Primary navigation' }))
       .queryByRole('link', { name: 'Roadmap' })).toBeNull();
     expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))
-      .getByRole('link', { name: 'Roadmap' })).toHaveAttribute('href', '/roadmap/');
+      .queryByRole('link', { name: 'Roadmap' })).toBeNull();
+    expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))
+      .getByRole('link', { name: 'House rules' })).toHaveAttribute('href', '/guidelines/');
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' });
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');

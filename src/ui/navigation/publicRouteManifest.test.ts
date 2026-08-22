@@ -105,6 +105,9 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
       '/onyxos/',
       '/status/',
       '/accessibility/',
+      '/privacy/',
+      '/guidelines/',
+      '/contact/',
       '/integrations/',
       '/agents/',
       '/glossary/',
@@ -126,7 +129,7 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
     const grouped = Object.values(PUBLIC_ROUTE_GROUPS).flat();
     expect(grouped).toEqual(PUBLIC_ROUTE_MANIFEST.map((route) => route.id));
     expect(PUBLIC_ROUTE_MANIFEST.map((route) => route.group)).toEqual([
-      'product', 'product', 'product', 'product', 'trust', 'trust',
+      'product', 'product', 'product', 'product', 'trust', 'trust', 'trust', 'trust', 'trust',
       'resources', 'resources', 'resources', 'resources', 'resources', 'resources', 'resources',
       'resources', 'resources',
     ]);
@@ -150,8 +153,8 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
 
     expect(publicNavigationRoutes()).toEqual(declared);
     expect(metadata).toEqual(runtime);
-    expect(publicNavigationRoutes().map((route) => route.navigationOrder)).toEqual([0, 1, 2]);
-    expect(publicNavigationRoutes().map((route) => route.label)).toEqual(['About', 'Join', 'Download']);
+    expect(publicNavigationRoutes().map((route) => route.navigationOrder)).toEqual([0, 1]);
+    expect(publicNavigationRoutes().map((route) => route.label)).toEqual(['About', 'Download']);
     expect(publicRouteById('onyxos')).toMatchObject({
       placement: 'none',
       navigation: { desktop: false, mobile: false },
@@ -182,7 +185,10 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
   it('looks up canonical metadata by ID', () => {
     expect(publicRouteById('download')).toMatchObject({ href: '/download/', path: '/download', label: 'Download' });
     expect(publicRouteById('about')).toMatchObject({ href: '/about/', path: '/about', label: 'About' });
-    expect(publicRouteById('invite')).toMatchObject({ href: '/invite/', path: '/invite', label: 'Join', placement: 'primary' });
+    expect(publicRouteById('invite')).toMatchObject({ href: '/invite/', path: '/invite', label: 'Join', placement: 'none' });
+    expect(publicRouteById('privacy')).toMatchObject({ href: '/privacy/', placement: 'none' });
+    expect(publicRouteById('guidelines')).toMatchObject({ href: '/guidelines/', label: 'House rules' });
+    expect(publicRouteById('contact')).toMatchObject({ href: '/contact/', placement: 'none' });
     expect(publicRouteById('status')).toMatchObject({ placement: 'none', navigationOrder: null });
     expect(publicRouteById('roadmap')).toMatchObject({ placement: 'none' });
     expect(publicRouteById('onyxos')).toMatchObject({ placement: 'none' });

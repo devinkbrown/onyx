@@ -354,13 +354,9 @@ export default function Download(): JSX.Element {
   const installGuide = typeof window !== 'undefined'
     && /^\/install(?:\/|$)/.test(window.location.pathname);
   setPageMeta(
-    installGuide
-      ? 'Install Onyx on this device — browser first'
-      : 'Get Onyx on this device — browser first',
-    installGuide
-      ? 'Install Onyx in your browser, or keep it on this device. Desktop packages are optional and unsigned. macOS native packages are coming soon.'
-      : 'Get Onyx on this device in your browser. Keep it here from a supporting browser. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
-    installGuide ? '/install/' : '/download/',
+    'Get Onyx on this device — browser first',
+    'Get Onyx on this device in your browser. Keep it here from a supporting browser. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
+    '/download/',
   );
 
   const [catalog] = createResource(loadCatalog);
@@ -395,10 +391,8 @@ export default function Download(): JSX.Element {
         <div class="r-grain" aria-hidden="true" />
 
         <section class="r-wrap data-hero dl-hero" aria-labelledby="download-heading">
-          <p class="dl-kicker">{installGuide ? 'Install guide' : 'This device'}</p>
-          <h1 id="download-heading">
-            {installGuide ? 'Install Onyx on this device' : 'Get Onyx on this device'}
-          </h1>
+          <p class="dl-kicker">{installGuide ? 'Same page as Download' : 'This device'}</p>
+          <h1 id="download-heading">Get Onyx on this device</h1>
           <p class="dl-lede">Open it in the browser. That is the main door.</p>
           <p class="sub">
             Supporting browsers can keep Onyx here as an installed app — same rooms,

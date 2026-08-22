@@ -225,12 +225,12 @@
 
 .data-hero h1 {
   margin: 22px 0 0;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(3rem, 0.8rem + 8vw, 7.8rem);
-  line-height: 0.88;
-  letter-spacing: 0;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-weight: 650;
+  font-size: clamp(2.1rem, 1.2rem + 3vw, 3.4rem);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-transform: none;
   color: var(--paper);
   text-wrap: balance;
 }

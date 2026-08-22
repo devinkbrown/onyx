@@ -180,12 +180,12 @@ describe('Download page', () => {
     window.history.replaceState(null, '', '/install/');
     const { getByRole } = render(() => <Download />);
 
-    expect(document.title).toBe('Install Onyx on this device — browser first');
+    expect(document.title).toBe('Get Onyx on this device — browser first');
     expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
       'href',
-      'http://localhost:3000/install/',
+      'http://localhost:3000/download/',
     );
-    expect(getByRole('heading', { name: 'Install Onyx on this device' })).toBeInTheDocument();
+    expect(getByRole('heading', { name: 'Get Onyx on this device' })).toBeInTheDocument();
     expect(getByRole('heading', { name: /install on linux/i })).toBeInTheDocument();
     expect(getByRole('main', { name: 'Get Onyx' })).toHaveAttribute('id', 'public-main');
     expect(within(getByRole('navigation', { name: 'Primary navigation' }))

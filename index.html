@@ -9,7 +9,7 @@
     <title>Onyx — a room for your people</title>
     <meta
       name="description"
-      content="Open Onyx in your browser for rooms, messages, calls, and private DMs — without ads. Invite friends, clubs, and class groups. Use the same client across desktop and mobile, or choose a native download."
+      content="Rooms, calls, and private DMs. History stays on this device — about 400 messages per room. No ads. Open it in your browser."
     />
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
@@ -23,7 +23,7 @@
     <meta property="og:title" content="Onyx — a room for your people" />
     <meta
       property="og:description"
-      content="Open Onyx in your browser for rooms, messages, calls, and private DMs — without ads. Invite friends, clubs, and class groups. Use the same client across desktop and mobile, or choose a native download."
+      content="Rooms, calls, and private DMs. History stays on this device — about 400 messages per room. No ads. Open it in your browser."
     />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Onyx" />
@@ -37,12 +37,37 @@
     <meta name="twitter:title" content="Onyx — a room for your people" />
     <meta
       name="twitter:description"
-      content="Open Onyx in your browser for rooms, messages, calls, and private DMs — without ads. Invite friends, clubs, and class groups. Use the same client across desktop and mobile, or choose a native download."
+      content="Rooms, calls, and private DMs. History stays on this device — about 400 messages per room. No ads. Open it in your browser."
     />
     <meta name="twitter:image" content="https://eshmaki.me/og.png" />
     <meta name="twitter:image:alt" content="Onyx — a quiet harbor at night. Conversation glowing on a dark pier." />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "name": "Onyx",
+            "url": "https://eshmaki.me/"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "Onyx",
+            "applicationCategory": "CommunicationApplication",
+            "operatingSystem": "Web",
+            "url": "https://eshmaki.me/app/",
+            "offers": {
+              "@type": "Offer",
+              "price": 0,
+              "priceCurrency": "USD"
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
+    <a class="html-shell-skip" href="#root">Skip to content</a>
     <div id="root"></div>
     <script type="module" src="/src/index.tsx"></script>
   </body>

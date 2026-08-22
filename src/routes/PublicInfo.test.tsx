@@ -6,7 +6,6 @@ import { PublicInfo, resolvePublicInfoPage, type PublicInfoPage } from './Public
 /** Manifest order for the shared primary navigation. */
 const PRIMARY_LINKS = [
   ['About', '/about/'],
-  ['Join', '/invite/'],
   ['Download', '/download/'],
 ] as const;
 

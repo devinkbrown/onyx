@@ -26,6 +26,9 @@ export type RouteLifecycleId =
   | 'appearance'
   | 'guides'
   | 'community'
+  | 'privacy'
+  | 'guidelines'
+  | 'contact'
   | 'app';
 
 export type RouteLifecycleEntry = {
@@ -47,10 +50,13 @@ const ROUTE_LIFECYCLE_SEEDS = [
   { path: '/glossary', id: 'glossary', label: 'Glossary', publicNavigation: false },
   { path: '/stats', id: 'stats', label: 'Stats', publicNavigation: false },
   { path: '/roadmap', id: 'roadmap', label: 'Roadmap', publicNavigation: false },
-  { path: '/invite', id: 'invite', label: 'Join', publicNavigation: true },
+  { path: '/invite', id: 'invite', label: 'Join', publicNavigation: false },
   { path: '/appearance', id: 'appearance', label: 'Appearance', publicNavigation: false },
   { path: '/guides', id: 'guides', label: 'Guides', publicNavigation: false },
   { path: '/community', id: 'community', label: 'Community', publicNavigation: false },
+  { path: '/privacy', id: 'privacy', label: 'Privacy', publicNavigation: false },
+  { path: '/guidelines', id: 'guidelines', label: 'House rules', publicNavigation: false },
+  { path: '/contact', id: 'contact', label: 'Contact', publicNavigation: false },
   { path: '/app', id: 'app', label: ROUTE_LIFECYCLE_APP_LABEL, publicNavigation: false },
 ] as const satisfies readonly Readonly<{
   path: string;

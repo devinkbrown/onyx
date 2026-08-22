@@ -28,10 +28,10 @@
       "url": "/status/"
     },
     {
-      "name": "Channel stats",
-      "short_name": "Stats",
-      "description": "View public channel rhythm and activity.",
-      "url": "/stats/"
+      "name": "House rules",
+      "short_name": "Rules",
+      "description": "How we treat each other in the rooms.",
+      "url": "/guidelines/"
     }
   ],
   "icons": [
@@ -46,6 +46,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "screenshots": [

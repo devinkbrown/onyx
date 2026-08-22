@@ -30,15 +30,15 @@ describe('Landing', () => {
     expect(getByRole('heading', { level: 1 })).toHaveTextContent('A room for your people.');
     expect(container.querySelector('a.home-cta-primary')).toHaveAttribute('href', '/app/');
     expect(container.querySelector('a.home-cta-primary')).toHaveTextContent('Join free');
-    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/invite/?join=%23root');
-    expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('Invite someone');
+    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/download/');
+    expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('Download');
     expect(container.textContent).toMatch(/Invite someone\. Join a room\. Talk\./);
   });
 
   it('derives public destination links from manifest hrefs', () => {
     const { container, getByRole } = render(() => <Landing />);
-    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/invite/?join=%23root');
-    expect(getByRole('link', { name: /see what's happening/i })).toHaveAttribute('href', '/stats/');
+    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/download/');
+    expect(getByRole('link', { name: /keep it here/i })).toHaveAttribute('href', '/download/');
     expect(getByRole('link', { name: /how the rooms work/i })).toHaveAttribute('href', '/about/');
   });
 
@@ -50,10 +50,10 @@ describe('Landing', () => {
       href: link.getAttribute('href'),
     }))).toEqual([
       { label: 'Status', href: '/status/' },
-      { label: 'Stats', href: '/stats/' },
       { label: 'Roadmap', href: '/roadmap/' },
       { label: 'About', href: '/about/' },
       { label: 'Download', href: '/download/' },
+      { label: 'Guides', href: '/guides/' },
       { label: 'Invite', href: '/invite/?join=%23root' },
     ]);
   });
@@ -78,7 +78,7 @@ describe('Landing', () => {
     expect(trust).toHaveTextContent('No ads');
     expect(trust).toHaveTextContent('No third-party trackers');
     expect(trust).toHaveTextContent('Private DMs');
-    expect(trust).toHaveTextContent('Open engine');
+    expect(trust).toHaveTextContent('History on this device');
     expect(container.textContent).not.toMatch(/fully encrypted|group E2EE|passkey|Discord-killer|nobody.s product|cloud history/i);
   });
 

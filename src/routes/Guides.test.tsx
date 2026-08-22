@@ -11,11 +11,10 @@ import {
 
 const PRIMARY_LINKS = [
   ['About', '/about/'],
-  ['Join', '/invite/'],
   ['Download', '/download/'],
 ] as const;
 
-const FORBIDDEN = /WeeChat|weechat|irssi|mIRC|\bmirc\b|IRCv3|\bIRC\b|Discord killer|\bmesh\b|handshake|claim path|group E2EE|passkey as/i;
+const FORBIDDEN = /mIRC|\bmirc\b|IRCv3|\bIRC\b|Discord killer|\bmesh\b|handshake|claim path|group E2EE live|passkey as/i;
 
 const SURFACES = ['guides', 'community'] as const satisfies readonly GuidesSurface[];
 
@@ -62,6 +61,9 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
     expect(container.textContent).not.toMatch(FORBIDDEN);
     expect(container.textContent).not.toMatch(/Anton|neon/i);
     expect(screen.queryByRole('heading', { name: /WeeChat|irssi|mIRC/i })).toBeNull();
+    const optional = container.querySelector('.guides-card--optional');
+    expect(optional?.textContent).toMatch(/WeeChat/);
+    expect(optional?.textContent).toMatch(/irssi/);
   });
 
   it('keeps the how-tos in newcomer order with another client last', () => {
