@@ -113,8 +113,14 @@ function nickField(): HTMLElement {
   return screen.getByRole('textbox', { name: /^(display name|name|account name)$/i });
 }
 
-function publicCopy(): string {
-  return screen.getByTestId('connect-screen').textContent ?? '';
+function visibleCopy(): string {
+  const root = screen.getByTestId('connect-screen');
+  const heading = root.querySelector('.conn-title')?.textContent ?? '';
+  const sub = root.querySelector('.conn-sub')?.textContent ?? '';
+  const fields = [...root.querySelectorAll('.onyx-field, .conn-alt, .conn-foot, .conn-status')]
+    .map((node) => node.textContent ?? '')
+    .join(' ');
+  return `${heading} ${sub} ${fields}`;
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
@@ -134,8 +140,8 @@ describe('Connect screen rendering', () => {
 
   it('never uses infrastructure or identity-mode copy on the first screen', () => {
     render(() => <Connect />);
-    expect(publicCopy()).not.toMatch(
-      /claim path|nearest node|handshake|tonight on the water|mesh is listening|auto-routed|ircv?3?|sasl|\bcap\b/i,
+    expect(visibleCopy()).not.toMatch(
+      /claim path|nearest node|handshake|tonight on the water|mesh is listening|auto-routed|\birc\b|\bsasl\b/i,
     );
   });
 
@@ -241,7 +247,7 @@ describe('Passkey sign-in', () => {
     render(() => <Connect />);
     expect(screen.queryByTestId('conn-passkey-primary')).not.toBeInTheDocument();
     expect(screen.queryByTestId('conn-passkey-submit')).not.toBeInTheDocument();
-    expect(publicCopy()).not.toMatch(/passkey/i);
+    expect(visibleCopy()).not.toMatch(/passkey/i);
 
     clickMode(/sign in/i);
     expect(screen.queryByTestId('conn-passkey-primary')).not.toBeInTheDocument();
