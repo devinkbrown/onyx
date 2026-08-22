@@ -594,6 +594,7 @@ describe('PresenceRibbon commercial room header', () => {
     expect(screen.getByTestId('ribbon-mute-channel')).toHaveTextContent('Mute room');
     expect(screen.getByTestId('ribbon-hide-room')).toHaveTextContent('Hide room');
     expect(screen.getByTestId('ribbon-leave-room')).toHaveTextContent('Leave room');
+    expect(screen.queryByTestId('ribbon-room-care')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ribbon-hide-room'));
     expect(store.getState().hiddenRooms.has('#general')).toBe(true);
@@ -605,6 +606,23 @@ describe('PresenceRibbon commercial room header', () => {
     expect(sendRaw).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId('harbor-leave-confirm'));
     expect(sendRaw).toHaveBeenCalledWith('PART', '#general', 'Goodbye');
+  });
+
+  it('opens Room care from This room, not from Mute Hide Leave', () => {
+    seedChannel('#harbor', new Map([
+      ['alice', makeUser('alice')],
+      ['bob', makeUser('bob')],
+      ['cara', makeUser('cara')],
+    ]));
+    render(() => <PresenceRibbon />);
+    openMore();
+    expect(screen.getByTestId('ribbon-room-care')).toHaveTextContent('Room care');
+    const items = Array.from(screen.getByTestId('ribbon-more-menu').querySelectorAll('[role="menuitem"]'));
+    const labels = items.map((el) => el.textContent ?? '');
+    const careIdx = labels.findIndex((text) => text.includes('Room care'));
+    const muteIdx = labels.findIndex((text) => text.includes('Mute room'));
+    expect(careIdx).toBeGreaterThanOrEqual(0);
+    expect(careIdx).toBeLessThan(muteIdx);
   });
 
   it('closes a DM from More without PARTing', () => {

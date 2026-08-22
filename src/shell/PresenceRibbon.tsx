@@ -24,10 +24,12 @@ import { channelNotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
+import { isConsumerStewardshipRoom } from '@/lib/rooms/roomStewardship';
 import { Popover } from '@/primitives/index';
 import { ChannelSettings } from './ChannelSettings';
 import { RoomMediaIndex } from './RoomMediaIndex';
 import { openRoomInviteShare } from './roomInviteShareState';
+import { openRoomStewardship } from './roomStewardshipState';
 import { openCloseConversationConfirm, openLeaveRoomConfirm } from './roomVerbConfirm';
 import { ROOM_VERB_COPY } from '@/lib/roomListVerbs';
 import { ChannelNotifyControl } from './ChannelNotifyControl';
@@ -966,6 +968,30 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       </svg>
                       <span>Room settings</span>
                     </button>
+                    <Show when={isConsumerStewardshipRoom(activeUsers()?.size ?? 0)}>
+                      <button
+                        type="button"
+                        class="shell-ribbon-more-item"
+                        role="menuitem"
+                        aria-label={`Room care for ${settingsChannel()}`}
+                        aria-haspopup="dialog"
+                        data-testid="ribbon-room-care"
+                        onClick={() => {
+                          const channel = settingsChannel() ?? '';
+                          closeMoreThen(() => openRoomStewardship(channel));
+                        }}
+                        onKeyDown={onMoreMenuKeyDown}
+                      >
+                        <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 4v4" />
+                          <path d="M8 8h8" />
+                          <path d="M7 20c0-3 2.2-5 5-5s5 2 5 5" />
+                          <circle cx="12" cy="10" r="2.2" />
+                        </svg>
+                        <span>Room care</span>
+                      </button>
+                    </Show>
                     <a
                       class="shell-ribbon-more-item"
                       role="menuitem"
