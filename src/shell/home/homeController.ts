@@ -383,9 +383,13 @@ export function createHomeController(): HomeController {
       mutedDMs: mutedDMs(),
     });
   });
-  const memoryCatchUp = createMemo<CatchUpItem[]>(() =>
-    catchUpMemory().map(catchUpItemFromMemory),
-  );
+  const memoryCatchUp = createMemo<CatchUpItem[]>(() => {
+    const levels = channelNotify();
+    const muted = mutedDMs();
+    return catchUpMemory()
+      .map(catchUpItemFromMemory)
+      .filter((item) => !isCatchUpHardSilenced(item.kind, item.target, levels, muted));
+  });
   const hasLiveTranscript = createMemo(() => {
     for (const channel of channels().values()) {
       if (channel.messages.length > 0) return true;
@@ -405,10 +409,7 @@ export function createHomeController(): HomeController {
   }));
   const catchUp = createMemo<CatchUpItem[]>(() => {
     const source = catchUpSource();
-    const items = source.fromMemory ? source.items.slice() : liveCatchUp();
-    const levels = channelNotify();
-    const muted = mutedDMs();
-    return items.filter((item) => !isCatchUpHardSilenced(item.kind, item.target, levels, muted));
+    return source.fromMemory ? source.items.slice() : liveCatchUp();
   });
   const catchUpFromMemory = createMemo(() => catchUpSource().fromMemory);
 
