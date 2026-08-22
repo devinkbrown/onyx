@@ -4,7 +4,7 @@
  *
  * - Enter sends; Shift+Enter inserts newline; Enter during an IME composition
  *   confirms the candidate and never sends
- * - Textarea grows with content (up to 200px)
+ * - Textarea grows with content (one line → ~5 lines, then internal scroll)
  * - Disabled when no active target or not connected
  * - Attachments upload to the configured media endpoint before send
  * - Per-target drafts are persisted through the vanilla store
@@ -279,7 +279,8 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (activeEditing()) return 'Edit message';
     if (isOffline()) return t ? `Offline — queues for ${t}` : 'Reconnecting…';
     if (!t) return 'Pick a room or a person to begin';
-    return 'Message';
+    if (t.startsWith('#') || t.startsWith('&')) return `Message ${t}`;
+    return `Message @${t}`;
   });
 
   // Keep the destination and the current composition state visible above the
@@ -565,11 +566,15 @@ export function Composer(props: ComposerProps): JSX.Element {
   });
 
   // ── auto-resize ──
+  // Grow to the CSS max (~5 lines). Reading computed max-height keeps JS in
+  // lockstep with the desktop / phone / landscape caps in shell.css.
   function autoResize(): void {
     const el = textareaRef;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    const parsed = Number.parseFloat(getComputedStyle(el).maxHeight);
+    const cap = Number.isFinite(parsed) && parsed > 0 ? parsed : 160;
+    el.style.height = `${Math.min(el.scrollHeight, cap)}px`;
   }
 
   function persistDraft(nextText: string): void {
@@ -1121,7 +1126,7 @@ export function Composer(props: ComposerProps): JSX.Element {
       <Show when={activeReply()}>
         {(reply) => (
           <div class="shell-composer-context" role="status" aria-live="polite">
-            <span class="shell-composer-context-label">replying to {reply().from}</span>
+            <span class="shell-composer-context-label">Replying to {reply().from}</span>
             <span class="shell-composer-context-text">
               {clippedText(activeReplyPreviewText(reply()))}
             </span>
@@ -1135,7 +1140,7 @@ export function Composer(props: ComposerProps): JSX.Element {
       <Show when={activeEditing()}>
         {(edit) => (
           <div class="shell-composer-context shell-composer-context--edit" role="status" aria-live="polite">
-            <span class="shell-composer-context-label">editing</span>
+            <span class="shell-composer-context-label">Editing</span>
             <span class="shell-composer-context-text">{clippedText(edit().text)}</span>
             <button type="button" class="shell-composer-context-close" aria-label="Cancel edit" onClick={cancelEdit}>
               ×

@@ -1311,20 +1311,10 @@
 .moderation-cockpit__protocol p { margin: 6px 0; }
 .moderation-cockpit__protocol code { display: block; padding: 7px 8px; overflow-wrap: anywhere; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: var(--surface-void); color: var(--paper-dim); font: var(--text-2xs) var(--font-mono); }
 
-/* A true, compact orientation seam: target and unread state already owned by
-   the store, placed below the ribbon so it never competes with room controls. */
+/* Ribbon is the only visible room header. Keep this strip in the tree for
+   AT / tests, but do not stack a second orientation chrome under PresenceRibbon. */
 .shell-room-current {
-  display: flex;
-  align-items: baseline;
-  gap: 0.35rem 0.65rem;
-  min-width: 0;
-  min-height: 28px;
-  padding: 6px 14px;
-  border-bottom: 1px solid var(--seam-faint);
-  box-shadow: inset 2px 0 0 var(--lapis);
-  color: var(--paper-mute);
-  font: 600 0.68rem/1.25 var(--font-mono);
-  letter-spacing: 0.035em;
+  display: none;
 }
 .shell-room-current__kicker {
   flex: 0 0 auto;
@@ -3276,22 +3266,18 @@
   background: transparent;
 }
 
-/* A quiet, data-bearing orientation seam. It is intentionally not a second
-   toolbar: target, topic, and read state remain visible while history pages,
-   loading skeletons, and the virtualised log change beneath it. */
+/* Visually hidden — MessageView keeps the current-conversation receipt for AT.
+   The ribbon is the only on-screen header. */
 .shell-conversation-brief {
-  display: flex;
-  align-items: center;
-  gap: 0.42rem;
-  min-width: 0;
-  min-height: 34px;
-  padding: 7px var(--space-5) 6px;
-  border-bottom: 1px solid color-mix(in oklab, var(--seam-faint) 88%, transparent);
-  background: color-mix(in oklab, var(--ink) 24%, transparent);
-  color: var(--paper-mute);
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.035em;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .shell-conversation-brief-kicker {
   flex: none;
@@ -3574,7 +3560,9 @@
 }
 
 .shell-boosts {
-  margin-top: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 6px;
 }
 
 .shell-feed-empty {
@@ -3597,7 +3585,7 @@
   font-style: italic;
   font-size: 1.05rem;
   letter-spacing: 0.01em;
-  color: color-mix(in oklab, var(--ink) 72%, var(--paper-mute));
+  color: var(--paper);
 }
 
 .shell-feed-empty-body {
@@ -3731,12 +3719,13 @@
 .shell-msg-group {
   position: relative;
   display: grid;
-  grid-template-columns: 42px 1fr;
+  grid-template-columns: 40px 1fr;
   gap: 0 var(--space-3);
-  padding: var(--space-2) var(--space-5) var(--space-1);
-  margin-top: var(--space-2);
+  padding: 10px var(--space-5) 4px;
+  margin-top: 6px;
   max-width: var(--shell-measure);
   margin-inline: auto;
+  border-radius: var(--r-sm);
   /* opacity covers pending → ACK (Era 1 A6); background is the hover wash. */
   transition:
     background var(--dur) var(--ease),
@@ -3759,7 +3748,7 @@
 .shell-msg-group--system {
   grid-template-columns: 1fr;
   /* Align the system line under the message body: avatar + gap + left padding. */
-  padding: var(--space-1) var(--space-5) var(--space-1) calc(42px + var(--space-3) + var(--space-5));
+  padding: var(--space-1) var(--space-5) var(--space-1) calc(40px + var(--space-3) + var(--space-5));
 }
 
 .shell-msg-avatar {
@@ -3783,10 +3772,10 @@
 
 .shell-msg-author {
   font-family: var(--font-sans);
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--paper);
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   cursor: default;
   transition: color var(--dur) var(--ease);
 }
@@ -3797,12 +3786,12 @@
 }
 
 .shell-msg-ts {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
   color: var(--paper-mute);
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   flex: none;
-  opacity: 0.78;
+  opacity: 0.85;
 }
 
 .shell-msg-edited {
@@ -3889,8 +3878,9 @@
 }
 
 .shell-msg-text {
-  font-size: 0.91rem;
-  line-height: 1.56;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
   color: var(--paper);
   word-break: break-word;
   overflow-wrap: break-word;
@@ -3954,11 +3944,12 @@
 .shell-msg-cont {
   position: relative; /* anchor for the per-message action bar (.msg-menu) */
   display: grid;
-  grid-template-columns: 42px 1fr;
+  grid-template-columns: 40px 1fr;
   gap: 0 var(--space-3);
-  padding: 1px var(--space-5);
+  padding: 3px var(--space-5);
   max-width: var(--shell-measure);
   margin-inline: auto;
+  border-radius: var(--r-sm);
   /* opacity covers pending → ACK (Era 1 A6); background is the hover wash. */
   transition:
     background var(--dur) var(--ease),
@@ -3968,10 +3959,10 @@
 .shell-msg-cont-ts {
   grid-column: 1;
   align-self: center;
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
   color: var(--paper-mute);
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-align: right;
   padding-right: 2px;
   opacity: 0;
@@ -3989,8 +3980,8 @@
 /* System line — joins, parts, mode changes. A quiet ripple in the current:
    small, dim, and prefixed with a soft azure tide-mark. */
 .shell-msg-system {
-  /* Align under the message body: avatar (42px) + column gap + left padding. */
-  padding: var(--space-1) var(--space-5) var(--space-1) calc(42px + var(--space-3) + var(--space-5));
+  /* Align under the message body: avatar (40px) + column gap + left padding. */
+  padding: var(--space-1) var(--space-5) var(--space-1) calc(40px + var(--space-3) + var(--space-5));
   max-width: var(--shell-measure);
   margin-inline: auto;
   font-family: var(--font-mono);
@@ -4019,35 +4010,33 @@
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: var(--space-3);
-  margin: var(--space-2) var(--space-5);
-  color: var(--lapis-bright);
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  margin: 10px var(--space-5);
+  color: var(--lapis);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .shell-unread-divider::before,
 .shell-unread-divider::after {
   content: '';
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in oklab, var(--lapis-bright) 46%, transparent) 100%
-  );
+  background: color-mix(in oklab, var(--lapis) 42%, transparent);
 }
 
 .shell-unread-divider::after {
-  transform: scaleX(-1);
+  transform: none;
 }
 
-.shell-unread-divider span {
-  padding: 3px 8px;
+.shell-unread-divider span,
+.shell-unread-divider-label {
+  padding: 2px 10px;
   border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--lapis-deep) 24%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 26%, transparent);
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis) 28%, transparent);
 }
 
 .shell-since-digest {
@@ -4402,11 +4391,12 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-bottom: 4px;
-  padding: 2px 0 2px 9px;
-  border-left: 2px solid var(--seam);
+  margin-bottom: 6px;
+  padding: 3px 0 3px 10px;
+  border-left: 2px solid var(--lapis);
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
-  font-size: 0.78rem;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
   color: var(--paper-mute);
   white-space: nowrap;
   overflow: hidden;
@@ -4422,8 +4412,9 @@
 
 .shell-msg-reply-from {
   color: var(--lapis-bright);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 650;
   flex: none;
 }
 
@@ -4469,12 +4460,12 @@
   align-items: center;
   gap: 5px;
   padding: 2px 8px 2px 6px;
-  border: 1px solid var(--seam-faint);
+  border: 1px solid var(--seam);
   border-radius: var(--r-pill);
   cursor: pointer;
   font-size: 0.82rem;
   color: var(--paper-dim);
-  background: color-mix(in oklab, var(--stone-2) 34%, transparent);
+  background: transparent;
   /* Gentle scale-in when a pill appears — quick enough to feel like feedback
      on react, calm enough not to be busy when a channel's reactions mount. */
   animation: shell-reaction-pop 0.22s var(--ease-out-expo, var(--ease));
@@ -4500,12 +4491,12 @@
   color: var(--paper);
 }
 
-/* A reaction you've already given glows azure — your mark on the message. */
+/* Active reaction: 12% lapis wash, 1px seam, no glow. */
 .shell-reaction--mine {
   border-color: var(--seam);
-  background: color-mix(in oklab, var(--lapis) 18%, transparent);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
   color: var(--paper);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent);
+  box-shadow: none;
 }
 
 .shell-reaction--mine .shell-reaction-count { color: var(--lapis-bright); }
@@ -4529,30 +4520,16 @@
   color: var(--paper-mute);
 }
 
+/* Default path: no in-flow uppercase chips. Hover toolbar is `.msg-menu`. */
 .shell-msg-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 5px;
-  opacity: 0.42;
-  transition: opacity var(--dur) var(--ease);
+  display: none;
 }
 
 .shell-msg-group:hover .shell-msg-actions,
 .shell-msg-group:focus-within .shell-msg-actions,
 .shell-msg-cont:hover .shell-msg-actions,
 .shell-msg-cont:focus-within .shell-msg-actions {
-  opacity: 1;
-}
-
-/* Pointer devices: hold the row actions out of sight until the message is
-   hovered or keyboard-focused. They stay in flow (opacity only) so revealing
-   them never reflows the feed. Touch devices keep the faint resting state
-   above, since there is no hover to surface them. */
-@media (hover: hover) and (pointer: fine) {
-  .shell-msg-actions {
-    opacity: 0;
-  }
+  display: none;
 }
 
 .shell-msg-action {
@@ -4587,15 +4564,17 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  min-height: 36px;
   padding: 7px 16px;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--lapis-bright);
   background: var(--ink);
   border: 1px solid var(--seam);
-  border-radius: 2px;
+  border-radius: var(--r-pill);
   cursor: pointer;
   box-shadow: none;
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
@@ -4647,9 +4626,9 @@
   gap: var(--space-2);
   min-width: 0;
   margin: 0 2px var(--space-2);
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  letter-spacing: 0.035em;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  letter-spacing: 0;
 }
 .shell-composer-brief-destination {
   min-width: 0;
@@ -4678,8 +4657,9 @@
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-2);
-  padding: var(--space-2);
+  padding: 8px 10px;
   border: 1px solid var(--seam-faint);
+  border-left: 3px solid var(--lapis);
   border-radius: var(--r-md);
   color: var(--paper-dim);
   background: color-mix(in oklab, var(--stone-2) 38%, transparent);
@@ -4717,8 +4697,8 @@
 }
 
 .shell-composer-topic-clear {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   border: 1px solid transparent;
@@ -4741,10 +4721,11 @@
 }
 
 .shell-composer-context-label {
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--lapis-bright);
   white-space: nowrap;
 }
@@ -4757,13 +4738,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.78rem;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
   color: var(--paper-dim);
 }
 
 .shell-composer-context-close {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   border: 1px solid var(--seam-faint);
@@ -5177,10 +5159,12 @@
   gap: var(--space-1);
   align-items: flex-end;
   min-width: 0;
-  padding: 3px;
+  min-height: 48px;
+  padding: 4px;
   background: color-mix(in oklab, var(--ink) 82%, var(--stone-2));
   border: 1px solid var(--seam);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-lg);
+  box-shadow: none;
   transition:
     border-color var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease),
@@ -5201,10 +5185,14 @@
 .shell-composer-textarea {
   --composer-field-height: 42px;
   --composer-line-box: 1.52em;
+  --composer-max-lines: 5;
   flex: 1 1 auto;
   min-width: 0;
   min-height: var(--composer-field-height);
-  max-height: 200px;
+  max-height: calc(
+    var(--composer-line-box) * var(--composer-max-lines)
+    + 2 * max(0px, calc((var(--composer-field-height) - var(--composer-line-box)) / 2))
+  );
   /* A textarea lays its line box from the padding edge instead of centering it.
      Consume the full one-line field height explicitly so placeholder and typed
      text sit on the same optical center as the surrounding controls. */
@@ -5236,7 +5224,7 @@
   height: 40px;
   min-width: 40px;
   min-height: 40px;
-  margin-bottom: 2px;
+  margin-bottom: 0;
   display: grid;
   place-items: center;
   border: 1px solid transparent;
@@ -5302,7 +5290,7 @@
   width: min(260px, calc(100vw - 24px));
   padding: 6px;
   border: 1px solid var(--seam);
-  border-radius: 2px;
+  border-radius: var(--r-md);
   background: var(--ink);
   box-shadow: none;
 }
@@ -5461,12 +5449,12 @@
   gap: 10px;
   margin: 0 0 var(--space-2);
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   border: 1px solid color-mix(in oklab, var(--paper) 14%, transparent);
   background: color-mix(in oklab, var(--ink) 55%, transparent);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  letter-spacing: 0;
   color: var(--paper-dim);
 }
 .shell-composer-outbox--offline {
@@ -6262,8 +6250,7 @@
   .shell-sidebar .shell-primary-nav { display: none; }
 
   .shell-room-current {
-    min-height: 30px;
-    padding-inline: 10px;
+    display: none;
   }
 
   /* Channel drawer — slides in from the left, stops above the tab bar */
@@ -6621,8 +6608,15 @@
   .shell-composer-textarea {
     --composer-field-height: 44px;
     --composer-line-box: 1.4em;
+    --composer-max-lines: 5;
     font-size: 16px;
-    max-height: min(28svh, 148px);
+    max-height: min(
+      28svh,
+      calc(
+        var(--composer-line-box) * var(--composer-max-lines)
+        + 2 * max(0px, calc((var(--composer-field-height) - var(--composer-line-box)) / 2))
+      )
+    );
     padding-inline: 10px;
     /* Comfortable reading density for long drafts on phone. */
     letter-spacing: 0;
@@ -6919,15 +6913,7 @@
   }
 
   .shell-conversation-brief {
-    min-height: 36px;
-    padding: 7px 10px 6px;
-    gap: 0.35rem;
-  }
-
-  .shell-conversation-brief-detail {
-    max-width: 10.5ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: none;
   }
 
   .shell-msg-group {
@@ -6971,8 +6957,8 @@
 
   .shell-msg-ts,
   .shell-msg-cont-ts {
-    font-size: 0.56rem;
-    letter-spacing: 0.03em;
+    font-size: 0.6875rem;
+    letter-spacing: 0;
   }
 
   .shell-msg-cont-ts {
@@ -6986,14 +6972,9 @@
     line-height: 1.5;
   }
 
-  .shell-msg-actions {
-    gap: 4px;
-    margin-top: 3px;
-  }
-
+  .shell-msg-actions,
   .shell-msg-action {
-    min-width: 36px;
-    min-height: 36px;
+    display: none;
   }
 
   .shell-reactions {
@@ -7043,15 +7024,13 @@
 
 @media (max-width: 420px) {
   .shell-room-current {
-    flex-wrap: wrap;
-    gap: 2px 8px;
+    display: none;
   }
-  .shell-room-current__label { flex: 1 1 12ch; }
-  .shell-room-current__detail { flex: 0 0 auto; }
 }
 
 @media (forced-colors: active) {
   .shell-room-current {
+    display: none;
     border-bottom-color: CanvasText;
     box-shadow: inset 2px 0 0 Highlight;
     color: CanvasText;
@@ -8553,15 +8532,15 @@
 }
 .shell-day-divider-label {
   flex: none;
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-mute);
   padding: 2px 12px;
   border: 1px solid var(--line-faint);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--ink) 72%, transparent);
 }
 
@@ -8628,8 +8607,9 @@
   border-radius: 5px;
 }
 
-/* The author's nick-tint rings their avatar — name and face share a hue. */
+/* People are circles; the author's nick-tint rings their avatar. */
 .shell-msg-avatar .onyx-avatar {
+  border-radius: var(--r-pill);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--nick-tint, var(--lapis)) 45%, transparent);
 }
 
@@ -8653,14 +8633,22 @@
    on .shell-msg-group / .shell-msg-cont covers pending → confirmed ACK. No
    continuous pulse (WCAG 2.2.2). */
 .shell-msg-pending {
-  opacity: 0.55;
+  opacity: 0.78;
   animation: shell-msg-echo-in var(--dur-fast, 160ms) var(--ease) both;
 }
-.shell-msg-pending .shell-msg-ts::after,
-.shell-msg-pending .shell-msg-cont-ts::after {
-  content: ' · queued';
-  color: var(--paper-mute);
-  font-style: italic;
+.shell-msg-pending-mark {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in oklab, var(--lapis) 28%, var(--seam-faint));
+  border-radius: var(--r-pill);
+  color: var(--lapis-bright);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  font-style: normal;
+  letter-spacing: 0;
 }
 @keyframes shell-msg-echo-in {
   from {
@@ -8668,7 +8656,7 @@
     transform: translateY(6px);
   }
   to {
-    opacity: 0.55;
+    opacity: 0.78;
     transform: translateY(0);
   }
 }

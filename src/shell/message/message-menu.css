@@ -32,8 +32,8 @@
   opacity: 0;
   transform: translateY(3px);
   transition:
-    opacity var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+    opacity var(--dur-micro, 100ms) var(--ease),
+    transform var(--dur-micro, 100ms) var(--ease);
 }
 
 /* Reveal on row hover/focus. The parent rows carry these classes. */
@@ -67,8 +67,8 @@
 .msg-menu-btn {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--paper-mute);

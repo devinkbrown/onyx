@@ -34,7 +34,6 @@ import {
   type ReviewHistoryEntry,
 } from '@/lib/notifications/reviewHistory';
 import { buildSinceDigest } from '@/lib/notifications/sinceDigest';
-import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { aggregateMessageReactions } from '@/lib/reactions/quietBoosts';
 import {
   createEffect,
@@ -1766,7 +1765,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   return (
     <main class="shell-messages" aria-label="Messages">
       <section
-        class="shell-conversation-brief"
+        class="shell-conversation-brief sr-only"
         aria-label={`Current conversation: ${conversationBrief().label}${conversationBrief().topic ? `, topic ${conversationBrief().topic}` : ''}, ${conversationBrief().detail}`}
         data-conversation-kind={conversationBrief().kind}
       >
@@ -1967,7 +1966,6 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     <p class="shell-feed-empty-title">A private conversation</p>
                     <p class="shell-feed-empty-body">
                       Messages with {activeTarget()} stay on this device until you send.
-                      Type below — or <kbd class="shell-feed-empty-kbd">/search</kbd> local history.
                     </p>
                   </Show>
                   <Show when={activeView().kind === 'status'}>
@@ -2023,22 +2021,6 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               <p class="shell-channel-intro-note">
                 This is the very beginning of the conversation. Say something worth scrolling back to.
               </p>
-              <Show
-                when={/^[#&]/.test(
-                  (activeView() as { kind: 'channel'; channel: string }).channel.trim(),
-                )}
-              >
-                <a
-                  class="shell-ribbon-stats shell-channel-intro-ledger"
-                  href={statsRoomHref(
-                    (activeView() as { kind: 'channel'; channel: string }).channel,
-                  )}
-                  data-testid="channel-intro-ledger"
-                  aria-label={`Room ledger for ${(activeView() as { kind: 'channel'; channel: string }).channel}`}
-                >
-                  Room ledger
-                </a>
-              </Show>
               <ScheduledEventLine channel={(activeView() as { kind: 'channel'; channel: string }).channel} />
             </div>
           </Show>
@@ -2135,7 +2117,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     aria-label="New messages"
                     tabIndex={-1}
                   >
-                    <span class="shell-unread-divider-label">new messages</span>
+                    <span class="shell-unread-divider-label">New messages</span>
                   </div>
                 </Show>
               );
@@ -2234,6 +2216,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                           >
                             {fmtTime(msg.time)}
                           </time>
+                          <Show when={msg.pending}>
+                            <span class="shell-msg-pending-mark" aria-hidden="true">Queued</span>
+                          </Show>
                           <Show when={msg.edited}>
                             <EditedMarker messageId={msg.id} />
                           </Show>
@@ -2277,6 +2262,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                   >
                     <span class="shell-msg-cont-ts" aria-hidden="true">
                       {fmtTime(msg.time)}
+                      <Show when={msg.pending}>
+                        <span class="shell-msg-pending-mark">Queued</span>
+                      </Show>
                     </span>
                     <MessageMenu
                       msg={msg}
@@ -2330,7 +2318,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 : 'Jump to latest messages'
           }
         >
-          <Show when={unreadBelow() > 0} fallback={<span>↓ latest</span>}>
+          <Show when={unreadBelow() > 0} fallback={<span>Jump to latest</span>}>
             <span class="shell-jump-latest-count">{unreadBelow()}</span>
             <span>new</span>
             <span aria-hidden="true">↓</span>

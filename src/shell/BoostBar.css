@@ -8,27 +8,29 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-1);
+  gap: 6px;
+  width: 100%;
 }
 
 .boost-pill {
   display: inline-flex;
   min-width: 0;
-  min-height: 1.8rem;
+  min-height: 28px;
   appearance: none;
   cursor: pointer;
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
   padding: 0 var(--space-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--seam);
   border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--stone) 72%, var(--ink));
+  background: transparent;
   color: var(--paper-dim);
   font: inherit;
   line-height: 1;
+  box-shadow: none;
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
-    color var(--dur) var(--ease), transform var(--dur) var(--ease);
+    color var(--dur) var(--ease);
 }
 
 .boost-pill:hover {
@@ -43,13 +45,14 @@
 }
 
 .boost-pill.you {
-  border-color: var(--lapis-bright);
-  background: color-mix(in oklab, var(--lapis) 24%, var(--ink));
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
   color: var(--paper);
+  box-shadow: none;
 }
 
 .boost-pill.you:hover {
-  background: color-mix(in oklab, var(--lapis) 30%, var(--ink));
+  background: color-mix(in oklab, var(--lapis) 16%, transparent);
 }
 
 .boost-emoji {

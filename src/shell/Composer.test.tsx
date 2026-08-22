@@ -77,7 +77,7 @@ describe('Composer accessibility', () => {
     // Assert — Standard primary: Attach · message · Emoji · More · Send
     const message = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
     expect(message).toBeDefined();
-    expect(message.placeholder).toBe('Message');
+    expect(message.placeholder).toBe('Message #room');
     expect(message.placeholder).not.toMatch(/\/search|\/mute|\/export|\/help/);
     expect(getByRole('button', { name: 'Attach files' })).toBeDefined();
     expect(getByRole('button', { name: 'Insert emoji' })).toBeDefined();
@@ -88,6 +88,32 @@ describe('Composer accessibility', () => {
     expect(queryByRole('button', { name: 'Schedule message to send later' })).toBeNull();
     expect(queryByRole('button', { name: /export|format/i })).toBeNull();
     expect(screen.getByRole('note', { name: 'Current compose context' })).toHaveTextContent('To #roomReady to send');
+  });
+
+  it('uses Message @nick as the DM placeholder', () => {
+    store.setState(
+      {
+        ...initialState,
+        activeView: { kind: 'dm', nick: 'mika' },
+        connectionStatus: 'connected',
+        ourNick: 'me',
+        server: {
+          id: 'composer-test',
+          name: 'Onyx',
+          network: 'Onyx',
+          url: 'wss://example.test',
+          icon: '',
+          nick: 'me',
+          account: 'me',
+          connected: true,
+        },
+      },
+      true,
+    );
+
+    const { getByRole } = render(() => <Composer />);
+    const message = getByRole('textbox', { name: /message mika/i }) as HTMLTextAreaElement;
+    expect(message.placeholder).toBe('Message @mika');
   });
 
   it('locks Standard primary control order: attach, message, emoji, more, send', () => {
@@ -202,7 +228,7 @@ describe('Composer accessibility', () => {
 
     const { getByRole, queryByText } = render(() => <Composer />);
 
-    expect(getByRole('status')).toHaveTextContent('replying to aliceprivate hello');
+    expect(getByRole('status')).toHaveTextContent('Replying to aliceprivate hello');
     expect(queryByText(/ONYXDM1 ciphertext-envelope/)).toBeNull();
   });
 
@@ -727,6 +753,27 @@ describe('Composer outbox status chrome', () => {
     render(() => <Composer />);
     expect(screen.queryByText(/Queued \(/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Messages queue on this device/i)).not.toBeInTheDocument();
+  });
+
+  it('quotes a reply fragment above the field and keeps the primary Send action', () => {
+    seedActiveChannel();
+    store.setState({
+      replyingTo: {
+        id: 'quote-parent',
+        from: 'alice',
+        text: 'a short fragment to quote',
+        time: new Date(),
+        type: 'msg',
+        target: '#room',
+      },
+    });
+
+    const { getByRole, getByText } = render(() => <Composer />);
+
+    expect(getByText('Replying to alice')).toBeInTheDocument();
+    expect(getByText('a short fragment to quote')).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Cancel reply' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Send message' })).toBeInTheDocument();
   });
 });
 

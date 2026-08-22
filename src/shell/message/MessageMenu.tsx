@@ -650,30 +650,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   return (
     <div class="msg-menu" role="group" aria-label={`Actions for message from ${local.msg.from}`}>
       <div class="msg-menu-bar">
-        {/* One-tap quick reactions — the two most-used, no picker needed */}
-        <Show when={caps().canReact}>
-          <button
-            type="button"
-            class="msg-menu-btn"
-            aria-label="React with thumbs up"
-            onClick={() => react('👍')}
-          >
-            <svg class="msg-menu-icon" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 7.5 7.6 2.2a1.5 1.5 0 0 1 1.7 1.4V6h3.1a1.3 1.3 0 0 1 1.28 1.55l-.9 4.4A1.3 1.3 0 0 1 11.5 13H5" />
-              <rect x="1.6" y="7.2" width="3.4" height="6" rx="1" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="msg-menu-btn"
-            aria-label="React with heart"
-            onClick={() => react('❤️')}
-          >
-            <svg class="msg-menu-icon" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
-              <path d="M8 13.4S2.2 10 2.2 5.9A3.1 3.1 0 0 1 8 4.3a3.1 3.1 0 0 1 5.8 1.6C13.8 10 8 13.4 8 13.4Z" />
-            </svg>
-          </button>
-        </Show>
+        {/* Overlay chrome: React · Reply · More. Edit/Delete stay in overflow. */}
         {/* React → emoji picker */}
         <Show when={caps().canReact}>
           <Popover

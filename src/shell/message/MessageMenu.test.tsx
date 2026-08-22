@@ -915,6 +915,7 @@ describe('<MessageMenu>', () => {
     ));
 
     expect(screen.queryByRole('menuitem', { name: 'Edit message from alice' })).toBeNull();
+    expect(screen.queryByTestId('msg-menu-edit')).toBeNull();
     expect(screen.getByRole('menuitem', { name: 'Reply to message from alice' })).toBeInTheDocument();
   });
 
@@ -1337,5 +1338,71 @@ describe('<MessageMenu>', () => {
 
     fireEvent.keyDown(search, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Choose reaction for message from alice' })).toBeNull();
+  });
+
+  it('surfaces React, Reply, and More on the hover bar — Edit/Delete stay in overflow', () => {
+    const msg: ChatMessage = {
+      id: 'm-hover-owned',
+      from: 'alice',
+      text: 'own line',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit canRedact />
+    ));
+
+    expect(screen.getByRole('button', { name: 'Reply to alice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose reaction for message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions for message from alice' })).toBeInTheDocument();
+    expect(screen.queryByTestId('msg-menu-edit')).toBeNull();
+    expect(screen.queryByTestId('msg-menu-delete')).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Edit message from alice' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Delete message from alice for everyone' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Copy text from message from alice' })).toBeNull();
+  });
+
+  it('keeps Edit/Delete off the hover bar for someone else’s message', () => {
+    const msg: ChatMessage = {
+      id: 'm-hover-other',
+      from: 'bob',
+      text: 'other line',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit canRedact />
+    ));
+
+    expect(screen.getByRole('button', { name: 'Reply to bob' })).toBeInTheDocument();
+    expect(screen.queryByTestId('msg-menu-edit')).toBeNull();
+    expect(screen.queryByTestId('msg-menu-delete')).toBeNull();
+  });
+
+  it('opens the existing delete confirmation from overflow Delete', () => {
+    const msg: ChatMessage = {
+      id: 'm-hover-delete',
+      from: 'alice',
+      text: 'remove me',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit canRedact menuOpen />
+    ));
+
+    fireEvent.click(screen.getByRole('menuitem', {
+      name: 'Delete message from alice for everyone',
+    }));
+
+    expect(screen.getByRole('group', {
+      name: 'Confirm deleting message from alice for everyone',
+    })).toBeInTheDocument();
   });
 });
