@@ -2627,8 +2627,7 @@ describe('AppShell', () => {
       });
     });
 
-    it('summarizes unread home recaps and hands them to Spotlight', async () => {
-      const travelToSpy = vi.spyOn(store.getState(), 'travelTo');
+    it('opens a Home mention row into the room instead of a recap feed', () => {
       const channel = {
         ...makeChannel(
           '#general',
@@ -2651,85 +2650,18 @@ describe('AppShell', () => {
         activeView: { kind: 'home' },
         connectionStatus: 'connected',
         networkName: 'Onyx',
+        firstUnreadId: new Map([['#general', 'msg-new-a']]),
         channelLastActivity: new Map([['#general', new Date('2025-01-01T12:02:00Z').getTime()]]),
       }, true);
 
-      render(() => (
-        <>
-          <AppShell />
-          <Spotlight />
-        </>
-      ));
+      render(() => <AppShell />);
 
-      const recaps = screen.getByRole('list', { name: 'Since you left recaps' });
-      expect(within(recaps).getByText('#general')).toBeInTheDocument();
-      expect(within(recaps).getByText('2 lines, 1 mention')).toBeInTheDocument();
-      expect(within(recaps).getByText('bob, carol')).toBeInTheDocument();
-      expect(within(recaps).getByText('New handoff note two')).toBeInTheDocument();
-      expect(within(recaps).getAllByRole('listitem')).toHaveLength(1);
-
-      fireEvent.click(within(recaps).getByRole('button', { name: 'Find related actions for #general' }));
-
-      await waitFor(() => {
-        expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
-        expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('goto #general');
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Close spotlight' }));
-
-      fireEvent.click(within(recaps).getByRole('button', { name: 'Review #general from first unread line' }));
+      expect(screen.getByRole('region', { name: 'Catch up on what you missed' })).toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'Since you left recaps' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Open #general at your first unread message/ }));
       const activeView = store.getState().activeView;
       expect(activeView.kind).toBe('channel');
       if (activeView.kind === 'channel') expect(activeView.channel).toBe('#general');
-      expect(store.getState().timeTravelLandingId).toBe('msg-new-a');
-      expect(travelToSpy).toHaveBeenCalledWith('#general', new Date('2025-01-01T12:00:00Z'));
-
-      store.getState().navigate({ kind: 'home' });
-
-      const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
-      const reviewCards = screen.getByRole('list', { name: 'Recent catch-up review cards' });
-      expect(within(reviewHistory).getByText('Reviewed recently')).toBeInTheDocument();
-      expect(within(reviewHistory).getByText('#general')).toBeInTheDocument();
-      expect(within(reviewHistory).getByText('2 lines, 1 mention')).toBeInTheDocument();
-      expect(within(reviewHistory).getByText('New handoff note two')).toBeInTheDocument();
-      expect(within(reviewCards).getAllByRole('listitem')).toHaveLength(1);
-
-      fireEvent.click(within(reviewHistory).getByRole('button', {
-        name: 'Find related actions for reviewed #general',
-      }));
-      await waitFor(() => {
-        expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
-        expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('review #general');
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Close spotlight' }));
-
-      fireEvent.click(within(reviewHistory).getByRole('button', {
-        name: 'Reopen reviewed catch-up for #general',
-      }));
-      const reopenedView = store.getState().activeView;
-      expect(reopenedView.kind).toBe('channel');
-      if (reopenedView.kind === 'channel') expect(reopenedView.channel).toBe('#general');
-      expect(store.getState().timeTravelLandingId).toBe('msg-new-a');
-      expect(travelToSpy).toHaveBeenCalledTimes(2);
-      expect(travelToSpy).toHaveBeenLastCalledWith(
-        '#general',
-        new Date('2025-01-01T12:00:00Z'),
-        'msg-new-a',
-      );
-
-      store.getState().navigate({ kind: 'home' });
-      const reviewHistoryAgain = await screen.findByLabelText('Recent catch-up reviews');
-      fireEvent.click(within(reviewHistoryAgain).getByRole('button', {
-        name: 'Search reviewed text for #general',
-      }));
-      await waitFor(() => {
-        expect(screen.getByRole('search', { name: 'Message search' })).toBeInTheDocument();
-        expect(screen.getByRole('searchbox', { name: 'Search messages' })).toHaveValue('New handoff note two');
-      });
-      const searchedView = store.getState().activeView;
-      expect(searchedView.kind).toBe('channel');
-      if (searchedView.kind === 'channel') expect(searchedView.channel).toBe('#general');
-
-      travelToSpy.mockRestore();
     });
 
     it('keeps reviewed catch-up ranges visible while disconnected', async () => {
@@ -2772,11 +2704,8 @@ describe('AppShell', () => {
       const localMemory = await screen.findByText(/On this device:.*1 queued send/);
       expect(localMemory).toHaveTextContent('1 room draft');
       expect(localMemory).toHaveTextContent('1 topic draft');
-      const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
-      expect(within(reviewHistory).getByText('Reviewed recently')).toBeInTheDocument();
-      expect(within(reviewHistory).getByText('offline recall')).toBeInTheDocument();
-      expect(within(reviewHistory).getByText('#general')).toBeInTheDocument();
-      expect(within(reviewHistory).getByText('Offline recall note')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Recent catch-up reviews')).not.toBeInTheDocument();
+      expect(screen.queryByText('Reviewed recently')).not.toBeInTheDocument();
     });
 
     it('shows joined-room chanstats rhythm with scheduled event context', async () => {
@@ -2822,24 +2751,11 @@ describe('AppShell', () => {
 
       render(() => <AppShell />);
 
-      const rhythm = await screen.findByLabelText('Room rhythm');
-      const directory = screen.getByRole('list', { name: 'Active room directory' });
-      expect(within(directory).getAllByRole('listitem')).toHaveLength(2);
-      expect(within(rhythm).getByText('#general')).toBeInTheDocument();
-      expect(within(rhythm).getByText('3 people here now')).toBeInTheDocument();
-      expect(within(rhythm).getByText('Planning call')).toBeInTheDocument();
-      expect(within(rhythm).getByText('Office hours')).toBeInTheDocument();
-      expect(within(rhythm).queryByText('#outside')).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: /Open #general for Office hours/i }));
-      expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
-      expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date(eventAt * 1000));
-
-      store.getState().navigate({ kind: 'home' });
-      const nextRhythm = await screen.findByLabelText('Room rhythm');
-      fireEvent.click(within(nextRhythm).getByRole('button', { name: /Open #general, 3 people here now/i }));
-      expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
-      expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date(eventAt * 1000));
+      expect(screen.getByRole('main', { name: 'Home' })).toBeInTheDocument();
+      expect(screen.queryByLabelText('Room rhythm')).not.toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'Active room directory' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/people here now|people online/i)).not.toBeInTheDocument();
+      expect(travelToSpy).not.toHaveBeenCalled();
       travelToSpy.mockRestore();
     });
 
@@ -2865,22 +2781,9 @@ describe('AppShell', () => {
 
       render(() => <AppShell />);
 
-      const boosts = screen.getByLabelText('Quiet boosts');
-      const boostCards = screen.getByRole('list', { name: 'Quiet boost cards' });
-      expect(within(boosts).getByText('reactions')).toBeInTheDocument();
-      expect(within(boostCards).getAllByRole('listitem')).toHaveLength(1);
-      expect(within(boosts).getByText('#general')).toBeInTheDocument();
-      expect(boosts).toHaveTextContent('Quietly boosted note');
-      expect(within(boosts).getByLabelText('3 quiet boosts')).toBeInTheDocument();
-      expect(within(boosts).getByText('2')).toBeInTheDocument();
-
-      fireEvent.click(within(boosts).getByRole('button', { name: 'Open boosted message in #general' }));
-
-      const activeView = store.getState().activeView;
-      expect(activeView.kind).toBe('channel');
-      if (activeView.kind === 'channel') expect(activeView.channel).toBe('#general');
-      expect(store.getState().timeTravelLandingId).toBe('boosted-home');
-      expect(travelToSpy).toHaveBeenCalledWith('#general', boosted.time);
+      expect(screen.queryByLabelText('Quiet boosts')).not.toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'Quiet boost cards' })).not.toBeInTheDocument();
+      expect(travelToSpy).not.toHaveBeenCalled();
       travelToSpy.mockRestore();
     });
   });
