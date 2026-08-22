@@ -877,7 +877,7 @@ describe('Composer blocked DM compose', () => {
       ourNick: 'me',
       ignoredUsers: new Set(['mika']),
       dms: new Map([['mika', { nick: 'mika', account: null, unread: 0, highlights: 0, messages: [] }]]),
-      client: { isupport: { CHANTYPES: '#&' } } as never,
+      client: { isupport: { CHANTYPES: '#&' }, negotiatedCaps: new Set() } as never,
       server: {
         id: 'composer-test',
         name: 'Onyx',

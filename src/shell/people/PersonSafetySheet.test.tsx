@@ -36,7 +36,7 @@ describe('PersonSafetyHost', () => {
     store.setState({
       ...initialState,
       connectionStatus: 'connected',
-      client: { sendRaw, join, isupport: { CHANTYPES: '#&' } } as never,
+      client: { sendRaw, join, isupport: { CHANTYPES: '#&' }, negotiatedCaps: new Set() } as never,
       server,
       ourNick: owner.identity,
       ignoredUsers: new Set(),

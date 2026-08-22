@@ -49,7 +49,7 @@ describe('people-card block via existing ignore', () => {
       server,
       ourNick: owner.identity,
       connectionStatus: 'connected',
-      client: { sendRaw: vi.fn(() => true), isupport: { CHANTYPES: '#&' } } as never,
+      client: { sendRaw: vi.fn(() => true), isupport: { CHANTYPES: '#&' }, negotiatedCaps: new Set() } as never,
       channels: new Map([['#quiet', channel('#quiet')]]),
       dms: new Map(),
       ignoredUsers: new Set(),
