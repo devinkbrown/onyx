@@ -62,6 +62,11 @@ describe('StatsRoute', () => {
     expect(within(primary).queryByRole('link', { name: 'Status' })).toBeNull();
     expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))
       .getByRole('link', { name: 'Status' })).toHaveAttribute('href', '/status/');
+    expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))
+      .queryByRole('link', { name: 'Stats' })).toBeNull();
+    expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))
+      .queryByRole('link', { name: 'OnyxOS' })).toBeNull();
+    expect(within(primary).queryByRole('link', { name: 'OnyxOS' })).toBeNull();
     expect(screen.getByRole('navigation', { name: 'Stats sections' })).toBeInTheDocument();
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' })
       .filter((link) => link.classList.contains('public-frame__open'));
