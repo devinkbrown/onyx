@@ -793,4 +793,78 @@ describe('ChannelSidebar accessibility', () => {
     expect(mira.getAttribute('aria-label')).toBe('DM with mira');
     expect(mira.querySelector('[data-testid="sidebar-dm-keywarn"]')).toBeNull();
   });
+
+  it('orders Messages by recency, not nick alpha', () => {
+    const dms = new Map<string, DMConversation>();
+    dms.set('ada', {
+      ...makeDm('ada'),
+      messages: [makeMessage('older', { id: 'ada-1', time: new Date('2026-08-20T12:00:00.000Z') })],
+    });
+    dms.set('zoe', {
+      ...makeDm('zoe'),
+      messages: [makeMessage('newer', { id: 'zoe-1', time: new Date('2026-08-22T18:00:00.000Z') })],
+    });
+    store.setState({
+      ...initialState,
+      channels: new Map(),
+      dms,
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+    }, true);
+
+    const { container } = render(() => <ChannelSidebar mode="messages" />);
+    const nicks = rows(container).map((row) => row.querySelector('.shell-channel-name')?.textContent);
+    expect(nicks).toEqual(['zoe', 'ada']);
+    expect(nicks).not.toEqual(['ada', 'zoe']);
+  });
+
+  it('marks Messages people with a circle, not an @ sigil', () => {
+    const dms = new Map<string, DMConversation>();
+    dms.set('erin', makeDm('erin', 1));
+    store.setState({
+      ...initialState,
+      channels: new Map(),
+      dms,
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+    }, true);
+
+    const { getByRole } = render(() => <ChannelSidebar mode="messages" />);
+    const erin = getByRole('button', { name: /erin/ });
+    const avatar = erin.querySelector('.shell-dm-avatar');
+    expect(avatar?.textContent).toBe('E');
+    expect(avatar?.getAttribute('aria-hidden')).toBe('true');
+    expect(erin).toHaveClass('shell-channel-item--dm');
+    expect(erin.querySelector('.shell-channel-sigil')).toBeNull();
+    expect(erin.textContent).not.toMatch(/@erin/);
+  });
+
+  it('keeps Rooms alpha even when activity would reverse the names', () => {
+    const channels = new Map<string, Channel>();
+    channels.set('#zeta', makeChannel('#zeta'));
+    channels.set('#alpha', makeChannel('#alpha'));
+    store.setState({
+      ...initialState,
+      channels,
+      dms: new Map(),
+      channelLastActivity: new Map([
+        ['#zeta', Date.parse('2026-08-22T18:00:00.000Z')],
+        ['#alpha', Date.parse('2026-08-20T12:00:00.000Z')],
+      ]),
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+    }, true);
+
+    const { container } = render(() => <ChannelSidebar mode="rooms" />);
+    const names = rows(container)
+      .map((row) => row.querySelector('.shell-channel-name')?.textContent)
+      .filter((name) => name && name !== 'Activity');
+    expect(names).toEqual(['alpha', 'zeta']);
+  });
 });
