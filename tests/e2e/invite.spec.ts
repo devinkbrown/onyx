@@ -32,10 +32,10 @@ test.describe('Onyx /invite landing preview (consume side)', () => {
 
     // The observable success signal: the landing page names the exact room.
     await expect(page.locator('h1')).toContainText('#general');
-    await expect(page.getByText(/A friend invited you to #general/i).first()).toBeVisible();
+    await expect(page.getByText(/Choose a display name to walk in/i)).toBeVisible();
 
     // The primary CTA deep-links into the app carrying the validated join param.
-    const openCta = page.getByRole('link', { name: /^Join$/ });
+    const openCta = page.getByTestId('invite-join');
     await expect(openCta).toHaveAttribute('href', '/app/?join=%23general');
   });
 
@@ -48,7 +48,7 @@ test.describe('Onyx /invite landing preview (consume side)', () => {
     await expect(page.getByText('roadmap').first()).toBeVisible();
 
     // App handoff carries every validated field so the room opens the same way.
-    const openCta = page.getByRole('link', { name: /^Join$/ });
+    const openCta = page.getByTestId('invite-join');
     await expect(openCta).toHaveAttribute('href', /\/app\/\?.*join=%23design/);
     await expect(openCta).toHaveAttribute('href', /as=river/);
     await expect(openCta).toHaveAttribute('href', /topic=roadmap/);

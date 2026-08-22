@@ -20,9 +20,9 @@ test('keeps the PublicFrame Invite route usable at 400% zoom', async ({ page }) 
   await expect(frame.locator('header.public-frame__header')).toHaveCount(1);
   await expect(frame.locator('footer.public-frame__footer')).toHaveCount(1);
   await expect(header.locator('a[href="/invite/"]')).toHaveAttribute('aria-current', 'page');
-  await expect(main.getByRole('heading', { name: 'Join #root', exact: true })).toBeVisible();
-  await expect(main.getByRole('note', { name: 'Invite preview' })).toBeVisible();
-  await expect(main.getByRole('link', { name: 'Join' })).toHaveAttribute(
+  await expect(main.getByRole('heading', { name: '#root', exact: true })).toBeVisible();
+  await expect(main.locator('.invite-card')).toBeVisible();
+  await expect(main.getByTestId('invite-join')).toHaveAttribute(
     'href',
     '/app/?join=%23root',
   );

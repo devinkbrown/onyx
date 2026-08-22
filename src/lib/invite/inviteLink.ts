@@ -30,6 +30,10 @@ export interface InviteLinkSpec {
   topic?: string | null;
   /** Open the room in reader mode first. */
   reader?: boolean;
+  /** Optional inviter nick carried as `?by=`. */
+  inviter?: string | null;
+  /** Optional faces already in the room, carried as `?with=`. */
+  faces?: readonly string[] | null;
 }
 
 export interface InviteLinkOpts {
@@ -70,6 +74,12 @@ export function buildInviteLink(spec: InviteLinkSpec, opts: InviteLinkOpts): Inv
 
   const guestName = spec.guestName?.trim();
   if (guestName) params.set('as', guestName);
+
+  const inviter = spec.inviter?.trim();
+  if (inviter) params.set('by', inviter);
+
+  const faces = spec.faces?.map((nick) => nick.trim()).filter(Boolean) ?? [];
+  if (faces.length > 0) params.set('with', faces.join(','));
 
   // buildInviteCard re-validates every field and produces the canonical URL;
   // anything that fails validation is absent from card.url below.

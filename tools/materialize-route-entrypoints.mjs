@@ -52,8 +52,8 @@ export const ROUTE_ENTRYPOINTS = [
   },
   {
     route: 'invite',
-    title: 'Join Onyx — a friend invited you',
-    description: 'A friend invited you to a room on Onyx. Choose a display name and join.',
+    title: 'Join Onyx — open a room invite',
+    description: 'See the room, choose a display name, and join in the browser. No account required for the first hello.',
   },
   {
     route: 'download',

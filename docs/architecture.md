@@ -237,12 +237,16 @@ state). Almost every module has a co-located `*.test.ts`.
   (`src/shell/threadIndex.ts:24`).
 - `src/lib/invite/` — rich shareable invites. `inviteLink.ts` `buildInviteLink`
   is the pure builder for the create side: from an `InviteLinkSpec` (channel +
-  optional preferred nick / moment / topic) it emits both the canonical share URL
-  (`<origin>?join=…`) and the in-app deep-link (`<appOrigin>?join=…`)
-  (`src/lib/invite/inviteLink.ts:60`). Every field is re-validated by routing the
-  spec through `inviteCard.buildInviteCard`, so a comma or control character (a
-  JOIN-list / CRLF smuggling vector) is dropped and a bad channel degrades to a
-  network-only invite rather than a broken target. The **Share invite** section in
+  optional preferred nick / moment / topic / inviter / faces) it emits both the
+  canonical share URL (`<origin>?join=…`) and the in-app deep-link
+  (`<appOrigin>?join=…`) (`src/lib/invite/inviteLink.ts:60`). Every field is
+  re-validated by routing the spec through `inviteCard.buildInviteCard`, so a
+  comma or control character (a JOIN-list / CRLF smuggling vector) is dropped
+  and a bad channel degrades to a network-only invite rather than a broken
+  target. The public `/invite` route is a room card: real topic, `?by=` inviter,
+  up to three `?with=` / last-speaker faces, and last pulse from public
+  chanstats — omitted when unknown, never a fake online count
+  (`src/lib/invite/inviteRoomPulse.ts`). The **Share invite** section in
   `src/shell/ChannelSettings.tsx:393` is the UI; a successful copy is announced
   through a polite live region (`src/shell/ChannelSettings.tsx:444`, WCAG 2.2
   SC 4.1.3).

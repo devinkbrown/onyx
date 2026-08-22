@@ -5,12 +5,18 @@
 
 import { parseAtParam, parseJoinParam, parseReaderParam, parseTopicParam } from '@/lib/deeplink';
 
+export const INVITE_FACE_MAX = 3;
+
 export interface InviteCard {
   channel: string | null;
   at: Date | null;
   topic: string | null;
   readerMode: boolean;
   guestName: string | null;
+  /** Who sent the link, when `?by=` carries a valid nick. */
+  inviter: string | null;
+  /** Up to three nicks from `?with=`. Never padded or invented. */
+  faces: string[];
   network: string;
   url: string;
 }
@@ -44,6 +50,30 @@ export function guestNameError(raw: string): string | undefined {
   return undefined;
 }
 
+/** Deduped, validated nicks, capped at three. Later lists fill gaps only. */
+export function mergeInviteFaces(...lists: Array<readonly string[] | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const faces: string[] = [];
+  for (const list of lists) {
+    for (const raw of list ?? []) {
+      const nick = parseGuestName(raw);
+      if (!nick) continue;
+      const key = nick.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      faces.push(nick);
+      if (faces.length >= INVITE_FACE_MAX) return faces;
+    }
+  }
+  return faces;
+}
+
+/** `?with=alice,bob` — commas/whitespace split, then each nick is re-validated. */
+export function parseInviteFaces(raw: string | null): string[] {
+  if (!raw) return [];
+  return mergeInviteFaces(raw.split(/[,\s]+/u));
+}
+
 function canonicalInviteUrl(origin: string, card: Omit<InviteCard, 'network' | 'url'>): string {
   const canonicalParams = new URLSearchParams();
   if (card.channel !== null) canonicalParams.set('join', card.channel);
@@ -51,6 +81,8 @@ function canonicalInviteUrl(origin: string, card: Omit<InviteCard, 'network' | '
   if (card.topic !== null) canonicalParams.set('topic', card.topic);
   if (card.readerMode) canonicalParams.set('reader', '1');
   if (card.guestName !== null) canonicalParams.set('as', card.guestName);
+  if (card.inviter !== null) canonicalParams.set('by', card.inviter);
+  if (card.faces.length > 0) canonicalParams.set('with', card.faces.join(','));
 
   const query = canonicalParams.toString();
   return query.length > 0 ? `${origin}?${query}` : origin;
@@ -65,7 +97,9 @@ export function buildInviteCard(
   const topic = parseTopicParam(params.get('topic'));
   const readerMode = parseReaderParam(params.get('reader'));
   const guestName = parseGuestName(params.get('as'));
-  const partialCard = { channel, at, topic, readerMode, guestName };
+  const inviter = parseGuestName(params.get('by'));
+  const faces = parseInviteFaces(params.get('with'));
+  const partialCard = { channel, at, topic, readerMode, guestName, inviter, faces };
 
   return {
     channel,
@@ -73,6 +107,8 @@ export function buildInviteCard(
     topic,
     readerMode,
     guestName,
+    inviter,
+    faces,
     network: opts.network,
     url: canonicalInviteUrl(opts.origin, partialCard),
   };
@@ -82,24 +118,26 @@ export function inviteTitle(card: InviteCard): string {
   return card.channel !== null ? `Join ${card.channel} on ${card.network}` : `Join ${card.network}`;
 }
 
+/** Room name is the card title. Bare links keep the network name. */
 export function inviteHeadline(card: InviteCard): string {
-  return card.channel !== null ? `Join ${card.channel}` : `Join ${card.network}`;
+  return card.channel !== null ? card.channel : `Join ${card.network}`;
 }
 
 export function inviteWelcome(card: InviteCard): string {
   return card.channel !== null
-    ? 'Choose a display name to enter this room.'
+    ? 'Choose a display name to walk in.'
     : 'Choose a display name, then pick a room once you are in.';
 }
 
 export function inviteDescription(card: InviteCard): string {
+  const target = card.channel !== null ? `${card.channel} on ${card.network}` : card.network;
   const parts: string[] = [];
-  if (card.channel !== null) {
-    parts.push(`A friend invited you to ${card.channel} on ${card.network}.`);
+  if (card.inviter !== null) {
+    parts.push(`${card.inviter} invited you to ${target}.`);
   } else {
-    parts.push(`A friend invited you to ${card.network}.`);
+    parts.push(`Join ${target}.`);
   }
-  if (card.topic !== null) parts.push(`They're talking about ${card.topic}.`);
+  if (card.topic !== null) parts.push(card.topic);
   return parts.join(' ');
 }
 

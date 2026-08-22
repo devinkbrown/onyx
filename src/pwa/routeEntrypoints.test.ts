@@ -43,8 +43,8 @@ const expected = {
     description: 'See how Onyx is becoming a first-class native OnyxOS experience while staying cross-platform, backed by evidence-led system engineering.',
   },
   invite: {
-    title: 'Join Onyx — a friend invited you',
-    description: 'A friend invited you to a room on Onyx. Choose a display name and join.',
+    title: 'Join Onyx — open a room invite',
+    description: 'See the room, choose a display name, and join in the browser. No account required for the first hello.',
   },
   download: {
     title: 'Get Onyx on this device — browser first',

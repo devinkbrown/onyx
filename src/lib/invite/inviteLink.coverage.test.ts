@@ -47,6 +47,8 @@ describe('rich invite link coverage', () => {
       topic: 'onboarding',
       readerMode: true,
       guestName: 'Guest_7',
+      inviter: null,
+      faces: [],
       network: OPTS.network,
       url: link.shareUrl,
     });
@@ -72,6 +74,8 @@ describe('rich invite link coverage', () => {
       topic: null,
       readerMode: false,
       guestName: 'Reader',
+      inviter: null,
+      faces: [],
       network: OPTS.network,
       url: `${OPTS.origin}?join=%23general&as=Reader`,
     });
@@ -99,6 +103,8 @@ describe('rich invite link coverage', () => {
       topic: null,
       readerMode: false,
       guestName: null,
+      inviter: null,
+      faces: [],
       network: OPTS.network,
       url: `${OPTS.origin}?join=%23general`,
     });
