@@ -79,7 +79,8 @@ describe('Harbor-night default chrome', () => {
     expect(rule(shell, '.onyx-sheet:has(.ap-panel) .onyx-sheet__panel')).toMatch(/background:\s*var\(--stone\)/);
     expect(rule(shell, '.onyx-sheet:has(.ap-panel) .onyx-sheet__panel')).toMatch(/backdrop-filter:\s*none/);
     expect(messages).not.toMatch(/feed-empty-channel-ledger/);
-    expect(messages).toMatch(/feed-empty-invite/);
+    expect(messages).not.toMatch(/feed-empty-invite/);
+    expect(messages).not.toMatch(/openRoomInviteShare/);
     expect(messages).toMatch(/Still waters here/);
     expect(messages).toMatch(/Say the first thing in \{activeTarget\(\)\}/);
   });

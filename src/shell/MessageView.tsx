@@ -1942,17 +1942,8 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         <>
                           <p class="shell-feed-empty-title">Still waters here</p>
                           <p class="shell-feed-empty-body">
-                            Say the first thing in {activeTarget()}, or invite a friend
-                            with a link.
+                            Say the first thing in {activeTarget()}.
                           </p>
-                          <button
-                            type="button"
-                            class="shell-sidebar-browse"
-                            data-testid="feed-empty-invite"
-                            onClick={() => openRoomInviteShare(activeTarget())}
-                          >
-                            Invite friends
-                          </button>
                         </>
                       }
                     >
