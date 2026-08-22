@@ -54,6 +54,7 @@ describe('Harbor-night default chrome', () => {
   const messages = read('src/shell/MessageView.tsx');
   const connect = read('src/app/connect.css');
   const home = read('src/routes/home.css');
+  const typography = read('src/ui/tokens/typography.css');
 
   it('uses an inset lapis hairline with no bloom', () => {
     expect(rule(globalCss, ':focus-visible')).toMatch(/outline-offset:\s*var\(--focus-offset/);
@@ -69,11 +70,14 @@ describe('Harbor-night default chrome', () => {
     expect(rule(shell, '.shell-ribbon-iconbtn')).toMatch(/min-height:\s*var\(--target-min, 44px\)/);
     expect(rule(shell, '.shell-notify-btn')).toMatch(/min-height:\s*var\(--target-min, 44px\)/);
     expect(rule(shell, '.shell-channel-star')).toMatch(/min-height:\s*var\(--target-min, 44px\)/);
+    expect(rule(shell, '.shell-topic-card-unread')).toMatch(/color:\s*var\(--paper\)/);
+    expect(rule(shell, '.shell-topic-card-unread')).toMatch(/font-weight:\s*600/);
     expect(shell).not.toMatch(/translate3d\(0,\s*-1px/);
   });
 
   it('keeps Appearance matte and empty rooms free of ledger chrome', () => {
-    expect(shell).toMatch(/\.onyx-sheet:has\(\.ap-panel\) \.onyx-sheet__panel \{[\s\S]*?backdrop-filter:\s*none/);
+    expect(rule(shell, '.onyx-sheet:has(.ap-panel) .onyx-sheet__panel')).toMatch(/background:\s*var\(--stone\)/);
+    expect(rule(shell, '.onyx-sheet:has(.ap-panel) .onyx-sheet__panel')).toMatch(/backdrop-filter:\s*none/);
     expect(messages).not.toMatch(/feed-empty-channel-ledger/);
     expect(messages).toMatch(/feed-empty-invite/);
     expect(messages).toMatch(/Still waters here/);
@@ -87,5 +91,6 @@ describe('Harbor-night default chrome', () => {
     expect(rule(connect, '.conn .onyx-button')).toMatch(/text-transform:\s*none/);
     expect(rule(home, '.r-landing.home .home-kicker')).toMatch(/font-family:\s*var\(--mn-sans\)/);
     expect(rule(home, '.r-landing.home .home-kicker')).toMatch(/text-transform:\s*none/);
+    expect(typography).toMatch(/--ui-tracking-kicker:\s*var\(--tracking-kicker, 0\.06em\)/);
   });
 });

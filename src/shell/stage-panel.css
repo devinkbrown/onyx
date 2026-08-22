@@ -23,7 +23,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-xs, 0.6875rem);
   font-weight: 600;
-  letter-spacing: var(--tracking-kicker, 0.12em);
+  letter-spacing: var(--tracking-kicker, 0.06em);
   text-transform: uppercase;
   color: var(--paper-mute, var(--muted, #9aa3b2));
 }

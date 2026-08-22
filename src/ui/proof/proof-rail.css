@@ -147,7 +147,7 @@
 .ui-proof-receipt__evidence-label {
   flex: 0 0 auto;
   text-transform: uppercase;
-  letter-spacing: var(--ui-tracking-kicker, 0.12em);
+  letter-spacing: var(--ui-tracking-kicker, 0.06em);
 }
 
 .ui-proof-receipt__evidence-type {
