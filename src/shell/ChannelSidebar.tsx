@@ -33,6 +33,7 @@ import { normalizeRoomTarget } from './roomIdentity';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { NotificationControls } from './NotificationControls';
 import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
+import { openRoomInviteShare } from './roomInviteShareState';
 
 export type ChannelSidebarProps = {
   /** Called when mobile close is triggered */
@@ -791,6 +792,14 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                             onClick={() => getState().openChannelBrowser()}
                           >
                             Browse rooms
+                          </button>
+                          <button
+                            type="button"
+                            class="shell-sidebar-browse"
+                            data-testid="sidebar-invite-friends"
+                            onClick={() => openRoomInviteShare('')}
+                          >
+                            Invite friends
                           </button>
                         </li>
                       </Show>

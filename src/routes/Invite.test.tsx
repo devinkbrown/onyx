@@ -22,9 +22,7 @@ describe('InviteRoute', () => {
     expect(src).toContain("import { PublicFrame } from '@/ui/public'");
     expect(src).toContain('currentPath="/invite/"');
     expect(src).toContain('mainLabel="Onyx invite"');
-    expect(src).toContain('class="ui-root r data-page invite-page"');
-    expect(src).toContain("function appHrefFromInvite(url: string): string {");
-    expect(src).toContain("return '/app/';");
+    expect(src).toContain('class="ui-root r invite-page"');
     expect(src).not.toContain('<PublicFooter');
     expect(src).not.toContain('<header');
     expect(src).not.toContain('<main');
@@ -36,7 +34,7 @@ describe('InviteRoute', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.invite-page')).toBeTruthy();
-    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Threshold.*Invite/);
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Friends.*Invite/);
     expect(container.querySelector('.r-ground')).toBeTruthy();
     expect(container.querySelector('.r-flecks')).toBeTruthy();
     expect(container.querySelector('.r-veins')).toBeTruthy();
@@ -65,28 +63,22 @@ describe('InviteRoute', () => {
     expect(toggle).toHaveFocus();
   });
 
-  it('renders a rich invite from query params and hands off to the app', () => {
+  it('renders a warm room preview with display name and Join', () => {
     window.history.pushState({}, '', '/invite/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release%20train&reader=1&as=yuki');
 
     render(() => <InviteRoute />);
 
-    expect(screen.getByRole('heading', { level: 1, name: /join\s+#general/i })).toBeInTheDocument();
-    expect(screen.getAllByText('Onyx').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('#general').length).toBeGreaterThan(1);
-    expect(screen.getAllByText('release train').length).toBeGreaterThan(0);
-    expect(screen.getByText('Reader mode opens before the room joins.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /what onyx keeps from this link/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /copy invite link/i })).toBeInTheDocument();
-    expect(screen.getAllByText('yuki').length).toBeGreaterThan(0);
-    const receipt = screen.getByLabelText('Invite handoff receipt');
-    expect(receipt).toHaveTextContent('#general');
-    expect(screen.getByRole('link', { name: /open invite in onyx/i })).toHaveAttribute(
+    expect(screen.getByRole('heading', { level: 1, name: 'Join #general' })).toBeInTheDocument();
+    expect(screen.getByText('Choose a display name to enter this room.')).toBeInTheDocument();
+    expect(screen.getByRole('note', { name: 'Invite preview' })).toHaveTextContent('Join #general on Onyx');
+    expect(screen.getByRole('note', { name: 'Invite preview' })).toHaveTextContent('release train');
+    expect(screen.getByLabelText('Display name')).toHaveValue('yuki');
+    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute(
       'href',
       '/app/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki',
     );
-    expect(screen.getByTestId('invite-hero-ledger')).toHaveAttribute('href', '/stats/?room=%23general');
-    expect(screen.getByTestId('invite-cta-ledger')).toHaveAttribute('href', '/stats/?room=%23general');
-    expect(screen.getByTestId('invite-room-ledger')).toHaveAttribute('href', '/stats/?room=%23general');
+    expect(screen.queryByText(/handoff receipt|room ledger|claim a name|open graph|handshake|claim path/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bmesh\b|\bIRC\b|\bMODE\b/)).not.toBeInTheDocument();
   });
 
   it('renders a bare invite as a network-only preview and hands off without a phantom room', () => {
@@ -94,11 +86,10 @@ describe('InviteRoute', () => {
 
     render(() => <InviteRoute />);
 
-    expect(screen.getByRole('heading', { level: 1, name: /join\s+onyx/i })).toBeInTheDocument();
-    expect(screen.getByText('Choose a room from Home')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open invite in onyx/i })).toHaveAttribute('href', '/app/');
-    expect(screen.queryByTestId('invite-hero-ledger')).toBeNull();
-    expect(screen.queryByTestId('invite-cta-ledger')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Join Onyx' })).toBeInTheDocument();
+    expect(screen.getByText('Choose a display name, then pick a room once you are in.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/app/');
+    expect(screen.queryByText(/#root|#general/)).not.toBeInTheDocument();
   });
 
   it('rejects an invalid join token instead of reflecting it', () => {
@@ -106,9 +97,21 @@ describe('InviteRoute', () => {
 
     render(() => <InviteRoute />);
 
-    expect(screen.getByRole('heading', { level: 1, name: /join\s+onyx/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Join Onyx' })).toBeInTheDocument();
     expect(screen.queryByText(/evil/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open invite in onyx/i })).toHaveAttribute('href', '/app/');
+    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/app/');
+  });
+
+  it('carries a typed display name into the existing join link', () => {
+    window.history.pushState({}, '', '/invite/?join=%23lounge');
+    render(() => <InviteRoute />);
+
+    fireEvent.input(screen.getByLabelText('Display name'), { target: { value: 'River' } });
+
+    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute(
+      'href',
+      '/app/?join=%23lounge&as=River',
+    );
   });
 
   it('sets invite-specific metadata', () => {
@@ -134,7 +137,7 @@ describe('InviteRoute', () => {
     window.history.pushState({}, '', '/invite/?join=%23general');
     render(() => <InviteRoute />);
 
-    const copy = screen.getByRole('button', { name: 'Copy invite link' });
+    const copy = screen.getByRole('button', { name: 'Copy link' });
     expect(writeClipboardText).not.toHaveBeenCalled();
     fireEvent.click(copy);
     fireEvent.click(copy);
@@ -145,17 +148,17 @@ describe('InviteRoute', () => {
     expect(screen.queryByText('Invite link copied to clipboard.')).not.toBeInTheDocument();
     resolveCopy(true);
     expect(await screen.findByText('Invite link copied to clipboard.')).toHaveAttribute('role', 'status');
-    expect(screen.getByRole('button', { name: 'Copied invite' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Copied link' })).not.toBeDisabled();
   });
 
   it('keeps truthful failure feedback when no clipboard pathway succeeds', async () => {
     vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(false);
     render(() => <InviteRoute />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy invite link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Copy failed');
-    expect(screen.queryByRole('button', { name: 'Copied invite' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copied link' })).not.toBeInTheDocument();
   });
 
   it('ignores a clipboard completion delivered after the invite route unmounts', async () => {
@@ -166,7 +169,7 @@ describe('InviteRoute', () => {
     vi.spyOn(clipboard, 'writeClipboardText').mockReturnValue(pending);
     const view = render(() => <InviteRoute />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy invite link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
     view.unmount();
     resolveCopy(true);
     await pending;

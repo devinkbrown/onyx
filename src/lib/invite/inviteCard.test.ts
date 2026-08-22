@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 
-import { buildInviteCard, inviteDescription, inviteOgMeta, inviteTitle } from './inviteCard';
+import {
+  buildInviteCard,
+  guestNameError,
+  inviteDescription,
+  inviteHeadline,
+  inviteOgMeta,
+  inviteTitle,
+  inviteWelcome,
+  parseGuestName,
+} from './inviteCard';
 
 const ORIGIN = 'https://onyx.example/invite';
 const NETWORK = 'Libera Garden';
@@ -56,8 +65,10 @@ describe('buildInviteCard', () => {
       { network: NETWORK, origin: ORIGIN },
     );
 
+    expect(inviteHeadline(card)).toBe('Join #general');
+    expect(inviteWelcome(card)).toBe('Choose a display name to enter this room.');
     expect(inviteDescription(card)).toBe(
-      'Jump into the conversation from 2026-06-30T12:00:00.000Z. Open the release topic. Start in reader mode. Continue as yuki',
+      `A friend invited you to #general on ${NETWORK}. They're talking about release.`,
     );
   });
 
@@ -69,7 +80,7 @@ describe('buildInviteCard', () => {
 
     expect(inviteOgMeta(card)).toEqual([
       { property: 'og:title', content: `Join #general on ${NETWORK}` },
-      { property: 'og:description', content: `Open an invite to #general on ${NETWORK}.` },
+      { property: 'og:description', content: `A friend invited you to #general on ${NETWORK}.` },
       { property: 'og:url', content: `${ORIGIN}?join=%23general` },
       { property: 'og:type', content: 'website' },
     ]);
@@ -129,5 +140,15 @@ describe('buildInviteCard', () => {
     expect(card.topic).toBeNull();
     expect(card.readerMode).toBe(false);
     expect(card.url).toBe(`${ORIGIN}?join=%23general`);
+  });
+});
+
+describe('guest display name', () => {
+  it('accepts a valid name and explains an invalid one without protocol jargon', () => {
+    expect(parseGuestName('  River  ')).toBe('River');
+    expect(guestNameError('')).toBeUndefined();
+    expect(guestNameError('guest nick')).toMatch(/start with a letter/i);
+    expect(guestNameError('guest nick')).not.toMatch(/irc|nick|mode/i);
+    expect(guestNameError('a'.repeat(65))).toMatch(/64 characters/i);
   });
 });

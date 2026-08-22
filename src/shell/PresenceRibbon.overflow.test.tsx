@@ -343,12 +343,14 @@ describe('PresenceRibbon commercial room header', () => {
     const panel = screen.getByTestId('ribbon-more-menu');
     const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
     const labels = items.map((el) => el.textContent ?? '');
+    const inviteIdx = labels.findIndex((t) => t.includes('Invite friends'));
     const settingsIdx = labels.findIndex((t) => t.includes('Room settings'));
     const ledgerIdx = labels.findIndex((t) => t.includes('Room ledger'));
     const pinsIdx = labels.findIndex((t) => t.includes('Pinned messages'));
     const jumpIdx = labels.findIndex((t) => t.includes('Jump to date'));
     const youIdx = labels.findIndex((t) => t.includes('You') || t.includes('Guest'));
-    expect(settingsIdx).toBeGreaterThanOrEqual(0);
+    expect(inviteIdx).toBeGreaterThanOrEqual(0);
+    expect(settingsIdx).toBeGreaterThan(inviteIdx);
     expect(ledgerIdx).toBeGreaterThan(settingsIdx);
     expect(pinsIdx).toBeGreaterThan(ledgerIdx);
     expect(jumpIdx).toBeGreaterThan(pinsIdx);

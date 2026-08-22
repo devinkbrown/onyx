@@ -27,10 +27,21 @@ export interface InviteCard {
 const GUEST_NICK_RE = /^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/;
 const GUEST_NICK_MAX = 64;
 
-function parseGuestName(raw: string | null): string | null {
+export function parseGuestName(raw: string | null): string | null {
   const trimmed = raw?.trim() ?? '';
   if (trimmed.length === 0 || trimmed.length > GUEST_NICK_MAX) return null;
   return GUEST_NICK_RE.test(trimmed) ? trimmed : null;
+}
+
+/** Empty is allowed (the recipient can still join and pick a name later). */
+export function guestNameError(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.length > GUEST_NICK_MAX) return 'Name must be 64 characters or fewer.';
+  if (!GUEST_NICK_RE.test(trimmed)) {
+    return 'Start with a letter. Use letters, numbers, or -[]\\`_^{|}.';
+  }
+  return undefined;
 }
 
 function canonicalInviteUrl(origin: string, card: Omit<InviteCard, 'network' | 'url'>): string {
@@ -71,14 +82,25 @@ export function inviteTitle(card: InviteCard): string {
   return card.channel !== null ? `Join ${card.channel} on ${card.network}` : `Join ${card.network}`;
 }
 
+export function inviteHeadline(card: InviteCard): string {
+  return card.channel !== null ? `Join ${card.channel}` : `Join ${card.network}`;
+}
+
+export function inviteWelcome(card: InviteCard): string {
+  return card.channel !== null
+    ? 'Choose a display name to enter this room.'
+    : 'Choose a display name, then pick a room once you are in.';
+}
+
 export function inviteDescription(card: InviteCard): string {
-  const details: string[] = [];
-  if (card.at !== null) details.push(`Jump into the conversation from ${card.at.toISOString()}`);
-  if (card.topic !== null) details.push(`Open the ${card.topic} topic`);
-  if (card.readerMode) details.push('Start in reader mode');
-  if (card.guestName !== null) details.push(`Continue as ${card.guestName}`);
-  const target = card.channel !== null ? `${card.channel} on ${card.network}` : card.network;
-  return details.length > 0 ? details.join('. ') : `Open an invite to ${target}.`;
+  const parts: string[] = [];
+  if (card.channel !== null) {
+    parts.push(`A friend invited you to ${card.channel} on ${card.network}.`);
+  } else {
+    parts.push(`A friend invited you to ${card.network}.`);
+  }
+  if (card.topic !== null) parts.push(`They're talking about ${card.topic}.`);
+  return parts.join(' ');
 }
 
 export function inviteOgMeta(card: InviteCard): Array<{ property: string; content: string }> {

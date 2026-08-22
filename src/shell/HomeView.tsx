@@ -27,6 +27,7 @@ export function HomeView() {
       recaps={home.recaps}
       more={home.more}
       showFirstRoomPrompt={home.showFirstRoomPrompt}
+      showInviteFriends={home.showInviteFriends}
       isJoined={home.isJoined}
       caughtUpPlan={home.caughtUpPlan}
       actions={home.actions}

@@ -26,6 +26,7 @@ import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Popover } from '@/primitives/index';
 import { ChannelSettings } from './ChannelSettings';
+import { openRoomInviteShare } from './roomInviteShareState';
 import { ChannelNotifyControl } from './ChannelNotifyControl';
 import { NotificationCenter } from './NotificationCenter';
 import { PresenceHeatline } from './PresenceHeatline';
@@ -806,6 +807,28 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                     role="menu"
                     aria-labelledby="ribbon-more-room-label"
                   >
+                    <button
+                      type="button"
+                      class="shell-ribbon-more-item"
+                      role="menuitem"
+                      aria-label={`Invite friends to ${settingsChannel()}`}
+                      aria-haspopup="dialog"
+                      data-testid="ribbon-invite-friends"
+                      onClick={() => {
+                        const channel = settingsChannel() ?? '';
+                        closeMoreThen(() => openRoomInviteShare(channel));
+                      }}
+                      onKeyDown={onMoreMenuKeyDown}
+                    >
+                      <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="9" cy="8" r="3" />
+                        <path d="M3 19a6 6 0 0 1 12 0" />
+                        <path d="M17 8h4" />
+                        <path d="M19 6v4" />
+                      </svg>
+                      <span>Invite friends</span>
+                    </button>
                     <button
                       type="button"
                       class="shell-ribbon-more-item"
