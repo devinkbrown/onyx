@@ -14,7 +14,8 @@
  *
  * Sorted: netop > founder > owner > admin > op > halfop > voice > member; then alpha within group.
  *
- * Click a user → Popover mini-card with nick, account, badges, and actions.
+ * Click a user → consumer people card (display name, avatar, Message /
+ * Mention / Ignore). WHOIS, ledger, hostmasks, and op-voice live under Advanced.
  *
  * SOLID IDIOMS: never destructure props; splitProps; createMemo; For/Show.
  */
@@ -39,16 +40,11 @@ import {
   memberPrefixHeight,
   sectionMemberWindow,
 } from './memberWindow';
-import { formatMentionInsert } from '@/lib/composer/composerInject';
-import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
-import { preferences } from '@/lib/prefs/preferences';
-import {
-  memberModerationKindsForMode,
-  type ModerationActionDraft,
-  type NormalizedModerationAction,
-} from '@/lib/moderation/actionModel';
-import { Avatar, Popover, Button, IconButton } from '@/primitives/index';
+import type { ModerationActionDraft } from '@/lib/moderation/actionModel';
+import { applyMemberModeration } from '@/lib/moderation/applyMemberModeration';
+import { Avatar, Popover, IconButton } from '@/primitives/index';
 import { ModerationActionReview } from './moderation/ModerationActionReview';
+import { PeopleProfileCard } from './PeopleProfileCard';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 
 // Role resolution, grouping, and identity-stable reconciliation live in
@@ -101,286 +97,16 @@ type MemberCardProps = {
 function MemberCard(props: MemberCardProps): JSX.Element {
   const [local] = splitProps(props, ['user', 'role', 'channel', 'onOpenDm', 'onOpenWhois', 'onRequestModeration']);
 
-  // Reactive op-gate: moderation controls only render for op (or higher).
-  const canModerate = useStore((s) => selectIsChannelOp(local.channel)(s));
-  const ourNick = useStore((s) => s.ourNick);
-
-  // Whether the target currently holds the named status mode.
-  const hasMode = (m: string): boolean => local.user.modes.has(m);
-  const isSelf = (): boolean => local.user.nick.toLowerCase() === ourNick().toLowerCase();
-  const cardInstanceId = createUniqueId();
-  const cardId = createMemo(() => {
-    const channel = local.channel.replace(/[^a-z0-9_-]+/giu, '-').replace(/^-|-$/gu, '') || 'channel';
-    const nick = local.user.nick.replace(/[^a-z0-9_-]+/giu, '-').replace(/^-|-$/gu, '') || 'member';
-    return `member-card-${cardInstanceId}-${channel}-${nick}`;
-  });
-
-  function memberTriggerForAction(event: MouseEvent): HTMLButtonElement | null {
-    const action = event.currentTarget;
-    return action instanceof HTMLElement
-      ? action.closest('.onyx-popover')?.querySelector<HTMLButtonElement>('.onyx-popover__trigger') ?? null
-      : null;
-  }
-
-  function closeCardForHandoff(event: MouseEvent, focusRoster = false): HTMLElement | null {
-    const memberTrigger = memberTriggerForAction(event);
-    if (!memberTrigger) return null;
-
-    const roster = memberTrigger.closest<HTMLElement>('.shell-members');
-    const target = focusRoster ? roster : memberTrigger;
-
-    if (memberTrigger.getAttribute('aria-expanded') === 'true') memberTrigger.click();
-    target?.focus({ preventScroll: true });
-    // Popover restores its own opener in a microtask. Run after that restore so
-    // a later MODE/KICK echo cannot remove the element that owns focus.
-    if (focusRoster && target) queueMicrotask(() => target.focus({ preventScroll: true }));
-    return target;
-  }
-
-  function handleDm(): void {
-    if (local.onOpenDm) {
-      local.onOpenDm(local.user.nick);
-      return;
-    }
-    getState().navigate({ kind: 'dm', nick: local.user.nick });
-  }
-
-  function handleMention(): void {
-    const insert = formatMentionInsert(local.user.nick);
-    if (!insert) return;
-    getState().injectComposerText(local.channel, insert, 'append');
-    getState().addToast({
-      variant: 'info',
-      title: `Mention ${local.user.nick}`,
-      description: 'Inserted into the composer for this room.',
-    });
-    queueMicrotask(() => {
-      document.querySelector<HTMLElement>('[data-composer-input]')?.focus();
-    });
-  }
-
-  async function handleCopyNick(): Promise<void> {
-    const nick = local.user.nick.trim();
-    if (!nick) return;
-    const ok = await writeClipboardText(nick);
-    getState().addToast({
-      variant: ok ? 'success' : 'warning',
-      title: ok ? 'Name copied' : 'Could not copy name',
-      description: ok
-        ? `${nick} is on the clipboard.`
-        : 'Clipboard access was denied in this browser.',
-    });
-  }
-
-  function handleWhois(event: MouseEvent): void {
-    // The WHOIS Sheet lives outside this native popover. Its first pointer
-    // interaction light-dismisses the popover and removes this Profile button,
-    // so explicitly give the owning shell the persistent member-row trigger
-    // instead of relying on native popover focus timing.
-    const memberTrigger = closeCardForHandoff(event);
-    if (local.onOpenWhois && memberTrigger) {
-      local.onOpenWhois(local.user.nick, memberTrigger);
-      return;
-    }
-    getState().whois(local.user.nick);
-  }
-
-  const showRoomModeration = createMemo(() => {
-    const kinds = memberModerationKindsForMode(preferences().experienceMode);
-    return canModerate() && !isSelf() && kinds.includes('kick');
-  });
-
-  const showIrcRoleControls = createMemo(() => {
-    const kinds = memberModerationKindsForMode(preferences().experienceMode);
-    return canModerate() && !isSelf() && kinds.includes('op');
-  });
-
-  function requestModeration(event: MouseEvent, draft: ModerationActionDraft): void {
-    const trigger = closeCardForHandoff(event, true);
-    local.onRequestModeration?.(draft, trigger);
-  }
-
-  function handleOp(event: MouseEvent): void {
-    requestModeration(event, {
-      kind: hasMode('o') ? 'deop' : 'op',
-      channel: local.channel,
-      target: local.user.nick,
-    });
-  }
-
-  function handleVoice(event: MouseEvent): void {
-    requestModeration(event, {
-      kind: hasMode('v') ? 'devoice' : 'voice',
-      channel: local.channel,
-      target: local.user.nick,
-    });
-  }
-
-  function handleKick(event: MouseEvent): void {
-    requestModeration(event, {
-      kind: 'kick',
-      channel: local.channel,
-      target: local.user.nick,
-    });
-  }
-
-  function handleBan(event: MouseEvent): void {
-    requestModeration(event, {
-      kind: 'ban',
-      channel: local.channel,
-      target: local.user.nick,
-    });
-  }
-
-  const isIgnored = useStore((s) => s.isIgnored(local.user.nick));
-
-  function handleIgnore(event: MouseEvent): void {
-    closeCardForHandoff(event, true);
-    const nick = local.user.nick;
-    if (isIgnored()) {
-      getState().unignoreUser(nick);
-      getState().addToast({
-        variant: 'info',
-        title: `Unignored ${nick}`,
-        description: 'Messages and notifications from this name resume on this device.',
-      });
-      return;
-    }
-    getState().ignoreUser(nick);
-    getState().addToast({
-      variant: 'info',
-      title: `Ignoring ${nick}`,
-      description: 'Their messages are hidden on this device. Notifications are silenced too.',
-    });
-  }
-
   return (
-    <div
-      class="shell-member-card"
-      role="region"
-      aria-labelledby={`${cardId()}-nick`}
-      aria-describedby={`${cardId()}-role`}
-    >
-      <div class="shell-member-card-head">
-        <Avatar
-          name={local.user.nick}
-          size="md"
-          owner={local.role.key === 'owner' || local.role.key === 'founder'}
-          aria-hidden="true"
-        />
-        <div>
-          <p class="shell-member-card-nick" id={`${cardId()}-nick`}>{local.user.nick}</p>
-          <p class="shell-member-card-role" id={`${cardId()}-role`}>
-            {local.role.label} in {local.channel}
-          </p>
-          <Show when={local.user.account}>
-            {(acct) => (
-              <p class="shell-member-card-account">~{acct()}</p>
-            )}
-          </Show>
-        </div>
-      </div>
-      <Show when={local.role.key !== 'member'}>
-        <div class="shell-member-card-badges">
-          <RoleBadge role={local.role} />
-        </div>
-      </Show>
-      <div class="shell-member-card-actions">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDm}
-          aria-label={`Send DM to ${local.user.nick}`}
-        >
-          Message
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleMention}
-          data-testid="member-card-mention"
-          aria-label={`Mention ${local.user.nick} in the composer`}
-        >
-          Mention
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => void handleCopyNick()}
-          data-testid="member-card-copy-nick"
-          aria-label={`Copy name ${local.user.nick}`}
-        >
-          Copy name
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleWhois}
-          aria-label={`View profile of ${local.user.nick}`}
-        >
-          Profile
-        </Button>
-        <Show when={!isSelf()}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleIgnore}
-            data-testid="member-card-ignore"
-            aria-label={
-              isIgnored()
-                ? `Stop ignoring ${local.user.nick} on this device`
-                : `Ignore ${local.user.nick} on this device`
-            }
-          >
-            {isIgnored() ? 'Unignore' : 'Ignore'}
-          </Button>
-        </Show>
-      </div>
-
-      {/* Advanced / Network Ops only — never against yourself, never in Standard. */}
-      <Show when={showRoomModeration()}>
-        <div
-          class="shell-member-card-mod"
-          role="group"
-          aria-label={`Moderate ${local.user.nick}`}
-        >
-          <Show when={showIrcRoleControls()}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleOp}
-              aria-label={hasMode('o') ? `Remove op from ${local.user.nick}` : `Give op to ${local.user.nick}`}
-            >
-              {hasMode('o') ? 'Deop' : 'Op'}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleVoice}
-              aria-label={hasMode('v') ? `Remove voice from ${local.user.nick}` : `Give voice to ${local.user.nick}`}
-            >
-              {hasMode('v') ? 'Devoice' : 'Voice'}
-            </Button>
-          </Show>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={handleKick}
-            aria-label={`Kick ${local.user.nick} from ${local.channel}`}
-          >
-            Kick
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={handleBan}
-            aria-label={`Ban ${local.user.nick} from ${local.channel}`}
-          >
-            Ban
-          </Button>
-        </div>
-      </Show>
-    </div>
+    <PeopleProfileCard
+      nick={local.user.nick}
+      channel={local.channel}
+      user={local.user}
+      role={local.role}
+      onOpenDm={local.onOpenDm}
+      onOpenWhois={local.onOpenWhois}
+      onRequestModeration={local.onRequestModeration}
+    />
   );
 }
 
@@ -822,35 +548,4 @@ export function MemberList(props: MemberListProps): JSX.Element {
       />
     </aside>
   );
-}
-
-function applyMemberModeration(action: NormalizedModerationAction): void {
-  const state = getState();
-  switch (action.kind) {
-    case 'kick':
-      state.kickMember(action.channel, action.target, action.reason);
-      break;
-    case 'ban':
-      state.banMask(action.channel, action.mask);
-      break;
-    case 'unban':
-      state.unbanMask(action.channel, action.mask);
-      break;
-    case 'op':
-      state.opMember(action.channel, action.target, true);
-      break;
-    case 'deop':
-      state.opMember(action.channel, action.target, false);
-      break;
-    case 'voice':
-      state.voiceMember(action.channel, action.target, true);
-      break;
-    case 'devoice':
-      state.voiceMember(action.channel, action.target, false);
-      break;
-    default: {
-      const _exhaustive: never = action;
-      void _exhaustive;
-    }
-  }
 }

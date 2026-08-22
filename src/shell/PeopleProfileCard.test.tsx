@@ -1,0 +1,127 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { Channel, ChannelUser } from '@/lib/irc/types';
+import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
+import { store } from '@/lib/store/store';
+import { PEOPLE_PROFILE_ADVANCED_TESTID, PeopleProfileCard } from './PeopleProfileCard';
+
+const initialState = store.getInitialState();
+
+function makeUser(nick: string, extra: Partial<ChannelUser> = {}): ChannelUser {
+  return { nick, modes: extra.modes ?? new Set(), ...extra };
+}
+
+function seedRoom(users: ChannelUser[], ourNick = 'me'): void {
+  const channels = new Map<string, Channel>();
+  const usersMap = new Map<string, ChannelUser>();
+  for (const user of users) usersMap.set(user.nick.toLowerCase(), user);
+  channels.set('#general', {
+    name: '#general',
+    topic: '',
+    topicSetBy: '',
+    topicSetAt: null,
+    modes: '',
+    users: usersMap,
+    unread: 0,
+    highlights: 0,
+    createdAt: null,
+    messages: [],
+  });
+  store.setState({
+    ...initialState,
+    client: {
+      sendRaw: vi.fn(),
+      isupport: { CHANTYPES: '#&' },
+      modeToPrefix: { Y: '*', Q: '!', q: '~', a: '&', o: '@', h: '%', v: '+' },
+    } as never,
+    channels,
+    ourNick,
+    activeView: { kind: 'channel', channel: '#general' },
+    connectionStatus: 'connected',
+  }, true);
+}
+
+afterEach(() => {
+  cleanup();
+});
+
+beforeEach(() => {
+  store.setState(initialState, true);
+  localStorage.clear();
+  resetPreferences();
+});
+
+describe('PeopleProfileCard', () => {
+  it('shows a consumer card with display name, about, and Message / Mention / Ignore', () => {
+    seedRoom([makeUser('me', { modes: new Set(['o']) }), makeUser('bob')]);
+    store.setState({
+      userProfiles: new Map([['bob', {
+        nick: 'bob',
+        displayName: 'Bob Example',
+        bio: 'Builds rooms on this device.',
+      }]]),
+    });
+
+    render(() => <PeopleProfileCard nick="bob" channel="#general" />);
+
+    const card = screen.getByRole('region', { name: 'Bob Example' });
+    expect(card).toHaveAccessibleDescription('Builds rooms on this device.');
+    expect(screen.getByText('bob')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send DM to bob' })).toBeInTheDocument();
+    expect(screen.getByTestId('member-card-mention')).toBeInTheDocument();
+    expect(screen.getByTestId('member-card-ignore')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Report/i })).toBeNull();
+    expect(card.querySelector('.shell-people-card-identity')).not.toHaveTextContent('Voice');
+    expect(card.querySelector('.shell-role-badge')).toBeNull();
+    expect(card.querySelector('.shell-people-card-advanced')).toBeTruthy();
+  });
+
+  it('does not invent an about line when the server has no bio', () => {
+    seedRoom([makeUser('me'), makeUser('quiet')]);
+
+    render(() => <PeopleProfileCard nick="quiet" channel="#general" />);
+
+    expect(screen.getByRole('region', { name: 'quiet' })).toBeInTheDocument();
+    expect(screen.queryByText(/about/i)).toBeNull();
+    expect(document.querySelector('.shell-people-card-about')).toBeNull();
+  });
+
+  it('keeps WHOIS, ledger, hostmasks, and room roles under Advanced', () => {
+    seedRoom([makeUser('me', { modes: new Set(['o']) }), makeUser('bob', { modes: new Set(['v']), account: 'bob-account' })]);
+    store.setState({
+      whoisData: new Map([['bob', {
+        nick: 'bob',
+        username: 'bobu',
+        host: 'user.example.net',
+        loading: false,
+      }]]),
+    });
+    setPreference('experienceMode', 'network-ops');
+
+    render(() => <PeopleProfileCard nick="bob" channel="#general" />);
+
+    const advanced = screen.getByTestId(PEOPLE_PROFILE_ADVANCED_TESTID);
+    expect(advanced).toHaveTextContent('Advanced');
+    expect(screen.getByRole('button', { name: 'View profile of bob' })).toBeInTheDocument();
+    expect(screen.getByTestId('people-profile-ledger')).toHaveAttribute('href', '/stats/?room=%23general');
+    expect(screen.getByTestId('people-profile-hostmask')).toHaveTextContent('bobu@user.example.net');
+    expect(screen.getByText('Voice in #general')).toBeInTheDocument();
+    expect(screen.getByText('Account bob-account')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Give op to bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kick bob from #general' })).toBeInTheDocument();
+  });
+
+  it('hides Message and Ignore on your own card', () => {
+    seedRoom([makeUser('me', { modes: new Set(['o']) })]);
+
+    render(() => <PeopleProfileCard nick="me" channel="#general" />);
+
+    expect(screen.getByRole('region', { name: 'me' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send DM to me' })).toBeNull();
+    expect(screen.queryByTestId('member-card-ignore')).toBeNull();
+    fireEvent.click(screen.getByTestId(PEOPLE_PROFILE_ADVANCED_TESTID));
+    expect(screen.getByRole('button', { name: 'View profile of me' })).toBeInTheDocument();
+  });
+});

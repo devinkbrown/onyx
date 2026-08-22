@@ -2320,6 +2320,7 @@ describe('AppShell', () => {
       }
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       fireEvent.click(memberTrigger);
+      fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
       const profileButton = screen.getByRole('button', { name: 'View profile of alice' });
       fireEvent.click(profileButton);
 
@@ -2361,6 +2362,7 @@ describe('AppShell', () => {
       expect(memberList).not.toBeNull();
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       fireEvent.click(memberTrigger);
+      fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
       fireEvent.click(screen.getByRole('button', { name: 'View profile of alice' }));
       const profile = await screen.findByRole('dialog', { name: 'Profile: alice' });
 
@@ -2445,6 +2447,7 @@ describe('AppShell', () => {
 
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       fireEvent.click(memberTrigger);
+      fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
       fireEvent.click(screen.getByRole('button', { name: 'View profile of alice' }));
       const profile = await screen.findByRole('dialog', { name: 'Profile: alice' });
 
@@ -2475,6 +2478,7 @@ describe('AppShell', () => {
 
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       fireEvent.click(memberTrigger);
+      fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
       fireEvent.click(screen.getByRole('button', { name: 'View profile of alice' }));
       const profile = await screen.findByRole('dialog', { name: 'Profile: alice' });
 
@@ -2605,6 +2609,7 @@ describe('AppShell', () => {
       expect(memberList).not.toBeNull();
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       fireEvent.click(memberTrigger);
+      fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
       fireEvent.click(screen.getByRole('button', { name: 'View profile of alice' }));
       await screen.findByRole('dialog', { name: 'Profile: alice' });
 

@@ -53,6 +53,8 @@ export type PresenceRibbonProps = {
   onJoinVoice?: (withVideo: boolean) => void;
   /** Mobile uses the persistent Menu for workspace settings; keep this overflow contextual. */
   contextActionsOnly?: boolean;
+  onOpenDm?: (nick: string) => void;
+  onOpenWhois?: (nick: string, returnFocus: HTMLElement) => void;
 };
 
 export type VoiceRoomStatusInput = {
@@ -140,6 +142,8 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     'showJoinVoice',
     'onJoinVoice',
     'contextActionsOnly',
+    'onOpenDm',
+    'onOpenWhois',
   ]);
 
   const activeView = useStore((s) => s.activeView);
@@ -585,7 +589,11 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
         {/* Presence-as-place secondary: desktop facepile only (CSS hides on narrow). */}
         <Show when={activeView().kind === 'channel'}>
           <div class="shell-ribbon-facepile">
-            <Facepile members={facepileMembers} />
+            <Facepile
+              members={facepileMembers}
+              onOpenDm={local.onOpenDm}
+              onOpenWhois={local.onOpenWhois}
+            />
           </div>
         </Show>
       </div>
