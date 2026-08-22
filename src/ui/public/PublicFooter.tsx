@@ -2,7 +2,7 @@
 import { For, type JSX } from 'solid-js';
 import { publicRouteById, type PublicRouteId } from '@/ui/navigation/publicRouteManifest';
 
-const FOOTER_ROUTE_IDS = ['about', 'invite', 'download', 'guides', 'status', 'roadmap', 'onyxos', 'accessibility'] as const satisfies readonly PublicRouteId[];
+const FOOTER_ROUTE_IDS = ['about', 'invite', 'download', 'guides', 'status', 'roadmap', 'accessibility'] as const satisfies readonly PublicRouteId[];
 const FOOTER_ROUTES = FOOTER_ROUTE_IDS.map(publicRouteById);
 
 export function PublicFooter(): JSX.Element {

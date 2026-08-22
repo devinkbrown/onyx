@@ -152,6 +152,11 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
     expect(metadata).toEqual(runtime);
     expect(publicNavigationRoutes().map((route) => route.navigationOrder)).toEqual([0, 1, 2]);
     expect(publicNavigationRoutes().map((route) => route.label)).toEqual(['About', 'Join', 'Download']);
+    expect(publicRouteById('onyxos')).toMatchObject({
+      placement: 'none',
+      navigation: { desktop: false, mobile: false },
+      navigationOrder: null,
+    });
   });
 
   it('covers every public router destination and preserves the install compatibility alias', () => {

@@ -54,6 +54,9 @@ are staged, and must never fabricate a macOS artifact on Linux.
 Existing supporting routes that remain valid links: `/stats/`, `/roadmap/`,
 `/invite/`, `/app/`, `/download/`, `/guides/`, `/community/`. `/guides/` and
 `/community/` are the same Getting started how-tos for the official app.
+`/onyxos/` remains a working unlisted deep URL only — no header, footer, Home,
+About, Download, Guides, or sitemap promotion, and no “also see OnyxOS” cards
+on the main story.
 
 ---
 

@@ -53,16 +53,17 @@ describe('OnyxOS route', () => {
     expect(page!.querySelector('.onyxos-wordmark, .onyxos-nav')).toBeNull();
   });
 
-  it('keeps OnyxOS out of the consumer primary nav and in the quieter footer', () => {
-    render(() => <OnyxOS />);
+  it('keeps the unlisted /onyxos/ route out of public chrome', () => {
+    const { container } = render(() => <OnyxOS />);
     const primary = screen.getByRole('navigation', { name: 'Primary navigation' });
     const links = within(primary).getAllByRole('link');
 
     expect(links.map((link) => [link.textContent, link.getAttribute('href')]))
       .toEqual(PRIMARY_LINKS.map(([label, href]) => [label, href]));
+    expect(links.filter((link) => link.getAttribute('aria-current') === 'page'))
+      .toHaveLength(0);
     expect(within(primary).queryByRole('link', { name: 'OnyxOS' })).toBeNull();
-    expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))
-      .getByRole('link', { name: 'OnyxOS' })).toHaveAttribute('href', '/onyxos/');
+    expect(container.querySelector('header a[href="/onyxos/"], footer a[href="/onyxos/"]')).toBeNull();
 
     for (const label of ['Accessibility', 'Glossary', 'Integrations', 'Agent safety', 'Stats', 'Appearance', 'Status', 'Roadmap']) {
       expect(within(primary).queryByRole('link', { name: label })).toBeNull();

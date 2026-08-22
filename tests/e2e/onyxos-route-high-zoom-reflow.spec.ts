@@ -20,7 +20,7 @@ test('keeps the PublicFrame OnyxOS route usable at 400% zoom', async ({ page }) 
   await expect(frame.locator('footer.public-frame__footer')).toHaveCount(1);
   await expect(main.locator('main, header, footer')).toHaveCount(0);
   await expect(header.locator('a[href="/onyxos/"]')).toHaveCount(0);
-  await expect(footer.locator('a[href="/onyxos/"]')).toBeVisible();
+  await expect(footer.locator('a[href="/onyxos/"]')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: /communication,\s*at home in the system/i })).toBeVisible();
 
   await page.keyboard.press('Tab');
