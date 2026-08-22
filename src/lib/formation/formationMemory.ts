@@ -61,7 +61,11 @@ function sanitizeRoom(value: unknown, nowMs: number): FormationRoomMemory | null
   const firstSeenAt = value.firstSeenAt;
   if (typeof firstSeenAt !== 'number' || !Number.isFinite(firstSeenAt) || firstSeenAt <= 0) return null;
   if (nowMs - firstSeenAt > FORMATION_WINDOW_MS) return null;
-  const role: FormationRole = value.role === 'joiner' ? 'joiner' : value.role === 'founder' ? 'founder' : null;
+  const role: FormationRole | null = value.role === 'joiner'
+    ? 'joiner'
+    : value.role === 'founder'
+      ? 'founder'
+      : null;
   if (!role) return null;
   const firstJoiner = typeof value.firstJoiner === 'string' && isUsableNick(value.firstJoiner)
     ? value.firstJoiner.trim()
@@ -88,10 +92,6 @@ function sanitizeSnapshot(value: unknown, nowMs: number): FormationMemorySnapsho
   }
   const invite = typeof value.inviteChannel === 'string' ? parseJoinParam(value.inviteChannel) : null;
   return { rooms, inviteChannel: invite };
-}
-
-function snapshotEqual(a: FormationMemorySnapshot, b: FormationMemorySnapshot): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function notify(ownerKey: string, snapshot: FormationMemorySnapshot): void {
