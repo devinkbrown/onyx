@@ -83,6 +83,8 @@ describe('Harbor-night default chrome', () => {
   it('quiets first-run and landing kickers', () => {
     expect(rule(connect, '.conn-eyebrow')).toMatch(/font-family:\s*var\(--font-sans\)/);
     expect(rule(connect, '.conn-eyebrow')).toMatch(/text-transform:\s*none/);
+    expect(connect).toMatch(/\.conn \.onyx-field__label[\s\S]*?text-transform:\s*none/);
+    expect(rule(connect, '.conn .onyx-button')).toMatch(/text-transform:\s*none/);
     expect(rule(home, '.r-landing.home .home-kicker')).toMatch(/font-family:\s*var\(--mn-sans\)/);
     expect(rule(home, '.r-landing.home .home-kicker')).toMatch(/text-transform:\s*none/);
   });
