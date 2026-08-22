@@ -814,7 +814,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       aria-label={`Invite friends to ${settingsChannel()}`}
                       aria-haspopup="dialog"
                       data-testid="ribbon-invite-friends"
-                      onClick={() => closeMoreThen(() => openRoomInviteShare(settingsChannel() ?? ''))}
+                      onClick={() => {
+                        const channel = settingsChannel() ?? '';
+                        closeMoreThen(() => openRoomInviteShare(channel));
+                      }}
                       onKeyDown={onMoreMenuKeyDown}
                     >
                       <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"

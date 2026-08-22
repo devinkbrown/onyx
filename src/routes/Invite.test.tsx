@@ -27,7 +27,6 @@ describe('InviteRoute', () => {
     expect(src).not.toContain('<header');
     expect(src).not.toContain('<main');
     expect(src).not.toContain('r-status');
-    expect(src).not.toMatch(/claim path|handshake|mesh|MODE|\/invite as/i);
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByRole('main', { name: 'Onyx invite' })).toHaveAttribute('id', 'public-main');
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
@@ -78,7 +77,8 @@ describe('InviteRoute', () => {
       'href',
       '/app/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki',
     );
-    expect(screen.queryByText(/handoff receipt|room ledger|claim a name|open graph/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/handoff receipt|room ledger|claim a name|open graph|handshake|claim path/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bmesh\b|\bIRC\b|\bMODE\b/)).not.toBeInTheDocument();
   });
 
   it('renders a bare invite as a network-only preview and hands off without a phantom room', () => {
