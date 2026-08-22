@@ -99,6 +99,7 @@ function actions(over: Partial<HomeBriefingActions> = {}): HomeBriefingActions {
     openQuietActivity: noop,
     openQuietBoost: noop,
     markAllCaughtUp: noop,
+    openInviteFriends: noop,
     ...over,
   };
 }
@@ -147,6 +148,7 @@ function renderView(over: Partial<{
       recaps={() => []}
       more={() => over.more ?? more()}
       showFirstRoomPrompt={() => false}
+      showInviteFriends={() => false}
       isJoined={() => false}
       caughtUpPlan={() => rooms > 0
         ? { targets: [{ kind: 'channel', target: '#mentions', unread, highlights: 0 }], rooms, unread, mentions: 0 }
@@ -190,6 +192,36 @@ describe('HomeBriefingView — presentation contract', () => {
     expect(screen.getByRole('button', { name: 'Browse rooms' })).toHaveClass('home-cta');
     expect(screen.getByRole('button', { name: 'Search messages' })).toHaveClass('home-action--supporting');
     expect(screen.getByRole('button', { name: 'Search messages' })).not.toHaveClass('home-action--primary');
+    expect(screen.queryByRole('button', { name: 'Invite friends' })).not.toBeInTheDocument();
+  });
+
+  it('offers Invite friends and Browse rooms in plain language when the desk is empty', () => {
+    const openInviteFriends = vi.fn();
+    render(() => (
+      <HomeBriefingView
+        nowMs={() => NOW}
+        welcomeName={() => 'me'}
+        connectionStatus={() => 'connected'}
+        localMemoryStatus={() => 'On this device: remembered rooms stay available.'}
+        briefing={() => briefing({ hasRooms: false, liveCatchUp: [], resumePoints: [] })}
+        outboxChrome={() => null}
+        queuedSends={() => []}
+        confirmDiscardId={() => null}
+        recaps={() => []}
+        more={() => more()}
+        showFirstRoomPrompt={() => true}
+        showInviteFriends={() => true}
+        isJoined={() => false}
+        caughtUpPlan={() => EMPTY_CAUGHT_UP}
+        actions={actions({ openInviteFriends })}
+      />
+    ));
+
+    expect(screen.getByRole('button', { name: 'Browse rooms' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Invite friends' }));
+    expect(openInviteFriends).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/invite friends with a link/i)).toBeInTheDocument();
+    expect(screen.queryByText(/mesh|handshake|claim path|member count/i)).not.toBeInTheDocument();
   });
 
   it('keeps mobile reading order: needs, continue, live, explore', () => {

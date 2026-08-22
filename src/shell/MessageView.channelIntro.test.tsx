@@ -100,6 +100,7 @@ describe('MessageView channel intro ledger', () => {
       expect(screen.getByTestId('feed-empty')).toBeTruthy();
     });
 
+    expect(screen.getByTestId('feed-empty-invite')).toHaveTextContent('Invite friends');
     expect(screen.getByTestId('feed-empty-channel-ledger')).toHaveAttribute(
       'href',
       '/stats/?room=%23general',

@@ -665,17 +665,17 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
         {/* ── Share invite ── */}
         <section class="shell-chset-section" aria-labelledby="chset-invite-heading">
-          <h3 id="chset-invite-heading" class="shell-chset-heading">Share invite</h3>
+          <h3 id="chset-invite-heading" class="shell-chset-heading">Invite friends</h3>
 
           <div class="shell-chset-readonly" role="group" aria-label="Invite preview">
-            <p class="shell-chset-readonly-label">This invite opens</p>
+            <p class="shell-chset-readonly-label">Friends open this room</p>
             {/* Sourced from the RESOLVED card, never the raw channel, so the
                 preview can never claim a room the link actually dropped. */}
             <p class="shell-chset-readonly-value">{inviteLink().card.channel ?? networkName()}</p>
             <Show
               when={inviteLink().hasChannel}
               fallback={
-                <p class="shell-chset-hint">A network invite — the recipient picks a room from Home.</p>
+                <p class="shell-chset-hint">A link to Onyx — friends pick a room from Home.</p>
               }
             >
               <p class="shell-chset-hint">
@@ -691,7 +691,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             <FormField
               id="chset-invite-nick"
               label="Suggested guest name (optional)"
-              description="Pre-fills the connect form for whoever opens the link. Leave blank to let them choose."
+              description="Optional. Prefills a name for whoever opens the link. Leave blank so they choose."
               type="text"
               value={invitePreferredNick()}
               autocomplete="off"

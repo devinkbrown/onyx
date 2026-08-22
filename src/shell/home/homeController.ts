@@ -66,6 +66,7 @@ import { outboxHomeChrome, type OutboxHomeChrome } from '@/lib/vault/outboxStatu
 import type { ChatMessage } from '@/lib/irc/types';
 import { openSpotlight } from '@/chat/spotlight/useSpotlight';
 import { openMessageSearch, openMessageSearchWithQuery } from '../search/useMessageSearch';
+import { openRoomInviteShare } from '../roomInviteShareState';
 import {
   composeHomeBriefing,
   homeBriefingEqual,
@@ -146,6 +147,7 @@ export type HomeBriefingActions = {
   openQuietActivity: (item: QuietActivityItem) => void;
   openQuietBoost: (item: QuietBoostDigestItem) => void;
   markAllCaughtUp: () => void;
+  openInviteFriends: () => void;
 };
 
 export type HomeController = {
@@ -160,6 +162,7 @@ export type HomeController = {
   recaps: () => readonly HomeCatchUpRecap[];
   more: () => HomeMoreActivityView;
   showFirstRoomPrompt: () => boolean;
+  showInviteFriends: () => boolean;
   isJoined: (name: string) => boolean;
   caughtUpPlan: () => CaughtUpPlan;
   actions: HomeBriefingActions;
@@ -633,6 +636,14 @@ export function createHomeController(): HomeController {
       && directoryAll().length === 0
       && recentRooms().length === 0,
   );
+  const showInviteFriends = createMemo(() =>
+    connectionStatus() === 'connected'
+    && (channels().size === 0 || dms().size === 0),
+  );
+  const inviteShareChannel = createMemo(() => {
+    for (const room of channels().values()) return room.name;
+    return '';
+  });
   const moreActivityHasContent = createMemo(() =>
     !!stats.latest
     || (connectionStatus() === 'connected' && roomRhythm().length > 0)
@@ -804,6 +815,7 @@ export function createHomeController(): HomeController {
       if (current.rooms === 0) return;
       for (const target of current.targets) state.markRead(target.target);
     },
+    openInviteFriends: () => openRoomInviteShare(inviteShareChannel()),
   };
 
   return {
@@ -818,6 +830,7 @@ export function createHomeController(): HomeController {
     recaps: catchUpRecaps,
     more,
     showFirstRoomPrompt,
+    showInviteFriends,
     isJoined,
     caughtUpPlan,
     actions,

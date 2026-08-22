@@ -32,10 +32,10 @@ test.describe('Onyx /invite landing preview (consume side)', () => {
 
     // The observable success signal: the landing page names the exact room.
     await expect(page.locator('h1')).toContainText('#general');
-    await expect(page.getByText(/Open an invite to #general/i).first()).toBeVisible();
+    await expect(page.getByText(/A friend invited you to #general/i).first()).toBeVisible();
 
     // The primary CTA deep-links into the app carrying the validated join param.
-    const openCta = page.getByRole('link', { name: /Open invite in Onyx/i });
+    const openCta = page.getByRole('link', { name: /^Join$/ });
     await expect(openCta).toHaveAttribute('href', '/app/?join=%23general');
   });
 
@@ -48,7 +48,7 @@ test.describe('Onyx /invite landing preview (consume side)', () => {
     await expect(page.getByText('roadmap').first()).toBeVisible();
 
     // App handoff carries every validated field so the room opens the same way.
-    const openCta = page.getByRole('link', { name: /Open invite in Onyx/i });
+    const openCta = page.getByRole('link', { name: /^Join$/ });
     await expect(openCta).toHaveAttribute('href', /\/app\/\?.*join=%23design/);
     await expect(openCta).toHaveAttribute('href', /as=river/);
     await expect(openCta).toHaveAttribute('href', /topic=roadmap/);
@@ -59,7 +59,7 @@ test.describe('Onyx /invite landing preview (consume side)', () => {
 
     await expect(page.locator('h1')).toContainText('Onyx');
     // Fallback copy tells the recipient to pick a room rather than naming a fake one.
-    await expect(page.getByText(/Choose a room from Home/i).first()).toBeVisible();
+    await expect(page.getByText(/pick a room once you are in/i).first()).toBeVisible();
   });
 
   test('an invalid room param is rejected, not reflected (no injection)', async ({ page }) => {

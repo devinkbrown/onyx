@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
-import './data-pages.css';
 import './invite.css';
 import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
-import { buildInviteCard, inviteDescription, inviteTitle } from '@/lib/invite/inviteCard';
-import { statsRoomHref } from '@/lib/stats/channelDetail';
+import {
+  buildInviteCard,
+  guestNameError,
+  inviteDescription,
+  inviteHeadline,
+  inviteTitle,
+  inviteWelcome,
+  parseGuestName,
+} from '@/lib/invite/inviteCard';
+import { buildInviteLink } from '@/lib/invite/inviteLink';
+import { FormField } from '@/primitives/index';
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
 
@@ -21,30 +29,11 @@ function currentOrigin(): string {
   return `${window.location.origin}/invite/`;
 }
 
-function appHrefFromInvite(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return parsed.search ? `/app/${parsed.search}` : '/app/';
-  } catch {
-    return '/app/';
-  }
-}
-
-function formatMoment(at: Date): string {
-  return new Intl.DateTimeFormat('en', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'UTC',
-  }).format(at);
-}
-
-function isPublicStatsChannel(channel: string | null): channel is string {
-  return channel !== null && /^[#&]/.test(channel.trim());
-}
-
 export default function InviteRoute() {
   const [copyState, setCopyState] = createSignal<'idle' | 'copied' | 'failed'>('idle');
   const [copyBusy, setCopyBusy] = createSignal(false);
+  const [displayName, setDisplayName] = createSignal('');
+  const [nameError, setNameError] = createSignal<string | undefined>(undefined);
   let copyEpoch = 0;
   let disposed = false;
   const card = createMemo(() => buildInviteCard(currentParams(), {
@@ -52,8 +41,28 @@ export default function InviteRoute() {
     origin: currentOrigin(),
   }));
   const title = createMemo(() => inviteTitle(card()));
+  const headline = createMemo(() => inviteHeadline(card()));
   const description = createMemo(() => inviteDescription(card()));
-  const appHref = createMemo(() => appHrefFromInvite(card().url));
+  const welcome = createMemo(() => inviteWelcome(card()));
+
+  createEffect(() => {
+    const suggested = card().guestName;
+    if (suggested) setDisplayName(suggested);
+  });
+
+  const joinHref = createMemo(() => {
+    const name = parseGuestName(displayName());
+    return buildInviteLink(
+      {
+        channel: card().channel ?? '',
+        guestName: name,
+        at: card().at,
+        topic: card().topic,
+        reader: card().readerMode,
+      },
+      { network: NETWORK_NAME, origin: currentOrigin(), appOrigin: '/app/' },
+    ).appHref;
+  });
 
   createEffect(() => {
     setPageMeta(title(), description(), card().url);
@@ -81,9 +90,14 @@ export default function InviteRoute() {
   }
 
   function copyButtonLabel(): string {
-    if (copyBusy()) return 'Copying invite…';
-    if (copyState() === 'copied') return 'Copied invite';
-    return 'Copy invite link';
+    if (copyBusy()) return 'Copying link…';
+    if (copyState() === 'copied') return 'Copied link';
+    return 'Copy link';
+  }
+
+  function onNameInput(value: string): void {
+    setDisplayName(value);
+    setNameError(guestNameError(value));
   }
 
   return (
@@ -92,13 +106,13 @@ export default function InviteRoute() {
       mainLabel="Onyx invite"
       context={(
         <p class="public-frame__current-line">
-          <span class="public-frame__current-kicker">Threshold</span>
+          <span class="public-frame__current-kicker">Friends</span>
           <span aria-hidden="true">·</span>
           <span class="public-frame__current-label">Invite</span>
         </p>
       )}
     >
-      <div class="ui-root r data-page invite-page">
+      <div class="ui-root r invite-page">
       <div class="r-ground" aria-hidden="true" />
       <div class="r-flecks" aria-hidden="true" />
       <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
@@ -108,164 +122,78 @@ export default function InviteRoute() {
       </svg>
       <div class="r-grain" aria-hidden="true" />
 
-      <section class="r-wrap data-hero" aria-labelledby="invite-heading">
-        <p class="r-kicker">invite</p>
-        <h1 id="invite-heading" aria-label={card().channel ? `Join ${card().channel}` : `Join ${NETWORK_NAME}`}>
-          <Show when={card().channel} fallback={<>Join<br /><span class="invite-title-accent">{NETWORK_NAME}</span></>}>
-            {(channel) => (
-              <>
-                Join<br />
-                <Show
-                  when={isPublicStatsChannel(channel())}
-                  fallback={<span class="invite-title-accent">{channel()}</span>}
-                >
-                  <a
-                    class="invite-title-accent invite-title-ledger"
-                    href={statsRoomHref(channel())}
-                    aria-label={`Room ledger for ${channel()}`}
-                    data-testid="invite-hero-ledger"
-                  >
-                    {channel()}
-                  </a>
-                </Show>
-              </>
+      <section class="invite-door" aria-labelledby="invite-heading">
+        <p class="invite-eyebrow">Onyx</p>
+        <h1 id="invite-heading">{headline()}</h1>
+        <p class="invite-lede">{welcome()}</p>
+
+        <div class="invite-preview" role="note" aria-label="Invite preview">
+          <span class="invite-preview-eyebrow">Invite</span>
+          <h2 class="invite-preview-title">{title()}</h2>
+          <p class="invite-preview-desc">{description()}</p>
+          <Show when={card().topic}>
+            {(topic) => (
+              <p class="invite-preview-topic">
+                {topic()}
+              </p>
             )}
           </Show>
-        </h1>
-        <p class="sub">{description()}</p>
-        <dl class="invite-safety-receipt" aria-label="Invite handoff receipt">
-          <div>
-            <dt>Source</dt>
-            <dd>This invite URL</dd>
-          </div>
-          <div>
-            <dt>Destination</dt>
-            <dd>{card().channel ?? 'Onyx room directory'}</dd>
-          </div>
-          <div>
-            <dt>Handoff</dt>
-            <dd>Only supported fields move into Onyx when you choose Open invite.</dd>
-          </div>
-        </dl>
-        <div class="r-cta">
-          <a class="r-btn primary" href={appHref()}>Open invite in Onyx</a>
-          <Show when={isPublicStatsChannel(card().channel) ? card().channel : undefined}>
-            {(channel) => (
-              <a
-                class="r-btn ghost"
-                href={statsRoomHref(channel())}
-                aria-label={`Room ledger for ${channel()}`}
-                data-testid="invite-cta-ledger"
-              >
-                Room ledger
-              </a>
-            )}
-          </Show>
-          <button
-            type="button"
-            class="r-btn ghost"
-            disabled={copyBusy()}
-            aria-busy={copyBusy()}
-            onClick={() => void copyInvite()}
-          >
-            {copyButtonLabel()}
-          </button>
-          <a class="r-btn ghost" href="/about/">How Onyx works</a>
         </div>
+
+        <form
+          class="invite-join"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const error = guestNameError(displayName());
+            if (error) {
+              setNameError(error);
+              return;
+            }
+            window.location.assign(joinHref());
+          }}
+        >
+          <FormField
+            id="invite-display-name"
+            label="Display name"
+            type="text"
+            placeholder="your-name"
+            autocomplete="username"
+            maxlength={64}
+            value={displayName()}
+            error={nameError()}
+            onInput={(event) => onNameInput(event.currentTarget.value)}
+          />
+          <div class="invite-actions">
+            <a class="r-btn primary" href={joinHref()}>
+              Join
+            </a>
+            <button
+              type="button"
+              class="r-btn ghost"
+              disabled={copyBusy()}
+              aria-busy={copyBusy()}
+              onClick={() => void copyInvite()}
+            >
+              {copyButtonLabel()}
+            </button>
+          </div>
+        </form>
+
+        <p class="invite-alt">
+          Already have an account?
+          {' '}
+          <a href={joinHref()}>Sign in</a>
+        </p>
+        <p class="invite-alt">
+          <a href="/about/">How Onyx works</a>
+        </p>
+
         <Show when={copyState() === 'copied'}>
           <p class="invite-copy-status" role="status">Invite link copied to clipboard.</p>
         </Show>
         <Show when={copyState() === 'failed'}>
-          <p class="invite-copy-status" role="alert">Copy failed. The canonical invite is listed below.</p>
+          <p class="invite-copy-status" role="alert">Copy failed. You can still join below.</p>
         </Show>
-      </section>
-
-      <section class="r-wrap r-section data-grid" aria-label="Invite details">
-        <article class="data-card">
-          <span class="label">entry</span>
-          <h2>Walk in as a guest, claim a name when ready</h2>
-          <p>
-            Invite links preserve the room, optional moment, and suggested guest
-            name. Onyx opens the same native guest, sign-in, and register flows,
-            then joins the room after the connection is established.
-          </p>
-          <div class="data-list data-list--compact invite-facts">
-            <div class="data-row">
-              <div><strong>Network</strong><span>{card().network}</span></div>
-            </div>
-            <div class="data-row">
-              <div>
-                <strong>Room</strong>
-                <Show
-                  when={isPublicStatsChannel(card().channel) ? card().channel : undefined}
-                  fallback={<span>{card().channel ?? 'Choose a room from Home'}</span>}
-                >
-                  {(channel) => (
-                    <span class="invite-room-detail">
-                      <span>{channel()}</span>
-                      <a
-                        class="invite-room-ledger"
-                        href={statsRoomHref(channel())}
-                        aria-label={`Room ledger for ${channel()}`}
-                        data-testid="invite-room-ledger"
-                      >
-                        Room ledger
-                      </a>
-                    </span>
-                  )}
-                </Show>
-              </div>
-            </div>
-            <Show when={card().at}>
-              {(at) => (
-                <div class="data-row">
-                  <div><strong>Moment</strong><span>{formatMoment(at())} UTC</span></div>
-                </div>
-              )}
-            </Show>
-            <Show when={card().topic}>
-              {(topic) => (
-                <div class="data-row">
-                  <div><strong>Named conversation</strong><span>{topic()}</span></div>
-                </div>
-              )}
-            </Show>
-            <Show when={card().readerMode}>
-              <div class="data-row">
-                <div><strong>Reading projection</strong><span>Reader mode opens before the room joins.</span></div>
-              </div>
-            </Show>
-            <Show when={card().guestName}>
-              {(guestName) => (
-                <div class="data-row">
-                  <div><strong>Suggested name</strong><span>{guestName()}</span></div>
-                </div>
-              )}
-            </Show>
-          </div>
-        </article>
-        <aside class="data-card">
-          <span class="label">link preview</span>
-          <h3>{title()}</h3>
-          <p>{description()}</p>
-          <div class="data-list data-list--compact">
-            <div class="data-row"><div><strong>Open Graph title</strong><span>{title()}</span></div></div>
-            <div class="data-row"><div><strong>Canonical invite</strong><span>{card().url}</span></div></div>
-            <div class="data-row"><div><strong>App handoff</strong><span>{appHref()}</span></div></div>
-          </div>
-        </aside>
-      </section>
-      <section class="r-wrap r-section invite-runway" aria-labelledby="invite-runway-heading">
-        <span class="r-eyebrow">first run</span>
-        <h2 class="r-title" id="invite-runway-heading">What Onyx keeps from this link</h2>
-        <div class="invite-runway__grid" role="list">
-          <div role="listitem"><strong>Room</strong><span>{card().channel ?? 'Home directory'}</span></div>
-          <div role="listitem"><strong>Moment</strong><span>{card().at ? formatMoment(card().at!) : 'Latest activity'}</span></div>
-          <div role="listitem"><strong>Topic</strong><span>{card().topic ?? 'Whole room'}</span></div>
-          <div role="listitem"><strong>Projection</strong><span>{card().readerMode ? 'Reader mode' : 'Standard mode'}</span></div>
-          <div role="listitem"><strong>Identity</strong><span>{card().guestName ?? 'Choose guest or account'}</span></div>
-          <div role="listitem"><strong>After claim</strong><span>Same room path, saved identity, local memory.</span></div>
-        </div>
       </section>
       </div>
     </PublicFrame>

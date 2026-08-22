@@ -36,6 +36,7 @@ export type HomeBriefingViewProps = {
   recaps: () => readonly HomeCatchUpRecap[];
   more: () => HomeMoreActivityView;
   showFirstRoomPrompt: () => boolean;
+  showInviteFriends: () => boolean;
   isJoined: (name: string) => boolean;
   caughtUpPlan: () => CaughtUpPlan;
   actions: HomeBriefingActions;
@@ -399,6 +400,15 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
             >
               Browse rooms
             </button>
+            <Show when={props.showInviteFriends()}>
+              <button
+                type="button"
+                class="home-action home-action--supporting"
+                onClick={() => props.actions.openInviteFriends()}
+              >
+                Invite friends
+              </button>
+            </Show>
             <button
               type="button"
               class="home-action home-action--supporting"
@@ -860,7 +870,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
               <p class="home-first-room__title">Start with a room.</p>
               <p class="home-first-room__copy">
                 Rooms hold your conversation, files, and calls in one place.
-                Browse what is open now, or join one by name.
+                Browse what is open now, or invite friends with a link.
               </p>
             </div>
           </Show>

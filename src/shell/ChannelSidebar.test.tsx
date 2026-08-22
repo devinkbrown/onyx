@@ -657,6 +657,7 @@ describe('ChannelSidebar accessibility', () => {
     ));
 
     expect(getByText('No rooms yet. Browse rooms to join one.')).toBeInTheDocument();
+    expect(getByTestId('sidebar-invite-friends')).toHaveTextContent('Invite friends');
     fireEvent.click(getByTestId('sidebar-browse-rooms'));
     expect(store.getState().showChannelBrowser).toBe(true);
   });

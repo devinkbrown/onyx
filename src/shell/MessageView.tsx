@@ -69,6 +69,7 @@ import { formatWebhookNoticeBody } from '@/lib/integrations/webhookBlockKit';
 import { MessageText } from '@/shell/message/MessageText';
 import { MessageMenu } from '@/shell/message/MessageMenu';
 import { activeMessageSearchResultId, openMessageSearchWithQuery } from './search/useMessageSearch';
+import { openRoomInviteShare } from './roomInviteShareState';
 import { TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';
@@ -1927,11 +1928,17 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                   <Show when={activeView().kind === 'channel'}>
                     <p class="shell-feed-empty-title">Still waters here</p>
                     <p class="shell-feed-empty-body">
-                      Say the first thing in {activeTarget()}, or try
-                      {' '}<kbd class="shell-feed-empty-kbd">/search</kbd>,
-                      {' '}<kbd class="shell-feed-empty-kbd">/share</kbd>,
-                      or <kbd class="shell-feed-empty-kbd">/export</kbd>.
+                      Say the first thing in {activeTarget()}, or invite a friend
+                      with a link.
                     </p>
+                    <button
+                      type="button"
+                      class="shell-sidebar-browse"
+                      data-testid="feed-empty-invite"
+                      onClick={() => openRoomInviteShare(activeTarget())}
+                    >
+                      Invite friends
+                    </button>
                     <Show
                       when={
                         activeView().kind === 'channel'
