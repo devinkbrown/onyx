@@ -155,8 +155,8 @@
 .r-hero-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: clamp(28px, 5vw, 72px); align-items: center; }
 @media (max-width: 900px) { .r-hero-grid { grid-template-columns: 1fr; } .r-hero-art { order: -1; } }
 .r-hero-art { display: flex; justify-content: center; align-items: center; filter: drop-shadow(0 24px 60px color-mix(in oklab, var(--lapis) 26%, transparent)); }
-.r-kicker { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--lapis-bright); }
-.r-kicker::before { content: '~ '; color: var(--paper-mute); }
+.r-kicker { font-family: var(--font-sans); font-size: var(--text-sm); letter-spacing: 0.01em; text-transform: none; color: var(--paper-dim); }
+.r-kicker::before { content: none; }
 .r-hero h1 { margin: 24px 0 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(3rem, 0.6rem + 10vw, 8.5rem); line-height: 0.86; letter-spacing: -0.01em; text-transform: uppercase; color: var(--paper); text-wrap: balance; }
 .r-hero h1 .gold,
 .gold {

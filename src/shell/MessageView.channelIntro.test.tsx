@@ -78,6 +78,9 @@ describe('MessageView empty room and channel intro', () => {
 
     expect(screen.getByTestId('channel-intro').querySelector('.shell-channel-intro-title')?.textContent).toBe('#general');
     expect(screen.getByTestId('channel-intro').querySelectorAll('p')).toHaveLength(1);
+    expect(screen.getByTestId('channel-intro')).toHaveTextContent(
+      'This is the very beginning of the conversation.',
+    );
     expect(screen.queryByTestId('channel-intro-ledger')).toBeNull();
     expect(screen.queryByRole('link', { name: /Room ledger/i })).toBeNull();
   });
@@ -147,8 +150,9 @@ describe('MessageView empty room and channel intro', () => {
     render(() => <MessageView />);
 
     await waitFor(() => {
-      expect(screen.queryByTestId('channel-intro')).toBeNull();
+      expect(screen.getByTestId('feed-empty')).toBeTruthy();
     });
+    expect(screen.queryByTestId('channel-intro')).toBeNull();
     expect(screen.queryByTestId('channel-intro-ledger')).toBeNull();
     expect(screen.queryByRole('link', { name: /Room ledger/i })).toBeNull();
     expect(screen.getByTestId('feed-empty')).toHaveTextContent('A private conversation');
@@ -156,6 +160,7 @@ describe('MessageView empty room and channel intro', () => {
       'Only the two of you can read these messages. They stay on this device.',
     );
     expect(screen.getByTestId('feed-empty')).not.toHaveTextContent(/fully encrypted|cloud sync|TOFU|🔒/i);
+    expect(screen.getByTestId('feed-empty')).not.toHaveTextContent('/search');
   });
 
   it('asks a first-hour guest to say hi instead of showing slash commands', async () => {

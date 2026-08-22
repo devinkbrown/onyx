@@ -1290,9 +1290,9 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
             role="note"
             aria-label={`Room current: ${roomCurrent().label}, ${roomCurrent().detail}`}
           >
-            <span class="shell-room-current__kicker">Room current</span>
-            <span class="shell-room-current__label">{roomCurrent().label}</span>
-            <span class="shell-room-current__detail">{roomCurrent().detail}</span>
+            <span class="shell-room-current__kicker sr-only">Room current</span>
+            <span class="shell-room-current__label sr-only">{roomCurrent().label}</span>
+            <span class="shell-room-current__detail sr-only">{roomCurrent().detail}</span>
             <button
               ref={(element) => { contextTriggerRef = element; }}
               type="button"

@@ -58,8 +58,8 @@
 
 .r-landing.home a:focus-visible,
 .r-landing.home button:focus-visible {
-  outline: var(--focus-ring, 2px solid var(--mn-signal));
-  outline-offset: var(--focus-offset, 3px);
+  outline: var(--focus-ring, 1px solid var(--mn-signal));
+  outline-offset: var(--focus-offset, -1px);
 }
 
 .r-landing.home .r-wrap { max-width: 1100px; }
@@ -82,10 +82,10 @@
 
 .r-landing.home .home-kicker {
   margin: 0 0 14px;
-  font-family: var(--mn-mono);
-  font-size: var(--text-xs, 0.6875rem);
-  letter-spacing: var(--tracking-kicker, 0.12em);
-  text-transform: uppercase;
+  font-family: var(--mn-sans);
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: color-mix(in oklab, var(--mn-mute) 82%, var(--mn-signal));
 }
 
@@ -124,7 +124,7 @@
   align-items: center;
   min-height: var(--target-min, 44px);
   font-family: var(--mn-sans);
-  font-size: var(--text-md, 0.9375rem);
+  font-size: var(--text-md, 1rem);
   color: var(--mn-mute);
   text-decoration: underline;
   text-decoration-color: color-mix(in oklab, var(--mn-signal) 42%, transparent);
@@ -148,13 +148,13 @@
   border-radius: 2px;
   background: var(--mn-signal);
   color: var(--mn-on-signal);
-  font: 750 var(--text-md, .9375rem)/1 var(--mn-sans);
+  font: 750 var(--text-md, 1rem)/1 var(--mn-sans);
   text-decoration: none;
 }
 .r-landing.home .home-cta-primary:hover { background: color-mix(in oklab, var(--mn-signal) 78%, white); }
 .r-landing.home .product-preview { min-width: 0; padding: clamp(16px, 2.5vw, 24px); border: 1px solid var(--mn-edge); border-radius: 2px; background: var(--mn-face); box-shadow: none; }
 .r-landing.home .product-preview__head h2, .r-landing.home .product-preview__head p { margin: 0; }
-.r-landing.home .product-preview__eyebrow { color: var(--mn-signal); font: 700 var(--text-2xs)/1 var(--mn-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+.r-landing.home .product-preview__eyebrow { color: var(--mn-signal); font: 650 var(--text-sm)/1 var(--mn-sans); letter-spacing: 0.01em; text-transform: none; }
 .r-landing.home .product-preview__head h2 { margin-top: 8px; color: var(--mn-text); font: 650 clamp(1.1rem, 2vw, 1.35rem)/1.2 var(--mn-sans); }
 .r-landing.home .product-preview__head p:not(.product-preview__eyebrow) { margin-top: 8px; color: var(--mn-mute); font-size: var(--text-sm); line-height: 1.45; }
 .r-landing.home .product-preview__tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 18px; padding: 4px; border: 1px solid var(--mn-edge); border-radius: 4px; background: var(--mn-void); }
@@ -558,7 +558,7 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--target-min, 44px);
-  font-size: var(--text-md, 0.9375rem);
+  font-size: var(--text-md, 1rem);
   color: color-mix(in oklab, var(--mn-text) 80%, var(--mn-mute));
   text-decoration: none;
   border-bottom: 1px solid transparent;

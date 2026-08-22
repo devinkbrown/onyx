@@ -296,7 +296,7 @@ export default function StatsRoute() {
       mainLabel="Onyx network stats"
       context={(
         <p class="public-frame__current-line">
-          <span class="public-frame__current-kicker">Signal</span>
+          <span class="public-frame__current-kicker">Rooms</span>
           <span aria-hidden="true">·</span>
           <span class="public-frame__current-label">Stats</span>
         </p>
@@ -315,7 +315,7 @@ export default function StatsRoute() {
         <div class="r-grain" aria-hidden="true" />
 
         <section class="r-wrap data-hero stats-hero" aria-labelledby="stats-heading">
-        <p class="r-kicker">public network · room activity</p>
+        <p class="r-kicker">Rooms</p>
         <h1 id="stats-heading">The rooms <br /><span class="stats-title-accent">in motion</span></h1>
         <p class="sub">
           See where people are talking, follow the network’s rhythm, and step
@@ -345,7 +345,7 @@ export default function StatsRoute() {
             <>
               <div class="stats-ledger" aria-label="Live feed ledger">
                 <span class="stats-ledger-mark" data-state={feedState()} aria-hidden="true" />
-                <p><strong>{data().network || 'Onyx'} activity ledger</strong> · {feedLedgerPhrase(feedState())} · {data().node || 'network export'} · updated {relTime(data().generated_at, nowMs())}</p>
+                <p><strong>{data().network || 'Onyx'} activity</strong> · {feedLedgerPhrase(feedState())} · {data().node || 'network export'} · updated {relTime(data().generated_at, nowMs())}</p>
                 <button
                   type="button"
                   class="stats-refresh"

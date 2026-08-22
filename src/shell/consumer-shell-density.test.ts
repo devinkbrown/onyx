@@ -28,9 +28,9 @@ describe('Consumer shell density', () => {
     expect(rule(shellCss, '.shell-channel-item')).toMatch(/min-height:\s*44px/);
     expect(rule(shellCss, '.shell-channel-item')).toMatch(/contain-intrinsic-size:\s*auto 44px/);
     expect(rule(shellCss, '.shell-ribbon')).toMatch(/height:\s*56px/);
-    expect(rule(shellCss, '.shell-rail-entry')).toMatch(/min-height:\s*40px/);
-    expect(rule(shellCss, '.shell-composer-tool')).toMatch(/min-height:\s*40px/);
-    expect(rule(shellCss, '.shell-composer-send')).toMatch(/min-height:\s*40px/);
+    expect(rule(shellCss, '.shell-rail-entry')).toMatch(/min-height:\s*var\(--target-min, 44px\)/);
+    expect(rule(shellCss, '.shell-composer-tool')).toMatch(/min-height:\s*var\(--target-min, 44px\)/);
+    expect(rule(shellCss, '.shell-composer-send')).toMatch(/min-height:\s*var\(--target-min, 44px\)/);
     expect(rule(shellCss, '.shell-sidebar-browse')).toMatch(/min-height:\s*44px/);
   });
 

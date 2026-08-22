@@ -63,9 +63,9 @@
 .shell input:focus-visible,
 .shell textarea:focus-visible,
 .shell-mobile-nav-btn:focus-visible {
-  outline: 2px solid var(--lapis);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--lapis) 22%, transparent);
+  outline: var(--focus-ring, 1px solid var(--lapis));
+  outline-offset: var(--focus-offset, -1px);
+  box-shadow: none;
 }
 
 .sr-only {
@@ -110,7 +110,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 10px 0 12px;
   background: color-mix(in oklab, var(--stone) 42%, var(--ink));
   border-right: 1px solid var(--seam);
@@ -152,10 +152,10 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
+  width: var(--target-min, 44px);
+  height: var(--target-min, 44px);
+  min-width: var(--target-min, 44px);
+  min-height: var(--target-min, 44px);
   border: 1px solid transparent;
   border-radius: var(--r-md);
   cursor: pointer;
@@ -180,9 +180,9 @@
 /* The Appearance link is an <a>, which the global .shell focus rule (button /
    [role=button] / input / textarea) does not cover — give it a focus ring. */
 .shell-rail-entry:focus-visible {
-  outline: 2px solid var(--lapis);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--lapis) 22%, transparent);
+  outline: var(--focus-ring, 1px solid var(--lapis));
+  outline-offset: var(--focus-offset, -1px);
+  box-shadow: none;
 }
 
 .shell-rail-entry--active {
@@ -345,10 +345,10 @@
   grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: var(--target-min, 44px);
   padding: 6px 8px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--paper-dim);
   font: 600 0.82rem/1 var(--font-sans);
@@ -453,8 +453,8 @@
   cursor: pointer;
   color: var(--paper-mute);
   font: 650 0.68rem/1 var(--font-sans);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
   user-select: none;
 }
 
@@ -474,9 +474,9 @@
   border: 1px solid color-mix(in oklab, var(--lapis) 36%, var(--seam-faint));
   background: color-mix(in oklab, var(--lapis-deep) 22%, transparent);
   color: var(--lapis-bright);
-  font: 700 0.58rem/1 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 700 0.58rem/1 var(--font-sans);
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .shell-sidebar-filter-disclosure--active > .shell-sidebar-filter-summary {
@@ -567,10 +567,10 @@
   align-items: center;
   min-height: var(--target-min, 44px);
   padding: 0 2px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--paper-mute);
   text-decoration: none;
   white-space: nowrap;
@@ -641,17 +641,19 @@
 }
 
 .shell-notify-btn {
-  width: 24px;
-  height: 24px;
+  width: var(--target-min, 44px);
+  height: var(--target-min, 44px);
+  min-width: var(--target-min, 44px);
+  min-height: var(--target-min, 44px);
   display: grid;
   place-items: center;
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   background: color-mix(in oklab, var(--ink) 64%, transparent);
   color: var(--paper-mute);
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 800;
   transition:
     color var(--dur) var(--ease),
@@ -787,7 +789,7 @@
 
 .shell-notify-quiet-select {
   width: 100%;
-  height: 34px;
+  height: var(--target-min, 44px);
   padding: 0 7px;
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
@@ -952,12 +954,12 @@
 
 .shell-channel-star {
   flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
+  width: var(--target-min, 44px);
+  height: var(--target-min, 44px);
+  min-width: var(--target-min, 44px);
+  min-height: var(--target-min, 44px);
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--paper-mute);
   cursor: pointer;
@@ -1001,7 +1003,7 @@
   contain-intrinsic-size: auto 44px;
   min-height: 44px;
   padding: 8px 10px;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   border: 1px solid transparent;
   cursor: pointer;
   font-size: 0.84rem;
@@ -1053,7 +1055,7 @@
 }
 
 .shell-channel-item--unread:not(.shell-channel-item--active) .shell-channel-sigil {
-  color: var(--lapis);
+  color: var(--paper);
 }
 
 /* A mention/highlight badge glows bioluminescent azure — it is a call to you,
@@ -1353,10 +1355,10 @@
 }
 .shell-room-current__kicker {
   flex: 0 0 auto;
-  color: var(--lapis-bright);
-  font-size: 0.6rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  color: var(--paper-mute);
+  font-size: inherit;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .shell-room-current__label {
   min-width: 0;
@@ -1389,20 +1391,20 @@
   }
 
   ::view-transition-old(onyx-conversation) {
-    animation: onyx-conversation-out 140ms ease-in both;
+    animation: onyx-conversation-out var(--dur-fast, 160ms) ease-in both;
   }
 
   ::view-transition-new(onyx-conversation) {
-    animation: onyx-conversation-in 180ms ease-out both;
+    animation: onyx-conversation-in var(--dur-base, 220ms) ease-out both;
   }
 }
 
 @keyframes onyx-conversation-out {
-  to { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 0; }
 }
 
 @keyframes onyx-conversation-in {
-  from { opacity: 0; transform: translateX(6px); }
+  from { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2002,7 +2004,6 @@
 .shell-ribbon-event-chip:hover {
   border-color: color-mix(in oklab, var(--gold-bright) 70%, var(--line));
   background: color-mix(in oklab, var(--gold) 18%, var(--stone) 54%);
-  transform: translate3d(0, -1px, 0);
 }
 
 .shell-ribbon-event-chip:focus-visible {
@@ -2077,7 +2078,6 @@
   border-color: color-mix(in oklab, var(--lapis) 55%, var(--line));
   background: color-mix(in oklab, var(--lapis) 18%, var(--stone) 54%);
   color: var(--paper);
-  transform: translate3d(0, -1px, 0);
 }
 
 .shell-ribbon-voice-chip--active {
@@ -2115,26 +2115,25 @@
   margin-inline: 2px;
 }
 
-/* Unified icon-button base — Call/People/More primary targets ≥40×40 desktop. */
+/* Unified icon-button base — Call/People/More primary targets ≥44×44. */
 .shell-ribbon-iconbtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
+  height: var(--target-min, 44px);
+  min-width: var(--target-min, 44px);
+  min-height: var(--target-min, 44px);
   padding: 0;
   color: var(--paper-dim);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   cursor: pointer;
   transition:
     color var(--dur) var(--ease),
     border-color var(--dur) var(--ease),
-    background var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+    background var(--dur) var(--ease);
 }
 
 .shell-ribbon-iconbtn:hover {
@@ -2144,8 +2143,8 @@
 }
 
 .shell-ribbon-iconbtn:focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 2px;
+  outline: var(--focus-ring, 1px solid var(--lapis));
+  outline-offset: var(--focus-offset, -1px);
 }
 
 .shell-ribbon-ico {
@@ -2386,8 +2385,8 @@
 }
 
 .shell-ribbon-account:focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 2px;
+  outline: var(--focus-ring, 1px solid var(--lapis));
+  outline-offset: var(--focus-offset, -1px);
 }
 
 .shell-ribbon-account-text {
@@ -2398,11 +2397,11 @@
 }
 
 .shell-ribbon-account-name {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--lapis-bright);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--paper);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2429,8 +2428,8 @@
   background: color-mix(in oklab, var(--stone) 18%, transparent);
   font-family: var(--font-mono);
   font-size: 0.62rem;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
   color: var(--paper-mute);
   flex: none;
   min-width: 10px;
@@ -2905,27 +2904,26 @@
   border-color: var(--gold-bright);
 }
 
-/* On phones the Appearance sheet fills the viewport. An opaque sheet made
-   every successful wallpaper selection look broken because the live renderer
-   was completely hidden behind it. Keep enough glass for the chosen scene to
-   remain unmistakably visible while preserving text contrast. */
+/* On phones the Appearance sheet fills the viewport. Stay matte — no glass.
+   A slightly open ink wash lets the chosen scene remain visible without a
+   backdrop-filter bloom. */
 @media (max-width: 42rem) {
   .onyx-sheet:has(.ap-panel) .onyx-sheet__backdrop {
-    background: color-mix(in oklab, var(--ink) 38%, transparent);
+    background: color-mix(in oklab, var(--ink) 62%, transparent);
   }
 
   .onyx-sheet:has(.ap-panel) .onyx-sheet__panel {
-    background: color-mix(in oklab, var(--stone) 76%, transparent);
-    backdrop-filter: blur(14px) saturate(1.08);
-    -webkit-backdrop-filter: blur(14px) saturate(1.08);
+    background: var(--stone);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .onyx-sheet:has(.ap-panel) .onyx-sheet__header {
-    background: color-mix(in oklab, var(--stone-2) 66%, transparent);
+    background: var(--stone-2);
   }
 
   .onyx-sheet:has(.ap-panel) .onyx-sheet__body {
-    background: color-mix(in oklab, var(--ink) 12%, transparent);
+    background: var(--ink);
   }
 }
 
@@ -3336,11 +3334,11 @@
 }
 .shell-conversation-brief-kicker {
   flex: none;
-  color: var(--lapis-bright);
-  font-size: 0.57rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  color: var(--paper-mute);
+  font-size: inherit;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .shell-conversation-brief-target,
 .shell-conversation-brief-topic {
@@ -3587,6 +3585,11 @@
   .shell-topic-card-follow {
     min-height: 44px;
   }
+
+  .shell-msg-text {
+    font-size: var(--text-lg);
+    line-height: var(--leading-body);
+  }
 }
 
 @media (forced-colors: active) {
@@ -3638,15 +3641,16 @@
   margin: 0;
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   letter-spacing: 0.01em;
   color: var(--paper);
 }
 
 .shell-feed-empty-body {
   margin: 0;
-  font-size: 0.88rem;
-  color: var(--paper-mute);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+  color: var(--paper-dim);
   max-width: 24rem;
 }
 
@@ -3776,8 +3780,8 @@
   display: grid;
   grid-template-columns: 40px 1fr;
   gap: 0 var(--space-3);
-  padding: 10px var(--space-5) 4px;
-  margin-top: 6px;
+  padding: var(--space-2) var(--space-5) var(--space-1);
+  margin-top: var(--space-4);
   max-width: var(--shell-measure);
   margin-inline: auto;
   border-radius: var(--r-sm);
@@ -3796,8 +3800,8 @@
 
 .shell-msg-group:focus-visible,
 .shell-msg-cont:focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 2px;
+  outline: var(--focus-ring, 1px solid var(--lapis));
+  outline-offset: var(--focus-offset, -1px);
 }
 
 .shell-msg-group--system {
@@ -3835,16 +3839,11 @@
   transition: color var(--dur) var(--ease);
 }
 
-.shell-msg-group:hover .shell-msg-author,
-.shell-msg-group:focus-visible .shell-msg-author {
-  color: var(--lapis-bright);
-}
-
 .shell-msg-ts {
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  color: var(--paper-mute);
-  letter-spacing: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--paper-dim);
+  letter-spacing: 0.04em;
   flex: none;
   opacity: 0.85;
 }
@@ -3863,9 +3862,9 @@
   padding: 0;
   margin: 0;
   cursor: pointer;
-  color: var(--paper-mute);
+  color: var(--paper-dim);
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: var(--text-2xs);
   letter-spacing: 0.04em;
   text-decoration: underline dotted;
   text-underline-offset: 0.15em;
@@ -3933,9 +3932,8 @@
 }
 
 .shell-msg-text {
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  line-height: 1.5;
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
   color: var(--paper);
   word-break: break-word;
   overflow-wrap: break-word;
@@ -4001,7 +3999,7 @@
   display: grid;
   grid-template-columns: 40px 1fr;
   gap: 0 var(--space-3);
-  padding: 3px var(--space-5);
+  padding: 2px var(--space-5);
   max-width: var(--shell-measure);
   margin-inline: auto;
   border-radius: var(--r-sm);
@@ -4014,10 +4012,10 @@
 .shell-msg-cont-ts {
   grid-column: 1;
   align-self: center;
-  font-family: var(--font-sans);
-  font-size: 0.6875rem;
-  color: var(--paper-mute);
-  letter-spacing: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--paper-dim);
+  letter-spacing: 0.04em;
   text-align: right;
   padding-right: 2px;
   opacity: 0;
@@ -5200,8 +5198,8 @@
 .shell-typing-dots span:nth-child(3) { animation-delay: 0.32s; }
 
 @keyframes shell-typing-bounce {
-  0%, 80%, 100% { opacity: 0.35; transform: translateY(0); }
-  40% { opacity: 1; transform: translateY(-2px); }
+  0%, 80%, 100% { opacity: 0.35; }
+  40% { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5218,7 +5216,7 @@
   padding: 4px;
   background: color-mix(in oklab, var(--ink) 82%, var(--stone-2));
   border: 1px solid var(--seam);
-  border-radius: var(--r-lg);
+  border-radius: var(--composer-radius, var(--r-lg));
   box-shadow: none;
   transition:
     border-color var(--dur) var(--ease),
@@ -5238,8 +5236,8 @@
 }
 
 .shell-composer-textarea {
-  --composer-field-height: 42px;
-  --composer-line-box: 1.52em;
+  --composer-field-height: var(--target-min, 44px);
+  --composer-line-box: 1.5em;
   --composer-max-lines: 5;
   flex: 1 1 auto;
   min-width: 0;
@@ -5262,7 +5260,7 @@
   -webkit-appearance: none;
   resize: none;
   font-family: var(--font-sans);
-  font-size: 0.91rem;
+  font-size: var(--text-md);
   line-height: var(--composer-line-box);
   color: var(--paper);
   background: transparent;
@@ -5275,11 +5273,11 @@
 
 .shell-composer-tool {
   flex: none;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
-  margin-bottom: 0;
+  width: var(--target-min, 44px);
+  height: var(--target-min, 44px);
+  min-width: var(--target-min, 44px);
+  min-height: var(--target-min, 44px);
+  margin-bottom: 2px;
   display: grid;
   place-items: center;
   border: 1px solid transparent;
@@ -5432,10 +5430,10 @@
 
 .shell-composer-send {
   flex: none;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
+  width: var(--target-min, 44px);
+  height: var(--target-min, 44px);
+  min-width: var(--target-min, 44px);
+  min-height: var(--target-min, 44px);
   margin: 0 1px 1px 0;
   display: grid;
   place-items: center;
@@ -5446,16 +5444,16 @@
   background: color-mix(in oklab, var(--lapis-deep) 22%, transparent);
   font-size: 1rem;
   transition:
-    color var(--dur) var(--ease),
-    border-color var(--dur) var(--ease),
-    background var(--dur) var(--ease),
-    box-shadow var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+    color var(--dur-fast, 160ms) var(--ease),
+    border-color var(--dur-fast, 160ms) var(--ease),
+    background var(--dur-fast, 160ms) var(--ease),
+    box-shadow var(--dur-fast, 160ms) var(--ease),
+    transform var(--dur-micro, 100ms) var(--ease);
 }
 
 .shell-composer-send:focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 2px;
+  outline: var(--focus-ring, 1px solid var(--lapis));
+  outline-offset: var(--focus-offset, -1px);
 }
 
 /* Armed: there is text to send. Fills with current, glows, invites the tap. */
@@ -6794,7 +6792,7 @@
   }
   .shell-composer-inner {
     gap: 4px;
-    border-radius: var(--r-md);
+    border-radius: var(--composer-radius, var(--r-lg));
     padding: 3px;
     border: 1px solid var(--seam);
     background: color-mix(in oklab, var(--stone-2) 42%, transparent);
@@ -7151,8 +7149,9 @@
 
   .shell-msg-ts,
   .shell-msg-cont-ts {
-    font-size: 0.6875rem;
-    letter-spacing: 0;
+    font-size: var(--text-2xs);
+    letter-spacing: 0.03em;
+    color: var(--paper-dim);
   }
 
   .shell-msg-cont-ts {
@@ -7162,8 +7161,8 @@
   }
 
   .shell-msg-text {
-    font-size: 0.95rem;
-    line-height: 1.5;
+    font-size: var(--text-lg);
+    line-height: var(--leading-body);
   }
 
   .shell-msg-actions,
@@ -7734,9 +7733,9 @@
   }
 
   .shell-notify-btn {
-    width: 44px;
-    height: 44px;
-    font-size: 24px;
+    width: var(--target-min, 44px);
+    height: var(--target-min, 44px);
+    font-size: 0.75rem;
   }
 
   .shell-notify-quiet-select {
@@ -8847,7 +8846,7 @@
   font-family: var(--font-display);
   font-size: 1.6rem;
   color: var(--lapis-bright);
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   background: color-mix(in oklab, var(--stone-2) 80%, transparent);
   border: 1px solid color-mix(in oklab, var(--lapis) 30%, var(--line));
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-deep) 16%, transparent);
@@ -8981,16 +8980,16 @@
 }
 .shell-ribbon-present {
   color: var(--paper-mute, inherit);
-  font: 650 0.68rem/1 var(--font-mono, ui-monospace, monospace);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font: 650 0.75rem/1 var(--font-sans);
+  letter-spacing: 0.01em;
+  text-transform: none;
   white-space: nowrap;
 }
 .shell-ribbon-stats {
   color: var(--paper-dim, inherit);
-  font: 650 0.68rem/1 var(--font-mono, ui-monospace, monospace);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font: 650 0.75rem/1 var(--font-sans);
+  letter-spacing: 0.01em;
+  text-transform: none;
   text-decoration: none;
 }
 .shell-ribbon-stats:hover,

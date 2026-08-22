@@ -97,10 +97,10 @@
 .onyx-modal__close:focus-visible,
 .onyx-toast button:focus-visible,
 .onyx-tabs__trigger:focus-visible {
-  border-color: var(--lapis-bright);
-  box-shadow:
-    0 0 0 1px var(--ink),
-    0 0 0 3px color-mix(in oklab, var(--lapis-bright) 68%, transparent);
+  border-color: var(--lapis);
+  outline: var(--focus-ring, 1px solid var(--lapis));
+  outline-offset: var(--focus-offset, -1px);
+  box-shadow: none;
 }
 
 .onyx-button:disabled,
@@ -721,10 +721,8 @@
   background: var(--onyx-avatar-bg);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-pill);
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--ink) 64%, transparent) inset,
-    0 8px 18px -16px var(--lapis-bright);
-  font-family: var(--font-mono);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ink) 64%, transparent);
+  font-family: var(--font-sans);
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
