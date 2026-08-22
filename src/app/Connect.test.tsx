@@ -148,6 +148,14 @@ describe('Connect screen rendering', () => {
     );
   });
 
+  it('has no Add to Home Screen or install CTA on first-run Connect', () => {
+    render(() => <Connect />);
+    expect(visibleCopy()).not.toMatch(/add to home screen|install the app|install onyx|beforeinstallprompt/i);
+    expect(screen.queryByTestId('a2hs-sheet')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('a2hs-add')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add to home screen|install/i })).not.toBeInTheDocument();
+  });
+
   it('aborts its latency selection when the connect screen unmounts', async () => {
     let selectionSignal: AbortSignal | undefined;
     vi.mocked(selectBestNode).mockImplementationOnce((_nodes, options) => {

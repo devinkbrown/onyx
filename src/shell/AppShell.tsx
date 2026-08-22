@@ -32,6 +32,7 @@ import './voice/voice.css';
 
 import { lazy, createEffect, createMemo, createSignal, ErrorBoundary, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, Suspense, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
+import { AddToHomeScreenSheet } from '@/pwa/AddToHomeScreenSheet';
 import { useThemeOptional } from '@/theme';
 import { Background } from '@/backgrounds/index';
 import { resolveBackgroundId } from './themeBackground';
@@ -1343,6 +1344,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                 <DmSafetySheet hideTrigger />
                 <GuestClaimPrompt />
                 <FirstRunNotifyPrompt />
+                <AddToHomeScreenSheet />
                 <DmKeyChangeBanner />
                 <Show when={preferences().timeScrubber && !inCall()}>
                   <TimeScrubber />
