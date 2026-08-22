@@ -29,12 +29,28 @@ const card = (container: HTMLElement, label: string) => {
   return item;
 };
 
+function openAppearanceAdvanced(container: HTMLElement): void {
+  const summary = container.querySelector<HTMLElement>('[data-testid="appearance-advanced"] > summary');
+  if (!summary) throw new Error('Missing Advanced disclosure');
+  fireEvent.click(summary);
+}
+
 describe('Appearance', () => {
   beforeEach(() => { vi.useFakeTimers(); getState().setBackground('obsidian'); });
   afterEach(() => { cleanup(); resetSceneMotion(); vi.useRealTimers(); });
 
+  it('shows consumer looks instead of Theme Studio on the default path', () => {
+    const { getByRole, queryByRole, getByTestId } = renderAppearance();
+    expect(getByRole('heading', { name: 'Appearance' })).toBeInTheDocument();
+    expect(getByRole('radio', { name: 'Ocean · Dark look' })).toBeInTheDocument();
+    expect(getByRole('radio', { name: 'Pearl · Light look' })).toBeInTheDocument();
+    expect(getByTestId('appearance-advanced')).not.toHaveAttribute('open');
+    expect(queryByRole('heading', { name: 'Theme Studio' })).toBeNull();
+  });
+
   it('keeps all background choices staged until Apply', () => {
     const { container, getByRole } = renderAppearance();
+    openAppearanceAdvanced(container);
     fireEvent.click(card(container, 'Gold Veins'));
     expect(getState().backgroundId).toBe('obsidian');
     expect(getByRole('button', { name: 'Apply background' })).not.toBeDisabled();
@@ -44,6 +60,7 @@ describe('Appearance', () => {
 
   it('cancels a staged background with Escape', () => {
     const { container } = renderAppearance();
+    openAppearanceAdvanced(container);
     fireEvent.click(card(container, 'Starfield'));
     fireEvent.keyDown(container.querySelector('.ap')!, { key: 'Escape' });
     expect(card(container, 'Obsidian')).toHaveAttribute('aria-checked', 'true');
@@ -52,6 +69,7 @@ describe('Appearance', () => {
 
   it('previews hover only after the 160ms intent delay without persisting', () => {
     const { container, getByTestId } = renderAppearance();
+    openAppearanceAdvanced(container);
     fireEvent.pointerEnter(card(container, 'Phoenix'), { pointerType: 'mouse' });
     vi.advanceTimersByTime(BACKGROUND_PREVIEW_DELAY_MS - 1);
     expect(getByTestId('background-preview')).toHaveAttribute('data-background-id', 'obsidian');
@@ -63,6 +81,7 @@ describe('Appearance', () => {
   it('previews a still frame from Motion Off without changing it before Apply', () => {
     setSceneMotion('off');
     const { container, getByTestId, getByRole } = renderAppearance();
+    openAppearanceAdvanced(container);
     expect(getByTestId('background-preview')).not.toHaveAttribute('data-motion-override');
 
     fireEvent.pointerEnter(card(container, 'Phoenix'), { pointerType: 'mouse' });
@@ -77,6 +96,7 @@ describe('Appearance', () => {
   it('keeps Motion Off after applying a staged wallpaper', () => {
     setSceneMotion('off');
     const { container, getByRole } = renderAppearance();
+    openAppearanceAdvanced(container);
     fireEvent.click(card(container, 'Phoenix'));
     fireEvent.click(getByRole('button', { name: 'Apply background' }));
     expect(localStorage.getItem('onyx:scene-motion')).toBe('off');
@@ -84,13 +104,15 @@ describe('Appearance', () => {
   });
 
   it('presents all five picker groups with radio semantics', () => {
-    const { getByRole, getAllByRole } = renderAppearance();
+    const { container, getByRole, getAllByRole } = renderAppearance();
+    openAppearanceAdvanced(container);
     for (const label of ['Match my theme', 'Living ambient', 'Quiet stills', 'Featured scenes', 'More presets']) expect(getByRole('heading', { name: label })).toBeInTheDocument();
     expect(getAllByRole('radio').length).toBeGreaterThan(20);
   });
 
   it('uses arrow keys to select and focus the next background radio', () => {
     const { container } = renderAppearance();
+    openAppearanceAdvanced(container);
     const obsidian = card(container, 'Obsidian');
     obsidian.focus();
     fireEvent.keyDown(obsidian, { key: 'ArrowRight' });
@@ -103,6 +125,7 @@ describe('Appearance', () => {
 
   it('clears an aborted touch gesture before keyboard preview', () => {
     const { container, getByTestId } = renderAppearance();
+    openAppearanceAdvanced(container);
     const phoenix = card(container, 'Phoenix');
     fireEvent.pointerDown(phoenix, { pointerType: 'touch' });
     fireEvent.pointerCancel(phoenix, { pointerType: 'touch' });

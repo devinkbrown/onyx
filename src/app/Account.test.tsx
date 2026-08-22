@@ -56,6 +56,10 @@ function renderPanel(opts?: { account?: string | null }) {
   return { client, ...result };
 }
 
+function openYouAdvanced(): void {
+  fireEvent.click(screen.getByTestId('you-advanced').querySelector('summary')!);
+}
+
 beforeEach(() => {
   store.setState(initialState, true);
   resetGuestClaimSheetState();
@@ -178,6 +182,7 @@ describe('Account panel — signed in', () => {
     const [open, setOpen] = createSignal(true);
     store.setState({ client: client as never, server: seedServer('alice') });
     render(() => <AccountPanel open={open()} onOpenChange={setOpen} />);
+    openYouAdvanced();
 
     fireEvent.input(screen.getByLabelText(/confirm email change/i), {
       target: { value: 'alice-password' },
@@ -212,6 +217,7 @@ describe('Account panel — signed in', () => {
     });
     renderPanel({ account: 'alice' });
     expect(screen.getByLabelText('Email address')).toHaveValue('alice@example.net');
+    openYouAdvanced();
 
     fireEvent.input(screen.getByLabelText(/account password \(to change protection\)/i), {
       target: { value: 'alice-password' },
@@ -243,6 +249,7 @@ describe('Account panel — signed in', () => {
 
   it('clears account secrets when the same account name moves to another server', async () => {
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
     fireEvent.input(screen.getByLabelText(/account password \(to change protection\)/i), {
       target: { value: 'first-server-password' },
     });
@@ -338,12 +345,13 @@ describe('Account panel — signed in', () => {
     expect(screen.getByRole('region', { name: 'Account summary' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Email' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Password' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('you-advanced').querySelector('summary')!);
     expect(screen.getByRole('region', { name: 'Protection' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Device encryption keys' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Delete account' })).toBeInTheDocument();
   });
 
-  it('exposes a You workspace rail into Appearance', async () => {
+  it('exposes a You settings list into Appearance', async () => {
     const openAppearance = vi.spyOn(getState(), 'openAppearance');
     const closeSpy = vi.fn();
     store.setState({
@@ -352,10 +360,12 @@ describe('Account panel — signed in', () => {
     });
     render(() => <AccountPanel open={true} onOpenChange={closeSpy} />);
 
-    expect(screen.getByRole('navigation', { name: 'You workspace' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Account' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('navigation', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByTestId('you-settings')).toBeInTheDocument();
     expect(screen.getByTestId('you-advanced')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'You' })).toBeInTheDocument();
+    expect(screen.queryByTestId('theme-studio')).toBeNull();
+    expect(screen.queryByRole('radio', { name: /Vermillion/i })).toBeNull();
 
     fireEvent.click(screen.getByTestId('you-open-appearance'));
     expect(closeSpy).toHaveBeenCalledWith(false);
@@ -377,7 +387,7 @@ describe('Account panel — signed in', () => {
     });
     renderPanel({ account: 'alice' });
     expect(screen.getByText('alice@example.net')).toBeInTheDocument();
-    expect(screen.getByText('8')).toBeInTheDocument();
+    expect(screen.queryByText('8')).not.toBeInTheDocument();
   });
 
   it('change email dispatches ACCOUNTSET email', () => {
@@ -423,6 +433,7 @@ describe('Account panel — signed in', () => {
     const setSpy = vi.spyOn(getState(), 'accountSet');
     const noteSpy = vi.spyOn(getState(), 'addNotification');
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
 
     const secureSwitch = screen.getByLabelText('Toggle secure');
     // No password yet — flips, but we expect a guidance notification, not a send.
@@ -440,6 +451,7 @@ describe('Account panel — signed in', () => {
   it('recover dispatches RECOVER with the nick', () => {
     const spy = vi.spyOn(getState(), 'recover');
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
 
     fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'alice' } });
     fireEvent.submit(screen.getByRole('form', { name: 'Recover a name' }));
@@ -449,6 +461,7 @@ describe('Account panel — signed in', () => {
   it('bounds an oversized recover-nick paste before dispatch', () => {
     const spy = vi.spyOn(getState(), 'recover');
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
     const input = screen.getByLabelText('Name');
     const expected = 'n'.repeat(64);
 
@@ -464,6 +477,7 @@ describe('Account panel — signed in', () => {
     const addSpy = vi.spyOn(getState(), 'certAdd');
     const listSpy = vi.spyOn(getState(), 'certList');
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
 
     fireEvent.click(screen.getByRole('button', { name: /bind this connection's certificate/i }));
     expect(addSpy).toHaveBeenCalled();
@@ -475,6 +489,7 @@ describe('Account panel — signed in', () => {
     const deleteSpy = vi.spyOn(getState(), 'e2eeKeyDelete');
     const statusSpy = vi.spyOn(getState(), 'keyTransparencyStatus');
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
 
     fireEvent.click(screen.getByRole('button', { name: 'List device keys' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove legacy browser key' }));
@@ -493,6 +508,7 @@ describe('Account panel — signed in', () => {
     vi.spyOn(dmCipher, 'deviceRegistryId').mockResolvedValue('web-stable-device-id');
     const addSpy = vi.spyOn(getState(), 'e2eeKeyAdd');
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
 
     fireEvent.click(screen.getByRole('button', { name: 'Publish this device key' }));
 
@@ -514,6 +530,7 @@ describe('Account panel — signed in', () => {
     const registrySpy = vi.spyOn(dmCipher, 'deviceRegistryId').mockResolvedValue('alice-device-id');
     const addSpy = vi.spyOn(getState(), 'e2eeKeyAdd');
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
 
     const publish = screen.getByRole('button', { name: 'Publish this device key' });
     fireEvent.click(publish);
@@ -533,6 +550,7 @@ describe('Account panel — signed in', () => {
 
   it('surfaces E2EEKEY and KEYTRANS account notices', () => {
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
     store.setState({
       serviceNotices: [
         { source: 'Account', text: 'E2EEKEY STATUS account=alice devices=1', time: new Date() },
@@ -554,6 +572,7 @@ describe('Account panel — signed in', () => {
 
   it('labels persona actions with the persona name', () => {
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
     store.setState({
       personas: [{ name: 'poet', host: 'poets.society/alice', source: 'grant' }],
     });
@@ -564,6 +583,7 @@ describe('Account panel — signed in', () => {
   it('bounds an oversized persona-host paste before dispatch', () => {
     const spy = vi.spyOn(getState(), 'vhostClaim');
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
     store.setState({
       personaOffers: [{ template: 'poets.society/*', label: 'Poets' }],
     });
@@ -595,6 +615,7 @@ describe('Account panel — guarded deletion (DROP)', () => {
   it('requires arming + typed confirmation + password before DROP', () => {
     const spy = vi.spyOn(getState(), 'dropAccount');
     renderPanel({ account: 'alice' });
+    openYouAdvanced();
 
     // Arm the danger zone.
     fireEvent.click(screen.getByTestId('account-drop-arm'));

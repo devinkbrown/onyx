@@ -7,7 +7,7 @@
  * and background selection wiring through the store.
  */
 
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { store } from '@/lib/store/store';
 import { encodeTheme } from '@/lib/theme/themeShare';
@@ -22,6 +22,10 @@ import {
 } from '@/lib/prefs/sceneMotion';
 
 const initialState = store.getInitialState();
+
+function openAppearanceAdvanced(): void {
+  fireEvent.click(screen.getByTestId('appearance-advanced').querySelector('summary')!);
+}
 
 describe('AppearancePanel', () => {
   beforeEach(() => {
@@ -41,19 +45,32 @@ describe('AppearancePanel', () => {
     expect(screen.queryByTestId('appearance-panel')).toBeNull();
   });
 
-  it('opens via the store action and lists every theme', () => {
+  it('opens via the store action and lists public looks, not the full catalogue', () => {
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
 
     expect(screen.getByTestId('appearance-panel')).toBeInTheDocument();
-    // One radio per theme + one per background; at least the themes are present.
+    const looks = screen.getByRole('radiogroup', { name: 'Look' });
+    expect(within(looks).getByRole('radio', { name: 'Ocean · Dark look' })).toBeInTheDocument();
+    expect(within(looks).getByRole('radio', { name: 'Pearl · Light look' })).toBeInTheDocument();
+    expect(within(looks).getAllByRole('radio')).toHaveLength(2);
+    expect(screen.getByTestId('appearance-advanced')).not.toHaveAttribute('open');
+  });
+
+  it('keeps the full catalogue and Theme Studio under Advanced', () => {
+    store.getState().openAppearance();
+    render(() => <AppearancePanel />);
+    openAppearanceAdvanced();
+
     const themeRadios = screen.getAllByRole('radio', { name: /theme$/ });
     expect(themeRadios.length).toBe(THEME_IDS.length);
+    expect(screen.getByRole('link', { name: 'Open Theme Studio' })).toHaveAttribute('href', '/appearance/');
   });
 
   it('updates the store background when a background chip is clicked', () => {
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
+    openAppearanceAdvanced();
 
     const before = store.getState().backgroundId;
     // "Mineral Aurora" is the canvas variant; the scene "Aurora Borealis"
@@ -68,6 +85,7 @@ describe('AppearancePanel', () => {
   it('exposes 44px touch targets and commits background on touch-driven click', () => {
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
+    openAppearanceAdvanced();
 
     const goldVeins = screen.getByRole('radio', { name: /gold veins/i });
     expect(goldVeins.style.minHeight).toBe('44px');
@@ -84,6 +102,7 @@ describe('AppearancePanel', () => {
     store.setState({ backgroundId: AUTO_BACKGROUND_ID });
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
+    openAppearanceAdvanced();
 
     expect(screen.getByRole('radio', { name: /auto — theme-matched background/i }))
       .toHaveAttribute('aria-checked', 'true');
@@ -98,6 +117,7 @@ describe('AppearancePanel', () => {
     setSceneMotion('off');
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
+    openAppearanceAdvanced();
 
     fireEvent.click(screen.getByRole('radio', { name: /starfield/i }));
 
@@ -110,6 +130,7 @@ describe('AppearancePanel', () => {
   it('exposes background motion controls beside the mobile-safe picker', () => {
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
+    openAppearanceAdvanced();
 
     fireEvent.click(screen.getByRole('radio', { name: 'Still' }));
     expect(sceneMotion()).toBe('still');
@@ -124,6 +145,7 @@ describe('AppearancePanel', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
+    openAppearanceAdvanced();
     window.dispatchEvent(new Event('resize'));
 
     expect(screen.getByRole('radio', { name: 'Adaptive' })).toHaveAttribute('aria-checked', 'true');
@@ -137,6 +159,7 @@ describe('AppearancePanel', () => {
     store.setState({ backgroundId: 'starfield' });
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
+    openAppearanceAdvanced();
 
     const summary = screen.getByText('Choose background').closest('summary');
     expect(summary).toBeInTheDocument();
@@ -148,27 +171,24 @@ describe('AppearancePanel', () => {
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
 
-    const allThemeRadios = screen.getAllByRole('radio', { name: /theme$/ });
-    const oceanRadio = screen.getByRole('radio', { name: 'Ocean theme' });
+    const looks = screen.getByRole('radiogroup', { name: 'Look' });
+    const oceanRadio = within(looks).getByRole('radio', { name: 'Ocean · Dark look' });
 
     fireEvent.click(oceanRadio);
     expect(oceanRadio).toHaveAttribute('tabIndex', '0');
 
-    const oceanIndex = allThemeRadios.indexOf(oceanRadio);
-    const nextIndex = (oceanIndex + 1) % allThemeRadios.length;
-    const nextTheme = allThemeRadios[nextIndex]!;
-
     fireEvent.keyDown(oceanRadio, { key: 'ArrowRight', code: 'ArrowRight' });
 
-    expect(nextTheme).toHaveFocus();
-    expect(nextTheme).toHaveAttribute('aria-checked', 'true');
-    expect(oceanRadio).toHaveAttribute('tabIndex', '-1');
-    expect(nextTheme).toHaveAttribute('tabIndex', '0');
+    const pearlRadio = within(looks).getByRole('radio', { name: 'Pearl · Light look' });
+    expect(pearlRadio).toHaveAttribute('aria-checked', 'true');
+    expect(within(looks).getByRole('radio', { name: 'Ocean · Dark look' })).toHaveAttribute('tabIndex', '-1');
+    expect(pearlRadio).toHaveAttribute('tabIndex', '0');
   });
 
   it('supports Home/End navigation on motion radios', () => {
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
+    openAppearanceAdvanced();
 
     const offRadio = screen.getByRole('radio', { name: 'Off' });
     fireEvent.click(offRadio);
@@ -197,6 +217,7 @@ describe('AppearancePanel', () => {
     };
     store.getState().openAppearance();
     render(() => <AppearancePanel />);
+    openAppearanceAdvanced();
 
     fireEvent.click(screen.getByRole('button', { name: 'Share / import' }));
     fireEvent.input(screen.getByLabelText('Theme code or link'), {
