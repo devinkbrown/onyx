@@ -65,6 +65,7 @@ describe('Composer accessibility', () => {
   afterEach(() => {
     cleanup();
     resetFirstHourForTests();
+    vi.restoreAllMocks();
   });
 
   it('gives the textarea an accessible name and labels the tool buttons', () => {
@@ -209,6 +210,45 @@ describe('Composer accessibility', () => {
     await waitFor(() => expect(queryByText('alice-private.png')).toBeNull());
     expect(revokeObjectURL).toHaveBeenCalledOnce();
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:alice-private');
+  });
+
+  it('attaches a pasted image from the clipboard', () => {
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pasted');
+    seedActiveChannel();
+    const { getByRole, getByText } = render(() => <Composer />);
+    const file = new File(['pixels'], 'paste.png', { type: 'image/png' });
+    fireEvent.paste(getByRole('textbox', { name: /message #room/i }), {
+      clipboardData: { files: [file], items: [] },
+    });
+    expect(getByText('paste.png')).toBeDefined();
+    expect(createObjectURL).toHaveBeenCalledWith(file);
+  });
+
+  it('attaches a clipboard item image when files is empty', () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:item-paste');
+    seedActiveChannel();
+    const { getByRole, getByText } = render(() => <Composer />);
+    const file = new File(['pixels'], 'from-item.png', { type: 'image/png' });
+    fireEvent.paste(getByRole('textbox', { name: /message #room/i }), {
+      clipboardData: {
+        files: [],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
+      },
+    });
+    expect(getByText('from-item.png')).toBeDefined();
+  });
+
+  it('keeps a failed upload attached and says Couldn\'t send. Try again.', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fail');
+    seedActiveChannel();
+    const { getByLabelText, getByRole, getByText, findByRole } = render(() => <Composer />);
+    const input = getByLabelText('Choose files to attach') as HTMLInputElement;
+    const file = new File(['x'], 'shot.png', { type: 'image/png' });
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    fireEvent.change(input);
+    fireEvent.click(getByRole('button', { name: 'Send message' }));
+    expect(await findByRole('alert')).toHaveTextContent("Couldn't send. Try again.");
+    expect(getByText('shot.png')).toBeDefined();
   });
 
   it('previews an unlocked encrypted reply from transient plaintext only', () => {

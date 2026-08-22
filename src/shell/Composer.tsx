@@ -41,8 +41,8 @@ import {
 } from '@/lib/composer/nickComplete';
 import { mergeComposerInsert } from '@/lib/composer/composerInject';
 import { composerDraftKey } from '@/lib/composer/drafts';
-import { UploadError, uploadFile } from '@/lib/upload/upload';
-import { buildAttachmentMessage } from '@/lib/upload/attachmentMessage';
+import { uploadFile } from '@/lib/upload/upload';
+import { ATTACHMENT_SEND_FAILED, buildAttachmentMessage } from '@/lib/upload/attachmentMessage';
 import {
   SCHEDULE_PRESETS,
   isSchedulable,
@@ -845,8 +845,21 @@ export function Composer(props: ComposerProps): JSX.Element {
     input.value = '';
   }
 
+  function filesFromClipboard(data: DataTransfer | null): File[] {
+    if (!data) return [];
+    const listed = Array.from(data.files ?? []);
+    if (listed.length > 0) return listed;
+    const fromItems: File[] = [];
+    for (const item of Array.from(data.items ?? [])) {
+      if (item.kind !== 'file') continue;
+      const file = item.getAsFile();
+      if (file) fromItems.push(file);
+    }
+    return fromItems;
+  }
+
   function handlePaste(e: ClipboardEvent): void {
-    const files = Array.from(e.clipboardData?.files ?? []);
+    const files = filesFromClipboard(e.clipboardData);
     if (files.length === 0) return;
     e.preventDefault();
     addFiles(files);
@@ -913,13 +926,12 @@ export function Composer(props: ComposerProps): JSX.Element {
         uploaded.push(result.url);
       } catch (error) {
         if (signal.aborted) return null;
-        const message = error instanceof UploadError ? error.message : 'Upload failed.';
         updateAttachment(item.id, {
           status: 'error',
-          error: message,
+          error: ATTACHMENT_SEND_FAILED,
           progress: null,
         });
-        setComposerError(message);
+        setComposerError(ATTACHMENT_SEND_FAILED);
         return null;
       }
     }
@@ -998,6 +1010,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         const line = buildAttachmentMessage({
           url,
           name: item?.file.name,
+          sizeBytes: item?.file.size,
           caption: i === 0 ? baseContent || undefined : undefined,
         });
         if (line) attachmentLines.push(line);

@@ -8226,36 +8226,133 @@
   color: var(--lapis-bright);
 }
 
-.shell-msg-media-link {
+.shell-msg-media-link,
+.shell-msg-media-open {
   display: inline-block;
+  padding: 0;
   border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.shell-msg-media-open:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
 }
 
 .shell-msg-media-img {
   display: block;
-  max-width: min(480px, 100%);
-  max-height: 320px;
+  max-width: min(420px, 100%);
+  max-height: 360px;
   width: auto;
   height: auto;
   border-radius: var(--r-md);
   border: 1px solid var(--seam-faint);
   object-fit: contain;
   background: color-mix(in oklab, var(--ink) 50%, var(--stone-2));
-  cursor: pointer;
-  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
-}
-
-.shell-msg-media-img:hover {
-  opacity: 0.9;
 }
 
 .shell-msg-media-video,
 .shell-msg-media-audio {
   display: block;
-  max-width: min(480px, 100%);
+  max-width: min(420px, 100%);
   border-radius: var(--r-md);
   border: 1px solid var(--seam-faint);
   background: color-mix(in oklab, var(--ink) 50%, var(--stone-2));
+}
+
+.shell-msg-file {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: min(280px, 100%);
+  margin-top: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 38%, transparent);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.shell-msg-file:hover,
+.shell-msg-file:focus-visible {
+  border-color: var(--seam);
+  color: var(--paper);
+}
+
+.shell-msg-file:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.shell-msg-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+}
+
+.shell-msg-file-size {
+  flex: 0 0 auto;
+  color: var(--paper-mute);
+  font-size: 0.72rem;
+}
+
+.shell-msg-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+}
+
+.shell-msg-lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--ink) 72%, transparent);
+}
+
+.shell-msg-lightbox-dialog {
+  position: relative;
+  z-index: 1;
+  max-width: min(920px, 92vw);
+  max-height: 92vh;
+}
+
+.shell-msg-lightbox-img {
+  display: block;
+  max-width: 92vw;
+  max-height: 88vh;
+  border-radius: var(--r-md);
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 50%, var(--stone-2));
+}
+
+.shell-msg-lightbox-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--stone-2) 70%, transparent);
+  color: var(--paper);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.shell-msg-lightbox-close:hover,
+.shell-msg-lightbox-close:focus-visible {
+  border-color: var(--seam);
+}
+
+.shell-msg-lightbox-close:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
 }
 
 .shell-msg-media-video {
@@ -8468,9 +8565,6 @@
   .shell-msg-channel-link,
   .shell-msg-media-img {
     transition: none;
-  }
-  .shell-msg-media-img:hover {
-    transform: none;
   }
 }
 
