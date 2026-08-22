@@ -38,7 +38,9 @@ export function AddToHomeScreenSheet(): JSX.Element {
     matchMedia: typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       ? window.matchMedia.bind(window)
       : null,
-    navigator: typeof navigator !== 'undefined' ? navigator : null,
+    navigator: typeof navigator !== 'undefined'
+      ? { standalone: (navigator as { standalone?: boolean }).standalone }
+      : null,
   }));
   const joinedRoom = useStore((state) => state.channels.size > 0);
   const sentLive = useStore((state) => stateHasSentMessage(state));
