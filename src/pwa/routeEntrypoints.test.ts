@@ -31,12 +31,12 @@ const expected = {
     description: 'See public Onyx room activity, network message trends, people online, and room sparklines.',
   },
   status: {
-    title: 'Onyx status — network health',
-    description: 'Public Onyx network health, node uptime, peer latency, users online, and backup readiness.',
+    title: 'Onyx status — are the rooms up?',
+    description: 'See whether Onyx rooms are reachable tonight. If the public report is missing or stale, we cannot claim health.',
   },
   roadmap: {
-    title: 'Onyx roadmap — what shipped and what is next',
-    description: 'Track the public Onyx roadmap across memory, reach, privacy, presence, operations, and the time-native client work next.',
+    title: 'Onyx roadmap — rooms, calls, catch-up',
+    description: 'What we are working on: rooms that stay open, calls when you want them, catch-up when you come back, and a Home Screen on this device.',
   },
   onyxos: {
     title: 'OnyxOS + Onyx — communication at home in the system',
@@ -262,6 +262,7 @@ describe('SPA route entrypoint materializer', () => {
     expect(locations.length).toBeGreaterThan(1);
     expect(new Set(locations).size).toBe(locations.length);
     expect(locations).not.toContain('https://eshmaki.me/onyxos/');
+    expect(locations).not.toContain('https://eshmaki.me/stats/');
     for (const location of locations) {
       const url = new URL(location);
       expect(url.origin, location).toBe('https://eshmaki.me');

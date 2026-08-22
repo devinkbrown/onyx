@@ -160,6 +160,11 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
       navigation: { desktop: false, mobile: false },
       navigationOrder: null,
     });
+    expect(publicRouteById('stats')).toMatchObject({
+      placement: 'none',
+      navigation: { desktop: false, mobile: false },
+      navigationOrder: null,
+    });
   });
 
   it('covers every public router destination and preserves the install compatibility alias', () => {
