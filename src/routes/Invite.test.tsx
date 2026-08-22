@@ -75,7 +75,7 @@ describe('InviteRoute', () => {
     expect(screen.getByRole('note', { name: 'Invite preview' })).toHaveTextContent('Join #general on Onyx');
     expect(screen.getByRole('note', { name: 'Invite preview' })).toHaveTextContent('release train');
     expect(screen.getByLabelText('Display name')).toHaveValue('yuki');
-    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute(
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Join' })).toHaveAttribute(
       'href',
       '/app/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki',
     );
@@ -90,7 +90,7 @@ describe('InviteRoute', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Join Onyx' })).toBeInTheDocument();
     expect(screen.getByText('Choose a display name, then pick a room once you are in.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/app/');
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/app/');
     expect(screen.queryByText(/#root|#general/)).not.toBeInTheDocument();
   });
 
@@ -101,7 +101,7 @@ describe('InviteRoute', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Join Onyx' })).toBeInTheDocument();
     expect(screen.queryByText(/evil/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/app/');
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/app/');
   });
 
   it('carries a typed display name into the existing join link', () => {
@@ -110,7 +110,7 @@ describe('InviteRoute', () => {
 
     fireEvent.input(screen.getByLabelText('Display name'), { target: { value: 'River' } });
 
-    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute(
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Join' })).toHaveAttribute(
       'href',
       '/app/?join=%23lounge&as=River',
     );
