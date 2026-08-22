@@ -1311,20 +1311,10 @@
 .moderation-cockpit__protocol p { margin: 6px 0; }
 .moderation-cockpit__protocol code { display: block; padding: 7px 8px; overflow-wrap: anywhere; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: var(--surface-void); color: var(--paper-dim); font: var(--text-2xs) var(--font-mono); }
 
-/* A true, compact orientation seam: target and unread state already owned by
-   the store, placed below the ribbon so it never competes with room controls. */
+/* Ribbon is the only visible room header. Keep this strip in the tree for
+   AT / tests, but do not stack a second orientation chrome under PresenceRibbon. */
 .shell-room-current {
-  display: flex;
-  align-items: baseline;
-  gap: 0.35rem 0.65rem;
-  min-width: 0;
-  min-height: 28px;
-  padding: 6px 14px;
-  border-bottom: 1px solid var(--seam-faint);
-  box-shadow: inset 2px 0 0 var(--lapis);
-  color: var(--paper-mute);
-  font: 600 0.68rem/1.25 var(--font-mono);
-  letter-spacing: 0.035em;
+  display: none;
 }
 .shell-room-current__kicker {
   flex: 0 0 auto;
@@ -3276,22 +3266,18 @@
   background: transparent;
 }
 
-/* A quiet, data-bearing orientation seam. It is intentionally not a second
-   toolbar: target, topic, and read state remain visible while history pages,
-   loading skeletons, and the virtualised log change beneath it. */
+/* Visually hidden — MessageView keeps the current-conversation receipt for AT.
+   The ribbon is the only on-screen header. */
 .shell-conversation-brief {
-  display: flex;
-  align-items: center;
-  gap: 0.42rem;
-  min-width: 0;
-  min-height: 34px;
-  padding: 7px var(--space-5) 6px;
-  border-bottom: 1px solid color-mix(in oklab, var(--seam-faint) 88%, transparent);
-  background: color-mix(in oklab, var(--ink) 24%, transparent);
-  color: var(--paper-mute);
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.035em;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .shell-conversation-brief-kicker {
   flex: none;
@@ -3599,7 +3585,7 @@
   font-style: italic;
   font-size: 1.05rem;
   letter-spacing: 0.01em;
-  color: color-mix(in oklab, var(--ink) 72%, var(--paper-mute));
+  color: var(--paper);
 }
 
 .shell-feed-empty-body {
@@ -3787,7 +3773,7 @@
 .shell-msg-author {
   font-family: var(--font-sans);
   font-size: 0.9375rem;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--paper);
   letter-spacing: 0;
   cursor: default;
@@ -3800,12 +3786,12 @@
 }
 
 .shell-msg-ts {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
   color: var(--paper-mute);
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   flex: none;
-  opacity: 0.78;
+  opacity: 0.85;
 }
 
 .shell-msg-edited {
@@ -3893,7 +3879,7 @@
 
 .shell-msg-text {
   font-family: var(--font-sans);
-  font-size: 0.9375rem;
+  font-size: 1rem;
   line-height: 1.5;
   color: var(--paper);
   word-break: break-word;
@@ -3973,10 +3959,10 @@
 .shell-msg-cont-ts {
   grid-column: 1;
   align-self: center;
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
   color: var(--paper-mute);
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   text-align: right;
   padding-right: 2px;
   opacity: 0;
@@ -4474,12 +4460,12 @@
   align-items: center;
   gap: 5px;
   padding: 2px 8px 2px 6px;
-  border: 1px solid var(--seam-faint);
+  border: 1px solid var(--seam);
   border-radius: var(--r-pill);
   cursor: pointer;
   font-size: 0.82rem;
   color: var(--paper-dim);
-  background: color-mix(in oklab, var(--stone-2) 34%, transparent);
+  background: transparent;
   /* Gentle scale-in when a pill appears — quick enough to feel like feedback
      on react, calm enough not to be busy when a channel's reactions mount. */
   animation: shell-reaction-pop 0.22s var(--ease-out-expo, var(--ease));
@@ -4505,12 +4491,12 @@
   color: var(--paper);
 }
 
-/* A reaction you've already given glows azure — your mark on the message. */
+/* Active reaction: 12% lapis wash, 1px seam, no glow. */
 .shell-reaction--mine {
   border-color: var(--seam);
-  background: color-mix(in oklab, var(--lapis) 18%, transparent);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
   color: var(--paper);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent);
+  box-shadow: none;
 }
 
 .shell-reaction--mine .shell-reaction-count { color: var(--lapis-bright); }
@@ -4534,30 +4520,16 @@
   color: var(--paper-mute);
 }
 
+/* Default path: no in-flow uppercase chips. Hover toolbar is `.msg-menu`. */
 .shell-msg-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 5px;
-  opacity: 0.42;
-  transition: opacity var(--dur) var(--ease);
+  display: none;
 }
 
 .shell-msg-group:hover .shell-msg-actions,
 .shell-msg-group:focus-within .shell-msg-actions,
 .shell-msg-cont:hover .shell-msg-actions,
 .shell-msg-cont:focus-within .shell-msg-actions {
-  opacity: 1;
-}
-
-/* Pointer devices: hold the row actions out of sight until the message is
-   hovered or keyboard-focused. They stay in flow (opacity only) so revealing
-   them never reflows the feed. Touch devices keep the faint resting state
-   above, since there is no hover to surface them. */
-@media (hover: hover) and (pointer: fine) {
-  .shell-msg-actions {
-    opacity: 0;
-  }
+  display: none;
 }
 
 .shell-msg-action {
@@ -5187,10 +5159,12 @@
   gap: var(--space-1);
   align-items: flex-end;
   min-width: 0;
+  min-height: 48px;
   padding: 4px;
   background: color-mix(in oklab, var(--ink) 82%, var(--stone-2));
   border: 1px solid var(--seam);
   border-radius: var(--r-lg);
+  box-shadow: none;
   transition:
     border-color var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease),
@@ -5246,10 +5220,10 @@
 
 .shell-composer-tool {
   flex: none;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   margin-bottom: 0;
   display: grid;
   place-items: center;
@@ -6276,8 +6250,7 @@
   .shell-sidebar .shell-primary-nav { display: none; }
 
   .shell-room-current {
-    min-height: 30px;
-    padding-inline: 10px;
+    display: none;
   }
 
   /* Channel drawer — slides in from the left, stops above the tab bar */
@@ -6940,15 +6913,7 @@
   }
 
   .shell-conversation-brief {
-    min-height: 36px;
-    padding: 7px 10px 6px;
-    gap: 0.35rem;
-  }
-
-  .shell-conversation-brief-detail {
-    max-width: 10.5ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: none;
   }
 
   .shell-msg-group {
@@ -6992,8 +6957,8 @@
 
   .shell-msg-ts,
   .shell-msg-cont-ts {
-    font-size: 0.56rem;
-    letter-spacing: 0.03em;
+    font-size: 0.6875rem;
+    letter-spacing: 0;
   }
 
   .shell-msg-cont-ts {
@@ -7007,14 +6972,9 @@
     line-height: 1.5;
   }
 
-  .shell-msg-actions {
-    gap: 4px;
-    margin-top: 3px;
-  }
-
+  .shell-msg-actions,
   .shell-msg-action {
-    min-width: 36px;
-    min-height: 36px;
+    display: none;
   }
 
   .shell-reactions {
@@ -7064,15 +7024,13 @@
 
 @media (max-width: 420px) {
   .shell-room-current {
-    flex-wrap: wrap;
-    gap: 2px 8px;
+    display: none;
   }
-  .shell-room-current__label { flex: 1 1 12ch; }
-  .shell-room-current__detail { flex: 0 0 auto; }
 }
 
 @media (forced-colors: active) {
   .shell-room-current {
+    display: none;
     border-bottom-color: CanvasText;
     box-shadow: inset 2px 0 0 Highlight;
     color: CanvasText;

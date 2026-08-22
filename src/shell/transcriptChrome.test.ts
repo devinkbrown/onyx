@@ -28,21 +28,40 @@ describe('Transcript and composer commercial chrome', () => {
     expect(css).not.toMatch(/\.shell-composer-textarea\s*\{[^}]*max-height:\s*200px/s);
   });
 
-  it('uses Instrument Sans for unread and day markers, mono only for timestamps', () => {
+  it('uses quiet Instrument Sans row type — author 600, body ~16px, timestamp not tracked mono', () => {
     expect(css).toMatch(/\.shell-unread-divider\s*\{[^}]*font-family:\s*var\(--font-sans\)/s);
     expect(css).toMatch(/\.shell-unread-divider\s*\{[^}]*text-transform:\s*none/s);
     expect(css).toMatch(/\.shell-day-divider-label\s*\{[^}]*font-family:\s*var\(--font-sans\)/s);
     expect(css).toMatch(/\.shell-day-divider-label\s*\{[^}]*text-transform:\s*none/s);
-    expect(css).toMatch(/\.shell-msg-ts\s*\{[^}]*font-family:\s*var\(--font-mono\)/s);
+    expect(css).toMatch(/\.shell-msg-author\s*\{[^}]*font-weight:\s*600/s);
+    expect(css).toMatch(/\.shell-msg-text\s*\{[^}]*font-size:\s*1rem/s);
+    expect(css).toMatch(/\.shell-msg-ts\s*\{[^}]*font-family:\s*var\(--font-sans\)/s);
+    expect(css).toMatch(/\.shell-msg-ts\s*\{[^}]*font-size:\s*0\.75rem/s);
+    expect(css).toMatch(/\.shell-msg-ts\s*\{[^}]*color:\s*var\(--paper-mute\)/s);
+    expect(css).not.toMatch(/\.shell-msg-ts\s*\{[^}]*font-family:\s*var\(--font-mono\)/s);
     expect(css).toMatch(/\.shell-jump-latest\s*\{[^}]*font-family:\s*var\(--font-sans\)/s);
     expect(css).toMatch(/\.shell-jump-latest\s*\{[^}]*border-radius:\s*var\(--r-pill\)/s);
   });
 
-  it('keeps people circular in the transcript and the composer as a calm vessel', () => {
+  it('keeps people circular and the composer a 48px vessel with 40px tools', () => {
     expect(css).toMatch(/\.shell-msg-avatar\s+\.onyx-avatar\s*\{[^}]*border-radius:\s*var\(--r-pill\)/s);
+    expect(css).toMatch(/\.shell-composer-inner\s*\{[^}]*min-height:\s*48px/s);
     expect(css).toMatch(/\.shell-composer-inner\s*\{[^}]*border-radius:\s*var\(--r-lg\)/s);
+    expect(css).toMatch(/\.shell-composer-inner\s*\{[^}]*box-shadow:\s*none/s);
+    expect(css).toMatch(/\.shell-composer-tool\s*\{[^}]*width:\s*40px/s);
+    expect(css).toMatch(/\.shell-composer-send\s*\{[^}]*width:\s*40px/s);
+    expect(css).toMatch(/\.shell-composer-send:not\(:disabled\)\s*\{[^}]*background:\s*var\(--lapis\)/s);
     expect(css).toMatch(/\.shell-composer-context\s*\{[^}]*border-left:\s*3px\s+solid\s+var\(--lapis\)/s);
     expect(css).toMatch(/\.shell-msg-pending-mark\s*\{/s);
+  });
+
+  it('hides in-flow action chips and styles reaction pills without glow', () => {
+    expect(css).toMatch(/\.shell-msg-actions\s*\{[^}]*display:\s*none/s);
+    expect(css).toMatch(/\.shell-reaction\s*\{[^}]*border:\s*1px\s+solid\s+var\(--seam\)/s);
+    expect(css).toMatch(/\.shell-reaction\s*\{[^}]*border-radius:\s*var\(--r-pill\)/s);
+    expect(css).toMatch(/\.shell-reaction--mine\s*\{[^}]*lapis\) 12%/s);
+    expect(css).toMatch(/\.shell-reaction--mine\s*\{[^}]*box-shadow:\s*none/s);
+    expect(css).toMatch(/\.shell-room-current\s*\{[^}]*display:\s*none/s);
   });
 
   it('keeps phone composer primaries at 44px and above the virtual keyboard', () => {
@@ -54,10 +73,12 @@ describe('Transcript and composer commercial chrome', () => {
     expect(mobile).toMatch(/--shell-virtual-keyboard-inset/);
   });
 
-  it('does not dump a 12-item operator toolbar onto every row', () => {
+  it('fades the hover toolbar in 100ms and keeps coarse overflow at 44px', () => {
     const menu = stripComments(menuCss);
     expect(menu).toMatch(/\.msg-menu-bar\s*\{/s);
-    expect(menu).toMatch(/\.msg-menu-btn--danger/s);
+    expect(menu).toMatch(/opacity\s+var\(--dur-micro,\s*100ms\)/s);
     expect(menu).toMatch(/width:\s*32px/);
+    expect(menu).toMatch(/min-width:\s*44px/);
+    expect(menu).not.toMatch(/\.msg-menu-btn--danger/s);
   });
 });

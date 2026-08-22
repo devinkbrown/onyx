@@ -132,7 +132,7 @@ describe('MessageView consumer transcript chrome', () => {
     expect(screen.getByRole('article', { name: /queued/i })).toBeInTheDocument();
   });
 
-  it('exposes Reply and React on every live row, plus Edit/Delete on owned rows', () => {
+  it('exposes React, Reply, and More on every live row — not Edit/Delete chips', () => {
     seed([
       makeMessage('m-other', 'bob', 'theirs', 0),
       makeMessage('m-own', 'alice', 'ours', 1),
@@ -142,8 +142,12 @@ describe('MessageView consumer transcript chrome', () => {
 
     expect(screen.getByRole('button', { name: 'Reply to bob' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Choose reaction for message from bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions for message from bob' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reply to alice' })).toBeInTheDocument();
-    expect(screen.getByTestId('msg-menu-edit')).toBeInTheDocument();
-    expect(screen.getByTestId('msg-menu-delete')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose reaction for message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions for message from alice' })).toBeInTheDocument();
+    expect(screen.queryByTestId('msg-menu-edit')).toBeNull();
+    expect(screen.queryByTestId('msg-menu-delete')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^(react|reply|edit|delete)$/i })).toBeNull();
   });
 });

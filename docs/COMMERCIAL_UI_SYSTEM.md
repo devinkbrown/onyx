@@ -348,10 +348,13 @@ disconnecting, without blocking the composer, and without false product claims.
 |-------|----------|
 | **Grouping** | Same author within 5 minutes: avatar + name once, then bare continuation lines. Day separators in sentence case. |
 | **Unread** | Captured divider holds position while new messages arrive. Visible label **New messages**. Scrolled-up pill: Jump to latest / N new. |
-| **Hover / focus** | Reply · React (quick + picker) · Edit/Delete if owned · ⋯ overflow. Power items stay in overflow — not a 12-item toolbar on every row. |
-| **Reactions** | Chips wrap under the message body (`BoostBar`). |
+| **Hover / focus** | Overlay on `.shell-msg-group` / `.shell-msg-cont`: **React · Reply · More**, top-right, fade 100ms. Edit/Delete stay in overflow. No uppercase in-flow `.shell-msg-action` chips. Mobile: long-press / revealed row or 44px overflow. |
+| **Reactions** | Pills under the body: `--r-pill`, 1px seam, emoji + count. Active = 12% lapis wash. No glow. |
 | **Pending** | Local echo stays visible (`Queued` chip + dimmed row). Composer outbox still exposes retry. |
-| **Composer** | One line grows to 5, then internal scroll. Primary: **+** · message · emoji · More · **Send**. Reply quotes a fragment above the field. 44px targets on phone; sits above the software keyboard. |
+| **Composer** | `.shell-composer-inner`: radius 8–12, min-height 48px, tools 40×40 desktop / 44×44 coarse. Send filled lapis only when armed. Placeholder `Message #name` / `Message @nick`. No outer bloom. |
+| **Row type** | Body ~15–16px Instrument Sans. Timestamp 11–12px `--paper-mute`, not 10px tracked mono. Author 600. |
+| **Empty room** | One Fraunces line + one sentence. Composer is the only CTA — no Room ledger. Skeleton while history loads. |
+| **Header** | Ribbon is the only visible room header. `.shell-room-current` and `.shell-conversation-brief` stay for AT/tests, not as a second orientation strip. |
 | **Shapes** | People are circles; room intro glyph stays a squircle. |
 
 **Forbidden:** IRC mode letters on the transcript, neon/glow, glass/blur, Inter, Anton, purple/blurple clone, store/IRC/E2EE/vault/media rewrites.

@@ -77,7 +77,7 @@ describe('Composer accessibility', () => {
     // Assert — Standard primary: Attach · message · Emoji · More · Send
     const message = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
     expect(message).toBeDefined();
-    expect(message.placeholder).toBe('Message');
+    expect(message.placeholder).toBe('Message #room');
     expect(message.placeholder).not.toMatch(/\/search|\/mute|\/export|\/help/);
     expect(getByRole('button', { name: 'Attach files' })).toBeDefined();
     expect(getByRole('button', { name: 'Insert emoji' })).toBeDefined();
@@ -88,6 +88,32 @@ describe('Composer accessibility', () => {
     expect(queryByRole('button', { name: 'Schedule message to send later' })).toBeNull();
     expect(queryByRole('button', { name: /export|format/i })).toBeNull();
     expect(screen.getByRole('note', { name: 'Current compose context' })).toHaveTextContent('To #roomReady to send');
+  });
+
+  it('uses Message @nick as the DM placeholder', () => {
+    store.setState(
+      {
+        ...initialState,
+        activeView: { kind: 'dm', nick: 'mika' },
+        connectionStatus: 'connected',
+        ourNick: 'me',
+        server: {
+          id: 'composer-test',
+          name: 'Onyx',
+          network: 'Onyx',
+          url: 'wss://example.test',
+          icon: '',
+          nick: 'me',
+          account: 'me',
+          connected: true,
+        },
+      },
+      true,
+    );
+
+    const { getByRole } = render(() => <Composer />);
+    const message = getByRole('textbox', { name: /message mika/i }) as HTMLTextAreaElement;
+    expect(message.placeholder).toBe('Message @mika');
   });
 
   it('locks Standard primary control order: attach, message, emoji, more, send', () => {

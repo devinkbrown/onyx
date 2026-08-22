@@ -279,7 +279,8 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (activeEditing()) return 'Edit message';
     if (isOffline()) return t ? `Offline — queues for ${t}` : 'Reconnecting…';
     if (!t) return 'Pick a room or a person to begin';
-    return 'Message';
+    if (t.startsWith('#') || t.startsWith('&')) return `Message ${t}`;
+    return `Message @${t}`;
   });
 
   // Keep the destination and the current composition state visible above the

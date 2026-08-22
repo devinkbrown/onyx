@@ -32,8 +32,8 @@
   opacity: 0;
   transform: translateY(3px);
   transition:
-    opacity var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+    opacity var(--dur-micro, 100ms) var(--ease),
+    transform var(--dur-micro, 100ms) var(--ease);
 }
 
 /* Reveal on row hover/focus. The parent rows carry these classes. */
@@ -84,13 +84,6 @@
   color: var(--lapis-bright);
   border-color: var(--seam-faint);
   background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
-}
-
-.msg-menu-btn--danger:hover,
-.msg-menu-btn--danger:focus-visible {
-  color: var(--shu-bright);
-  border-color: color-mix(in oklab, var(--shu) 40%, transparent);
-  background: color-mix(in oklab, var(--shu) 14%, transparent);
 }
 
 .msg-menu-icon {

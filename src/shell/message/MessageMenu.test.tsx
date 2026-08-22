@@ -1340,7 +1340,7 @@ describe('<MessageMenu>', () => {
     expect(screen.queryByRole('dialog', { name: 'Choose reaction for message from alice' })).toBeNull();
   });
 
-  it('surfaces Reply, React, and owned Edit/Delete on the hover bar', () => {
+  it('surfaces React, Reply, and More on the hover bar — Edit/Delete stay in overflow', () => {
     const msg: ChatMessage = {
       id: 'm-hover-owned',
       from: 'alice',
@@ -1356,11 +1356,11 @@ describe('<MessageMenu>', () => {
 
     expect(screen.getByRole('button', { name: 'Reply to alice' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Choose reaction for message from alice' })).toBeInTheDocument();
-    expect(screen.getByTestId('msg-menu-edit')).toHaveAccessibleName('Edit message from alice');
-    expect(screen.getByTestId('msg-menu-delete')).toHaveAccessibleName(
-      'Delete message from alice for everyone',
-    );
     expect(screen.getByRole('button', { name: 'More actions for message from alice' })).toBeInTheDocument();
+    expect(screen.queryByTestId('msg-menu-edit')).toBeNull();
+    expect(screen.queryByTestId('msg-menu-delete')).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Edit message from alice' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Delete message from alice for everyone' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: 'Copy text from message from alice' })).toBeNull();
   });
 
@@ -1383,7 +1383,7 @@ describe('<MessageMenu>', () => {
     expect(screen.queryByTestId('msg-menu-delete')).toBeNull();
   });
 
-  it('opens the existing delete confirmation from the hover-bar Delete', () => {
+  it('opens the existing delete confirmation from overflow Delete', () => {
     const msg: ChatMessage = {
       id: 'm-hover-delete',
       from: 'alice',
@@ -1394,14 +1394,15 @@ describe('<MessageMenu>', () => {
     };
 
     render(() => (
-      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit canRedact />
+      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit canRedact menuOpen />
     ));
 
-    fireEvent.click(screen.getByTestId('msg-menu-delete'));
+    fireEvent.click(screen.getByRole('menuitem', {
+      name: 'Delete message from alice for everyone',
+    }));
 
     expect(screen.getByRole('group', {
       name: 'Confirm deleting message from alice for everyone',
     })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Copy text from message from alice' })).toBeNull();
   });
 });

@@ -41,7 +41,7 @@ function makeChannel(name: string, messages: ChatMessage[] = []): Channel {
   };
 }
 
-describe('MessageView channel intro ledger', () => {
+describe('MessageView empty room and channel intro', () => {
   beforeEach(() => {
     store.setState(initialState, true);
     resetPreferences();
@@ -55,7 +55,7 @@ describe('MessageView channel intro ledger', () => {
     resetFirstHourForTests();
   });
 
-  it('links an empty public channel intro to the room ledger', async () => {
+  it('keeps the beginning card to one Fraunces line and one sentence — no Room ledger', async () => {
     store.setState(
       {
         ...initialState,
@@ -76,16 +76,13 @@ describe('MessageView channel intro ledger', () => {
       expect(screen.getByTestId('channel-intro')).toBeTruthy();
     });
 
-    expect(screen.getByTestId('channel-intro-ledger')).toHaveAttribute(
-      'href',
-      '/stats/?room=%23general',
-    );
-    expect(screen.getByRole('link', { name: 'Room ledger for #general' })).toHaveTextContent(
-      'Room ledger',
-    );
+    expect(screen.getByTestId('channel-intro').querySelector('.shell-channel-intro-title')?.textContent).toBe('#general');
+    expect(screen.getByTestId('channel-intro').querySelectorAll('p')).toHaveLength(1);
+    expect(screen.queryByTestId('channel-intro-ledger')).toBeNull();
+    expect(screen.queryByRole('link', { name: /Room ledger/i })).toBeNull();
   });
 
-  it('links a brand-new public channel empty state to the room ledger', async () => {
+  it('shows one empty-room lede plus one sentence and no Room ledger CTA', async () => {
     store.setState(
       {
         ...initialState,
@@ -103,14 +100,37 @@ describe('MessageView channel intro ledger', () => {
       expect(screen.getByTestId('feed-empty')).toBeTruthy();
     });
 
+    const empty = screen.getByTestId('feed-empty');
+    expect(empty.querySelector('.shell-feed-empty-title')?.textContent).toBe('Still waters here');
+    expect(empty.querySelector('.shell-feed-empty-body')?.textContent).toMatch(/Say the first thing in #general/);
     expect(screen.getByTestId('feed-empty-invite')).toHaveTextContent('Invite friends');
-    expect(screen.getByTestId('feed-empty-channel-ledger')).toHaveAttribute(
-      'href',
-      '/stats/?room=%23general',
-    );
+    expect(screen.queryByTestId('feed-empty-channel-ledger')).toBeNull();
+    expect(screen.queryByRole('link', { name: /Room ledger/i })).toBeNull();
   });
 
-  it('omits the ledger link for direct-message views', async () => {
+  it('does not flash the empty room while history is loading', async () => {
+    store.setState(
+      {
+        ...initialState,
+        channels: new Map([['#general', makeChannel('#general')]]),
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        historyLoading: new Map([['#general', true]]),
+      },
+      true,
+    );
+
+    render(() => <MessageView />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Loading messages')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('feed-empty')).toBeNull();
+    expect(screen.queryByText('Still waters here')).toBeNull();
+  });
+
+  it('omits the beginning card for direct-message views', async () => {
     store.setState(
       {
         ...initialState,
@@ -130,6 +150,7 @@ describe('MessageView channel intro ledger', () => {
       expect(screen.queryByTestId('channel-intro')).toBeNull();
     });
     expect(screen.queryByTestId('channel-intro-ledger')).toBeNull();
+    expect(screen.queryByRole('link', { name: /Room ledger/i })).toBeNull();
   });
 
   it('asks a first-hour guest to say hi instead of showing slash commands', async () => {
