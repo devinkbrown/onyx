@@ -197,7 +197,8 @@ describe('DmSafetySheet', () => {
     resolveTrev(SAFETY_NUMBER);
     await Promise.resolve();
 
-    expect(screen.queryByLabelText(/Safety number for Mika/i)).toBeNull();
+    expect(screen.queryByRole('region', { name: /compare this safety number with Mika/i })).toBeNull();
+    expect(screen.queryByLabelText(/Safety number for Mika:/i)).toBeNull();
     expect(document.body).not.toHaveTextContent('11111');
   });
 
@@ -209,8 +210,7 @@ describe('DmSafetySheet', () => {
     store.setState({
       peerDmKeys: new Map([['trev', validPeerKey()]]),
     });
-    expect(screen.getByTestId('dm-safety-private')).toHaveAttribute(
-      'aria-label',
+    expect(screen.getByTestId('dm-safety-private').getAttribute('aria-label') ?? '').toMatch(
       /only the two of you can read these messages/i,
     );
     expect(screen.getByTestId('dm-safety-private')).toHaveTextContent('Private');

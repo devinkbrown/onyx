@@ -541,8 +541,7 @@ describe('PresenceRibbon commercial room header', () => {
       peerDmKeys: new Map([['alice', validPeerKey()]]),
     });
     expect(screen.getByTestId('ribbon-dm-private')).toHaveTextContent('Private');
-    expect(screen.getByTestId('ribbon-dm-private')).toHaveAttribute(
-      'aria-label',
+    expect(screen.getByTestId('ribbon-dm-private').getAttribute('aria-label') ?? '').toMatch(
       /only the two of you can read these messages/i,
     );
 
