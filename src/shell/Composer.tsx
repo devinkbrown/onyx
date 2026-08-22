@@ -44,6 +44,18 @@ import { composerDraftKey } from '@/lib/composer/drafts';
 import { uploadFile } from '@/lib/upload/upload';
 import { ATTACHMENT_SEND_FAILED, buildAttachmentMessage } from '@/lib/upload/attachmentMessage';
 import {
+  formatAttachmentBytes,
+  planAttachmentAccept,
+} from '@/lib/upload/attachmentCaps';
+import {
+  compactPhoto,
+  isPhotoFile,
+  keepOriginalFile,
+  photoQualityOptions,
+  stripPhotoExif,
+  type PhotoQuality,
+} from '@/lib/upload/photoPolicy';
+import {
   SCHEDULE_PRESETS,
   isSchedulable,
   parseDateTimeLocal,
@@ -84,15 +96,20 @@ type AttachmentState = 'ready' | 'uploading' | 'uploaded' | 'error';
 type ComposerAttachment = {
   id: string;
   file: File;
+  originalFile: File;
+  photoFile: File | null;
+  compactFile: File | null;
   previewUrl: string | null;
   status: AttachmentState;
   progress: number | null;
   error: string | null;
   uploadedUrl: string | null;
+  treatAs: 'photo' | 'file';
+  quality: PhotoQuality;
+  sendOriginal: boolean;
+  originalBytes: number;
+  compactBytes: number | null;
 };
-
-const MAX_ATTACHMENTS = 5;
-const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 let attachmentId = 0;
 
@@ -101,16 +118,14 @@ function nextAttachmentId(): string {
   return `composer-attachment-${Date.now()}-${attachmentId}`;
 }
 
-function isImageFile(file: File): boolean {
-  return file.type.startsWith('image/');
+function formatBytes(bytes: number): string {
+  return formatAttachmentBytes(bytes);
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(kb >= 100 ? 0 : 1)} KB`;
-  const mb = kb / 1024;
-  return `${mb.toFixed(mb >= 100 ? 0 : 1)} MB`;
+function fileToUpload(item: ComposerAttachment): File {
+  if (item.treatAs === 'file' || item.sendOriginal) return keepOriginalFile(item.originalFile);
+  if (item.quality === 'compact' && item.compactFile) return item.compactFile;
+  return item.photoFile ?? item.file;
 }
 
 function clippedText(text: string, max = 96): string {
@@ -801,38 +816,80 @@ export function Composer(props: ComposerProps): JSX.Element {
     }
 
     const current = attachments();
-    const room = Math.max(0, MAX_ATTACHMENTS - current.length);
-    if (room === 0) {
-      setComposerError(`You can attach up to ${MAX_ATTACHMENTS} files.`);
-      return;
-    }
-
+    const decision = planAttachmentAccept(files, current.length);
     const accepted: ComposerAttachment[] = [];
-    for (const file of files.slice(0, room)) {
-      if (file.size > MAX_ATTACHMENT_BYTES) {
-        setComposerError(`${file.name} is larger than ${formatBytes(MAX_ATTACHMENT_BYTES)}.`);
-        continue;
-      }
-      const previewUrl = isImageFile(file) ? URL.createObjectURL(file) : null;
+    for (const index of decision.acceptIndexes) {
+      const file = files[index];
+      if (!file) continue;
+      const photo = isPhotoFile(file);
+      const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
       if (previewUrl) previewUrls.add(previewUrl);
       accepted.push({
         id: nextAttachmentId(),
         file,
+        originalFile: file,
+        photoFile: null,
+        compactFile: null,
         previewUrl,
         status: 'ready',
         progress: null,
         error: null,
         uploadedUrl: null,
+        treatAs: photo ? 'photo' : 'file',
+        quality: 'original',
+        sendOriginal: false,
+        originalBytes: file.size,
+        compactBytes: null,
       });
     }
 
-    if (files.length > room) {
-      setComposerError(`Only ${room} more file${room === 1 ? '' : 's'} can be attached.`);
-    }
     if (accepted.length > 0) {
       setAttachments((items) => [...items, ...accepted]);
-      setComposerError(null);
     }
+    if (decision.error) setComposerError(decision.error);
+    else if (accepted.length > 0) setComposerError(null);
+
+    for (const item of accepted) {
+      if (item.treatAs === 'photo') void preparePhotoAttachment(item.id, item.originalFile);
+    }
+  }
+
+  async function preparePhotoAttachment(id: string, original: File): Promise<void> {
+    try {
+      const photoFile = await stripPhotoExif(original);
+      const compact = await compactPhoto(photoFile);
+      updateAttachment(id, {
+        photoFile,
+        file: photoFile,
+        compactFile: compact?.file ?? null,
+        compactBytes: compact?.compactBytes ?? null,
+      });
+    } catch {
+      // Keep the staged original; Send original still works.
+    }
+  }
+
+  function choosePhotoQuality(id: string, quality: PhotoQuality): void {
+    const item = attachments().find((entry) => entry.id === id);
+    if (!item) return;
+    const nextFile = quality === 'compact'
+      ? (item.compactFile ?? item.photoFile ?? item.file)
+      : (item.photoFile ?? item.file);
+    updateAttachment(id, {
+      quality,
+      sendOriginal: false,
+      treatAs: 'photo',
+      file: nextFile,
+    });
+  }
+
+  function chooseSendOriginal(id: string): void {
+    const item = attachments().find((entry) => entry.id === id);
+    if (!item) return;
+    updateAttachment(id, {
+      sendOriginal: true,
+      file: keepOriginalFile(item.originalFile),
+    });
   }
 
   function removeAttachment(id: string): void {
@@ -917,7 +974,7 @@ export function Composer(props: ComposerProps): JSX.Element {
       });
 
       try {
-        const result = await uploadFile(item.file, {
+        const result = await uploadFile(fileToUpload(item), {
           mediaUrl,
           signal,
           onProgress: (progress) => {
@@ -1017,10 +1074,11 @@ export function Composer(props: ComposerProps): JSX.Element {
       for (let i = 0; i < urls.length; i += 1) {
         const url = urls[i]!;
         const item = attachments().find((a) => a.uploadedUrl === url) ?? attachments()[i];
+        const outgoing = item ? fileToUpload(item) : null;
         const line = buildAttachmentMessage({
           url,
-          name: item?.file.name,
-          sizeBytes: item?.file.size,
+          name: outgoing?.name ?? item?.file.name,
+          sizeBytes: outgoing?.size ?? item?.file.size,
           caption: i === 0 ? baseContent || undefined : undefined,
         });
         if (line) attachmentLines.push(line);
@@ -1192,7 +1250,34 @@ export function Composer(props: ComposerProps): JSX.Element {
                 </Show>
                 <div class="shell-attachment-meta">
                   <span class="shell-attachment-name">{item.file.name}</span>
-                  <span class="shell-attachment-size">{formatBytes(item.file.size)}</span>
+                  <span class="shell-attachment-size">{formatBytes(fileToUpload(item).size)}</span>
+                  <Show when={item.treatAs === 'photo'}>
+                    <div class="shell-attachment-quality" role="radiogroup" aria-label={`Photo quality for ${item.originalFile.name}`}>
+                      <For each={photoQualityOptions(item.originalBytes, item.compactBytes)}>
+                        {(option) => (
+                          <button
+                            type="button"
+                            class="shell-attachment-quality-opt"
+                            role="radio"
+                            aria-checked={!item.sendOriginal && item.quality === option.quality}
+                            disabled={item.status === 'uploading'}
+                            onClick={() => choosePhotoQuality(item.id, option.quality)}
+                          >
+                            {option.label}
+                          </button>
+                        )}
+                      </For>
+                      <button
+                        type="button"
+                        class="shell-attachment-quality-opt"
+                        aria-pressed={item.sendOriginal}
+                        disabled={item.status === 'uploading'}
+                        onClick={() => chooseSendOriginal(item.id)}
+                      >
+                        Send original
+                      </button>
+                    </div>
+                  </Show>
                   <Show when={item.status === 'uploading'}>
                     <progress
                       class="shell-attachment-progress"

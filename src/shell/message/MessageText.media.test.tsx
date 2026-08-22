@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import 'fake-indexeddb/auto';
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { setPreference } from '@/lib/prefs/preferences';
 import { clearVault, importVault, loadRecent, parseVaultExport } from '@/lib/vault/historyVault';
@@ -194,6 +194,27 @@ describe('MessageText external media hardening', () => {
     expect(screen.getByRole('dialog', { name: 'Image' })).toBeInTheDocument();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(screen.queryByRole('dialog', { name: 'Image' })).toBeNull();
+  });
+
+  it('does not auto-save on lightbox open and saves only from Save', () => {
+    const href = new URL('/uploads/local.png', window.location.href).toString();
+    const downloads: string[] = [];
+    const click = HTMLAnchorElement.prototype.click;
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function mockClick(this: HTMLAnchorElement) {
+      if (this.hasAttribute('download') || this.download) {
+        downloads.push(this.download || this.getAttribute('download') || '');
+        return;
+      }
+      click.call(this);
+    });
+
+    render(() => <MessageText text={href} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open image' }));
+    expect(screen.getByRole('dialog', { name: 'Image' })).toBeInTheDocument();
+    expect(downloads).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(downloads).toEqual(['local.png']);
   });
 
   it('never auto-loads a credential-bearing URL as a message subresource', () => {

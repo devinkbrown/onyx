@@ -38,6 +38,7 @@ import {
   extractAttachmentPresentation,
   type ParsedAttachment,
 } from '@/lib/upload/attachmentMessage';
+import { saveMediaFromUserGesture } from '@/lib/upload/saveMedia';
 import { fetchLinkPreview, isPreviewableUrl, pickPreviewUrl } from '@/lib/preview/linkPreview';
 import {
   mayUnfurlUrl,
@@ -178,14 +179,23 @@ function MessageImageLightbox(props: {
             class="shell-msg-lightbox-img"
             referrerPolicy="no-referrer"
           />
-          <button
-            type="button"
-            class="shell-msg-lightbox-close"
-            aria-label="Close"
-            onClick={() => local.onClose()}
-          >
-            ×
-          </button>
+          <div class="shell-msg-lightbox-actions">
+            <button
+              type="button"
+              class="shell-msg-lightbox-save"
+              onClick={() => saveMediaFromUserGesture({ href: local.src })}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              class="shell-msg-lightbox-close"
+              aria-label="Close"
+              onClick={() => local.onClose()}
+            >
+              ×
+            </button>
+          </div>
         </div>
       </div>
     </Portal>

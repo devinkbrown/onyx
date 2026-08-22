@@ -6,6 +6,7 @@
  * People visible at 0 with truthful aria-expanded; conn always present;
  * call lifecycle truth table; More section headings + valid menus.
  */
+import 'fake-indexeddb/auto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -385,13 +386,15 @@ describe('PresenceRibbon commercial room header', () => {
     const inviteIdx = labels.findIndex((t) => t.includes('Invite friends'));
     const settingsIdx = labels.findIndex((t) => t.includes('Room settings'));
     const ledgerIdx = labels.findIndex((t) => t.includes('Room ledger'));
+    const mediaIdx = labels.findIndex((t) => t.includes('Pictures, files, and links'));
     const pinsIdx = labels.findIndex((t) => t.includes('Pinned messages'));
     const jumpIdx = labels.findIndex((t) => t.includes('Jump to date'));
     const youIdx = labels.findIndex((t) => t.includes('You') || t.includes('Guest'));
     expect(inviteIdx).toBeGreaterThanOrEqual(0);
     expect(settingsIdx).toBeGreaterThan(inviteIdx);
     expect(ledgerIdx).toBeGreaterThan(settingsIdx);
-    expect(pinsIdx).toBeGreaterThan(ledgerIdx);
+    expect(mediaIdx).toBeGreaterThan(ledgerIdx);
+    expect(pinsIdx).toBeGreaterThan(mediaIdx);
     expect(jumpIdx).toBeGreaterThan(pinsIdx);
     expect(youIdx).toBeGreaterThan(jumpIdx);
     expect(screen.getByTestId('ribbon-channel-ledger')).toHaveAttribute(
@@ -454,6 +457,18 @@ describe('PresenceRibbon commercial room header', () => {
     });
   });
 
+  it('opens Pictures, files, and links from More for the current room', async () => {
+    seedChannel();
+    render(() => <PresenceRibbon />);
+    expect(screen.queryByTestId('room-media-index')).not.toBeInTheDocument();
+    openMore();
+    fireEvent.click(screen.getByTestId('ribbon-room-media'));
+    await waitFor(() => {
+      expect(screen.getByTestId('room-media-index')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('dialog', { name: 'Pictures, files, and links' })).toBeInTheDocument();
+  });
+
   it('wires Jump to date from More (This room) with one-click openJumpToDate', async () => {
     seedChannel();
     const openSpy = vi.spyOn(store.getState(), 'openJumpToDate');
@@ -485,6 +500,7 @@ describe('PresenceRibbon commercial room header', () => {
     expect(screen.queryByTestId('ribbon-members')).not.toBeInTheDocument();
     openMore();
     expect(screen.getByText('Conversation')).toBeInTheDocument();
+    expect(screen.getByTestId('ribbon-room-media')).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-preferences')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-settings-gear')).not.toBeInTheDocument();

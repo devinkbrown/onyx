@@ -584,7 +584,37 @@ describe('Composer accessibility', () => {
 
     // Assert — the failure is exposed to AT via an assertive alert.
     const alert = getByRole('alert');
-    expect(alert.textContent).toMatch(/larger than/i);
+    expect(alert.textContent).toBe('huge.bin is larger than 25 MB.');
+  });
+
+  it('rejects a sixth file with the published 5-file copy', () => {
+    seedActiveChannel();
+    const { getByRole, getByLabelText, getAllByRole } = render(() => <Composer />);
+    const fileInput = getByLabelText('Choose files to attach') as HTMLInputElement;
+    const files = Array.from({ length: 6 }, (_, index) => (
+      new File(['x'], `part-${index + 1}.txt`, { type: 'text/plain' })
+    ));
+    Object.defineProperty(fileInput, 'files', { value: files, configurable: true });
+    fireEvent.change(fileInput);
+
+    expect(getByRole('alert').textContent).toBe('You can attach up to 5 files.');
+    expect(getAllByRole('listitem')).toHaveLength(5);
+  });
+
+  it('defaults photos to Original with a size label and offers Send original', async () => {
+    seedActiveChannel();
+    const { getByLabelText, findByRole, getByRole } = render(() => <Composer />);
+    const fileInput = getByLabelText('Choose files to attach') as HTMLInputElement;
+    const photo = new File([Uint8Array.from([0xff, 0xd8, 0xff, 0xd9])], 'harbour.jpg', {
+      type: 'image/jpeg',
+    });
+    Object.defineProperty(fileInput, 'files', { value: [photo], configurable: true });
+    fireEvent.change(fileInput);
+
+    const original = await findByRole('radio', { name: /Original ·/ });
+    expect(original).toHaveAttribute('aria-checked', 'true');
+    expect(original.textContent).toMatch(/B|KB|MB/);
+    expect(getByRole('button', { name: 'Send original' })).toBeInTheDocument();
   });
 });
 

@@ -26,6 +26,7 @@ import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Popover } from '@/primitives/index';
 import { ChannelSettings } from './ChannelSettings';
+import { RoomMediaIndex } from './RoomMediaIndex';
 import { openRoomInviteShare } from './roomInviteShareState';
 import { ChannelNotifyControl } from './ChannelNotifyControl';
 import { NotificationCenter } from './NotificationCenter';
@@ -290,6 +291,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     return selectGroupControlRoom(runtime, room) ? room : null;
   });
   const [settingsOpen, setSettingsOpen] = createSignal(false);
+  const [mediaIndexOpen, setMediaIndexOpen] = createSignal(false);
   const [moreOpen, setMoreOpen] = createSignal(false);
   let moreMenuRef: HTMLDivElement | undefined;
 
@@ -1070,6 +1072,23 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       type="button"
                       class="shell-ribbon-more-item"
                       role="menuitem"
+                      data-testid="ribbon-room-media"
+                      aria-label={`Pictures, files, and links for ${settingsChannel()}`}
+                      onClick={() => closeMoreThen(() => setMediaIndexOpen(true))}
+                      onKeyDown={onMoreMenuKeyDown}
+                    >
+                      <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="5" width="16" height="14" rx="3" />
+                        <circle cx="9" cy="10" r="1.6" />
+                        <path d="m7 16 3.2-3.2L13 15l2-2 3 3" />
+                      </svg>
+                      <span>Pictures, files, and links</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="shell-ribbon-more-item"
+                      role="menuitem"
                       aria-label={
                         pinCount() > 0
                           ? `${pinCount()} pinned message${pinCount() === 1 ? '' : 's'}`
@@ -1150,6 +1169,23 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       role="menu"
                       aria-labelledby="ribbon-more-conv-label"
                     >
+                      <button
+                        type="button"
+                        class="shell-ribbon-more-item"
+                        role="menuitem"
+                        data-testid="ribbon-room-media"
+                        aria-label={`Pictures, files, and links for ${nick()}`}
+                        onClick={() => closeMoreThen(() => setMediaIndexOpen(true))}
+                        onKeyDown={onMoreMenuKeyDown}
+                      >
+                        <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="4" y="5" width="16" height="14" rx="3" />
+                          <circle cx="9" cy="10" r="1.6" />
+                          <path d="m7 16 3.2-3.2L13 15l2-2 3 3" />
+                        </svg>
+                        <span>Pictures, files, and links</span>
+                      </button>
                       {jumpDateMenuItem(`Jump to date in DM with ${nick()}`)}
                     </div>
                   </div>
@@ -1231,6 +1267,15 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
             channel={name()}
             open={settingsOpen()}
             onOpenChange={setSettingsOpen}
+          />
+        )}
+      </Show>
+      <Show when={channelName() && (activeView().kind === 'channel' || activeView().kind === 'dm')}>
+        {(target) => (
+          <RoomMediaIndex
+            target={target()}
+            open={mediaIndexOpen()}
+            onOpenChange={setMediaIndexOpen}
           />
         )}
       </Show>

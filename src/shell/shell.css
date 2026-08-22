@@ -4824,10 +4824,10 @@
 
 .shell-attachment {
   display: grid;
-  grid-template-columns: 38px minmax(110px, 1fr) 24px;
-  align-items: center;
+  grid-template-columns: 38px minmax(110px, 1fr) 44px;
+  align-items: start;
   gap: var(--space-2);
-  max-width: min(100%, 340px);
+  max-width: min(100%, 360px);
   padding: var(--space-1);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
@@ -4896,9 +4896,39 @@
   accent-color: var(--lapis-bright);
 }
 
+.shell-attachment-quality {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shell-attachment-quality-opt {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--seam-faint);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--paper);
+  font-family: var(--font-sans, inherit);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.shell-attachment-quality-opt[aria-checked='true'],
+.shell-attachment-quality-opt[aria-pressed='true'] {
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone-2) 46%, transparent);
+}
+
+.shell-attachment-quality-opt:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
 .shell-attachment-remove {
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 1px solid var(--seam-faint);
@@ -7268,7 +7298,7 @@
   .shell-composer-inner { gap: 3px; }
   .shell-command-item { grid-template-columns: 1fr; gap: 2px; }
   .shell-emoji-grid { grid-template-columns: repeat(7, minmax(28px, 1fr)); }
-  .shell-attachment { grid-template-columns: 34px minmax(0, 1fr) 24px; max-width: 100%; }
+  .shell-attachment { grid-template-columns: 34px minmax(0, 1fr) 44px; max-width: 100%; }
   .shell-msg-group,
   .shell-msg-cont {
     padding-inline: 8px;
@@ -8377,12 +8407,19 @@
   background: color-mix(in oklab, var(--ink) 50%, var(--stone-2));
 }
 
-.shell-msg-lightbox-close {
+.shell-msg-lightbox-actions {
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 32px;
-  height: 32px;
+  display: flex;
+  gap: 8px;
+}
+
+.shell-msg-lightbox-save,
+.shell-msg-lightbox-close {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
   display: grid;
   place-items: center;
   border: 1px solid var(--seam-faint);
@@ -8391,13 +8428,23 @@
   color: var(--paper);
   cursor: pointer;
   line-height: 1;
+  font-family: var(--font-sans, inherit);
+  font-size: 0.82rem;
 }
 
+.shell-msg-lightbox-close {
+  width: 44px;
+  padding: 0;
+}
+
+.shell-msg-lightbox-save:hover,
+.shell-msg-lightbox-save:focus-visible,
 .shell-msg-lightbox-close:hover,
 .shell-msg-lightbox-close:focus-visible {
   border-color: var(--seam);
 }
 
+.shell-msg-lightbox-save:focus-visible,
 .shell-msg-lightbox-close:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 2px;
