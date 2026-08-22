@@ -4,7 +4,8 @@
  *
  * Reads store: channels, dms, offlineMemo, peerKeyChanges, activeView,
  * connectionStatus. Messages rows are name + preview + unread — no list
- * padlock. A pending key-change may mark that row only.
+ * padlock. Messages sort by last message / lastSeen recency, not nick.
+ * A pending key-change may mark that row only.
  * Actions: joinChannel (store), navigate (store). Offline-memo aggregates
  * surface as a calm "N offline" stamp on DM rows; navigate → clearOfflineMemo
  * drops the map entry and the stamp clears reactively.
@@ -31,6 +32,7 @@ import {
   filterSidebarNames,
   matchesSidebarQuery,
 } from '@/lib/channel/sidebarFilter';
+import { sortMessagesInbox } from '@/lib/channel/messagesInbox';
 import { normalizeRoomTarget } from './roomIdentity';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { latestDmListPreview } from '@/lib/e2ee/dmPrivacyChrome';
@@ -347,12 +349,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     getState().toggleFolderCollapsed(id);
   }
 
-  // ── sorted DM list ──
+  // ── Messages inbox: recency (last message / lastSeen), not nick alpha ──
   const sortedDms = createMemo(() => {
     const entries: DMConversation[] = [];
     dms().forEach((dm) => entries.push(dm));
-    const sorted = entries.sort((a, b) => a.nick.localeCompare(b.nick));
-    return filterSidebarNames(sorted, listFilter(), (dm) => dm.nick, {
+    return filterSidebarNames(sortMessagesInbox(entries), listFilter(), (dm) => dm.nick, {
       unreadOnly: unreadOnly(),
     });
   });
@@ -875,7 +876,9 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                         aria-label={`DM with ${dm.nick}${preview() ? `, ${preview()}` : ''}${keyChanged() ? ', device key changed' : ''}${unreadLabel(dm.unread, dm.highlights)}${offlineMemoLabel(offlineCount())}`}
                         onClick={() => handleDmClick(dm)}
                       >
-                        <span class="shell-channel-sigil" aria-hidden="true">@</span>
+                        <span class="shell-dm-avatar" aria-hidden="true">
+                          {(dm.nick.trim().charAt(0) || '?').toUpperCase()}
+                        </span>
                         <span class="shell-dm-copy">
                           <span class="shell-channel-name">{dm.nick}</span>
                           <Show when={preview()}>

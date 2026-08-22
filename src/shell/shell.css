@@ -1093,6 +1093,21 @@
   white-space: normal;
 }
 
+.shell-dm-avatar {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--stone-3) 72%, var(--lapis-deep));
+  color: var(--paper);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .shell-dm-copy {
   flex: 1;
   min-width: 0;
