@@ -7,7 +7,7 @@
  * by the pure {@link buildFacepile} — this component only renders it.
  *
  * Each face opens the consumer people card (display name, avatar, Message /
- * Mention / Ignore). Network details stay under Advanced on that card.
+ * Mention / Block / Report). Network details stay under Advanced on that card.
  *
  * SOLID IDIOMS: never destructure props; splitProps; createMemo; For/Show;
  * component body runs once.

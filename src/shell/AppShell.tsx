@@ -45,6 +45,7 @@ const WhoisSheet = lazy(() => import('./WhoisSheet').then((m) => ({ default: m.W
 import { PresenceRibbon } from './PresenceRibbon';
 import { RoomInviteShareHost } from './RoomInviteShare';
 import { HarborConfirmHost } from './HarborConfirmSheet';
+import { PersonSafetyHost } from './people/PersonSafetySheet';
 import { StagePanel } from './StagePanel';
 import { GuestClaimPrompt } from './GuestClaimPrompt';
 import { FirstRunNotifyPrompt } from './FirstRunNotifyPrompt';
@@ -1583,6 +1584,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
 
       <RoomInviteShareHost />
       <HarborConfirmHost />
+      <PersonSafetyHost />
 
       {/* Keyboard shortcuts help overlay — opened with "?" or Home shortcuts action */}
       <Show when={showKeyboardShortcuts()}>

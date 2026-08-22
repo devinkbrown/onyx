@@ -2,7 +2,7 @@
 /**
  * IgnoredUsersControl — device-local ignore list manager for Preferences.
  *
- * Complements message-menu Ignore and /ignore|/unignore. Device-only: does not
+ * Complements people-card Block and /ignore|/unignore. Device-only: does not
  * talk to the network; identity-scoped via store ignoreUser/unignoreUser.
  */
 import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
@@ -26,7 +26,7 @@ export function IgnoredUsersControl(): JSX.Element {
   function addNick(): void {
     const nick = draft().trim();
     if (!nick) {
-      setError('Enter a name to ignore on this device.');
+      setError('Enter a name to block on this device.');
       return;
     }
     if (nick.length > MAX_IGNORED_NICK_LENGTH) {
@@ -35,7 +35,7 @@ export function IgnoredUsersControl(): JSX.Element {
     }
     const self = getState().ourNick?.toLowerCase();
     if (self && nick.toLowerCase() === self) {
-      setError('You cannot ignore yourself.');
+      setError('You cannot block yourself.');
       return;
     }
     getState().ignoreUser(nick);
@@ -43,8 +43,8 @@ export function IgnoredUsersControl(): JSX.Element {
     setError(null);
     getState().addToast({
       variant: 'info',
-      title: `Ignoring ${nick}`,
-      description: 'Their messages are hidden on this device. Notifications are silenced too.',
+      title: `Blocked ${nick}`,
+      description: 'You will not see them on this device. They are not told.',
     });
   }
 
@@ -52,7 +52,7 @@ export function IgnoredUsersControl(): JSX.Element {
     getState().unignoreUser(nick);
     getState().addToast({
       variant: 'info',
-      title: `Unignored ${nick}`,
+      title: `Unblocked ${nick}`,
       description: 'Messages and notifications from this name resume on this device.',
     });
   }
@@ -64,18 +64,18 @@ export function IgnoredUsersControl(): JSX.Element {
       data-testid="pref-ignored-users"
     >
       <div class="pref-group-head">
-        <h3 id="pref-ignored-users-title" class="pref-label">Ignored names</h3>
+        <h3 id="pref-ignored-users-title" class="pref-label">Blocked names</h3>
         <span class="pref-count" data-testid="pref-ignored-users-count">
           {list().length === 0 ? 'None' : `${list().length}`}
         </span>
       </div>
       <p class="pref-desc">
-        Device-only hide list. Ignored names&apos; messages and notifications stay silent here;
-        the network is not told. Message menu Ignore and /ignore share this list.
+        You will not see them on this device. They are not told. People-card Block
+        and /ignore share this list.
       </p>
 
-      <div class="ignored-users-add" role="group" aria-label="Add name to ignore list">
-        <label class="sr-only" for="pref-ignore-nick-input">Name to ignore</label>
+      <div class="ignored-users-add" role="group" aria-label="Add name to blocked list">
+        <label class="sr-only" for="pref-ignore-nick-input">Name to block</label>
         <input
           id="pref-ignore-nick-input"
           class="pref-text-input"
@@ -103,7 +103,7 @@ export function IgnoredUsersControl(): JSX.Element {
           data-testid="pref-ignore-add"
           onClick={addNick}
         >
-          Ignore
+          Block
         </button>
       </div>
       <Show when={error()}>
@@ -118,7 +118,7 @@ export function IgnoredUsersControl(): JSX.Element {
         when={list().length > 0}
         fallback={
           <p class="ignored-users-empty" data-testid="pref-ignored-users-empty">
-            No nicks ignored on this device.
+            Nobody blocked on this device.
           </p>
         }
       >
@@ -131,10 +131,10 @@ export function IgnoredUsersControl(): JSX.Element {
                   type="button"
                   class="ignored-users-unignore"
                   data-testid={`pref-unignore-${nick}`}
-                  aria-label={`Stop ignoring ${nick}`}
+                  aria-label={`Unblock ${nick}`}
                   onClick={() => removeNick(nick)}
                 >
-                  Unignore
+                  Unblock
                 </button>
               </li>
             )}

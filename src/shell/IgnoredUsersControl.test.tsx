@@ -52,7 +52,7 @@ describe('IgnoredUsersControl', () => {
 
   it('shows empty state when nobody is ignored', () => {
     render(() => <IgnoredUsersControl />);
-    expect(screen.getByTestId('pref-ignored-users-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('pref-ignored-users-empty')).toHaveTextContent('Nobody blocked');
     expect(screen.getByTestId('pref-ignored-users-count')).toHaveTextContent('None');
   });
 
@@ -82,7 +82,7 @@ describe('IgnoredUsersControl', () => {
   it('refuses empty and self nicks', () => {
     render(() => <IgnoredUsersControl />);
     fireEvent.click(screen.getByTestId('pref-ignore-add'));
-    expect(screen.getByTestId('pref-ignore-error')).toHaveTextContent(/Enter a name/i);
+    expect(screen.getByTestId('pref-ignore-error')).toHaveTextContent(/Enter a name to block/i);
 
     fireEvent.input(screen.getByTestId('pref-ignore-nick-input'), {
       target: { value: 'Self' },

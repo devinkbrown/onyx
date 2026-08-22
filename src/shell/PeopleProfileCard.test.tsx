@@ -6,6 +6,8 @@ import type { Channel, ChannelUser } from '@/lib/irc/types';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import { PEOPLE_PROFILE_ADVANCED_TESTID, PeopleProfileCard } from './PeopleProfileCard';
+import { PersonSafetyHost } from './people/PersonSafetySheet';
+import { closePersonSafety } from './people/personSafetyState';
 
 const initialState = store.getInitialState();
 
@@ -45,6 +47,7 @@ function seedRoom(users: ChannelUser[], ourNick = 'me'): void {
 
 afterEach(() => {
   cleanup();
+  closePersonSafety();
 });
 
 beforeEach(() => {
@@ -54,7 +57,7 @@ beforeEach(() => {
 });
 
 describe('PeopleProfileCard', () => {
-  it('shows a consumer card with display name, about, and Message / Mention / Ignore', () => {
+  it('shows a consumer card with display name, about, and Message / Mention / Block / Report', () => {
     seedRoom([makeUser('me', { modes: new Set(['o']) }), makeUser('bob')]);
     store.setState({
       userProfiles: new Map([['bob', {
@@ -71,8 +74,9 @@ describe('PeopleProfileCard', () => {
     expect(screen.getByText('bob')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send DM to bob' })).toBeInTheDocument();
     expect(screen.getByTestId('member-card-mention')).toBeInTheDocument();
-    expect(screen.getByTestId('member-card-ignore')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Report/i })).toBeNull();
+    expect(screen.getByTestId('member-card-block')).toBeInTheDocument();
+    expect(screen.getByTestId('member-card-report')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Mute room|Leave room|Hide room/i })).toBeNull();
     expect(card.querySelector('.shell-people-card-identity')).not.toHaveTextContent('Voice');
     expect(card.querySelector('.shell-role-badge')).toBeNull();
     expect(card.querySelector('.shell-people-card-advanced')).toBeTruthy();
@@ -113,15 +117,84 @@ describe('PeopleProfileCard', () => {
     expect(screen.getByRole('button', { name: 'Kick bob from #general' })).toBeInTheDocument();
   });
 
-  it('hides Message and Ignore on your own card', () => {
+  it('hides Message, Block, and Report on your own card', () => {
     seedRoom([makeUser('me', { modes: new Set(['o']) })]);
 
     render(() => <PeopleProfileCard nick="me" channel="#general" />);
 
     expect(screen.getByRole('region', { name: 'me' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Send DM to me' })).toBeNull();
-    expect(screen.queryByTestId('member-card-ignore')).toBeNull();
+    expect(screen.queryByTestId('member-card-block')).toBeNull();
+    expect(screen.queryByTestId('member-card-report')).toBeNull();
     fireEvent.click(screen.getByTestId(PEOPLE_PROFILE_ADVANCED_TESTID));
     expect(screen.getByRole('button', { name: 'View profile of me' })).toBeInTheDocument();
+  });
+
+  it('marks a nameless account as Guest and still offers Block', () => {
+    seedRoom([makeUser('me'), makeUser('wanderer')]);
+
+    render(() => <PeopleProfileCard nick="wanderer" channel="#general" />);
+
+    expect(screen.getByText('Guest')).toBeInTheDocument();
+    expect(screen.getByTestId('member-card-block')).toBeInTheDocument();
+  });
+
+  it('asks before blocking, then hides their messages via ignore', () => {
+    seedRoom([makeUser('me'), makeUser('bob')], 'me');
+    store.setState({
+      server: {
+        id: 'people-card',
+        name: 'People',
+        network: 'People',
+        url: 'wss://people-card.test/ws',
+        icon: '',
+        nick: 'me',
+        account: 'me',
+        connected: true,
+      },
+    });
+
+    render(() => (
+      <>
+        <PeopleProfileCard nick="bob" channel="#general" />
+        <PersonSafetyHost />
+      </>
+    ));
+
+    fireEvent.click(screen.getByTestId('member-card-block'));
+    expect(store.getState().ignoredUsers.has('bob')).toBe(false);
+    fireEvent.click(screen.getByTestId('person-block-confirm'));
+    expect(store.getState().ignoredUsers.has('bob')).toBe(true);
+  });
+
+  it('unblocks from the same card and refuses a new DM while blocked', () => {
+    seedRoom([makeUser('me'), makeUser('bob')]);
+    store.setState({
+      server: {
+        id: 'people-card',
+        name: 'People',
+        network: 'People',
+        url: 'wss://people-card.test/ws',
+        icon: '',
+        nick: 'me',
+        account: 'me',
+        connected: true,
+      },
+    });
+    store.getState().ignoreUser('bob');
+    const navigate = vi.fn();
+    const addToast = vi.fn();
+    store.setState({ navigate, addToast });
+
+    render(() => <PeopleProfileCard nick="bob" channel="#general" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send DM to bob' }));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(addToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'You blocked bob',
+    }));
+
+    fireEvent.click(screen.getByTestId('member-card-block'));
+    expect(store.getState().ignoredUsers.has('bob')).toBe(false);
   });
 });

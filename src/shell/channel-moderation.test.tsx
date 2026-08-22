@@ -105,7 +105,8 @@ describe('MemberList moderation', () => {
     expect(screen.getByRole('region', { name: 'bob' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send DM to bob' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mention bob in the composer' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ignore bob on this device' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Block bob on this device' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Report bob' })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
     expect(screen.getByRole('button', { name: 'View profile of bob' })).toBeInTheDocument();
   });

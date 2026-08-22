@@ -90,7 +90,7 @@ describe('Facepile', () => {
     expect(screen.getByRole('region', { name: 'ada' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send DM to ada' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mention ada in the composer' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ignore ada on this device' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Report/i })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Block ada on this device' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Report ada' })).toBeInTheDocument();
   });
 });
