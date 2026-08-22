@@ -33,7 +33,7 @@ describe('MessageText external media hardening', () => {
     expect(image).toHaveAttribute('decoding', 'async');
     expect(image).toHaveAttribute('referrerpolicy', 'no-referrer');
     expect(image).not.toHaveAttribute('crossorigin');
-    expect(image?.closest('a')).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(image?.closest('button')).toHaveAttribute('aria-label', 'Open image');
   });
 
   it('preserves automatic same-origin image previews', () => {
@@ -151,6 +151,49 @@ describe('MessageText external media hardening', () => {
       name: 'Load external image from tracker.example.test',
     }));
     expect(container.querySelector('img.shell-msg-media-img')).toHaveAttribute('src', href);
+  });
+
+  it('renders an attached photo without the [file:] receipt text', () => {
+    const href = new URL('/uploads/harbour.png', window.location.href).toString();
+    const { container } = render(() => (
+      <MessageText text={`harbour at dusk\n[file: harbour.png] 2.0 KB ${href}`} />
+    ));
+
+    expect(screen.getByText('harbour at dusk')).toBeInTheDocument();
+    expect(screen.queryByText(/\[file:/)).toBeNull();
+    expect(screen.queryByText(href)).toBeNull();
+    expect(container.querySelector('img.shell-msg-media-img')).toHaveAttribute('src', href);
+  });
+
+  it('renders a non-image attachment as a name-and-size chip', () => {
+    const href = 'https://cdn.example.test/notes.pdf';
+    render(() => (
+      <MessageText text={`[file: notes.pdf] 12.0 KB ${href}`} />
+    ));
+
+    expect(screen.queryByText(/\[file:/)).toBeNull();
+    expect(screen.queryByText(href)).toBeNull();
+    const chip = screen.getByRole('link', { name: /notes\.pdf/ });
+    expect(chip).toHaveClass('shell-msg-file');
+    expect(chip).toHaveAttribute('href', href);
+    expect(chip).toHaveTextContent('12.0 KB');
+  });
+
+  it('opens a lightbox from an inline image and closes on backdrop and Escape', () => {
+    const href = new URL('/uploads/local.png', window.location.href).toString();
+    render(() => <MessageText text={href} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open image' }));
+    const dialog = screen.getByRole('dialog', { name: 'Image' });
+    expect(dialog.querySelector('img.shell-msg-lightbox-img')).toHaveAttribute('src', href);
+
+    fireEvent.click(document.querySelector('.shell-msg-lightbox-backdrop')!);
+    expect(screen.queryByRole('dialog', { name: 'Image' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open image' }));
+    expect(screen.getByRole('dialog', { name: 'Image' })).toBeInTheDocument();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(screen.queryByRole('dialog', { name: 'Image' })).toBeNull();
   });
 
   it('never auto-loads a credential-bearing URL as a message subresource', () => {

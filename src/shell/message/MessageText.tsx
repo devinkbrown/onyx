@@ -30,7 +30,14 @@ import {
   type JSX,
 } from 'solid-js';
 import { createResource } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { preferences } from '@/lib/prefs/preferences';
+import { createDialogFocus } from '@/primitives/focusTrap';
+import {
+  classifyAttachmentKind,
+  extractAttachmentPresentation,
+  type ParsedAttachment,
+} from '@/lib/upload/attachmentMessage';
 import { fetchLinkPreview, isPreviewableUrl, pickPreviewUrl } from '@/lib/preview/linkPreview';
 import {
   mayUnfurlUrl,
@@ -67,10 +74,6 @@ import type {
 } from '@/lib/format/parseMessage';
 
 // ── Media detection ───────────────────────────────────────────────────────────
-
-const IMAGE_EXTS = /\.(png|jpe?g|gif|webp|avif)(\?.*)?$/i;
-const VIDEO_EXTS = /\.(mp4|webm)(\?.*)?$/i;
-const AUDIO_EXTS = /\.(mp3|ogg|wav)(\?.*)?$/i;
 
 type MediaKind = 'image' | 'video' | 'audio' | null;
 
@@ -127,18 +130,8 @@ function resourceHost(url: string): string {
 }
 
 function detectMediaKind(url: string): MediaKind {
-  try {
-    // Only allow https/http
-    const u = new URL(url);
-    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
-    const path = u.pathname;
-    if (IMAGE_EXTS.test(path)) return 'image';
-    if (VIDEO_EXTS.test(path)) return 'video';
-    if (AUDIO_EXTS.test(path)) return 'audio';
-    return null;
-  } catch {
-    return null;
-  }
+  const kind = classifyAttachmentKind(url);
+  return kind === 'file' ? null : kind;
 }
 
 // ── Media unfurl ──────────────────────────────────────────────────────────────
@@ -148,10 +141,114 @@ type MediaUnfurlProps = {
   kind: MediaKind;
 };
 
+function MessageImageLightbox(props: {
+  src: string;
+  onClose: () => void;
+  returnFocus: HTMLElement | null;
+}): JSX.Element {
+  const [local] = splitProps(props, ['src', 'onClose', 'returnFocus']);
+  let dialogRef: HTMLDivElement | undefined;
+
+  createDialogFocus({
+    isOpen: () => true,
+    getPanel: () => dialogRef,
+    onEscape: () => local.onClose(),
+    getReturnFocus: () => local.returnFocus,
+  });
+
+  return (
+    <Portal>
+      <div class="shell-msg-lightbox" role="presentation">
+        <div
+          class="shell-msg-lightbox-backdrop"
+          aria-hidden="true"
+          onClick={() => local.onClose()}
+        />
+        <div
+          ref={dialogRef}
+          class="shell-msg-lightbox-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image"
+          tabindex="-1"
+        >
+          <img
+            src={local.src}
+            alt=""
+            class="shell-msg-lightbox-img"
+            referrerPolicy="no-referrer"
+          />
+          <button
+            type="button"
+            class="shell-msg-lightbox-close"
+            aria-label="Close"
+            onClick={() => local.onClose()}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    </Portal>
+  );
+}
+
+function FileChip(props: {
+  name: string | null;
+  sizeLabel: string | null;
+  href: string;
+}): JSX.Element {
+  const [local] = splitProps(props, ['name', 'sizeLabel', 'href']);
+  const label = createMemo(() => local.name ?? 'File');
+
+  return (
+    <a
+      href={local.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="shell-msg-file"
+    >
+      <span class="shell-msg-file-name">{label()}</span>
+      <Show when={local.sizeLabel}>
+        {(size) => <span class="shell-msg-file-size">{size()}</span>}
+      </Show>
+    </a>
+  );
+}
+
+function AttachmentBlock(props: { item: ParsedAttachment }): JSX.Element {
+  const [local] = splitProps(props, ['item']);
+  const mediaKind = createMemo<MediaKind>(() => (
+    local.item.kind === 'image' || local.item.kind === 'video' ? local.item.kind : null
+  ));
+  const canUnfurl = createMemo(() => {
+    if (mediaKind() === null || !isAutoLoadableHttpUrl(local.item.url)) return false;
+    // First-party uploads are chat media, not an OpenGraph unfurl. Cross-origin
+    // still honors the link-preview preference (consent lives in MediaUnfurl).
+    return isSameOriginHttpUrl(local.item.url) || liveUnfurlPrivacy().linkPreviews;
+  });
+
+  return (
+    <Show
+      when={canUnfurl()}
+      fallback={(
+        <FileChip
+          name={local.item.name}
+          sizeLabel={local.item.sizeLabel}
+          href={local.item.url}
+        />
+      )}
+    >
+      <MediaUnfurl href={local.item.url} kind={mediaKind()} />
+    </Show>
+  );
+}
+
 function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
   const [local] = splitProps(props, ['href', 'kind']);
   const [failed, setFailed] = createSignal(false);
   const [externalAllowed, setExternalAllowed] = createSignal(false);
+  const [lightboxOpen, setLightboxOpen] = createSignal(false);
+  let lightboxTrigger: HTMLElement | null = null;
 
   // Defense in depth at the sink: only credential-free same-origin or public
   // http(s) may reach the media gate. Public cross-origin resources remain
@@ -167,6 +264,7 @@ function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
     observedResource = nextResource;
     setFailed(false);
     setExternalAllowed(false);
+    setLightboxOpen(false);
   });
 
   const allowedHref = createMemo(() => {
@@ -212,12 +310,14 @@ function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
               >
                 <Switch>
                   <Match when={local.kind === 'image'}>
-                    <a
-                      href={allowed()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="shell-msg-media-link"
-                      aria-label="Open image in new tab"
+                    <button
+                      type="button"
+                      class="shell-msg-media-open"
+                      aria-label="Open image"
+                      onClick={(event) => {
+                        lightboxTrigger = event.currentTarget;
+                        setLightboxOpen(true);
+                      }}
                     >
                       <img
                         src={allowed()}
@@ -228,7 +328,14 @@ function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
                         class="shell-msg-media-img"
                         onError={() => setFailed(true)}
                       />
-                    </a>
+                    </button>
+                    <Show when={lightboxOpen()}>
+                      <MessageImageLightbox
+                        src={allowed()}
+                        returnFocus={lightboxTrigger}
+                        onClose={() => setLightboxOpen(false)}
+                      />
+                    </Show>
                   </Match>
                   <Match when={local.kind === 'video'}>
                     <video
@@ -1051,7 +1158,8 @@ function LinkPreviewCard(props: { url: string; privacy: UnfurlPrivacyPrefs }): J
 export function MessageText(props: MessageTextProps): JSX.Element {
   const [local] = splitProps(props, ['text', 'selfNick', 'onChannelClick', 'class', 'origin']);
 
-  const blockKit = createMemo(() => extractBlockKitLite(local.text));
+  const attachments = createMemo(() => extractAttachmentPresentation(local.text));
+  const blockKit = createMemo(() => extractBlockKitLite(attachments().caption));
   const tokens = createMemo(() => parseMessage(blockKit().text));
 
   /** First plain web link → OG preview card (preference-gated). */
@@ -1068,14 +1176,20 @@ export function MessageText(props: MessageTextProps): JSX.Element {
     return pickPreviewUrl(hrefs, privacy);
   });
 
+  const attachmentHrefs = createMemo(() => new Set(
+    attachments().attachments.map((item) => item.url),
+  ));
+
   /** Collect top-level link tokens that are media URLs for unfurling. */
   const mediaLinks = createMemo<Array<{ href: string; kind: NonNullable<MediaKind> }>>(() => {
     const privacy = liveUnfurlPrivacy();
     if (!privacy.linkPreviews) return [];
     const result: Array<{ href: string; kind: NonNullable<MediaKind> }> = [];
+    const seen = attachmentHrefs();
     for (const t of tokens()) {
       if (t.type === 'link') {
         const href = (t as { href: string }).href;
+        if (seen.has(href)) continue;
         const kind = detectMediaKind(href);
         if (kind === null) continue;
         // Same-origin media always eligible; cross-origin honors https-only + blocklist.
@@ -1094,6 +1208,11 @@ export function MessageText(props: MessageTextProps): JSX.Element {
         selfNick={local.selfNick ?? ''}
         onChannelClick={local.onChannelClick}
       />
+      <Show when={attachments().attachments.length > 0}>
+        <For each={attachments().attachments}>
+          {(item) => <AttachmentBlock item={item} />}
+        </For>
+      </Show>
       <Show when={mediaLinks().length > 0}>
         <For each={mediaLinks()}>
           {(media) => <MediaUnfurl href={media.href} kind={media.kind} />}
