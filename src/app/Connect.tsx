@@ -1089,23 +1089,14 @@ export function Connect(props: ConnectProps): JSX.Element {
                     <span class="conn-invite-eyebrow">Invite</span>
                     <h2 class="conn-invite-title">{inviteTitle(card)}</h2>
                     <p class="conn-invite-desc">{inviteDescription(card)}</p>
-                    <Show when={card.guestName || card.topic}>
-                      <ul class="conn-invite-meta">
-                        <Show when={card.guestName}>
-                          {(name) => (
-                            <li>
-                              Suggested name: <span class="mono">{name()}</span>
-                            </li>
-                          )}
-                        </Show>
-                        <Show when={card.topic}>
-                          {(topic) => (
-                            <li>
-                              Topic: <span class="mono">{topic()}</span>
-                            </li>
-                          )}
-                        </Show>
-                      </ul>
+                    <Show when={card.topic}>
+                      {(topic) => (
+                        <ul class="conn-invite-meta">
+                          <li>
+                            Topic: <span class="mono">{topic()}</span>
+                          </li>
+                        </ul>
+                      )}
                     </Show>
                   </div>
                 )}
