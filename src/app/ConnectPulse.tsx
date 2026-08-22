@@ -31,8 +31,8 @@ type NodePing = { host: string; ms: number };
 /** The connect screen never names hostnames (design intent: nothing to pick,
     nothing to configure — enforced by Connect tests). Nodes show as roles. */
 const NODE_ROLE: Record<string, string> = {
-  'eshmaki.me': 'home node',
-  'ircx.us': 'peer node',
+  'eshmaki.me': 'home',
+  'ircx.us': 'peer',
 };
 
 async function pingAll(signal?: AbortSignal): Promise<NodePing[]> {
@@ -87,7 +87,7 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
   return (
     <aside class="cpulse" aria-label="Live network activity">
       <header class="cpulse-head">
-        <p class="cpulse-eyebrow">tonight, on the water</p>
+        <p class="cpulse-eyebrow">Active rooms</p>
         <Show
           when={stats.latest}
           fallback={
@@ -166,20 +166,20 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
         </ul>
       </Show>
 
-      <footer class="cpulse-nodes" aria-label="Network nodes">
+      <footer class="cpulse-nodes" aria-label="Connection quality">
         <For each={NODES}>
           {(node) => {
             const ping = createMemo(() => pings.latest?.find((p) => p.host === node.host));
             return (
               <span class="cpulse-node" data-nearest={fastest() === node.host ? 'true' : 'false'}>
                 <span class="cpulse-node-dot" aria-hidden="true" />
-                <span class="cpulse-node-host">{NODE_ROLE[node.host] ?? 'node'}</span>
+                <span class="cpulse-node-host">{NODE_ROLE[node.host] ?? 'route'}</span>
                 <span class="cpulse-node-ms">
                   {(() => {
                     const p = ping();
                     if (!p) return '…';
                     if (!Number.isFinite(p.ms)) return 'n/a';
-                    return `${Math.round(p.ms)}ms${fastest() === node.host ? ' · nearest' : ''}`;
+                    return `${Math.round(p.ms)}ms`;
                   })()}
                 </span>
               </span>

@@ -1,24 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * Connect.tsx — Onyx connect screen (deep-water dark-luxury).
+ * Connect.tsx — Onyx first-run join screen.
  *
- * The front door to Onyx. A segmented mode switch routes between
- * three auth surfaces, all on the same deep-water atmosphere:
+ * One primary path: join as a guest with a display name. Sign in and
+ * Create account are secondary. The client still auto-selects a transport
+ * endpoint; that choice is never shown or configurable here.
  *
- *   • Guest    — nick only; drifts in anonymously (or with a saved SESSION).
- *   • Sign in  — passkey primary when WebAuthn is available; password demoted
- *                under "Use password instead" (SASL). Password-only on browsers
- *                without passkey support.
- *   • Register — desired account + optional email + password (+ confirm), with
- *                live validation and a strength meter. Flows form → verify → done.
+ *   • Guest    — display name; optional room; land on Home if empty.
+ *   • Sign in  — account name + password. Passkeys are not presented until
+ *                server support is live end-to-end.
+ *   • Register — account + optional email + password, then verify.
  *
- * Two contextual recovery paths layer on top:
- *   • GHOST reclaim — when a nick is in use, offer to evict the stale session.
- *   • Session resume — a one-tap "welcome back" when a remembered identity exists.
- *
- * The network is one place, so the client does NOT expose a server picker:
- * it measures latency to each node and attaches to the fastest (nearest) one
- * automatically. Which node is used is never surfaced in the UI.
+ * Contextual recovery (reclaim a name in use, resume a remembered identity)
+ * stays available without teaching identity modes on first arrival.
  *
  * The global store is the single source of truth. We call getState() actions and
  * gate the view on connectionStatus; registration reacts to registerPending /
@@ -51,7 +45,6 @@ import { parseAtParam, parseJoinParam, parseReaderParam, parseTopicParam } from 
 import { buildInviteCard, inviteTitle, inviteDescription } from '@/lib/invite/inviteCard';
 import { setPreference } from '@/lib/prefs/preferences';
 import { isPasskeySupported } from '@/lib/webauthn/passkey';
-import { ConnectPulse } from './ConnectPulse';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
@@ -75,105 +68,38 @@ import { installConnectPageLifecycle } from './connectPageLifecycle';
 // keep it out of the connection chunk and warm it while the socket handshakes.
 const AppShell = lazy(() => import('@/shell/AppShell').then((module) => ({ default: module.AppShell })));
 
-// ── Deep-water atmosphere — depth, azure currents, bioluminescence ───────────
-// Self-contained to the connect screen (namespaced .conn-sea-*) so it carries
-// its own depth motifs rather than borrowing the landing layer. Every moving
-// part is paused under prefers-reduced-motion (see connect.css).
-
-/** Sparse drifting bioluminescent motes — deterministic layout, no randomness. */
-const MOTES: ReadonlyArray<{ x: number; y: number; s: number; d: number; t: 'cyan' | 'gold' }> = [
-  { x: 12, y: 22, s: 2.4, d: 0,    t: 'cyan' },
-  { x: 28, y: 64, s: 1.6, d: 1400, t: 'cyan' },
-  { x: 44, y: 14, s: 1.9, d: 600,  t: 'gold' },
-  { x: 61, y: 48, s: 2.6, d: 2200, t: 'cyan' },
-  { x: 73, y: 78, s: 1.5, d: 900,  t: 'cyan' },
-  { x: 84, y: 30, s: 2.0, d: 1800, t: 'gold' },
-  { x: 91, y: 60, s: 1.7, d: 300,  t: 'cyan' },
-  { x: 18, y: 86, s: 1.4, d: 2600, t: 'cyan' },
-];
-
+// Quiet dark field only — no poster glow, grid, or decorative motion.
 function Atmosphere(): JSX.Element {
   return (
     <>
-      {/* Depth gradient — abyss (bottom) → light filtering down (top) */}
       <div class="conn-sea-depth" aria-hidden="true" />
-      {/* Caustics — faint light bands drifting near the surface */}
-      <div class="conn-sea-caustics" aria-hidden="true" />
-      {/* Currents — flowing azure paths, one with a slow dash drift */}
-      <svg
-        class="conn-sea-currents"
-        aria-hidden="true"
-        viewBox="0 0 1440 900"
-        preserveAspectRatio="xMidYMid slice"
-      >
-        <path d="M0,300 Q300,200 600,300 T1200,280 T1440,320" />
-        <path class="drift" d="M0,520 Q360,400 720,490 T1440,470" />
-        <path d="M-40,720 Q380,620 760,700 T1480,680" />
-      </svg>
-      {/* Bioluminescence — sparse pulsing motes */}
-      <div class="conn-sea-motes" aria-hidden="true">
-        <For each={MOTES}>
-          {(m) => (
-            <span
-              class="conn-sea-mote"
-              data-tone={m.t}
-              style={{
-                left: `${m.x}%`,
-                top: `${m.y}%`,
-                '--mote-size': `${m.s}px`,
-                '--mote-delay': `${m.d}ms`,
-              }}
-            />
-          )}
-        </For>
-      </div>
-      {/* Film grain — faint texture over the water */}
       <div class="conn-sea-grain" aria-hidden="true" />
     </>
   );
 }
 
+/**
+ * Passkeys exist in the client, but server WEBAUTHN is not live end-to-end.
+ * Do not present them as an available sign-in method on this surface.
+ */
+const PRESENT_PASSKEY_SIGNIN = false;
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
 type Mode = 'guest' | 'signin' | 'register';
 
-const MODES: ReadonlyArray<{
-  id: Mode;
-  label: string;
-  short: string;
-}> = [
-  { id: 'guest', label: 'Guest', short: 'Enter quickly' },
-  { id: 'signin', label: 'Sign in', short: 'Resume your identity' },
-  { id: 'register', label: 'Register', short: 'Claim a name' },
-];
-
-const MODE_GUIDANCE: Record<Mode, {
-  eyebrow: string;
-  title: string;
-  body: string;
-  identity: string;
-  continuity: string;
-}> = {
+const MODE_COPY: Record<Mode, { title: string; body: string }> = {
   guest: {
-    eyebrow: 'Fast entry',
-    title: 'Arrive without an account',
-    body: 'Explore first. Nothing is published as an account, and you can claim your name later.',
-    identity: 'Guest identity',
-    continuity: 'Until disconnect',
+    title: 'Join a room',
+    body: 'Join free — send a message in about a minute.',
   },
   signin: {
-    eyebrow: 'Returning member',
-    title: 'Resume your Onyx identity',
-    body: 'Use a passkey when available, or open the password route deliberately. Your rooms and sessions follow your account.',
-    identity: 'Existing account',
-    continuity: 'Account sessions',
+    title: 'Sign in',
+    body: 'Use the name and password for your account.',
   },
   register: {
-    eyebrow: 'New identity',
-    title: 'Claim a name on Onyx',
-    body: 'Create a portable account, verify it, then add passkeys or device credentials from your profile.',
-    identity: 'New account',
-    continuity: 'Recovery ready',
+    title: 'Create account',
+    body: 'Keep your name and rooms. Email is optional and can be added later.',
   },
 };
 
@@ -524,23 +450,25 @@ export function Connect(props: ConnectProps): JSX.Element {
   });
 
   const PHASE_LABEL: Record<'idle' | 'connecting' | 'error', string> = {
-    idle:       'not connected',
-    connecting: 'connecting',
-    error:      'error',
+    idle:       'Ready',
+    connecting: 'Connecting',
+    error:      'Couldn’t join',
   };
   const phaseLabel = createMemo(() => PHASE_LABEL[formPhase()]);
 
   // ── Live validity helpers (declared early so status copy can read them) ─────
   const nickTrimmed = createMemo(() => nick().trim());
-  const passkeySupported = createMemo(() => isPasskeySupported());
+  const passkeySupported = createMemo(
+    () => PRESENT_PASSKEY_SIGNIN && isPasskeySupported(),
+  );
 
   /** Sign-in password fields + SASL submit — open by default only without passkeys. */
   const showSignInPasswordPath = createMemo(
     () => mode() === 'signin' && (!passkeySupported() || passwordPathOpen()),
   );
-  /** Stay-signed-in stores a password; only relevant for guest or password sign-in. */
+  /** Stay-signed-in stores a password — sign-in only, never the first-run guest screen. */
   const showStaySignedIn = createMemo(
-    () => mode() === 'guest' || showSignInPasswordPath(),
+    () => showSignInPasswordPath(),
   );
   /** Password/guest/register primary submit; hidden when passkey is the only CTA. */
   const showPasswordSubmit = createMemo(
@@ -557,21 +485,21 @@ export function Connect(props: ConnectProps): JSX.Element {
     }
     switch (formPhase()) {
       case 'connecting':
-        return 'Opening a secure connection…';
+        return 'Connecting securely.';
       case 'error':
         if (registeredNickNeedsSignIn()) {
-          return 'That name belongs to an account. Sign in to use it; Onyx will not connect it as a guest.';
+          return 'That name belongs to an account. Sign in to use it.';
         }
         if (nickInUse()) {
-          return 'That name is already in the water — reclaim it, or pick another.';
+          return 'That name is already in use. Reclaim it, or pick another.';
         }
         if (/password|auth|login|incorrect|credential|464/i.test(lastErrorText())) {
           return 'That password was not accepted. Check it and sign in again.';
         }
-        return "The network didn't answer — it may be busy. Try again in a moment.";
+        return 'Couldn’t reach Onyx just now. Try again in a moment.';
       default:
         return routing()
-          ? 'Finding the nearest node…'
+          ? 'Connecting securely.'
           : modeHint(mode());
     }
   });
@@ -581,11 +509,13 @@ export function Connect(props: ConnectProps): JSX.Element {
       case 'signin':
         return passkeySupported()
           ? 'Sign in with a passkey — or use your account password.'
-          : 'Sign in to your account — Onyx finds the nearest node for you.';
+          : 'Enter your name and password to continue.';
       case 'register':
-        return 'Claim a name that is yours — registration takes a moment.';
+        return 'Choose a name and password to create your account.';
       default:
-        return 'Pick an unregistered name to explore — Onyx finds the nearest node for you.';
+        return inviteCard
+          ? 'Choose a display name, then join.'
+          : 'Choose a display name to join.';
     }
   }
 
@@ -1087,9 +1017,9 @@ export function Connect(props: ConnectProps): JSX.Element {
   }
 
   function rememberedStatus(identity: RememberedIdentity): string {
-    if (identity.access === 'resume') return 'Session ready';
+    if (identity.access === 'resume') return 'Ready to continue';
     if (identity.access === 'sign-in') return 'Saved sign-in';
-    return 'Identity only';
+    return 'Saved name';
   }
 
   // ── Disconnect ──────────────────────────────────────────────────────────────
@@ -1109,20 +1039,20 @@ export function Connect(props: ConnectProps): JSX.Element {
   );
   const showReclaim = createMemo(() => formPhase() === 'error' && nickInUse());
   const inVerifyStep = createMemo(() => registerPhase() === 'verifying');
-  const modeGuidance = createMemo(() => MODE_GUIDANCE[mode()]);
-  const destinationLabel = createMemo(() => {
-    const normalized = normalizeRoomTarget(room());
-    if (normalized) return normalized;
-    return 'Home';
-  });
-  const primaryStep = createMemo(() => {
-  if (inVerifyStep()) return 'Use the code we sent to finish creating your account.';
-    if (mode() === 'signin' && passkeySupported() && !passwordPathOpen()) {
-      return 'Use your passkey to sign in, or choose a password or recovery code below.';
+  const headingCopy = createMemo(() => {
+    if (mode() === 'guest' && inviteCard?.channel) {
+      return {
+        title: `Join ${inviteCard.channel}`,
+        body: 'Choose a display name to enter this room.',
+      };
     }
-    if (mode() === 'register') return 'Create the account, then verify it before entering Home.';
-    if (mode() === 'signin') return 'Sign in with the account password for this name.';
-    return 'Choose a guest name, then continue to Home or the optional room above.';
+    return MODE_COPY[mode()];
+  });
+  const inviteOnlyName = createMemo(() => mode() === 'guest' && !!inviteCard?.channel);
+  const nickFieldLabel = createMemo(() => {
+    if (mode() === 'register') return 'Account name';
+    if (mode() === 'guest') return 'Display name';
+    return 'Name';
   });
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -1144,69 +1074,29 @@ export function Connect(props: ConnectProps): JSX.Element {
             <div class="conn-crest" aria-hidden="true" />
 
             <div class="conn-body">
-              {/* Header */}
               <header class="conn-header">
                 <span class="conn-brand" aria-hidden="true">
                   <Mascot variant="mark" class="conn-brand-mark" />
                 </span>
                 <span class="conn-eyebrow">Onyx</span>
-                <h1 class="conn-title">Enter Onyx</h1>
-                <p class="conn-sub">
-                  Choose an identity, confirm where you want to land, and Onyx
-                  handles the route. There is no server list to configure.
-                </p>
+                <h1 class="conn-title">{headingCopy().title}</h1>
+                <p class="conn-sub">{headingCopy().body}</p>
               </header>
 
-              {/* Invite preview — mini-shell glimpse of the room you're entering */}
               <Show when={inviteCard} keyed>
                 {(card) => (
                   <div class="conn-invite" role="note" aria-label="Invite preview">
-                    <span class="conn-invite-eyebrow">You're invited</span>
-                    <div class="conn-invite-shell" aria-hidden="true">
-                      <div class="conn-invite-rail">
-                        <span class="conn-invite-room is-active">
-                          {card.channel ?? 'Onyx'}
-                        </span>
-                        <Show when={card.channel}>
-                          <span class="conn-invite-room">#root</span>
-                        </Show>
-                      </div>
-                      <div class="conn-invite-pane">
-                        <div class="conn-invite-pane-head">
-                          <span class="conn-invite-hash">#</span>
-                          <span class="conn-invite-pane-name">
-                            {(card.channel ?? 'public room').replace(/^#/, '')}
-                          </span>
-                          <Show when={card.readerMode}>
-                            <span class="conn-invite-chip">Reader</span>
-                          </Show>
-                        </div>
-                        <div class="conn-invite-lines">
-                          <span class="conn-invite-line is-mute" />
-                          <span class="conn-invite-line" />
-                          <span class="conn-invite-line is-short" />
-                        </div>
-                      </div>
-                    </div>
+                    <span class="conn-invite-eyebrow">Invite</span>
                     <h2 class="conn-invite-title">{inviteTitle(card)}</h2>
                     <p class="conn-invite-desc">{inviteDescription(card)}</p>
-                    <Show when={card.guestName || card.topic}>
-                      <ul class="conn-invite-meta">
-                        <Show when={card.guestName}>
-                          {(name) => (
-                            <li>
-                              Continue as <span class="mono">{name()}</span>
-                            </li>
-                          )}
-                        </Show>
-                        <Show when={card.topic}>
-                          {(topic) => (
-                            <li>
-                              Topic focus: <span class="mono">{topic()}</span>
-                            </li>
-                          )}
-                        </Show>
-                      </ul>
+                    <Show when={card.topic}>
+                      {(topic) => (
+                        <ul class="conn-invite-meta">
+                          <li>
+                            Topic: <span class="mono">{topic()}</span>
+                          </li>
+                        </ul>
+                      )}
                     </Show>
                   </div>
                 )}
@@ -1219,7 +1109,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                     <div>
                       <span class="conn-resume-eyebrow">Welcome back</span>
                       <h2 id="conn-identities-title" class="conn-identities-title">
-                        Remembered identities
+                        Continue where you left off
                       </h2>
                     </div>
                     <span class="conn-identities-count" aria-label={`${rememberedIdentities().length} remembered identities`}>
@@ -1239,18 +1129,17 @@ export function Connect(props: ConnectProps): JSX.Element {
                           <button
                             type="button"
                             class="conn-identity-select"
-                            aria-label={`Select ${identity.nick} on ${identity.server}`}
+                            aria-label={`Select ${identity.nick}`}
                             aria-pressed={selectedIdentityId() === identity.id ? 'true' : 'false'}
                             onClick={() => handleIdentitySelect(identity)}
                           >
                             <span class="conn-identity-nick">{identity.nick}</span>
-                            <span class="conn-identity-server">{identity.server}</span>
                             <span class="conn-identity-status">{rememberedStatus(identity)}</span>
                           </button>
                           <button
                             type="button"
                             class="conn-identity-forget"
-                            aria-label={`Forget ${identity.nick} on ${identity.server}`}
+                            aria-label={`Forget ${identity.nick}`}
                             onClick={() => handleForgetRemembered(identity)}
                           >
                             Forget
@@ -1289,75 +1178,6 @@ export function Connect(props: ConnectProps): JSX.Element {
                   </div>
                 </section>
               </Show>
-
-              {/* Mode switch */}
-              <div
-                class="conn-modes"
-                role="tablist"
-                aria-label="Connection mode"
-                data-testid="conn-modes"
-              >
-                <For each={MODES}>
-                  {(m) => (
-                    <button
-                      type="button"
-                      role="tab"
-                      class="conn-mode"
-                      data-active={mode() === m.id ? 'true' : 'false'}
-                      aria-selected={mode() === m.id ? 'true' : 'false'}
-                      disabled={!isFormReady()}
-                      onClick={() => switchMode(m.id)}
-                    >
-                      <span class="conn-mode-label">{m.label}</span>
-                      <span class="conn-mode-short">{m.short}</span>
-                    </button>
-                  )}
-                </For>
-              </div>
-
-              <section class="conn-arrival" aria-labelledby="conn-arrival-title">
-                <div class="conn-arrival-copy">
-                  <span class="conn-arrival-eyebrow">{modeGuidance().eyebrow}</span>
-                  <h2 id="conn-arrival-title" class="conn-arrival-title">
-                    {modeGuidance().title}
-                  </h2>
-                  <p class="conn-arrival-body">{modeGuidance().body}</p>
-                  <Show when={mode() !== 'register'}>
-                    <button
-                      type="button"
-                      class="conn-arrival-switch"
-                      onClick={() => switchMode('register')}
-                    >
-                      {mode() === 'guest' ? 'Claim a name' : 'Create an account instead'}
-                    </button>
-                  </Show>
-                </div>
-                <dl class="conn-arrival-map" aria-label="Arrival summary">
-                  <div>
-                    <dt>Identity</dt>
-                    <dd>{modeGuidance().identity}</dd>
-                  </div>
-                  <div>
-                    <dt>Destination</dt>
-                    <dd>{mode() === 'register' ? 'Home after verification' : destinationLabel()}</dd>
-                  </div>
-                  <div>
-                    <dt>Continuity</dt>
-                    <dd>{mode() === 'guest' && staySignedIn() ? 'This device' : modeGuidance().continuity}</dd>
-                  </div>
-                </dl>
-                <p class="conn-route" data-routing={routing() ? 'true' : 'false'}>
-                  <span class="conn-route-dot" aria-hidden="true" />
-                  <Show when={routing()} fallback="Private route ready · nearest healthy node">
-                    Measuring a private route…
-                  </Show>
-                </p>
-              </section>
-
-              <p class="conn-primary-cue" role="note">
-                <span>Next</span>
-                {primaryStep()}
-              </p>
 
               {/* ── Verify step (register only) ── */}
               <Show when={inVerifyStep()}>
@@ -1426,7 +1246,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                   <div class="conn-fields">
                     <FormField
                       id="conn-nick"
-                      label={mode() === 'register' ? 'Desired account name' : mode() === 'guest' ? 'Guest name' : 'Name'}
+                      label={nickFieldLabel()}
                       type="text"
                       placeholder="your-name"
                       autocomplete="username"
@@ -1442,14 +1262,14 @@ export function Connect(props: ConnectProps): JSX.Element {
                       aria-required="true"
                     />
 
-                    {/* Optional room — nothing joins automatically */}
-                    <Show when={mode() !== 'register'}>
+                    {/* Optional room — hidden on invite (destination is already known). */}
+                    <Show when={mode() !== 'register' && !inviteOnlyName()}>
                       <FormField
                         id="conn-room"
                         label="Room"
-                        description="Optional — join a room right away, or browse from Home"
+                        description="Optional — skip this to choose a room after you join"
                         type="text"
-                        placeholder="#root"
+                        placeholder="#lounge"
                         maxlength={64}
                         disabled={!isFormReady()}
                         value={room()}
@@ -1562,6 +1382,18 @@ export function Connect(props: ConnectProps): JSX.Element {
                       </div>
                     </Show>
 
+                    <Show when={mode() === 'signin' && !passkeySupported() && !recoveryPathOpen()}>
+                      <button
+                        type="button"
+                        class="conn-password-path-toggle"
+                        data-testid="conn-recovery-path-open"
+                        disabled={!isFormReady()}
+                        onClick={() => setRecoveryPathOpen(true)}
+                      >
+                        Use a recovery code
+                      </button>
+                    </Show>
+
                     <Show when={mode() === 'signin' && recoveryPathOpen()}>
                       <label class="onyx-field" for="conn-recovery-code">
                         <span class="onyx-field__label">Recovery code</span>
@@ -1578,8 +1410,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                         />
                       </label>
                       <p class="conn-mode-hint">
-                        Enter a single-use offline recovery code from Account → Recovery codes.
-                        Connects as your account nick, then spends the code (Crockford alphabet — no I/L/O/U).
+                        Enter one recovery code from your saved list. Each code can be used once.
                       </p>
                     </Show>
 
@@ -1628,12 +1459,10 @@ export function Connect(props: ConnectProps): JSX.Element {
                     <div class="conn-toggle">
                       <div class="conn-toggle-body">
                         <label class="conn-toggle-label" for="conn-stay-signed-in">
-                          {mode() === 'guest' ? 'Remember on this device' : 'Stay signed in'}
+                          Stay signed in
                         </label>
                         <p class="conn-toggle-description" id="conn-session-desc">
-                          {mode() === 'guest'
-                            ? 'Off by default. Onyx keeps a resumable session token when the network provides one. This does not reserve your name or create an account.'
-                            : 'Off by default. When enabled, Onyx stores your account password in this browser so it can sign in and request a SESSION token on reconnect. Use only on a private device.'}
+                          Off by default. Saves your account password in this browser. Use only on a private device.
                         </p>
                       </div>
                       <label class="conn-toggle-switch">
@@ -1675,7 +1504,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                     <div class="conn-auth-required" role="alert" data-testid="conn-auth-required">
                       <div>
                         <strong>This name is protected</strong>
-                        <span>Authenticate before Onyx can use it on the network.</span>
+                        <span>Sign in to use this account name.</span>
                       </div>
                       <button type="button" onClick={() => switchMode('signin')}>
                         Sign in as {nickTrimmed() || 'this account'}
@@ -1702,7 +1531,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                         <div class="conn-reclaim-form">
                           <p class="conn-reclaim-lead">
                             Enter the account password for <b>{nickTrimmed()}</b> to
-                            evict the stale session.
+                            take this name back.
                           </p>
                           <PasswordInput
                             id="conn-reclaim-password"
@@ -1735,15 +1564,13 @@ export function Connect(props: ConnectProps): JSX.Element {
                     </div>
                   </Show>
 
-                  {/* Submit — guest / register / password sign-in. Hidden when
-                      passkey is the sole primary CTA (password path collapsed). */}
                   <Show when={showPasswordSubmit()}>
-                    <div class="conn-actions" style={{ 'margin-top': '20px' }}>
+                    <div class="conn-actions">
                       <Show
                         when={statusPhase() !== 'connecting'}
                         fallback={
-                          <div class="conn-submit" style={{ display: 'flex', 'align-items': 'center', gap: '10px' }}>
-                            <Spinner size="sm" label={registerPending() ? 'Registering' : phaseLabel()} />
+                          <div class="conn-submit conn-submit--busy">
+                            <Spinner size="sm" label={registerPending() ? 'Creating account' : phaseLabel()} />
                           </div>
                         }
                       >
@@ -1762,17 +1589,48 @@ export function Connect(props: ConnectProps): JSX.Element {
                   </Show>
                 </form>
               </Show>
+
+              <nav class="conn-alt" aria-label="Other ways to join" data-testid="conn-modes">
+                <Show when={mode() !== 'guest'}>
+                  <button
+                    type="button"
+                    class="conn-alt-link"
+                    data-testid="conn-mode-guest"
+                    disabled={!isFormReady()}
+                    onClick={() => switchMode('guest')}
+                  >
+                    Join as guest
+                  </button>
+                </Show>
+                <Show when={mode() !== 'signin'}>
+                  <button
+                    type="button"
+                    class="conn-alt-link"
+                    data-testid="conn-mode-signin"
+                    disabled={!isFormReady()}
+                    onClick={() => switchMode('signin')}
+                  >
+                    Sign in
+                  </button>
+                </Show>
+                <Show when={mode() !== 'register'}>
+                  <button
+                    type="button"
+                    class="conn-alt-link"
+                    data-testid="conn-mode-register"
+                    disabled={!isFormReady()}
+                    onClick={() => switchMode('register')}
+                  >
+                    Create account
+                  </button>
+                </Show>
+              </nav>
             </div>
 
-            {/* Footer */}
             <footer class="conn-foot">
-              <span><b>Onyx</b> · protected · auto-routed</span>
-              <span aria-hidden="true">·</span>
-              <a href="/download/">Install guide</a>
+              <span>Rooms, calls, and private messages — no ads.</span>
             </footer>
           </div>
-
-          <ConnectPulse deepLink={deepLinkJoin} />
           </div>
         </div>
       }
@@ -1804,9 +1662,9 @@ export function Connect(props: ConnectProps): JSX.Element {
 // ── Submit copy ───────────────────────────────────────────────────────────────
 
 const SUBMIT_ARIA: Record<Mode, string> = {
-  guest:    'Connect to Onyx as a guest',
+  guest:    'Join Onyx as a guest',
   signin:   'Sign in to Onyx',
-  register: 'Register a new account',
+  register: 'Create a new account',
 };
 
 function submitLabel(mode: Mode, phase: 'idle' | 'connecting' | 'error'): string {
@@ -1814,6 +1672,6 @@ function submitLabel(mode: Mode, phase: 'idle' | 'connecting' | 'error'): string
   switch (mode) {
     case 'signin':   return 'Sign in';
     case 'register': return 'Create account';
-    default:         return 'Continue';
+    default:         return 'Join';
   }
 }
