@@ -147,10 +147,9 @@ describe('About page — CSS source', () => {
     expect(css.includes('.ab-pillars')).toBe(true);
   });
 
-  it('uses Instrument Sans and at most one Fraunces line, not Anton or gold', () => {
+  it('uses Instrument Sans, not Fraunces, Anton, or gold', () => {
     expect(css.includes('var(--font-sans)')).toBe(true);
-    expect(css.includes('var(--font-serif)')).toBe(true);
-    expect((css.match(/var\(--font-serif\)/g) ?? []).length).toBe(1);
+    expect(css.includes('var(--font-serif)')).toBe(false);
     expect(css.replace(/\/\*[\s\S]*?\*\//g, '').includes('Anton')).toBe(false);
     const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
     expect(cssNoComments.includes('var(--gold)')).toBe(false);

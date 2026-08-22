@@ -14,7 +14,7 @@ for (const viewport of [
     const trust = page.locator('[data-home-trust]');
     await expect(primary).toBeVisible();
     await expect(preview).toBeVisible();
-    await expect(preview.getByText('Static preview')).toBeVisible();
+    await expect(preview.getByText('Preview', { exact: true }).first()).toBeVisible();
     await expect(trust).toBeVisible();
     await expect(current.locator('li')).toHaveCount(4);
     await expect(page.locator('[data-home-evidence]')).toHaveCount(0);

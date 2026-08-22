@@ -15,7 +15,8 @@ describe('ProductPreview', () => {
     expect(screen.getByRole('tab', { name: 'Messages' })).toHaveAttribute('aria-selected', 'true');
     await Promise.resolve();
     expect(screen.getByRole('tab', { name: 'Messages' })).toHaveFocus();
-    expect(preview).toHaveTextContent(/not live rooms, people, messages/i);
+    expect(preview).toHaveTextContent('Preview');
+    expect(preview).toHaveTextContent(/labeled conversation|side conversation|quiet list/i);
   });
 
   it('renders a mineral-night mini-shell with a room conversation, not grey skeleton bars', () => {

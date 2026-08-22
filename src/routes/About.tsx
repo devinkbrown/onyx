@@ -34,7 +34,7 @@ export default function About() {
       <section class="r-wrap ab-hero" aria-labelledby="about-hero-heading">
         <p class="ab-kicker">a community</p>
         <h1 id="about-hero-heading">Rooms for people you already like.</h1>
-        <p class="serif-pull">
+        <p class="ab-lede">
           Friends, clubs, and creators hanging out — not a status board.
         </p>
         <div class="ab-seam" aria-hidden="true" />

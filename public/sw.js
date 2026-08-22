@@ -128,8 +128,13 @@ function isCacheableStaticPath(pathname) {
   return pathname.startsWith('/assets/')
     || pathname.startsWith('/fonts/')
     || pathname === '/favicon.ico'
+    || pathname === '/favicon.svg'
+    || pathname === '/favicon-32.png'
+    || pathname === '/apple-touch-icon.png'
     || pathname === '/icon-192.png'
     || pathname === '/icon-512.png'
+    || pathname === '/og.png'
+    || pathname.startsWith('/brand/')
     || /^\/screenshots\/[^/]+\.png$/.test(pathname);
 }
 

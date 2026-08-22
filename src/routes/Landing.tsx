@@ -19,15 +19,13 @@ const LANDING_SHELF_ITEMS = [
 const TRUST_CLAIMS = [
   ['No ads', 'Nobody is selling your attention in the room.'],
   ['No third-party trackers', 'This site does not load analytics pixels or ad tags.'],
-  ['Private DMs', 'Side conversations can stay between people. Room text is not end-to-end.'],
-  ['History on your device', 'Catch-up and drafts stay with you on this device.'],
+  ['Private DMs', 'Only the two of you. The words stay on this device.'],
+  ['Open engine', 'The protocol and server are open to read.'],
 ] as const;
 
 /**
- * Onyx public homepage — a community door.
+ * Onyx public homepage — quiet harbor, community door.
  * Contract: docs/PUBLIC_COMPANY_SITE.md
- * Proof order: invite/join hero → labeled room preview → trust strip →
- * community prose → quiet extras shelf. Header owns Open Onyx → /app/.
  */
 export default function Landing() {
   setPageMeta(
@@ -40,13 +38,6 @@ export default function Landing() {
     <PublicFrame
       currentPath="/"
       mainLabel="Onyx home"
-      context={(
-        <p class="public-frame__current-line">
-          <span class="public-frame__current-kicker">Community</span>
-          <span aria-hidden="true">·</span>
-          <span class="public-frame__current-label">Home</span>
-        </p>
-      )}
     >
       <div class="ui-root r r-landing home">
       <div class="r-ground home-ground" aria-hidden="true" />
@@ -67,6 +58,14 @@ export default function Landing() {
             <p class="home-desktop-note">
               Open it in the browser — no install, no ads. Hosts and downloads live below.
             </p>
+            <img
+              class="home-mascot"
+              src="/brand/mascot.png"
+              width="220"
+              height="220"
+              alt=""
+              decoding="async"
+            />
           </div>
 
           <ProductPreview />
@@ -118,9 +117,9 @@ export default function Landing() {
         id="extras"
         class="r-wrap home-shelf"
         data-home-shelf
-        aria-label="Hosting and extras"
+        aria-label="Also here"
       >
-        <p class="home-shelf-label">Hosting and extras</p>
+        <p class="home-shelf-label">Also here</p>
         <ul class="home-shelf-list">
           <For each={LANDING_SHELF_ITEMS}>
             {(item) => <li><a href={item[0]}>{item[1]}</a></li>}

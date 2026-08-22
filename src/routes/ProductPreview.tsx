@@ -3,6 +3,8 @@
 import { createSignal, For, type JSX } from 'solid-js';
 
 type PreviewState = 'room' | 'home' | 'messages';
+type RoomChip = { name: string; kind: 'room' | 'person'; active?: boolean; unread?: boolean };
+type PreviewMessage = { nick: string; initial: string; text: string; time: string; you?: boolean };
 type PreviewPanel = {
   id: PreviewState;
   label: string;
@@ -11,8 +13,8 @@ type PreviewPanel = {
   items: readonly string[];
   roomTitle: string;
   roomTopic: string;
-  rooms: readonly { name: string; active?: boolean; unread?: boolean }[];
-  messages: readonly { nick: string; text: string; time: string; you?: boolean }[];
+  rooms: readonly RoomChip[];
+  messages: readonly PreviewMessage[];
   stage?: { title: string; detail: string } | null;
   composer: string;
 };
@@ -22,20 +24,20 @@ const PANELS: readonly PreviewPanel[] = [
     id: 'room',
     label: 'Room',
     title: 'Friends in a room that stays open.',
-    body: 'This is a labeled look at a room — not live people, messages, or activity counts.',
+    body: 'A labeled look at a room.',
     items: ['A shared room', 'People you invited', 'A call when you want one'],
     roomTitle: 'Weekend plans',
     roomTopic: 'Saturday dinner and a porch call',
     rooms: [
-      { name: 'Home' },
-      { name: 'Weekend plans', active: true },
-      { name: 'Studio hours', unread: true },
-      { name: '@mika' },
+      { name: 'Home', kind: 'room' },
+      { name: 'Weekend plans', kind: 'room', active: true },
+      { name: 'Studio hours', kind: 'room', unread: true },
+      { name: '@mika', kind: 'person' },
     ],
     messages: [
-      { nick: 'mika', text: 'dinner’s at 7:30 if that still works', time: '19:42' },
-      { nick: 'you', text: 'perfect — I’ll grab bread on the way', time: '19:43', you: true },
-      { nick: 'jun', text: 'joining the porch call after the dishes', time: '19:44' },
+      { nick: 'mika', initial: 'M', text: 'dinner’s at 7:30 if that still works', time: '19:42' },
+      { nick: 'you', initial: 'Y', text: 'perfect — I’ll grab bread on the way', time: '19:43', you: true },
+      { nick: 'jun', initial: 'J', text: 'joining the porch call after the dishes', time: '19:44' },
     ],
     stage: { title: 'Porch call', detail: 'Hop in when you are ready' },
     composer: 'Message Weekend plans',
@@ -44,20 +46,20 @@ const PANELS: readonly PreviewPanel[] = [
     id: 'home',
     label: 'Home',
     title: 'Catch up when you get back.',
-    body: 'Home is a quiet list of rooms you already share — not a feed of strangers.',
+    body: 'Home is a quiet list of rooms you already share.',
     items: ['What you missed', 'Saved on this device', 'Pick up mid-conversation'],
     roomTitle: 'Home',
     roomTopic: 'Come back whenever you like',
     rooms: [
-      { name: 'Home', active: true },
-      { name: 'Weekend plans' },
-      { name: 'Studio hours', unread: true },
-      { name: '@mika' },
+      { name: 'Home', kind: 'room', active: true },
+      { name: 'Weekend plans', kind: 'room' },
+      { name: 'Studio hours', kind: 'room', unread: true },
+      { name: '@mika', kind: 'person' },
     ],
     messages: [
-      { nick: 'Weekend plans', text: 'jun replied about the porch call', time: 'today' },
-      { nick: 'Studio hours', text: 'Two notes waiting since last time', time: 'today' },
-      { nick: '@mika', text: 'Your draft is still here', time: 'local' },
+      { nick: 'Weekend plans', initial: 'W', text: 'jun replied about the porch call', time: 'today' },
+      { nick: 'Studio hours', initial: 'S', text: 'Two notes waiting since last time', time: 'today' },
+      { nick: '@mika', initial: 'M', text: 'Your draft is still here', time: 'local' },
     ],
     stage: null,
     composer: 'Jump to a room',
@@ -66,19 +68,19 @@ const PANELS: readonly PreviewPanel[] = [
     id: 'messages',
     label: 'Messages',
     title: 'A quiet side conversation.',
-    body: 'Direct messages sit next to rooms. This picture does not claim a live private session.',
+    body: 'Direct messages sit next to rooms.',
     items: ['Same people', 'A side chat', 'Shown as a DM, not a room'],
     roomTitle: '@mika',
     roomTopic: 'Just the two of you',
     rooms: [
-      { name: 'Home' },
-      { name: 'Weekend plans' },
-      { name: '@mika', active: true },
-      { name: '@jun' },
+      { name: 'Home', kind: 'room' },
+      { name: 'Weekend plans', kind: 'room' },
+      { name: '@mika', kind: 'person', active: true },
+      { name: '@jun', kind: 'person' },
     ],
     messages: [
-      { nick: 'mika', text: 'can you send the address again?', time: '19:40' },
-      { nick: 'you', text: 'on my way — I’ll drop it here', time: '19:41', you: true },
+      { nick: 'mika', initial: 'M', text: 'can you send the address again?', time: '19:40' },
+      { nick: 'you', initial: 'Y', text: 'on my way — I’ll drop it here', time: '19:41', you: true },
     ],
     stage: null,
     composer: 'Message @mika',
@@ -106,9 +108,9 @@ export function ProductPreview(): JSX.Element {
   return (
     <section class="product-preview" id="community" aria-labelledby="product-preview-title" data-product-preview data-preview-state={active()}>
       <div class="product-preview__head">
-        <p class="product-preview__eyebrow">Static preview</p>
+        <p class="product-preview__eyebrow">Preview</p>
         <h2 id="product-preview-title">A look inside a room</h2>
-        <p>This is an illustration of people and rooms, not live rooms, people, messages, or network activity.</p>
+        <p>Weekend plans — a labeled conversation, not a live room.</p>
       </div>
       <div ref={(element) => { tablistRef = element; }} class="product-preview__tabs" role="tablist" aria-label="Preview areas" onKeyDown={onKeyDown}>
         <For each={PANELS}>{(panel) => (
@@ -116,16 +118,11 @@ export function ProductPreview(): JSX.Element {
         )}</For>
       </div>
       <div class="product-preview__canvas" role="tabpanel" id={`preview-panel-${current().id}`} aria-labelledby={`preview-tab-${current().id}`} tabindex="0">
-        <span class="product-preview__canvas-label">Static preview · {current().label}</span>
+        <span class="product-preview__canvas-label">Preview · {current().label}</span>
         <div class="product-preview__window" aria-hidden="true">
-          <div class="product-preview__dock">
-            <i class="is-active" />
-            <i />
-            <i />
-          </div>
           <div class="product-preview__rail">
             <For each={current().rooms}>{(room) => (
-              <span classList={{ 'is-active': !!room.active, 'is-unread': !!room.unread }}>{room.name}</span>
+              <span classList={{ 'is-active': !!room.active, 'is-unread': !!room.unread, 'is-person': room.kind === 'person', 'is-room': room.kind === 'room' }}>{room.name}</span>
             )}</For>
           </div>
           <div class="product-preview__content">
@@ -143,8 +140,9 @@ export function ProductPreview(): JSX.Element {
             <div class="product-preview__thread">
               <For each={current().messages}>{(msg) => (
                 <div class="product-preview__msg" classList={{ 'is-you': !!msg.you }}>
-                  <time>{msg.time}</time>
+                  <span class="product-preview__face" data-you={msg.you ? 'true' : undefined}>{msg.initial}</span>
                   <p><b>{msg.nick}</b> {msg.text}</p>
+                  <time>{msg.time}</time>
                 </div>
               )}</For>
             </div>

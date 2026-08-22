@@ -58,9 +58,23 @@ export function setPageMeta(title: string, description: string, path = '/'): voi
   upsertMeta('meta[property="og:description"]', { property: 'og:description', content: description });
   upsertMeta('meta[property="og:type"]', { property: 'og:type', content: 'website' });
   upsertMeta('meta[property="og:url"]', { property: 'og:url', content: url });
-  upsertMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary' });
+  const image = new URL('/og.png', url).toString();
+  upsertMeta('meta[property="og:image"]', { property: 'og:image', content: image });
+  upsertMeta('meta[property="og:image:type"]', { property: 'og:image:type', content: 'image/png' });
+  upsertMeta('meta[property="og:image:width"]', { property: 'og:image:width', content: '1200' });
+  upsertMeta('meta[property="og:image:height"]', { property: 'og:image:height', content: '630' });
+  upsertMeta('meta[property="og:image:alt"]', {
+    property: 'og:image:alt',
+    content: 'Onyx — a quiet harbor at night. Conversation glowing on a dark pier.',
+  });
+  upsertMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary_large_image' });
   upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: title });
   upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: description });
+  upsertMeta('meta[name="twitter:image"]', { name: 'twitter:image', content: image });
+  upsertMeta('meta[name="twitter:image:alt"]', {
+    name: 'twitter:image:alt',
+    content: 'Onyx — a quiet harbor at night. Conversation glowing on a dark pier.',
+  });
   upsertLink('link[rel="canonical"]', { rel: 'canonical', href: url });
 
   let json = document.querySelector<HTMLScriptElement>('script[data-onyx-route-jsonld]');

@@ -10,7 +10,10 @@ export function PublicFooter(): JSX.Element {
     <footer class="public-frame__footer">
       <div class="public-frame__footer-inner">
         <div>
-          <a class="public-frame__footer-brand" href={publicRouteById('home').href}>Onyx</a>
+          <a class="public-frame__footer-brand" href={publicRouteById('home').href}>
+            <img class="public-frame__mark" src="/brand/mark.png" width="28" height="28" alt="" />
+            <span>Onyx</span>
+          </a>
           <p>Rooms, messages, and calls for friends, clubs, and creators.</p>
         </div>
         <nav aria-label="Footer navigation">

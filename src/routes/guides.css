@@ -1,17 +1,27 @@
-/* Getting started / Guides — community how-tos. Instrument Sans body,
-   Fraunces thesis only. No Anton, no neon, no uppercase shout. */
+/* Getting started / Guides — community how-tos. Instrument Sans only.
+   No Anton, no neon, no uppercase shout. */
 .guides-page {
   --guides-current: var(--public-current, var(--lapis));
   --guides-paper: var(--public-text, var(--paper));
   --guides-muted: var(--public-muted, var(--paper-dim));
 }
 
+.guides-page .r-kicker {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--guides-muted);
+}
+.guides-page .r-kicker::before { content: none; }
+
 .guides-page .data-hero h1 {
-  font-family: var(--font-serif);
-  font-weight: 520;
+  font-family: var(--font-sans);
+  font-weight: 650;
   font-size: clamp(2rem, 1.4rem + 2vw, 3rem);
   line-height: 1.15;
-  letter-spacing: 0;
+  letter-spacing: -0.02em;
   text-transform: none;
 }
 

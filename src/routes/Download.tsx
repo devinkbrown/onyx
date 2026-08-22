@@ -399,7 +399,7 @@ export default function Download(): JSX.Element {
           <h1 id="download-heading">
             {installGuide ? 'Install Onyx on this device' : 'Get Onyx on this device'}
           </h1>
-          <p class="serif-pull">Open it in the browser. That is the main door.</p>
+          <p class="dl-lede">Open it in the browser. That is the main door.</p>
           <p class="sub">
             Supporting browsers can keep Onyx here as an installed app — same rooms,
             messages, and calls. Desktop packages exist if you want them. They stay

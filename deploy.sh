@@ -94,6 +94,10 @@ SPA_OWNED_BLOCKLIST=(
   sw.js
   icon-192.png
   icon-512.png
+  apple-touch-icon.png
+  favicon-32.png
+  og.png
+  brand
   screenshots
   opcodec_wasm.js
   opcodec_wasm.wasm

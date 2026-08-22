@@ -123,7 +123,15 @@ export default function InviteRoute() {
       <div class="r-grain" aria-hidden="true" />
 
       <section class="invite-door" aria-labelledby="invite-heading">
-        <p class="invite-eyebrow">Onyx</p>
+        <img
+          class="invite-mascot"
+          src="/brand/mascot-wave.png"
+          width="160"
+          height="160"
+          alt=""
+          decoding="async"
+        />
+        <p class="invite-eyebrow">A friend invited you</p>
         <h1 id="invite-heading">{headline()}</h1>
         <p class="invite-lede">{welcome()}</p>
 

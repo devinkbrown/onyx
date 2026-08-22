@@ -34,12 +34,21 @@
   background: var(--stone);
 }
 
+.invite-mascot {
+  display: block;
+  width: 7.5rem;
+  height: auto;
+  margin: 0 auto 0.35rem;
+  pointer-events: none;
+  user-select: none;
+}
+
 .invite-eyebrow {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--paper-mute);
 }
 
@@ -74,10 +83,10 @@
 }
 
 .invite-preview-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--paper-dim);
 }
 
