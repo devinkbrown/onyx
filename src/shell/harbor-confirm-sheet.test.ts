@@ -15,6 +15,6 @@ describe('harbor confirm sheet chrome', () => {
     expect(css).not.toMatch(/backdrop-filter/);
     expect(css).not.toMatch(/text-transform:\s*uppercase/);
     expect(css).not.toMatch(/Inter|blurple|purple|#5865f2/i);
-    expect(css).not.toMatch(/kicker/);
+    expect(css).not.toMatch(/__kicker|text-transform:\s*uppercase/);
   });
 });

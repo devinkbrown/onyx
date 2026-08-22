@@ -64,21 +64,8 @@ function seedChannel(name = '#general', users?: Map<string, ChannelUser>): void 
   store.setState({
     ...initialState,
     connectionStatus: 'connected',
-    server: {
-      id: 'ribbon',
-      name: 'Ribbon',
-      network: 'Ribbon',
-      url: 'wss://ribbon.test/ws',
-      icon: '',
-      nick: 'alice',
-      account: 'alice',
-      connected: true,
-    },
-    ourNick: 'alice',
     activeView: { kind: 'channel', channel: name },
     channels: new Map([[name, channel]]),
-    hiddenRooms: new Set(),
-    closedConversations: new Set(),
   });
 }
 
@@ -570,7 +557,20 @@ describe('PresenceRibbon commercial room header', () => {
   it('exposes Mute, Hide room, and Leave room as three overflow verbs', () => {
     const sendRaw = vi.fn();
     seedChannel();
-    store.setState({ client: { sendRaw } as never });
+    store.setState({
+      client: { sendRaw } as never,
+      server: {
+        id: 'ribbon',
+        name: 'Ribbon',
+        network: 'Ribbon',
+        url: 'wss://ribbon.test/ws',
+        icon: '',
+        nick: 'alice',
+        account: 'alice',
+        connected: true,
+      },
+      ourNick: 'alice',
+    });
     render(() => (
       <>
         <PresenceRibbon />

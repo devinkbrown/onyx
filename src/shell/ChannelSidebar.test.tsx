@@ -643,7 +643,7 @@ describe('ChannelSidebar accessibility', () => {
       <ChannelSidebar mode="rooms" activeSection="rooms" />
     ));
     expect(queryByRole('button', { name: '#alpha' })).toBeNull();
-    expect(getByRole('button', { name: /#bravo/ })).toBeInTheDocument();
+    expect(getByRole('button', { name: '#bravo, 3 unread, 2 mentions' })).toBeInTheDocument();
     expect(store.getState().channels.has('#alpha')).toBe(true);
     expect(getByRole('region', { name: 'Rooms · 3 joined' })).toBeInTheDocument();
   });
