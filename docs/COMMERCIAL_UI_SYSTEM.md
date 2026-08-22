@@ -177,7 +177,10 @@ Remembering desktop open/closed under an `onyx:` localStorage (or prefs) key is 
 
 | Token | Desktop | ~390 mobile |
 |-------|---------|-------------|
-| Ribbon height | 52–56px (prefer **56**) | **56–60px** |
+| Ribbon height | **56px** | **56px** (landscape-short may compact) |
+| Sidebar room / message rows | **44px** | **44px** |
+| Composer attach / emoji / More | min **40×40** | min **44×44** |
+| Composer Send | min **40×40** | min **44×44** |
 | Primary Call / People / More | min **40×40** | min **44×44** |
 | Inbox chrome | ≥36 | ≥44 hit area |
 | Jump to date | menuitem in More | menuitem in More |

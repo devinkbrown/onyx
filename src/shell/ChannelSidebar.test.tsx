@@ -656,7 +656,7 @@ describe('ChannelSidebar accessibility', () => {
       <ChannelSidebar mode="rooms" activeSection="rooms" />
     ));
 
-    expect(getByText('No rooms yet.')).toBeInTheDocument();
+    expect(getByText('No rooms yet. Browse rooms to join one.')).toBeInTheDocument();
     fireEvent.click(getByTestId('sidebar-browse-rooms'));
     expect(store.getState().showChannelBrowser).toBe(true);
   });

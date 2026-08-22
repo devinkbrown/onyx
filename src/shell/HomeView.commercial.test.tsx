@@ -280,7 +280,7 @@ describe('HomeView — commercial public hierarchy', () => {
     const navigate = vi.spyOn(store.getState(), 'navigate');
     render(() => <HomeView />);
 
-    expect(screen.getByText('Current ledger')).toBeInTheDocument();
+    expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Welcome, me.' })).toBeInTheDocument();
     const cont = screen.getByRole('region', { name: 'Continue where you left off' });
     const live = screen.getByRole('region', { name: 'Live now' });

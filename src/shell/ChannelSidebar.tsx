@@ -717,7 +717,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         <Show when={organized().favorites.length > 0}>
           <div class="shell-sidebar-section" data-testid="sidebar-favorites">
             <p class="shell-sidebar-section-label" id="sidebar-favorites-label">
-              favorites
+              Favorites
             </p>
             <ul
               class="shell-channel-list"
@@ -769,7 +769,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                   }
                 >
                   <p class="shell-sidebar-section-label" id="sidebar-channels-label">
-                    rooms
+                    Rooms
                   </p>
                 </Show>
                 <ul
@@ -783,7 +783,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                     fallback={
                       <Show when={isUncategorized() && sortedChannels().length === 0}>
                         <li class="shell-sidebar-zero">
-                          <p class="shell-sidebar-empty">No rooms yet.</p>
+                          <p class="shell-sidebar-empty">No rooms yet. Browse rooms to join one.</p>
                           <button
                             type="button"
                             class="shell-sidebar-browse"
@@ -811,11 +811,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         <Show when={showMessages()}>
           <div class="shell-sidebar-section">
             <p class="shell-sidebar-section-label" id="sidebar-dms-label">
-              messages
+              Messages
             </p>
             <Show
               when={sortedDms().length > 0}
-              fallback={<p class="shell-sidebar-empty">No messages yet. Start one from People or search.</p>}
+              fallback={<p class="shell-sidebar-empty">No messages yet. Open a person to start one.</p>}
             >
               <ul
                 class="shell-dm-list"

@@ -19,7 +19,7 @@
 
 import { createEffect, createMemo, createSignal, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPins } from '@/lib/store';
-import { openPreferences } from '@/lib/prefs/preferences';
+import { openPreferences, preferences } from '@/lib/prefs/preferences';
 import { channelNotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
@@ -531,7 +531,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 activeView().kind === 'channel'
                   ? `Room ${name()}. Click to copy name.`
                   : activeView().kind === 'dm'
-                    ? `Direct message ${name()}. Click to copy nick.`
+                    ? `Direct message ${name()}. Click to copy name.`
                     : `${name()}. Click to copy.`
               }
               onClick={() => {
@@ -575,8 +575,8 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           )}
         </Show>
 
-        {/* Live 24h activity rhythm (channels only) — hides when there's none. */}
-        <Show when={activeView().kind === 'channel'}>
+        {/* Live 24h activity rhythm — power-user chrome, not first-run. */}
+        <Show when={activeView().kind === 'channel' && preferences().experienceMode !== 'standard'}>
           <PresenceHeatline channel={() => (activeView().kind === 'channel' ? channelName() : null)} />
         </Show>
 

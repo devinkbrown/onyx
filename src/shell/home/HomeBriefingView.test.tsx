@@ -182,7 +182,7 @@ describe('HomeBriefingView — presentation contract', () => {
     renderView();
     const main = screen.getByRole('main', { name: 'Network home' });
     expect(within(main).getByRole('heading', { level: 1, name: 'Welcome, me.' })).toBeInTheDocument();
-    expect(within(main).getByText('Current ledger')).toBeInTheDocument();
+    expect(within(main).getByText('Home')).toBeInTheDocument();
     expect(within(main).getByRole('heading', { name: 'Needs you' })).toBeInTheDocument();
     expect(within(main).getByRole('heading', { name: 'Continue' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Browse rooms' })).toBeInTheDocument();

@@ -23,10 +23,11 @@
 
 .home-kicker {
   margin: 0 0 8px;
-  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
-  font-size: var(--text-xs, 0.6875rem);
-  letter-spacing: var(--tracking-kicker, 0.12em);
-  text-transform: uppercase;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  font-size: var(--text-sm, 0.8125rem);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-mute);
 }
 
@@ -70,8 +71,9 @@
   border: 0;
   background: transparent;
   color: var(--paper-dim);
-  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
-  font-size: 12px;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  font-size: 0.82rem;
+  font-weight: 650;
 }
 .home-overflow__summary::-webkit-details-marker { display: none; }
 .home-overflow__summary:focus-visible,
@@ -128,11 +130,11 @@
 }
 .home-shortcut-note > span {
   color: var(--lapis-bright);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs, 0.625rem);
-  font-weight: 700;
-  letter-spacing: var(--tracking-kicker, 0.12em);
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs, 0.6875rem);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .home-shortcut-note b {
   min-width: 1.5rem;
@@ -518,9 +520,11 @@
   line-height: 1.15;
 }
 .home-pulse-label {
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-mute);
 }
 
@@ -651,10 +655,11 @@
 }
 .home-explore-kicker {
   margin: 0 0 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-mute);
 }
 .home-first-room {
@@ -677,9 +682,9 @@
 .home-first-room__eyebrow {
   margin: 0 0 8px;
   color: var(--lapis-bright);
-  font: 700 var(--text-xs, 0.6875rem)/1 var(--font-mono);
-  letter-spacing: var(--tracking-kicker, 0.12em);
-  text-transform: uppercase;
+  font: 650 var(--text-sm, 0.8125rem)/1.2 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
 }
 .home-first-room__title {
   margin: 0;
@@ -735,10 +740,11 @@
   align-items: center;
   min-height: 44px;
   padding: 8px 2px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-mute);
 }
 .home-more-activity__summary::-webkit-details-marker { display: none; }
@@ -1231,10 +1237,11 @@
 .home-section-label {
   display: block;
   margin: 0 0 10px;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs, 0.6875rem);
-  letter-spacing: var(--tracking-kicker, 0.12em);
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm, 0.8125rem);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-mute);
 }
 .home-grid {
@@ -1692,11 +1699,11 @@
 }
 .home-catchup-tier-label {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   /* Real audited text token (secondary). --paper-dim clears 4.5:1 on the
      Catch-up --stone/--ink surface in every theme (worst case 4.94:1); the
      former color-mix(--ink 55% transparent) composited to ~1:1 near-black
@@ -2034,11 +2041,11 @@
   align-items: center;
   gap: 8px;
   padding: var(--space-2) 0;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
   font-weight: 650;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-dim);
 }
 .home-catchup-details__summary::-webkit-details-marker {
