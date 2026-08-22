@@ -280,3 +280,23 @@ export function StageIcon(props: IconProps): JSX.Element {
     </Svg>
   );
 }
+
+export function MoreIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+    </Svg>
+  );
+}
+
+export function InviteIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19" />
+      <circle cx="10" cy="8" r="3" />
+      <path d="M19 8v6M16 11h6" />
+    </Svg>
+  );
+}

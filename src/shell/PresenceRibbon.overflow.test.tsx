@@ -310,6 +310,17 @@ describe('PresenceRibbon commercial room header', () => {
     view.unmount();
   });
 
+  it('puts Join call in More when the ribbon Call control is hidden', () => {
+    seedChannel();
+    const onJoinVoice = vi.fn();
+    render(() => <PresenceRibbon onJoinVoice={onJoinVoice} />);
+
+    expect(screen.queryByTestId('ribbon-join-call')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ribbon-more'));
+    fireEvent.click(screen.getByTestId('ribbon-more-join-call'));
+    expect(onJoinVoice).toHaveBeenCalledWith(false);
+  });
+
   it('surfaces pins + Jump to date inside grouped More (This room) with valid menus', () => {
     seedChannel();
     store.setState({

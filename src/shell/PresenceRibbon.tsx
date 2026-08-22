@@ -345,6 +345,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const showCallJoin = createMemo(
     () => !!local.showJoinVoice && !!local.onJoinVoice && roomCallPresentation() === 'idle',
   );
+  /** Pref-hidden Call still has to be one click away — More, not Advanced. */
+  const showCallJoinInMore = createMemo(
+    () => !!local.onJoinVoice
+      && !showCallJoin()
+      && roomCallPresentation() === 'idle'
+      && activeView().kind === 'channel',
+  );
 
   const voiceRoomStatus = createMemo(() => buildVoiceRoomStatus({
     participants: voiceParticipants(),
@@ -695,7 +702,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                   <path d="M20 14h-3v6h3a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2Z" />
                   <path d="M15 9.5 19 7v6l-4-2.5" />
                 </svg>
-                <span class="shell-ribbon-action-label">Call</span>
+                <span class="shell-ribbon-action-label">{voiceCount() > 0 ? 'Join call' : 'Call'}</span>
               </button>
             </Show>
             <Show when={groupControlRoom()}>
@@ -845,6 +852,29 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                     role="menu"
                     aria-labelledby="ribbon-more-room-label"
                   >
+                    <Show when={showCallJoinInMore()}>
+                      <button
+                        type="button"
+                        class="shell-ribbon-more-item"
+                        role="menuitem"
+                        aria-label="Join call"
+                        data-testid="ribbon-more-join-call"
+                        onClick={() => {
+                          const join = local.onJoinVoice;
+                          closeMoreThen(() => join?.(false));
+                        }}
+                        onKeyDown={onMoreMenuKeyDown}
+                      >
+                        <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
+                          <path d="M4 14h3v6H4a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z" />
+                          <path d="M20 14h-3v6h3a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2Z" />
+                          <path d="M15 9.5 19 7v6l-4-2.5" />
+                        </svg>
+                        <span>Join call</span>
+                      </button>
+                    </Show>
                     <button
                       type="button"
                       class="shell-ribbon-more-item"
