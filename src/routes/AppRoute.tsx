@@ -15,6 +15,7 @@ import { Connect } from '../app/Connect';
 import { initVaultSync } from '../lib/vault/vaultSync';
 import { applyRetentionPolicy, setRetentionPolicy } from '../lib/vault/historyVault';
 import { readRetentionPolicy } from '../lib/vault/retentionPolicy';
+import { AddToHomeScreenRuntime } from '../pwa/AddToHomeScreenRuntime';
 import { AppBadgeRuntime } from '../pwa/AppBadgeRuntime';
 import { AttentionTitleRuntime } from '../pwa/AttentionTitleRuntime';
 
@@ -43,6 +44,7 @@ export default function AppRoute() {
     <>
       <AppBadgeRuntime />
       <AttentionTitleRuntime />
+      <AddToHomeScreenRuntime />
       <Connect />
     </>
   );

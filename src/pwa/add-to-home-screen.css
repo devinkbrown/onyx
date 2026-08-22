@@ -1,0 +1,22 @@
+/* Day-2 Home Screen courtesy sheet — Instrument Sans body, Sheet chrome owns Fraunces once. */
+
+.a2hs-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.a2hs-sheet__detail {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--paper-mute);
+}
+
+.a2hs-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
