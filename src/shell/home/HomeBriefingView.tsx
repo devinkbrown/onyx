@@ -14,9 +14,11 @@ import type { ResumePoint } from '@/lib/catchup/resumePoints';
 import type { HomeMemoryItem } from '@/lib/notifications/homeMemory';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import type { CaughtUpPlan } from '@/lib/catchup/markCaughtUp';
+import type { FormationStrip } from '@/lib/formation/formationLoop';
 import { HomeMarkCaughtUp } from './HomeMarkCaughtUp';
 import type { FirstHourCoachTip } from '@/lib/firstHour/firstHour';
 import { FirstHourCoach } from '../FirstHourCoach';
+import { HomeFormationStrip } from './HomeFormationStrip';
 import type { HomeBriefing, HomeLiveSlot, HomeOverflow } from './homeBriefingModel';
 import type {
   HomeBriefingActions,
@@ -41,6 +43,7 @@ export type HomeBriefingViewProps = {
   showInviteFriends: () => boolean;
   showFirstHourWelcome: () => boolean;
   firstHourTip: () => FirstHourCoachTip | null;
+  formationStrip: () => FormationStrip | null;
   isJoined: (name: string) => boolean;
   caughtUpPlan: () => CaughtUpPlan;
   actions: HomeBriefingActions;
@@ -462,6 +465,16 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
             </p>
           </Show>
         </header>
+
+        <Show when={props.formationStrip()}>
+          {(strip) => (
+            <HomeFormationStrip
+              strip={strip()}
+              onOpen={props.actions.openFormationRoom}
+              onReshare={props.actions.reshareFormation}
+            />
+          )}
+        </Show>
 
         <Show when={props.outboxChrome()}>
           {(chrome) => (

@@ -707,6 +707,51 @@
   gap: 10px;
   margin-top: 16px;
 }
+.home-formation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px 20px;
+  margin: 0 0 22px;
+  padding: 16px 18px 16px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg, 12px);
+  background: color-mix(in oklab, var(--stone-2) 64%, transparent);
+  box-shadow: var(--elev-1, none);
+  border-left: 3px solid var(--lapis);
+}
+.home-formation__copy {
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+.home-formation__eyebrow {
+  margin: 0 0 6px;
+  color: var(--lapis-bright);
+  font: 700 var(--text-xs, 0.6875rem)/1 var(--font-mono);
+  letter-spacing: var(--tracking-kicker, 0.12em);
+  text-transform: uppercase;
+}
+.home-formation__title {
+  margin: 0;
+  color: var(--paper);
+  font-size: var(--text-lg, 1.0625rem);
+  font-weight: 650;
+  letter-spacing: var(--tracking-title, -0.02em);
+  line-height: var(--leading-snug, 1.35);
+}
+.home-formation__detail {
+  max-width: 48ch;
+  margin: 6px 0 0;
+  color: var(--paper-dim);
+  font-size: var(--text-md, 0.9375rem);
+  line-height: var(--leading-body, 1.55);
+}
+.home-formation__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .home-empty {
   margin: 8px 0 28px;
   padding: var(--pad-panel, 1rem) var(--pad-panel-lg, 1.25rem);
@@ -1463,6 +1508,11 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
     margin-top: 16px;
+  }
+  .home-formation__actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
   }
   .home-cta,
   .home-action {

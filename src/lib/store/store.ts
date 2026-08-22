@@ -11460,6 +11460,27 @@ export const store = createStore<OnyxState>()(
           break;
         }
 
+        // ── RPL_CREATIONTIME (329): :server 329 <me> <#chan> <unix> ─────
+        // Seeds Channel.createdAt so Home's 3-in-48h founder strip can age a
+        // room from the server clock instead of inventing one.
+        case '329': {
+          const ch = params[1] ?? '';
+          if (!isChan(ch) || !_validInboundWireToken(ch, MAX_VAULT_TARGET_LENGTH)) break;
+          const unix = boundedUnsignedInteger(params[2], 4_102_444_800);
+          if (unix == null || unix <= 0) break;
+          const createdAt = new Date(unix * 1000);
+          if (!Number.isFinite(createdAt.getTime())) break;
+          const key = ch.toLowerCase();
+          set(s => {
+            const channels = new Map(s.channels);
+            const c = channels.get(key);
+            if (!c) return {};
+            channels.set(key, { ...c, createdAt });
+            return { channels };
+          });
+          break;
+        }
+
         // ── Messages ──────────────────────────────────────────────────────
         case 'PRIVMSG':
         case 'NOTICE': {
