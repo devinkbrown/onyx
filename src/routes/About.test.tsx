@@ -223,7 +223,9 @@ describe('About page — DOM rendering', () => {
     expect(document.querySelector('footer.public-frame__footer')).not.toBeNull();
     const t = document.querySelector('footer.public-frame__footer')?.textContent ?? '';
     expect(t).toContain('Onyx');
-    expect(t).toContain('Accessibility');
+    expect(t).toContain('House rules');
+    expect(t).toContain('Privacy');
+    expect(t).not.toContain('Accessibility');
     expect(t).not.toMatch(/onyxos/i);
     cleanup();
   });

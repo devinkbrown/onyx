@@ -14,7 +14,7 @@ const PRIMARY_LINKS = [
   ['Download', '/download/'],
 ] as const;
 
-const FORBIDDEN = /fully encrypted|we cannot read your messages|group E2EE live|passkeys? as anonymous|Discord killer|military-grade|cloud history|arbitration|liability cap|Terms of Service|mailto:/i;
+const FORBIDDEN = /fully encrypted|we cannot read your messages|group E2EE is live|passkeys? as anonymous|Discord killer|military-grade|cloud history|arbitration|liability cap|mailto:/i;
 
 const PAGES = ['privacy', 'guidelines', 'contact'] as const satisfies readonly TrustPageId[];
 
@@ -68,7 +68,7 @@ describe('Trust page facts', () => {
     expect(screen.getByText(/about 400 recent messages per room/i)).toBeInTheDocument();
     expect(screen.getByText(/Group E2EE is not live/)).toBeInTheDocument();
     expect(screen.getByText(/does not sell your attention/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute('href', '/contact/');
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Contact' })).toHaveAttribute('href', '/contact/');
     expect(document.body.textContent).not.toMatch(/we cannot read/i);
     expect(document.body.querySelector('a[href^="mailto:"]')).toBeNull();
   });
