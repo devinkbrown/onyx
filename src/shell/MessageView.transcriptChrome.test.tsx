@@ -6,8 +6,8 @@
  * discoverability without touching store/protocol kernels.
  */
 import 'fake-indexeddb/auto';
-import { cleanup, render, screen } from '@solidjs/testing-library';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Channel, ChannelUser, ChatMessage } from '@/lib/irc/types';
 import { resetPreferences } from '@/lib/prefs/preferences';
@@ -149,5 +149,101 @@ describe('MessageView consumer transcript chrome', () => {
     expect(screen.queryByTestId('msg-menu-edit')).toBeNull();
     expect(screen.queryByTestId('msg-menu-delete')).toBeNull();
     expect(screen.queryByRole('button', { name: /^(react|reply|edit|delete)$/i })).toBeNull();
+  });
+
+  it('arms reply when a row is swiped right', () => {
+    seed([makeMessage('m-swipe', 'bob', 'swipe me', 0)]);
+    render(() => <MessageView />);
+
+    const row = document.querySelector('[data-message-search-id="m-swipe"]');
+    expect(row).toBeInstanceOf(HTMLElement);
+    fireEvent.pointerDown(row as HTMLElement, {
+      pointerType: 'touch',
+      pointerId: 1,
+      isPrimary: true,
+      button: 0,
+      clientX: 24,
+      clientY: 40,
+    });
+    fireEvent.pointerMove(row as HTMLElement, {
+      pointerType: 'touch',
+      pointerId: 1,
+      isPrimary: true,
+      button: 0,
+      clientX: 24 + 72,
+      clientY: 42,
+    });
+    fireEvent.pointerUp(row as HTMLElement, {
+      pointerType: 'touch',
+      pointerId: 1,
+      isPrimary: true,
+      button: 0,
+      clientX: 96,
+      clientY: 42,
+    });
+
+    expect(store.getState().replyingTo).toMatchObject({ id: 'm-swipe', from: 'bob' });
+    expect(row).toHaveClass('shell-msg-group');
+    expect(row?.querySelector('.shell-msg-bubble')).toBeNull();
+  });
+
+  it('opens the same overlay actions on a touch long-press', () => {
+    vi.useFakeTimers();
+    seed([makeMessage('m-hold', 'bob', 'hold me', 0)]);
+    render(() => <MessageView />);
+
+    const row = document.querySelector('[data-message-search-id="m-hold"]');
+    expect(row).toBeInstanceOf(HTMLElement);
+    fireEvent.pointerDown(row as HTMLElement, {
+      pointerType: 'touch',
+      pointerId: 1,
+      isPrimary: true,
+      button: 0,
+      clientX: 28,
+      clientY: 28,
+    });
+    vi.advanceTimersByTime(450);
+    vi.useRealTimers();
+
+    expect(row).toHaveClass('shell-msg-revealed');
+    expect(screen.getByRole('menu', { name: 'More actions for message from bob' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Reply to message from bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reply to bob' })).toBeInTheDocument();
+  });
+
+  it('keeps the desktop hover toolbar and ignores mouse-drag as swipe', () => {
+    seed([makeMessage('m-hover', 'bob', 'hover stays', 0)]);
+    render(() => <MessageView />);
+
+    const row = document.querySelector('[data-message-search-id="m-hover"]');
+    expect(row).toBeInstanceOf(HTMLElement);
+    fireEvent.pointerDown(row as HTMLElement, {
+      pointerType: 'mouse',
+      pointerId: 1,
+      button: 0,
+      clientX: 20,
+      clientY: 40,
+    });
+    fireEvent.pointerMove(row as HTMLElement, {
+      pointerType: 'mouse',
+      pointerId: 1,
+      button: 0,
+      clientX: 140,
+      clientY: 40,
+    });
+    fireEvent.pointerUp(row as HTMLElement, {
+      pointerType: 'mouse',
+      pointerId: 1,
+      button: 0,
+      clientX: 140,
+      clientY: 40,
+    });
+
+    expect(store.getState().replyingTo).toBeNull();
+    expect(screen.getByRole('button', { name: 'Reply to bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose reaction for message from bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions for message from bob' })).toBeInTheDocument();
+    expect(row).toHaveClass('shell-msg-group');
+    expect(row?.querySelector('.shell-msg-bubble')).toBeNull();
   });
 });

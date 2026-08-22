@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 const here = dirname(fileURLToPath(import.meta.url));
 const shellCss = readFileSync(join(here, 'shell.css'), 'utf8');
 const menuCss = readFileSync(join(here, 'message/message-menu.css'), 'utf8');
+const gestureCss = readFileSync(join(here, 'message/row-gesture.css'), 'utf8');
 
 function stripComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -81,5 +82,18 @@ describe('Transcript and composer commercial chrome', () => {
     expect(menu).toMatch(/width:\s*32px/);
     expect(menu).toMatch(/min-width:\s*44px/);
     expect(menu).not.toMatch(/\.msg-menu-btn--danger/s);
+  });
+
+  it('keeps swipe chrome matte and the row a grid line — no bubble or liquid glass', () => {
+    const gesture = stripComments(gestureCss);
+    expect(css).toMatch(/\.shell-msg-group\s*\{[^}]*display:\s*grid/s);
+    expect(css).toMatch(/\.shell-msg-group\s*\{[^}]*grid-template-columns:\s*40px 1fr/s);
+    expect(gesture).toMatch(/touch-action:\s*pan-y/);
+    expect(gesture).toMatch(/transform:\s*translateX\(var\(--row-swipe-x/);
+    expect(gesture).toMatch(/prefers-reduced-motion:\s*reduce/);
+    expect(gesture).not.toMatch(/backdrop-filter/);
+    expect(gesture).not.toMatch(/-webkit-backdrop-filter/);
+    expect(gesture).not.toMatch(/\.shell-msg-bubble/);
+    expect(gesture).not.toMatch(/border-radius:\s*(1[6-9]|[2-9]\d)px/);
   });
 });

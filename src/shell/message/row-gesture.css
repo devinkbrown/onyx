@@ -1,0 +1,76 @@
+/**
+ * row-gesture.css — swipe-to-reply affordance on transcript rows.
+ *
+ * Quiet harbor: transform/opacity only. No backdrop-filter, no liquid glass,
+ * no iMessage bubbles. The existing 40px + body grid stays the row shape.
+ * Desktop hover toolbar is unchanged (this file only adds swipe chrome).
+ */
+
+.shell-msg-group,
+.shell-msg-cont {
+  touch-action: pan-y;
+}
+
+.shell-msg-swipe-affordance {
+  position: absolute;
+  inset-inline-start: 8px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
+  display: grid;
+  place-items: center;
+  color: var(--lapis);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+  transform: scale(0.7);
+}
+
+.shell-msg-swipe-affordance-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.shell-msg-group.shell-msg--swiping,
+.shell-msg-cont.shell-msg--swiping {
+  touch-action: none;
+  transform: translateX(var(--row-swipe-x, 0px));
+  transition: none;
+}
+
+.shell-msg-group.shell-msg--swiping .shell-msg-swipe-affordance,
+.shell-msg-cont.shell-msg--swiping .shell-msg-swipe-affordance {
+  opacity: var(--row-swipe-progress, 0);
+  transform: scale(calc(0.7 + 0.3 * var(--row-swipe-progress, 0)));
+}
+
+.shell-msg--armed .shell-msg-swipe-affordance {
+  color: var(--lapis-bright);
+}
+
+.shell-msg-group.shell-msg--spring-back,
+.shell-msg-cont.shell-msg--spring-back {
+  transform: translateX(0);
+  transition: transform var(--dur, 220ms) var(--ease);
+}
+
+.shell-msg-group.shell-msg--gesturing,
+.shell-msg-cont.shell-msg--gesturing {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-msg-group.shell-msg--swiping,
+  .shell-msg-cont.shell-msg--swiping,
+  .shell-msg-group.shell-msg--spring-back,
+  .shell-msg-cont.shell-msg--spring-back,
+  .shell-msg-swipe-affordance,
+  .shell-msg--swiping .shell-msg-swipe-affordance {
+    transform: none;
+    transition: none;
+  }
+}

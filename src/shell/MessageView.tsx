@@ -69,8 +69,14 @@ import { Sheet } from '@/primitives/index';
 import { formatWebhookNoticeBody } from '@/lib/integrations/webhookBlockKit';
 import { MessageText } from '@/shell/message/MessageText';
 import { MessageMenu } from '@/shell/message/MessageMenu';
+import { ReplyIcon } from '@/shell/message/icons';
+import {
+  createRowGesture,
+  rowGesturePointerProps,
+  shouldIgnoreRowGestureClick,
+} from '@/shell/message/rowGesture';
+import '@/shell/message/row-gesture.css';
 import { activeMessageSearchResultId, openMessageSearchWithQuery } from './search/useMessageSearch';
-import { openRoomInviteShare } from './roomInviteShareState';
 import { TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';
@@ -1597,6 +1603,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   // land on a link, button, or an active text selection are ignored so they keep
   // their normal behaviour rather than toggling the bar.
   function toggleReveal(msgId: string, event: MouseEvent): void {
+    if (shouldIgnoreRowGestureClick(event)) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest('a, button, input, textarea, select, [role="button"], [contenteditable="true"]')) {
       return;
@@ -2156,6 +2163,17 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 e.preventDefault();
                 setMenuOpen(true);
               };
+              const rowGesture = createRowGesture({
+                onSwipeReply: () => {
+                  getState().setReplyingTo(msg);
+                },
+                onLongPressMenu: () => {
+                  setRevealedId(msg.id);
+                  setMenuOpen(true);
+                },
+              });
+              onCleanup(() => rowGesture.dispose());
+              const gestureProps = rowGesturePointerProps(rowGesture);
 
               // Continuation/full-header grouping is reactive so keyed rows
               // update when prepend/delete changes their predecessor.
@@ -2181,7 +2199,14 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       onContextMenu={openMenuFromRow}
                       onClick={(e) => toggleReveal(msg.id, e)}
                       onKeyDown={(e) => toggleRevealFromKeyboard(msg.id, e)}
+                      onPointerDown={gestureProps.onPointerDown}
+                      onPointerMove={gestureProps.onPointerMove}
+                      onPointerUp={gestureProps.onPointerUp}
+                      onPointerCancel={gestureProps.onPointerCancel}
                     >
+                      <span class="shell-msg-swipe-affordance" aria-hidden="true">
+                        <ReplyIcon class="shell-msg-swipe-affordance-icon" />
+                      </span>
                       <MessageMenu
                         msg={msg}
                         target={activeTarget()}
@@ -2252,7 +2277,14 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     onContextMenu={openMenuFromRow}
                     onClick={(e) => toggleReveal(msg.id, e)}
                     onKeyDown={(e) => toggleRevealFromKeyboard(msg.id, e)}
+                    onPointerDown={gestureProps.onPointerDown}
+                    onPointerMove={gestureProps.onPointerMove}
+                    onPointerUp={gestureProps.onPointerUp}
+                    onPointerCancel={gestureProps.onPointerCancel}
                   >
+                    <span class="shell-msg-swipe-affordance" aria-hidden="true">
+                      <ReplyIcon class="shell-msg-swipe-affordance-icon" />
+                    </span>
                     <span class="shell-msg-cont-ts" aria-hidden="true">
                       {fmtTime(msg.time)}
                       <Show when={msg.pending}>
