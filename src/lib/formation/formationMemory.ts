@@ -174,7 +174,7 @@ export function foldFormationMemory(input: FormationFoldInput): FormationMemoryS
   const ourNick = input.ourNick.trim();
   const pending = parseJoinParam(input.pendingJoin)
     ?? inviteChannelFromSearch(input.locationSearch ?? '')
-    ?? input.memory.inviteChannel;
+    ?? parseJoinParam(input.memory.inviteChannel);
 
   for (const [key, room] of Object.entries(input.memory.rooms)) {
     const clean = sanitizeRoom(room, input.nowMs);

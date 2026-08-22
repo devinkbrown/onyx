@@ -142,10 +142,14 @@ describe('formationMemory persistence', () => {
       inviteChannel: '#lounge',
     }, OWNER, NOW);
     expect(readFormationMemory(OWNER, NOW)).toEqual(written);
-    expect(Object.keys(localStorage).some((key) => key.startsWith(FORMATION_MEMORY_KEY))).toBe(true);
+    const storedKeys: string[] = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(FORMATION_MEMORY_KEY)) storedKeys.push(key);
+    }
+    expect(storedKeys.length).toBeGreaterThan(0);
 
-    const key = Object.keys(localStorage).find((item) => item.startsWith(FORMATION_MEMORY_KEY));
-    localStorage.setItem(key!, '{"rooms":{"#x":{"firstSeenAt":"nope"}}}');
+    localStorage.setItem(storedKeys[0]!, '{"rooms":{"#x":{"firstSeenAt":"nope"}}}');
     expect(readFormationMemory(OWNER, NOW)).toEqual(emptyFormationMemory());
   });
 
