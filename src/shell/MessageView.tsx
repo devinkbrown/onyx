@@ -2135,7 +2135,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     aria-label="New messages"
                     tabIndex={-1}
                   >
-                    <span class="shell-unread-divider-label">new messages</span>
+                    <span class="shell-unread-divider-label">New messages</span>
                   </div>
                 </Show>
               );
@@ -2234,6 +2234,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                           >
                             {fmtTime(msg.time)}
                           </time>
+                          <Show when={msg.pending}>
+                            <span class="shell-msg-pending-mark" aria-hidden="true">Queued</span>
+                          </Show>
                           <Show when={msg.edited}>
                             <EditedMarker messageId={msg.id} />
                           </Show>
@@ -2277,6 +2280,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                   >
                     <span class="shell-msg-cont-ts" aria-hidden="true">
                       {fmtTime(msg.time)}
+                      <Show when={msg.pending}>
+                        <span class="shell-msg-pending-mark">Queued</span>
+                      </Show>
                     </span>
                     <MessageMenu
                       msg={msg}
@@ -2330,7 +2336,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 : 'Jump to latest messages'
           }
         >
-          <Show when={unreadBelow() > 0} fallback={<span>↓ latest</span>}>
+          <Show when={unreadBelow() > 0} fallback={<span>Jump to latest</span>}>
             <span class="shell-jump-latest-count">{unreadBelow()}</span>
             <span>new</span>
             <span aria-hidden="true">↓</span>

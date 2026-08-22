@@ -202,7 +202,7 @@ describe('Composer accessibility', () => {
 
     const { getByRole, queryByText } = render(() => <Composer />);
 
-    expect(getByRole('status')).toHaveTextContent('replying to aliceprivate hello');
+    expect(getByRole('status')).toHaveTextContent('Replying to aliceprivate hello');
     expect(queryByText(/ONYXDM1 ciphertext-envelope/)).toBeNull();
   });
 
@@ -727,6 +727,27 @@ describe('Composer outbox status chrome', () => {
     render(() => <Composer />);
     expect(screen.queryByText(/Queued \(/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Messages queue on this device/i)).not.toBeInTheDocument();
+  });
+
+  it('quotes a reply fragment above the field and keeps the primary Send action', () => {
+    seedActiveChannel();
+    store.setState({
+      replyingTo: {
+        id: 'quote-parent',
+        from: 'alice',
+        text: 'a short fragment to quote',
+        time: new Date(),
+        type: 'msg',
+        target: '#room',
+      },
+    });
+
+    const { getByRole, getByText } = render(() => <Composer />);
+
+    expect(getByText('Replying to alice')).toBeInTheDocument();
+    expect(getByText('a short fragment to quote')).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Cancel reply' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Send message' })).toBeInTheDocument();
   });
 });
 

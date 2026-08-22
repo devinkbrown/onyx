@@ -67,8 +67,8 @@
 .msg-menu-btn {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--paper-mute);
@@ -84,6 +84,13 @@
   color: var(--lapis-bright);
   border-color: var(--seam-faint);
   background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
+}
+
+.msg-menu-btn--danger:hover,
+.msg-menu-btn--danger:focus-visible {
+  color: var(--shu-bright);
+  border-color: color-mix(in oklab, var(--shu) 40%, transparent);
+  background: color-mix(in oklab, var(--shu) 14%, transparent);
 }
 
 .msg-menu-icon {

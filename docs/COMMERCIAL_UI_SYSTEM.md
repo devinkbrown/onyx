@@ -261,8 +261,9 @@ disconnecting, without blocking the composer, and without false product claims.
 | **4** | Composer public default (+ tray) | `Composer.tsx`, `Composer.test.tsx`, composer CSS in `shell.css`, this doc | **Done** (denser More tools tray) |
 | **5** | You hub tiers | AppShell you surface, Preferences structure, Appearance, Account | **Done** (You + Account; ops matrix off Activity in Standard) |
 | **6** | Rooms/Messages collection polish | `ChannelSidebar.*`, sidebar CSS + shell/landing copy | **Done** |
+| **7** | Transcript + composer consumer density | `MessageView.tsx`, `Composer.tsx`, `MessageMenu.tsx`, `shell.css`, `message-menu.css` | **Done** |
 
-**Deferred beyond top 6:** transcript type density; default-off TimeScrubber/Watch; Landing claim alignment when packaging ledger green; **member-column persistence**.
+**Deferred beyond top 7:** default-off TimeScrubber/Watch; Landing claim alignment when packaging ledger green; **member-column persistence**.
 
 **Kernel freeze:** do not redesign by rewriting `src/lib/irc/`, `src/lib/store/`, `src/lib/cadence-media/`, `src/lib/e2ee/`, vault crypto boundaries, or wire METADATA keys `ocean.*`.
 
@@ -336,6 +337,29 @@ disconnecting, without blocking the composer, and without false product claims.
 - Focused: `pnpm exec vitest run src/shell/Composer.test.tsx --maxWorkers=1`
 - `pnpm typecheck` · `pnpm lint` · `pnpm build` · `git diff --check`
 - No store/protocol/E2EE/media/scheduling-helper edits; no commit/push/deploy from this lane.
+
+---
+
+## 6d. Transcript public default (slice 7)
+
+**Purpose:** The surface people stare at — grouped rows, unread, hover reply/react, and the composer — reads like a commercial chat app while staying ocean (Instrument Sans, `--ink` / `--lapis` / `--paper`, no blurple, no neon).
+
+| Piece | Behavior |
+|-------|----------|
+| **Grouping** | Same author within 5 minutes: avatar + name once, then bare continuation lines. Day separators in sentence case. |
+| **Unread** | Captured divider holds position while new messages arrive. Visible label **New messages**. Scrolled-up pill: Jump to latest / N new. |
+| **Hover / focus** | Reply · React (quick + picker) · Edit/Delete if owned · ⋯ overflow. Power items stay in overflow — not a 12-item toolbar on every row. |
+| **Reactions** | Chips wrap under the message body (`BoostBar`). |
+| **Pending** | Local echo stays visible (`Queued` chip + dimmed row). Composer outbox still exposes retry. |
+| **Composer** | One line grows to 5, then internal scroll. Primary: **+** · message · emoji · More · **Send**. Reply quotes a fragment above the field. 44px targets on phone; sits above the software keyboard. |
+| **Shapes** | People are circles; room intro glyph stays a squircle. |
+
+**Forbidden:** IRC mode letters on the transcript, neon/glow, glass/blur, Inter, Anton, purple/blurple clone, store/IRC/E2EE/vault/media rewrites.
+
+### Slice 7 acceptance gates
+
+- Focused: `pnpm exec vitest run src/shell/MessageView.transcriptChrome.test.tsx src/shell/transcriptChrome.test.ts src/shell/Composer.test.tsx src/shell/message/MessageMenu.test.tsx --maxWorkers=1`
+- `pnpm typecheck` · `pnpm lint` · `git diff --check`
 
 ---
 

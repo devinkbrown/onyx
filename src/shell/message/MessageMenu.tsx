@@ -741,6 +741,36 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
           </button>
         </Show>
 
+        {/* Edit / Delete stay on the hover bar when the row is already ours.
+            Overflow still lists them; this is discoverability, not a second
+            operator toolbar. Delete reuses the existing confirm sheet. */}
+        <Show when={caps().canEdit}>
+          <button
+            type="button"
+            class="msg-menu-btn"
+            data-testid="msg-menu-edit"
+            aria-label={`Edit ${messageActionTarget()}`}
+            onClick={edit}
+          >
+            <EditIcon class="msg-menu-icon" />
+          </button>
+        </Show>
+        <Show when={caps().canDelete}>
+          <button
+            type="button"
+            class="msg-menu-btn msg-menu-btn--danger"
+            data-testid="msg-menu-delete"
+            aria-label={`Delete ${messageActionTarget()} for everyone`}
+            onClick={() => {
+              setReactOpen(false);
+              setDeleteConfirming(true);
+              setMenuOpen(true);
+            }}
+          >
+            <TrashIcon class="msg-menu-icon" />
+          </button>
+        </Show>
+
         {/* Overflow ⋯ */}
         <Popover
           open={menuOpen()}
