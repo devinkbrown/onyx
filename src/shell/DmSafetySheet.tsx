@@ -96,7 +96,7 @@ export function DmSafetySheet(props: DmSafetySheetProps = {}): JSX.Element {
   });
 
   const openThisSheet = (): void => {
-    if (peer()) setOpen(true);
+    if (dmPeer(getState().activeView)) setOpen(true);
   };
   registerDmSafetySheetOpener(openThisSheet);
   onCleanup(() => {
