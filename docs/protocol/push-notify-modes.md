@@ -17,9 +17,11 @@ Body text that looks like E2EE envelope is redacted in the **service worker** (`
 | `shouldNotify` (`decision.ts`) | Desktop/sound gate: DND, mute, focus, throttle; alert kinds include `mention`/`dm`/`follow`/`call` |
 | Channel notify mode | Per-channel `all` / `mentions` / `mute` via `channelNotifyMode` |
 | `recoverWebPush` | Re-bind after reconnect / SW update |
+| You → Notifications | Short product page: Mentions, DMs, Calls + existing room mute/mentions-only. Uses this browser's service worker and the server `WEBPUSH` contract — no third-party vendor. |
+| First-run ask | One quiet chip after a real send or receive (never a wall on Connect). The Zig desktop host does not claim system notifications while `notifications: false`. |
 
 ## Operator check
 
-1. Account → enable push while connected  
+1. You → Notifications → turn on alerts while connected  
 2. Close tab; send a mention / start MEDIA JOIN from another client  
 3. Lock-screen shows mention/call title, never ciphertext  

@@ -24,6 +24,10 @@ import {
   isGuestClaimSheetOpen,
   resetGuestClaimSheetState,
 } from '@/shell/guestClaimState';
+import {
+  isNotificationsOpen,
+  resetNotificationsOpenState,
+} from '@/lib/notifications/youNotificationsState';
 
 const initialState = store.getInitialState();
 
@@ -63,6 +67,7 @@ function openYouAdvanced(): void {
 beforeEach(() => {
   store.setState(initialState, true);
   resetGuestClaimSheetState();
+  resetNotificationsOpenState();
 });
 
 afterEach(() => {
@@ -72,6 +77,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   resetGuestClaimSheetState();
+  resetNotificationsOpenState();
 });
 
 describe('Account panel — guest state', () => {
@@ -371,6 +377,22 @@ describe('Account panel — signed in', () => {
     expect(closeSpy).toHaveBeenCalledWith(false);
     await waitFor(() => {
       expect(openAppearance).toHaveBeenCalled();
+    });
+  });
+
+  it('exposes a You workspace rail into Notifications', async () => {
+    const closeSpy = vi.fn();
+    store.setState({
+      client: makeClient() as never,
+      server: seedServer('alice'),
+    });
+    render(() => <AccountPanel open={true} onOpenChange={closeSpy} />);
+
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('you-open-notifications'));
+    expect(closeSpy).toHaveBeenCalledWith(false);
+    await waitFor(() => {
+      expect(isNotificationsOpen()).toBe(true);
     });
   });
 
