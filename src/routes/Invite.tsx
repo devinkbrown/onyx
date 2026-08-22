@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './invite.css';
-import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, createResource, createSignal, Index, onCleanup, Show } from 'solid-js';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import {
   buildInviteCard,
@@ -156,14 +156,14 @@ export default function InviteRoute() {
                 <dt>Already in</dt>
                 <dd>
                   <ul class="invite-faces">
-                    <For each={faces()}>
+                    <Index each={faces()}>
                       {(nick) => (
                         <li class="invite-face">
                           <Avatar name={nick()} size="sm" />
                           <span>{nick()}</span>
                         </li>
                       )}
-                    </For>
+                    </Index>
                   </ul>
                 </dd>
               </div>

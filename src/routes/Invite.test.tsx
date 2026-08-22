@@ -5,14 +5,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 
 import * as clipboard from '@/lib/clipboard/writeClipboardText';
-import { loadInviteRoomPulse } from '@/lib/invite/inviteRoomPulse';
 import InviteRoute from './Invite';
+
+const loadInviteRoomPulse = vi.hoisted(() => vi.fn(async () => null));
 
 vi.mock('@/lib/invite/inviteRoomPulse', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/invite/inviteRoomPulse')>();
   return {
     ...actual,
-    loadInviteRoomPulse: vi.fn(actual.loadInviteRoomPulse),
+    loadInviteRoomPulse,
   };
 });
 
@@ -21,9 +22,9 @@ const src = readFileSync(resolve(__dirname, 'Invite.tsx'), 'utf8');
 afterEach(() => {
   cleanup();
   window.history.replaceState(null, '', '/');
-  vi.mocked(loadInviteRoomPulse).mockReset();
-  vi.mocked(loadInviteRoomPulse).mockResolvedValue(null);
   vi.restoreAllMocks();
+  loadInviteRoomPulse.mockReset();
+  loadInviteRoomPulse.mockResolvedValue(null);
 });
 
 describe('InviteRoute', () => {
@@ -108,7 +109,7 @@ describe('InviteRoute', () => {
   });
 
   it('shows last pulse and a last-speaker face only from real public data', async () => {
-    vi.mocked(loadInviteRoomPulse).mockResolvedValue({
+    loadInviteRoomPulse.mockResolvedValue({
       topic: 'Ops desk',
       lastPulse: '3m ago',
       faces: ['aria'],

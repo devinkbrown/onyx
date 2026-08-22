@@ -68,10 +68,10 @@ export function mergeInviteFaces(...lists: Array<readonly string[] | null | unde
   return faces;
 }
 
-/** `?with=alice,bob` — commas/whitespace split, then each nick is re-validated. */
+/** `?with=alice,bob` — comma-separated, then each nick is re-validated. */
 export function parseInviteFaces(raw: string | null): string[] {
   if (!raw) return [];
-  return mergeInviteFaces(raw.split(/[,\s]+/u));
+  return mergeInviteFaces(raw.split(','));
 }
 
 function canonicalInviteUrl(origin: string, card: Omit<InviteCard, 'network' | 'url'>): string {
