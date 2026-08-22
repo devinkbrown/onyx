@@ -81,6 +81,9 @@ describe('About page — source structure', () => {
     expect(srcContains('Friends, clubs, and creators')).toBe(true);
     expect(srcContains('href="/invite/"')).toBe(true);
     expect(srcContains('href="/app/"')).toBe(true);
+    expect(srcContains('/brand/mascot-still.png')).toBe(true);
+    expect((src.match(/\/brand\/mascot/g) ?? []).length).toBe(1);
+    expect(src).not.toMatch(/Pebble/);
   });
 
   it('does not mention OnyxOS in the public About story', () => {
@@ -145,6 +148,8 @@ describe('About page — CSS source', () => {
     expect(css.includes('.ab-seam')).toBe(true);
     expect(css.includes('.ab-who')).toBe(true);
     expect(css.includes('.ab-pillars')).toBe(true);
+    expect(css.includes('.ab-quiet-note')).toBe(true);
+    expect(css.includes('.ab-mascot')).toBe(true);
   });
 
   it('uses Instrument Sans, not Fraunces, Anton, or gold', () => {

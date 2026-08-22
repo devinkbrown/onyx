@@ -19,12 +19,19 @@ export function PublicHeader(props: { currentPath?: string; navItems?: readonly 
             class="public-frame__lockup"
             src="/brand/lockup.png"
             width="200"
-            height="70"
+            height="78"
             alt=""
             decoding="async"
           />
           <BrandMark size={32} />
-          <span>Onyx</span>
+          <img
+            class="public-frame__wordmark"
+            src="/brand/wordmark.png"
+            width="86"
+            height="37"
+            alt=""
+            decoding="async"
+          />
         </a>
         <PublicNav currentPath={props.currentPath} items={props.navItems} />
       </div>

@@ -229,7 +229,7 @@ public destinations.
 | Direction | Quiet harbor at night — ink, stone, one lapis gleam |
 | Signature | Community hero + locked mark/mascot + labeled room preview + trust strip |
 | Primary CTA | **Open Onyx** → `/app/`, owned by `PublicFrame`; hero may say **Join free** |
-| Identity | Locked assets in `public/brand/`: stone-squircle mark, night lockup, harbor-seal mascot (do not name it on Home), app-icon, 1200×630 `og.png`. Do not invent a different logo or mascot. |
+| Identity | Locked assets in `public/brand/`: stone-squircle `mark.png` (favicon / apple-touch / PWA / filled `app-icon.png` source), night `lockup.png`, `wordmark.png`, harbor-seal mascot at most once per public page (do not name it; never in chat chrome), 1200×630 `og.png`. Do not invent a different logo, mascot, or palette. |
 | Aperture | Static, labeled **Preview**; shows a room, not Connect; no ops-disclaimer, no fake activity, no laptop mockup |
 | Extras | Below the fold: Status, Roadmap, About, Download, Guides, Invite. Live mesh/stats telemetry stays on those routes, fail-honest |
 | Tokens | `--public-void #05070A`, `--public-surface #0C1016`, `--public-seam #1A222C`, `--public-paper #E6E8EC`, `--public-current #5BA3C9` (alive actions only), `--public-ember #C97B6B` (caution/future/degraded only) |

@@ -114,6 +114,17 @@ export default function About() {
             <p>A room and a stage for the people who already showed up, without ads in the way.</p>
           </article>
         </div>
+        <aside class="ab-quiet-note">
+          <img
+            class="ab-mascot"
+            src="/brand/mascot-still.png"
+            width="148"
+            height="148"
+            alt=""
+            decoding="async"
+          />
+          <p>A quiet harbor. The rooms stay open when you come back.</p>
+        </aside>
       </section>
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>

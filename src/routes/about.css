@@ -188,6 +188,31 @@
   color: var(--paper-dim);
 }
 
+.ab-quiet-note {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 36rem;
+  margin-top: 2rem;
+}
+
+.ab-mascot {
+  display: block;
+  width: 5.5rem;
+  height: auto;
+  flex: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ab-quiet-note p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--paper-dim);
+}
+
 .ab-quiet-links {
   display: flex;
   flex-wrap: wrap;
@@ -216,7 +241,8 @@
   .ab-hero,
   .ab-section,
   .ab-pillars,
-  .ab-who {
+  .ab-who,
+  .ab-quiet-note {
     min-width: 0;
     max-width: 100%;
   }
