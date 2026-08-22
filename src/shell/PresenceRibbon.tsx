@@ -820,7 +820,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                         role="menuitem"
                         aria-label="Join call"
                         data-testid="ribbon-more-join-call"
-                        onClick={() => closeMoreThen(() => local.onJoinVoice?.(false))}
+                        onClick={() => {
+                          const join = local.onJoinVoice;
+                          closeMoreThen(() => join?.(false));
+                        }}
                         onKeyDown={onMoreMenuKeyDown}
                       >
                         <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
