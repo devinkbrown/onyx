@@ -869,7 +869,10 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
   onMount(() => {
     onCleanup(registerStartRoomHandler(() => {
       selectSidebarMode('rooms');
-      if (isMobile()) openMobileCollection('rooms');
+      const mobileViewport = typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(max-width: 900px)').matches;
+      if (mobileViewport) getState().openMobileSidebar();
       queueMicrotask(() => {
         focusJoinRoomInput();
       });
