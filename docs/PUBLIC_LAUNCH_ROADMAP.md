@@ -71,6 +71,7 @@ Companions:
 | First-run copy honesty about desktop availability | **DONE** on Landing — browser-first; desktop only after release gates |
 | Connect first-run ritual | **DONE** — guest display name + Join; Sign in / Create account secondary; public words only (rooms, messages, display name, join); no mesh / node / claim-path |
 | After-join first hour | **DONE** — room join focuses the composer with a say-hi hint; empty Home offers Browse rooms / Start a room / Invite friends; at most two dismissible tips; `onyx:first-hour-seen` hides them for returning users |
+| After-create 3-in-48h | **DONE** — Home founder strip nags until 3 people have shown up; Reshare reuses the existing invite link + share sheet; joiner Home says hi when invite context exists |
 | Account / invite onboarding polish | **PENDING** (product kernel exists; public funnel TBD) |
 
 ---

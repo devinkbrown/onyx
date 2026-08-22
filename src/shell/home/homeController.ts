@@ -64,7 +64,19 @@ import {
   type OutboxEntry,
 } from '@/lib/vault/historyVault';
 import { outboxHomeChrome, type OutboxHomeChrome } from '@/lib/vault/outboxStatus';
-import type { ChatMessage } from '@/lib/irc/types';
+import type { Channel, ChatMessage } from '@/lib/irc/types';
+import {
+  emptyFormationMemory,
+  selectFormationStrip,
+  type FormationChannel,
+  type FormationStrip,
+} from '@/lib/formation/formationLoop';
+import {
+  foldFormationMemory,
+  readFormationMemory,
+  subscribeFormationMemory,
+  writeFormationMemory,
+} from '@/lib/formation/formationMemory';
 import { openSpotlight } from '@/chat/spotlight/useSpotlight';
 import { openMessageSearch, openMessageSearchWithQuery } from '../search/useMessageSearch';
 import { openRoomInviteShare } from '../roomInviteShareState';
@@ -163,6 +175,8 @@ export type HomeBriefingActions = {
   openQuietBoost: (item: QuietBoostDigestItem) => void;
   markAllCaughtUp: () => void;
   openInviteFriends: () => void;
+  openFormationRoom: (channel: string) => void;
+  reshareFormation: (channel: string) => void;
 };
 
 export type HomeController = {
@@ -180,10 +194,36 @@ export type HomeController = {
   showInviteFriends: () => boolean;
   showFirstHourWelcome: () => boolean;
   firstHourTip: () => ReturnType<typeof firstHourCoachTip>;
+  formationStrip: () => FormationStrip | null;
   isJoined: (name: string) => boolean;
   caughtUpPlan: () => CaughtUpPlan;
   actions: HomeBriefingActions;
 };
+
+function formationChannelsFromStore(
+  rooms: Iterable<Channel>,
+  readable: (message: ChatMessage) => boolean,
+): FormationChannel[] {
+  const observed: FormationChannel[] = [];
+  for (const channel of rooms) {
+    const chatters = new Set<string>();
+    for (const message of channel.messages) {
+      if (readable(message) && message.from.trim()) {
+        chatters.add(message.from.trim().toLowerCase());
+      }
+    }
+    observed.push({
+      name: channel.name,
+      createdAtMs: channel.createdAt?.getTime() ?? null,
+      members: [...channel.users.values()].map((user) => ({
+        nick: user.nick,
+        modes: [...user.modes],
+        hasChat: chatters.has(user.nick.toLowerCase()),
+      })),
+    });
+  }
+  return observed;
+}
 
 function isReadableHomeMessage(message: ChatMessage): boolean {
   const text = message.plaintext ?? message.text;
@@ -226,6 +266,7 @@ export function createHomeController(): HomeController {
   const connectionStatus = useStore((s) => s.connectionStatus);
   const outboxDeliveryFailed = useStore((s) => s.outboxDeliveryFailed);
   const ourNick = useStore((s) => s.ourNick);
+  const pendingDeepLinkJoin = useStore((s) => s.pendingDeepLinkJoin);
   const serverUrl = useStore((s) => s.server?.url.trim() ?? '');
   const accountIdentity = useStore((s) =>
     (s.server?.account ?? s.ourNick).trim().toLowerCase(),
@@ -674,6 +715,43 @@ export function createHomeController(): HomeController {
     isFirstHourSeen();
     return firstHourCoachTip('home');
   });
+  const [formationMemory, setFormationMemory] = createSignal(emptyFormationMemory());
+  createEffect(() => {
+    const owner = memoryOwner();
+    if (!owner) {
+      setFormationMemory(emptyFormationMemory());
+      return;
+    }
+    setFormationMemory(readFormationMemory(owner, nowMs()));
+    onCleanup(subscribeFormationMemory((snapshot) => setFormationMemory(snapshot), owner));
+  });
+  const observedFormation = createMemo(() =>
+    formationChannelsFromStore(channels().values(), isReadableHomeMessage),
+  );
+  createEffect(() => {
+    const owner = memoryOwner();
+    if (!owner || connectionStatus() !== 'connected') return;
+    const next = foldFormationMemory({
+      nowMs: nowMs(),
+      ourNick: ourNick(),
+      channels: observedFormation(),
+      pendingJoin: pendingDeepLinkJoin(),
+      locationSearch: typeof window === 'undefined' ? '' : window.location.search,
+      memory: formationMemory(),
+    });
+    if (JSON.stringify(next) === JSON.stringify(formationMemory())) return;
+    setFormationMemory(writeFormationMemory(next, owner, nowMs()));
+  });
+  const formationStrip = createMemo(() =>
+    selectFormationStrip({
+      nowMs: nowMs(),
+      connected: connectionStatus() === 'connected',
+      ourNick: ourNick(),
+      channels: observedFormation(),
+      pendingJoin: pendingDeepLinkJoin(),
+      memory: formationMemory(),
+    }),
+  );
   const moreActivityHasContent = createMemo(() =>
     !!stats.latest
     || (connectionStatus() === 'connected' && roomRhythm().length > 0)
@@ -867,6 +945,12 @@ export function createHomeController(): HomeController {
       for (const target of current.targets) state.markRead(target.target);
     },
     openInviteFriends: () => openRoomInviteShare(inviteShareChannel()),
+    openFormationRoom: (channel) => {
+      getState().navigate({ kind: 'channel', channel });
+    },
+    reshareFormation: (channel) => {
+      openRoomInviteShare(channel);
+    },
   };
 
   return {
@@ -884,6 +968,7 @@ export function createHomeController(): HomeController {
     showInviteFriends,
     showFirstHourWelcome,
     firstHourTip,
+    formationStrip,
     isJoined,
     caughtUpPlan,
     actions,

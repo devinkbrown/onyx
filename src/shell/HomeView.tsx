@@ -30,6 +30,7 @@ export function HomeView() {
       showInviteFriends={home.showInviteFriends}
       showFirstHourWelcome={home.showFirstHourWelcome}
       firstHourTip={home.firstHourTip}
+      formationStrip={home.formationStrip}
       isJoined={home.isJoined}
       caughtUpPlan={home.caughtUpPlan}
       actions={home.actions}

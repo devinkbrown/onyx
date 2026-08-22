@@ -439,6 +439,14 @@ describe('channel mode tracking via _handleMessage', () => {
     expect(st.flags.has('t')).toBe(true);
   });
 
+  it('RPL_CREATIONTIME (329) seeds Channel.createdAt from the unix timestamp', () => {
+    seed('#general', [makeUser('me', ['Q'])]);
+    feed(':server 329 me #general 1724350000');
+    expect(store.getState().channels.get('#general')?.createdAt).toEqual(new Date(1724350000 * 1000));
+    feed(':server 329 me #general not-a-time');
+    expect(store.getState().channels.get('#general')?.createdAt).toEqual(new Date(1724350000 * 1000));
+  });
+
   it('a live MODE +k echo records the key, and -k clears it', () => {
     seed('#general', [makeUser('me', ['o'])]);
     feed(':op!u@h MODE #general +k hunter2');

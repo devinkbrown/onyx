@@ -104,6 +104,8 @@ function actions(over: Partial<HomeBriefingActions> = {}): HomeBriefingActions {
     openQuietBoost: noop,
     markAllCaughtUp: noop,
     openInviteFriends: noop,
+    openFormationRoom: noop,
+    reshareFormation: noop,
     ...over,
   };
 }
@@ -136,6 +138,7 @@ function renderView(over: Partial<{
   caughtUpUnread: number;
   firstHourWelcome: boolean;
   firstHourTip: HomeBriefingViewProps['firstHourTip'] extends () => infer T ? T : never;
+  formation: HomeBriefingViewProps['formationStrip'] extends () => infer T ? T : never;
 }> = {}) {
   const model = over.briefing ?? briefing();
   const nextActions = over.actions ?? actions();
@@ -157,6 +160,7 @@ function renderView(over: Partial<{
       showInviteFriends={() => false}
       showFirstHourWelcome={() => over.firstHourWelcome === true}
       firstHourTip={() => over.firstHourTip ?? null}
+      formationStrip={() => over.formation ?? null}
       isJoined={() => false}
       caughtUpPlan={() => rooms > 0
         ? { targets: [{ kind: 'channel', target: '#mentions', unread, highlights: 0 }], rooms, unread, mentions: 0 }
@@ -223,6 +227,7 @@ describe('HomeBriefingView — presentation contract', () => {
         showInviteFriends={() => true}
         showFirstHourWelcome={() => false}
         firstHourTip={() => null}
+        formationStrip={() => null}
         isJoined={() => false}
         caughtUpPlan={() => EMPTY_CAUGHT_UP}
         actions={actions({ openInviteFriends })}
@@ -286,6 +291,7 @@ describe('HomeBriefingView — presentation contract', () => {
         showInviteFriends={() => false}
         showFirstHourWelcome={() => false}
         firstHourTip={() => null}
+        formationStrip={() => null}
         isJoined={() => false}
         caughtUpPlan={() => EMPTY_CAUGHT_UP}
         actions={actions({ openBrowseRooms, openCreateRoom })}
@@ -297,6 +303,33 @@ describe('HomeBriefingView — presentation contract', () => {
     fireEvent.click(within(empty).getByRole('button', { name: 'Start a room' }));
     expect(openBrowseRooms).toHaveBeenCalledOnce();
     expect(openCreateRoom).toHaveBeenCalledOnce();
+  });
+
+  it('nags a founder with real names and the existing Reshare action', () => {
+    const openFormationRoom = vi.fn();
+    const reshareFormation = vi.fn();
+    renderView({
+      formation: {
+        kind: 'first-join',
+        channel: '#lounge',
+        present: 2,
+        missing: 1,
+        knownNames: ['Alex'],
+        headline: 'Alex is here — say the thing you invited them for.',
+        detail: "1 of 3 hasn't opened this",
+        canReshare: true,
+      },
+      actions: actions({ openFormationRoom, reshareFormation }),
+    });
+
+    const strip = screen.getByRole('region', { name: 'Room formation' });
+    expect(strip).toHaveTextContent('Alex is here — say the thing you invited them for.');
+    expect(strip).toHaveTextContent('#lounge');
+    expect(strip).not.toHaveTextContent(/DAU|Discord|tour|people online/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Reshare' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open #lounge' }));
+    expect(reshareFormation).toHaveBeenCalledWith('#lounge');
+    expect(openFormationRoom).toHaveBeenCalledWith('#lounge');
   });
 
   it('keeps mobile reading order: needs, continue, live, explore', () => {

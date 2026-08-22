@@ -66,10 +66,13 @@ After connection:
 2. A guest who joined with no room lands on Home with Browse rooms, Start a
    room, and Invite friends. First-run tips are quiet, dismissible, and stored
    in `onyx:first-hour-seen` so they do not return.
-3. Returning Home still shows unread/catch-up when there is real activity.
-4. Open Preferences to choose history retention, notifications, appearance,
+3. Returning Home still shows unread/catch-up when there is real activity. A
+   room you created (or are the only member of) in the last 48 hours may ask
+   you to reshare until three people have actually shown up — no invented members.
+4. Join a channel from the channel browser or composer command surface.
+5. Open Preferences to choose history retention, notifications, appearance,
    media, and import/export behavior.
-5. Use the account panel for device identity, direct-message keys, sessions,
+6. Use the account panel for device identity, direct-message keys, sessions,
    recovery codes, and server-gated passkeys.
 
 The app route is `/app`. Public informational routes include `/about`,
