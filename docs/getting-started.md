@@ -52,8 +52,10 @@ outside local development.
 
 The landing page leads to the connect surface. First-run is guest join: a
 display name, an optional room, then Join. Sign in and Create account stay
-secondary. The server, not the client, is authoritative for registration,
-account state, and session-resume tokens.
+secondary. Public copy uses rooms, messages, display name, join, sign in,
+and create account — not mesh, node, or claim-path language. The server, not
+the client, is authoritative for registration, account state, and
+session-resume tokens.
 
 After connection:
 

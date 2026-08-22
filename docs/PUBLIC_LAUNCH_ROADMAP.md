@@ -69,6 +69,7 @@ Companions:
 |------|--------|
 | Browser connect path | **DONE** (existing `/app` + Connect) |
 | First-run copy honesty about desktop availability | **DONE** on Landing — browser-first; desktop only after release gates |
+| Connect first-run ritual | **DONE** — guest display name + Join; Sign in / Create account secondary; public words only (rooms, messages, display name, join); no mesh / node / claim-path |
 | Account / invite onboarding polish | **PENDING** (product kernel exists; public funnel TBD) |
 
 ---

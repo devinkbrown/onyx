@@ -259,7 +259,7 @@ disconnecting, without blocking the composer, and without false product claims.
 | **5** | You hub tiers | AppShell you surface, Preferences structure, Appearance, Account | **Done** (You + Account; ops matrix off Activity in Standard) |
 | **6** | Rooms/Messages collection polish | `ChannelSidebar.*`, sidebar CSS + shell/landing copy | **Done** |
 
-**Deferred beyond top 6:** transcript type density; default-off TimeScrubber/Watch; Connect copy; Landing claim alignment when packaging ledger green; **member-column persistence**.
+**Deferred beyond top 6:** transcript type density; default-off TimeScrubber/Watch; Landing claim alignment when packaging ledger green; **member-column persistence**.
 
 **Kernel freeze:** do not redesign by rewriting `src/lib/irc/`, `src/lib/store/`, `src/lib/cadence-media/`, `src/lib/e2ee/`, vault crypto boundaries, or wire METADATA keys `ocean.*`.
 

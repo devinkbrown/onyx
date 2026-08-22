@@ -170,6 +170,8 @@ describe('Connect screen rendering', () => {
   it('defaults to guest join', () => {
     render(() => <Connect />);
     expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'guest');
+    expect(visibleCopy()).toMatch(/join free/i);
+    expect(visibleCopy()).toMatch(/send a message/i);
   });
 
   it('renders the display name field', () => {

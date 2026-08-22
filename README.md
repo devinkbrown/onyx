@@ -57,9 +57,9 @@ planning material and may describe work before or after the current checkout.
 
 ## Screenshots
 
-![Onyx desktop client](public/screenshots/app-wide.png)
+![Onyx desktop connect](public/screenshots/app-wide.png)
 
-![Onyx mobile client](public/screenshots/app-mobile.png)
+![Onyx mobile connect](public/screenshots/app-mobile.png)
 
 ## Run the client locally
 

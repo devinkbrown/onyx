@@ -91,7 +91,7 @@ type Mode = 'guest' | 'signin' | 'register';
 const MODE_COPY: Record<Mode, { title: string; body: string }> = {
   guest: {
     title: 'Join a room',
-    body: 'Choose a display name. You can sign in or create an account anytime.',
+    body: 'Join free — send a message in about a minute.',
   },
   signin: {
     title: 'Sign in',

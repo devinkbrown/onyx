@@ -1,6 +1,7 @@
 /* ── Onyx connect / first-run ───────────────────────────────────────────────
-   Calm dark join screen. Instrument Sans throughout. No display poster type,
-   neon glow, decorative grid, or infrastructure chrome. Tokens only.
+   Quiet-threshold ocean door: mineral night, 2px stone card, fine seams.
+   Instrument Sans UI, one Fraunces lede, JetBrains Mono status only.
+   No Anton, glow, glass, or a second brand. Tokens only.
    ─────────────────────────────────────────────────────────────────────────── */
 
 .conn {
@@ -23,9 +24,7 @@
   inset: 0;
   z-index: -3;
   pointer-events: none;
-  background:
-    radial-gradient(80% 50% at 50% 0%, color-mix(in oklab, var(--stone-2) 80%, transparent) 0%, transparent 70%),
-    var(--ink);
+  background: var(--ink);
 }
 
 .conn-sea-grain {
@@ -41,16 +40,17 @@
 .conn-stage {
   display: flex;
   justify-content: center;
-  width: min(440px, 100%);
+  width: min(520px, calc(100vw - 40px));
 }
 
 .conn-card {
   position: relative;
   width: 100%;
-  border-radius: 12px;
-  background: color-mix(in oklab, var(--stone) 88%, var(--ink));
+  border-radius: 2px;
+  background: var(--stone);
   border: 1px solid var(--seam);
   box-shadow: none;
+  backdrop-filter: none;
 }
 
 .conn-crest {
@@ -87,34 +87,44 @@
 }
 
 .conn-eyebrow {
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs, 0.6875rem);
+  letter-spacing: var(--tracking-kicker, 0.12em);
   text-transform: uppercase;
   color: var(--paper-dim);
 }
 
+.conn-eyebrow::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: var(--seam-faint);
+}
+
 .conn-title {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
   font-family: var(--font-sans);
   font-weight: 600;
-  font-size: clamp(1.5rem, 1.15rem + 1.4vw, 1.85rem);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.5rem, 1.15rem + 1.4vw, 2rem);
+  line-height: var(--leading-tight, 1.15);
+  letter-spacing: var(--tracking-title, -0.02em);
   text-transform: none;
   color: var(--paper);
+  text-shadow: none;
 }
 
 .conn-sub {
-  margin: 6px 0 0;
-  font-family: var(--font-sans);
-  font-style: normal;
-  font-weight: 400;
-  font-size: 0.95rem;
-  line-height: 1.45;
+  margin: 10px 0 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 380;
+  font-size: var(--text-lg, 1.0625rem);
+  line-height: var(--leading-body, 1.55);
   color: var(--paper-dim);
-  max-width: 38ch;
+  max-width: 42ch;
 }
 
 .conn-invite {
@@ -122,16 +132,15 @@
   flex-direction: column;
   gap: 6px;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: 2px;
   border: 1px solid var(--seam-faint);
   background: color-mix(in oklab, var(--ink) 55%, var(--stone));
 }
 
 .conn-invite-eyebrow {
-  font-family: var(--font-sans);
-  font-size: 0.72rem;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs, 0.6875rem);
+  letter-spacing: var(--tracking-kicker, 0.12em);
   text-transform: uppercase;
   color: var(--paper-dim);
 }
@@ -176,7 +185,7 @@
   flex-direction: column;
   gap: 12px;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: 2px;
   border: 1px solid var(--seam-faint);
   background: color-mix(in oklab, var(--ink) 52%, var(--stone));
 }
@@ -190,10 +199,9 @@
 
 .conn-resume-eyebrow {
   display: block;
-  font-family: var(--font-sans);
-  font-size: 0.72rem;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs, 0.6875rem);
+  letter-spacing: var(--tracking-kicker, 0.12em);
   text-transform: uppercase;
   color: var(--paper-dim);
 }
@@ -234,7 +242,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: stretch;
   border: 1px solid var(--seam-faint);
-  border-radius: 8px;
+  border-radius: 2px;
   background: color-mix(in oklab, var(--ink) 62%, var(--stone));
 }
 
@@ -267,7 +275,7 @@
 .conn-identity-forget:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: 2px;
 }
 
 .conn-identity-nick {
@@ -366,13 +374,14 @@
   min-width: 64px;
   min-height: 48px;
   padding: 0 12px;
-  border-radius: var(--r-sm);
+  border-radius: 2px;
   border: 1px solid var(--seam);
   background: color-mix(in oklab, var(--stone-2) 70%, transparent);
   color: var(--paper-dim);
-  font-family: var(--font-sans);
-  font-size: 0.8rem;
-  font-weight: 650;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   cursor: pointer;
 }
 
@@ -423,7 +432,7 @@
   margin: 0;
   padding: 10px 12px;
   border: none;
-  border-radius: var(--r-sm);
+  border-radius: 2px;
   background: transparent;
   color: var(--paper-dim);
   font-family: var(--font-sans);
@@ -498,7 +507,7 @@
   justify-content: space-between;
   gap: 14px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 2px;
   border: 1px solid var(--seam-faint);
   background: color-mix(in oklab, var(--stone) 30%, transparent);
 }
@@ -581,11 +590,12 @@
   align-items: flex-start;
   gap: 11px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 2px;
   border: 1px solid var(--seam-faint);
   background: color-mix(in oklab, var(--ink) 64%, var(--stone));
-  font-family: var(--font-sans);
-  font-size: 0.82rem;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
   min-height: 46px;
 }
 
@@ -623,6 +633,8 @@
 .conn-status[data-phase='error'] .conn-status-phase { color: var(--shu-bright); }
 
 .conn-status-msg {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
   color: var(--paper-dim);
   font-size: 0.84rem;
   line-height: 1.4;
@@ -637,7 +649,7 @@
   margin-top: 4px;
   padding: 12px 14px;
   border: 1px solid color-mix(in oklab, var(--gold) 44%, var(--seam-faint));
-  border-radius: 10px;
+  border-radius: 2px;
   background: color-mix(in oklab, var(--gold) 10%, var(--ink));
 }
 
@@ -649,7 +661,7 @@
   min-height: 44px;
   padding: 8px 12px;
   border: 1px solid color-mix(in oklab, var(--gold) 52%, transparent);
-  border-radius: 8px;
+  border-radius: 2px;
   background: color-mix(in oklab, var(--gold) 14%, transparent);
   color: var(--gold-bright);
   font-family: var(--font-sans);
@@ -668,7 +680,7 @@
   min-height: 44px;
   text-align: left;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 2px;
   border: 1px solid color-mix(in oklab, var(--gold) 40%, transparent);
   background: color-mix(in oklab, var(--gold) 8%, transparent);
   color: var(--gold-bright);
@@ -688,7 +700,7 @@
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border-radius: 10px;
+  border-radius: 2px;
   border: 1px solid color-mix(in oklab, var(--gold) 36%, transparent);
   background: color-mix(in oklab, var(--ink) 56%, var(--stone));
 }
