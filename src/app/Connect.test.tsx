@@ -21,6 +21,7 @@ import { NODES, selectBestNode } from './nodes';
 import { store, getState } from '@/lib/store';
 import { preferences, resetPreferences } from '@/lib/prefs/preferences';
 import { loadCredentials } from '@/lib/credentials';
+import { peekFirstHourHandoff, resetFirstHourForTests } from '@/lib/firstHour/firstHour';
 
 // Connect owns only the form/shell gate. Keep its unit suite isolated from the
 // large lazy shell graph while preserving the disconnect callback contract.
@@ -86,6 +87,7 @@ beforeEach(() => {
     window.localStorage.clear();
   } catch { /* ignore */ }
   resetPreferences();
+  resetFirstHourForTests();
 });
 
 afterEach(() => {
@@ -93,6 +95,7 @@ afterEach(() => {
   restorePasskeyEnvironment?.();
   restorePasskeyEnvironment = undefined;
   vi.restoreAllMocks();
+  resetFirstHourForTests();
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1204,6 +1207,11 @@ describe('optional room to join (no autojoin)', () => {
     fireEvent.input(roomField(), { target: { value: 'lounge' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(store.getState().pendingDeepLinkJoin).toBe('#lounge');
+    expect(peekFirstHourHandoff()).toEqual({
+      landing: 'room',
+      channel: '#lounge',
+      guest: true,
+    });
     connectSpy.mockRestore();
   });
 
@@ -1228,6 +1236,11 @@ describe('optional room to join (no autojoin)', () => {
     fireEvent.input(screen.getByRole('textbox', { name: /^(display name|name|account name)$/i }), { target: { value: 'tester' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(store.getState().pendingDeepLinkJoin).toBeNull();
+    expect(peekFirstHourHandoff()).toEqual({
+      landing: 'home',
+      channel: null,
+      guest: true,
+    });
     connectSpy.mockRestore();
   });
 

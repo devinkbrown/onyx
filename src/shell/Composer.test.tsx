@@ -25,6 +25,11 @@ import { store } from '@/lib/store/store';
 import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import { _resetVaultForTests, queueOutbox } from '@/lib/vault/historyVault';
 import { Composer } from './Composer';
+import {
+  isFirstHourSeen,
+  recordFirstHourHandoff,
+  resetFirstHourForTests,
+} from '@/lib/firstHour/firstHour';
 
 const initialState = store.getInitialState();
 
@@ -54,10 +59,12 @@ function seedActiveChannel(): void {
 describe('Composer accessibility', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+    resetFirstHourForTests();
   });
 
   afterEach(() => {
     cleanup();
+    resetFirstHourForTests();
   });
 
   it('gives the textarea an accessible name and labels the tool buttons', () => {
@@ -720,5 +727,32 @@ describe('Composer outbox status chrome', () => {
     render(() => <Composer />);
     expect(screen.queryByText(/Queued \(/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Messages queue on this device/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('Composer first-hour room landing', () => {
+  beforeEach(() => {
+    store.setState(initialState, true);
+    resetFirstHourForTests();
+  });
+
+  afterEach(() => {
+    cleanup();
+    resetFirstHourForTests();
+  });
+
+  it('focuses the composer and shows a dismissible say-hi hint', async () => {
+    recordFirstHourHandoff({ landing: 'room', channel: '#room', guest: true });
+    seedActiveChannel();
+    render(() => <Composer />);
+
+    const message = screen.getByRole('textbox', { name: /message #room/i });
+    await waitFor(() => expect(document.activeElement).toBe(message));
+    expect(screen.getByTestId('first-hour-coach')).toHaveTextContent('Say hi');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss tip' }));
+    expect(isFirstHourSeen()).toBe(true);
+    expect(screen.queryByTestId('first-hour-coach')).not.toBeInTheDocument();
   });
 });

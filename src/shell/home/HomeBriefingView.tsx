@@ -15,6 +15,8 @@ import type { HomeMemoryItem } from '@/lib/notifications/homeMemory';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import type { CaughtUpPlan } from '@/lib/catchup/markCaughtUp';
 import { HomeMarkCaughtUp } from './HomeMarkCaughtUp';
+import type { FirstHourCoachTip } from '@/lib/firstHour/firstHour';
+import { FirstHourCoach } from '../FirstHourCoach';
 import type { HomeBriefing, HomeLiveSlot, HomeOverflow } from './homeBriefingModel';
 import type {
   HomeBriefingActions,
@@ -37,6 +39,8 @@ export type HomeBriefingViewProps = {
   more: () => HomeMoreActivityView;
   showFirstRoomPrompt: () => boolean;
   showInviteFriends: () => boolean;
+  showFirstHourWelcome: () => boolean;
+  firstHourTip: () => FirstHourCoachTip | null;
   isJoined: (name: string) => boolean;
   caughtUpPlan: () => CaughtUpPlan;
   actions: HomeBriefingActions;
@@ -387,11 +391,17 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
           <h1 class="home-title">
             {props.welcomeName() ? `Welcome, ${props.welcomeName()}.` : 'Welcome.'}
           </h1>
-          <p class="home-sub">What needs you, and where you continue.</p>
-          <p class="home-shortcut-note">
-            <span>Tip</span>
-            Press <b>/</b> to search or <b>?</b> for shortcuts.
+          <p class="home-sub">
+            {props.showFirstHourWelcome()
+              ? 'Browse a room, start one, or invite a friend.'
+              : 'What needs you, and where you continue.'}
           </p>
+          <Show when={!props.showFirstHourWelcome()}>
+            <p class="home-shortcut-note">
+              <span>Tip</span>
+              Press <b>/</b> to search or <b>?</b> for shortcuts.
+            </p>
+          </Show>
           <div class="home-welcome-actions" role="group" aria-label="Primary home actions">
             <button
               type="button"
@@ -400,7 +410,23 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
             >
               Browse rooms
             </button>
-            <Show when={props.showInviteFriends()}>
+            <Show when={props.showFirstHourWelcome()}>
+              <button
+                type="button"
+                class="home-action home-action--supporting"
+                onClick={() => props.actions.startRoom()}
+              >
+                Start a room
+              </button>
+              <button
+                type="button"
+                class="home-action home-action--supporting"
+                onClick={() => props.actions.inviteFriends()}
+              >
+                Invite friends
+              </button>
+            </Show>
+            <Show when={!props.showFirstHourWelcome() && props.showInviteFriends()}>
               <button
                 type="button"
                 class="home-action home-action--supporting"
@@ -409,14 +435,25 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                 Invite friends
               </button>
             </Show>
-            <button
-              type="button"
-              class="home-action home-action--supporting"
-              onClick={() => props.actions.openSearchMessages()}
-            >
-              Search messages
-            </button>
+            <Show when={!props.showFirstHourWelcome()}>
+              <button
+                type="button"
+                class="home-action home-action--supporting"
+                onClick={() => props.actions.openSearchMessages()}
+              >
+                Search messages
+              </button>
+            </Show>
           </div>
+          <Show when={props.firstHourTip()}>
+            {(tip) => (
+              <FirstHourCoach
+                tip={tip()}
+                placement="home"
+                onDismiss={() => props.actions.dismissFirstHourTip()}
+              />
+            )}
+          </Show>
           <Show when={props.connectionStatus() !== 'connected'}>
             <p class="home-offline-note" role="status">
               {props.localMemoryStatus()}
@@ -864,7 +901,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
             </div>
           </Show>
 
-          <Show when={props.showFirstRoomPrompt()}>
+          <Show when={props.showFirstRoomPrompt() && !props.showFirstHourWelcome()}>
             <div class="home-first-room" role="note" aria-label="Start with a room">
               <p class="home-first-room__eyebrow">Your space is ready</p>
               <p class="home-first-room__title">Start with a room.</p>

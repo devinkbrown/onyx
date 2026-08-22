@@ -118,6 +118,7 @@ import {
 import { makeReducedDataSignal } from '@/lib/a11y/reducedData';
 import { scheduleBackgroundTask, type CancelBackgroundTask } from '@/lib/backgroundTask';
 import { createVirtualKeyboardOverlayController } from '@/lib/mobile/virtualKeyboardOverlay';
+import { focusJoinRoomInput, registerStartRoomHandler } from './startRoom';
 import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
@@ -864,6 +865,16 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
     }
     openMobileSidebar();
   }
+
+  onMount(() => {
+    onCleanup(registerStartRoomHandler(() => {
+      selectSidebarMode('rooms');
+      if (isMobile()) openMobileCollection('rooms');
+      queueMicrotask(() => {
+        focusJoinRoomInput();
+      });
+    }));
+  });
 
   function openCalls(): void {
     closeActiveMobileDrawer(false);

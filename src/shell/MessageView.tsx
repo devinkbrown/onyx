@@ -81,6 +81,11 @@ import {
   selectMessageAnchorIndex,
 } from './messageWindow';
 import { threadParentIds } from './threadIndex';
+import {
+  firstHourHandoffEpoch,
+  firstHourComposerHint,
+  isFirstHourSeen,
+} from '@/lib/firstHour/firstHour';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -993,6 +998,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const t = activeTarget();
     if (!t) return false;
     return historyLoading().get(t.toLowerCase()) ?? false;
+  });
+
+  const firstHourSayHi = createMemo(() => {
+    firstHourHandoffEpoch();
+    isFirstHourSeen();
+    return firstHourComposerHint();
   });
 
   // ── unread divider ──
@@ -1926,37 +1937,30 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                   data-testid="feed-empty"
                 >
                   <Show when={activeView().kind === 'channel'}>
-                    <p class="shell-feed-empty-title">Still waters here</p>
-                    <p class="shell-feed-empty-body">
-                      Say the first thing in {activeTarget()}, or invite a friend
-                      with a link.
-                    </p>
-                    <button
-                      type="button"
-                      class="shell-sidebar-browse"
-                      data-testid="feed-empty-invite"
-                      onClick={() => openRoomInviteShare(activeTarget())}
-                    >
-                      Invite friends
-                    </button>
                     <Show
-                      when={
-                        activeView().kind === 'channel'
-                        && /^[#&]/.test(
-                          (activeView() as { kind: 'channel'; channel: string }).channel.trim(),
-                        )
+                      when={firstHourSayHi()}
+                      fallback={
+                        <>
+                          <p class="shell-feed-empty-title">Still waters here</p>
+                          <p class="shell-feed-empty-body">
+                            Say the first thing in {activeTarget()}, or invite a friend
+                            with a link.
+                          </p>
+                          <button
+                            type="button"
+                            class="shell-sidebar-browse"
+                            data-testid="feed-empty-invite"
+                            onClick={() => openRoomInviteShare(activeTarget())}
+                          >
+                            Invite friends
+                          </button>
+                        </>
                       }
                     >
-                      <a
-                        class="shell-ribbon-stats shell-feed-empty-ledger"
-                        href={statsRoomHref(
-                          (activeView() as { kind: 'channel'; channel: string }).channel,
-                        )}
-                        data-testid="feed-empty-channel-ledger"
-                        aria-label={`Room ledger for ${(activeView() as { kind: 'channel'; channel: string }).channel}`}
-                      >
-                        Room ledger
-                      </a>
+                      <p class="shell-feed-empty-title">Say hi</p>
+                      <p class="shell-feed-empty-body">
+                        Type a first message below to join the room.
+                      </p>
                     </Show>
                   </Show>
                   <Show when={activeView().kind === 'dm'}>

@@ -28,6 +28,8 @@ export function HomeView() {
       more={home.more}
       showFirstRoomPrompt={home.showFirstRoomPrompt}
       showInviteFriends={home.showInviteFriends}
+      showFirstHourWelcome={home.showFirstHourWelcome}
+      firstHourTip={home.firstHourTip}
       isJoined={home.isJoined}
       caughtUpPlan={home.caughtUpPlan}
       actions={home.actions}

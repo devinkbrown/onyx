@@ -41,6 +41,11 @@ import {
   openGuestClaimSheet,
   setGuestClaimSheetOpenState,
 } from './guestClaimState';
+import {
+  firstHourHandoffEpoch,
+  isFirstHourSeen,
+  shouldSuppressGuestClaim,
+} from '@/lib/firstHour/firstHour';
 import './guest-claim.css';
 
 /** localStorage flag base: durable chip dismissal (onyx: + per-owner suffix). */
@@ -121,9 +126,11 @@ export function GuestClaimPrompt(): JSX.Element {
       : null
   ));
   const liveNick = createMemo(() => ourNick().trim());
-  const showChip = createMemo(
-    () => isGuest() && !dismissed() && liveNick() !== '',
-  );
+  const showChip = createMemo(() => {
+    firstHourHandoffEpoch();
+    isFirstHourSeen();
+    return isGuest() && !dismissed() && liveNick() !== '' && !shouldSuppressGuestClaim();
+  });
   const sheetOpen = createMemo(
     () => isGuest() && liveNick() !== '' && isGuestClaimSheetOpen(),
   );
