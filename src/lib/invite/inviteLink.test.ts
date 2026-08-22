@@ -108,6 +108,18 @@ describe('buildInviteLink', () => {
     expect(link.shareUrl).toBe('https://eshmaki.me/invite/?join=%23general');
   });
 
+  it('round-trips inviter and faces through the canonical link', () => {
+    const link = buildInviteLink(
+      { channel: '#lounge', inviter: 'river', faces: ['aria', 'mae', 'jun', 'extra', 'bad nick'] },
+      OPTS,
+    );
+
+    expect(link.card.inviter).toBe('river');
+    expect(link.card.faces).toEqual(['aria', 'mae', 'jun']);
+    expect(link.shareUrl).toBe('https://eshmaki.me/invite/?join=%23lounge&by=river&with=aria%2Cmae%2Cjun');
+    expect(link.appHref).toBe('/app/?join=%23lounge&by=river&with=aria%2Cmae%2Cjun');
+  });
+
   it('never emits an absolute app deep-link when appOrigin is a bare path', () => {
     const link = buildInviteLink({ channel: '#general', at: new Date('2026-06-30T12:00:00.000Z') }, OPTS);
 

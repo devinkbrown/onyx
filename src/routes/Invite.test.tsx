@@ -5,7 +5,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 
 import * as clipboard from '@/lib/clipboard/writeClipboardText';
+import type { InviteRoomPulse } from '@/lib/invite/inviteRoomPulse';
 import InviteRoute from './Invite';
+
+const loadInviteRoomPulse = vi.hoisted(() =>
+  vi.fn<(channel: string) => Promise<InviteRoomPulse | null>>(async () => null),
+);
+
+vi.mock('@/lib/invite/inviteRoomPulse', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/invite/inviteRoomPulse')>();
+  return {
+    ...actual,
+    loadInviteRoomPulse,
+  };
+});
 
 const src = readFileSync(resolve(__dirname, 'Invite.tsx'), 'utf8');
 
@@ -13,6 +26,8 @@ afterEach(() => {
   cleanup();
   window.history.replaceState(null, '', '/');
   vi.restoreAllMocks();
+  loadInviteRoomPulse.mockReset();
+  loadInviteRoomPulse.mockResolvedValue(null);
 });
 
 describe('InviteRoute', () => {
@@ -34,7 +49,7 @@ describe('InviteRoute', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.invite-page')).toBeTruthy();
-    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Friends.*Invite/);
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Room.*Invite/);
     expect(container.querySelector('.r-ground')).toBeTruthy();
     expect(container.querySelector('.r-flecks')).toBeTruthy();
     expect(container.querySelector('.r-veins')).toBeTruthy();
@@ -65,22 +80,51 @@ describe('InviteRoute', () => {
     expect(toggle).toHaveFocus();
   });
 
-  it('renders a warm room preview with display name and Join', () => {
+  it('renders a room card with display name and Join', () => {
     window.history.pushState({}, '', '/invite/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release%20train&reader=1&as=yuki');
 
     render(() => <InviteRoute />);
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Join #general' })).toBeInTheDocument();
-    expect(screen.getByText('Choose a display name to enter this room.')).toBeInTheDocument();
-    expect(screen.getByRole('note', { name: 'Invite preview' })).toHaveTextContent('Join #general on Onyx');
-    expect(screen.getByRole('note', { name: 'Invite preview' })).toHaveTextContent('release train');
+    expect(screen.getByRole('heading', { level: 1, name: '#general' })).toBeInTheDocument();
+    expect(screen.getByText('release train')).toBeInTheDocument();
+    expect(screen.getByText('Choose a display name to walk in.')).toBeInTheDocument();
     expect(screen.getByLabelText('Display name')).toHaveValue('yuki');
-    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute(
+    expect(screen.getByTestId('invite-join')).toHaveAttribute(
       'href',
       '/app/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki',
     );
-    expect(screen.queryByText(/handoff receipt|room ledger|claim a name|open graph|handshake|claim path/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/\bmesh\b|\bIRC\b|\bMODE\b/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('invite-inviter')).toBeNull();
+    expect(screen.queryByTestId('invite-faces')).toBeNull();
+    expect(screen.queryByTestId('invite-pulse')).toBeNull();
+    expect(screen.queryByText(/handoff receipt|room ledger|claim a name|open graph|handshake|claim path|register/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bmesh\b|\bIRC\b|\bMODE\b|12 online/i)).not.toBeInTheDocument();
+  });
+
+  it('shows who invited and faces only when the link carries them', async () => {
+    window.history.pushState({}, '', '/invite/?join=%23lounge&by=river&with=aria,mae');
+
+    render(() => <InviteRoute />);
+
+    expect(screen.getByTestId('invite-inviter')).toHaveTextContent('river');
+    expect(screen.getByTestId('invite-faces')).toHaveTextContent('aria');
+    expect(screen.getByTestId('invite-faces')).toHaveTextContent('mae');
+    expect(screen.queryByText(/12 online|people here/i)).not.toBeInTheDocument();
+  });
+
+  it('shows last pulse and a last-speaker face only from real public data', async () => {
+    loadInviteRoomPulse.mockResolvedValue({
+      topic: 'Ops desk',
+      lastPulse: '3m ago',
+      faces: ['aria'],
+    });
+    window.history.pushState({}, '', '/invite/?join=%23ops');
+
+    render(() => <InviteRoute />);
+
+    expect(await screen.findByText('Ops desk')).toBeInTheDocument();
+    expect(screen.getByTestId('invite-pulse')).toHaveTextContent('3m ago');
+    expect(screen.getByTestId('invite-faces')).toHaveTextContent('aria');
+    expect(screen.queryByText(/12 online|present/i)).not.toBeInTheDocument();
   });
 
   it('renders a bare invite as a network-only preview and hands off without a phantom room', () => {
@@ -90,7 +134,7 @@ describe('InviteRoute', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Join Onyx' })).toBeInTheDocument();
     expect(screen.getByText('Choose a display name, then pick a room once you are in.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/app/');
+    expect(screen.getByTestId('invite-join')).toHaveAttribute('href', '/app/');
     expect(screen.queryByText(/#root|#general/)).not.toBeInTheDocument();
   });
 
@@ -101,7 +145,7 @@ describe('InviteRoute', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Join Onyx' })).toBeInTheDocument();
     expect(screen.queryByText(/evil/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/app/');
+    expect(screen.getByTestId('invite-join')).toHaveAttribute('href', '/app/');
   });
 
   it('carries a typed display name into the existing join link', () => {
@@ -110,7 +154,7 @@ describe('InviteRoute', () => {
 
     fireEvent.input(screen.getByLabelText('Display name'), { target: { value: 'River' } });
 
-    expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute(
+    expect(screen.getByTestId('invite-join')).toHaveAttribute(
       'href',
       '/app/?join=%23lounge&as=River',
     );

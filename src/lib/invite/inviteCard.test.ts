@@ -34,6 +34,8 @@ describe('buildInviteCard', () => {
       topic: 'release train',
       readerMode: true,
       guestName: 'yuki',
+      inviter: null,
+      faces: [],
       network: NETWORK,
       url: `${ORIGIN}?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki`,
     });
@@ -65,11 +67,9 @@ describe('buildInviteCard', () => {
       { network: NETWORK, origin: ORIGIN },
     );
 
-    expect(inviteHeadline(card)).toBe('Join #general');
-    expect(inviteWelcome(card)).toBe('Choose a display name to enter this room.');
-    expect(inviteDescription(card)).toBe(
-      `A friend invited you to #general on ${NETWORK}. They're talking about release.`,
-    );
+    expect(inviteHeadline(card)).toBe('#general');
+    expect(inviteWelcome(card)).toBe('Choose a display name to walk in.');
+    expect(inviteDescription(card)).toBe(`Join #general on ${NETWORK}. release`);
   });
 
   it('returns Open Graph metadata for the invite card', () => {
@@ -80,7 +80,7 @@ describe('buildInviteCard', () => {
 
     expect(inviteOgMeta(card)).toEqual([
       { property: 'og:title', content: `Join #general on ${NETWORK}` },
-      { property: 'og:description', content: `A friend invited you to #general on ${NETWORK}.` },
+      { property: 'og:description', content: `Join #general on ${NETWORK}.` },
       { property: 'og:url', content: `${ORIGIN}?join=%23general` },
       { property: 'og:type', content: 'website' },
     ]);
@@ -150,5 +150,30 @@ describe('guest display name', () => {
     expect(guestNameError('guest nick')).toMatch(/start with a letter/i);
     expect(guestNameError('guest nick')).not.toMatch(/irc|nick|mode/i);
     expect(guestNameError('a'.repeat(65))).toMatch(/64 characters/i);
+  });
+});
+
+describe('inviter and faces', () => {
+  it('keeps a valid inviter and up to three faces from the link', () => {
+    const card = buildInviteCard(
+      new URLSearchParams({ join: '#lounge', by: '  river  ', with: 'aria, mae, jun, extra' }),
+      { network: NETWORK, origin: ORIGIN },
+    );
+
+    expect(card.inviter).toBe('river');
+    expect(card.faces).toEqual(['aria', 'mae', 'jun']);
+    expect(card.url).toBe(`${ORIGIN}?join=%23lounge&by=river&with=aria%2Cmae%2Cjun`);
+    expect(inviteDescription(card)).toBe(`river invited you to #lounge on ${NETWORK}.`);
+  });
+
+  it('drops a hostile inviter or face instead of reflecting it', () => {
+    const card = buildInviteCard(
+      new URLSearchParams({ join: '#lounge', by: 'bad nick', with: 'ok,bad nick,yu\x00ki' }),
+      { network: NETWORK, origin: ORIGIN },
+    );
+
+    expect(card.inviter).toBeNull();
+    expect(card.faces).toEqual(['ok']);
+    expect(card.url).toBe(`${ORIGIN}?join=%23lounge&with=ok`);
   });
 });

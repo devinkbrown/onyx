@@ -19,12 +19,6 @@ const routes = [
     heroSelector: '.data-hero h1',
     copySelector: '.data-card p',
   },
-  {
-    path: '/invite/?join=%23root',
-    heading: 'Join #root',
-    heroSelector: '.data-hero h1',
-    copySelector: '.data-card p',
-  },
 ] as const;
 
 for (const route of routes) {
