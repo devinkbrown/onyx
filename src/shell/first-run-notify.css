@@ -1,68 +1,20 @@
-/* First-run closed-tab notify chip — one quiet ask after real chat. */
+/* First-run notify sheet — Instrument Sans body, Sheet chrome owns Fraunces once. */
 
 .first-run-notify {
   display: flex;
-  flex-wrap: nowrap;
-  gap: var(--space-2);
-  align-items: center;
-  justify-content: space-between;
-  margin: 4px var(--space-3) 0;
-  padding: 4px 8px 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--stone-2) 62%, var(--stone));
-  max-width: min(100%, 32rem);
-  flex: none;
-}
-
-.first-run-notify__text {
-  margin: 0;
-  min-width: 0;
-  font-family: var(--font-sans);
-  font-size: 0.8125rem;
-  line-height: 1.25;
-  color: var(--paper-mute);
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .first-run-notify__actions {
   display: flex;
-  gap: var(--space-1);
+  flex-wrap: wrap;
+  gap: var(--space-2);
   align-items: center;
-  flex-shrink: 0;
-}
-
-.first-run-notify__dismiss {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border: 1px solid transparent;
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: var(--paper-mute);
-  cursor: pointer;
-}
-
-.first-run-notify__dismiss:hover,
-.first-run-notify__dismiss:focus-visible {
-  color: var(--paper);
-  background: color-mix(in oklch, var(--paper) 8%, transparent);
-}
-
-@media (max-width: 42rem) and (max-height: 30rem) {
-  .first-run-notify {
-    margin:
-      4px
-      max(8px, env(safe-area-inset-right, 0px))
-      0
-      max(8px, env(safe-area-inset-left, 0px));
-    padding: 6px 8px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .first-run-notify__dismiss {
+  .first-run-notify {
     transition: none;
   }
 }

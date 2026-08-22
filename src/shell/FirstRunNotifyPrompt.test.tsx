@@ -2,17 +2,16 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Channel, ChannelUser, ChatMessage } from '@/lib/irc/types';
 import type { ArmClosedTabResult } from '@/lib/notifications/armClosedTab';
 import type { DesktopNotificationPermission } from '@/lib/notifications/decision';
 import {
+  FIRST_RUN_NOTIFY_LEDE,
+  FIRST_RUN_NOTIFY_TITLE,
+  markNotifyFirstSend,
   resetFirstRunNotifyState,
 } from '@/lib/notifications/firstRunNotify';
-import {
-  isNotificationsOpen,
-  resetNotificationsOpenState,
-} from '@/lib/notifications/youNotificationsState';
-import { store, type Server } from '@/lib/store/store';
+import { resetNotificationsOpenState } from '@/lib/notifications/youNotificationsState';
+import { store } from '@/lib/store/store';
 
 const browserMocks = vi.hoisted(() => ({
   getPermission: vi.fn<() => DesktopNotificationPermission>(() => 'default'),
@@ -29,6 +28,10 @@ const armMocks = vi.hoisted(() => ({
 const platformMocks = vi.hoisted(() => ({
   surface: 'browser' as 'browser' | 'pwa' | 'zig-desktop',
   notifications: false,
+}));
+
+const standaloneMocks = vi.hoisted(() => ({
+  standalone: undefined as boolean | undefined,
 }));
 
 vi.mock('@/lib/notifications/browser', () => ({
@@ -56,55 +59,17 @@ vi.mock('@/lib/platform', () => ({
   }),
 }));
 
+vi.mock('@/lib/notifications/firstRunNotify', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/notifications/firstRunNotify')>();
+  return {
+    ...actual,
+    readNavigatorStandalone: () => standaloneMocks.standalone,
+  };
+});
+
 import { FirstRunNotifyPrompt } from './FirstRunNotifyPrompt';
 
 const initialState = store.getInitialState();
-
-function server(account: string | null): Server {
-  return {
-    id: 'local',
-    name: 'Local',
-    network: 'Onyx',
-    url: 'wss://example.invalid',
-    icon: '#000',
-    nick: 'me',
-    account,
-    connected: true,
-  };
-}
-
-function realMessage(): ChatMessage {
-  return {
-    id: 'm1',
-    time: new Date('2026-08-22T12:00:00.000Z'),
-    from: 'bob',
-    text: 'hello',
-    type: 'msg',
-    target: '#general',
-  };
-}
-
-function emptyChannel(): Channel {
-  return {
-    name: '#general',
-    topic: '',
-    topicSetBy: '',
-    topicSetAt: null,
-    modes: '',
-    users: new Map<string, ChannelUser>(),
-    unread: 0,
-    highlights: 0,
-    createdAt: null,
-    messages: [{
-      id: 'join-1',
-      time: new Date('2026-08-22T12:00:00.000Z'),
-      from: 'me',
-      text: 'joined',
-      type: 'join',
-      target: '#general',
-    }],
-  };
-}
 
 describe('FirstRunNotifyPrompt', () => {
   beforeEach(() => {
@@ -114,6 +79,7 @@ describe('FirstRunNotifyPrompt', () => {
     localStorage.clear();
     platformMocks.surface = 'browser';
     platformMocks.notifications = false;
+    standaloneMocks.standalone = undefined;
     browserMocks.getPermission.mockReset().mockReturnValue('default');
     armMocks.arm.mockReset().mockResolvedValue({
       permission: 'granted',
@@ -130,39 +96,31 @@ describe('FirstRunNotifyPrompt', () => {
     localStorage.clear();
   });
 
-  it('stays quiet until a real message is sent or received', () => {
-    store.setState({
-      server: server('alice'),
-      channels: new Map([['#general', emptyChannel()]]),
-    });
+  it('stays quiet on first paint — inbound history is not a send', () => {
     render(() => <FirstRunNotifyPrompt />);
     expect(screen.queryByTestId('first-run-notify')).not.toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_NOTIFY_TITLE)).not.toBeInTheDocument();
   });
 
-  it('asks once after real chat and can be dismissed', async () => {
-    const room = emptyChannel();
-    room.messages = [...room.messages, realMessage()];
-    store.setState({
-      server: server('alice'),
-      channels: new Map([['#general', room]]),
-    });
-    render(() => <FirstRunNotifyPrompt />);
+  it('asks once after the first send and dismissed stays dismissed', async () => {
+    markNotifyFirstSend();
+    const view = render(() => <FirstRunNotifyPrompt />);
 
-    expect(await screen.findByTestId('first-run-notify')).toHaveTextContent(/mentions, DMs, or calls/i);
-    expect(screen.getByTestId('first-run-notify')).not.toHaveTextContent(/e2ee|onesignal/i);
+    const sheet = await screen.findByTestId('first-run-notify');
+    expect(sheet).toHaveTextContent(FIRST_RUN_NOTIFY_TITLE);
+    expect(sheet).toHaveTextContent(FIRST_RUN_NOTIFY_LEDE);
+    expect(sheet).not.toHaveTextContent(/e2ee|onesignal|safari tab/i);
 
     fireEvent.click(screen.getByTestId('first-run-notify-dismiss'));
     expect(screen.queryByTestId('first-run-notify')).not.toBeInTheDocument();
+
+    view.unmount();
+    render(() => <FirstRunNotifyPrompt />);
+    expect(screen.queryByTestId('first-run-notify')).not.toBeInTheDocument();
   });
 
-  it('arms closed-tab alerts from the quiet ask', async () => {
-    store.setState({
-      server: server('alice'),
-      channels: new Map([['#general', {
-        ...emptyChannel(),
-        messages: [realMessage()],
-      }]]),
-    });
+  it('arms closed-tab alerts from the quiet sheet', async () => {
+    markNotifyFirstSend();
     render(() => <FirstRunNotifyPrompt />);
 
     fireEvent.click(await screen.findByTestId('first-run-notify-enable'));
@@ -170,35 +128,42 @@ describe('FirstRunNotifyPrompt', () => {
     await waitFor(() => expect(screen.queryByTestId('first-run-notify')).not.toBeInTheDocument());
   });
 
-  it('opens You → Notifications from the chip', async () => {
-    store.setState({
-      server: server('alice'),
-      notifications: [{
-        id: 'n1',
-        type: 'mention',
-        text: 'ping',
-        from: 'bob',
-        channel: '#general',
-        at: new Date(),
-      }],
-    });
+  it('iOS Safari tab does not claim push after a send', () => {
+    standaloneMocks.standalone = false;
+    platformMocks.surface = 'browser';
+    markNotifyFirstSend();
     render(() => <FirstRunNotifyPrompt />);
 
-    fireEvent.click(await screen.findByTestId('first-run-notify-settings'));
-    expect(isNotificationsOpen()).toBe(true);
     expect(screen.queryByTestId('first-run-notify')).not.toBeInTheDocument();
+    expect(screen.queryByText(/push|when this tab is closed|web push/i)).not.toBeInTheDocument();
+    expect(armMocks.arm).not.toHaveBeenCalled();
+  });
+
+  it('may offer on an iOS Home Screen standalone web app after a send', async () => {
+    standaloneMocks.standalone = true;
+    platformMocks.surface = 'pwa';
+    markNotifyFirstSend();
+    render(() => <FirstRunNotifyPrompt />);
+
+    expect(await screen.findByTestId('first-run-notify')).toHaveTextContent(FIRST_RUN_NOTIFY_TITLE);
   });
 
   it('does not ask on the Zig host when native notifications are false', () => {
     platformMocks.surface = 'zig-desktop';
     platformMocks.notifications = false;
-    store.setState({
-      server: server('alice'),
-      channels: new Map([['#general', {
-        ...emptyChannel(),
-        messages: [realMessage()],
-      }]]),
-    });
+    markNotifyFirstSend();
+    render(() => <FirstRunNotifyPrompt />);
+    expect(screen.queryByTestId('first-run-notify')).not.toBeInTheDocument();
+  });
+
+  it('does not nag when permission is already granted or denied', () => {
+    markNotifyFirstSend();
+    browserMocks.getPermission.mockReturnValue('granted');
+    const granted = render(() => <FirstRunNotifyPrompt />);
+    expect(screen.queryByTestId('first-run-notify')).not.toBeInTheDocument();
+    granted.unmount();
+
+    browserMocks.getPermission.mockReturnValue('denied');
     render(() => <FirstRunNotifyPrompt />);
     expect(screen.queryByTestId('first-run-notify')).not.toBeInTheDocument();
   });

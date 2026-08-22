@@ -1,26 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type { ChatMessage } from '@/lib/irc/types';
-
 import {
-  NOTIFY_FIRST_RUN_ACTIVITY_KEY,
+  FIRST_RUN_NOTIFY_LEDE,
+  FIRST_RUN_NOTIFY_TITLE,
   NOTIFY_FIRST_RUN_DISMISS_KEY,
-  conversationHasRealActivity,
+  NOTIFY_FIRST_SEND_KEY,
+  canClaimClosedTabPush,
   dismissNotifyAsk,
-  hasNotifyActivity,
-  inboxHasRealActivity,
+  firstRunNotifyCopy,
+  hasNotifyFirstSend,
   isNotifyAskDismissed,
-  isRealConversationMessage,
-  markNotifyActivity,
+  markNotifyFirstSend,
+  readNavigatorStandalone,
   resetFirstRunNotifyState,
   shouldOfferFirstRunNotify,
-  stateHasRealConversationActivity,
 } from './firstRunNotify';
-
-function message(type: ChatMessage['type']): Pick<ChatMessage, 'type'> {
-  return { type };
-}
 
 describe('first-run notify decision', () => {
   beforeEach(() => {
@@ -33,60 +28,27 @@ describe('first-run notify decision', () => {
     localStorage.clear();
   });
 
-  it('treats chat, action, and whisper as real activity — not join or system', () => {
-    expect(isRealConversationMessage(message('msg'))).toBe(true);
-    expect(isRealConversationMessage(message('action'))).toBe(true);
-    expect(isRealConversationMessage(message('whisper'))).toBe(true);
-    expect(isRealConversationMessage(message('join'))).toBe(false);
-    expect(isRealConversationMessage(message('part'))).toBe(false);
-    expect(isRealConversationMessage(message('system'))).toBe(false);
-    expect(isRealConversationMessage(message('topic'))).toBe(false);
-    expect(conversationHasRealActivity([message('join'), message('msg')])).toBe(true);
-    expect(conversationHasRealActivity([message('join'), message('part')])).toBe(false);
-  });
-
-  it('treats mention and DM inbox rows as received activity', () => {
-    expect(inboxHasRealActivity([{ type: 'system' }])).toBe(false);
-    expect(inboxHasRealActivity([{ type: 'mention' }])).toBe(true);
-    expect(inboxHasRealActivity([{ type: 'dm' }])).toBe(true);
-  });
-
-  it('finds real activity across rooms, DMs, or the inbox', () => {
-    expect(stateHasRealConversationActivity({
-      channels: new Map([['#room', { messages: [message('join')] }]]),
-      dms: new Map(),
-      notifications: [],
-    })).toBe(false);
-
-    expect(stateHasRealConversationActivity({
-      channels: new Map([['#room', { messages: [message('msg')] }]]),
-      dms: new Map(),
-      notifications: [],
-    })).toBe(true);
-
-    expect(stateHasRealConversationActivity({
-      channels: new Map(),
-      dms: new Map([['bob', { messages: [message('msg')] }]]),
-      notifications: [],
-    })).toBe(true);
-
-    expect(stateHasRealConversationActivity({
-      channels: new Map(),
-      dms: new Map(),
-      notifications: [{ type: 'mention' }],
-    })).toBe(true);
-  });
-
-  it('offers the quiet ask only after real activity, once, when permission is still default', () => {
+  it('does not offer on first paint — no send yet', () => {
     const base = {
-      activity: true,
+      sent: false,
+      dismissed: false,
+      permission: 'default' as const,
+      surface: 'browser' as const,
+      hostNotifications: false,
+    };
+    expect(shouldOfferFirstRunNotify(base)).toBe(false);
+    expect(shouldOfferFirstRunNotify({ ...base, sent: true })).toBe(true);
+  });
+
+  it('offers only after a send, once, when permission is still default', () => {
+    const base = {
+      sent: true,
       dismissed: false,
       permission: 'default' as const,
       surface: 'browser' as const,
       hostNotifications: false,
     };
     expect(shouldOfferFirstRunNotify(base)).toBe(true);
-    expect(shouldOfferFirstRunNotify({ ...base, activity: false })).toBe(false);
     expect(shouldOfferFirstRunNotify({ ...base, dismissed: true })).toBe(false);
     expect(shouldOfferFirstRunNotify({ ...base, permission: 'granted' })).toBe(false);
     expect(shouldOfferFirstRunNotify({ ...base, permission: 'denied' })).toBe(false);
@@ -95,14 +57,14 @@ describe('first-run notify decision', () => {
 
   it('does not ask on the Zig host when native notifications are false', () => {
     expect(shouldOfferFirstRunNotify({
-      activity: true,
+      sent: true,
       dismissed: false,
       permission: 'default',
       surface: 'zig-desktop',
       hostNotifications: false,
     })).toBe(false);
     expect(shouldOfferFirstRunNotify({
-      activity: true,
+      sent: true,
       dismissed: false,
       permission: 'default',
       surface: 'zig-desktop',
@@ -110,20 +72,70 @@ describe('first-run notify decision', () => {
     })).toBe(true);
   });
 
-  it('persists activity and dismiss under onyx: keys', () => {
-    expect(hasNotifyActivity()).toBe(false);
+  it('iOS tab does not claim push; Home Screen standalone may', () => {
+    expect(canClaimClosedTabPush(false)).toBe(false);
+    expect(canClaimClosedTabPush(true)).toBe(true);
+    expect(canClaimClosedTabPush(undefined)).toBe(true);
+    expect(canClaimClosedTabPush(null)).toBe(true);
+
+    expect(firstRunNotifyCopy(false)).toBeNull();
+    expect(firstRunNotifyCopy(true)).toEqual({
+      title: FIRST_RUN_NOTIFY_TITLE,
+      lede: FIRST_RUN_NOTIFY_LEDE,
+    });
+    expect(firstRunNotifyCopy(undefined)).toEqual({
+      title: FIRST_RUN_NOTIFY_TITLE,
+      lede: FIRST_RUN_NOTIFY_LEDE,
+    });
+
+    expect(shouldOfferFirstRunNotify({
+      sent: true,
+      dismissed: false,
+      permission: 'default',
+      surface: 'browser',
+      hostNotifications: false,
+      navigatorStandalone: false,
+    })).toBe(false);
+    expect(shouldOfferFirstRunNotify({
+      sent: true,
+      dismissed: false,
+      permission: 'default',
+      surface: 'pwa',
+      hostNotifications: false,
+      navigatorStandalone: true,
+    })).toBe(true);
+
+    expect(readNavigatorStandalone({ standalone: false })).toBe(false);
+    expect(readNavigatorStandalone({ standalone: true })).toBe(true);
+    expect(readNavigatorStandalone({})).toBeUndefined();
+  });
+
+  it('persists first send and dismiss under onyx: keys', () => {
+    expect(hasNotifyFirstSend()).toBe(false);
     expect(isNotifyAskDismissed()).toBe(false);
 
-    markNotifyActivity();
+    markNotifyFirstSend();
     dismissNotifyAsk();
 
-    expect(hasNotifyActivity()).toBe(true);
+    expect(hasNotifyFirstSend()).toBe(true);
     expect(isNotifyAskDismissed()).toBe(true);
-    expect(localStorage.getItem(NOTIFY_FIRST_RUN_ACTIVITY_KEY)).toBe('1');
+    expect(localStorage.getItem(NOTIFY_FIRST_SEND_KEY)).toBe('1');
     expect(localStorage.getItem(NOTIFY_FIRST_RUN_DISMISS_KEY)).toBe('1');
 
-    markNotifyActivity();
+    markNotifyFirstSend();
     dismissNotifyAsk();
-    expect(localStorage.getItem(NOTIFY_FIRST_RUN_ACTIVITY_KEY)).toBe('1');
+    expect(localStorage.getItem(NOTIFY_FIRST_SEND_KEY)).toBe('1');
+  });
+
+  it('dismissed stays dismissed', () => {
+    markNotifyFirstSend();
+    dismissNotifyAsk();
+    expect(shouldOfferFirstRunNotify({
+      sent: hasNotifyFirstSend(),
+      dismissed: isNotifyAskDismissed(),
+      permission: 'default',
+      surface: 'browser',
+      hostNotifications: false,
+    })).toBe(false);
   });
 });
