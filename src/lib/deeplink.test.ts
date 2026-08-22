@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildMomentLink, parseAtParam, parseEventTime, parseJoinParam, parseReaderParam, parseTopicParam } from './deeplink';
+import { buildMomentLink, normalizeCreateRoomName, parseAtParam, parseEventTime, parseJoinParam, parseReaderParam, parseTopicParam, sanitizeCreateRoomTopic } from './deeplink';
 
 const FIXED_NOW = new Date('2026-07-08T12:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -14,6 +14,33 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('normalizeCreateRoomName', () => {
+  it('prefixes a bare name and lowercases it', () => {
+    expect(normalizeCreateRoomName(' Friends ')).toBe('#friends');
+    expect(normalizeCreateRoomName('#Root')).toBe('#root');
+    expect(normalizeCreateRoomName('&Ops')).toBe('&ops');
+  });
+
+  it('rejects empty, spaces, commas, and bare prefixes', () => {
+    expect(normalizeCreateRoomName('')).toBeNull();
+    expect(normalizeCreateRoomName('my room')).toBeNull();
+    expect(normalizeCreateRoomName('#bad,chan')).toBeNull();
+    expect(normalizeCreateRoomName('#')).toBeNull();
+  });
+});
+
+describe('sanitizeCreateRoomTopic', () => {
+  it('trims a short topic and allows empty', () => {
+    expect(sanitizeCreateRoomTopic('  Weekly reads  ')).toBe('Weekly reads');
+    expect(sanitizeCreateRoomTopic('   ')).toBe('');
+  });
+
+  it('rejects control characters and oversized topics', () => {
+    expect(sanitizeCreateRoomTopic('hi\u0007there')).toBeNull();
+    expect(sanitizeCreateRoomTopic('x'.repeat(301))).toBeNull();
+  });
 });
 
 describe('parseJoinParam', () => {

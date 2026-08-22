@@ -124,6 +124,18 @@ describe('buildCommands', () => {
     expect(sendRaw).toHaveBeenCalledWith('LIST');
     expect(getState().showChannelBrowser).toBe(true);
     expect(getState().channelListLoading).toBe(true);
+    expect(getState().channelBrowserMode).toBe('browse');
+  });
+
+  it('opens Start a room without issuing LIST', () => {
+    const sendRaw = vi.fn();
+    setState({ client: { sendRaw } as never });
+
+    buildCommands(getState()).find((entry) => entry.id === 'action-create-room')?.run();
+
+    expect(sendRaw).not.toHaveBeenCalled();
+    expect(getState().showChannelBrowser).toBe(true);
+    expect(getState().channelBrowserMode).toBe('create');
   });
 
   it('includes every theme and background action', () => {

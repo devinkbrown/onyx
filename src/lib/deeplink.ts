@@ -18,7 +18,30 @@
 
 const JOIN_PARAM_RE = /^[&#][^\s\x00-\x1f\x7f,]{1,63}$/;
 const TOPIC_PARAM_CONTROL_PATTERN = /[\x00-\x1f\x7f,]/u;
+const CREATE_TOPIC_CONTROL_PATTERN = /[\x00-\x1f\x7f]/u;
+const CREATE_TOPIC_MAX_CHARS = 300;
 const textEncoder = new TextEncoder();
+
+/**
+ * Consumer create-room names: bare "friends" becomes "#friends".
+ * Same joinable shape as `?join=` — no spaces, commas, or control chars.
+ */
+export function normalizeCreateRoomName(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const prefixed = trimmed.startsWith('#') || trimmed.startsWith('&') ? trimmed : `#${trimmed}`;
+  const normalized = prefixed.toLowerCase();
+  return JOIN_PARAM_RE.test(normalized) ? normalized : null;
+}
+
+/** Optional topic for Start a room. Empty is allowed; control chars are not. */
+export function sanitizeCreateRoomTopic(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  if (CREATE_TOPIC_CONTROL_PATTERN.test(trimmed)) return null;
+  if (trimmed.length > CREATE_TOPIC_MAX_CHARS) return null;
+  return trimmed;
+}
 
 /**
  * Parse and validate a `?join=` search-param value into a channel name.

@@ -77,6 +77,7 @@ function actions(over: Partial<HomeBriefingActions> = {}): HomeBriefingActions {
   const noop = () => undefined;
   return {
     openBrowseRooms: noop,
+    openCreateRoom: noop,
     openSearchMessages: noop,
     startRoom: noop,
     inviteFriends: noop,
@@ -195,8 +196,10 @@ describe('HomeBriefingView — presentation contract', () => {
     expect(within(main).getByRole('heading', { name: 'Needs you' })).toBeInTheDocument();
     expect(within(main).getByRole('heading', { name: 'Continue' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Browse rooms' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start a room' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Search messages' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Browse rooms' })).toHaveClass('home-cta');
+    expect(screen.getByRole('button', { name: 'Start a room' })).toHaveClass('home-cta');
     expect(screen.getByRole('button', { name: 'Search messages' })).toHaveClass('home-action--supporting');
     expect(screen.getByRole('button', { name: 'Search messages' })).not.toHaveClass('home-action--primary');
     expect(screen.queryByRole('button', { name: 'Invite friends' })).not.toBeInTheDocument();
@@ -255,6 +258,45 @@ describe('HomeBriefingView — presentation contract', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss tip' }));
     expect(dismissFirstHourTip).toHaveBeenCalledOnce();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('opens Start a room from the welcome actions', () => {
+    const openCreateRoom = vi.fn();
+    renderView({ actions: actions({ openCreateRoom }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Start a room' }));
+    expect(openCreateRoom).toHaveBeenCalledOnce();
+  });
+
+  it('offers Browse rooms and Start a room on the first-room empty state', () => {
+    const openBrowseRooms = vi.fn();
+    const openCreateRoom = vi.fn();
+    render(() => (
+      <HomeBriefingView
+        nowMs={() => NOW}
+        welcomeName={() => 'me'}
+        connectionStatus={() => 'connected'}
+        localMemoryStatus={() => 'On this device: remembered rooms stay available.'}
+        briefing={() => briefing({ hasRooms: false, liveCatchUp: [], resumePoints: [] })}
+        outboxChrome={() => null}
+        queuedSends={() => []}
+        confirmDiscardId={() => null}
+        recaps={() => []}
+        more={() => more()}
+        showFirstRoomPrompt={() => true}
+        showInviteFriends={() => false}
+        showFirstHourWelcome={() => false}
+        firstHourTip={() => null}
+        isJoined={() => false}
+        caughtUpPlan={() => EMPTY_CAUGHT_UP}
+        actions={actions({ openBrowseRooms, openCreateRoom })}
+      />
+    ));
+
+    const empty = screen.getByRole('note', { name: 'Start with a room' });
+    fireEvent.click(within(empty).getByRole('button', { name: 'Browse rooms' }));
+    fireEvent.click(within(empty).getByRole('button', { name: 'Start a room' }));
+    expect(openBrowseRooms).toHaveBeenCalledOnce();
+    expect(openCreateRoom).toHaveBeenCalledOnce();
   });
 
   it('keeps mobile reading order: needs, continue, live, explore', () => {

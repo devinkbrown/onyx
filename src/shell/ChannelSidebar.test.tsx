@@ -660,5 +660,27 @@ describe('ChannelSidebar accessibility', () => {
     expect(getByTestId('sidebar-invite-friends')).toHaveTextContent('Invite friends');
     fireEvent.click(getByTestId('sidebar-browse-rooms'));
     expect(store.getState().showChannelBrowser).toBe(true);
+    expect(store.getState().channelBrowserMode).toBe('browse');
+  });
+
+  it('offers Start a room when the room list is empty', () => {
+    store.setState({
+      ...initialState,
+      channels: new Map(),
+      dms: new Map(),
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+      showChannelBrowser: false,
+    }, true);
+
+    const { getByTestId } = render(() => (
+      <ChannelSidebar mode="rooms" activeSection="rooms" />
+    ));
+
+    fireEvent.click(getByTestId('sidebar-start-room'));
+    expect(store.getState().showChannelBrowser).toBe(true);
+    expect(store.getState().channelBrowserMode).toBe('create');
   });
 });

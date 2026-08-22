@@ -200,6 +200,37 @@ describe('channel management — raw command dispatch', () => {
     });
   });
 
+  it('createRoom() joins, sets an optional topic, and opens the room', () => {
+    const client = seed('#general', [makeUser('me')]);
+    const join = vi.fn();
+    (client as { join: ReturnType<typeof vi.fn> }).join = join;
+    store.setState({ showChannelBrowser: true, channelBrowserMode: 'create' });
+
+    expect(store.getState().createRoom(' Friends ', ' Weekly reads ')).toBe(true);
+    expect(join).toHaveBeenCalledWith('#friends', undefined);
+    expect(client.sendRaw).toHaveBeenCalledWith('TOPIC', '#friends', 'Weekly reads');
+    expect(store.getState().showChannelBrowser).toBe(false);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#friends' });
+  });
+
+  it('createRoom() refuses an invalid name without sending JOIN', () => {
+    const client = seed('#general', [makeUser('me')]);
+    const join = vi.fn();
+    (client as { join: ReturnType<typeof vi.fn> }).join = join;
+
+    expect(store.getState().createRoom('bad,name')).toBe(false);
+    expect(join).not.toHaveBeenCalled();
+    expect(client.sendRaw).not.toHaveBeenCalled();
+  });
+
+  it('openCreateRoom() opens the existing browser on the create view', () => {
+    seed('#general', [makeUser('me')]);
+    store.getState().openCreateRoom();
+    expect(store.getState().showChannelBrowser).toBe(true);
+    expect(store.getState().channelBrowserMode).toBe('create');
+    expect(store.getState().channelListLoading).toBe(false);
+  });
+
   it('deduplicates channel browser LIST rows by room name', () => {
     seed('#general', [makeUser('me')]);
     store.setState({ channelListLoading: true });
