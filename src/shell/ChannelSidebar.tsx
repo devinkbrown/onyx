@@ -800,18 +800,18 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                           <button
                             type="button"
                             class="shell-sidebar-browse"
-                            data-testid="sidebar-invite-friends"
-                            onClick={() => openRoomInviteShare('')}
-                          >
-                            Invite friends
-                          </button>
-                          <button
-                            type="button"
-                            class="shell-sidebar-browse"
                             data-testid="sidebar-start-room"
                             onClick={() => getState().openCreateRoom()}
                           >
                             Start a room
+                          </button>
+                          <button
+                            type="button"
+                            class="shell-sidebar-browse"
+                            data-testid="sidebar-invite-friends"
+                            onClick={() => openRoomInviteShare('')}
+                          >
+                            Invite friends
                           </button>
                         </li>
                       </Show>

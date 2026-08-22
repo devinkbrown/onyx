@@ -1093,8 +1093,8 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
       id: 'action-create-room',
       section: 'Actions',
       title: 'Start a room',
-      hint: 'Name a place for your friends',
-      keywords: ['rooms', 'create', 'start', 'new', 'topic'],
+      hint: 'Name a place and invite a few friends',
+      keywords: ['rooms', 'create', 'start', 'new', 'invite', 'friends'],
       run: () => getState().openCreateRoom(),
     },
     {

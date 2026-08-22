@@ -121,6 +121,17 @@ describe('Composer accessibility', () => {
     expect(container.querySelector('[data-uses-padlock], .shell-composer-lock, [aria-label*="lock" i]')).toBeNull();
   });
 
+  it('focuses the composer when Start a room lands in the room', async () => {
+    seedActiveChannel();
+    store.setState({ pendingComposerFocusTarget: '#room' });
+    render(() => <Composer />);
+    const message = await screen.findByRole('textbox', { name: /message #room/i });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(message);
+    });
+    expect(store.getState().pendingComposerFocusTarget).toBeNull();
+  });
+
   it('locks Standard primary control order: attach, message, emoji, more, send', () => {
     seedActiveChannel();
     const { container } = render(() => <Composer />);
