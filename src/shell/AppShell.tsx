@@ -118,6 +118,15 @@ import { makeReducedDataSignal } from '@/lib/a11y/reducedData';
 import { scheduleBackgroundTask, type CancelBackgroundTask } from '@/lib/backgroundTask';
 import { createVirtualKeyboardOverlayController } from '@/lib/mobile/virtualKeyboardOverlay';
 import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
+import { callJoinFailedToast } from '@/lib/media/callJoinCopy';
+import { CallJoinBanner } from './voice/CallJoinBanner';
+import {
+  clearRejoinChannel,
+  noteLiveCall,
+  noteTransportLost,
+  peekRejoinChannel,
+  resetCallRejoinState,
+} from './voice/callRejoinState';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
 
@@ -243,6 +252,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const showWhois = useStore((s) => s.showWhois);
   const showKeyboardShortcuts = useStore((s) => s.showKeyboardShortcuts);
   const isOper = useStore((s) => s.isOper);
+  const connectionStatus = useStore((s) => s.connectionStatus);
   const reducedData = makeReducedDataSignal();
   const [primarySurface, setPrimarySurface] = createSignal<'conversation' | 'calls'>('conversation');
   const [contextRailOpen, setContextRailOpen] = createSignal(false);
@@ -292,10 +302,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
     mediaDisposed = true;
     voiceJoinAttempt += 1;
     const pendingVoice = getState().voice;
-    if (
+      if (
       pendingVoice.callState === 'in_call'
       && pendingVoice.callStartedAt === null
     ) getState().leaveVoiceChannel();
+    resetCallRejoinState();
     cancelMediaPreload();
   });
   function ensureMediaEngine(): Promise<boolean> {
@@ -334,6 +345,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const voice = useStore((s) => s.voice);
   const showVoiceSettings = useStore((s) => s.showVoiceSettings);
   const [callSurfaceChannel, setCallSurfaceChannel] = createSignal<string | null>(null);
+  const [joinFailedChannel, setJoinFailedChannel] = createSignal<string | null>(null);
+  const [rejoinChannel, setRejoinChannel] = createSignal<string | null>(null);
   const inCall = createMemo(() => {
     const cs = voice().callState;
     return cs !== 'idle' && cs !== 'ringing_in' && cs !== 'ringing_out';
@@ -354,7 +367,28 @@ export function AppShell(props: AppShellProps): JSX.Element {
       setCallSurfaceChannel(null);
     } else if (current.callChannel) {
       setCallSurfaceChannel(current.callChannel);
+      noteLiveCall(current.callChannel);
+      setJoinFailedChannel(null);
+      setRejoinChannel(null);
+      clearRejoinChannel();
     }
+  });
+  createEffect(() => {
+    const status = connectionStatus();
+    if (status !== 'disconnected' && status !== 'reconnecting') return;
+    noteTransportLost();
+    const channel = peekRejoinChannel();
+    if (channel) setRejoinChannel(channel);
+  });
+  const callJoinBannerChannel = createMemo(() => {
+    const view = activeView();
+    if (view.kind !== 'channel' || inCall()) return null;
+    const room = view.channel.toLowerCase();
+    const failed = joinFailedChannel();
+    if (failed && failed.toLowerCase() === room) return failed;
+    const rejoin = rejoinChannel();
+    if (rejoin && rejoin.toLowerCase() === room) return rejoin;
+    return null;
   });
   // Any voice surface (incoming/outgoing ring, active call, or the settings
   // sheet) is only ever shown when the call is non-idle or settings are open.
@@ -424,7 +458,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
           && current.callStartedAt === null;
         if (!stillOurs) return;
 
-        const name = captureError instanceof Error ? captureError.name : '';
         const message = captureError instanceof Error ? captureError.message : '';
         // Vitest stubs getUserMedia to reject with "not available in test" —
         // continue without a preacquired stream so unit tests still exercise
@@ -440,15 +473,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
             cameraStream: null,
             callStartedAt: null,
           });
-          const detail = name === 'NotAllowedError'
-            ? 'Camera/microphone permission was blocked. Allow access for this site and try again.'
-            : name === 'NotFoundError'
-              ? 'No camera or microphone was found on this device.'
-              : message || 'Could not access media devices.';
+          setJoinFailedChannel(channel);
           getState().addToast({
             variant: 'error',
-            title: withVideo ? 'Camera unavailable' : 'Microphone unavailable',
-            description: detail,
+            ...callJoinFailedToast(captureError),
           });
           return;
         }
@@ -510,10 +538,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
       }
       if (!mediaReady) {
         rollbackProvisionalJoin();
+        setJoinFailedChannel(channel);
         getState().addToast({
           variant: 'error',
-          title: withVideo ? 'Video could not start' : 'Voice could not start',
-          description: 'The media engine did not load. Try joining again.',
+          ...callJoinFailedToast(),
         });
         return;
       }
@@ -540,13 +568,14 @@ export function AppShell(props: AppShellProps): JSX.Element {
       }
       if (!storeJoinStarted) {
         rollbackProvisionalJoin();
+        setJoinFailedChannel(channel);
         getState().addToast({
           variant: 'error',
-          title: withVideo ? 'Video could not start' : 'Voice could not start',
-          description: 'The media engine did not load. Try joining again.',
+          ...callJoinFailedToast(),
         });
       } else {
-        // Store already rolled back + toasted with a specific identity/codec message.
+        // Store already rolled back + toasted with consumer join copy.
+        setJoinFailedChannel(channel);
         preacquired?.getTracks().forEach((t) => t.stop());
       }
     }
@@ -1262,12 +1291,22 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                         role="region"
                         data-testid="voice-stage-loading"
                       >
-                        <p role="status">Starting call…</p>
+                        <p role="status">Connecting…</p>
                       </div>
                     }
                   >
                     <VoiceStage />
                   </Suspense>
+                </Show>
+                <Show when={callJoinBannerChannel()}>
+                  <CallJoinBanner
+                    onRetry={() => {
+                      setJoinFailedChannel(null);
+                      setRejoinChannel(null);
+                      clearRejoinChannel();
+                      void joinVoice(false);
+                    }}
+                  />
                 </Show>
                 <DmSafetySheet />
                 <GuestClaimPrompt />

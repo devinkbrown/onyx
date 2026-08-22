@@ -115,7 +115,7 @@ describe('channel media panel lifecycle', () => {
 
     expect(store.getState().voice.callState).toBe('idle');
     expect(store.getState().voice.callChannel).toBeNull();
-    expect(store.getState().toasts.at(-1)?.title).toBe('Camera unavailable');
+    expect(store.getState().toasts.at(-1)?.title).toBe("Couldn't join. Try again.");
   });
 
   it('does not resurrect a call when pending Edge capture resolves after leave', async () => {

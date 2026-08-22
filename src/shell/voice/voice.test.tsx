@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import type { CadencePeerState } from '@/lib/cadence-media/types';
+import * as clipboard from '@/lib/clipboard/writeClipboardText';
 import { VoiceStage } from './VoiceStage';
 import { ParticipantTile } from './ParticipantTile';
 import { VoiceBar, downloadLocalRecording, localRecordingFilename } from './VoiceBar';
@@ -124,6 +125,10 @@ function seedVoiceStore(
     },
     true,
   );
+}
+
+function openCallMore(getByTestId: (id: string) => HTMLElement): void {
+  fireEvent.click(getByTestId('call-more-button'));
 }
 
 function setDisplayCapture(method?: MediaDevices['getDisplayMedia']): void {
@@ -1103,6 +1108,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     fireEvent.click(getByTestId('deafen-button'));
 
     // Assert
@@ -1165,6 +1171,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const btn = getByTestId('screenshare-button');
     fireEvent.click(btn);
 
@@ -1190,6 +1197,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const btn = getByTestId('screenshare-button');
     fireEvent.click(btn);
     fireEvent.click(btn);
@@ -1219,6 +1227,7 @@ describe('VoiceBar', () => {
       .mockRejectedValue(new Error('permission denied'));
 
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const btn = getByTestId('screenshare-button');
     fireEvent.click(btn);
 
@@ -1241,6 +1250,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const btn = getByTestId('screenshare-button');
     setDisplayCapture();
     store.setState({ mediaAvailable: false });
@@ -1292,6 +1302,7 @@ describe('VoiceBar', () => {
     try {
       seedVoiceStore([]);
       const { getByTestId } = render(() => <VoiceBar />);
+      openCallMore(getByTestId);
       const btn = getByTestId('record-button');
 
       expect(btn).toBeEnabled();
@@ -1334,6 +1345,7 @@ describe('VoiceBar', () => {
     try {
       seedVoiceStore([]);
       const { getByTestId } = render(() => <VoiceBar />);
+      openCallMore(getByTestId);
       const btn = getByTestId('record-button');
       expect(btn).toBeDisabled();
       expect(btn).toHaveAttribute('aria-label', 'Recording unavailable');
@@ -1389,6 +1401,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const btn = getByTestId('screenshare-button');
     const originalClass = btn.className;
     store.setState({ mediaAvailable: true });
@@ -1424,6 +1437,32 @@ describe('VoiceBar', () => {
     expect(toolbar).toBeDefined();
   });
 
+  it('shows people on the call plus sentence-case mute, video, and leave', () => {
+    seedVoiceStore([makePeer('alice')]);
+    const { getByTestId } = render(() => <VoiceBar />);
+    expect(getByTestId('call-people').textContent).toMatch(/You/);
+    expect(getByTestId('call-people').textContent).toMatch(/alice/i);
+    expect(getByTestId('participant-count')).toHaveTextContent('2 people');
+    expect(getByTestId('mute-button')).toHaveTextContent('Mute');
+    expect(getByTestId('camera-button')).toHaveTextContent('Video');
+    expect(getByTestId('leave-button')).toHaveTextContent('Leave');
+    expect(getByTestId('invite-to-call')).toHaveTextContent('Invite');
+    expect(getByTestId('mute-button').className).toMatch(/voice-bar__action/);
+  });
+
+  it('copies the room invite link instead of inventing a call protocol', async () => {
+    seedVoiceStore([]);
+    const writeSpy = vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(true);
+    const { getByTestId } = render(() => <VoiceBar />);
+    fireEvent.click(getByTestId('invite-to-call'));
+    await waitFor(() => expect(writeSpy).toHaveBeenCalled());
+    const copied = String(writeSpy.mock.calls[0]?.[0] ?? '');
+    expect(copied).toContain('join=%23media');
+    expect(copied).not.toMatch(/call=|cadence|media=/i);
+    expect(getByTestId('invite-status')).toHaveTextContent('Invite link copied');
+    writeSpy.mockRestore();
+  });
+
   it('raise-hand button calls toggleRaiseHand and reflects pressed state', () => {
     // Arrange
     seedVoiceStore([]);
@@ -1433,6 +1472,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const btn = getByTestId('raise-hand-button');
     expect(btn).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(btn);
@@ -1452,6 +1492,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const btn = getByTestId('captions-button');
     expect(btn).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(btn);
@@ -1471,6 +1512,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const btn = getByTestId('layout-button');
     expect(btn).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(btn);
@@ -1496,6 +1538,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     fireEvent.click(getByTestId('spatial-audio-button'));
 
     // Assert
@@ -1511,6 +1554,7 @@ describe('VoiceBar', () => {
 
     // Act — open the popover and reach the pad.
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     fireEvent.click(getByTestId('spatial-audio-button'));
     const pad = getByTestId('spatial-audio-pad');
 
@@ -1535,6 +1579,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const btn = getByTestId('spatial-audio-unavailable-button');
 
     // Assert
@@ -1549,6 +1594,7 @@ describe('VoiceBar', () => {
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     fireEvent.click(getByTestId('settings-button'));
 
     // Assert
@@ -1634,6 +1680,7 @@ describe('VoiceBar', () => {
 
     // Act — open the popover, then click a reaction
     const { getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     fireEvent.click(getByTestId('reactions-button'));
     fireEvent.click(getByTestId('reaction-🎉'));
 
@@ -1645,7 +1692,8 @@ describe('VoiceBar', () => {
   it('opens a named reaction dialog, focuses the first item, and roves with every menu navigation key', async () => {
     seedVoiceStore([]);
 
-    const { getByRole } = render(() => <VoiceBar />);
+    const { getByRole, getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const trigger = getByRole('button', { name: 'Send a reaction' });
     trigger.focus();
     fireEvent.click(trigger);
@@ -1674,7 +1722,8 @@ describe('VoiceBar', () => {
     seedVoiceStore([]);
     const spy = vi.spyOn(store.getState(), 'sendCallReaction').mockImplementation(() => {});
 
-    const { getByRole } = render(() => <VoiceBar />);
+    const { getByRole, getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const trigger = getByRole('button', { name: 'Send a reaction' });
     trigger.focus();
     fireEvent.click(trigger);
@@ -1705,7 +1754,8 @@ describe('VoiceBar', () => {
     seedVoiceStore([]);
     const spy = vi.spyOn(store.getState(), 'sendCallReaction').mockImplementation(() => {});
 
-    const { getByRole, queryByRole } = render(() => <VoiceBar />);
+    const { getByRole, getByTestId, queryByRole } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
     const trigger = getByRole('button', { name: 'Send a reaction' });
     trigger.focus();
     fireEvent.click(trigger);
@@ -2128,7 +2178,8 @@ describe('VoiceBar popover triggers', () => {
     seedVoiceStore([], [makeChannelUser('self')]);
 
     // Act
-    const { getByRole } = render(() => <VoiceBar />);
+    const { getByRole, getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
 
     // Assert — getByRole throws on a duplicate/nested button, so this proves the
     // trigger is a single tab stop with a real accessible name.
@@ -2141,7 +2192,8 @@ describe('VoiceBar popover triggers', () => {
     store.setState((s) => ({ mediaAvailable: true, voice: { ...s.voice } }));
 
     // Act
-    const { getByRole } = render(() => <VoiceBar />);
+    const { getByRole, getByTestId } = render(() => <VoiceBar />);
+    openCallMore(getByTestId);
 
     // Assert — name comes from the (now non-interactive) labelled child span
     expect(getByRole('button', { name: /Spatial audio controls/ })).toBeInTheDocument();

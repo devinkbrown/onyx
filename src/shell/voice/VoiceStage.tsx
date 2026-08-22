@@ -257,9 +257,7 @@ export function VoiceStage() {
         when={callReady()}
         fallback={
           <p class="voice-stage__starting" role="status" data-testid="voice-stage-loading">
-            {voice().cameraOn || voice().cameraStream || hasLiveVideo()
-              ? 'Starting video…'
-              : 'Starting voice…'}
+            Connecting…
           </p>
         }
       >

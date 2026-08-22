@@ -73,9 +73,47 @@
   margin: 0;
   padding: 8px 4px;
   color: var(--paper-mute);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+.call-join-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  margin: 0 var(--space-3, 12px);
+  padding: 8px 12px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
+}
+
+.call-join-banner__copy {
+  margin: 0;
+  color: var(--paper);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.call-join-banner__retry {
+  appearance: none;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--lapis) 22%, var(--stone));
+  color: var(--paper);
+  font: 650 14px/1.2 var(--font-sans);
+  cursor: pointer;
+}
+
+.call-join-banner__retry:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
 }
 
 /* Compact (default): small tray — video is a 16:9 box, NOT a full-width banner. */
@@ -742,7 +780,7 @@
   background: color-mix(in oklab, var(--stone) 74%, var(--ink));
   border-top: 1px solid var(--seam-faint);
   box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   flex-shrink: 0;
   z-index: 10;
 }
@@ -764,15 +802,101 @@
   min-width: 0;
 }
 
+.voice-bar__people {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.voice-bar__people-faces {
+  display: flex;
+  align-items: center;
+}
+
+.voice-bar__people-faces .onyx-avatar {
+  box-shadow: 0 0 0 2px var(--stone-2);
+}
+
+.voice-bar__people-faces .onyx-avatar + .onyx-avatar {
+  margin-left: -0.55rem;
+}
+
+.voice-bar__people-names {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--paper);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
 .voice-bar__channel-name {
   font-size: 11px;
-  color: var(--paper);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--paper-mute);
+  letter-spacing: 0.02em;
+  text-transform: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 120px;
+}
+
+.voice-bar__action {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-radius: var(--r-md);
+}
+
+.voice-bar__action-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+
+.voice-bar__action-label {
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.voice-bar__more-wrap {
+  position: relative;
+}
+
+.voice-bar__more-tools {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 220px;
+  padding: 8px;
+  z-index: 20;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone) 86%, var(--ink));
+  box-shadow: 0 12px 32px -20px color-mix(in oklab, var(--ink) 80%, transparent);
+}
+
+.voice-bar__more-tools[hidden] {
+  display: none;
+}
+
+.voice-bar__more-tools .voice-bar__group {
+  flex-wrap: wrap;
 }
 
 .voice-bar__meta {

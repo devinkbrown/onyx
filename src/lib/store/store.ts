@@ -57,6 +57,7 @@ import {
 } from '@/lib/irc/recoveryCodes';
 import type { CadencePeerState, CadenceRoomStats, CallState } from '@/lib/cadence-media/types';
 import { getMountedCadenceMediaEngine } from '@/lib/mediaEngineMount';
+import { callJoinFailedToast } from '@/lib/media/callJoinCopy';
 import { parseActivity } from '@/lib/activity';
 import {
   MAX_VAULT_MESSAGE_ID_LENGTH,
@@ -16656,8 +16657,7 @@ export const store = createStore<OnyxState>()(
         preacquired?.getTracks().forEach((t) => t.stop());
         get().addToast({
           variant: 'error',
-          title: 'Media engine not ready',
-          description: 'Voice/video is still initialising — try again in a moment.',
+          ...callJoinFailedToast(),
         });
         return;
       }
@@ -16670,8 +16670,7 @@ export const store = createStore<OnyxState>()(
         preacquired?.getTracks().forEach((t) => t.stop());
         get().addToast({
           variant: 'error',
-          title: withVideo ? 'Video unavailable' : 'Voice unavailable',
-          description: 'This connection does not support media frames (need onyx.irc-media.v1). Reconnect and try again.',
+          ...callJoinFailedToast(),
         });
         return;
       }
@@ -16704,14 +16703,9 @@ export const store = createStore<OnyxState>()(
           // Superseded — caller owns stopping only if we never adopted.
           return;
         }
-        const message = error instanceof Error ? error.message : String(error);
-        const identityMissing = /device identity|E2EE|signing|UNENROLLED|AUTH_REQUIRED/i.test(message);
         get().addToast({
           variant: 'error',
-          title: withVideo ? 'Video could not start' : 'Voice could not start',
-          description: identityMissing
-            ? 'Media calls need an enrolled account device identity. Sign in and ensure passkey/device keys are available, then try again.'
-            : (message || 'Media startup failed. Check microphone/camera permissions and try again.'),
+          ...callJoinFailedToast(error),
         });
         get().setVoiceCallState({
           callState: 'idle',
@@ -16742,10 +16736,7 @@ export const store = createStore<OnyxState>()(
         });
         get().addToast({
           variant: 'error',
-          title: withVideo ? 'Camera unavailable' : 'Microphone unavailable',
-          description: withVideo
-            ? 'Could not access your camera/microphone. Check browser permissions and that no other app holds the camera.'
-            : 'Could not access your microphone. Check browser permissions.',
+          ...callJoinFailedToast(),
         });
         return;
       }

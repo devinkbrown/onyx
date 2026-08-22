@@ -1510,9 +1510,11 @@ describe('AppShell', () => {
 
       await waitFor(() => {
         expect(engine.joinVoice).toHaveBeenCalledWith('#general', null);
-        expect(store.getState().toasts.at(-1)?.title).toBe('Voice could not start');
+        expect(store.getState().toasts.at(-1)?.title).toBe("Couldn't join. Try again.");
       });
       expect(store.getState().voice.callState).toBe('idle');
+      expect(await screen.findByTestId('call-join-banner')).toHaveTextContent("Couldn't join. Try again.");
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
     });
 
     it('hands a gesture-captured stream to joinVideo (desktop activation path)', async () => {

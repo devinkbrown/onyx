@@ -3,11 +3,9 @@
  * VoiceBar — persistent control bar shown whenever callState is active.
  *
  * Control cluster (grouped left → right):
- *   Identity:  self Avatar + channel name + live duration timer + participant count
- *   Media:     Mic · Deafen · Camera · Screenshare · Record (local-only download)
- *   Engage:    Raise hand · Reactions · Captions
- *   View:      Grid ↔ Spotlight · Settings
- *   Exit:      Hang up
+ *   People:    who is on the call, timer, count
+ *   Primary:   Mute · Video · Invite · More · Leave (44px, sentence-case)
+ *   More:      lab tools (deafen, share, record, hand, reactions, captions, spatial)
  *   Right:     security chip (shield for hop crypto; padlock only if media E2EE)
  *              + connection-quality pip
  *
@@ -47,13 +45,18 @@ import { shortDuration } from '@/lib/time/relativeTime';
 import { createScreenWakeLockController } from '@/lib/screenWakeLock';
 import { createCallMediaSessionController } from '@/lib/callMediaSession';
 import { Avatar, Popover, Sheet, Tooltip } from '@/primitives';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
+import { buildRoomCallInviteUrl } from '@/lib/invite/roomCallInvite';
+import { selectChannelEncryptionPolicy } from '@/lib/store/store';
 import {
   MicIcon, MicOffIcon, DeafenIcon, DeafenOffIcon, CameraIcon, CameraOffIcon,
   ScreenShareIcon, ScreenShareStopIcon, RecordIcon, RecordStopIcon,
   CaptionsIcon, HandIcon, ReactionIcon,
   GridIcon, SpotlightIcon, SpatialAudioIcon, SettingsIcon, HangupIcon,
   ShieldIcon, LockIcon, LockOpenIcon, WarningIcon, StageIcon,
+  MoreIcon, InviteIcon,
 } from './icons';
+import { noteUserLeftCall } from './callRejoinState';
 import type { CadenceRoomStats, CallState, NetworkQualityTier } from '@/lib/cadence-media/types';
 import {
   resolveCallSecurity,
@@ -745,6 +748,8 @@ export function VoiceBar() {
     onHangup: () => getState().leaveVoiceChannel(),
   });
 
+  const [moreOpen, setMoreOpen] = createSignal(false);
+  const [inviteStatus, setInviteStatus] = createSignal('');
   const [reactionsOpen, setReactionsOpen] = createSignal(false);
   const [reactionIndex, setReactionIndex] = createSignal(0);
   const [privacyOpen, setPrivacyOpen] = createSignal(false);
@@ -780,10 +785,18 @@ export function VoiceBar() {
 
   const channelLabel = createMemo(() => voice().callChannel ?? voice().callWith ?? '');
   const selfNick = createMemo(() => ourNick() ?? '');
-  const participantCount = createMemo(() => {
+  const callPeople = createMemo(() => {
     const channel = voice().callChannel;
     const roster = channel ? voiceChannelParticipants().get(channel.toLowerCase()) : undefined;
-    return mergeVoiceParticipants(selfNick() || 'you', voice().peers, roster).length;
+    return mergeVoiceParticipants(selfNick() || 'you', voice().peers, roster);
+  });
+  const participantCount = createMemo(() => callPeople().length);
+  const peopleLabel = createMemo(() => {
+    const people = callPeople();
+    const names = people.map((person) => (person.isSelf ? 'You' : displayNick(person.nick)));
+    if (names.length === 0) return 'You';
+    if (names.length <= 3) return names.join(', ');
+    return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
   });
   const securityAffordance = createMemo(() =>
     resolveCallSecurity({
@@ -1140,7 +1153,33 @@ export function VoiceBar() {
     void finalizeRecording({ download: true });
   });
 
-  const handleLeave = () => getState().leaveVoiceChannel();
+  const handleLeave = () => {
+    noteUserLeftCall();
+    getState().leaveVoiceChannel();
+  };
+
+  const handleInvite = (): void => {
+    const channel = voice().callChannel;
+    if (!channel) return;
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://eshmaki.me';
+    const state = getState();
+    const url = buildRoomCallInviteUrl({
+      channel,
+      origin,
+      network: state.networkName,
+      encryptionPolicy: selectChannelEncryptionPolicy(channel)(state),
+    });
+    void writeClipboardText(url).then((ok) => {
+      setInviteStatus(ok ? 'Invite link copied' : 'Could not copy invite link');
+      state.addToast({
+        variant: ok ? 'success' : 'warning',
+        title: ok ? 'Invite link copied' : 'Could not copy',
+        description: ok
+          ? 'Share this room link so someone can join the call.'
+          : 'Copy the room invite from Room settings instead.',
+      });
+    });
+  };
 
   function setPositionForSpatialNick(nick: string, pos: SpatialAudioPosition): void {
     const engine = getMountedCadenceMediaEngine();
@@ -1276,25 +1315,41 @@ export function VoiceBar() {
         aria-label="Voice call controls"
         data-testid="voice-bar"
       >
-        {/* Left: identity + call info */}
+        {/* Left: people on this call */}
         <div class="voice-bar__identity">
-          <Avatar name={selfNick()} size="sm" />
-          <div class="voice-bar__channel">
-            <span class="voice-bar__channel-name" title={channelLabel()}>
-              {channelLabel()}
-            </span>
-            <span class="voice-bar__meta">
-              <Show when={voice().callState === 'in_call'}>
-                <CallTimer active startedAt={voice().callStartedAt} />
-                <span class="voice-bar__dot" aria-hidden="true">·</span>
-              </Show>
-              <span
-                class="voice-bar__count"
-                data-testid="participant-count"
-                aria-label={`${participantCount()} in call`}
-              >
-                <span aria-hidden="true">◇ {participantCount()}</span>
+          <div
+            class="voice-bar__people"
+            data-testid="call-people"
+            aria-label={`${participantCount()} in call`}
+          >
+            <div class="voice-bar__people-faces" aria-hidden="true">
+              <For each={callPeople().slice(0, 3)}>
+                {(person) => (
+                  <Avatar name={person.isSelf ? selfNick() || 'You' : person.nick} size="sm" />
+                )}
+              </For>
+            </div>
+            <div class="voice-bar__channel">
+              <span class="voice-bar__people-names" title={peopleLabel()}>
+                {peopleLabel()}
               </span>
+              <span class="voice-bar__channel-name" title={channelLabel()}>
+                {channelLabel()}
+              </span>
+              <span class="voice-bar__meta">
+                <Show when={voice().callState === 'in_call'}>
+                  <CallTimer active startedAt={voice().callStartedAt} />
+                  <span class="voice-bar__dot" aria-hidden="true">·</span>
+                </Show>
+                <span
+                  class="voice-bar__count"
+                  data-testid="participant-count"
+                  aria-label={`${participantCount()} in call`}
+                >
+                  <span aria-hidden="true">
+                    {participantCount()} {participantCount() === 1 ? 'person' : 'people'}
+                  </span>
+                </span>
               {/* Active-speaker (auto-focus) chip. Visual-only promotion of the
                   participant currently holding the floor; the roster announcer
                   covers screen-reader presence, so this is aria-hidden to avoid
@@ -1331,29 +1386,115 @@ export function VoiceBar() {
               </Show>
             </span>
           </div>
+          </div>
         </div>
 
         <div class="voice-bar__sep" aria-hidden="true" />
 
-        {/* Center: controls */}
+        {/* Center: consumer call controls */}
         <div class="voice-bar__controls">
-          {/* ── Media group ── */}
-          <div class="voice-bar__group" role="group" aria-label="Media controls">
-            <Tooltip content={voice().muted ? 'Unmute microphone' : 'Mute microphone'} placement="top">
+          <div class="voice-bar__group" role="group" aria-label="Call controls">
+            <Tooltip content={voice().muted ? 'Unmute' : 'Mute'} placement="top">
               <button
                 type="button"
-                class={`onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md${voice().muted ? ' onyx-icon-button--muted' : ''}`}
+                class={`voice-bar__action onyx-icon-button onyx-icon-button--ghost${voice().muted ? ' onyx-icon-button--muted' : ''}`}
                 aria-label={voice().muted ? 'Unmute microphone' : 'Mute microphone'}
                 aria-pressed={voice().muted}
                 onClick={handleToggleMute}
                 data-testid="mute-button"
               >
-                <span class="onyx-icon-button__glyph" aria-hidden="true">
+                <span class="voice-bar__action-icon onyx-icon-button__glyph" aria-hidden="true">
                   <Show when={voice().muted} fallback={<MicIcon />}><MicOffIcon /></Show>
                 </span>
+                <span class="voice-bar__action-label">{voice().muted ? 'Unmute' : 'Mute'}</span>
               </button>
             </Tooltip>
 
+            <Tooltip content={voice().cameraOn ? 'Video off' : 'Video'} placement="top">
+              <button
+                type="button"
+                class="voice-bar__action onyx-icon-button onyx-icon-button--ghost"
+                aria-label={voice().cameraOn ? 'Turn off camera' : 'Turn on camera'}
+                aria-pressed={voice().cameraOn}
+                onClick={handleToggleCamera}
+                data-testid="camera-button"
+              >
+                <span class="voice-bar__action-icon onyx-icon-button__glyph" aria-hidden="true">
+                  <Show when={voice().cameraOn} fallback={<CameraOffIcon />}><CameraIcon /></Show>
+                </span>
+                <span class="voice-bar__action-label">{voice().cameraOn ? 'Video off' : 'Video'}</span>
+              </button>
+            </Tooltip>
+
+            <Tooltip content="Invite" placement="top">
+              <button
+                type="button"
+                class="voice-bar__action onyx-icon-button onyx-icon-button--ghost"
+                aria-label="Invite with room link"
+                data-testid="invite-to-call"
+                onClick={handleInvite}
+              >
+                <span class="voice-bar__action-icon onyx-icon-button__glyph" aria-hidden="true">
+                  <InviteIcon />
+                </span>
+                <span class="voice-bar__action-label">Invite</span>
+              </button>
+            </Tooltip>
+            <span
+              class="sr-only"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="invite-status"
+            >
+              {inviteStatus()}
+            </span>
+          </div>
+
+          <span
+            class="sr-only"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-testid="screenshare-status"
+          >
+            {screenshareStatus()}
+          </span>
+          <span
+            class="sr-only"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-testid="record-status"
+          >
+            {recordingStatus()}
+          </span>
+
+          <div class="voice-bar__more-wrap">
+            <button
+              type="button"
+              class="voice-bar__action onyx-icon-button onyx-icon-button--ghost"
+              aria-label="More call tools"
+              aria-expanded={moreOpen()}
+              aria-controls="voice-bar-more-tools"
+              data-testid="call-more-button"
+              title="More"
+              onClick={() => setMoreOpen((open) => !open)}
+            >
+              <span class="voice-bar__action-icon onyx-icon-button__glyph" aria-hidden="true">
+                <MoreIcon />
+              </span>
+              <span class="voice-bar__action-label">More</span>
+            </button>
+            <div
+              id="voice-bar-more-tools"
+              class="voice-bar__more-tools"
+              role="dialog"
+              aria-label="More call tools"
+              hidden={!moreOpen()}
+              data-testid="call-more-tools"
+            >
+          <div class="voice-bar__group" role="group" aria-label="Media controls">
             <Tooltip content={voice().deafened ? 'Undeafen' : 'Deafen'} placement="top">
               <button
                 type="button"
@@ -1365,21 +1506,6 @@ export function VoiceBar() {
               >
                 <span class="onyx-icon-button__glyph" aria-hidden="true">
                   <Show when={voice().deafened} fallback={<DeafenIcon />}><DeafenOffIcon /></Show>
-                </span>
-              </button>
-            </Tooltip>
-
-            <Tooltip content={voice().cameraOn ? 'Turn off camera' : 'Turn on camera'} placement="top">
-              <button
-                type="button"
-                class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
-                aria-label={voice().cameraOn ? 'Turn off camera' : 'Turn on camera'}
-                aria-pressed={voice().cameraOn}
-                onClick={handleToggleCamera}
-                data-testid="camera-button"
-              >
-                <span class="onyx-icon-button__glyph" aria-hidden="true">
-                  <Show when={voice().cameraOn} fallback={<CameraOffIcon />}><CameraIcon /></Show>
                 </span>
               </button>
             </Tooltip>
@@ -1401,15 +1527,6 @@ export function VoiceBar() {
                 </span>
               </button>
             </Tooltip>
-            <span
-              class="sr-only"
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              data-testid="screenshare-status"
-            >
-              {screenshareStatus()}
-            </span>
 
             <Tooltip content={recordingLabel()} placement="top">
               <button
@@ -1428,15 +1545,6 @@ export function VoiceBar() {
                 </span>
               </button>
             </Tooltip>
-            <span
-              class="sr-only"
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              data-testid="record-status"
-            >
-              {recordingStatus()}
-            </span>
           </div>
 
           <div class="voice-bar__sep" aria-hidden="true" />
@@ -1699,19 +1807,20 @@ export function VoiceBar() {
               </button>
             </Tooltip>
           </div>
-
-          <div class="voice-bar__sep" aria-hidden="true" />
+            </div>
+          </div>
 
           {/* Leave */}
-          <Tooltip content="Leave call" placement="top">
+          <Tooltip content="Leave" placement="top">
             <button
               type="button"
-              class="onyx-icon-button voice-bar__leave"
+              class="voice-bar__action voice-bar__leave onyx-icon-button"
               aria-label="Leave voice call"
               onClick={handleLeave}
               data-testid="leave-button"
             >
-              <span class="onyx-icon-button__glyph" aria-hidden="true"><HangupIcon /></span>
+              <span class="voice-bar__action-icon onyx-icon-button__glyph" aria-hidden="true"><HangupIcon /></span>
+              <span class="voice-bar__action-label">Leave</span>
             </button>
           </Tooltip>
         </div>
