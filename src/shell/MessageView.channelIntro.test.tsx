@@ -105,8 +105,11 @@ describe('MessageView empty room and channel intro', () => {
 
     const empty = screen.getByTestId('feed-empty');
     expect(empty.querySelector('.shell-feed-empty-title')?.textContent).toBe('Still waters here');
-    expect(empty.querySelector('.shell-feed-empty-body')?.textContent).toMatch(/Say the first thing in #general/);
-    expect(screen.getByTestId('feed-empty-invite')).toHaveTextContent('Invite friends');
+    expect(empty.querySelector('.shell-feed-empty-body')?.textContent).toBe(
+      'Say the first thing in #general.',
+    );
+    expect(screen.queryByTestId('feed-empty-invite')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Invite friends/i })).toBeNull();
     expect(screen.queryByTestId('feed-empty-channel-ledger')).toBeNull();
     expect(screen.queryByRole('link', { name: /Room ledger/i })).toBeNull();
   });

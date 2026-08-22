@@ -96,7 +96,7 @@
   --ui-leading-evidence: 1.5;
 
   /* ── Tracking ──────────────────────────────────────────────────────────── */
-  --ui-tracking-kicker: var(--tracking-kicker, 0.12em);
+  --ui-tracking-kicker: var(--tracking-kicker, 0.06em);
   --ui-tracking-title: var(--tracking-title, -0.02em);
   --ui-tracking-normal: 0;
   --ui-tracking-evidence: 0.01em;

@@ -30,7 +30,7 @@
   grid-row: 1;
   color: var(--gold-bright);
   font: 650 var(--text-2xs, 0.625rem)/1 var(--font-mono);
-  letter-spacing: var(--tracking-kicker, 0.12em);
+  letter-spacing: var(--tracking-kicker, 0.06em);
   text-transform: uppercase;
 }
 

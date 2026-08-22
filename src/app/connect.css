@@ -358,6 +358,19 @@
 .conn .onyx-field__label,
 .conn .onyx-field__description {
   color: var(--paper-dim);
+  font-family: var(--font-sans);
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.conn .onyx-field__label {
+  font-size: var(--text-sm);
+}
+
+.conn .onyx-button {
+  font-family: var(--font-sans);
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 .conn .onyx-field__input {
@@ -565,8 +578,8 @@
 }
 
 .conn-toggle-switch input:focus-visible + .conn-toggle-track {
-  outline: var(--focus-ring, 1px solid var(--lapis)); outline-offset: var(--focus-offset, -1px);
-  outline-offset: 2px;
+  outline: var(--focus-ring, 1px solid var(--lapis));
+  outline-offset: var(--focus-offset, -1px);
 }
 
 .conn-toggle-thumb {

@@ -729,7 +729,7 @@
   margin: 0 0 6px;
   color: var(--lapis-bright);
   font: 700 var(--text-xs, 0.6875rem)/1 var(--font-mono);
-  letter-spacing: var(--tracking-kicker, 0.12em);
+  letter-spacing: var(--tracking-kicker, 0.06em);
   text-transform: uppercase;
 }
 .home-formation__title {

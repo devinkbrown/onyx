@@ -37,6 +37,14 @@
   color: var(--public-current, var(--lapis-bright));
 }
 
+.status-route .data-card .label,
+.status-route .data-card h2,
+.status-route .data-card h3 {
+  font-family: var(--font-sans);
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
 /* Signature element: a quiet mesh-observation seam. The marker and ruled line
    encode the state of the exported observation; they are not ornamental uptime
    lights and never imply more than the adjacent text says. */
