@@ -61,4 +61,10 @@ describe('Consumer shell language', () => {
     expect(settings).not.toMatch(/Room key \(\+k\)/);
     expect(settings).not.toMatch(/User limit \(\+l\)/);
   });
+
+  it('exposes Hide room and Leave room as distinct settings verbs', () => {
+    expect(settings).toMatch(/chset-hide/);
+    expect(settings).toMatch(/chset-leave/);
+    expect(settings).not.toMatch(/Archive/);
+  });
 });

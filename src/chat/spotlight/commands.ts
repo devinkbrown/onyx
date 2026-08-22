@@ -43,6 +43,7 @@ import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { useSpotlight } from './useSpotlight';
 import { parseTimeExpr } from './timeGrammar';
 import { isSchedulable, parseDateTimeLocal } from '@/lib/schedule/scheduleTime';
+import { openLeaveRoomConfirm } from '@/shell/roomVerbConfirm';
 
 export type SpotlightSection = 'Rooms' | 'DMs' | 'People' | 'Actions';
 
@@ -579,33 +580,142 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
     }
   }
 
-  const partArg = commandArg(query, 'part') ?? commandArg(query, 'leave');
+  const hideArg = commandArg(query, 'hide room')
+    ?? commandArg(query, 'close room')
+    ?? commandArg(query, 'exit room')
+    ?? commandArg(query, 'close channel')
+    ?? commandArg(query, 'exit channel')
+    ?? commandArg(query, 'hide');
+  if (hideArg) {
+    const channel = normalizeChannel(hideArg);
+    if (channel.length > 1 && !/\s/.test(channel)) {
+      const name = state.channels.get(channel.toLowerCase())?.name ?? channel;
+      commands.push({
+        id: `grammar:hide:${channel.toLowerCase()}`,
+        section: 'Actions',
+        title: `Hide ${name}`,
+        hint: 'stay joined; drop from Rooms',
+        keywords: [query.trim(), 'hide', 'hide room', 'close room', 'exit room', 'close channel', 'exit channel', name],
+        run: () => getState().hideRoom(name),
+      });
+    }
+  } else if (exactCommand(
+    query,
+    'hide',
+    'hide room',
+    'close room',
+    'exit room',
+    'close channel',
+    'exit channel',
+  )) {
+    const active = state.activeView.kind === 'channel' ? state.activeView.channel : null;
+    if (active) {
+      commands.push({
+        id: `grammar:hide:${active.toLowerCase()}`,
+        section: 'Actions',
+        title: `Hide ${active}`,
+        hint: 'stay joined; drop from Rooms',
+        keywords: [query.trim(), 'hide', 'hide room', 'close room', 'exit room', active],
+        run: () => {
+          const view = getState().activeView;
+          if (view.kind === 'channel') getState().hideRoom(view.channel);
+        },
+      });
+    }
+  }
+
+  const closeConversationArg = commandArg(query, 'close conversation')
+    ?? commandArg(query, 'close dm');
+  if (closeConversationArg) {
+    const nick = closeConversationArg.replace(/^@/, '').trim();
+    if (/^[^\s,]{1,64}$/.test(nick)) {
+      const known = state.dms.get(nick.toLowerCase());
+      commands.push({
+        id: `grammar:close-conversation:${nick.toLowerCase()}`,
+        section: 'Actions',
+        title: `Close conversation with ${known?.nick ?? nick}`,
+        hint: 'leaves Messages; history stays',
+        keywords: [query.trim(), 'close conversation', 'close dm', nick],
+        run: () => getState().closeConversation(known?.nick ?? nick),
+      });
+    }
+  } else if (exactCommand(query, 'close conversation', 'close dm', 'close')) {
+    const view = state.activeView;
+    if (view.kind === 'dm') {
+      commands.push({
+        id: `grammar:close-conversation:${view.nick.toLowerCase()}`,
+        section: 'Actions',
+        title: `Close conversation with ${view.nick}`,
+        hint: 'leaves Messages; history stays',
+        keywords: [query.trim(), 'close conversation', 'close dm', 'close', view.nick],
+        run: () => getState().closeConversation(view.nick),
+      });
+    } else if (view.kind === 'channel' && exactCommand(query, 'close')) {
+      commands.push({
+        id: `grammar:hide:${view.channel.toLowerCase()}`,
+        section: 'Actions',
+        title: `Hide ${view.channel}`,
+        hint: 'stay joined; drop from Rooms',
+        keywords: [query.trim(), 'close', 'hide room', view.channel],
+        run: () => getState().hideRoom(view.channel),
+      });
+    }
+  }
+
+  const leaveArg = commandArg(query, 'leave');
+  if (leaveArg) {
+    const channel = normalizeChannel(leaveArg);
+    if (channel.length > 1 && !/\s/.test(channel)) {
+      const name = state.channels.get(channel.toLowerCase())?.name ?? channel;
+      commands.push({
+        id: `grammar:leave:${channel.toLowerCase()}`,
+        section: 'Actions',
+        title: `Leave ${name}`,
+        hint: 'leave room',
+        keywords: [query.trim(), 'leave', 'leave room', name],
+        run: () => openLeaveRoomConfirm(name),
+      });
+    }
+  } else if (exactCommand(query, 'leave', 'leave room')) {
+    const active = state.activeView.kind === 'channel' ? state.activeView.channel : null;
+    if (active) {
+      commands.push({
+        id: `grammar:leave:${active.toLowerCase()}`,
+        section: 'Actions',
+        title: `Leave ${active}`,
+        hint: 'leave current room',
+        keywords: [query.trim(), 'leave', 'leave room', active],
+        run: () => openLeaveRoomConfirm(active),
+      });
+    }
+  }
+
+  const partArg = commandArg(query, 'part');
   if (partArg) {
     const channel = normalizeChannel(partArg);
-    if (channel.length > 1) {
+    if (channel.length > 1 && !/\s/.test(channel)) {
       const name = state.channels.get(channel.toLowerCase())?.name ?? channel;
       commands.push({
         id: `grammar:part:${channel.toLowerCase()}`,
         section: 'Actions',
-        title: `Leave ${name}`,
-        hint: 'leave room',
-        keywords: [query.trim(), 'part', 'leave', 'close room', 'exit room', 'close channel', 'exit channel', name],
+        title: `PART ${name}`,
+        hint: 'advanced IRC',
+        keywords: [query.trim(), 'part', name],
         run: () => getState().partChannel(name),
       });
     }
-  } else if (exactCommand(query, 'part', 'leave')) {
+  } else if (exactCommand(query, 'part')) {
     const active = state.activeView.kind === 'channel' ? state.activeView.channel : null;
     if (active) {
       commands.push({
         id: `grammar:part:${active.toLowerCase()}`,
         section: 'Actions',
-        title: `Leave ${active}`,
-        hint: 'leave current room',
-        keywords: [query.trim(), 'part', 'leave', 'close room', 'exit room', 'close channel', 'exit channel', active],
+        title: `PART ${active}`,
+        hint: 'advanced IRC',
+        keywords: [query.trim(), 'part', active],
         run: () => {
-          const current = getState();
-          const view = current.activeView;
-          if (view.kind === 'channel') current.partChannel(view.channel);
+          const view = getState().activeView;
+          if (view.kind === 'channel') getState().partChannel(view.channel);
         },
       });
     }

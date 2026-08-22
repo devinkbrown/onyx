@@ -2323,6 +2323,19 @@
   outline-offset: 1px;
 }
 
+.shell-ribbon-more-item--verb {
+  min-height: 44px;
+}
+
+.shell-ribbon-more-item--leave {
+  color: var(--shu);
+}
+
+.shell-ribbon-more-item--leave:hover,
+.shell-ribbon-more-item--leave:focus-visible {
+  color: var(--shu-bright);
+}
+
 .shell-ribbon-more-ico {
   width: var(--space-4);
   height: var(--space-4);

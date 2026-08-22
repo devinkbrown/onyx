@@ -1,0 +1,70 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Quiet harbor confirm — Fraunces once, Instrument Sans, no kicker, no glass. */
+
+.harbor-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+
+.harbor-confirm__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--ink) 72%, black);
+}
+
+.harbor-confirm__panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(26rem, calc(100vw - 2rem));
+  padding: 1.35rem 1.4rem 1.2rem;
+  border: 1px solid var(--seam, var(--line));
+  border-radius: 2px;
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 0 18px 40px color-mix(in oklab, black 35%, transparent);
+}
+
+.harbor-confirm__title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 520;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--paper);
+}
+
+.harbor-confirm__body {
+  margin: 0.7rem 0 0;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--paper-dim);
+}
+
+.harbor-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.2rem;
+}
+
+.harbor-confirm__actions .onyx-button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.harbor-confirm__actions .onyx-button--danger {
+  background: var(--shu);
+  border-color: var(--shu);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .harbor-confirm__panel {
+    transition: none;
+  }
+}

@@ -15,6 +15,8 @@ import type { Channel, ChannelUser } from '@/lib/irc/types';
 import type { NotifyLevel } from '@/lib/notifications/channelNotifyMode';
 import { readChannelTopicDraft, saveChannelTopicDraft } from '@/lib/channel/topicDrafts';
 import { ChannelSettings } from './ChannelSettings';
+import { HarborConfirmHost } from './HarborConfirmSheet';
+import { closeRoomVerbConfirm } from './roomVerbConfirm';
 
 vi.mock('@/lib/stats/channelDetail', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/stats/channelDetail')>();
@@ -133,6 +135,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  closeRoomVerbConfirm();
   vi.restoreAllMocks();
   Reflect.deleteProperty(navigator, 'share');
   Reflect.deleteProperty(navigator, 'canShare');
@@ -306,19 +309,33 @@ describe('ChannelSettings — Export transcript', () => {
 });
 
 describe('ChannelSettings — Leave channel', () => {
-  it('requires confirm before parting the active channel', () => {
+  it('requires harbor confirm before parting the active channel', () => {
     const sendRaw = vi.fn();
     seed(undefined, { client: { sendRaw } });
     const onOpenChange = vi.fn();
     render(() => (
-      <ChannelSettings channel="#general" open={true} onOpenChange={onOpenChange} />
+      <>
+        <ChannelSettings channel="#general" open={true} onOpenChange={onOpenChange} />
+        <HarborConfirmHost />
+      </>
     ));
 
     fireEvent.click(screen.getByTestId('chset-leave'));
     expect(sendRaw).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId('chset-leave-confirm'));
-    expect(sendRaw).toHaveBeenCalledWith('PART', '#general', 'Goodbye');
     expect(onOpenChange).toHaveBeenCalledWith(false);
+    fireEvent.click(screen.getByTestId('harbor-leave-confirm'));
+    expect(sendRaw).toHaveBeenCalledWith('PART', '#general', 'Goodbye');
+  });
+
+  it('hides the room without PARTing', () => {
+    const sendRaw = vi.fn();
+    seed(undefined, { client: { sendRaw } });
+    renderPanel();
+
+    fireEvent.click(screen.getByTestId('chset-hide'));
+    expect(sendRaw).not.toHaveBeenCalled();
+    expect(store.getState().hiddenRooms.has('#general')).toBe(true);
+    expect(store.getState().channels.has('#general')).toBe(true);
   });
 });
 

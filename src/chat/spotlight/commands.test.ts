@@ -25,6 +25,7 @@ import {
 import type { DMConversation, Server } from '@/lib/store/store';
 import { THEME_IDS } from '@/theme';
 import { buildCommands } from './commands';
+import { closeRoomVerbConfirm, roomVerbConfirm } from '@/shell/roomVerbConfirm';
 
 const initialState = store.getInitialState();
 const MEMORY_OWNER = { serverUrl: 'ircs://ircx.us:6697', identity: 'kain' } as const;
@@ -95,6 +96,7 @@ describe('buildCommands', () => {
     setVaultMode('exact');
     setTranslationTarget('');
     localStorage.clear();
+    closeRoomVerbConfirm();
     document.documentElement.removeAttribute('data-theme');
   });
 
@@ -404,22 +406,36 @@ describe('buildCommands', () => {
     expect(travelTo).toHaveBeenCalledWith('&ops', new Date(2026, 6, 7, 15, 0, 0, 0));
   });
 
-  it('builds a leave command that parts a named channel through partChannel', () => {
+  it('builds a leave command that asks before parting', () => {
     const partChannel = vi.fn();
     setState({
       channels: new Map([['#forge', channel('#forge')]]),
       partChannel,
     });
 
-    const command = buildCommands(getState(), 'leave forge').find((entry) => entry.id === 'grammar:part:#forge');
+    const command = buildCommands(getState(), 'leave forge').find((entry) => entry.id === 'grammar:leave:#forge');
     expect(command?.title).toBe('Leave #forge');
-    expect(command?.keywords).toContain('part');
+    expect(command?.keywords).not.toContain('close room');
     command?.run();
 
+    expect(partChannel).not.toHaveBeenCalled();
+    expect(roomVerbConfirm()).toEqual({ kind: 'leave', channel: '#forge' });
+  });
+
+  it('parts a named channel only from the typed PART alias', () => {
+    const partChannel = vi.fn();
+    setState({
+      channels: new Map([['#forge', channel('#forge')]]),
+      partChannel,
+    });
+
+    const command = buildCommands(getState(), 'part forge').find((entry) => entry.id === 'grammar:part:#forge');
+    expect(command?.title).toBe('PART #forge');
+    command?.run();
     expect(partChannel).toHaveBeenCalledWith('#forge');
   });
 
-  it('parts the active channel from the bare leave verb', () => {
+  it('parts the active channel from the bare PART verb', () => {
     const partChannel = vi.fn();
     setState({
       activeView: { kind: 'channel', channel: '#lapis' },
@@ -428,15 +444,65 @@ describe('buildCommands', () => {
     });
 
     const command = buildCommands(getState(), 'part').find((entry) => entry.id === 'grammar:part:#lapis');
-    expect(command?.title).toBe('Leave #lapis');
+    expect(command?.title).toBe('PART #lapis');
     command?.run();
     expect(partChannel).toHaveBeenCalledWith('#lapis');
   });
 
   it('omits the bare leave verb when no channel is active', () => {
     setState({ activeView: { kind: 'home' } });
-    const command = buildCommands(getState(), 'leave').find((entry) => entry.id.startsWith('grammar:part:'));
+    const command = buildCommands(getState(), 'leave').find((entry) => entry.id.startsWith('grammar:leave:'));
     expect(command).toBeUndefined();
+  });
+
+  it('hides a named room from close room without PARTing', () => {
+    const hideRoom = vi.fn();
+    const partChannel = vi.fn();
+    setState({
+      channels: new Map([['#forge', channel('#forge')]]),
+      hideRoom,
+      partChannel,
+    });
+
+    const command = buildCommands(getState(), 'close room forge').find((entry) => entry.id === 'grammar:hide:#forge');
+    expect(command?.title).toBe('Hide #forge');
+    command?.run();
+    expect(hideRoom).toHaveBeenCalledWith('#forge');
+    expect(partChannel).not.toHaveBeenCalled();
+  });
+
+  it('hides the active room from exit room without PARTing', () => {
+    const hideRoom = vi.fn();
+    const partChannel = vi.fn();
+    setState({
+      activeView: { kind: 'channel', channel: '#lapis' },
+      channels: new Map([['#lapis', channel('#lapis')]]),
+      hideRoom,
+      partChannel,
+    });
+
+    const command = buildCommands(getState(), 'exit room').find((entry) => entry.id === 'grammar:hide:#lapis');
+    expect(command?.title).toBe('Hide #lapis');
+    command?.run();
+    expect(hideRoom).toHaveBeenCalledWith('#lapis');
+    expect(partChannel).not.toHaveBeenCalled();
+  });
+
+  it('closes the active DM without PARTing a channel', () => {
+    const closeConversation = vi.fn();
+    const partChannel = vi.fn();
+    setState({
+      activeView: { kind: 'dm', nick: 'mira' },
+      dms: new Map([['mira', dm('mira')]]),
+      closeConversation,
+      partChannel,
+    });
+
+    const command = buildCommands(getState(), 'close').find((entry) => entry.id === 'grammar:close-conversation:mira');
+    expect(command?.title).toBe('Close conversation with mira');
+    command?.run();
+    expect(closeConversation).toHaveBeenCalledWith('mira');
+    expect(partChannel).not.toHaveBeenCalled();
   });
 
   it('jumps to the first unread in a named channel via navigate', () => {

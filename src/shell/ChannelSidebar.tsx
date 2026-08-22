@@ -211,6 +211,8 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
 
   // ── store selectors ──
   const channels = useStore((s) => s.channels);
+  const hiddenRooms = useStore((s) => s.hiddenRooms);
+  const closedConversations = useStore((s) => s.closedConversations);
   const channelLastActivity = useStore((s) => s.channelLastActivity);
   const starredChannels = useStore((s) => s.starredChannels);
   const channelFolders = useStore((s) => s.channelFolders);
@@ -271,8 +273,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
 
   // ── sorted channel list (alpha base; stars + folders layer on top) ──
   const sortedChannels = createMemo(() => {
+    const hidden = hiddenRooms();
     const entries: Channel[] = [];
-    channels().forEach((ch) => entries.push(ch));
+    channels().forEach((ch) => {
+      if (!hidden.has(ch.name.toLowerCase())) entries.push(ch);
+    });
     const sorted = entries.sort((a, b) => a.name.localeCompare(b.name));
     return filterSidebarNames(sorted, listFilter(), (ch) => ch.name, {
       unreadOnly: unreadOnly(),
@@ -349,8 +354,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
 
   // ── sorted DM list ──
   const sortedDms = createMemo(() => {
+    const closed = closedConversations();
     const entries: DMConversation[] = [];
-    dms().forEach((dm) => entries.push(dm));
+    dms().forEach((dm) => {
+      if (!closed.has(dm.nick.toLowerCase())) entries.push(dm);
+    });
     const sorted = entries.sort((a, b) => a.nick.localeCompare(b.nick));
     return filterSidebarNames(sorted, listFilter(), (dm) => dm.nick, {
       unreadOnly: unreadOnly(),
