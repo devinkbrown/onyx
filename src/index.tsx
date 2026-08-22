@@ -45,6 +45,7 @@ const Invite = lazy(() => import('./routes/Invite'));
 const OnyxOS = lazy(() => import('./routes/OnyxOS'));
 const Download = lazy(() => import('./routes/Download'));
 const PublicInfoRoute = lazy(() => import('./routes/PublicInfo'));
+const Guides = lazy(() => import('./routes/Guides'));
 // Both paths share one deferred public-route chunk; the module dispatches the
 // catchall to its route-terminus component after loading.
 const NotFoundRoute = withLazyRoute(PublicInfoRoute);
@@ -89,6 +90,7 @@ const RoadmapRoute = withLazyRoute(Roadmap);
 const InviteRoute = withLazyRoute(Invite);
 const OnyxOSRoute = withLazyRoute(OnyxOS);
 const DownloadRoute = withLazyRoute(Download);
+const GuidesRoute = withLazyRoute(Guides);
 
 // Global command palette host. The panel + its command catalogue live in a
 // lazy chunk; we ARM (and permanently keep mounted) on the first open so the
@@ -133,6 +135,7 @@ render(
           <Route path={['/invite', '/invite/']} component={InviteRoute} />
           <Route path={['/onyxos', '/onyxos/']} component={OnyxOSRoute} />
           <Route path={['/download', '/download/', '/install', '/install/']} component={DownloadRoute} />
+          <Route path={['/guides', '/guides/', '/community', '/community/']} component={GuidesRoute} />
           <Route path={['/accessibility/', '/glossary/', '/integrations/', '/agents/']} component={() => <LazyRouteBoundary><PublicInfoRoute /></LazyRouteBoundary>} />
           <Route path="/*notFound" component={NotFoundRoute} />
         </Router>

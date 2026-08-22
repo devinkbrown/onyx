@@ -193,9 +193,9 @@ assert_ok "allowlist does not collide with SPA-owned names" \
 
 # Synthetic legacy staging: no root overlay
 echo "-- stage_legacy_entry no root overlay"
-mkdir -p "${TMP}/landing/dist/guides" "${TMP}/staged/app"
+mkdir -p "${TMP}/landing/dist/why" "${TMP}/staged/app"
 echo "legacy-root" >"${TMP}/landing/dist/index.html"
-echo "guide" >"${TMP}/landing/dist/guides/x.html"
+echo "guide" >"${TMP}/landing/dist/why/x.html"
 echo 'html data-theme="ocean"' >"${TMP}/staged/index.html"
 echo "spa-robots" >"${TMP}/staged/robots.txt"
 echo "landing-robots" >"${TMP}/landing/dist/robots.txt"
@@ -203,12 +203,12 @@ echo "spa-app" >"${TMP}/staged/app/index.html"
 echo '<meta name="robots" content="noindex, nofollow" />' >"${TMP}/staged/404.html"
 echo "const CACHE_NAME = 'onyx-shell-vtest';" >"${TMP}/staged/sw.js"
 
-stage_legacy_entry "${TMP}/landing/dist" "${TMP}/staged" "guides"
-assert_eq "guides staged" "guide" "$(cat "${TMP}/staged/guides/x.html")"
+stage_legacy_entry "${TMP}/landing/dist" "${TMP}/staged" "why"
+assert_eq "why staged" "guide" "$(cat "${TMP}/staged/why/x.html")"
 assert_eq "index not replaced by missing allowlist copy" "html data-theme=\"ocean\"" "$(cat "${TMP}/staged/index.html")"
 
 # Symlink refuse
-ln -s /etc/passwd "${TMP}/landing/dist/evil-link" 2>/dev/null || ln -s guides "${TMP}/landing/dist/evil-link"
+ln -s /etc/passwd "${TMP}/landing/dist/evil-link" 2>/dev/null || ln -s why "${TMP}/landing/dist/evil-link"
 if stage_legacy_entry "${TMP}/landing/dist" "${TMP}/staged" "evil-link" 2>/dev/null; then
   echo "  FAIL symlink entry should fail"
   FAIL=$((FAIL + 1))
@@ -230,21 +230,21 @@ fi
 
 # Missing entry is skip (ok)
 assert_ok "missing allowlist entry is skip" \
-  stage_legacy_entry "${TMP}/landing/dist" "${TMP}/staged" "community"
+  stage_legacy_entry "${TMP}/landing/dist" "${TMP}/staged" "self-host"
 
 echo "-- SPA fingerprints before/after legacy staging"
 fp_before="${TMP}/fp-before.txt"
 fp_after="${TMP}/fp-after.txt"
 fingerprint_spa_owned "${TMP}/staged" >"${fp_before}"
 # Stage a non-SPA allowlisted path — fingerprints must stay identical
-mkdir -p "${TMP}/landing/dist/community"
-echo "comm" >"${TMP}/landing/dist/community/c.html"
-stage_legacy_entry "${TMP}/landing/dist" "${TMP}/staged" "community"
+mkdir -p "${TMP}/landing/dist/self-host"
+echo "comm" >"${TMP}/landing/dist/self-host/c.html"
+stage_legacy_entry "${TMP}/landing/dist" "${TMP}/staged" "self-host"
 fingerprint_spa_owned "${TMP}/staged" >"${fp_after}"
 assert_ok "fingerprints unchanged after allowlisted staging" \
   assert_spa_fingerprints_unchanged "${fp_before}" "${fp_after}"
-assert_eq "community support present without SPA mutation" "comm" \
-  "$(cat "${TMP}/staged/community/c.html")"
+assert_eq "self-host support present without SPA mutation" "comm" \
+  "$(cat "${TMP}/staged/self-host/c.html")"
 
 # Mutate SPA root and expect fingerprint mismatch
 echo "MUTATED" >"${TMP}/staged/index.html"

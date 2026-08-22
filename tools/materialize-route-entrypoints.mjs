@@ -87,6 +87,16 @@ export const ROUTE_ENTRYPOINTS = [
     title: 'Onyx agent safety — automation with boundaries',
     description: 'Read the public contract for labelled, reviewed, capability-scoped automation in Onyx.',
   },
+  {
+    route: 'guides',
+    title: 'Onyx guides — join a room in the official app',
+    description: 'Short how-tos for joining a room, inviting a friend, private messages, calls, and keeping Onyx on this device.',
+  },
+  {
+    route: 'community',
+    title: 'Onyx community — how to join and be here',
+    description: 'How to join a room in Onyx, invite a friend, and treat each other well. The official app is the usual way in.',
+  },
 ];
 
 function escapeHtml(value) {

@@ -91,8 +91,9 @@ is the only writer of the live out.**
 
 The **Vite/Solid Landing** is authoritative for the public root and all SPA
 routes. `/home/kain/landing` is **legacy support only**: deploy builds it and
-stages **allowlisted** non-conflicting paths (`guides`, `community`, `install`,
-`self-host`, `why`, `memory`, `onyxOS`, `fonts`). It never overlays root
+stages **allowlisted** non-conflicting paths (`self-host`,
+`why`, `memory`, `onyxOS`, `fonts`). `/guides/` and `/community/` are SPA
+Getting started how-tos. It never overlays root
 documents (`index.html`, `robots.txt`, `sitemap.xml`, favicons) or SPA-owned
 routes/assets/service worker. SPA-owned content is fingerprinted before staging
 and re-verified afterward.

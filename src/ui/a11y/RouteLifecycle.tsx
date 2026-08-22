@@ -24,6 +24,8 @@ export type RouteLifecycleId =
   | 'roadmap'
   | 'invite'
   | 'appearance'
+  | 'guides'
+  | 'community'
   | 'app';
 
 export type RouteLifecycleEntry = {
@@ -47,6 +49,8 @@ const ROUTE_LIFECYCLE_SEEDS = [
   { path: '/roadmap', id: 'roadmap', label: 'Roadmap', publicNavigation: false },
   { path: '/invite', id: 'invite', label: 'Join', publicNavigation: true },
   { path: '/appearance', id: 'appearance', label: 'Appearance', publicNavigation: false },
+  { path: '/guides', id: 'guides', label: 'Guides', publicNavigation: false },
+  { path: '/community', id: 'community', label: 'Community', publicNavigation: false },
   { path: '/app', id: 'app', label: ROUTE_LIFECYCLE_APP_LABEL, publicNavigation: false },
 ] as const satisfies readonly Readonly<{
   path: string;

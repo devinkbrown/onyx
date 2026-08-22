@@ -112,6 +112,8 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
       '/roadmap/',
       '/invite/',
       '/appearance/',
+      '/guides/',
+      '/community/',
     ]);
     for (const route of PUBLIC_ROUTE_MANIFEST) {
       expect(route.href === '/' ? route.path : route.href).toBe(
@@ -126,6 +128,7 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
     expect(PUBLIC_ROUTE_MANIFEST.map((route) => route.group)).toEqual([
       'product', 'product', 'product', 'product', 'trust', 'trust',
       'resources', 'resources', 'resources', 'resources', 'resources', 'resources', 'resources',
+      'resources', 'resources',
     ]);
   });
 

@@ -29,8 +29,8 @@ daemon are operational products with their own deployment and release boundaries
 
 ## Layout
 - Entry: `src/index.tsx` — routes `/` (Landing), `/about`, `/app` (AppShell),
-  `/appearance`, `/stats`, `/status`, `/roadmap`, and `/invite`. Keep this
-  table in sync with `ROUTE_ENTRYPOINTS` in
+  `/appearance`, `/stats`, `/status`, `/roadmap`, `/invite`, `/guides`, and
+  `/community`. Keep this table in sync with `ROUTE_ENTRYPOINTS` in
   `tools/materialize-route-entrypoints.mjs`, which owns their static metadata.
   First import is `src/lib/migrateStorage.ts` (legacy `ocean-*` →
   `onyx:*` localStorage migration, runs as an import side effect) — keep it first.

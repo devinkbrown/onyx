@@ -48,7 +48,9 @@ describe('InviteRoute', () => {
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');
     expect(screen.getByRole('link', { name: 'How Onyx works' })).toHaveAttribute('href', '/about/');
-    expect(container.querySelector('a[href="/guides/"]')).toBeNull();
+    expect(container.querySelector('.invite-page a[href="/guides/"]')).toBeNull();
+    expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))
+      .getByRole('link', { name: 'Guides' })).toHaveAttribute('href', '/guides/');
   });
 
   it('keeps the canonical mobile disclosure keyboard operable', () => {

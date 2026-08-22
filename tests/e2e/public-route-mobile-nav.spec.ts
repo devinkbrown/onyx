@@ -68,6 +68,8 @@ test.describe('public route mobile navigation', () => {
     { path: '/glossary/', target: '/about/' },
     { path: '/integrations/', target: '/about/' },
     { path: '/agents/', target: '/about/' },
+    { path: '/guides/', target: '/about/' },
+    { path: '/community/', target: '/about/' },
   ] as const) {
     test(`${route.path} keeps PublicFrame navigation available`, async ({ page }) => {
       await page.goto(route.path);
