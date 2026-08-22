@@ -14,7 +14,8 @@
  *   • Passkeys      — WebAuthn passwordless credentials for this account.
  *   • Recover nick  — RECOVER a registered nick held by a stale session.
  *   • Sign out      — LOGOUT.
- *   • Danger zone   — DROP (guarded behind a typed confirmation).
+ *   • Data verbs    — download account record, save this device's history,
+ *                     DROP (harbor sheet: type the account name + password).
  *
  * Guests (no account) see a gentle "you're browsing as a guest" state that
  * opens the shared in-session claim Sheet (REGISTER → IDENTIFY on the live
@@ -66,6 +67,7 @@ import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { openGuestClaimSheet } from '@/shell/guestClaimState';
 import { YouSettings } from './YouSettings';
 import { YouHubNav } from '@/shell/YouHubNav';
+import { AccountDataVerbs } from './AccountDataVerbs';
 
 export interface AccountPanelProps {
   open: boolean;
@@ -281,11 +283,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     clearCopyTimer();
   });
 
-  // Danger zone — drop requires typing the account name + password.
-  const [dropConfirm, setDropConfirm] = createSignal('');
-  const [dropPassword, setDropPassword] = createSignal('');
-  const [dropArmed, setDropArmed] = createSignal(false);
-
   const clearLocalAccountState = (): void => {
     setEmailValue('');
     setEmailPassword('');
@@ -302,9 +299,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     setClaimHost('');
     e2eePublishEpoch += 1;
     setE2eeDeviceBusy(false);
-    setDropConfirm('');
-    setDropPassword('');
-    setDropArmed(false);
     copyEpoch += 1;
     clearCopyTimer();
     setCopiedField(null);
@@ -474,21 +468,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
   function signOut(): void {
     getState().logout();
-    local.onOpenChange(false);
-  }
-
-  const dropReady = createMemo(() =>
-    dropArmed() && dropConfirm().trim() === account() && !!dropPassword(),
-  );
-
-  function submitDrop(event: SubmitEvent): void {
-    event.preventDefault();
-    const acct = account();
-    if (!acct || !dropReady()) return;
-    getState().dropAccount(acct, dropPassword());
-    setDropConfirm('');
-    setDropPassword('');
-    setDropArmed(false);
     local.onOpenChange(false);
   }
 
@@ -806,6 +785,16 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               Sign out
             </Button>
           </Section>
+
+          <Show when={account()}>
+            {(acct) => (
+              <AccountDataVerbs
+                account={acct()}
+                active={local.open}
+                onDeleted={() => local.onOpenChange(false)}
+              />
+            )}
+          </Show>
         </Show>
             </>
           )}
@@ -1038,75 +1027,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               </Button>
             </form>
           </Section>
-
-          {/* Danger zone — DROP */}
-          <section class="acct-section acct-danger" aria-labelledby="acct-delete-account-title" aria-describedby="acct-delete-account-hint">
-            <div class="acct-section-head">
-              <h3 class="acct-section-title acct-danger-title" id="acct-delete-account-title">Delete account</h3>
-              <p class="acct-section-hint" id="acct-delete-account-hint">
-                Permanently deletes <b>{account()}</b>. This cannot be undone.
-              </p>
-            </div>
-            <div class="acct-section-body">
-              <Show
-                when={dropArmed()}
-                fallback={
-                  <Button
-                    type="button"
-                    variant="danger"
-                    size="sm"
-                    onClick={() => setDropArmed(true)}
-                    data-testid="account-drop-arm"
-                  >
-                    Delete account…
-                  </Button>
-                }
-              >
-                <form onSubmit={submitDrop} noValidate aria-label="Confirm account deletion">
-                  <FormField
-                    id="acct-drop-confirm"
-                    label={`Type "${account()}" to confirm`}
-                    type="text"
-                    autocomplete="off"
-                    placeholder={account() ?? ''}
-                    value={dropConfirm()}
-                    onInput={(e) => setDropConfirm(e.currentTarget.value)}
-                  />
-                  <PasswordField
-                    id="acct-drop-password"
-                    label="Account password"
-                    autocomplete="current-password"
-                    placeholder="account password"
-                    value={dropPassword()}
-                    onInput={setDropPassword}
-                  />
-                  <div class="acct-danger-actions">
-                    <Button
-                      type="submit"
-                      variant="danger"
-                      size="sm"
-                      disabled={!dropReady()}
-                      data-testid="account-drop-confirm"
-                    >
-                      Permanently delete
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setDropArmed(false);
-                        setDropConfirm('');
-                        setDropPassword('');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              </Show>
-            </div>
-          </section>
               </Show>
             </>
           )}

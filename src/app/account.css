@@ -628,6 +628,27 @@
   flex-wrap: wrap;
 }
 
+.acct-data-verbs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+[data-acct-sheet='delete'] .onyx-sheet__kicker {
+  display: none;
+}
+
+[data-acct-sheet='delete'] .onyx-sheet__header h2 {
+  text-transform: none;
+}
+
+.acct-delete-sheet__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
 /* ── Reduced motion ──────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

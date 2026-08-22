@@ -200,7 +200,7 @@ describe('Account panel — signed in', () => {
     fireEvent.input(screen.getByLabelText(/type "alice" to confirm/i), {
       target: { value: 'alice' },
     });
-    fireEvent.input(screen.getByLabelText('Account password'), {
+    fireEvent.input(screen.getByTestId('account-drop-password'), {
       target: { value: 'alice-password' },
     });
 
@@ -232,7 +232,7 @@ describe('Account panel — signed in', () => {
     fireEvent.input(screen.getByLabelText(/type "alice" to confirm/i), {
       target: { value: 'alice' },
     });
-    fireEvent.input(screen.getByLabelText('Account password'), {
+    fireEvent.input(screen.getByTestId('account-drop-password'), {
       target: { value: 'alice-password' },
     });
 
@@ -263,7 +263,7 @@ describe('Account panel — signed in', () => {
     fireEvent.input(screen.getByLabelText(/type "alice" to confirm/i), {
       target: { value: 'alice' },
     });
-    fireEvent.input(screen.getByLabelText('Account password'), {
+    fireEvent.input(screen.getByTestId('account-drop-password'), {
       target: { value: 'first-server-password' },
     });
 
@@ -351,10 +351,12 @@ describe('Account panel — signed in', () => {
     expect(screen.getByRole('region', { name: 'Account summary' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Email' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Password' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Download what we store' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: "Save this device's history" })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Delete account' })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('you-advanced').querySelector('summary')!);
     expect(screen.getByRole('region', { name: 'Protection' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Device encryption keys' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Delete account' })).toBeInTheDocument();
   });
 
   it('exposes a You settings list into Appearance', async () => {
@@ -637,7 +639,6 @@ describe('Account panel — guarded deletion (DROP)', () => {
   it('requires arming + typed confirmation + password before DROP', () => {
     const spy = vi.spyOn(getState(), 'dropAccount');
     renderPanel({ account: 'alice' });
-    openYouAdvanced();
 
     // Arm the danger zone.
     fireEvent.click(screen.getByTestId('account-drop-arm'));
@@ -650,7 +651,7 @@ describe('Account panel — guarded deletion (DROP)', () => {
     fireEvent.input(screen.getByLabelText(/type "alice" to confirm/i), {
       target: { value: 'bob' },
     });
-    fireEvent.input(screen.getByLabelText('Account password'), {
+    fireEvent.input(screen.getByTestId('account-drop-password'), {
       target: { value: 'hunter2' },
     });
     expect(confirmBtn).toBeDisabled();

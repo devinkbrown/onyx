@@ -62,8 +62,12 @@ describe('You settings list', () => {
     expect(settings).toHaveTextContent('Reduced motion');
     expect(settings).toHaveTextContent('Voice devices');
     expect(settings).toHaveTextContent('Language');
-    expect(settings).toHaveTextContent('Data export');
+    expect(settings).toHaveTextContent('Download what we store');
+    expect(settings).toHaveTextContent("Save this device's history");
+    expect(settings).toHaveTextContent('Delete account');
     expect(settings).toHaveTextContent('Support');
+    expect(settings).not.toHaveTextContent('Data export');
+    expect(settings).not.toHaveTextContent('Your data');
     expect(settings).toHaveTextContent('Advanced');
 
     expect(screen.queryByTestId('theme-studio')).toBeNull();
