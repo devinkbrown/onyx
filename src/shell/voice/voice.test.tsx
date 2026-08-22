@@ -334,6 +334,37 @@ describe('VoiceStage', () => {
     expect(stop).not.toHaveBeenCalled();
   });
 
+  it('does not detach an unchanged peer video stream when speaking status updates', () => {
+    const stream = {
+      getTracks: () => [],
+      getVideoTracks: () => [],
+    } as unknown as MediaStream;
+    seedVoiceStore(
+      [makePeer('alice', { hasVideo: true })],
+      [],
+      { videoParticipants: new Map([['alice', stream]]) },
+    );
+
+    const view = render(() => <VoiceStage />);
+    const video = view.getByTestId('tile-video') as HTMLVideoElement;
+    let attached = video.srcObject;
+    let assignments = 0;
+    Object.defineProperty(video, 'srcObject', {
+      configurable: true,
+      get: () => attached,
+      set: value => {
+        assignments += 1;
+        attached = value;
+      },
+    });
+
+    store.getState().setSpeakingNick('alice', true);
+
+    expect(view.getByTestId('tile-video')).toBe(video);
+    expect(video.srcObject).toBe(stream);
+    expect(assignments).toBe(0);
+  });
+
   it('keeps roster-only cross-node participants in the screenshare filmstrip without duplicates', () => {
     // Arrange — Alice is a decoded peer while differently-cased Alice and bob
     // also arrive through the mesh-wide room roster.

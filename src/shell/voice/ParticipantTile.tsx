@@ -115,50 +115,59 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
   const [nativePipPending, setNativePipPending] = createSignal(false);
   let nativePipOperation = 0;
   let disposed = false;
+  let boundVideo: HTMLVideoElement | undefined;
+  let boundStream: MediaStream | null = null;
+
+  const handleEnterPictureInPicture = () => {
+    if (!disposed) setNativePipActive(true);
+  };
+  const handleLeavePictureInPicture = () => {
+    if (!disposed) setNativePipActive(false);
+  };
+
+  const detachBoundVideo = () => {
+    const el = boundVideo;
+    if (!el) return;
+    nativePipOperation += 1;
+    el.removeEventListener('enterpictureinpicture', handleEnterPictureInPicture);
+    el.removeEventListener('leavepictureinpicture', handleLeavePictureInPicture);
+    if (!disposed) {
+      setNativePipActive(false);
+      setNativePipPending(false);
+    }
+    if (nativePipSupported && document.pictureInPictureElement === el) {
+      void document.exitPictureInPicture().catch(() => {
+        // The browser may already be closing PiP during navigation/unmount.
+      });
+    }
+    if (el.srcObject) el.srcObject = null;
+    boundVideo = undefined;
+    boundStream = null;
+  };
 
   onCleanup(() => {
     disposed = true;
-    nativePipOperation += 1;
+    detachBoundVideo();
   });
 
-  // Bind stream to <video>.srcObject — never via attribute.
-  // Runs whenever the stream changes, and cleans up the previous assignment.
+  // Slot models are rebuilt for speaking/mute/hand updates. Bind by actual
+  // element + stream identity so that status-only churn never blanks and
+  // reattaches an unchanged live video feed.
   createEffect(() => {
     const el = videoRef;
-    const s = local.stream;
-    if (!el) return;
+    const stream = local.stream;
+    if (el === boundVideo && stream === boundStream) return;
 
-    const handleEnterPictureInPicture = () => {
-      if (!disposed) setNativePipActive(true);
-    };
-    const handleLeavePictureInPicture = () => {
-      if (!disposed) setNativePipActive(false);
-    };
+    detachBoundVideo();
+    if (!el || !stream) return;
 
-    el.srcObject = s ?? null;
+    boundVideo = el;
+    boundStream = stream;
+    el.srcObject = stream;
     if (nativePipSupported) {
       el.addEventListener('enterpictureinpicture', handleEnterPictureInPicture);
       el.addEventListener('leavepictureinpicture', handleLeavePictureInPicture);
     }
-    onCleanup(() => {
-      // A stream replacement can remove the <video> while a PiP request is
-      // still pending even though the tile component itself remains mounted.
-      // Fence that request exactly like an unmount and let a later stream start
-      // with a usable (non-pending) control.
-      nativePipOperation += 1;
-      el.removeEventListener('enterpictureinpicture', handleEnterPictureInPicture);
-      el.removeEventListener('leavepictureinpicture', handleLeavePictureInPicture);
-      if (!disposed) {
-        setNativePipActive(false);
-        setNativePipPending(false);
-      }
-      if (nativePipSupported && document.pictureInPictureElement === el) {
-        void document.exitPictureInPicture().catch(() => {
-          // The browser may already be closing PiP during navigation/unmount.
-        });
-      }
-      if (el.srcObject) el.srcObject = null;
-    });
   });
 
   const speaking = createMemo(() =>
