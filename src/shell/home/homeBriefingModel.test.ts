@@ -259,6 +259,26 @@ describe('composeHomeBriefing — phases', () => {
   });
 });
 
+describe('composeHomeBriefing — catch-up inbox', () => {
+  it('lists mentions and unreads by recency, not operator rank', () => {
+    const liveCatchUp = [
+      item('channel', '#older', 20, 0, { lastActivity: NOW - 8_000 }),
+      item('channel', '#ping', 2, 1, { lastActivity: NOW - 2_000 }),
+      item('dm', 'mira', 1, 0, { lastActivity: NOW }),
+    ];
+    const briefing = composeHomeBriefing(base({
+      liveCatchUp,
+      hasRooms: true,
+      hasLiveTranscript: true,
+      firstUnreadId: new Map([['#ping', 'p-1']]),
+    }));
+    expect(briefing.inbox.mentions.map((row) => row.target)).toEqual(['#ping']);
+    expect(briefing.inbox.mentions[0]?.boundaryId).toBe('p-1');
+    expect(briefing.inbox.missed.map((row) => row.target)).toEqual(['mira', '#older']);
+    expect(briefing.showQuietEmpty).toBe(false);
+  });
+});
+
 describe('composeHomeBriefing — caps, overflow, order', () => {
   it('caps attention at 6 and reports the exact remainder', () => {
     const attention = Array.from({ length: 8 }, (_, i) =>

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * HomeView — thin composition root for the connected Current Ledger.
+ * HomeView — thin composition root for the Home catch-up inbox.
  *
  * Accessors, resources, and handlers live in createHomeController.
  * Ordering/caps live in composeHomeBriefing. Markup lives in HomeBriefingView.

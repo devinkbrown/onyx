@@ -80,7 +80,7 @@ Shell-local surface state (`primarySurface`, `sidebarMode`, mobile bottom nav) a
 |-------|------|
 | Room tools (pins, notify, settings, export, topic edit) | Room sheet / **More → This room** (slice 1 uses More) |
 | Appearance + prefs + account entry | **You** hub (Account + Menu) |
-| Home digests | Needs you → Continue → Live now → Explore → More activity |
+| Home digests | Catch-up inbox (mentions + unreads, recency first) |
 | Composer attach/format/schedule | Standard primary: **+** · message · emoji · **More tools** · Send; schedule/jump in More (slice 4) |
 
 ### De-emphasize
@@ -272,25 +272,23 @@ disconnecting, without blocking the composer, and without false product claims.
 
 ## 6b. Home screen contract (slice 3)
 
-**Purpose:** Answer *what needs me* and *where do I continue* — not an admin dashboard.
+**Purpose:** Answer *what did I miss?* — a quiet inbox, not an admin dashboard.
 
 | Band | Content | Truth rule |
 |------|---------|------------|
-| **Welcome** | Personal greeting + **Browse rooms** + **Search messages** | No fabricated claims |
+| **Masthead** | One Fraunces line: **What did you miss?** or **The room is quiet.** | No feature tour, no Theme Studio |
+| **Formation** | Existing 3-in-48h founder strip when present | Do not rebuild or invent members |
 | **Outbox / connection** | Queued sends, offline “on this device” note | Bodies never on Home |
-| **Needs you** | Unread DMs + direct mentions (`buildAwayDigest.attention`) | **Direct mentions from muted rooms stay in Needs you**; only ambient unread from muted rooms stays quiet; fail-closed |
-| **Continue** | Exact first-unread resume + followed rooms | Same `firstUnreadId` / memory boundary |
-| **Live now** | Real scheduled events + non-idle call state only | **Never auto-join** media; navigate only |
-| **Explore** | Directory stats (when present) + recent rooms | No invented occupancy |
-| **Caught up** | Empty copy when nothing needs attention | No fake people/badges |
-| **More activity** | Pulse, room rhythm, quiet tiers/boosts, review history, remembered rooms | Collapsed by default |
+| **Inbox** | Mentions of you, then unread rooms/DMs, each recency first | Open at `firstUnreadId` when it exists |
+| **Invites** | “someone wants you in {room}” only from existing INVITE notices | Do not invent an invite store |
+| **Caught up** | Quiet empty + Browse / Start a room if those already exist | No fake people, occupancy, or Room ledger |
 
-**Copy:** Prefer rooms, messages, on this device, first unread, pick up where you left off.
-**Avoid on primary surface:** device memory, last-read boundary, chanstats heatlines, reviewed spans, Join #root.
+**Copy:** Prefer missed, mentions, unread, the room is quiet.
+**Avoid on primary surface:** Explore directory, Activity/reaction feed, people online, Room ledger, Join #root, coach marks.
 
-**Visual:** Spacious reading flow (Instrument Sans body/titles, restrained Fraunces lede, mono for status/time). One sparse cyan signal line on Needs you → Continue. Matte cards with fine borders; no animated active-nav glow. Desktop ~1440 and mobile ~390; ≥44px touch; visible focus; `prefers-reduced-motion`.
+**Visual:** Instrument Sans body; Fraunces once. Lapis only when something is alive (unread, Join). People are circles; rooms are squircles. ≥44px touch; visible focus; `prefers-reduced-motion`.
 
-**Strata markers retained:** `data-home-stratum` attention | followed | quiet | resume | memory; plus `data-home-band` needs-you | continue | live-now | explore | caught-up | more-activity.
+**Strata markers:** `data-home-stratum` attention | missed | invites | memory | outbox; plus `data-home-band` inbox | caught-up.
 
 **Kernel freeze:** no store/protocol/navigation-kernel edits; preserve `buildCatchUp` / `buildAwayDigest` / `buildResumePoints` / outbox / reader handoff / cold vault paint.
 

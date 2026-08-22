@@ -131,7 +131,7 @@ describe('PresenceRibbon commercial room header', () => {
     expect(screen.queryByRole('menuitem', { name: 'Search messages' })).not.toBeInTheDocument();
   });
 
-  it('keeps Search off the Home ribbon so the welcome Search messages CTA stays the single Home door', () => {
+  it('keeps Search on the Home ribbon so Home itself stays a catch-up inbox', () => {
     store.setState({
       ...initialState,
       connectionStatus: 'connected',
@@ -139,8 +139,7 @@ describe('PresenceRibbon commercial room header', () => {
     });
     render(() => <PresenceRibbon />);
 
-    expect(screen.queryByTestId('ribbon-search')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Search messages' })).toBeNull();
+    expect(screen.getByTestId('ribbon-search')).toHaveAttribute('aria-label', 'Search messages');
   });
 
   it('uses a room-specific mobile overflow while the persistent Menu owns workspace settings', () => {
@@ -171,9 +170,6 @@ describe('PresenceRibbon commercial room header', () => {
 
     expect(screen.queryByTestId('ribbon-more')).toBeNull();
     expect(screen.queryByRole('button', { name: /Room actions|Conversation actions/ })).toBeNull();
-    if (activeView.kind === 'home') {
-      expect(screen.queryByTestId('ribbon-search')).toBeNull();
-    }
   });
 
   it('keeps a healthy mobile DM context operable and correctly labelled', () => {

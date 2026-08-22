@@ -108,12 +108,9 @@ describe('HomeView — cold / vault-first paint', () => {
       screen.getByRole('region', { name: 'Catch up on what you missed' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /Open #ops, 4 unread, 1 mention/ }),
+      screen.getByRole('button', { name: /Open #ops at your first unread message, 4 unread, 1 mention/ }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('region', { name: 'Resume where you left off' }),
-    ).toBeInTheDocument();
-    // Offline banner still honest — on-device only, not a live mesh claim.
+    expect(screen.queryByRole('region', { name: 'Explore' })).not.toBeInTheDocument();
     expect(screen.getByText(/On this device:/i)).toBeInTheDocument();
   });
 
@@ -149,10 +146,10 @@ describe('HomeView — cold / vault-first paint', () => {
     await waitFor(() => {
       const memory = document.querySelector('[data-home-stratum="memory"]');
       expect(memory).not.toBeNull();
-      expect(memory).toHaveAttribute('aria-label', 'Remembered rooms on this device');
+      expect(memory).toHaveAttribute('aria-label', 'Device-local catch-up');
       expect(
         screen.getByRole('button', {
-          name: /Rejoin #archive, last remembered/i,
+          name: /Open #archive from this device, 2 remembered messages/,
         }),
       ).toBeInTheDocument();
       expect(screen.getByText(/newest remembered line/)).toBeInTheDocument();

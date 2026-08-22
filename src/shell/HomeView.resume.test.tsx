@@ -26,7 +26,6 @@ import {
   setPreference,
 } from '@/lib/prefs/preferences';
 import { mergeFollowedKeys } from '@/lib/notifications/followed';
-import { recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import {
   saveMessages,
   _resetVaultForTests,
@@ -181,26 +180,25 @@ describe('HomeView — resume section a11y', () => {
 
     await waitFor(() => {
       expect(screen.queryByTestId('home-suspended')).not.toBeInTheDocument();
-      expect(screen.getByRole('main', { name: 'Network home' })).toBeInTheDocument();
+      expect(screen.getByRole('main', { name: 'Home' })).toBeInTheDocument();
     });
   });
 
-  it('renders each resume point as a named native button, not a bare div', () => {
+  it('renders each inbox row as a named native button, not a bare div', () => {
     seedResume();
     render(() => <HomeView />);
 
-    const resume = screen.getByRole('region', { name: 'Resume where you left off' });
-    expect(resume).toBeInTheDocument();
+    const inbox = screen.getByRole('region', { name: 'Catch up on what you missed' });
+    expect(inbox).toBeInTheDocument();
 
     const btn = screen.getByRole('button', {
-      name: 'Resume #general at your first unread message, 3 unread, 2 mentions',
+      name: 'Open #general at your first unread message, 3 unread, 2 mentions',
     });
-    // A real <button> is keyboard-operable (Enter/Space) by the platform.
     expect(btn.tagName).toBe('BUTTON');
     expect(btn).toHaveAttribute('type', 'button');
   });
 
-  it('activating a resume point navigates and lands focus on the first-unread boundary', () => {
+  it('activating an inbox row navigates and lands focus on the first-unread boundary', () => {
     seedResume();
     const navigate = vi.spyOn(store.getState(), 'navigate').mockImplementation(() => {});
     const focusMessage = vi.spyOn(store.getState(), 'focusMessage').mockImplementation(() => {});
@@ -208,7 +206,7 @@ describe('HomeView — resume section a11y', () => {
     render(() => <HomeView />);
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Resume #general at your first unread message, 3 unread, 2 mentions',
+        name: 'Open #general at your first unread message, 3 unread, 2 mentions',
       }),
     );
 
@@ -218,36 +216,22 @@ describe('HomeView — resume section a11y', () => {
 });
 
 describe('HomeView — A9 strata visual hierarchy markers', () => {
-  it('marks Needs you / Followed / Quiet / Resume with data-home-stratum', () => {
+  it('marks mentions and unreads as inbox strata', () => {
     seedStrata();
     render(() => <HomeView />);
 
     const attention = document.querySelector('[data-home-stratum="attention"]');
-    const followed = document.querySelector('[data-home-stratum="followed"]');
-    const quiet = document.querySelector('[data-home-stratum="quiet"]');
-    const resume = document.querySelector('[data-home-stratum="resume"]');
+    const missed = document.querySelector('[data-home-stratum="missed"]');
 
     expect(attention).not.toBeNull();
     expect(attention).toHaveClass('home-catchup-tier--attention');
-    // Section heading already reads "Needs you" once — no duplicate tier label.
-    expect(attention?.querySelector('.home-catchup-tier-label')).toBeNull();
-    expect(attention?.getAttribute('aria-label')).toBe('Mentions and direct messages');
-
-    expect(followed).not.toBeNull();
-    expect(followed).toHaveClass('home-catchup-tier--followed');
-    expect(followed?.querySelector('.home-catchup-tier-label')?.textContent).toBe('Followed');
-
-    expect(quiet).not.toBeNull();
-    expect(quiet).toHaveClass('home-catchup-tier--quiet');
-    // Quiet stays collapsed (details) so it never steals focus under calm.
-    expect(quiet?.tagName).toBe('DETAILS');
-    expect((quiet as HTMLDetailsElement).open).toBe(false);
-
-    expect(resume).not.toBeNull();
-    expect(resume).toHaveAttribute('aria-label', 'Resume where you left off');
+    expect(attention?.getAttribute('aria-label')).toBe('Mentions');
+    expect(missed).not.toBeNull();
+    expect(missed?.getAttribute('aria-label')).toBe('Unread rooms and messages');
+    expect(document.querySelector('[data-home-band="explore"]')).toBeNull();
   });
 
-  it('marks Device memory as the calm local-first stratum', async () => {
+  it('does not invent remembered-room theater when Home is quiet', async () => {
     setPreference('localHistory', true);
     await saveMessages(
       '#archive',
@@ -265,7 +249,6 @@ describe('HomeView — A9 strata visual hierarchy markers', () => {
       {
         ...initialState,
         channels: new Map(),
-        // Left rooms only — memory paints rooms you've since left.
         joinHistory: ['#archive'],
         ourNick: 'me',
         connectionStatus: 'connected',
@@ -277,12 +260,9 @@ describe('HomeView — A9 strata visual hierarchy markers', () => {
 
     render(() => <HomeView />);
 
-    await waitFor(() => {
-      const memory = document.querySelector('[data-home-stratum="memory"]');
-      expect(memory).not.toBeNull();
-      expect(memory).toHaveAttribute('aria-label', 'Remembered rooms on this device');
-      expect(memory?.querySelector('.home-section-label')?.textContent).toBe('On this device');
-    });
+    expect(screen.getByRole('heading', { name: 'The room is quiet.' })).toBeInTheDocument();
+    expect(document.querySelector('[data-home-band="explore"]')).toBeNull();
+    expect(screen.queryByText('Remembered rooms on this device')).not.toBeInTheDocument();
   });
 });
 
@@ -296,7 +276,7 @@ describe('HomeView — A13 reader default for catch-up handoffs', () => {
     render(() => <HomeView />);
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Resume #general at your first unread message, 3 unread, 2 mentions',
+        name: 'Open #general at your first unread message, 3 unread, 2 mentions',
       }),
     );
 
@@ -304,67 +284,20 @@ describe('HomeView — A13 reader default for catch-up handoffs', () => {
     expect(document.documentElement.dataset.reader).toBe('true');
   });
 
-  it('enables readerMode when opening a Needs-you catch-up row', () => {
-    seedStrata();
-    expect(preferences().readerMode).toBe(false);
-    vi.spyOn(store.getState(), 'navigate').mockImplementation(() => {});
-
-    render(() => <HomeView />);
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: /Open #mentions, 4 unread, 2 mentions/,
-      }),
-    );
-
-    expect(preferences().readerMode).toBe(true);
-  });
-
-  it('enables readerMode on Review from start (canonical read-since-you-left path)', () => {
+  it('enables readerMode when opening a mention inbox row', () => {
     seedStrata();
     expect(preferences().readerMode).toBe(false);
     vi.spyOn(store.getState(), 'navigate').mockImplementation(() => {});
     vi.spyOn(store.getState(), 'focusMessage').mockImplementation(() => {});
-    vi.spyOn(store.getState(), 'travelTo').mockImplementation(() => {});
 
     render(() => <HomeView />);
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Review #mentions from first unread line',
+        name: /Open #mentions at your first unread message, 4 unread, 2 mentions/,
       }),
     );
 
     expect(preferences().readerMode).toBe(true);
-  });
-
-  it('enables readerMode when reopening a reviewed catch-up span', () => {
-    seedResume();
-    recordReviewHistory(
-      {
-        target: '#general',
-        name: '#general',
-        kind: 'channel',
-        firstMessageId: 'msg-42',
-        firstAt: '2026-07-19T11:00:00.000Z',
-        reviewedAt: '2026-07-19T12:30:00.000Z',
-        messageCount: 3,
-        mentionCount: 2,
-        preview: 'boundary line',
-      },
-      OWNER,
-    );
-    expect(preferences().readerMode).toBe(false);
-    vi.spyOn(store.getState(), 'openVaultResult').mockImplementation(() => {});
-    vi.spyOn(store.getState(), 'travelTo').mockImplementation(() => {});
-
-    render(() => <HomeView />);
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Reopen reviewed catch-up for #general',
-      }),
-    );
-
-    expect(preferences().readerMode).toBe(true);
-    expect(document.documentElement.dataset.reader).toBe('true');
   });
 
   it('does not thrash setPreference when readerMode is already on', () => {
@@ -376,7 +309,7 @@ describe('HomeView — A13 reader default for catch-up handoffs', () => {
     render(() => <HomeView />);
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Resume #general at your first unread message, 3 unread, 2 mentions',
+        name: 'Open #general at your first unread message, 3 unread, 2 mentions',
       }),
     );
 

@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * HomeView.active-rooms.test.tsx — Active rooms directory open-or-join.
- *
- * Regression: cards label "Open →" when already joined, but must navigate
- * into that room (not emit a no-op JOIN that leaves activeView on home).
- * Unjoined cards still only join without inventing a local conversation.
+ * Home no longer hosts the active-room directory (Discord Explore / occupancy).
+ * Browse rooms still opens the existing channel browser.
  */
 import 'fake-indexeddb/auto';
-import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
@@ -70,42 +67,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('HomeView — Active rooms open-or-join', () => {
-  it('opens an already-joined mixed-case room via navigate without JOIN', async () => {
-    const channels = new Map<string, Channel>();
-    // Canonical store key is lowercase; directory may show different casing.
-    channels.set('#root', makeChannel('#root'));
-    store.setState({
-      channels,
-      activeView: { kind: 'home' },
-      connectionStatus: 'connected',
-      ourNick: 'me',
-    });
-
-    const joinSpy = vi.spyOn(store.getState(), 'joinChannel');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(JSON.stringify(statsPayload([{ channel: '#Root', messages: 42 }])), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      ),
-    );
-
-    render(() => <HomeView />);
-
-    const openBtn = await screen.findByRole('button', { name: 'Open #Root' });
-    expect(openBtn).toHaveTextContent('Open →');
-    expect(store.getState().activeView).toEqual({ kind: 'home' });
-
-    fireEvent.click(openBtn);
-
-    expect(joinSpy).not.toHaveBeenCalled();
-    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
-  });
-
-  it('labels current room presence instead of rolling active users', async () => {
+describe('HomeView — no Explore directory theater', () => {
+  it('does not paint occupancy or Room ledger on Home', async () => {
     store.setState({
       channels: new Map(),
       activeView: { kind: 'home' },
@@ -129,49 +92,27 @@ describe('HomeView — Active rooms open-or-join', () => {
     );
 
     render(() => <HomeView />);
+    await Promise.resolve();
 
-    const directory = await screen.findByRole('list', { name: 'Active room directory' });
-    expect(directory).toHaveTextContent('7 people here now');
-    expect(directory).toHaveTextContent('908 messages tracked');
-    expect(directory).not.toHaveTextContent('16 chatting');
-    expect(screen.getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
-      'href',
-      '/stats/?room=%23root',
-    );
-    expect(screen.getByRole('link', { name: 'Room ledger' })).toHaveAttribute('href', '/stats/');
+    expect(screen.queryByRole('list', { name: 'Active room directory' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/people here now|people online|messages tracked/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Room ledger/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'The room is quiet.' })).toBeInTheDocument();
   });
 
-  it('joins an unjoined room without navigating away from Home', async () => {
+  it('still opens Browse rooms from the quiet empty state', () => {
+    const channels = new Map<string, Channel>();
+    channels.set('#root', makeChannel('#root'));
     store.setState({
-      channels: new Map(),
+      channels,
       activeView: { kind: 'home' },
       connectionStatus: 'connected',
       ourNick: 'me',
-      client: { join: vi.fn(), sendRaw: vi.fn(), isupport: { CHANTYPES: '#&' } } as never,
     });
-
-    const joinSpy = vi.spyOn(store.getState(), 'joinChannel');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(JSON.stringify(statsPayload([{ channel: '#lobby', messages: 7 }])), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      ),
-    );
 
     render(() => <HomeView />);
-
-    const joinBtn = await screen.findByRole('button', { name: 'Join #lobby' });
-    expect(joinBtn).toHaveTextContent('Join →');
-
-    fireEvent.click(joinBtn);
-
-    await waitFor(() => {
-      expect(joinSpy).toHaveBeenCalledWith('#lobby');
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Browse rooms' }));
+    expect(store.getState().showChannelBrowser).toBe(true);
     expect(store.getState().activeView).toEqual({ kind: 'home' });
-    expect(store.getState().channels.has('#lobby')).toBe(false);
   });
 });

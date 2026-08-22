@@ -16,6 +16,11 @@ import { buildCatchUp, type CatchUpItem } from '@/lib/notifications/catchUp';
 import { buildAwayDigest, type AwayDigest } from '@/lib/notifications/awayDigest';
 import { calmPreset } from '@/lib/notifications/calmMode';
 import { buildResumePoints, type ResumePoint } from '@/lib/catchup/resumePoints';
+import {
+  parseInviteNotification,
+  type HomeInboxInvite,
+  type HomeInboxRow,
+} from '@/lib/catchup/homeInbox';
 import { planCatchUpAll, type CaughtUpPlan } from '@/lib/catchup/markCaughtUp';
 import {
   buildCatchUpMemorySnapshot,
@@ -156,6 +161,8 @@ export type HomeBriefingActions = {
   openAppearance: () => void;
   openShortcuts: () => void;
   openCatchUp: (item: CatchUpItem) => void;
+  openInboxRow: (row: HomeInboxRow) => void;
+  openInboxInvite: (invite: HomeInboxInvite) => void;
   resumeAt: (point: ResumePoint) => void;
   reviewCatchUpFromStart: (recap: HomeCatchUpRecap) => void;
   openCatchUpSpotlight: (item: CatchUpItem) => void;
@@ -261,6 +268,7 @@ export function createHomeController(): HomeController {
   const channelLastActivity = useStore((s) => s.channelLastActivity);
   const channelNotify = useStore((s) => s.channelNotify);
   const firstUnreadId = useStore((s) => s.firstUnreadId);
+  const notifications = useStore((s) => s.notifications);
   const channelProps = useStore((s) => s.channelProps);
   const composerDrafts = useStore((s) => s.composerDrafts);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -665,6 +673,12 @@ export function createHomeController(): HomeController {
       directory: directoryAll(),
       recentRooms: recentRooms(),
       coldVaultRooms: coldRememberedRooms(),
+      firstUnreadId: catchUpFromMemory()
+        ? firstUnreadMapFromMemory(catchUpMemory())
+        : firstUnreadId(),
+      invites: notifications()
+        .map(parseInviteNotification)
+        .filter((invite): invite is HomeInboxInvite => invite !== null),
     }),
     composeHomeBriefing({
       nowMs: Date.now(),
@@ -683,6 +697,8 @@ export function createHomeController(): HomeController {
       directory: [],
       recentRooms: [],
       coldVaultRooms: [],
+      firstUnreadId: new Map(),
+      invites: [],
     }),
     { equals: homeBriefingEqual },
   );
@@ -831,6 +847,27 @@ export function createHomeController(): HomeController {
       }
       if (item.kind === 'channel') getState().navigate({ kind: 'channel', channel: item.target });
       else getState().navigate({ kind: 'dm', nick: item.target });
+    },
+    openInboxRow: (row) => {
+      if (row.boundaryId) {
+        actions.resumeAt({
+          key: row.key,
+          kind: row.kind,
+          name: row.name,
+          target: row.target,
+          boundaryId: row.boundaryId,
+          unread: row.unread,
+          highlights: row.highlights,
+          followed: row.followed,
+          tier: row.highlights > 0 ? 'mention' : row.kind === 'dm' ? 'dm' : 'active',
+          lastActivity: row.lastActivity,
+        });
+        return;
+      }
+      actions.openCatchUp(row);
+    },
+    openInboxInvite: (invite) => {
+      getState().joinChannel(invite.channel);
     },
     resumeAt: (point) => {
       enableCatchUpReaderMode();

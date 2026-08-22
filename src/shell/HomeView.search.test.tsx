@@ -71,7 +71,7 @@ describe('Home Search Center integration', () => {
   it('opens all-device search from Home, refocuses on repeated Cmd/Ctrl-F, and restores focus', async () => {
     render(() => <AppShell />);
 
-    const homeTrigger = screen.getByRole('button', { name: 'Search messages' });
+    const homeTrigger = screen.getByTestId('ribbon-search');
     homeTrigger.focus();
     fireEvent.click(homeTrigger);
     const input = screen.getByRole('searchbox', { name: 'Search messages' });
@@ -86,9 +86,9 @@ describe('Home Search Center integration', () => {
     expect(screen.queryByRole('searchbox', { name: 'Search messages' })).not.toBeInTheDocument();
     expect(document.activeElement).toBe(homeTrigger);
 
-    const appearance = within(screen.getByRole('main', { name: 'Network home' }))
-      .getByRole('button', { name: 'Appearance' });
-    appearance.focus();
+    const browse = within(screen.getByRole('main', { name: 'Home' }))
+      .getByRole('button', { name: 'Browse rooms' });
+    browse.focus();
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
     const reopenedInput = screen.getByRole('searchbox', { name: 'Search messages' });
     await waitFor(() => expect(document.activeElement).toBe(reopenedInput));
@@ -98,7 +98,7 @@ describe('Home Search Center integration', () => {
     await waitFor(() => expect(document.activeElement).toBe(reopenedInput));
 
     fireEvent.keyDown(reopenedInput, { key: 'Escape' });
-    await waitFor(() => expect(document.activeElement).toBe(appearance));
+    await waitFor(() => expect(document.activeElement).toBe(browse));
   });
 
   it('does not move focus behind an open modal when Cmd/Ctrl-F is pressed', async () => {
@@ -155,7 +155,7 @@ describe('Room header message search', () => {
   it('opens current-room search from the header without Home or Cmd-K', async () => {
     render(() => <AppShell />);
 
-    expect(screen.queryByRole('main', { name: 'Network home' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('main', { name: 'Home' })).not.toBeInTheDocument();
     const headerSearch = screen.getByTestId('ribbon-search');
     expect(headerSearch).toHaveAttribute('aria-label', 'Search messages');
     expect(headerSearch).toHaveAttribute('aria-pressed', 'false');

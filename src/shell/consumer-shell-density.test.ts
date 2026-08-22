@@ -46,7 +46,8 @@ describe('Consumer shell density', () => {
 
 describe('Consumer shell language', () => {
   it('uses Home / rooms / messages on the default path', () => {
-    expect(homeView).toMatch(/>Home</);
+    expect(homeView).toMatch(/aria-label="Home"/);
+    expect(homeView).toMatch(/What did you miss\?/);
     expect(homeView).not.toMatch(/Current ledger/);
     expect(sidebar).toMatch(/>\s*Rooms\s*</);
     expect(sidebar).toMatch(/>\s*Messages\s*</);
