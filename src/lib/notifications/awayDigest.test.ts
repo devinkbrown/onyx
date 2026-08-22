@@ -82,18 +82,21 @@ describe('buildAwayDigest — tier decision table', () => {
     expect(d.followed).toHaveLength(0);
   });
 
-  it('routes a muted mentioned channel to attention (Needs you)', () => {
+  it('drops a muted mentioned channel from every digest tier (hard silence)', () => {
     const d = digest(
       [chan({ name: '#spam', highlights: 5 })],
       'regular',
       levels([['#spam', 'none']]),
     );
-    expect(d.attention.map((i) => i.name)).toEqual(['#spam']);
+    expect(d.attention).toHaveLength(0);
     expect(d.followed).toHaveLength(0);
     expect(d.quiet).toHaveLength(0);
+    expect(d.empty).toBe(true);
+    expect(d.totalUnread).toBe(0);
+    expect(d.totalMentions).toBe(0);
   });
 
-  it('keeps muted ambient and muted followed-no-highlight in the quiet tail', () => {
+  it('drops muted ambient and muted followed rooms instead of parking them in quiet', () => {
     const d = digest(
       [
         chan({ name: '#ambient', highlights: 0, followed: false }),
@@ -107,12 +110,34 @@ describe('buildAwayDigest — tier decision table', () => {
     );
     expect(d.attention).toHaveLength(0);
     expect(d.followed).toHaveLength(0);
-    expect(d.quiet.map((i) => i.name).sort()).toEqual(['#ambient', '#loud']);
+    expect(d.quiet).toHaveLength(0);
+    expect(d.empty).toBe(true);
   });
 
-  it('never mutes a DM via the channelNotify map', () => {
+  it('keeps a DM when only the channelNotify map names it', () => {
     const d = digest([dm({ name: 'carol' })], 'regular', levels([['carol', 'none']]));
     expect(d.attention.map((i) => i.name)).toEqual(['carol']);
+  });
+
+  it('drops a muted DM even when it has leftover highlights', () => {
+    const d = buildAwayDigest([dm({ name: 'carol', highlights: 2 })], {
+      notifyLevels: levels(),
+      mutedDMs: new Set(['carol']),
+      preset: 'regular',
+    });
+    expect(d.attention).toHaveLength(0);
+    expect(d.empty).toBe(true);
+    expect(d.totalMentions).toBe(0);
+  });
+
+  it('keeps a mentions-only room with @ in attention', () => {
+    const d = digest(
+      [chan({ name: '#pings', highlights: 2 })],
+      'regular',
+      levels([['#pings', 'mentions']]),
+    );
+    expect(d.attention.map((i) => i.name)).toEqual(['#pings']);
+    expect(d.empty).toBe(false);
   });
 });
 
@@ -146,18 +171,21 @@ describe('buildAwayDigest — ordering & aggregates', () => {
     expect(d.quiet.map((i) => i.name)).toEqual(['#c9', '#c8', '#c7']);
   });
 
-  it('sums unread and mentions across every tier, including capped/muted rows', () => {
+  it('sums unread and mentions across surviving tiers and omits muted rows', () => {
     const d = digest(
       [
         dm({ name: 'a', unread: 1, highlights: 1 }),
         chan({ name: '#f', followed: true, unread: 4 }),
-        chan({ name: '#m', unread: 7, highlights: 2 }, ),
+        chan({ name: '#m', unread: 7, highlights: 2 }),
       ],
       'regular',
       levels([['#m', 'none']]),
     );
-    expect(d.totalUnread).toBe(1 + 4 + 7);
-    expect(d.totalMentions).toBe(1 + 0 + 2);
+    expect(d.totalUnread).toBe(1 + 4);
+    expect(d.totalMentions).toBe(1);
+    expect(d.attention.map((i) => i.name)).toEqual(['a']);
+    expect(d.quiet).toHaveLength(0);
+    expect(d.followed.map((i) => i.name)).toEqual(['#f']);
   });
 
   it('reports empty when quietLimit hides every surviving (quiet-only) row', () => {

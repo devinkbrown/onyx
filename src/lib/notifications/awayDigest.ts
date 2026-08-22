@@ -7,14 +7,16 @@
 // preset and per-channel notification mode:
 //
 //   attention → DMs + channels where you were mentioned (the "needs attention"
-//               tier). A direct mention/highlight in a MUTED channel still
-//               lands here — mute only quiets ambient traffic. Under the
-//               `power` preset, followed channels escalate here too.
+//               tier). Mute is Discord-style hard silence: a muted room or DM
+//               never lands here, even with @ or a keyword highlight.
+//               Mentions-only is the middle All / @ / Mute level and still
+//               badges @. Under the `power` preset, followed channels escalate
+//               here too.
 //   followed  → active followed channels with unread but no mention, and not
 //               muted. Summarised but NEVER escalated to `attention` under
 //               `calm`/`regular`.
-//   quiet     → the collapsed ambient tail: unfollowed unread, plus muted
-//               channels that have NO highlights (ambient mute stays quiet).
+//   quiet     → the collapsed ambient tail: unfollowed unread that is not
+//               hard-silenced. Muted rooms/DMs are omitted entirely.
 //
 // PURITY: no clock read, no store read, no I/O. The caller injects the
 // notification-level map + the active calm preset. Read state already drives the
@@ -23,17 +25,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { CatchUpItem } from './catchUp';
-import { channelNotifyMode, type NotifyLevel } from './channelNotifyMode';
+import { isCatchUpHardSilenced, type NotifyLevel } from './channelNotifyMode';
 import type { CalmPreset } from './calmMode';
 
 export type AwayTier = 'attention' | 'followed' | 'quiet';
 
 export interface AwayDigest {
-  /** DMs + mentions including muted-room highlights (and, under `power`, followed). */
+  /** DMs + mentions (and, under `power`, followed). Hard-silenced rooms/DMs never appear. */
   attention: CatchUpItem[];
   /** Active followed channels, unread, not muted, no mention. */
   followed: CatchUpItem[];
-  /** Collapsed ambient tail: other unread + muted channels with zero highlights. */
+  /** Collapsed ambient tail: other unread. Hard-silenced rooms/DMs never appear. */
   quiet: CatchUpItem[];
   totalUnread: number;
   totalMentions: number;
@@ -46,27 +48,22 @@ export interface AwayDigestOptions {
   notifyLevels: ReadonlyMap<string, NotifyLevel>;
   /** Active calm preset — governs whether followed channels escalate. */
   preset: CalmPreset;
+  /** Dedicated DM hard-silence set (store `mutedDMs`). */
+  mutedDMs?: ReadonlySet<string>;
   /** Cap on the collapsed quiet tail. Default 6. */
   quietLimit?: number;
 }
 
 const DEFAULT_QUIET_LIMIT = 6;
 
-/** Channel mute only; DMs are never channel-muted via this map. */
-function isMuted(item: CatchUpItem, levels: ReadonlyMap<string, NotifyLevel>): boolean {
-  return item.kind === 'channel' && channelNotifyMode(levels, item.target) === 'mute';
-}
-
 function tierFor(
   item: CatchUpItem,
-  levels: ReadonlyMap<string, NotifyLevel>,
+  _levels: ReadonlyMap<string, NotifyLevel>,
   preset: CalmPreset,
 ): AwayTier {
-  // Mention / DM attention BEFORE mute demotion: a direct highlight in a muted
-  // channel still routes to Needs you. Ambient mute (zero highlights) stays quiet.
+  // Hard-silenced rows are dropped before this runs. Mentions-only rooms with
+  // an @ still reach attention; Mute never does.
   if (item.kind === 'dm' || item.highlights > 0) return 'attention';
-  // Mute demotes only non-highlight channel traffic (ambient + followed-no-ping).
-  if (isMuted(item, levels)) return 'quiet';
   // Followed channels sit in their own tier — never escalated to attention
   // under calm/regular. A power user pulls them up top.
   if (item.followed) return preset === 'power' ? 'attention' : 'followed';
@@ -106,7 +103,7 @@ export function buildAwayDigest(
   items: readonly CatchUpItem[],
   options: AwayDigestOptions,
 ): AwayDigest {
-  const { notifyLevels, preset } = options;
+  const { notifyLevels, preset, mutedDMs } = options;
   const quietLimit = options.quietLimit ?? DEFAULT_QUIET_LIMIT;
 
   const attention: CatchUpItem[] = [];
@@ -116,6 +113,8 @@ export function buildAwayDigest(
   let totalMentions = 0;
 
   for (const item of items) {
+    // Mute = hard silence. Mentions-only is a different level and still badges @.
+    if (isCatchUpHardSilenced(item.kind, item.target, notifyLevels, mutedDMs)) continue;
     totalUnread += item.unread;
     totalMentions += item.highlights;
     switch (tierFor(item, notifyLevels, preset)) {

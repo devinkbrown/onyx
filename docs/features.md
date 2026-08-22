@@ -81,21 +81,21 @@ there's nothing waiting. (`src/shell/HomeView.tsx:490`)
 
 ### The three tiers
 
-- **Needs you** — your DMs and any channel where you were **mentioned**. This
-  tier is always at the top and can't be silenced by muting.
-  (`src/lib/notifications/awayDigest.ts:66`, `src/shell/HomeView.tsx:511`)
+- **Needs you** — your DMs and any channel where you were **mentioned**. Mute
+  is Discord-style hard silence: a muted room or DM never appears here, even
+  with @ or a keyword highlight. Mentions-only is the middle All / @ / Mute
+  level and still badges @.
+  (`src/lib/notifications/awayDigest.ts`, `src/shell/HomeView.tsx:511`)
 - **Followed** — channels you follow that have unread messages but no mention.
   Summarised on their own, never bumped up into *Needs you*.
-  (`src/lib/notifications/awayDigest.ts:69`, `src/shell/HomeView.tsx:521`)
-- **Quiet activity** — the collapsed tail: everything else with unread, plus
-  **muted** ambient traffic (no mention/highlight). Direct mentions from a muted
-  room still stay in *Needs you*; only ambient muted unread is quiet. Folded into
-  an expandable *Quiet activity (N)* section and capped so it never floods the card.
-  (`src/lib/notifications/awayDigest.ts:66`, `src/lib/notifications/awayDigest.ts:139`,
-  `src/shell/HomeView.tsx:529`)
+  (`src/lib/notifications/awayDigest.ts`, `src/shell/HomeView.tsx:521`)
+- **Quiet activity** — the collapsed tail: everything else with unread that is
+  not hard-silenced. Folded into an expandable *Quiet activity (N)* section and
+  capped so it never floods the card.
+  (`src/lib/notifications/awayDigest.ts`, `src/shell/HomeView.tsx:529`)
 
-Muting a channel quiets only ambient unread (including followed-no-ping);
-muted-room highlights still route to **Needs you**. (`src/lib/notifications/awayDigest.ts:66`)
+Muting a channel or DM is hard silence — no badge, no OS ping, no digest row.
+Mentions-only still badges @. (`src/lib/notifications/awayDigest.ts`)
 
 ### How your calm preset changes it
 

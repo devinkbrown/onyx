@@ -221,7 +221,7 @@ export function YouNotifications(): JSX.Element {
             <section class="you-notify-room" aria-labelledby="you-notify-room-title">
               <h3 id="you-notify-room-title" class="you-notify-room-title">This room</h3>
               <p class="you-notify-room-copy">
-                All messages, mentions only, or mute — your alerts for {channel()} on this device.
+                All messages notify, Mentions only still badges @, Mute is hard silence — you will not be tapped.
               </p>
               <ChannelNotifyControl channel={channel()} />
             </section>

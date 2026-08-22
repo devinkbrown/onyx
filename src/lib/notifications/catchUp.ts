@@ -13,6 +13,8 @@
 // quietly below.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { isCatchUpHardSilenced, type NotifyLevel } from './channelNotifyMode';
+
 export interface CatchUpItem {
   /** Stable key for keyed rendering. */
   key: string;
@@ -46,6 +48,10 @@ interface DmLike {
 export interface CatchUpOptions {
   limit?: number;
   followedKeys?: ReadonlySet<string>;
+  /** Stored per-channel levels — muted rooms are omitted (hard silence). */
+  notifyLevels?: ReadonlyMap<string, NotifyLevel>;
+  /** Dedicated DM hard-silence set (store `mutedDMs`). */
+  mutedDMs?: ReadonlySet<string>;
 }
 
 function normalizeTarget(target: string): string {
@@ -84,10 +90,15 @@ export function buildCatchUp(
 ): CatchUpItem[] {
   const limit = typeof options === 'number' ? options : options.limit ?? 8;
   const followedKeys = typeof options === 'number' ? new Set<string>() : options.followedKeys ?? new Set<string>();
+  const notifyLevels = typeof options === 'number' ? undefined : options.notifyLevels;
+  const mutedDMs = typeof options === 'number' ? undefined : options.mutedDMs;
   const items: CatchUpItem[] = [];
 
   for (const ch of channels) {
-    if (ch.unread > 0 || ch.highlights > 0) {
+    if (
+      (ch.unread > 0 || ch.highlights > 0)
+      && !isCatchUpHardSilenced('channel', ch.name, notifyLevels ?? new Map(), mutedDMs)
+    ) {
       const followed = isFollowedTarget(ch.name, followedKeys, true);
       items.push({
         key: `c:${ch.name.toLowerCase()}`,
@@ -103,7 +114,10 @@ export function buildCatchUp(
   }
 
   for (const dm of dms) {
-    if (dm.unread > 0 || dm.highlights > 0) {
+    if (
+      (dm.unread > 0 || dm.highlights > 0)
+      && !isCatchUpHardSilenced('dm', dm.nick, notifyLevels ?? new Map(), mutedDMs)
+    ) {
       const followed = isFollowedTarget(dm.nick, followedKeys);
       items.push({
         key: `d:${dm.nick.toLowerCase()}`,

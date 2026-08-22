@@ -27,6 +27,13 @@ describe('CHANNEL_NOTIFY_OPTIONS', () => {
       expect(option.title.length).toBeGreaterThan(0);
     }
   });
+
+  it('labels Mute as hard silence and Mentions only as the middle @ level', () => {
+    const mentions = CHANNEL_NOTIFY_OPTIONS.find((option) => option.mode === 'mentions');
+    const mute = CHANNEL_NOTIFY_OPTIONS.find((option) => option.mode === 'mute');
+    expect(mentions?.title).toMatch(/still badges @/i);
+    expect(mute?.title).toMatch(/will not be tapped/i);
+  });
 });
 
 describe('channelNotifyIndex', () => {

@@ -179,6 +179,8 @@ describe('ChannelSettings — Notifications', () => {
 
     expect(screen.getByRole('heading', { name: 'Notifications' })).toBeInTheDocument();
     expect(notifySelect().value).toBe('all');
+    expect(screen.getByText(/Mute is hard silence — you will not be tapped/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mentions only still badges @/i)).toBeInTheDocument();
   });
 
   it('reflects the stored mode (mentions)', () => {

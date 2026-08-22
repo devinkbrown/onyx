@@ -42,8 +42,40 @@ export function channelNotifyMode(
 }
 
 /**
- * Derived helper: should a message in `channel` fire a notification?
- *   - `'mute'`     → never
+ * Mute is Discord-style hard silence: no OS ping, no badge, no digest row.
+ * Mentions-only is a separate middle All / @ / Mute level and is not silence.
+ */
+export function isHardSilenced(
+  levels: ReadonlyMap<string, NotifyLevel>,
+  channel: string,
+): boolean {
+  return channelNotifyMode(levels, channel) === 'mute';
+}
+
+/** DM mute uses the dedicated `mutedDMs` set, not the channel notify map. */
+export function isDmHardSilenced(
+  mutedDMs: ReadonlySet<string> | undefined,
+  nick: string,
+): boolean {
+  return mutedDMs?.has(nick.trim().toLowerCase()) === true;
+}
+
+/**
+ * Hard silence for a catch-up / digest row. Channels read `channelNotify`;
+ * DMs read `mutedDMs`. Mute never mixes in mentions-only.
+ */
+export function isCatchUpHardSilenced(
+  kind: 'channel' | 'dm',
+  target: string,
+  levels: ReadonlyMap<string, NotifyLevel>,
+  mutedDMs?: ReadonlySet<string>,
+): boolean {
+  return kind === 'dm' ? isDmHardSilenced(mutedDMs, target) : isHardSilenced(levels, target);
+}
+
+/**
+ * Derived helper: should a message in `channel` fire a notification or badge?
+ *   - `'mute'`     → never (hard silence — they will not be tapped)
  *   - `'mentions'` → only when the message mentions us (`isMention`)
  *   - `'all'`      → always (also the default when unset)
  */
