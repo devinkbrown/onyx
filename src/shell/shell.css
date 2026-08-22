@@ -2492,6 +2492,12 @@
   gap: 5px;
 }
 
+.shell-ribbon-search[aria-pressed='true'] {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis) 14%, transparent);
+}
+
 /* ── Channel settings gear (iconbtn + the signature rotate-on-hover) ── */
 .shell-ribbon-call {
   color: var(--lapis-bright);

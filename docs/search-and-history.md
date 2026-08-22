@@ -36,8 +36,9 @@ tells you when erasure could not be verified.
 
 ## Searching your history
 
-Press **Cmd/Ctrl-F** (or Home → **Search device memory**) to open message search.
-(`src/shell/AppShell.tsx:122`, `src/shell/HomeView.tsx:1138`) Search is layered:
+Press **Search** in the room or DM header, or **Cmd/Ctrl-F**. Home also has
+**Search messages** in the welcome actions. (`src/shell/PresenceRibbon.tsx`,
+`src/shell/AppShell.tsx`, `src/shell/home/HomeBriefingView.tsx`) Search is layered:
 
 1. **Visible matches** — messages already loaded in the active conversation
    (in-memory find next/previous).
@@ -80,14 +81,16 @@ download, no cloud AI:
 `src/lib/vault/searchVaultSemantic.ts:51`;
 `src/lib/vault/embeddingIndex.ts:2`, `:336`)
 
-Switch modes from the **Device recall** segmented control in the search panel
-(titles all end with “— all on this device”), from **Preferences → History &
-data → Default search mode**, or from the command palette (**Cmd/Ctrl-K**, then
-`vault: hybrid`, `vault: exact`, `vault: related`, or bare `vault` to cycle).
-The in-search choice is session-local; Preferences stores the default a fresh
-search starts in. (`src/shell/search/MessageSearch.tsx:58`,
-`src/shell/PreferencesPanel.tsx:3529`,
-`src/chat/spotlight/commands.ts:201`, `:813`)
+Switch modes from **Advanced** in the search panel (the **Device recall**
+segmented control; titles all end with “— all on this device”), from
+**Preferences → History & data → Default search mode**, or from the command
+palette (**Cmd/Ctrl-K**, then `vault: hybrid`, `vault: exact`, `vault: related`,
+or bare `vault` to cycle). Hybrid and related-term matching stay behind
+Advanced; the default search field just finds messages. The in-search choice is
+session-local; Preferences stores the default a fresh search starts in.
+(`src/shell/search/MessageSearch.tsx`,
+`src/shell/PreferencesPanel.tsx`,
+`src/chat/spotlight/commands.ts`)
 
 Result section titles stay explicit about provenance:
 

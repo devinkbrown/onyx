@@ -2,7 +2,7 @@
 /**
  * PresenceRibbon.overflow.test.tsx — commercial room-header slice.
  *
- * 4-zone place header: Call · People · More; pins + Jump to date in More;
+ * 4-zone place header: Call · People · Search · More; pins + Jump to date in More;
  * People visible at 0 with truthful aria-expanded; conn always present;
  * call lifecycle truth table; More section headings + valid menus.
  */
@@ -96,13 +96,17 @@ describe('PresenceRibbon commercial room header', () => {
     vi.restoreAllMocks();
   });
 
-  it('exposes More and People on the primary strip; demotes pins and Jump to date into More', () => {
+  it('exposes Search, More and People on the primary strip; demotes pins and Jump to date into More', () => {
     seedChannel();
     render(() => <PresenceRibbon />);
 
     expect(screen.getByTestId('ribbon-more')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument();
     expect(screen.getByTestId('ribbon-members')).toBeInTheDocument();
+    const search = screen.getByRole('button', { name: 'Search messages' });
+    expect(search).toBeInTheDocument();
+    expect(search).toHaveAttribute('data-testid', 'ribbon-search');
+    expect(search).toHaveAttribute('aria-pressed', 'false');
     // Jump to date is not a primary header control.
     expect(screen.queryByTestId('ribbon-jump-to-date')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-preferences')).not.toBeInTheDocument();
@@ -113,6 +117,19 @@ describe('PresenceRibbon commercial room header', () => {
 
     openMore();
     expect(screen.getByTestId('ribbon-jump-to-date')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Search messages' })).not.toBeInTheDocument();
+  });
+
+  it('keeps Search off the Home ribbon so the welcome Search messages CTA stays the single Home door', () => {
+    store.setState({
+      ...initialState,
+      connectionStatus: 'connected',
+      activeView: { kind: 'home' },
+    });
+    render(() => <PresenceRibbon />);
+
+    expect(screen.queryByTestId('ribbon-search')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Search messages' })).toBeNull();
   });
 
   it('uses a room-specific mobile overflow while the persistent Menu owns workspace settings', () => {
@@ -143,6 +160,9 @@ describe('PresenceRibbon commercial room header', () => {
 
     expect(screen.queryByTestId('ribbon-more')).toBeNull();
     expect(screen.queryByRole('button', { name: /Room actions|Conversation actions/ })).toBeNull();
+    if (activeView.kind === 'home') {
+      expect(screen.queryByTestId('ribbon-search')).toBeNull();
+    }
   });
 
   it('keeps a healthy mobile DM context operable and correctly labelled', () => {
@@ -442,6 +462,7 @@ describe('PresenceRibbon commercial room header', () => {
 
     expect(screen.queryByTestId('ribbon-jump-to-date')).not.toBeInTheDocument();
     expect(screen.getByTestId('ribbon-more')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Search messages' })).toBeInTheDocument();
     expect(screen.queryByTestId('ribbon-members')).not.toBeInTheDocument();
     openMore();
     expect(screen.getByText('Conversation')).toBeInTheDocument();
