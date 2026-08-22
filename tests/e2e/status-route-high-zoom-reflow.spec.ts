@@ -20,7 +20,8 @@ test('keeps the PublicFrame status route usable at 400% zoom', async ({ page }) 
   await expect(frame.locator('header')).toHaveCount(1);
   await expect(frame.locator('footer')).toHaveCount(1);
   await expect(skip).toHaveAttribute('href', '#public-main');
-  await expect(header.locator('a[href="/status/"]')).toHaveAttribute('aria-current', 'page');
+  await expect(header.locator('a[href="/status/"]')).toHaveCount(0);
+  await expect(footer.locator('a[href="/status/"]')).toBeVisible();
   await expect(frame.getByRole('status')).toContainText(/checking mesh|status unavailable/i);
 
   await page.keyboard.press('Tab');

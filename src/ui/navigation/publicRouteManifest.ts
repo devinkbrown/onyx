@@ -51,16 +51,16 @@ type PublicRouteSeed = Omit<PublicRouteMetadata, 'href'>;
 const PUBLIC_ROUTE_SEEDS = [
   { id: 'home', path: '/', label: 'Home', group: 'product', placement: 'brand', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'about', path: '/about', label: 'About', group: 'product', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 0 },
-  { id: 'download', path: '/download', label: 'Downloads', group: 'product', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 1 },
-  { id: 'onyxos', path: '/onyxos', label: 'OnyxOS', group: 'product', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 4 },
-  { id: 'status', path: '/status', label: 'Status', group: 'trust', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 2 },
+  { id: 'download', path: '/download', label: 'Download', group: 'product', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 2 },
+  { id: 'onyxos', path: '/onyxos', label: 'OnyxOS', group: 'product', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
+  { id: 'status', path: '/status', label: 'Status', group: 'trust', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'accessibility', path: '/accessibility', label: 'Accessibility', group: 'trust', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'integrations', path: '/integrations', label: 'Integrations', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'agents', path: '/agents', label: 'Agents', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'glossary', path: '/glossary', label: 'Glossary', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'stats', path: '/stats', label: 'Stats', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
-  { id: 'roadmap', path: '/roadmap', label: 'Roadmap', group: 'resources', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 3 },
-  { id: 'invite', path: '/invite', label: 'Invite', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
+  { id: 'roadmap', path: '/roadmap', label: 'Roadmap', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
+  { id: 'invite', path: '/invite', label: 'Join', group: 'resources', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 1 },
   { id: 'appearance', path: '/appearance', label: 'Appearance', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
 ] as const satisfies readonly PublicRouteSeed[];
 
@@ -94,17 +94,10 @@ export function publicRouteByPath(value: string | undefined): PublicRouteMetadat
   return PUBLIC_ROUTE_MANIFEST.find((route) => route.path === path);
 }
 
-/** Manifest-owned order for the single responsive public navigation DOM list. */
-const PUBLIC_PRIMARY_NAVIGATION = [
-  PUBLIC_ROUTE_MANIFEST[1]!,
-  PUBLIC_ROUTE_MANIFEST[2]!,
-  PUBLIC_ROUTE_MANIFEST[4]!,
-  PUBLIC_ROUTE_MANIFEST[10]!,
-  PUBLIC_ROUTE_MANIFEST[3]!,
-] as const;
-
 /** Compact shared-header projection, pinned to manifest parity by its tests. */
 /** Returns shared-header links in their explicit, breakpoint-stable order. */
 export function publicNavigationRoutes(): readonly PublicRouteMetadata[] {
-  return PUBLIC_PRIMARY_NAVIGATION;
+  return PUBLIC_ROUTE_MANIFEST
+    .filter((route) => route.placement === 'primary')
+    .toSorted((left, right) => (left.navigationOrder ?? 0) - (right.navigationOrder ?? 0));
 }

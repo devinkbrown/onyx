@@ -16,12 +16,67 @@
   padding-block: clamp(3rem, 7vw, 6rem);
 }
 
+.dl-kicker {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--public-current, var(--lapis-bright));
+}
+
 .dl-hero h1 {
-  max-width: 18ch;
+  max-width: 16ch;
   font-family: var(--font-sans);
   font-weight: 650;
   letter-spacing: -0.03em;
   text-transform: none;
+}
+
+.dl-hero .serif-pull {
+  margin: 22px 0 0;
+  max-width: 28ch;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 360;
+  font-size: clamp(1.15rem, 1rem + 0.6vw, 1.55rem);
+  line-height: 1.4;
+  color: var(--paper);
+}
+
+.dl-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.dl-cta .r-btn,
+.dl-browser .r-btn {
+  min-width: var(--target-min, 44px);
+  min-height: var(--target-min, 44px);
+}
+
+.dl-browser {
+  display: grid;
+  gap: 16px;
+  max-width: 58ch;
+}
+
+.dl-browser p {
+  margin: 0;
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  color: var(--paper-dim);
+}
+
+.dl-below-fold {
+  max-width: 62ch;
+  margin: 12px 0 0;
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  color: var(--paper-dim);
 }
 
 .dl-title-accent {
@@ -132,6 +187,18 @@
     padding-block: 24px 16px;
   }
 
+  .dl-cta,
+  .dl-browser {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dl-cta .r-btn,
+  .dl-browser .r-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+
   .dl-page .data-hero h1,
   .dl-page .dl-section-title {
     overflow-wrap: anywhere;
@@ -225,6 +292,7 @@
 
   .dl-page .dl-card,
   .dl-page .dl-honesty,
+  .dl-page .dl-browser,
   .dl-page .dl-verify,
   .dl-page .dl-status,
   .dl-page .dl-soon-arch,

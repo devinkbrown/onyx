@@ -17,7 +17,9 @@ describe('RoadmapRoute', () => {
     expect(container.querySelector('.ui-root.roadmap-page')).toBeTruthy();
     expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Planning\s*·\s*Proof before promise/);
     expect(within(screen.getByRole('navigation', { name: 'Primary navigation' }))
-      .getByRole('link', { name: 'Roadmap' })).toHaveAttribute('aria-current', 'page');
+      .queryByRole('link', { name: 'Roadmap' })).toBeNull();
+    expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))
+      .getByRole('link', { name: 'Roadmap' })).toHaveAttribute('href', '/roadmap/');
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' });
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');

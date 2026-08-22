@@ -42,7 +42,8 @@ describe('PWA manifest', () => {
     ].join('\n');
 
     expect(publicMetadata).not.toMatch(/IRCXNet/i);
-    expect(manifest.description).toContain('Onyx mesh');
+    expect(manifest.description).toMatch(/rooms, messages, and calls/i);
+    expect(manifest.description).not.toMatch(/\bmesh\b/i);
     expect(entryDocument).toContain('<title>Onyx — a room for your people</title>');
   });
 

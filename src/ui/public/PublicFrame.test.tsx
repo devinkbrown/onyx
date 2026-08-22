@@ -47,8 +47,10 @@ describe('PublicFrame', () => {
       const view = render(() => <PublicFrame currentPath={currentPath}>Content</PublicFrame>);
       const primary = screen.getByRole('navigation', { name: 'Primary navigation' });
       expect(primary).toContainElement(within(primary).getByRole('link', { name: 'About' }));
-      expect(within(primary).getByRole('link', { name: 'OnyxOS' })).toHaveAttribute('href', '/onyxos/');
-      expect(within(primary).getByRole('link', { name: 'Status' })).toHaveAttribute('aria-current', 'page');
+      expect(within(primary).getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/invite/');
+      expect(within(primary).getByRole('link', { name: 'Download' })).toHaveAttribute('href', '/download/');
+      expect(within(primary).queryByRole('link', { name: 'OnyxOS' })).toBeNull();
+      expect(within(primary).queryByRole('link', { name: 'Status' })).toBeNull();
       expect(screen.getByRole('link', { name: 'Open Onyx' })).toHaveAttribute('href', '/app/');
       expect(screen.getAllByRole('navigation', { name: /navigation/i })).toHaveLength(2);
       const footer = screen.getByRole('navigation', { name: 'Footer navigation' });
@@ -57,10 +59,11 @@ describe('PublicFrame', () => {
         href: link.getAttribute('href'),
       }))).toEqual([
         { label: 'About', href: '/about/' },
-        { label: 'OnyxOS', href: '/onyxos/' },
-        { label: 'Roadmap', href: '/roadmap/' },
+        { label: 'Join', href: '/invite/' },
+        { label: 'Download', href: '/download/' },
         { label: 'Status', href: '/status/' },
-        { label: 'Downloads', href: '/download/' },
+        { label: 'Roadmap', href: '/roadmap/' },
+        { label: 'OnyxOS', href: '/onyxos/' },
         { label: 'Accessibility', href: '/accessibility/' },
       ]);
       view.unmount();

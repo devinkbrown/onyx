@@ -45,7 +45,8 @@ test('keeps the PublicFrame Stats route usable at 400% zoom', async ({ page }) =
   const primary = header.getByRole('navigation', { name: 'Primary navigation' });
   await expect(primary).toBeVisible();
   await expect(primary.getByRole('link', { name: 'Stats' })).toHaveCount(0);
-  await expect(primary.getByRole('link', { name: 'Status' })).toBeVisible();
+  await expect(primary.getByRole('link', { name: 'Status' })).toHaveCount(0);
+  await expect(footer.getByRole('link', { name: 'Status' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(menuToggle).toHaveAttribute('aria-expanded', 'false');
   await expect(menuToggle).toBeFocused();

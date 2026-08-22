@@ -136,22 +136,23 @@ describe('Download page', () => {
     const { container } = render(() => <Download />);
 
     expect(screen.getByRole('banner')).toBeInTheDocument();
-    expect(screen.getByRole('main', { name: 'Onyx downloads' })).toHaveAttribute('id', 'public-main');
+    expect(screen.getByRole('main', { name: 'Get Onyx' })).toHaveAttribute('id', 'public-main');
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveAttribute('href', '#public-main');
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.dl-page')).toBeTruthy();
-    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Artifacts.*Downloads/);
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/This device.*Browser first/);
     expect(within(screen.getByRole('navigation', { name: 'Primary navigation' }))
-      .getByRole('link', { name: 'Downloads' })).toHaveAttribute('aria-current', 'page');
+      .getByRole('link', { name: 'Download' })).toHaveAttribute('aria-current', 'page');
     const openOnyx = screen.getAllByRole('link', { name: 'Open Onyx' })
       .filter((link) => link.classList.contains('public-frame__open'));
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');
-    expect(screen.getByRole('heading', { level: 1, name: /Windows, Linux,\s*FreeBSD & OpenBSD/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /Get Onyx on this device/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Keep Onyx on this device' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'What this is — and is not' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Native packages' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Desktop packages' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Verify a download' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Planned macOS architectures' })).toBeInTheDocument();
   });
@@ -176,16 +177,16 @@ describe('Download page', () => {
     window.history.replaceState(null, '', '/install/');
     const { getByRole } = render(() => <Download />);
 
-    expect(document.title).toBe('Install Onyx — native packages and browser app');
+    expect(document.title).toBe('Install Onyx on this device — browser first');
     expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
       'href',
       'http://localhost:3000/install/',
     );
-    expect(getByRole('heading', { name: 'Install Onyx' })).toBeInTheDocument();
+    expect(getByRole('heading', { name: 'Install Onyx on this device' })).toBeInTheDocument();
     expect(getByRole('heading', { name: /install on linux/i })).toBeInTheDocument();
-    expect(getByRole('main', { name: 'Onyx downloads' })).toHaveAttribute('id', 'public-main');
+    expect(getByRole('main', { name: 'Get Onyx' })).toHaveAttribute('id', 'public-main');
     expect(within(getByRole('navigation', { name: 'Primary navigation' }))
-      .getByRole('link', { name: 'Downloads' })).toHaveAttribute('aria-current', 'page');
+      .getByRole('link', { name: 'Download' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('renders four active lanes and distinguishes an unavailable catalog from missing artifacts', async () => {
@@ -196,7 +197,7 @@ describe('Download page', () => {
     const { getByTestId, getByRole, queryByTestId, queryByText } = render(() => <Download />);
     expect(getByTestId('download-page')).toBeInTheDocument();
     expect(
-      getByRole('heading', { level: 1, name: /Windows, Linux, FreeBSD & OpenBSD/i }),
+      getByRole('heading', { level: 1, name: /Get Onyx on this device/i }),
     ).toBeInTheDocument();
 
     // Active native packages
@@ -247,7 +248,9 @@ describe('Download page', () => {
     expect(queryByText(/is virus-free/i)).not.toBeInTheDocument();
     expect(queryByText(/signed installer available/i)).not.toBeInTheDocument();
     expect(queryByText(/codesigned and ready/i)).not.toBeInTheDocument();
-    expect(document.title).toMatch(/Download Onyx/i);
+    expect(document.title).toMatch(/Get Onyx on this device/i);
+    expect(getByTestId('dl-open-browser').getAttribute('href')).toBe('/app/');
+    expect(getByRole('heading', { name: 'Keep Onyx on this device' })).toBeInTheDocument();
   });
 
   it('withholds every artifact control when the catalog authoritatively marks a lane missing', async () => {
@@ -366,7 +369,7 @@ describe('Download page — source structure', () => {
   it('uses PublicFrame without duplicating document chrome', () => {
     expect(src).toContain('import { PublicFrame }');
     expect(src).toContain('currentPath="/download/"');
-    expect(src).toContain('mainLabel="Onyx downloads"');
+    expect(src).toContain('mainLabel="Get Onyx"');
     expect(src).not.toContain('<main');
     expect(src).not.toContain('<header');
     expect(src).not.toContain('<PublicFooter');

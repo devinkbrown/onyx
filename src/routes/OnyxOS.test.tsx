@@ -10,10 +10,8 @@ const onyxosCss = readFileSync(resolve(__dirname, 'onyxos.css'), 'utf8');
 /** Manifest order for the shared primary navigation. */
 const PRIMARY_LINKS = [
   ['About', '/about/'],
-  ['Downloads', '/download/'],
-  ['Status', '/status/'],
-  ['Roadmap', '/roadmap/'],
-  ['OnyxOS', '/onyxos/'],
+  ['Join', '/invite/'],
+  ['Download', '/download/'],
 ] as const;
 
 const STAGE_TABS = ['01 · Oracle', '02 · Clean room', '03 · Gate', '04 · Boot'] as const;
@@ -55,18 +53,18 @@ describe('OnyxOS route', () => {
     expect(page!.querySelector('.onyxos-wordmark, .onyxos-nav')).toBeNull();
   });
 
-  it('marks only OnyxOS as the current primary destination, in manifest order', () => {
+  it('keeps OnyxOS out of the consumer primary nav and in the quieter footer', () => {
     render(() => <OnyxOS />);
     const primary = screen.getByRole('navigation', { name: 'Primary navigation' });
     const links = within(primary).getAllByRole('link');
 
     expect(links.map((link) => [link.textContent, link.getAttribute('href')]))
       .toEqual(PRIMARY_LINKS.map(([label, href]) => [label, href]));
-    expect(links.filter((link) => link.getAttribute('aria-current') === 'page'))
-      .toHaveLength(1);
-    expect(within(primary).getByRole('link', { name: 'OnyxOS' })).toHaveAttribute('aria-current', 'page');
+    expect(within(primary).queryByRole('link', { name: 'OnyxOS' })).toBeNull();
+    expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))
+      .getByRole('link', { name: 'OnyxOS' })).toHaveAttribute('href', '/onyxos/');
 
-    for (const label of ['Accessibility', 'Glossary', 'Integrations', 'Agent safety', 'Stats', 'Invite', 'Appearance']) {
+    for (const label of ['Accessibility', 'Glossary', 'Integrations', 'Agent safety', 'Stats', 'Appearance', 'Status', 'Roadmap']) {
       expect(within(primary).queryByRole('link', { name: label })).toBeNull();
     }
   });

@@ -147,7 +147,8 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
 
     expect(publicNavigationRoutes()).toEqual(declared);
     expect(metadata).toEqual(runtime);
-    expect(publicNavigationRoutes().map((route) => route.navigationOrder)).toEqual([0, 1, 2, 3, 4]);
+    expect(publicNavigationRoutes().map((route) => route.navigationOrder)).toEqual([0, 1, 2]);
+    expect(publicNavigationRoutes().map((route) => route.label)).toEqual(['About', 'Join', 'Download']);
   });
 
   it('covers every public router destination and preserves the install compatibility alias', () => {
@@ -171,8 +172,12 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
   });
 
   it('looks up canonical metadata by ID', () => {
-    expect(publicRouteById('download')).toMatchObject({ href: '/download/', path: '/download', label: 'Downloads' });
+    expect(publicRouteById('download')).toMatchObject({ href: '/download/', path: '/download', label: 'Download' });
     expect(publicRouteById('about')).toMatchObject({ href: '/about/', path: '/about', label: 'About' });
+    expect(publicRouteById('invite')).toMatchObject({ href: '/invite/', path: '/invite', label: 'Join', placement: 'primary' });
+    expect(publicRouteById('status')).toMatchObject({ placement: 'none', navigationOrder: null });
+    expect(publicRouteById('roadmap')).toMatchObject({ placement: 'none' });
+    expect(publicRouteById('onyxos')).toMatchObject({ placement: 'none' });
   });
 
   it('normalizes path identity before lookup without promoting router aliases', () => {
