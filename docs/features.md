@@ -112,3 +112,16 @@ mention, then DMs, then most recent; the other tiers sort busiest-first.
 (`src/lib/notifications/awayDigest.ts:75`, `src/lib/notifications/awayDigest.ts:89`)
 Click any row to jump straight into that conversation.
 (`src/shell/HomeView.tsx:249`)
+
+## Mentions, DMs, and calls when the tab is closed
+
+You → **Notifications** is the short page for what can ping after this tab
+closes: mentions, DMs, and calls. Turning alerts on uses this browser's
+service worker and the network you already joined — not a third-party push
+vendor. A room you are in can still be set to all messages, mentions only, or
+mute. (`src/shell/YouNotifications.tsx`)
+
+Onyx asks once, quietly, after you have sent or received a real message — never
+as a wall on Connect. The desktop app does not claim system notifications while
+its host flag is off. (`src/shell/FirstRunNotifyPrompt.tsx`,
+`docs/protocol/push-notify-modes.md`)
