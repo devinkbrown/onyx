@@ -858,3 +858,45 @@ describe('Composer first-hour room landing', () => {
     expect(screen.queryByTestId('first-hour-coach')).not.toBeInTheDocument();
   });
 });
+
+describe('Composer blocked DM compose', () => {
+  beforeEach(() => {
+    store.setState(initialState, true);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('refuses to send a DM to someone blocked on this device', async () => {
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'dm', nick: 'mika' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      ignoredUsers: new Set(['mika']),
+      dms: new Map([['mika', { nick: 'mika', account: null, unread: 0, highlights: 0, messages: [] }]]),
+      client: { isupport: { CHANTYPES: '#&' } } as never,
+      server: {
+        id: 'composer-test',
+        name: 'Onyx',
+        network: 'Onyx',
+        url: 'wss://example.test',
+        icon: '',
+        nick: 'me',
+        account: 'me',
+        connected: true,
+      },
+    }, true);
+    const sendSpy = vi.spyOn(store.getState(), 'sendMessage').mockImplementation(() => {});
+    const { getByRole, findByText } = render(() => <Composer />);
+    const textarea = getByRole('textbox', { name: /message mika/i }) as HTMLTextAreaElement;
+    fireEvent.input(textarea, { target: { value: 'should not send' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    await findByText('Unblock them on this device to send a message.');
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(textarea.value).toBe('should not send');
+  });
+});

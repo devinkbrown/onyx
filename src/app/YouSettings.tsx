@@ -103,7 +103,7 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       <details class="you-settings-item" data-testid="you-blocked">
         <summary>Blocked users</summary>
         <div class="you-settings-item__body">
-          <p class="you-settings-hint">Hide someone on this device. This does not send a network command.</p>
+          <p class="you-settings-hint">You will not see them on this device. They are not told.</p>
           <IgnoredUsersControl />
         </div>
       </details>

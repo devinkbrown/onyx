@@ -15,7 +15,7 @@
  * Sorted: netop > founder > owner > admin > op > halfop > voice > member; then alpha within group.
  *
  * Click a user → consumer people card (display name, avatar, Message /
- * Mention / Ignore). WHOIS, ledger, hostmasks, and op-voice live under Advanced.
+ * Mention / Block / Report). WHOIS, ledger, hostmasks, and op-voice live under Advanced.
  *
  * SOLID IDIOMS: never destructure props; splitProps; createMemo; For/Show.
  */

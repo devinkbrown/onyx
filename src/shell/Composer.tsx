@@ -24,6 +24,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
+import { blockedDmComposeCopy, isBlockedDmTarget } from '@/lib/people/personSafety';
 import { useStore, getState, setState, selectDeviceMemoryOwner, selectOwnedScheduledMessageCount } from '@/lib/store';
 import { searchEmojis } from '@/lib/emoji/emoji';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
@@ -965,6 +966,17 @@ export function Composer(props: ComposerProps): JSX.Element {
   async function sendMessage(): Promise<void> {
     const t = target();
     if (!t || !isEnabled() || !canSend()) return;
+    const snapshot = getState();
+    if (isBlockedDmTarget(t, snapshot.ignoredUsers, snapshot.client?.isupport.CHANTYPES ?? '#&')) {
+      const copy = blockedDmComposeCopy(t);
+      setComposerError(copy.description);
+      snapshot.addToast({
+        variant: 'info',
+        title: copy.title,
+        description: copy.description,
+      });
+      return;
+    }
     setComposerError(null);
 
     if (isOffline()) {

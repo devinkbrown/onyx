@@ -6037,6 +6037,7 @@
 .shell-people-card-nick,
 .shell-people-card-pronouns,
 .shell-people-card-status,
+.shell-people-card-guest,
 .shell-people-card-about,
 .shell-people-card-meta,
 .shell-people-card-hostmask {
@@ -6047,7 +6048,8 @@
 
 .shell-people-card-nick,
 .shell-people-card-pronouns,
-.shell-people-card-status {
+.shell-people-card-status,
+.shell-people-card-guest {
   font-family: var(--font-sans);
   font-size: 0.8rem;
 }

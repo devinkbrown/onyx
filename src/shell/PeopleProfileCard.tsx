@@ -3,8 +3,9 @@
  * PeopleProfileCard — consumer person card (tap a face or name).
  *
  * Default surface: circular avatar, display name, optional about/status,
- * and Message / Mention / Ignore. Network WHOIS, room ledger, hostmasks,
- * and op/voice live under Advanced. No invented bios or abuse backend.
+ * and Message / Mention / Block / Report. Network WHOIS, room ledger, hostmasks,
+ * and op/voice live under Advanced. Block reuses device ignore. Report drafts
+ * a note to #root — there is no invented review inbox.
  */
 
 import { createMemo, createUniqueId, Show, splitProps, type JSX } from 'solid-js';
@@ -20,7 +21,9 @@ import {
 } from '@/lib/moderation/actionModel';
 import { normalizeIdentityOverrideNick } from '@/lib/identityOverrides';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
+import { blockedDmComposeCopy, personUnblockToast } from '@/lib/people/personSafety';
 import { Avatar, Button } from '@/primitives/index';
+import { openPersonBlockConfirm, openPersonReport } from './people/personSafetyState';
 
 export const PEOPLE_PROFILE_ADVANCED_TESTID = 'people-profile-advanced-toggle';
 
@@ -144,6 +147,15 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
   }
 
   function handleDm(): void {
+    if (isIgnored()) {
+      const copy = blockedDmComposeCopy(local.nick);
+      getState().addToast({
+        variant: 'info',
+        title: copy.title,
+        description: copy.description,
+      });
+      return;
+    }
     if (local.onOpenDm) {
       local.onOpenDm(local.nick);
       return;
@@ -227,24 +239,23 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
     });
   }
 
-  function handleIgnore(event: MouseEvent): void {
+  function handleBlock(event: MouseEvent): void {
     closeCardForHandoff(event, true);
     const nick = local.nick;
     if (isIgnored()) {
       getState().unignoreUser(nick);
       getState().addToast({
         variant: 'info',
-        title: `Unignored ${nick}`,
-        description: 'Messages and notifications from this name resume on this device.',
+        ...personUnblockToast(nick),
       });
       return;
     }
-    getState().ignoreUser(nick);
-    getState().addToast({
-      variant: 'info',
-      title: `Ignoring ${nick}`,
-      description: 'Their messages are hidden on this device. Notifications are silenced too.',
-    });
+    openPersonBlockConfirm(nick, !account());
+  }
+
+  function handleReport(event: MouseEvent): void {
+    closeCardForHandoff(event, true);
+    openPersonReport(local.nick, !account());
   }
 
   return (
@@ -279,6 +290,9 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
               <p class="shell-people-card-about" id={`${cardId()}-about`}>{value()}</p>
             )}
           </Show>
+          <Show when={!isSelf() && !account()}>
+            <p class="shell-people-card-guest">Guest</p>
+          </Show>
         </div>
       </div>
 
@@ -304,15 +318,24 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleIgnore}
-            data-testid="member-card-ignore"
+            onClick={handleBlock}
+            data-testid="member-card-block"
             aria-label={
               isIgnored()
-                ? `Stop ignoring ${local.nick} on this device`
-                : `Ignore ${local.nick} on this device`
+                ? `Unblock ${local.nick} on this device`
+                : `Block ${local.nick} on this device`
             }
           >
-            {isIgnored() ? 'Unignore' : 'Ignore'}
+            {isIgnored() ? 'Unblock' : 'Block'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleReport}
+            data-testid="member-card-report"
+            aria-label={`Report ${local.nick}`}
+          >
+            Report
           </Button>
         </div>
       </Show>
