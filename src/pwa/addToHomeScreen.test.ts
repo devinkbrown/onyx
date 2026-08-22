@@ -25,6 +25,7 @@ import {
   isReturningHomeScreenVisit,
   markHomeScreenMessageSent,
   peekCapturedInstallPrompt,
+  readNavigatorProbe,
   rememberHomeScreenVisit,
   requestHomeScreenAdd,
   resetAddToHomeScreenState,
@@ -148,6 +149,15 @@ describe('Add to Home Screen decision', () => {
     expect(event.prompt).not.toHaveBeenCalled();
 
     stop();
+  });
+
+  it('reads a stubbed Object.create(navigator) without claiming a branded userAgent', () => {
+    const stub = Object.create(navigator) as Navigator;
+    expect(readNavigatorProbe(stub)).toEqual({
+      userAgent: '',
+      platform: '',
+      maxTouchPoints: 0,
+    });
   });
 
   it('iOS copy is Share → Add to Home Screen and never claims beforeinstallprompt', () => {

@@ -5,6 +5,9 @@
  * Never a wall on first paint or Connect. Never the marketing site.
  * iOS may be offered only from the Home Screen standalone web app —
  * never a Safari tab, where Web Push does not work.
+ *
+ * `navigator.standalone === false` is the iOS Safari-tab signal (boolean
+ * false, not missing). Other browsers leave the property undefined.
  */
 import { createSignal, type Accessor } from 'solid-js';
 
@@ -19,42 +22,31 @@ export const FIRST_RUN_NOTIFY_TITLE = 'Get a ping when you leave';
 export const FIRST_RUN_NOTIFY_LEDE =
   'Mentions, DMs, and calls can reach this browser.';
 
-export type NotifyNavigatorProbe = {
-  userAgent?: string;
-  platform?: string;
-  maxTouchPoints?: number;
+export type NotifyStandaloneProbe = {
+  standalone?: boolean;
 };
 
-export function isIosSafariLike(input: NotifyNavigatorProbe = {}): boolean {
-  const ua = input.userAgent ?? '';
-  if (/iPad|iPhone|iPod/.test(ua)) return true;
-  return input.platform === 'MacIntel' && (input.maxTouchPoints ?? 0) > 1;
-}
-
-export function readNotifyNavigatorProbe(
-  nav: NotifyNavigatorProbe | null | undefined =
-    typeof navigator !== 'undefined' ? navigator : undefined,
-): NotifyNavigatorProbe {
-  return {
-    userAgent: nav?.userAgent ?? '',
-    platform: nav?.platform ?? '',
-    maxTouchPoints: nav?.maxTouchPoints ?? 0,
-  };
-}
-
 /** iOS Safari tabs cannot receive Web Push. Home Screen standalone can. */
-export function canClaimClosedTabPush(input: {
-  ios: boolean;
-  standalone: boolean;
-}): boolean {
-  return !(input.ios && !input.standalone);
+export function canClaimClosedTabPush(navigatorStandalone: boolean | null | undefined): boolean {
+  return navigatorStandalone !== false;
 }
 
-export function firstRunNotifyCopy(input: {
-  ios: boolean;
-  standalone: boolean;
-}): { title: string; lede: string } | null {
-  if (!canClaimClosedTabPush(input)) return null;
+export function readNavigatorStandalone(
+  nav: NotifyStandaloneProbe | null | undefined =
+    typeof navigator !== 'undefined' ? (navigator as NotifyStandaloneProbe) : undefined,
+): boolean | undefined {
+  try {
+    return nav?.standalone;
+  } catch {
+    return undefined;
+  }
+}
+
+export function firstRunNotifyCopy(navigatorStandalone: boolean | null | undefined): {
+  title: string;
+  lede: string;
+} | null {
+  if (!canClaimClosedTabPush(navigatorStandalone)) return null;
   return { title: FIRST_RUN_NOTIFY_TITLE, lede: FIRST_RUN_NOTIFY_LEDE };
 }
 
@@ -64,11 +56,10 @@ export function shouldOfferFirstRunNotify(input: {
   permission: DesktopNotificationPermission;
   surface: ClientSurface;
   hostNotifications: boolean;
-  ios: boolean;
-  standalone: boolean;
+  navigatorStandalone?: boolean | null;
 }): boolean {
   if (!input.sent || input.dismissed) return false;
-  if (!canClaimClosedTabPush(input)) return false;
+  if (!canClaimClosedTabPush(input.navigatorStandalone)) return false;
   if (input.surface === 'zig-desktop' && !input.hostNotifications) return false;
   return input.permission === 'default';
 }

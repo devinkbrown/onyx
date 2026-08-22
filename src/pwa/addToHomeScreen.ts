@@ -140,11 +140,16 @@ export function readNavigatorProbe(
   nav: { userAgent?: string; platform?: string; maxTouchPoints?: number } | null | undefined =
     typeof navigator !== 'undefined' ? navigator : undefined,
 ): A2hsNavigatorProbe {
-  return {
-    userAgent: nav?.userAgent ?? '',
-    platform: nav?.platform ?? '',
-    maxTouchPoints: nav?.maxTouchPoints ?? 0,
-  };
+  try {
+    return {
+      userAgent: nav?.userAgent ?? '',
+      platform: nav?.platform ?? '',
+      maxTouchPoints: nav?.maxTouchPoints ?? 0,
+    };
+  } catch {
+    // jsdom brand-checks Navigator getters; Object.create(navigator) stubs fail.
+    return { userAgent: '', platform: '', maxTouchPoints: 0 };
+  }
 }
 
 export function shouldOfferAddToHomeScreen(input: {

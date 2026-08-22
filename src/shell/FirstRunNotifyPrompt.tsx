@@ -20,14 +20,13 @@ import {
   dismissNotifyAsk,
   firstRunNotifyCopy,
   hasNotifyFirstSend,
-  isIosSafariLike,
   isNotifyAskDismissed,
-  readNotifyNavigatorProbe,
+  readNavigatorStandalone,
   shouldOfferFirstRunNotify,
 } from '@/lib/notifications/firstRunNotify';
 import { hostCannotNotifyNatively } from '@/lib/notifications/closedTabCopy';
 import { isNotificationsOpen } from '@/lib/notifications/youNotificationsState';
-import { capabilitiesForSurface, detectClientSurface, isStandaloneDisplayMode } from '@/lib/platform';
+import { capabilitiesForSurface, detectClientSurface } from '@/lib/platform';
 
 import './first-run-notify.css';
 
@@ -37,19 +36,8 @@ export function FirstRunNotifyPrompt(): JSX.Element {
   let disposed = false;
 
   const surface = createMemo(() => detectClientSurface());
-  const ios = createMemo(() => isIosSafariLike(readNotifyNavigatorProbe()));
-  const standalone = createMemo(() => isStandaloneDisplayMode({
-    matchMedia: typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia.bind(window)
-      : null,
-    navigator: typeof navigator !== 'undefined'
-      ? { standalone: (navigator as { standalone?: boolean }).standalone }
-      : null,
-  }));
-  const copy = createMemo(() => firstRunNotifyCopy({
-    ios: ios(),
-    standalone: standalone(),
-  }));
+  const navigatorStandalone = createMemo(() => readNavigatorStandalone());
+  const copy = createMemo(() => firstRunNotifyCopy(navigatorStandalone()));
   const offer = createMemo(() => {
     if (isNotificationsOpen()) return false;
     if (!copy()) return false;
@@ -59,8 +47,7 @@ export function FirstRunNotifyPrompt(): JSX.Element {
       permission: permission(),
       surface: surface(),
       hostNotifications: capabilitiesForSurface(surface()).notifications,
-      ios: ios(),
-      standalone: standalone(),
+      navigatorStandalone: navigatorStandalone(),
     });
   });
 

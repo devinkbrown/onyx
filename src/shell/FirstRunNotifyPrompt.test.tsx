@@ -28,11 +28,10 @@ const armMocks = vi.hoisted(() => ({
 const platformMocks = vi.hoisted(() => ({
   surface: 'browser' as 'browser' | 'pwa' | 'zig-desktop',
   notifications: false,
-  standalone: false,
 }));
 
-const notifySurfaceMocks = vi.hoisted(() => ({
-  ios: false,
+const standaloneMocks = vi.hoisted(() => ({
+  standalone: undefined as boolean | undefined,
 }));
 
 vi.mock('@/lib/notifications/browser', () => ({
@@ -50,7 +49,6 @@ vi.mock('@/lib/notifications/armClosedTab', () => ({
 
 vi.mock('@/lib/platform', () => ({
   detectClientSurface: () => platformMocks.surface,
-  isStandaloneDisplayMode: () => platformMocks.standalone,
   capabilitiesForSurface: () => ({
     bridge: false,
     notifications: platformMocks.notifications,
@@ -65,7 +63,7 @@ vi.mock('@/lib/notifications/firstRunNotify', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/notifications/firstRunNotify')>();
   return {
     ...actual,
-    isIosSafariLike: () => notifySurfaceMocks.ios,
+    readNavigatorStandalone: () => standaloneMocks.standalone,
   };
 });
 
@@ -81,8 +79,7 @@ describe('FirstRunNotifyPrompt', () => {
     localStorage.clear();
     platformMocks.surface = 'browser';
     platformMocks.notifications = false;
-    platformMocks.standalone = false;
-    notifySurfaceMocks.ios = false;
+    standaloneMocks.standalone = undefined;
     browserMocks.getPermission.mockReset().mockReturnValue('default');
     armMocks.arm.mockReset().mockResolvedValue({
       permission: 'granted',
@@ -132,8 +129,7 @@ describe('FirstRunNotifyPrompt', () => {
   });
 
   it('iOS Safari tab does not claim push after a send', () => {
-    notifySurfaceMocks.ios = true;
-    platformMocks.standalone = false;
+    standaloneMocks.standalone = false;
     platformMocks.surface = 'browser';
     markNotifyFirstSend();
     render(() => <FirstRunNotifyPrompt />);
@@ -144,8 +140,7 @@ describe('FirstRunNotifyPrompt', () => {
   });
 
   it('may offer on an iOS Home Screen standalone web app after a send', async () => {
-    notifySurfaceMocks.ios = true;
-    platformMocks.standalone = true;
+    standaloneMocks.standalone = true;
     platformMocks.surface = 'pwa';
     markNotifyFirstSend();
     render(() => <FirstRunNotifyPrompt />);

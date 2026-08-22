@@ -10,9 +10,9 @@ import {
   dismissNotifyAsk,
   firstRunNotifyCopy,
   hasNotifyFirstSend,
-  isIosSafariLike,
   isNotifyAskDismissed,
   markNotifyFirstSend,
+  readNavigatorStandalone,
   resetFirstRunNotifyState,
   shouldOfferFirstRunNotify,
 } from './firstRunNotify';
@@ -35,8 +35,6 @@ describe('first-run notify decision', () => {
       permission: 'default' as const,
       surface: 'browser' as const,
       hostNotifications: false,
-      ios: false,
-      standalone: false,
     };
     expect(shouldOfferFirstRunNotify(base)).toBe(false);
     expect(shouldOfferFirstRunNotify({ ...base, sent: true })).toBe(true);
@@ -49,8 +47,6 @@ describe('first-run notify decision', () => {
       permission: 'default' as const,
       surface: 'browser' as const,
       hostNotifications: false,
-      ios: false,
-      standalone: false,
     };
     expect(shouldOfferFirstRunNotify(base)).toBe(true);
     expect(shouldOfferFirstRunNotify({ ...base, dismissed: true })).toBe(false);
@@ -66,8 +62,6 @@ describe('first-run notify decision', () => {
       permission: 'default',
       surface: 'zig-desktop',
       hostNotifications: false,
-      ios: false,
-      standalone: false,
     })).toBe(false);
     expect(shouldOfferFirstRunNotify({
       sent: true,
@@ -75,23 +69,21 @@ describe('first-run notify decision', () => {
       permission: 'default',
       surface: 'zig-desktop',
       hostNotifications: true,
-      ios: false,
-      standalone: false,
     })).toBe(true);
   });
 
   it('iOS tab does not claim push; Home Screen standalone may', () => {
-    expect(isIosSafariLike({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)' })).toBe(true);
-    expect(isIosSafariLike({ userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)' })).toBe(true);
-    expect(isIosSafariLike({ platform: 'MacIntel', maxTouchPoints: 5 })).toBe(true);
-    expect(isIosSafariLike({ userAgent: 'Mozilla/5.0 Chrome/126.0.0.0 Mobile Safari/537.36' })).toBe(false);
+    expect(canClaimClosedTabPush(false)).toBe(false);
+    expect(canClaimClosedTabPush(true)).toBe(true);
+    expect(canClaimClosedTabPush(undefined)).toBe(true);
+    expect(canClaimClosedTabPush(null)).toBe(true);
 
-    expect(canClaimClosedTabPush({ ios: true, standalone: false })).toBe(false);
-    expect(canClaimClosedTabPush({ ios: true, standalone: true })).toBe(true);
-    expect(canClaimClosedTabPush({ ios: false, standalone: false })).toBe(true);
-
-    expect(firstRunNotifyCopy({ ios: true, standalone: false })).toBeNull();
-    expect(firstRunNotifyCopy({ ios: true, standalone: true })).toEqual({
+    expect(firstRunNotifyCopy(false)).toBeNull();
+    expect(firstRunNotifyCopy(true)).toEqual({
+      title: FIRST_RUN_NOTIFY_TITLE,
+      lede: FIRST_RUN_NOTIFY_LEDE,
+    });
+    expect(firstRunNotifyCopy(undefined)).toEqual({
       title: FIRST_RUN_NOTIFY_TITLE,
       lede: FIRST_RUN_NOTIFY_LEDE,
     });
@@ -102,8 +94,7 @@ describe('first-run notify decision', () => {
       permission: 'default',
       surface: 'browser',
       hostNotifications: false,
-      ios: true,
-      standalone: false,
+      navigatorStandalone: false,
     })).toBe(false);
     expect(shouldOfferFirstRunNotify({
       sent: true,
@@ -111,9 +102,12 @@ describe('first-run notify decision', () => {
       permission: 'default',
       surface: 'pwa',
       hostNotifications: false,
-      ios: true,
-      standalone: true,
+      navigatorStandalone: true,
     })).toBe(true);
+
+    expect(readNavigatorStandalone({ standalone: false })).toBe(false);
+    expect(readNavigatorStandalone({ standalone: true })).toBe(true);
+    expect(readNavigatorStandalone({})).toBeUndefined();
   });
 
   it('persists first send and dismiss under onyx: keys', () => {
@@ -142,8 +136,6 @@ describe('first-run notify decision', () => {
       permission: 'default',
       surface: 'browser',
       hostNotifications: false,
-      ios: false,
-      standalone: false,
     })).toBe(false);
   });
 });
