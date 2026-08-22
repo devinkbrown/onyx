@@ -15,25 +15,25 @@ ignores trailing slashes, query strings, and fragments before matching a path.
 The router may retain compatibility aliases; `/install` remains an alias of
 `/download`, not a second public destination. Visibility mirrors the existing
 public header:
-About, OnyxOS, Roadmap, Status, and Downloads are shown at both breakpoints;
+About, Downloads, Status, Roadmap, and OnyxOS are shown at both breakpoints;
 Home is the brand link. Other routable/supporting surfaces remain in the
 manifest but are not public-navigation links.
 
 Header placement is explicit metadata: `brand` is the Home brand link,
 `primary` identifies links inside the `Primary navigation` landmark, and `none`
 keeps supporting routes out of the shared header. `navigationOrder` preserves
-the current About, OnyxOS, Roadmap, Status, Downloads order independently from
+the current About, Downloads, Status, Roadmap, OnyxOS order independently from
 the manifest's product/trust/resources grouping.
 
 `PublicFrame` remains the only public document frame: one banner, one main, one
 footer, a skip link, and manifest-derived current-path navigation. An optional
 `context` current-line may sit between header and main when a route supplies
 it; existing route calls omit the slot and must keep working. Home uses that
-slot as `Threshold · Home`. The frame does not invent routes, slash aliases,
-or a second primary CTA. Home composition is thesis/entry beside a labeled
-static Room Aperture, then a source/state/scope/Status evidence rail, then
-the existing capability prose and operator shelf. This is a no-cut lock:
-public destinations and Home telemetry states stay in place.
+slot as `Community · Home`. The frame does not invent routes, slash aliases,
+or a second header CTA. Home composition is a community invitation and labeled
+static room preview, then a trust strip, community prose, and a quiet extras
+shelf below the fold. Live telemetry stays on Status/Stats, not Home. This is
+a no-cut lock for public destinations.
 
 ## Shell navigation invariants
 

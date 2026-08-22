@@ -1,17 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './home.css';
-import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
-import { fetchStatsIndex } from '@/lib/stats/networkIndex';
-import { statsRoomHref } from '@/lib/stats/channelDetail';
-import {
-  fetchNetworkStatus,
-  formatDuration,
-  publicMeshFeedState,
-} from '@/lib/stats/status';
-import { ProofRail, type TruthState } from '@/ui/proof';
+import { For } from 'solid-js';
 import { PublicFrame } from '@/ui/public';
-import { PUBLIC_ROUTE_MANIFEST } from '@/ui/navigation/publicRouteManifest';
+import { PUBLIC_ROUTE_MANIFEST, publicRouteById } from '@/ui/navigation/publicRouteManifest';
 import { setPageMeta } from './pageMeta';
 import { ProductPreview } from './ProductPreview';
 
@@ -24,83 +16,25 @@ const LANDING_SHELF_ITEMS = [
   [`${PUBLIC_ROUTE_MANIFEST[11]!.href}?join=%23root`, 'Invite'],
 ] as const;
 
+const TRUST_CLAIMS = [
+  ['No ads', 'Nobody is selling your attention in the room.'],
+  ['No third-party trackers', 'This site does not load analytics pixels or ad tags.'],
+  ['Private DMs', 'Side conversations can stay between people. Room text is not end-to-end.'],
+  ['History on your device', 'Catch-up and drafts stay with you on this device.'],
+] as const;
+
 /**
- * Onyx public homepage — Room Current threshold.
+ * Onyx public homepage — a community door.
  * Contract: docs/PUBLIC_COMPANY_SITE.md
- * Proof order: browser entry → labeled Room Aperture → evidence rail →
- * capability current → operator shelf. One primary Open Onyx CTA.
- * Native artifacts remain a secondary, platform-neutral link at /download/.
+ * Proof order: invite/join hero → labeled room preview → trust strip →
+ * community prose → quiet extras shelf. Header owns Open Onyx → /app/.
  */
 export default function Landing() {
   setPageMeta(
-    'Onyx — live rooms, messages, and calls',
-    'Open the Onyx service in your browser: rooms, DMs, and calls on your device. Inspect the public room pulse, then join. Native downloads are optional.',
+    'Onyx — a room for your people',
+    'A place for friends, clubs, and class groups to hang out. Open Onyx in your browser, invite someone, and join a room — without ads.',
     '/',
   );
-  const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
-  const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus, { initialValue: null });
-  const [nowMs, setNowMs] = createSignal(Date.now());
-  const refreshTimer = setInterval(() => {
-    setNowMs(Date.now());
-    void refetchStats();
-    void refetchStatus();
-  }, 30_000);
-  onCleanup(() => clearInterval(refreshTimer));
-
-  const busiest = createMemo(() =>
-    [...(stats.latest?.channels ?? [])].sort((a, b) => b.messages - a.messages)[0] ?? null,
-  );
-  const feedState = createMemo(() => (
-    status.loading ? 'loading' : publicMeshFeedState(status.latest, nowMs())
-  ));
-  const proofState = createMemo<TruthState>(() => {
-    switch (feedState()) {
-      // A current report only confirms the report's own complete, non-partitioned
-      // quorum observation. It is not an uptime or security assertion.
-      case 'current': return 'verified';
-      case 'degraded': return 'partial';
-      case 'stale': return 'reconnecting';
-      case 'future':
-      case 'unknown': return 'unknown';
-      case 'loading': return 'reconnecting';
-      default: return 'unavailable';
-    }
-  });
-  const proofDetail = createMemo(() => {
-    switch (feedState()) {
-      case 'current': return 'A current public network report confirms a complete, non-partitioned quorum observation.';
-      case 'degraded': return 'The public network report is current, but its observation is incomplete or degraded.';
-      case 'stale': return 'The last public network report is stale; a fresh observation is being awaited.';
-      case 'future': return 'The public network report has a future timestamp, so it cannot support a current claim.';
-      case 'unknown': return 'The public network report has no usable timestamp, so no current claim can be made.';
-      case 'loading': return 'The public network report is still being requested.';
-      default: return 'No public network report is available.';
-    }
-  });
-  const networkState = createMemo(() => {
-    switch (feedState()) {
-      case 'current': return 'operational';
-      case 'degraded': return 'degraded';
-      case 'stale': return 'stale';
-      case 'future': return 'time mismatch';
-      case 'unknown': return 'undated';
-      case 'loading': return 'listening';
-      default: return 'unavailable';
-    }
-  });
-  const peopleHint = createMemo(() => {
-    if (stats.latest) return 'reported';
-    return stats.loading ? 'waiting for stats' : 'no stats export';
-  });
-  const roomsHint = createMemo(() => {
-    if (stats.latest) return stats.latest.channels_complete ? 'tracked' : 'partial';
-    return stats.loading ? 'waiting' : 'no export';
-  });
-  const busyHint = createMemo(() => {
-    const report = status.latest;
-    if (report) return `up ${formatDuration(report.uptime_seconds)}`;
-    return status.loading ? 'no status yet' : 'no status export';
-  });
 
   return (
     <PublicFrame
@@ -108,33 +42,30 @@ export default function Landing() {
       mainLabel="Onyx home"
       context={(
         <p class="public-frame__current-line">
-          <span class="public-frame__current-kicker">Threshold</span>
+          <span class="public-frame__current-kicker">Community</span>
           <span aria-hidden="true">·</span>
           <span class="public-frame__current-label">Home</span>
         </p>
       )}
     >
       <div class="ui-root r r-landing home">
-      {/* Thin mineral atmosphere — motion stacks gated in home.css reduced-motion */}
       <div class="r-ground home-ground" aria-hidden="true" />
       <div class="r-grain home-grain" aria-hidden="true" />
 
       <section class="r-wrap home-hero" aria-labelledby="hero-heading">
         <div class="home-hero-grid">
           <div class="home-hero-copy">
-            <p class="home-kicker">Live service · rooms · messages · calls</p>
-            <h1 id="hero-heading" class="home-h1">Onyx is on. Open a room.</h1>
+            <p class="home-kicker">Friends · clubs · rooms</p>
+            <h1 id="hero-heading" class="home-h1">A room for your people.</h1>
             <p class="home-lede">
-              The same client for chat, DMs, and calls — in the browser now, or as a native install.
-              Public rooms keep a live pulse you can inspect before you join.
+              Invite someone. Join a room. Talk.
             </p>
             <div class="home-cta-row">
-              <a class="home-cta-primary" href="/app/">Open Onyx</a>
-              <a class="home-secondary-link" href={PUBLIC_ROUTE_MANIFEST[2]!.href}>Downloads</a>
+              <a class="home-cta-primary" href="/app/">Join free</a>
+              <a class="home-secondary-link" href={`${publicRouteById('invite').href}?join=%23root`}>Invite someone</a>
             </div>
             <p class="home-desktop-note">
-              No install is required to begin. Use the same client on desktop or mobile;
-              supporting browsers can also install Onyx as a PWA.
+              Open it in the browser — no install, no ads. Hosts and downloads live below.
             </p>
           </div>
 
@@ -142,113 +73,54 @@ export default function Landing() {
         </div>
       </section>
 
-      <section
-        class="r-wrap home-telemetry"
-        aria-label="Public network telemetry"
-      >
-        <ProofRail
-          state={proofState()}
-          label="Public network report"
-          detail={proofDetail()}
-          evidenceType="Public status feed"
-          ariaLabel="Public network report evidence"
-        />
-        <dl class="home-evidence-rail" data-home-evidence data-feed-state={feedState()}>
-          <div class="home-evidence-item">
-            <dt>Source</dt>
-            <dd>Public status feed</dd>
-          </div>
-          <div class="home-evidence-item">
-            <dt>State</dt>
-            <dd><strong data-state={networkState()}>{networkState()}</strong></dd>
-          </div>
-          <div class="home-evidence-item home-evidence-scope">
-            <dt>Scope</dt>
-            <dd>{proofDetail()}</dd>
-          </div>
-          <div class="home-evidence-item home-evidence-action">
-            <dt>Ledger</dt>
-            <dd>
-              <a class="home-telemetry-link" href={PUBLIC_ROUTE_MANIFEST[4]!.href}>Status</a>
-            </dd>
-          </div>
-        </dl>
-        <div class="home-telemetry-strip" data-feed-state={feedState()}>
-          <span class="home-telemetry-item">
-            <span class="k">network</span>
-            <strong data-state={networkState()}>{networkState()}</strong>
-          </span>
-          <span class="home-telemetry-sep" aria-hidden="true">·</span>
-          <span class="home-telemetry-item">
-            <span class="k">people</span>
-            <strong>
-              <Show when={stats.latest} fallback="--">
-                {(data) => data().users_online.toLocaleString('en-US')}
-              </Show>
-            </strong>
-            <span class="hint">{peopleHint()}</span>
-          </span>
-          <span class="home-telemetry-sep" aria-hidden="true">·</span>
-          <span class="home-telemetry-item">
-            <span class="k">rooms</span>
-            <strong>
-              <Show when={stats.latest} fallback="--">
-                {(data) => data().channels.length.toLocaleString('en-US')}
-              </Show>
-            </strong>
-            <span class="hint">{roomsHint()}</span>
-          </span>
-          <span class="home-telemetry-sep" aria-hidden="true">·</span>
-          <span class="home-telemetry-item">
-            <span class="k">busy</span>
-            <strong>
-              <Show when={busiest()} fallback="--">
-                {(room) => (
-                  <a class="home-busy-link" href={statsRoomHref(room().channel)}>
-                    {room().channel}
-                  </a>
-                )}
-              </Show>
-            </strong>
-            <span class="hint">{busyHint()}</span>
-          </span>
-        </div>
+      <section class="r-wrap home-trust" aria-labelledby="trust-heading">
+        <h2 id="trust-heading" class="home-visually-hidden">Why people stay</h2>
+        <ul class="home-trust-strip" data-home-trust>
+          <For each={TRUST_CLAIMS}>
+            {(claim) => (
+              <li>
+                <strong>{claim[0]}</strong>
+                <span>{claim[1]}</span>
+              </li>
+            )}
+          </For>
+        </ul>
       </section>
 
       <section class="r-wrap home-capability" aria-labelledby="capability-heading">
-        <h2 id="capability-heading" class="home-visually-hidden">What you get</h2>
+        <h2 id="capability-heading" class="home-visually-hidden">Life in the rooms</h2>
         <ul class="home-current" data-home-current>
           <li class="home-current-beat is-msg">
             <span class="mark mark-msg" aria-hidden="true" />
-            <span>Text rooms and direct messages</span>
+            <span>Rooms for friends, clubs, class groups, and public-interest hangouts</span>
           </li>
           <li class="home-current-beat is-call">
             <span class="mark mark-call" aria-hidden="true" />
-            <span>Voice and video when you need them</span>
+            <span>Talk in text, then start a call when the night wants one</span>
           </li>
           <li class="home-current-beat is-cont">
             <span class="mark mark-cont" aria-hidden="true" />
-            <span>Session resume and local history that stay with you</span>
+            <span>Come back later — the room and your place in it stay with you</span>
           </li>
           <li class="home-current-beat is-protect">
             <span class="mark mark-protect" aria-hidden="true" />
-            <span>Calls show how media is protected — never guessed.</span>
+            <span>Private DMs when a conversation should stay between people</span>
           </li>
         </ul>
-        <div class="home-capability-chapters" aria-label="Learn more about Onyx">
-          <a href={PUBLIC_ROUTE_MANIFEST[1]!.href}><strong>How Onyx works</strong><span>Read the product overview</span></a>
-          <a href={PUBLIC_ROUTE_MANIFEST[4]!.href}><strong>Network status</strong><span>See public operational evidence</span></a>
-          <a href={PUBLIC_ROUTE_MANIFEST[2]!.href}><strong>Downloads</strong><span>Choose a native app or browser entry</span></a>
+        <div class="home-capability-chapters" aria-label="More ways in">
+          <a href={`${publicRouteById('invite').href}?join=%23root`}><strong>Invite someone</strong><span>Send a room link to a friend</span></a>
+          <a href={publicRouteById('stats').href}><strong>See what's happening</strong><span>Public room activity, when it is published</span></a>
+          <a href={publicRouteById('about').href}><strong>How the rooms work</strong><span>A short, plain walkthrough</span></a>
         </div>
       </section>
 
       <nav
-        id="operators"
+        id="extras"
         class="r-wrap home-shelf"
         data-home-shelf
-        aria-label="Operators and power users"
+        aria-label="Hosting and extras"
       >
-        <p class="home-shelf-label">Operators and power users</p>
+        <p class="home-shelf-label">Hosting and extras</p>
         <ul class="home-shelf-list">
           <For each={LANDING_SHELF_ITEMS}>
             {(item) => <li><a href={item[0]}>{item[1]}</a></li>}

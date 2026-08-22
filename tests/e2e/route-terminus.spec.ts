@@ -35,9 +35,9 @@ test.describe('route terminus', () => {
 
     await page.getByRole('link', { name: 'Back to home' }).click();
     await expect(page).toHaveURL(/\/$/u);
-    await expect(page).toHaveTitle('Onyx — live rooms, messages, and calls');
+    await expect(page).toHaveTitle('Onyx — a room for your people');
     await expect.poll(() => headState(page)).toEqual({
-      title: 'Onyx — live rooms, messages, and calls',
+      title: 'Onyx — a room for your people',
       canonical: localCanonical,
       ogUrl: localCanonical,
       robots: null,
@@ -53,7 +53,7 @@ test.describe('route terminus', () => {
     await page.goForward();
     await expect(page).toHaveURL(/\/$/u);
     await expect.poll(() => headState(page)).toMatchObject({
-      title: 'Onyx — live rooms, messages, and calls', canonical: localCanonical, ogUrl: localCanonical, robots: null,
+      title: 'Onyx — a room for your people', canonical: localCanonical, ogUrl: localCanonical, robots: null,
     });
   });
 

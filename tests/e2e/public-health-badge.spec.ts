@@ -1,16 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 
 type HealthScenario = {
-  path: '/' | '/about/';
-  state: 'current' | 'degraded' | 'stale' | 'future' | 'unavailable';
+  path: '/about/';
+  state: 'future' | 'unavailable';
   label: string;
   selector: string;
 };
 
 const scenarios: HealthScenario[] = [
-  { path: '/', state: 'current', label: 'operational', selector: '[data-home-evidence]' },
-  { path: '/', state: 'degraded', label: 'degraded', selector: '[data-home-evidence]' },
-  { path: '/', state: 'stale', label: 'stale', selector: '[data-home-evidence]' },
   { path: '/about/', state: 'future', label: 'status time mismatch', selector: '.ab-feed' },
   { path: '/about/', state: 'unavailable', label: 'status unavailable', selector: '.ab-feed' },
 ];

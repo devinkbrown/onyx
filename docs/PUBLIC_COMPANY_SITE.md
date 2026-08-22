@@ -2,7 +2,7 @@
 
 **Status:** living contract for public marketing truth.
 **Companion claim ledger:** [`PUBLIC_LAUNCH_ROADMAP.md`](./PUBLIC_LAUNCH_ROADMAP.md).
-**Homepage implementation:** `src/routes/Landing.tsx` (+ shared `landing.css`, Home-only `home.css`, `Landing.test.tsx`).
+**Homepage implementation:** `src/routes/Landing.tsx` (+ shared `landing.css`, Home-only `home.css`, `ProductPreview.tsx`, `Landing.test.tsx`).
 
 This document freezes the **accepted Grok/Codex positioning decisions** so Landing,
 future Product/Communities/Organizations/Trust/Technology pages, and release copy
@@ -32,7 +32,7 @@ not shipped until real content and gates exist):
 
 | Surface | Role | Ship status for this pass |
 |---------|------|---------------------------|
-| **Home** `/` | Proof funnel + Open Onyx | **Ships** (Landing) |
+| **Home** `/` | Consumer product door + Open Onyx | **Ships** (Landing) |
 | **Product** | Rooms / Messages / Calls / Continuity depth | **PARTIAL** — Home pillars only; dedicated route gated |
 | **Communities** | Community proof path | **Gated** — no dedicated route yet |
 | **Organizations** | Org / team proof path (not “enterprise SSO pack”) | **Gated** — audience entry on Home only |
@@ -74,21 +74,29 @@ Every audience uses the **same** product. Paths differ only in **which proofs le
 
 ## Home proof order (required)
 
-Home is a **quiet threshold**, not an infomercial. Sections on `/` teach in this
-order of **argument** (layout may tighten for rhythm, but not reorder the story):
+Home is a **community door**, not an operator evidence desk. Sections on `/`
+teach in this order of **argument** (layout may tighten for rhythm, but not
+reorder the story):
 
-1. **Immediate browser entry** — one primary **Open Onyx** → `/app/`; optional
-   platform-neutral secondary text link to `/download/`. Exact platform
-   availability, signing state, and package requirements belong on Download.
-2. **Live-room aperture** — one honest **static** product preview, labeled
-   preview / not live content (not a laptop mockup; not live nicknames or metrics).
-3. **Compact live telemetry** — one strip from public stats/status feeds;
-   fail-honest when loading, stale, incomplete, or time-skewed (no invented counts).
-4. **One plain-language capability passage** — rooms, messages, calls/voice-video,
-   continuity (resume + local history), protection shown-not-assumed — **prose only**,
-   not a multi-card feature board.
-5. **Operator / power-user link shelf** — text links to Status, Stats, Roadmap,
-   About, Download, Invite (and existing footer). No second primary CTA.
+1. **Immediate invitation** — headline a stranger understands in three seconds
+   (a room for friends, clubs, class groups). Header owns **Open Onyx** → `/app/`.
+   Hero may say **Join free** to the same route. Secondary **Invite someone** →
+   `/invite/?join=%23root`. Exact platform availability belongs on Download.
+2. **Room aperture** — one honest **static** preview of people in a room, Home
+   catch-up, or DM, labeled preview / not live content (not a Connect form,
+   laptop mockup, terminal, or live nicknames or metrics).
+3. **Trust strip** — only claims the rooms can stand behind today: no ads, no
+   third-party trackers, private DMs, history on this device. No group E2EE,
+   passkeys, “fully encrypted,” or “open engine” as homepage personality.
+4. **One plain-language community passage** — rooms, talking, calls when wanted,
+   coming back later — **prose only**, not a multi-card feature board.
+5. **Quiet extras shelf** — Status, Stats, Roadmap, About, Download, Invite
+   (and existing footer). Hosts and operators stay below the fold.
+
+**Do not put on Home:** live telemetry rails, ProofRail receipts, “unavailable”
+network state, SHA-256 / mesh / node / IRC voice, or “Onyx is on.” Public
+stats and status remain on their own routes. A “See what’s happening” link may
+point at `/stats/` because that page is real.
 
 **Removed from Home (do not reintroduce):** audience taxonomy grids, six-card
 product boards, numbered how-to steps, faux terminals, protocol essays
@@ -185,11 +193,11 @@ Before flipping any public claim on Home or future marketing routes:
 3. `PUBLIC_LAUNCH_ROADMAP.md` claim ledger updated if the claim is launch-critical.
 4. No new route without real content (no empty shells for legal/download/enterprise).
 
-**This pass (quiet-threshold Home):** contract Home proof order + Landing section
-inventory (hero, aperture, telemetry strip, capability prose, operator shelf) +
-`home.css` mineral-night scope + tests. Shared `landing.css` remains for About /
-Download / footer primitives. No new routes. No stage/commit/push/deploy implied
-by this file alone.
+**This pass (community Home):** contract Home proof order + Landing section
+inventory (invite hero, labeled room preview, trust strip, community prose,
+quiet extras shelf) + `home.css` mineral-night scope + tests. Shared
+`landing.css` remains for About / Download / footer primitives. No new routes.
+No stage/commit/push/deploy implied by this file alone.
 
 ---
 
@@ -201,17 +209,17 @@ public destinations.
 
 | Surface | Contract |
 |---------|----------|
-| Subject | Onyx is a durable room for communities/groups and technically curious people |
-| Page job | In one calm pass: can I enter now, what kind of room is this, and what evidence supports its claims? |
-| Direction | Room Current — a quiet physical threshold into a room |
-| Signature | Room Aperture + Evidence Rail |
-| Primary CTA | Exactly one **Open Onyx** → `/app/`, owned by `PublicFrame` |
-| Aperture | Static, labeled **Preview** / not live content; no fake activity, no laptop mockup |
-| Evidence rail | Source, state, scope, and a Status ledger link; existing mesh/stats telemetry remains |
+| Subject | Onyx is a room for friends, clubs, and the people you want to talk to |
+| Page job | In one calm pass: can I walk in, who is it for, and what does a room feel like? |
+| Direction | Room Current — a warm mineral-night door into a community |
+| Signature | Community hero + labeled room preview + trust strip |
+| Primary CTA | **Open Onyx** → `/app/`, owned by `PublicFrame`; hero may say **Join free** |
+| Aperture | Static, labeled **Preview** / not live content; shows a room, not Connect; no fake activity, no laptop mockup |
+| Extras | Below the fold: Status, Stats, Roadmap, About, Download, Invite. Live mesh/stats telemetry stays on those routes, fail-honest |
 | Tokens | `--public-void #05070A`, `--public-surface #0C1016`, `--public-seam #1A222C`, `--public-paper #E6E8EC`, `--public-current #5BA3C9` (action/proof), `--public-ember #C97B6B` (caution/future/degraded only) |
-| Type | Fraunces for thesis/display only; Instrument Sans for body/control; JetBrains Mono for evidence/receipts |
+| Type | Instrument Sans for UI and headlines; Fraunces for at most one editorial line; JetBrains Mono for receipts on secondary routes |
 | Frame | One banner / one main / one footer; skip link; current-path nav; optional current-line `context` slot; 44px targets; forced colors; 200/400% zoom; reduced motion |
-| No-cut | All public routes and slash aliases remain; Home keeps every current content section and telemetry state |
+| No-cut | All public routes and slash aliases remain; Home does not host live telemetry |
 
 Forbidden on this pass: generic SaaS cards, laptop mockups, fake activity,
 broad neon gradients, gold shouting, Anton shouting, repeated primary CTAs,

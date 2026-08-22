@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later
  * Quiet-threshold Home only (imported by Landing.tsx).
  * Shared shell primitives stay in landing.css (About / Download / footer).
- * Room Current: thesis + Room Aperture + Evidence Rail.
+ * Room Current: community invitation + labeled room preview + trust strip.
  */
 
 .r-landing.home {
@@ -102,11 +102,12 @@
 
 .r-landing.home .home-lede {
   margin: 0 0 26px;
-  max-width: 36ch;
-  font-family: var(--mn-sans);
-  font-size: clamp(1.05rem, 1.7vw, 1.22rem);
-  font-weight: 400;
-  line-height: var(--leading-body, 1.55);
+  max-width: 38ch;
+  font-family: var(--mn-serif);
+  font-optical-sizing: auto;
+  font-size: clamp(1.08rem, 1.8vw, 1.28rem);
+  font-weight: 380;
+  line-height: var(--leading-body, 1.5);
   color: color-mix(in oklab, var(--mn-text) 86%, var(--mn-mute));
 }
 
@@ -164,7 +165,7 @@
 .r-landing.home .product-preview__window {
   display: grid;
   grid-template-columns: 28px 88px minmax(0, 1fr);
-  min-height: 210px;
+  min-height: 280px;
   overflow: hidden;
   border: 1px solid var(--mn-edge);
   border-radius: 4px;
@@ -228,10 +229,47 @@
 }
 .r-landing.home .product-preview__content {
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   align-content: start;
   gap: 8px;
-  padding: 10px;
+  padding: 0;
   background: var(--mn-face);
+}
+.r-landing.home .product-preview__roombar {
+  display: grid;
+  gap: 2px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--mn-edge);
+  background: color-mix(in oklab, var(--mn-void) 35%, var(--mn-face));
+}
+.r-landing.home .product-preview__roombar strong {
+  color: var(--mn-text);
+  font: 650 var(--text-xs)/1.2 var(--mn-sans);
+}
+.r-landing.home .product-preview__roombar small {
+  color: var(--mn-mute);
+  font-size: 0.62rem;
+}
+.r-landing.home .product-preview__stage {
+  margin: 0 10px;
+}
+.r-landing.home .product-preview__thread {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 0 10px;
+}
+.r-landing.home .product-preview__composer {
+  margin: 0 10px;
+  padding: 7px 9px;
+  border: 1px solid var(--mn-edge);
+  border-radius: 3px;
+  color: var(--mn-mute);
+  font: 500 0.62rem/1.2 var(--mn-sans);
+  background: var(--mn-void);
+}
+.r-landing.home .product-preview__proof {
+  margin: 0 10px 10px;
 }
 .r-landing.home .product-preview__stage {
   display: grid;
@@ -288,11 +326,11 @@
   font-weight: 650;
   width: auto !important;
 }
+.r-landing.home .product-preview__msg.is-you p { color: color-mix(in oklab, var(--mn-text) 78%, var(--mn-mute)); }
 .r-landing.home .product-preview__proof {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 4px;
   padding-top: 8px;
   border-top: 1px solid var(--mn-edge);
 }
@@ -322,9 +360,10 @@
 .r-landing.home .home-capability-chapters a:hover { border-color: color-mix(in oklab, var(--mn-signal) 55%, var(--mn-edge)); }
 .r-landing.home .home-capability-chapters span { color: var(--mn-mute); font-size: var(--text-sm); line-height: 1.35; }
 
+@media (max-width: 900px) { .r-landing.home .home-trust-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .r-landing.home .home-hero-grid, .r-landing.home .product-preview__canvas { grid-template-columns: 1fr; }.r-landing.home .home-capability-chapters { grid-template-columns: 1fr; }.r-landing.home .product-preview__canvas-label { grid-column: auto; } }
 @media (max-width: 320px) { .r-landing.home .home-cta-row { align-items: stretch; }.r-landing.home .home-cta-primary, .r-landing.home .home-secondary-link { width: 100%; justify-content: center; }.r-landing.home .product-preview { padding: 12px; }.r-landing.home .product-preview__tabs { gap: 2px; }.r-landing.home .product-preview__tabs button { font-size: .65rem; } }
-@media (prefers-reduced-transparency: reduce) { .r-landing.home .product-preview, .r-landing.home .home-capability-chapters a { background: var(--mn-face); } }
+@media (prefers-reduced-transparency: reduce) { .r-landing.home .product-preview, .r-landing.home .home-capability-chapters a, .r-landing.home .home-trust-strip li { background: var(--mn-face); } }
 
 .r-landing.home .home-desktop-note {
   margin: 0;
@@ -425,96 +464,32 @@
 .r-landing.home .home-aperture-marks .is-cont { color: var(--mn-mute); }
 .r-landing.home .home-aperture-marks .is-protect { color: color-mix(in oklab, var(--mn-protect) 72%, var(--mn-mute)); }
 
-/* Evidence rail */
-.r-landing.home .home-telemetry { padding-block: 10px 26px; }
-
-.r-landing.home .home-evidence-rail {
+.r-landing.home .home-trust { padding-block: 8px 28px; }
+.r-landing.home .home-trust-strip {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 1.6fr) auto;
-  gap: 12px 20px;
-  margin: 14px 0 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--mn-edge);
-  border-inline-start: 2px solid var(--mn-signal);
-  border-radius: 2px;
-  background: var(--mn-face);
-}
-
-.r-landing.home .home-evidence-item {
-  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 18px;
   margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.r-landing.home .home-evidence-item dt {
-  margin: 0 0 4px;
-  font-family: var(--mn-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--mn-mute) 85%, var(--mn-edge));
-}
-.r-landing.home .home-evidence-item dd {
-  margin: 0;
-  font-family: var(--mn-mono);
-  font-size: var(--text-sm, 0.8125rem);
-  line-height: 1.45;
-  color: var(--mn-text);
-  overflow-wrap: anywhere;
-}
-.r-landing.home .home-evidence-item strong { font-weight: 600; }
-.r-landing.home .home-evidence-item strong[data-state='operational'] { color: var(--mn-ok); }
-.r-landing.home .home-evidence-item strong[data-state='degraded'] { color: var(--mn-warn); }
-
-.r-landing.home .home-telemetry-strip {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--mn-edge);
-  border-radius: 2px;
-  background: var(--mn-face);
-  font-family: var(--mn-mono);
-  font-size: var(--text-sm, 0.8125rem);
-  color: var(--mn-mute);
-}
-
-.r-landing.home .home-telemetry-item {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+.r-landing.home .home-trust-strip li {
+  display: grid;
   gap: 6px;
+  min-height: 88px;
+  padding: 14px;
+  border: 1px solid var(--mn-edge);
+  border-radius: 2px;
+  background: var(--mn-face);
 }
-.r-landing.home .home-telemetry-item .k {
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.65rem;
-  color: color-mix(in oklab, var(--mn-mute) 85%, var(--mn-edge));
-}
-.r-landing.home .home-telemetry-item strong {
-  font-weight: 600;
+.r-landing.home .home-trust-strip strong {
+  font: 650 var(--text-md, 0.9375rem)/1.25 var(--mn-sans);
   color: var(--mn-text);
-  font-variant-numeric: tabular-nums;
 }
-.r-landing.home .home-telemetry-item strong[data-state='operational'] { color: var(--mn-ok); }
-.r-landing.home .home-telemetry-item strong[data-state='degraded'] { color: var(--mn-warn); }
-.r-landing.home .home-telemetry-item .hint { color: var(--mn-mute); font-size: 0.72rem; }
-.r-landing.home .home-busy-link {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 0.16em;
-  text-decoration-color: color-mix(in oklab, var(--mn-signal) 55%, transparent);
-}
-.r-landing.home .home-busy-link:hover { color: var(--mn-signal); }
-.r-landing.home .home-telemetry-sep { color: var(--mn-edge); user-select: none; }
-
-.r-landing.home .home-telemetry-link,
-.r-landing.home .home-evidence-action .home-telemetry-link {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  color: var(--mn-signal);
-  text-decoration: underline;
-  text-underline-offset: 0.18em;
+.r-landing.home .home-trust-strip span {
+  color: var(--mn-mute);
+  font-size: var(--text-sm);
+  line-height: 1.4;
 }
 
 .r-landing.home .home-capability { padding-block: 8px 40px; }
@@ -599,19 +574,14 @@
     grid-template-columns: 1fr;
     gap: 28px;
   }
-
-  .r-landing.home .home-evidence-rail {
-    grid-template-columns: 1fr;
-    border-inline-start-width: 2px;
-  }
 }
 
 @media (max-width: 720px) {
-  .r-landing.home .home-telemetry-link { margin-left: 0; width: 100%; }
   .r-landing.home .home-current {
     grid-template-columns: 1fr;
     gap: 12px;
   }
+  .r-landing.home .home-trust-strip { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
@@ -626,9 +596,6 @@
     justify-content: center;
     width: 100%;
   }
-  .r-landing.home .home-telemetry-strip { padding: 12px; gap: 10px; }
-  .r-landing.home .home-telemetry-sep { display: none; }
-  .r-landing.home .home-telemetry-item { width: 100%; }
 }
 
 @media (max-width: 320px) {
@@ -642,10 +609,6 @@
   .r-landing.home .home-hero,
   .r-landing.home .home-hero-grid,
   .r-landing.home .home-hero-copy,
-  .r-landing.home .home-aperture,
-  .r-landing.home .home-aperture-shell,
-  .r-landing.home .home-telemetry,
-  .r-landing.home .home-evidence-rail,
   .r-landing.home .home-capability,
   .r-landing.home .home-current,
   .r-landing.home .home-shelf {
@@ -654,8 +617,6 @@
   }
 
   .r-landing.home .home-hero-copy *,
-  .r-landing.home .home-aperture-shell *,
-  .r-landing.home .home-telemetry *,
   .r-landing.home .home-current *,
   .r-landing.home .home-shelf * {
     min-width: 0;
@@ -673,10 +634,7 @@
     font-size: 14px;
     line-height: 1.2;
   }
-  .r-landing.home .home-aperture-label,
   .r-landing.home .home-current-beat,
-  .r-landing.home .home-telemetry-item,
-  .r-landing.home .home-evidence-item,
   .r-landing.home .home-shelf-list a {
     font-size: 14px;
   }
@@ -691,7 +649,6 @@
   }
 
   .r-landing.home .home-secondary-link,
-  .r-landing.home .home-telemetry-link,
   .r-landing.home .home-shelf-list a {
     transition: none;
   }
@@ -705,10 +662,7 @@
     box-shadow: none !important;
   }
 
-  .r-landing.home .home-aperture-shell,
-  .r-landing.home .home-telemetry-strip,
-  .r-landing.home .home-evidence-rail,
-  .r-landing.home .home-aperture-badge {
+  .r-landing.home .home-trust-strip li {
     border: 1px solid CanvasText;
     background: Canvas;
     color: CanvasText;

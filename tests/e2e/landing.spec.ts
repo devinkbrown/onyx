@@ -3,25 +3,27 @@ import { stubPublicFeeds } from './public-feed-fixture';
 
 // Headless-Chromium e2e for the Onyx launch site.
 test.describe('Onyx landing', () => {
-  test('hero loads with the current headline', async ({ page }) => {
+  test('hero loads with the community headline', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toHaveText('Onyx is on. Open a room.');
+    await expect(page.locator('h1')).toHaveText('A room for your people.');
   });
 
   test('kicker + primary CTAs render', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText(/live service · rooms · messages · calls/i)).toBeVisible();
+    await expect(page.getByText(/friends · clubs · rooms/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /join free/i }).first()).toBeVisible();
     await expect(page.getByRole('link', { name: /open onyx/i }).first()).toBeVisible();
   });
 
-  test('the page references the network', async ({ page }) => {
+  test('the page invites people into a room, not an evidence desk', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('region', { name: 'Public network telemetry' })).toBeVisible();
+    await expect(page.getByRole('region', { name: /look inside a room/i })).toBeVisible();
+    await expect(page.getByText(/unavailable/i)).toHaveCount(0);
   });
 
   test('the entry point routes into the app', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: /open onyx/i }).first().click();
+    await page.getByRole('link', { name: /join free/i }).first().click();
     await expect(page).toHaveURL(/\/app/);
   });
 
