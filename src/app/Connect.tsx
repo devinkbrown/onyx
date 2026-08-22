@@ -60,6 +60,7 @@ import {
   type SavedCredentials,
 } from '@/lib/credentials';
 import { normalizeRoomTarget } from '@/shell/roomIdentity';
+import { recordFirstHourHandoff } from '@/lib/firstHour/firstHour';
 import { initialNode, NODES, selectBestNode, type IrcNode } from './nodes';
 import { installConnectPageLifecycle } from './connectPageLifecycle';
 
@@ -748,6 +749,11 @@ export function Connect(props: ConnectProps): JSX.Element {
       normalizedRoom === deepLinkJoin ? deepLinkAt : null,
       normalizedRoom === deepLinkJoin ? deepLinkTopic : null,
     );
+    recordFirstHourHandoff({
+      landing: normalizedRoom ? 'room' : 'home',
+      channel: normalizedRoom,
+      guest: m === 'guest',
+    });
 
     if (m === 'signin') {
       if (recoveryPathOpen()) {

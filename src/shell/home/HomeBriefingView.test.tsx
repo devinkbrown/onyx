@@ -78,6 +78,9 @@ function actions(over: Partial<HomeBriefingActions> = {}): HomeBriefingActions {
   return {
     openBrowseRooms: noop,
     openSearchMessages: noop,
+    startRoom: noop,
+    inviteFriends: noop,
+    dismissFirstHourTip: noop,
     openAppearance: noop,
     openShortcuts: noop,
     openCatchUp: noop,
@@ -130,6 +133,8 @@ function renderView(over: Partial<{
   confirm: string | null;
   caughtUpRooms: number;
   caughtUpUnread: number;
+  firstHourWelcome: boolean;
+  firstHourTip: HomeBriefingViewProps['firstHourTip'] extends () => infer T ? T : never;
 }> = {}) {
   const model = over.briefing ?? briefing();
   const nextActions = over.actions ?? actions();
@@ -149,6 +154,8 @@ function renderView(over: Partial<{
       more={() => over.more ?? more()}
       showFirstRoomPrompt={() => false}
       showInviteFriends={() => false}
+      showFirstHourWelcome={() => over.firstHourWelcome === true}
+      firstHourTip={() => over.firstHourTip ?? null}
       isJoined={() => false}
       caughtUpPlan={() => rooms > 0
         ? { targets: [{ kind: 'channel', target: '#mentions', unread, highlights: 0 }], rooms, unread, mentions: 0 }
@@ -211,6 +218,8 @@ describe('HomeBriefingView — presentation contract', () => {
         more={() => more()}
         showFirstRoomPrompt={() => true}
         showInviteFriends={() => true}
+        showFirstHourWelcome={() => false}
+        firstHourTip={() => null}
         isJoined={() => false}
         caughtUpPlan={() => EMPTY_CAUGHT_UP}
         actions={actions({ openInviteFriends })}
@@ -222,6 +231,30 @@ describe('HomeBriefingView — presentation contract', () => {
     expect(openInviteFriends).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/invite friends with a link/i)).toBeInTheDocument();
     expect(screen.queryByText(/mesh|handshake|claim path|member count/i)).not.toBeInTheDocument();
+  });
+
+  it('lands an empty first hour on Browse, Start a room, and Invite friends', () => {
+    const startRoom = vi.fn();
+    const inviteFriends = vi.fn();
+    const dismissFirstHourTip = vi.fn();
+    renderView({
+      firstHourWelcome: true,
+      firstHourTip: { id: 'home-next', text: 'Browse a room, start one, or invite a friend.' },
+      actions: actions({ startRoom, inviteFriends, dismissFirstHourTip }),
+    });
+
+    expect(screen.queryByText('Current ledger')).not.toBeInTheDocument();
+    expect(screen.getByText('Home')).toBeInTheDocument();
+    expect(screen.queryByText('Power tip')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Search messages' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Browse rooms' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Start a room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Invite friends' }));
+    expect(startRoom).toHaveBeenCalledOnce();
+    expect(inviteFriends).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss tip' }));
+    expect(dismissFirstHourTip).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('keeps mobile reading order: needs, continue, live, explore', () => {

@@ -8,6 +8,7 @@ import type { DMConversation } from '@/lib/store/store';
 import { resetPreferences } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import { MessageView } from './MessageView';
+import { recordFirstHourHandoff, resetFirstHourForTests } from '@/lib/firstHour/firstHour';
 
 const initialState = store.getInitialState();
 
@@ -44,12 +45,14 @@ describe('MessageView channel intro ledger', () => {
   beforeEach(() => {
     store.setState(initialState, true);
     resetPreferences();
+    resetFirstHourForTests();
   });
 
   afterEach(() => {
     cleanup();
     store.setState(initialState, true);
     resetPreferences();
+    resetFirstHourForTests();
   });
 
   it('links an empty public channel intro to the room ledger', async () => {
@@ -127,5 +130,28 @@ describe('MessageView channel intro ledger', () => {
       expect(screen.queryByTestId('channel-intro')).toBeNull();
     });
     expect(screen.queryByTestId('channel-intro-ledger')).toBeNull();
+  });
+
+  it('asks a first-hour guest to say hi instead of showing slash commands', async () => {
+    recordFirstHourHandoff({ landing: 'room', channel: '#general', guest: true });
+    store.setState(
+      {
+        ...initialState,
+        channels: new Map([['#general', makeChannel('#general')]]),
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'river',
+      },
+      true,
+    );
+
+    render(() => <MessageView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('feed-empty')).toBeTruthy();
+    });
+    expect(screen.getByText('Say hi')).toBeInTheDocument();
+    expect(screen.queryByText('/search')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('feed-empty-channel-ledger')).not.toBeInTheDocument();
   });
 });

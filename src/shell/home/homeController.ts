@@ -68,6 +68,16 @@ import { openSpotlight } from '@/chat/spotlight/useSpotlight';
 import { openMessageSearch, openMessageSearchWithQuery } from '../search/useMessageSearch';
 import { openRoomInviteShare } from '../roomInviteShareState';
 import {
+  firstHourCoachTip,
+  firstHourHandoffEpoch,
+  inviteFriendsHref,
+  isFirstHourSeen,
+  markFirstHourSeen,
+  peekFirstHourHandoff,
+  shouldShowFirstHourHomeWelcome,
+} from '@/lib/firstHour/firstHour';
+import { requestStartRoom } from '../startRoom';
+import {
   composeHomeBriefing,
   homeBriefingEqual,
   selectHomeCatchUpSource,
@@ -126,6 +136,9 @@ export type HomeMoreActivityView = {
 export type HomeBriefingActions = {
   openBrowseRooms: () => void;
   openSearchMessages: () => void;
+  startRoom: () => void;
+  inviteFriends: () => void;
+  dismissFirstHourTip: () => void;
   openAppearance: () => void;
   openShortcuts: () => void;
   openCatchUp: (item: CatchUpItem) => void;
@@ -163,6 +176,8 @@ export type HomeController = {
   more: () => HomeMoreActivityView;
   showFirstRoomPrompt: () => boolean;
   showInviteFriends: () => boolean;
+  showFirstHourWelcome: () => boolean;
+  firstHourTip: () => ReturnType<typeof firstHourCoachTip>;
   isJoined: (name: string) => boolean;
   caughtUpPlan: () => CaughtUpPlan;
   actions: HomeBriefingActions;
@@ -629,6 +644,14 @@ export function createHomeController(): HomeController {
     { equals: homeBriefingEqual },
   );
 
+  const showFirstHourWelcome = createMemo(() =>
+    shouldShowFirstHourHomeWelcome({
+      connected: connectionStatus() === 'connected',
+      hasRooms: hasRooms(),
+      directoryCount: directoryAll().length,
+      recentCount: recentRooms().length,
+    }),
+  );
   const showFirstRoomPrompt = createMemo(
     () =>
       connectionStatus() === 'connected'
@@ -643,6 +666,11 @@ export function createHomeController(): HomeController {
   const inviteShareChannel = createMemo(() => {
     for (const room of channels().values()) return room.name;
     return '';
+  });
+  const firstHourTip = createMemo(() => {
+    firstHourHandoffEpoch();
+    isFirstHourSeen();
+    return firstHourCoachTip('home');
   });
   const moreActivityHasContent = createMemo(() =>
     !!stats.latest
@@ -681,8 +709,25 @@ export function createHomeController(): HomeController {
   });
 
   const actions: HomeBriefingActions = {
-    openBrowseRooms: () => getState().openChannelBrowser(),
+    openBrowseRooms: () => {
+      markFirstHourSeen();
+      getState().openChannelBrowser();
+    },
     openSearchMessages: () => openMessageSearch(),
+    startRoom: () => {
+      markFirstHourSeen();
+      requestStartRoom();
+    },
+    inviteFriends: () => {
+      markFirstHourSeen();
+      const handoff = peekFirstHourHandoff();
+      const joined = [...getState().channels.values()][0]?.name ?? null;
+      const href = inviteFriendsHref(handoff?.channel ?? joined);
+      if (typeof window !== 'undefined') window.location.assign(href);
+    },
+    dismissFirstHourTip: () => {
+      markFirstHourSeen();
+    },
     openAppearance: () => getState().openAppearance(),
     openShortcuts: () => getState().openKeyboardShortcuts(),
     openCatchUp: (item) => {
@@ -831,6 +876,8 @@ export function createHomeController(): HomeController {
     more,
     showFirstRoomPrompt,
     showInviteFriends,
+    showFirstHourWelcome,
+    firstHourTip,
     isJoined,
     caughtUpPlan,
     actions,

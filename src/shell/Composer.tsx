@@ -64,6 +64,15 @@ import {
   type OutboxEntry,
 } from '@/lib/vault/historyVault';
 import { outboxComposerChrome } from '@/lib/vault/outboxStatus';
+import {
+  firstHourComposerHint,
+  firstHourHandoffEpoch,
+  isFirstHourSeen,
+  markComposerFocused,
+  markFirstHourSeen,
+  shouldFocusComposer,
+} from '@/lib/firstHour/firstHour';
+import { FirstHourCoach } from './FirstHourCoach';
 
 export type ComposerProps = {
   /** Optionally override the active target; defaults to deriving from activeView */
@@ -540,6 +549,21 @@ export function Composer(props: ComposerProps): JSX.Element {
     focusTextarea();
   });
 
+  const sayHiHint = createMemo(() => {
+    firstHourHandoffEpoch();
+    isFirstHourSeen();
+    return firstHourComposerHint();
+  });
+
+  createEffect(() => {
+    firstHourHandoffEpoch();
+    const view = activeView();
+    const channel = view.kind === 'channel' ? view.channel : null;
+    if (!shouldFocusComposer(channel)) return;
+    markComposerFocused();
+    focusTextarea();
+  });
+
   // ── auto-resize ──
   function autoResize(): void {
     const el = textareaRef;
@@ -945,6 +969,7 @@ export function Composer(props: ComposerProps): JSX.Element {
       return;
     }
 
+    markFirstHourSeen();
     setIsSending(true);
     const upload = new AbortController();
     activeUpload?.abort();
@@ -1597,9 +1622,22 @@ export function Composer(props: ComposerProps): JSX.Element {
           </p>
         )}
       </Show>
-      <p class="shell-composer-hint" aria-hidden="true">
-        Enter to send · @ or Tab for nicks · Shift+Enter for newline · Paste or drop files to attach
-      </p>
+      <Show
+        when={sayHiHint()}
+        fallback={
+          <p class="shell-composer-hint" aria-hidden="true">
+            Enter to send · @ or Tab for nicks · Shift+Enter for newline · Paste or drop files to attach
+          </p>
+        }
+      >
+        {(hint) => (
+          <FirstHourCoach
+            tip={{ id: 'room-say-hi', text: hint() }}
+            placement="composer"
+            onDismiss={() => markFirstHourSeen()}
+          />
+        )}
+      </Show>
       </div>
     </section>
   );

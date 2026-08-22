@@ -20,6 +20,7 @@ import {
   openGuestClaimSheet,
   resetGuestClaimSheetState,
 } from './guestClaimState';
+import { recordFirstHourHandoff, resetFirstHourForTests } from '@/lib/firstHour/firstHour';
 
 const initialState = store.getInitialState();
 
@@ -59,6 +60,7 @@ function openSheetFromChip(): void {
 beforeEach(() => {
   store.setState(initialState, true);
   resetGuestClaimSheetState();
+  resetFirstHourForTests();
   localStorage.clear();
 });
 
@@ -67,6 +69,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   localStorage.clear();
   resetGuestClaimSheetState();
+  resetFirstHourForTests();
 });
 
 describe('GuestClaimPrompt — chip', () => {
@@ -86,6 +89,13 @@ describe('GuestClaimPrompt — chip', () => {
   it('is absent when there is no nick yet', () => {
     seed({ account: null, nick: '' });
     expect(screen.queryByTestId('guest-claim')).not.toBeInTheDocument();
+  });
+
+  it('stays hidden during the after-join first hour so there is no second identity ritual', () => {
+    recordFirstHourHandoff({ landing: 'room', channel: '#general', guest: true });
+    seed({ account: null, nick: 'Nova' });
+    expect(screen.queryByTestId('guest-claim')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('is absent after dismiss and persists the dismissal per guest identity', () => {
