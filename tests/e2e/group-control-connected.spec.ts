@@ -53,7 +53,7 @@ test('group-control status stays inactive in the production authenticated shell'
     await page.goto('/app');
     await expect(page.locator('body')).toBeVisible();
     await expect.poll(() => page.evaluate(() => '__onyx' in window)).toBe(false);
-    await page.getByRole('tab', { name: 'Sign in' }).click();
+    await page.getByTestId('conn-mode-signin').click();
     await page.locator('#conn-nick').fill(account);
     const passwordPath = page.getByTestId('conn-password-path-open');
     if (await passwordPath.isVisible()) await passwordPath.click();

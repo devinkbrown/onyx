@@ -6,11 +6,12 @@
  *
  * The store is the single source of truth. We spy on store actions to assert
  * correct invocation, and we seed reactive state directly to verify that the
- * form / AppShell gate, the three modes (Guest · Sign in · Register), validation,
- * the register → verify flow, and the GHOST / resume affordances behave.
+ * form / AppShell gate, guest join + secondary Sign in / Create account,
+ * validation, the register → verify flow, and the GHOST / resume affordances
+ * behave.
  *
- * There is no server picker: the client auto-routes to the fastest reachable
- * mesh node. We therefore assert the connect URL is *one of* the known nodes,
+ * There is no server picker: the client auto-selects a transport endpoint.
+ * We therefore assert the connect URL is *one of* the known endpoints,
  * never a specific one. No live WebSocket is needed (probing is stubbed).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -97,20 +98,31 @@ afterEach(() => {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function clickMode(name: RegExp): void {
-  fireEvent.click(screen.getByRole('tab', { name }));
+  if (/guest/i.test(name.source)) {
+    fireEvent.click(screen.getByTestId('conn-mode-guest'));
+    return;
+  }
+  if (/sign in/i.test(name.source)) {
+    fireEvent.click(screen.getByTestId('conn-mode-signin'));
+    return;
+  }
+  fireEvent.click(screen.getByTestId('conn-mode-register'));
 }
 
 function nickField(): HTMLElement {
-  // Guest / sign-in / register all use one id; labels are Name / Guest name / Desired account name.
-  return screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i });
+  return screen.getByRole('textbox', { name: /^(display name|name|account name)$/i });
+}
+
+function publicCopy(): string {
+  return screen.getByTestId('connect-screen').textContent ?? '';
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
 describe('Connect screen rendering', () => {
-  it('renders the connect screen heading', () => {
+  it('renders the guest join heading', () => {
     render(() => <Connect />);
-    expect(screen.getByRole('heading', { name: /enter onyx/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /join a room/i })).toBeInTheDocument();
   });
 
   it('does not expose a server picker or any node hostnames', () => {
@@ -120,14 +132,11 @@ describe('Connect screen rendering', () => {
     expect(screen.queryByText(/eshmaki\.me/i)).not.toBeInTheDocument();
   });
 
-  it('shows the auto-routing indicator', () => {
+  it('never uses infrastructure or identity-mode copy on the first screen', () => {
     render(() => <Connect />);
-    expect(screen.getAllByText(/nearest node/i).length).toBeGreaterThan(0);
-  });
-
-  it('links first-time visitors to the install guide before they connect', () => {
-    render(() => <Connect />);
-    expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/download/');
+    expect(publicCopy()).not.toMatch(
+      /claim path|nearest node|handshake|tonight on the water|mesh is listening|auto-routed|ircv?3?|sasl|\bcap\b/i,
+    );
   });
 
   it('aborts its latency selection when the connect screen unmounts', async () => {
@@ -144,30 +153,20 @@ describe('Connect screen rendering', () => {
     expect(selectionSignal?.aborted).toBe(true);
   });
 
-  it('renders the three-mode switch', () => {
+  it('keeps sign in and create account as secondary actions', () => {
     render(() => <Connect />);
-    expect(screen.getByRole('tab', { name: /guest/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /sign in/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /register/i })).toBeInTheDocument();
+    expect(screen.getByTestId('conn-mode-signin')).toHaveTextContent(/sign in/i);
+    expect(screen.getByTestId('conn-mode-register')).toHaveTextContent(/create account/i);
+    expect(screen.queryByTestId('conn-mode-guest')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
   });
 
-  it('explains what each arrival mode keeps and where it lands', () => {
+  it('defaults to guest join', () => {
     render(() => <Connect />);
-    const summary = screen.getByRole('region', { name: /arrive without an account/i });
-    expect(within(summary).getByText('Guest identity')).toBeInTheDocument();
-    expect(within(summary).getByText('Home')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('tab', { name: /register/i }));
-    expect(screen.getByRole('region', { name: /claim a name on onyx/i })).toBeInTheDocument();
-    expect(screen.getByText('Home after verification')).toBeInTheDocument();
+    expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'guest');
   });
 
-  it('defaults to Guest mode', () => {
-    render(() => <Connect />);
-    expect(screen.getByRole('tab', { name: /guest/i })).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('renders the nick field', () => {
+  it('renders the display name field', () => {
     render(() => <Connect />);
     expect(nickField()).toBeInTheDocument();
   });
@@ -177,15 +176,15 @@ describe('Connect screen rendering', () => {
     expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
   });
 
-  it('renders the stay signed in toggle in Guest mode', () => {
+  it('hides stay-signed-in and recovery details on the first screen', () => {
     render(() => <Connect />);
-    expect(screen.getByRole('switch')).toBeInTheDocument();
-    expect(screen.getByText(/does not reserve your name or create an account/i)).toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.queryByText(/recovery email|passkey|certificate|session token/i)).not.toBeInTheDocument();
   });
 
-  it('renders the connect button', () => {
+  it('renders the join button', () => {
     render(() => <Connect />);
-    expect(screen.getByTestId('conn-submit')).toBeInTheDocument();
+    expect(screen.getByTestId('conn-submit')).toHaveTextContent(/^join$/i);
   });
 
   it('renders the status region', () => {
@@ -206,7 +205,7 @@ describe('Mode switching', () => {
   it('reveals an account password field in Sign in mode', () => {
     render(() => <Connect />);
     clickMode(/sign in/i);
-    expect(screen.getByRole('tab', { name: /sign in/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'signin');
     expect(screen.getByLabelText(/account password/i)).toBeInTheDocument();
   });
 
@@ -226,7 +225,7 @@ describe('Mode switching', () => {
 
   it('changes the submit label per mode', () => {
     render(() => <Connect />);
-    expect(screen.getByTestId('conn-submit')).toHaveTextContent(/continue/i);
+    expect(screen.getByTestId('conn-submit')).toHaveTextContent(/^join$/i);
     clickMode(/sign in/i);
     expect(screen.getByTestId('conn-submit')).toHaveTextContent(/sign in/i);
     clickMode(/register/i);
@@ -237,89 +236,19 @@ describe('Mode switching', () => {
 // ── Passkey sign-in ─────────────────────────────────────────────────────────
 
 describe('Passkey sign-in', () => {
-  function connectedServer(account: string | null = null) {
-    return {
-      id: 'passkey-test',
-      name: 'Onyx',
-      network: 'Onyx',
-      url: NODES[0]!.wss,
-      icon: '',
-      nick: 'alice',
-      account,
-      connected: true,
-    };
-  }
-
-  function openPasskeySignIn(): HTMLElement {
+  it('does not present passkeys on Connect even when WebAuthn exists', () => {
     enablePasskeys();
     render(() => <Connect />);
+    expect(screen.queryByTestId('conn-passkey-primary')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('conn-passkey-submit')).not.toBeInTheDocument();
+    expect(publicCopy()).not.toMatch(/passkey/i);
+
     clickMode(/sign in/i);
-    fireEvent.input(nickField(), { target: { value: 'alice' } });
-    return screen.getByTestId('conn-passkey-submit');
-  }
-
-  it('makes passkey the primary sign-in CTA and collapses the password path', () => {
-    enablePasskeys();
-    render(() => <Connect />);
-    clickMode(/sign in/i);
-
-    expect(screen.getByTestId('conn-passkey-primary')).toBeInTheDocument();
-    const passkeyBtn = screen.getByTestId('conn-passkey-submit');
-    expect(passkeyBtn).toHaveTextContent(/sign in with a passkey/i);
-    // Primary solid button — not the old ghost demotion.
-    expect(passkeyBtn.className).toContain('onyx-button--primary');
-    expect(passkeyBtn.className).not.toContain('onyx-button--ghost');
-    expect(screen.queryByLabelText(/account password/i)).not.toBeInTheDocument();
-    expect(screen.queryByTestId('conn-submit')).not.toBeInTheDocument();
-    expect(screen.getByTestId('conn-password-path-open')).toHaveTextContent(/use password instead/i);
-    // Stay-signed-in stores a password — hidden while password path is collapsed.
-    expect(screen.queryByLabelText(/stay signed in/i)).not.toBeInTheDocument();
-  });
-
-  it('surfaces the passkey-primary mode hint once routing settles', async () => {
-    enablePasskeys();
-    render(() => <Connect />);
-    clickMode(/sign in/i);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('conn-status')).toHaveTextContent(
-        /sign in with a passkey — or use your account password/i,
-      ),
-    );
-  });
-
-  it('reveals the password path under "Use password instead"', () => {
-    enablePasskeys();
-    render(() => <Connect />);
-    clickMode(/sign in/i);
-
-    fireEvent.click(screen.getByTestId('conn-password-path-open'));
-
+    expect(screen.queryByTestId('conn-passkey-primary')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('conn-passkey-submit')).not.toBeInTheDocument();
     expect(screen.getByLabelText(/account password/i)).toBeInTheDocument();
     expect(screen.getByTestId('conn-submit')).toHaveTextContent(/sign in/i);
-    // Passkey stays available as a secondary action (ghost + divider).
-    const passkeyBtn = screen.getByTestId('conn-passkey-submit');
-    expect(passkeyBtn).toBeInTheDocument();
-    expect(passkeyBtn.className).toContain('onyx-button--ghost');
-    expect(passkeyBtn.className).not.toContain('onyx-button--primary');
-    expect(screen.getByTestId('conn-passkey-primary')).toHaveTextContent(/or use a passkey/i);
-    expect(screen.queryByTestId('conn-password-path-open')).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/stay signed in/i)).toBeInTheDocument();
-  });
-
-  it('collapses the password path again after a mode round-trip', () => {
-    enablePasskeys();
-    render(() => <Connect />);
-    clickMode(/sign in/i);
-    fireEvent.click(screen.getByTestId('conn-password-path-open'));
-    expect(screen.getByLabelText(/account password/i)).toBeInTheDocument();
-
-    clickMode(/guest/i);
-    clickMode(/sign in/i);
-
-    expect(screen.queryByLabelText(/account password/i)).not.toBeInTheDocument();
-    expect(screen.getByTestId('conn-passkey-submit').className).toContain('onyx-button--primary');
-    expect(screen.getByTestId('conn-password-path-open')).toBeInTheDocument();
+    expect(screen.getByTestId('conn-status')).not.toHaveTextContent(/passkey/i);
   });
 
   it('keeps password as the primary path when WebAuthn is unavailable', async () => {
@@ -332,281 +261,9 @@ describe('Passkey sign-in', () => {
     expect(screen.getByTestId('conn-submit')).toHaveTextContent(/sign in/i);
     await waitFor(() =>
       expect(screen.getByTestId('conn-status')).toHaveTextContent(
-        /sign in to your account — onyx finds the nearest node for you/i,
+        /enter your name and password to continue/i,
       ),
     );
-  });
-
-  it('validates the nick before opening a passkey transport', () => {
-    enablePasskeys();
-    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
-    render(() => <Connect />);
-    clickMode(/sign in/i);
-
-    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
-    expect(screen.getByText(/name is required/i)).toBeInTheDocument();
-    expect(connectSpy).not.toHaveBeenCalled();
-
-    fireEvent.input(nickField(), { target: { value: '1bad' } });
-    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
-    expect(screen.getByText(/must start with/i)).toBeInTheDocument();
-    expect(connectSpy).not.toHaveBeenCalled();
-  });
-
-  it('shows Connecting securely… while the anonymous transport opens', async () => {
-    vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    const button = openPasskeySignIn();
-
-    fireEvent.click(button);
-
-    expect(screen.getByTestId('conn-passkey-submit')).toHaveTextContent(/connecting securely/i);
-    expect(screen.getByTestId('conn-passkey-submit')).toBeDisabled();
-  });
-
-  it('opens IRC transport once before dispatching WEBAUTHN AUTH', async () => {
-    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {
-      store.setState({ passkeyBusy: true, passkeyError: null });
-    });
-    const dismissSpy = vi.spyOn(getState(), 'dismissPasskeyMessage');
-    const button = openPasskeySignIn();
-
-    fireEvent.click(button);
-    fireEvent.click(button);
-
-    expect(connectSpy).toHaveBeenCalledTimes(1);
-    expect(connectSpy).toHaveBeenCalledWith(expect.objectContaining({
-      nick: 'alice',
-      realname: 'alice (Onyx)',
-    }));
-    expect(signInSpy).not.toHaveBeenCalled();
-    expect(dismissSpy).toHaveBeenCalled();
-
-    store.setState({
-      status: 'connected',
-      connectionStatus: 'connected',
-      autoReconnect: true,
-      server: connectedServer(),
-    });
-
-    await waitFor(() => expect(signInSpy).toHaveBeenCalledTimes(1));
-    expect(signInSpy).toHaveBeenCalledWith('alice');
-    expect(screen.getByTestId('connect-screen')).toBeInTheDocument();
-    expect(screen.getByTestId('conn-passkey-submit')).toHaveTextContent(/waiting for your device/i);
-  });
-
-  it('returns a dismissed prompt to a focused, actionable sign-in form', async () => {
-    vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {
-      store.setState({ passkeyBusy: true, passkeyError: null });
-    });
-    const disconnectSpy = vi.spyOn(getState(), 'disconnect');
-    const button = openPasskeySignIn();
-
-    fireEvent.click(button);
-    store.setState({
-      status: 'connected',
-      connectionStatus: 'connected',
-      autoReconnect: true,
-      server: connectedServer(),
-    });
-    await waitFor(() => expect(getState().signInWithPasskey).toHaveBeenCalledWith('alice'));
-
-    store.setState({ passkeyBusy: false, passkeyError: 'Passkey prompt was dismissed.' });
-
-    await waitFor(() => expect(disconnectSpy).toHaveBeenCalledTimes(1));
-    const restoredButton = screen.getByTestId('conn-passkey-submit');
-    expect(screen.getByRole('alert')).toHaveTextContent('Passkey prompt was dismissed.');
-    await waitFor(() => expect(restoredButton).toHaveFocus());
-    // Form is actionable again after cancellation.
-    expect(restoredButton).not.toBeDisabled();
-    expect(restoredButton).toHaveTextContent(/sign in with a passkey/i);
-  });
-
-  it('releases the form when the anonymous transport drops before dispatch', async () => {
-    vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
-    const button = openPasskeySignIn();
-
-    fireEvent.click(button);
-    expect(screen.getByTestId('conn-passkey-submit')).toHaveTextContent(/connecting securely/i);
-
-    // Synchronous WS construction failure / drop before connected: free the guard.
-    store.setState({
-      status: 'disconnected',
-      connectionStatus: 'disconnected',
-      autoReconnect: false,
-    });
-
-    await waitFor(() =>
-      expect(screen.getByTestId('conn-passkey-submit')).toHaveTextContent(/sign in with a passkey/i),
-    );
-    expect(screen.getByTestId('conn-passkey-submit')).not.toBeDisabled();
-    expect(signInSpy).not.toHaveBeenCalled();
-  });
-
-  it('locks the form while a passkey attempt is in flight', async () => {
-    vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    openPasskeySignIn();
-    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
-
-    expect(nickField()).toBeDisabled();
-    expect(screen.getByTestId('conn-passkey-submit')).toBeDisabled();
-    expect(screen.getByTestId('conn-password-path-open')).toBeDisabled();
-  });
-
-  it('can start a fresh passkey attempt for another nick after a transport drop', async () => {
-    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
-    openPasskeySignIn();
-
-    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
-    store.setState({
-      status: 'disconnected',
-      connectionStatus: 'disconnected',
-      autoReconnect: false,
-    });
-    await waitFor(() =>
-      expect(screen.getByTestId('conn-passkey-submit')).not.toBeDisabled(),
-    );
-
-    fireEvent.input(nickField(), { target: { value: 'bob' } });
-    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
-    expect(connectSpy).toHaveBeenLastCalledWith(expect.objectContaining({ nick: 'bob' }));
-
-    store.setState({
-      status: 'connected',
-      connectionStatus: 'connected',
-      autoReconnect: true,
-      server: { ...connectedServer(null), nick: 'bob' },
-    });
-    await waitFor(() => expect(signInSpy).toHaveBeenCalledWith('bob'));
-  });
-
-  it('cancels the anonymous transport when mode changes before the challenge', async () => {
-    vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
-    const disconnectSpy = vi.spyOn(getState(), 'disconnect');
-    const button = openPasskeySignIn();
-
-    fireEvent.click(button);
-    const arrival = screen.getByRole('region', { name: /resume your onyx identity/i });
-    fireEvent.click(within(arrival).getByRole('button', { name: /create an account instead/i }));
-
-    expect(disconnectSpy).toHaveBeenCalledTimes(1);
-    store.setState({ status: 'connected', connectionStatus: 'connected' });
-    await Promise.resolve();
-    expect(signInSpy).not.toHaveBeenCalled();
-  });
-
-  it('freezes mode tabs once the passkey ceremony is dispatched', async () => {
-    vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {
-      store.setState({ passkeyBusy: true, passkeyError: null });
-    });
-    const disconnectSpy = vi.spyOn(getState(), 'disconnect');
-    const button = openPasskeySignIn();
-
-    fireEvent.click(button);
-    store.setState({
-      status: 'connected',
-      connectionStatus: 'connected',
-      autoReconnect: true,
-      server: connectedServer(),
-    });
-    await waitFor(() => expect(getState().signInWithPasskey).toHaveBeenCalledWith('alice'));
-    const disconnectsAfterDispatch = disconnectSpy.mock.calls.length;
-
-    // Mode change is ignored while dispatched so account A cannot complete on B.
-    clickMode(/guest/i);
-    expect(screen.getByRole('tab', { name: /sign in/i })).toHaveAttribute('aria-selected', 'true');
-    expect(disconnectSpy).toHaveBeenCalledTimes(disconnectsAfterDispatch);
-    expect(screen.getByTestId('conn-passkey-submit')).toHaveTextContent(/waiting for your device/i);
-  });
-
-  it('does not prompt again when SESSION already restored the requested account', async () => {
-    vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
-    const button = openPasskeySignIn();
-
-    fireEvent.click(button);
-    store.setState({
-      status: 'connected',
-      connectionStatus: 'connected',
-      autoReconnect: true,
-      server: connectedServer('alice'),
-    });
-
-    await waitFor(() => expect(screen.getByTestId('app-shell')).toBeInTheDocument());
-    expect(signInSpy).not.toHaveBeenCalled();
-  });
-
-  it('treats SESSION account restore as case-insensitive', async () => {
-    vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
-    const button = openPasskeySignIn();
-
-    fireEvent.click(button);
-    store.setState({
-      status: 'connected',
-      connectionStatus: 'connected',
-      autoReconnect: true,
-      server: connectedServer('ALICE'),
-    });
-
-    await waitFor(() => expect(screen.getByTestId('app-shell')).toBeInTheDocument());
-    expect(signInSpy).not.toHaveBeenCalled();
-  });
-
-  it('surfaces a store passkeyError without starting a ceremony', () => {
-    enablePasskeys();
-    store.setState({ passkeyError: 'No passkey is registered for this account.' });
-    render(() => <Connect />);
-    clickMode(/sign in/i);
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'No passkey is registered for this account.',
-    );
-  });
-
-  it('destroys the anonymous transport on unmount before dispatch', async () => {
-    enablePasskeys();
-    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
-    const disconnectSpy = vi.spyOn(getState(), 'disconnect');
-    const view = render(() => <Connect />);
-    clickMode(/sign in/i);
-    fireEvent.input(nickField(), { target: { value: 'alice' } });
-    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
-    expect(connectSpy).toHaveBeenCalledTimes(1);
-
-    view.unmount();
-    expect(disconnectSpy).toHaveBeenCalledTimes(1);
-    store.setState({ status: 'connected', connectionStatus: 'connected' });
-    await Promise.resolve();
-    expect(signInSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -781,7 +438,7 @@ describe('Sign in connect', () => {
     clickMode(/sign in/i);
 
     expect(screen.getByRole('switch', { name: 'Stay signed in' })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText(/stores your account password in this browser/i)).toBeInTheDocument();
+    expect(screen.getByText(/saves your account password in this browser/i)).toBeInTheDocument();
     expect(screen.getByText(/only on a private device/i)).toBeInTheDocument();
   });
 
@@ -897,7 +554,7 @@ describe('Register → verify → done flow', () => {
     render(() => <Connect />);
     clickMode(/register/i);
     store.setState({ registerPending: true });
-    await waitFor(() => expect(screen.getByRole('status', { name: /registering/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('status', { name: /creating account/i })).toBeInTheDocument());
   });
 
   it('surfaces registerError inline', async () => {
@@ -1047,10 +704,10 @@ describe('Session resume', () => {
     seedSavedCredentials();
     render(() => <Connect />);
     await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
-    const switcher = screen.getByRole('region', { name: /remembered identities/i });
+    const switcher = screen.getByRole('region', { name: /continue where you left off/i });
     expect(switcher).toHaveTextContent('kain');
-    expect(switcher).toHaveTextContent('wss://ircx.us:8080');
-    expect(switcher).toHaveTextContent(/session ready/i);
+    expect(switcher).not.toHaveTextContent(/wss:\/\//i);
+    expect(switcher).toHaveTextContent(/ready to continue/i);
   });
 
   it('never stages a malformed persisted resume token for Connect', async () => {
@@ -1080,7 +737,7 @@ describe('Session resume', () => {
 
     await waitFor(() => expect(screen.getByTestId('conn-remembered-signin')).toBeInTheDocument());
     expect(screen.queryByTestId('conn-resume')).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: /remembered identities/i })).not.toHaveTextContent(
+    expect(screen.getByRole('region', { name: /continue where you left off/i })).not.toHaveTextContent(
       'malformed resume token',
     );
     fireEvent.click(screen.getByTestId('conn-remembered-signin'));
@@ -1124,7 +781,8 @@ describe('Session resume', () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
     await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('switch'));
+    clickMode(/sign in/i);
+    fireEvent.click(screen.getByRole('switch', { name: 'Stay signed in' }));
 
     fireEvent.click(screen.getByTestId('conn-resume'));
 
@@ -1158,7 +816,8 @@ describe('Session resume', () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
     await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('switch'));
+    clickMode(/sign in/i);
+    fireEvent.click(screen.getByRole('switch', { name: 'Stay signed in' }));
 
     fireEvent.click(screen.getByTestId('conn-resume'));
 
@@ -1208,7 +867,7 @@ describe('Session resume', () => {
     expect(screen.queryByTestId('conn-resume')).not.toBeInTheDocument();
   });
 
-  it('re-authenticates a token-only identity with a passkey before resume', async () => {
+  it('does not start a passkey ceremony for a token-only remembered identity', async () => {
     enablePasskeys();
     window.localStorage.setItem(
       'onyx:credentials',
@@ -1225,40 +884,22 @@ describe('Session resume', () => {
         },
       }),
     );
-    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
-      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
-    });
-    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {
-      store.setState({ passkeyBusy: true, passkeyError: null });
-    });
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
 
     render(() => <Connect />);
 
     await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
-    expect(screen.getByRole('region', { name: /remembered identities/i })).toHaveTextContent(/session ready/i);
-    expect(screen.getByRole('region', { name: /remembered identities/i }).textContent).not.toContain('passkey-resume-token');
+    expect(screen.getByRole('region', { name: /continue where you left off/i })).toHaveTextContent(/ready to continue/i);
+    expect(screen.getByRole('region', { name: /continue where you left off/i }).textContent).not.toContain('passkey-resume-token');
 
     fireEvent.click(screen.getByTestId('conn-resume'));
 
-    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
-    expect(connectSpy.mock.calls[0]![0]).toMatchObject({
-      url: 'wss://ircx.us:8080',
-      nick: 'kain',
-    });
-    expect(connectSpy.mock.calls[0]![0].password).toBeUndefined();
+    expect(connectSpy).not.toHaveBeenCalled();
     expect(signInSpy).not.toHaveBeenCalled();
-
-    store.setState({
-      status: 'connected',
-      connectionStatus: 'connected',
-      autoReconnect: true,
-      server: {
-        id: 'resume-passkey', name: 'Onyx', network: 'Onyx',
-        url: 'wss://ircx.us:8080', icon: '', nick: 'kain', account: null, connected: true,
-      },
-    });
-
-    await waitFor(() => expect(signInSpy).toHaveBeenCalledWith('kain'));
+    expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'signin');
+    expect(screen.getByLabelText(/account password/i)).toBeInTheDocument();
+    expect(nickField()).toHaveValue('kain');
     connectSpy.mockRestore();
   });
 
@@ -1285,7 +926,7 @@ describe('Session resume', () => {
     fireEvent.click(screen.getByTestId('conn-resume'));
 
     expect(connectSpy).not.toHaveBeenCalled();
-    expect(screen.getByRole('tab', { name: /sign in/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'signin');
     expect(screen.getByLabelText(/account password/i)).toBeInTheDocument();
     expect(nickField()).toHaveValue('kain');
   });
@@ -1350,14 +991,14 @@ describe('Session resume', () => {
 
     render(() => <Connect />);
 
-    const switcher = await screen.findByRole('region', { name: /remembered identities/i });
+    const switcher = await screen.findByRole('region', { name: /continue where you left off/i });
     expect(within(switcher).getByText('Alice')).toBeInTheDocument();
     expect(within(switcher).getByText('Bob')).toBeInTheDocument();
     expect(switcher.textContent).not.toContain('alice-secret');
     expect(switcher.textContent).not.toContain('bob-secret');
     expect(switcher.textContent).not.toContain('alice-token');
 
-    fireEvent.click(within(switcher).getByRole('button', { name: `Select Bob on ${second.wss}` }));
+    fireEvent.click(within(switcher).getByRole('button', { name: `Select Bob` }));
     expect(nickField()).toHaveValue('Bob');
     expect(screen.getByTestId('conn-remembered-signin')).toBeInTheDocument();
 
@@ -1394,8 +1035,8 @@ describe('Session resume', () => {
 
     render(() => <Connect />);
 
-    const switcher = await screen.findByRole('region', { name: /remembered identities/i });
-    fireEvent.click(within(switcher).getByRole('button', { name: `Forget Bob on ${second.wss}` }));
+    const switcher = await screen.findByRole('region', { name: /continue where you left off/i });
+    fireEvent.click(within(switcher).getByRole('button', { name: `Forget Bob` }));
 
     expect(within(switcher).queryByText('Bob')).not.toBeInTheDocument();
     expect(within(switcher).getByText('Alice')).toBeInTheDocument();
@@ -1519,7 +1160,7 @@ describe('View gating on connectionStatus', () => {
     const guard = await screen.findByTestId('conn-auth-required');
     expect(screen.getByTestId('conn-status')).toHaveTextContent(/belongs to an account/i);
     fireEvent.click(within(guard).getByRole('button', { name: /sign in as alice/i }));
-    expect(screen.getByRole('tab', { name: /sign in/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'signin');
     expect(nickField()).toHaveValue('alice');
     connectSpy.mockRestore();
   });
@@ -1551,7 +1192,7 @@ describe('optional room to join (no autojoin)', () => {
   it('a filled room normalizes (# added) and queues the pending join on submit', () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
-    fireEvent.input(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i }), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByRole('textbox', { name: /^(display name|name|account name)$/i }), { target: { value: 'tester' } });
     fireEvent.input(roomField(), { target: { value: 'lounge' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(store.getState().pendingDeepLinkJoin).toBe('#lounge');
@@ -1565,11 +1206,8 @@ describe('optional room to join (no autojoin)', () => {
   ])('normalizes room "$entered" to "$expected" in destination and pending join', ({ entered, expected }) => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
-    fireEvent.input(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i }), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByRole('textbox', { name: /^(display name|name|account name)$/i }), { target: { value: 'tester' } });
     fireEvent.input(roomField(), { target: { value: entered } });
-
-    const summary = screen.getByRole('region', { name: /arrive without an account/i });
-    expect(within(summary).getByText(expected)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(store.getState().pendingDeepLinkJoin).toBe(expected);
@@ -1579,7 +1217,7 @@ describe('optional room to join (no autojoin)', () => {
   it('an empty room leaves no pending join — landing on Home is the default', () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
-    fireEvent.input(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i }), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByRole('textbox', { name: /^(display name|name|account name)$/i }), { target: { value: 'tester' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(store.getState().pendingDeepLinkJoin).toBeNull();
     connectSpy.mockRestore();
@@ -1587,7 +1225,7 @@ describe('optional room to join (no autojoin)', () => {
 
   it('a malformed room blocks submit with an error', () => {
     render(() => <Connect />);
-    fireEvent.input(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i }), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByRole('textbox', { name: /^(display name|name|account name)$/i }), { target: { value: 'tester' } });
     fireEvent.input(roomField(), { target: { value: '#bad channel' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(screen.getByText(/no spaces or commas/i)).toBeInTheDocument();
@@ -1599,8 +1237,8 @@ describe('optional room to join (no autojoin)', () => {
     render(() => <Connect />);
 
     expect(screen.getByRole('note', { name: /invite preview/i })).toHaveTextContent('Join #general');
-    expect(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i })).toHaveValue('yuki');
-    expect(roomField()).toHaveValue('#general');
+    expect(screen.getByRole('textbox', { name: /^(display name|name|account name)$/i })).toHaveValue('yuki');
+    expect(screen.queryByRole('textbox', { name: 'Room' })).not.toBeInTheDocument();
   });
 
   it('queues the invite room when connecting with the suggested guest nick', async () => {
@@ -1623,7 +1261,7 @@ describe('optional room to join (no autojoin)', () => {
 
     render(() => <Connect />);
     expect(screen.getByRole('note', { name: /invite preview/i })).toHaveTextContent('Join &ops');
-    expect(roomField()).toHaveValue('&ops');
+    expect(screen.queryByRole('textbox', { name: 'Room' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('conn-submit'));
 
     await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
@@ -1652,7 +1290,8 @@ describe('optional room to join (no autojoin)', () => {
 
     render(() => <Connect />);
 
-    expect(screen.getByRole('textbox', { name: /^(guest )?name$|^desired account name$/i })).toHaveValue('');
-    expect(roomField()).toHaveValue('#general');
+    expect(screen.getByRole('textbox', { name: /^(display name|name|account name)$/i })).toHaveValue('');
+    expect(screen.getByRole('note', { name: /invite preview/i })).toHaveTextContent('Join #general');
+    expect(screen.queryByRole('textbox', { name: 'Room' })).not.toBeInTheDocument();
   });
 });

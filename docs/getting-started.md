@@ -50,10 +50,10 @@ outside local development.
 
 ## First connection
 
-The landing page leads to the connect surface. You can enter as a guest or use
-the account flow supported by the connected server. The server, not the client,
-is authoritative for registration, SASL, account state, capabilities, and
-session-resume tokens.
+The landing page leads to the connect surface. First-run is guest join: a
+display name, an optional room, then Join. Sign in and Create account stay
+secondary. The server, not the client, is authoritative for registration,
+account state, and session-resume tokens.
 
 After connection:
 

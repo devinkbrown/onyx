@@ -145,8 +145,8 @@ async function startPinnedPreview(wsUrl: string, workRoot: string): Promise<{ or
 async function connectGuest(page: Page, origin: string, nick: string): Promise<void> {
   await page.goto(`${origin}/app/`, { waitUntil: 'domcontentloaded' });
   await expect.poll(() => page.evaluate(() => '__onyx' in window)).toBe(false);
-  const guestTab = page.getByRole('tab', { name: 'Guest' });
-  if (await guestTab.isVisible()) await guestTab.click();
+  const guestMode = page.getByTestId('conn-mode-guest');
+  if (await guestMode.isVisible()) await guestMode.click();
   await page.locator('#conn-nick').fill(nick);
   await page.getByTestId('conn-submit').click();
   await expect(page.getByTestId('app-shell')).toBeVisible({ timeout: 45_000 });

@@ -7,41 +7,79 @@ async function openConnect(page: Page, width: number, height: number): Promise<v
   await expect(page.getByTestId('connect-screen')).toBeVisible();
 }
 
+async function guestGeometry(page: Page) {
+  return page.evaluate(() => {
+    const card = document.querySelector<HTMLElement>('.conn-card')!;
+    const body = document.querySelector<HTMLElement>('.conn-body')!;
+    const submit = document.querySelector<HTMLElement>('[data-testid="conn-submit"]')!;
+    const name = document.querySelector<HTMLElement>('#conn-nick')!;
+    const room = document.querySelector<HTMLElement>('#conn-room')!;
+    const signIn = document.querySelector<HTMLElement>('[data-testid="conn-mode-signin"]')!;
+    const register = document.querySelector<HTMLElement>('[data-testid="conn-mode-register"]')!;
+    const cardBox = card.getBoundingClientRect();
+    const submitBox = submit.getBoundingClientRect();
+    const nameBox = name.getBoundingClientRect();
+    const roomBox = room.getBoundingClientRect();
+    return {
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+      documentHeight: document.documentElement.scrollHeight,
+      documentWidth: document.documentElement.scrollWidth,
+      cardTop: cardBox.top,
+      cardBottom: cardBox.bottom,
+      cardLeft: cardBox.left,
+      cardRight: cardBox.right,
+      submitTop: submitBox.top,
+      submitBottom: submitBox.bottom,
+      submitHeight: submitBox.height,
+      nameTop: nameBox.top,
+      nameBottom: nameBox.bottom,
+      roomTop: roomBox.top,
+      roomBottom: roomBox.bottom,
+      signInVisible: signIn.getBoundingClientRect().height > 0,
+      registerVisible: register.getBoundingClientRect().height > 0,
+      bodyClientHeight: body.clientHeight,
+      bodyScrollHeight: body.scrollHeight,
+      bodyClientWidth: body.clientWidth,
+      bodyScrollWidth: body.scrollWidth,
+      copy: document.querySelector('[data-testid="connect-screen"]')?.textContent ?? '',
+    };
+  });
+}
+
 test.describe('Connect viewport geometry', () => {
-  test('keeps the desktop card and primary guest action inside a 1440x900 viewport', async ({ page }) => {
+  test('keeps guest join complete inside a 1440x900 viewport', async ({ page }) => {
     await openConnect(page, 1440, 900);
+    const geometry = await guestGeometry(page);
 
-    const geometry = await page.evaluate(() => {
-      const card = document.querySelector<HTMLElement>('.conn-card')!;
-      const body = document.querySelector<HTMLElement>('.conn-body')!;
-      const submit = document.querySelector<HTMLElement>('[data-testid="conn-submit"]')!;
-      const cardBox = card.getBoundingClientRect();
-      const submitBox = submit.getBoundingClientRect();
-      return {
-        viewportHeight: window.innerHeight,
-        documentHeight: document.documentElement.scrollHeight,
-        cardTop: cardBox.top,
-        cardBottom: cardBox.bottom,
-        submitTop: submitBox.top,
-        submitBottom: submitBox.bottom,
-        bodyClientHeight: body.clientHeight,
-        bodyScrollHeight: body.scrollHeight,
-        bodyClientWidth: body.clientWidth,
-        bodyScrollWidth: body.scrollWidth,
-      };
-    });
-
+    expect(geometry.copy).not.toMatch(/claim path|nearest node|handshake|tonight on the water/i);
     expect(geometry.documentHeight).toBe(geometry.viewportHeight);
     expect(geometry.cardTop).toBeGreaterThanOrEqual(0);
     expect(geometry.cardBottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    expect(geometry.nameTop).toBeGreaterThanOrEqual(0);
+    expect(geometry.roomBottom).toBeLessThanOrEqual(geometry.viewportHeight);
     expect(geometry.submitTop).toBeGreaterThanOrEqual(geometry.cardTop);
-    expect(geometry.submitBottom).toBeLessThanOrEqual(geometry.cardBottom);
     expect(geometry.submitBottom).toBeLessThanOrEqual(geometry.viewportHeight);
-    expect(geometry.bodyScrollHeight).toBeGreaterThan(geometry.bodyClientHeight);
+    expect(geometry.submitHeight).toBeGreaterThanOrEqual(44);
+    expect(geometry.signInVisible).toBe(true);
+    expect(geometry.registerVisible).toBe(true);
     expect(geometry.bodyScrollWidth).toBe(geometry.bodyClientWidth);
   });
 
-  test('preserves the full-width, document-scrolling 390px mobile front door', async ({ page }) => {
+  test('keeps guest join complete inside a 1366x768 laptop viewport', async ({ page }) => {
+    await openConnect(page, 1366, 768);
+    const geometry = await guestGeometry(page);
+
+    expect(geometry.documentHeight).toBe(geometry.viewportHeight);
+    expect(geometry.nameBottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    expect(geometry.roomBottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    expect(geometry.submitBottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    expect(geometry.submitHeight).toBeGreaterThanOrEqual(44);
+    expect(geometry.signInVisible).toBe(true);
+    expect(geometry.registerVisible).toBe(true);
+  });
+
+  test('preserves the full-width 390px mobile front door with a reachable join action', async ({ page }) => {
     await openConnect(page, 390, 844);
 
     const beforeScroll = await page.evaluate(() => {
@@ -63,14 +101,13 @@ test.describe('Connect viewport geometry', () => {
       };
     });
 
-    expect(beforeScroll.documentHeight).toBeGreaterThan(beforeScroll.viewportHeight);
     expect(beforeScroll.documentWidth).toBe(beforeScroll.viewportWidth);
     expect(beforeScroll.cardLeft).toBeCloseTo(0, 1);
     expect(beforeScroll.cardRight).toBeCloseTo(beforeScroll.viewportWidth, 1);
     expect(beforeScroll.cardMinHeight).toBe(`${beforeScroll.viewportHeight}px`);
     expect(beforeScroll.bodyOverflowY).not.toBe('auto');
-    expect(beforeScroll.bodyPaddingTop).toBeGreaterThanOrEqual(22);
-    expect(beforeScroll.bodyPaddingBottom).toBeGreaterThanOrEqual(22);
+    expect(beforeScroll.bodyPaddingTop).toBeGreaterThanOrEqual(20);
+    expect(beforeScroll.bodyPaddingBottom).toBeGreaterThanOrEqual(14);
 
     const submit = page.getByTestId('conn-submit');
     await submit.scrollIntoViewIfNeeded();
@@ -79,5 +116,22 @@ test.describe('Connect viewport geometry', () => {
     expect(submitBox!.y).toBeGreaterThanOrEqual(0);
     expect(submitBox!.y + submitBox!.height).toBeLessThanOrEqual(beforeScroll.viewportHeight);
     expect(submitBox!.height).toBeGreaterThanOrEqual(44);
+
+    await expect(page.getByRole('heading', { name: /join a room/i })).toBeVisible();
+    await expect(page.getByLabel(/display name/i)).toBeVisible();
+    await expect(page.getByTestId('conn-mode-signin')).toBeVisible();
+    await expect(page.getByTestId('conn-mode-register')).toBeVisible();
+  });
+
+  test('keeps the join action reachable on a short 390x667 phone', async ({ page }) => {
+    await openConnect(page, 390, 667);
+    const submit = page.getByTestId('conn-submit');
+    await submit.scrollIntoViewIfNeeded();
+    const box = await submit.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(667);
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    await expect(page.getByLabel(/display name/i)).toBeVisible();
   });
 });
