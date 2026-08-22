@@ -3,6 +3,8 @@ import { describe, it, expect } from 'vitest';
 import {
   channelNotifyMode,
   shouldNotify,
+  isHardSilenced,
+  isCatchUpHardSilenced,
   modeToLevel,
   levelToMode,
   type NotifyLevel,
@@ -54,6 +56,25 @@ describe('channelNotifyMode pure helpers', () => {
     it('all (default when unset) always notifies', () => {
       expect(shouldNotify(levels, '#unset', true)).toBe(true);
       expect(shouldNotify(levels, '#unset', false)).toBe(true);
+    });
+  });
+
+  describe('hard silence', () => {
+    const levels = new Map<string, NotifyLevel>([
+      ['#muted', 'none'],
+      ['#mentions', 'mentions'],
+    ]);
+
+    it('treats mute as hard silence and mentions-only as a separate level', () => {
+      expect(isHardSilenced(levels, '#muted')).toBe(true);
+      expect(isHardSilenced(levels, '#mentions')).toBe(false);
+      expect(isHardSilenced(levels, '#unset')).toBe(false);
+    });
+
+    it('silences muted DMs from the dedicated set, not the channel map', () => {
+      expect(isCatchUpHardSilenced('dm', 'carol', levels, new Set(['carol']))).toBe(true);
+      expect(isCatchUpHardSilenced('dm', 'carol', levels, new Set())).toBe(false);
+      expect(isCatchUpHardSilenced('channel', '#muted', levels)).toBe(true);
     });
   });
 });

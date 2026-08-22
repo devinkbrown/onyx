@@ -85,6 +85,19 @@ describe('buildCatchUp', () => {
     );
     expect(out[0]?.target).toBe('recent');
   });
+
+  test('omits muted rooms and muted DMs even when leftover counters remain', () => {
+    const out = buildCatchUp(
+      [ch('#spam', 9, 4), ch('#pings', 1, 1)],
+      [dm('carol', 3, 2), dm('kai', 1, 1)],
+      new Map(),
+      {
+        notifyLevels: new Map([['#spam', 'none'], ['#pings', 'mentions']]),
+        mutedDMs: new Set(['carol']),
+      },
+    );
+    expect(out.map((i) => i.target).sort()).toEqual(['#pings', 'kai']);
+  });
 });
 
 describe('catchUpSummary', () => {

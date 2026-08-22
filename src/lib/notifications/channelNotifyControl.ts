@@ -32,8 +32,8 @@ export interface ChannelNotifyOption {
  */
 export const CHANNEL_NOTIFY_OPTIONS: readonly ChannelNotifyOption[] = [
   { mode: 'all', label: 'All', title: 'All messages' },
-  { mode: 'mentions', label: '@', title: 'Mentions only' },
-  { mode: 'mute', label: 'Mute', title: 'Mute' },
+  { mode: 'mentions', label: '@', title: 'Mentions only — still badges @' },
+  { mode: 'mute', label: 'Mute', title: 'Mute — you will not be tapped' },
 ];
 
 /**

@@ -37,6 +37,29 @@ describe('muted-DM actions', () => {
     expect(localStorage.getItem(key)).toBeNull();
   });
 
+  it('clears leftover DM badges when the conversation is muted', () => {
+    store.setState({
+      dms: new Map([
+        ['troublemaker', {
+          nick: 'TroubleMaker',
+          account: null,
+          unread: 4,
+          highlights: 4,
+          messages: [],
+        }],
+      ]),
+      firstUnreadId: new Map([['troublemaker', 'dm-1']]),
+    });
+
+    store.getState().muteDM('TroubleMaker');
+
+    expect(store.getState().dms.get('troublemaker')).toMatchObject({
+      unread: 0,
+      highlights: 0,
+    });
+    expect(store.getState().firstUnreadId.has('troublemaker')).toBe(false);
+  });
+
   it('fails closed without a server identity', () => {
     store.setState({ server: null, mutedDMs: new Set() });
     store.getState().muteDM('must-not-persist');

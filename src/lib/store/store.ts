@@ -7953,7 +7953,11 @@ export const store = createStore<OnyxState>()(
             get().addToast({
               variant: 'info',
               title: `Notify: ${mapped}`,
-              description: `Personal notification mode for ${target} on this device.`,
+              description: mapped === 'mute'
+                ? `${target} is hard-silenced on this device. You will not be tapped.`
+                : mapped === 'mentions'
+                  ? `${target} still badges @ on this device.`
+                  : `Personal notification mode for ${target} on this device.`,
             });
             return;
           }
@@ -9333,6 +9337,7 @@ export const store = createStore<OnyxState>()(
         saveChannelNotify(channelNotify, owner);
         return { channelNotify };
       });
+      if (level === 'none') get().reconcileChannelTopicUnread(key);
     },
     setChannelNotifyMode(channel, mode) {
       const owner = selectDeviceMemoryOwner(get());
@@ -9349,6 +9354,7 @@ export const store = createStore<OnyxState>()(
         saveChannelNotify(channelNotify, owner);
         return { channelNotify };
       });
+      if (level === 'none') get().reconcileChannelTopicUnread(key);
     },
     channelNotifyMode(channel) {
       return computeChannelNotifyMode(get().channelNotify, channel);
@@ -15695,7 +15701,14 @@ export const store = createStore<OnyxState>()(
       set(s => {
         const muted = parseMutedDMs([...s.mutedDMs, nick]);
         saveMutedDMs(muted, owner);
-        return { mutedDMs: muted };
+        const key = nick.trim().toLowerCase();
+        const existing = s.dms.get(key);
+        if (!existing) return { mutedDMs: muted };
+        const dms = new Map(s.dms);
+        dms.set(key, { ...existing, unread: 0, highlights: 0 });
+        const firstUnreadId = new Map(s.firstUnreadId);
+        firstUnreadId.delete(key);
+        return { mutedDMs: muted, dms, firstUnreadId };
       });
     },
     unmuteDM: (nick) => {
@@ -16395,6 +16408,8 @@ export const store = createStore<OnyxState>()(
     }),
     incrementUnread: (channel, isMention) => set(state => {
       const key = normalizeTargetKey(channel);
+      // Mute is hard silence — leftover callers must not badge a silenced room.
+      if ((state.channelNotify.get(key) ?? 'all') === 'none') return {};
       const newUnread = { ...state.channelUnread, [key]: (state.channelUnread[key] || 0) + 1 };
       const newMentions = isMention
         ? { ...state.channelMentions, [key]: (state.channelMentions[key] || 0) + 1 }

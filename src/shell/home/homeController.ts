@@ -14,6 +14,7 @@ import {
 import { useStore, getState } from '@/lib/store';
 import { buildCatchUp, type CatchUpItem } from '@/lib/notifications/catchUp';
 import { buildAwayDigest, type AwayDigest } from '@/lib/notifications/awayDigest';
+import { isCatchUpHardSilenced } from '@/lib/notifications/channelNotifyMode';
 import { calmPreset } from '@/lib/notifications/calmMode';
 import { buildResumePoints, type ResumePoint } from '@/lib/catchup/resumePoints';
 import {
@@ -267,6 +268,7 @@ export function createHomeController(): HomeController {
   const dms = useStore((s) => s.dms);
   const channelLastActivity = useStore((s) => s.channelLastActivity);
   const channelNotify = useStore((s) => s.channelNotify);
+  const mutedDMs = useStore((s) => s.mutedDMs);
   const firstUnreadId = useStore((s) => s.firstUnreadId);
   const notifications = useStore((s) => s.notifications);
   const channelProps = useStore((s) => s.channelProps);
@@ -377,11 +379,17 @@ export function createHomeController(): HomeController {
     return buildCatchUp(channels().values(), dms().values(), channelLastActivity(), {
       followedKeys: owner ? followed(owner) : new Set<string>(),
       limit: 24,
+      notifyLevels: channelNotify(),
+      mutedDMs: mutedDMs(),
     });
   });
-  const memoryCatchUp = createMemo<CatchUpItem[]>(() =>
-    catchUpMemory().map(catchUpItemFromMemory),
-  );
+  const memoryCatchUp = createMemo<CatchUpItem[]>(() => {
+    const levels = channelNotify();
+    const muted = mutedDMs();
+    return catchUpMemory()
+      .map(catchUpItemFromMemory)
+      .filter((item) => !isCatchUpHardSilenced(item.kind, item.target, levels, muted));
+  });
   const hasLiveTranscript = createMemo(() => {
     for (const channel of channels().values()) {
       if (channel.messages.length > 0) return true;
@@ -406,8 +414,12 @@ export function createHomeController(): HomeController {
   const catchUpFromMemory = createMemo(() => catchUpSource().fromMemory);
 
   const awayDigest = createMemo<AwayDigest>(
-    () => buildAwayDigest(catchUp(), { notifyLevels: channelNotify(), preset: calmPreset() }),
-    buildAwayDigest([], { notifyLevels: new Map(), preset: 'regular' }),
+    () => buildAwayDigest(catchUp(), {
+      notifyLevels: channelNotify(),
+      mutedDMs: mutedDMs(),
+      preset: calmPreset(),
+    }),
+    buildAwayDigest([], { notifyLevels: new Map(), mutedDMs: new Set(), preset: 'regular' }),
     { equals: awayDigestEqual },
   );
 
@@ -690,7 +702,7 @@ export function createHomeController(): HomeController {
       hasLiveTranscript: false,
       liveCatchUp: [],
       memoryCatchUp: [],
-      awayDigest: buildAwayDigest([], { notifyLevels: new Map(), preset: 'regular' }),
+      awayDigest: buildAwayDigest([], { notifyLevels: new Map(), mutedDMs: new Set(), preset: 'regular' }),
       resumePoints: [],
       scheduledEvents: [],
       liveCall: null,

@@ -882,8 +882,9 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               </For>
             </select>
             <p id="chset-notify-hint" class="shell-chset-hint">
-              Your own alerts for this room on this device. All messages notify, Mentions only
-              alerts when someone @-mentions you, and Mute silences it.
+              Your own alerts for this room on this device. All messages notify. Mentions only
+              still badges @. Mute is hard silence — you will not be tapped: no badge, no OS
+              ping, no digest highlight.
             </p>
           </form>
         </section>
