@@ -410,14 +410,16 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
             >
               Browse rooms
             </button>
+            <button
+              type="button"
+              class="home-cta"
+              onClick={() => props.showFirstHourWelcome()
+                ? props.actions.startRoom()
+                : props.actions.openCreateRoom()}
+            >
+              Start a room
+            </button>
             <Show when={props.showFirstHourWelcome()}>
-              <button
-                type="button"
-                class="home-action home-action--supporting"
-                onClick={() => props.actions.startRoom()}
-              >
-                Start a room
-              </button>
               <button
                 type="button"
                 class="home-action home-action--supporting"
@@ -907,8 +909,24 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
               <p class="home-first-room__title">Start with a room.</p>
               <p class="home-first-room__copy">
                 Rooms hold your conversation, files, and calls in one place.
-                Browse what is open now, or invite friends with a link.
+                Browse what is open now, start one for your friends, or invite friends with a link.
               </p>
+              <div class="home-first-room__actions" role="group" aria-label="Find or start a room">
+                <button
+                  type="button"
+                  class="home-cta"
+                  onClick={() => props.actions.openBrowseRooms()}
+                >
+                  Browse rooms
+                </button>
+                <button
+                  type="button"
+                  class="home-action home-action--supporting"
+                  onClick={() => props.actions.openCreateRoom()}
+                >
+                  Start a room
+                </button>
+              </div>
             </div>
           </Show>
         </section>

@@ -142,7 +142,7 @@ import {
 } from '@/lib/irc/channelAccess';
 import { preferences } from '@/lib/prefs/preferences';
 import { formatWebhookNoticeBody } from '@/lib/integrations/webhookBlockKit';
-import { parseEventTime } from '@/lib/deeplink';
+import { normalizeCreateRoomName, parseEventTime, sanitizeCreateRoomTopic } from '@/lib/deeplink';
 import {
   isValidTopicLabel,
   MAX_TOPIC_REGISTRY,
@@ -1089,6 +1089,8 @@ export interface OnyxState {
 
   // ── Channel Browser ───────────────────────────────────────────────────
   showChannelBrowser: boolean;
+  /** Browse list vs Start a room form — same sheet, same LIST store. */
+  channelBrowserMode: 'browse' | 'create';
   channelList: ChannelListEntry[];
   channelListLoading: boolean;
 
@@ -1174,6 +1176,12 @@ export interface OnyxState {
 
   /** Join a channel */
   joinChannel(channel: string, key?: string): void;
+
+  /**
+   * Start a room: JOIN (creates if new) plus optional TOPIC.
+   * Returns false when the name or topic is not joinable.
+   */
+  createRoom(name: string, topic?: string): boolean;
 
   /** Stash a validated deep-link channel until the connection lands */
   setPendingDeepLinkJoin(channel: string | null, at?: Date | null, topic?: string | null): void;
@@ -1481,6 +1489,7 @@ export interface OnyxState {
 
   // channel browser
   openChannelBrowser(): void;
+  openCreateRoom(): void;
   closeChannelBrowser(): void;
   refreshChannelList(): void;
 
@@ -5941,6 +5950,7 @@ export const store = createStore<OnyxState>()(
     lastReadAt: new Map(),
     viewUnreadDividerId: new Map(),
     showChannelBrowser: false,
+    channelBrowserMode: 'browse',
     channelList: [],
     channelListLoading: false,
     auditLog: [],
@@ -6532,6 +6542,17 @@ export const store = createStore<OnyxState>()(
     // ── joinChannel ──────────────────────────────────────────────────────
     joinChannel(channel, key) {
       get().client?.join(channel, key);
+    },
+
+    createRoom(name, topic) {
+      const channel = normalizeCreateRoomName(name);
+      if (!channel) return false;
+      const cleanedTopic = sanitizeCreateRoomTopic(topic ?? '');
+      if (cleanedTopic === null) return false;
+      get().joinChannel(channel);
+      if (cleanedTopic) get().setTopic(channel, cleanedTopic);
+      get().closeChannelBrowser();
+      return true;
     },
 
     setPendingDeepLinkJoin(channel, at, topic) {
@@ -9425,11 +9446,14 @@ export const store = createStore<OnyxState>()(
 
     // ── channel browser ───────────────────────────────────────────────────
     openChannelBrowser() {
-      set({ showChannelBrowser: true });
+      set({ showChannelBrowser: true, channelBrowserMode: 'browse' });
       get().refreshChannelList();
     },
+    openCreateRoom() {
+      set({ showChannelBrowser: true, channelBrowserMode: 'create' });
+    },
     closeChannelBrowser() {
-      set({ showChannelBrowser: false });
+      set({ showChannelBrowser: false, channelBrowserMode: 'browse' });
     },
     refreshChannelList() {
       set({ channelListLoading: true, channelList: [] });

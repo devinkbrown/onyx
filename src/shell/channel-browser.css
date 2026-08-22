@@ -84,6 +84,73 @@
   outline-offset: 1px;
 }
 
+.chb-start {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--paper);
+  background: color-mix(in oklab, var(--lapis-deep) 22%, var(--stone));
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
+  border-radius: var(--r-md);
+  padding: 8px 14px;
+  min-height: var(--target-min, 44px);
+  cursor: pointer;
+}
+.chb-start:hover {
+  border-color: color-mix(in oklab, var(--lapis-bright) 55%, var(--line));
+  background: color-mix(in oklab, var(--lapis-deep) 30%, var(--stone));
+}
+.chb-start:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: 1px;
+}
+.chb-start--empty {
+  margin-top: 12px;
+}
+
+.chb-empty-title {
+  margin: 0;
+  color: var(--paper);
+  font-weight: 650;
+}
+
+.chb-create {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chb-advanced {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  background: color-mix(in oklab, var(--stone-2) 50%, transparent);
+}
+.chb-advanced summary {
+  cursor: pointer;
+  font-weight: 650;
+  min-height: var(--target-min, 44px);
+  display: flex;
+  align-items: center;
+}
+.chb-advanced summary:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 1px);
+}
+.chb-advanced p {
+  margin: 0 0 8px;
+  color: var(--paper-dim);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.chb-create-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .chb-state {
   display: flex;
   align-items: center;
@@ -266,6 +333,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .chb-join,
+  .chb-start,
   .chb-card {
     transition: none;
   }

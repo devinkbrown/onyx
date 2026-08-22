@@ -135,6 +135,7 @@ export type HomeMoreActivityView = {
 
 export type HomeBriefingActions = {
   openBrowseRooms: () => void;
+  openCreateRoom: () => void;
   openSearchMessages: () => void;
   startRoom: () => void;
   inviteFriends: () => void;
@@ -712,6 +713,10 @@ export function createHomeController(): HomeController {
     openBrowseRooms: () => {
       markFirstHourSeen();
       getState().openChannelBrowser();
+    },
+    openCreateRoom: () => {
+      markFirstHourSeen();
+      getState().openCreateRoom();
     },
     openSearchMessages: () => openMessageSearch(),
     startRoom: () => {

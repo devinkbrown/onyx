@@ -51,7 +51,7 @@ describe('ChannelBrowser', () => {
     const directory = within(dialog).getByRole('list', { name: 'Public room directory' });
     expect(within(directory).getAllByRole('listitem')).toHaveLength(2);
     expect(within(dialog).getAllByText('#general')).toHaveLength(1);
-    expect(within(dialog).getByText('5 users')).toBeInTheDocument();
+    expect(within(dialog).getByText('5 people')).toBeInTheDocument();
     expect(within(dialog).getByText('Launch room')).toBeInTheDocument();
     expect(within(dialog).getByText('#random')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Join #general' })).toBeInTheDocument();
@@ -61,7 +61,7 @@ describe('ChannelBrowser', () => {
     );
     expect(directory.querySelectorAll('[data-room-card]')).toHaveLength(2);
 
-    fireEvent.input(within(dialog).getByRole('searchbox', { name: 'Filter rooms' }), {
+    fireEvent.input(within(dialog).getByRole('searchbox', { name: 'Search rooms' }), {
       target: { value: 'off-topic' },
     });
 
@@ -125,9 +125,9 @@ describe('ChannelBrowser', () => {
       expect(status).toBeInTheDocument();
 
       vi.advanceTimersByTime(400);
-      expect(status).toHaveTextContent('2 rooms available');
+      expect(status).toHaveTextContent('2 rooms you can join');
 
-      fireEvent.input(screen.getByRole('searchbox', { name: 'Filter rooms' }), {
+      fireEvent.input(screen.getByRole('searchbox', { name: 'Search rooms' }), {
         target: { value: 'off-topic' },
       });
       vi.advanceTimersByTime(400);
@@ -147,10 +147,51 @@ describe('ChannelBrowser', () => {
       render(() => <ChannelBrowser />);
 
       vi.advanceTimersByTime(400);
-      expect(screen.getByRole('status')).toHaveTextContent(/no public rooms/i);
+      expect(screen.getByRole('status')).toHaveTextContent(/no rooms yet/i);
+      expect(screen.getByText('No rooms yet. Start one.')).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Start a room' }).length).toBeGreaterThan(0);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('starts a room from the short form using JOIN and optional topic', () => {
+    const join = vi.fn();
+    const sendRaw = vi.fn();
+    store.setState({
+      client: { join, sendRaw, isupport: { CHANTYPES: '#&' } } as never,
+      showChannelBrowser: true,
+      channelBrowserMode: 'create',
+      connectionStatus: 'connected',
+      ourNick: 'me',
+    });
+
+    render(() => <ChannelBrowser />);
+
+    const dialog = screen.getByRole('dialog', { name: 'Start a room' });
+    expect(within(dialog).queryByText(/MODE|ACCESS|\/join/i)).not.toBeInTheDocument();
+    fireEvent.input(within(dialog).getByLabelText('Room name'), { target: { value: 'book-club' } });
+    fireEvent.input(within(dialog).getByLabelText('Topic (optional)'), {
+      target: { value: 'Weekly reads' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Start room' }));
+
+    expect(join).toHaveBeenCalledWith('#book-club', undefined);
+    expect(sendRaw).toHaveBeenCalledWith('TOPIC', '#book-club', 'Weekly reads');
+    expect(store.getState().showChannelBrowser).toBe(false);
+  });
+
+  it('switches from an empty directory to Start a room', () => {
+    store.setState({ channelListLoading: true });
+    feed(':server.test 323 me :End of LIST');
+    store.setState({ showChannelBrowser: true, channelBrowserMode: 'browse' });
+
+    render(() => <ChannelBrowser />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Start a room' })[0]!);
+    expect(store.getState().channelBrowserMode).toBe('create');
+    expect(screen.getByRole('dialog', { name: 'Start a room' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Browse rooms' })).toBeInTheDocument();
   });
 
   it('paints Join as a quiet-lapis squared control, not a gold pill', () => {

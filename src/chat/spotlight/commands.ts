@@ -1085,9 +1085,17 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
       id: 'action-browse-channels',
       section: 'Actions',
       title: 'Browse rooms',
-      hint: 'Every public room on the network',
+      hint: 'Find a public room to join',
       keywords: ['rooms', 'channels', 'browse', 'list', 'discover', 'directory'],
       run: () => getState().openChannelBrowser(),
+    },
+    {
+      id: 'action-create-room',
+      section: 'Actions',
+      title: 'Start a room',
+      hint: 'Name a place for your friends',
+      keywords: ['rooms', 'create', 'start', 'new', 'topic'],
+      run: () => getState().openCreateRoom(),
     },
     {
       id: 'action:join-channel',

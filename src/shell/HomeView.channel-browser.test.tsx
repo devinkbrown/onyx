@@ -37,4 +37,16 @@ describe('HomeView channel directory', () => {
 
     expect(store.getState().channelListLoading).toBe(false);
   });
+
+  it('opens Start a room from Home without a LIST request', () => {
+    const sendRaw = vi.fn();
+    store.setState({ client: { sendRaw, isupport: { CHANTYPES: '#&' } } as never });
+    render(() => <HomeView />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start a room' }));
+
+    expect(sendRaw).not.toHaveBeenCalled();
+    expect(store.getState().showChannelBrowser).toBe(true);
+    expect(store.getState().channelBrowserMode).toBe('create');
+  });
 });

@@ -701,6 +701,12 @@
   font-size: var(--text-md, 0.9375rem);
   line-height: var(--leading-body, 1.55);
 }
+.home-first-room__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
 .home-empty {
   margin: 8px 0 28px;
   padding: var(--pad-panel, 1rem) var(--pad-panel-lg, 1.25rem);

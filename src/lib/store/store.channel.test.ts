@@ -41,6 +41,7 @@ function makeClient() {
   return {
     sendRaw: vi.fn((..._args: string[]) => true),
     send: vi.fn((_line: string) => true),
+    join: vi.fn((_channel: string, _key?: string) => true),
     isupport: { CHANTYPES: '#&', CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'] },
     negotiatedCaps: new Set<string>(),
     capValues: new Map<string, string>(),
@@ -198,6 +199,32 @@ describe('channel management — raw command dispatch', () => {
       text: 'next milestone',
       topic: 'roadmap',
     });
+  });
+
+  it('createRoom() joins, sets an optional topic, and opens the room', () => {
+    const client = seed('#general', [makeUser('me')]);
+    store.setState({ showChannelBrowser: true, channelBrowserMode: 'create' });
+
+    expect(store.getState().createRoom(' Friends ', ' Weekly reads ')).toBe(true);
+    expect(client.join).toHaveBeenCalledWith('#friends', undefined);
+    expect(client.sendRaw).toHaveBeenCalledWith('TOPIC', '#friends', 'Weekly reads');
+    expect(store.getState().showChannelBrowser).toBe(false);
+  });
+
+  it('createRoom() refuses an invalid name without sending JOIN', () => {
+    const client = seed('#general', [makeUser('me')]);
+
+    expect(store.getState().createRoom('bad,name')).toBe(false);
+    expect(client.join).not.toHaveBeenCalled();
+    expect(client.sendRaw).not.toHaveBeenCalled();
+  });
+
+  it('openCreateRoom() opens the existing browser on the create view', () => {
+    seed('#general', [makeUser('me')]);
+    store.getState().openCreateRoom();
+    expect(store.getState().showChannelBrowser).toBe(true);
+    expect(store.getState().channelBrowserMode).toBe('create');
+    expect(store.getState().channelListLoading).toBe(false);
   });
 
   it('deduplicates channel browser LIST rows by room name', () => {
