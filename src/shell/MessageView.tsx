@@ -62,7 +62,6 @@ import {
   sanitizePersistedReplyPreviewText,
 } from '@/lib/e2ee/replyPrivacy';
 import { ScheduledEventLine } from './ScheduledEventLine';
-import { openRoomInviteShare } from './roomInviteShareState';
 import type { ChatMessage } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';
@@ -70,7 +69,6 @@ import { formatWebhookNoticeBody } from '@/lib/integrations/webhookBlockKit';
 import { MessageText } from '@/shell/message/MessageText';
 import { MessageMenu } from '@/shell/message/MessageMenu';
 import { activeMessageSearchResultId, openMessageSearchWithQuery } from './search/useMessageSearch';
-import { openRoomInviteShare } from './roomInviteShareState';
 import { TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';

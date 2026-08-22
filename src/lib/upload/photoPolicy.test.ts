@@ -36,6 +36,12 @@ function pngWithExif(): Uint8Array {
   return Uint8Array.from([...signature, ...ihdr, ...exif, ...iend]);
 }
 
+function fileFromBytes(bytes: Uint8Array, name: string, type: string): File {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return new File([copy.buffer], name, { type });
+}
+
 function chunk(type: string, data: number[]): number[] {
   const length = [
     (data.length >>> 24) & 0xff,
@@ -63,7 +69,7 @@ describe('photoPolicy', () => {
     expect(stripped[0]).toBe(0xff);
     expect(stripped[1]).toBe(0xd8);
 
-    const original = new File([bytes], 'harbour.jpg', { type: 'image/jpeg' });
+    const original = fileFromBytes(bytes, 'harbour.jpg', 'image/jpeg');
     const photo = await stripPhotoExif(original);
     expect(hasJpegExif(new Uint8Array(await photo.arrayBuffer()))).toBe(false);
     expect(keepOriginalFile(original)).toBe(original);
@@ -75,7 +81,7 @@ describe('photoPolicy', () => {
     expect(hasPngExif(bytes)).toBe(true);
     expect(hasPngExif(stripPngExif(bytes))).toBe(false);
 
-    const original = new File([bytes], 'harbour.png', { type: 'image/png' });
+    const original = fileFromBytes(bytes, 'harbour.png', 'image/png');
     const photo = await stripPhotoExif(original);
     expect(hasPngExif(new Uint8Array(await photo.arrayBuffer()))).toBe(false);
     expect(hasPngExif(new Uint8Array(await keepOriginalFile(original).arrayBuffer()))).toBe(true);

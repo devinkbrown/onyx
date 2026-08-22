@@ -1404,7 +1404,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           />
         )}
       </Show>
-      <Show when={channelName() && (activeView().kind === 'channel' || activeView().kind === 'dm')}>
+      <Show when={(activeView().kind === 'channel' || activeView().kind === 'dm') ? channelName() : null}>
         {(target) => (
           <RoomMediaIndex
             target={target()}
