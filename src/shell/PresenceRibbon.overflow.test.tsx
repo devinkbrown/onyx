@@ -12,10 +12,18 @@ import { fileURLToPath } from 'node:url';
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { toB64url } from '@/lib/e2ee/dmCipher';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import type { CallState } from '@/lib/cadence-media/types';
 import { PresenceRibbon } from './PresenceRibbon';
+
+function validPeerKey(): string {
+  const raw = new Uint8Array(65);
+  raw[0] = 0x04;
+  raw.fill(7, 1);
+  return toB64url(raw);
+}
 
 vi.mock('@/lib/prefs/preferences', () => ({
   openPreferences: vi.fn(),
@@ -508,5 +516,46 @@ describe('PresenceRibbon commercial room header', () => {
     expect(css).not.toMatch(
       /\/\*[^*]*facepile[^*]*\*\/\s*\.shell-ribbon-facepile\s*\{\s*display:\s*none/i,
     );
+  });
+
+  it('shows a Private chip only when the DM peer key is present and seal-ready', () => {
+    store.setState({
+      ...initialState,
+      connectionStatus: 'connected',
+      activeView: { kind: 'dm', nick: 'alice' },
+      dms: new Map([['alice', {
+        nick: 'alice',
+        account: null,
+        unread: 0,
+        highlights: 0,
+        messages: [],
+      }]]),
+    });
+    render(() => <PresenceRibbon />);
+
+    expect(screen.queryByTestId('ribbon-dm-private')).toBeNull();
+    expect(screen.getByTestId('ribbon-dm-verify')).toHaveTextContent('Verify');
+    expect(screen.getByTestId('ribbon-dm-verify')).not.toHaveTextContent(/🔒|lock/i);
+
+    store.setState({
+      peerDmKeys: new Map([['alice', validPeerKey()]]),
+    });
+    expect(screen.getByTestId('ribbon-dm-private')).toHaveTextContent('Private');
+    expect(screen.getByTestId('ribbon-dm-private').getAttribute('aria-label') ?? '').toMatch(
+      /only the two of you can read these messages/i,
+    );
+
+    store.setState({
+      peerKeyChanges: new Map([['alice', { pinnedKey: 'old', newKey: 'new' }]]),
+    });
+    expect(screen.queryByTestId('ribbon-dm-private')).toBeNull();
+  });
+
+  it('keeps Private and Verify off rooms so group E2EE is not implied', () => {
+    seedChannel();
+    render(() => <PresenceRibbon />);
+    expect(screen.queryByTestId('ribbon-dm-private')).toBeNull();
+    expect(screen.queryByTestId('ribbon-dm-verify')).toBeNull();
+    expect(screen.queryByText(/^Private$/)).toBeNull();
   });
 });

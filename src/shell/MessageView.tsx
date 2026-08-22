@@ -56,6 +56,7 @@ import {
 } from '@/lib/store';
 import { deviceMemoryOwnerKey, loadRecent } from '@/lib/vault/historyVault';
 import { revisionsFor, type EditRevision } from '@/lib/vault/editHistory';
+import { DM_EMPTY_BODY, DM_EMPTY_TITLE } from '@/lib/e2ee/dmPrivacyChrome';
 import {
   lockedPlaceholderForText,
   sanitizePersistedReplyPreviewText,
@@ -1963,9 +1964,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     </Show>
                   </Show>
                   <Show when={activeView().kind === 'dm'}>
-                    <p class="shell-feed-empty-title">A private conversation</p>
+                    <p class="shell-feed-empty-title">{DM_EMPTY_TITLE}</p>
                     <p class="shell-feed-empty-body">
-                      Messages with {activeTarget()} stay on this device until you send.
+                      {DM_EMPTY_BODY}
                     </p>
                   </Show>
                   <Show when={activeView().kind === 'status'}>

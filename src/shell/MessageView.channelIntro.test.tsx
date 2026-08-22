@@ -151,6 +151,11 @@ describe('MessageView empty room and channel intro', () => {
     });
     expect(screen.queryByTestId('channel-intro-ledger')).toBeNull();
     expect(screen.queryByRole('link', { name: /Room ledger/i })).toBeNull();
+    expect(screen.getByTestId('feed-empty')).toHaveTextContent('A private conversation');
+    expect(screen.getByTestId('feed-empty')).toHaveTextContent(
+      'Only the two of you can read these messages. They stay on this device.',
+    );
+    expect(screen.getByTestId('feed-empty')).not.toHaveTextContent(/fully encrypted|cloud sync|TOFU|🔒/i);
   });
 
   it('asks a first-hour guest to say hi instead of showing slash commands', async () => {

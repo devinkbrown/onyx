@@ -1338,7 +1338,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                     }}
                   />
                 </Show>
-                <DmSafetySheet />
+                <DmSafetySheet hideTrigger />
                 <GuestClaimPrompt />
                 <FirstRunNotifyPrompt />
                 <DmKeyChangeBanner />

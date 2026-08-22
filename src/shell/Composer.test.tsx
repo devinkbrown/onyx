@@ -91,13 +91,14 @@ describe('Composer accessibility', () => {
     expect(screen.getByRole('note', { name: 'Current compose context' })).toHaveTextContent('To #roomReady to send');
   });
 
-  it('uses Message @nick as the DM placeholder', () => {
+  it('uses Message @nick as the DM placeholder without lock chrome', () => {
     store.setState(
       {
         ...initialState,
         activeView: { kind: 'dm', nick: 'mika' },
         connectionStatus: 'connected',
         ourNick: 'me',
+        dms: new Map([['mika', { nick: 'mika', account: null, unread: 0, highlights: 0, messages: [] }]]),
         server: {
           id: 'composer-test',
           name: 'Onyx',
@@ -112,9 +113,12 @@ describe('Composer accessibility', () => {
       true,
     );
 
-    const { getByRole } = render(() => <Composer />);
+    const { getByRole, container } = render(() => <Composer />);
     const message = getByRole('textbox', { name: /message mika/i }) as HTMLTextAreaElement;
     expect(message.placeholder).toBe('Message @mika');
+    expect(message.placeholder).not.toMatch(/lock|private|encrypt/i);
+    expect(container.textContent).not.toMatch(/🔒/);
+    expect(container.querySelector('[data-uses-padlock], .shell-composer-lock, [aria-label*="lock" i]')).toBeNull();
   });
 
   it('locks Standard primary control order: attach, message, emoji, more, send', () => {

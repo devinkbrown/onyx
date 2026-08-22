@@ -1084,6 +1084,41 @@
   text-overflow: ellipsis;
 }
 
+.shell-channel-item--dm {
+  align-items: flex-start;
+  min-height: 44px;
+  contain-intrinsic-size: auto 44px;
+  white-space: normal;
+}
+
+.shell-dm-copy {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.shell-channel-item--dm .shell-channel-name {
+  flex: none;
+}
+
+.shell-dm-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--paper-mute);
+}
+
+.shell-dm-keywarn {
+  flex: none;
+  margin-top: 2px;
+  color: var(--shu-bright);
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
 .shell-channel-badge {
   flex: none;
   min-width: 18px;
@@ -1885,6 +1920,20 @@
 
 .shell-ribbon-sigil--dm {
   color: var(--paper-mute);
+}
+
+.shell-ribbon-private-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 0.55rem;
+  border: 1px solid color-mix(in oklab, var(--lapis) 28%, var(--line));
+  border-radius: var(--r-pill);
+  color: var(--paper-dim);
+  background: color-mix(in oklab, var(--lapis) 8%, transparent);
+  font: 600 0.68rem/1 var(--font-sans);
+  letter-spacing: 0.02em;
 }
 
 .shell-ribbon-sep {

@@ -17,9 +17,21 @@ import { cleanup, fireEvent, render, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
-import type { Channel } from '@/lib/irc/types';
+import type { Channel, ChatMessage } from '@/lib/irc/types';
 import type { DMConversation } from '@/lib/store/store';
 import { ChannelSidebar } from './ChannelSidebar';
+
+function makeMessage(text: string, extras: Partial<ChatMessage> = {}): ChatMessage {
+  return {
+    id: extras.id ?? 'm1',
+    time: extras.time ?? new Date('2026-08-22T00:00:00.000Z'),
+    from: extras.from ?? 'erin',
+    text,
+    type: extras.type ?? 'msg',
+    target: extras.target ?? 'erin',
+    ...extras,
+  };
+}
 
 const initialState = store.getInitialState();
 const originalStartViewTransition = Object.getOwnPropertyDescriptor(document, 'startViewTransition');
@@ -682,5 +694,53 @@ describe('ChannelSidebar accessibility', () => {
     fireEvent.click(getByTestId('sidebar-start-room'));
     expect(store.getState().showChannelBrowser).toBe(true);
     expect(store.getState().channelBrowserMode).toBe('create');
+  });
+
+  it('lists DMs as name, sealed preview, and unread — never a padlock', () => {
+    const dms = new Map<string, DMConversation>();
+    dms.set('erin', {
+      ...makeDm('erin', 2),
+      messages: [makeMessage('ONYXDM1 opaque-ciphertext', { encrypted: true })],
+    });
+    store.setState({
+      ...initialState,
+      channels: new Map(),
+      dms,
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+    }, true);
+
+    const { getByRole, container } = render(() => <ChannelSidebar mode="messages" />);
+    const erin = getByRole('button', { name: /erin/ });
+    expect(erin.getAttribute('aria-label')).toBe('DM with erin, Encrypted message, 2 unread');
+    expect(erin.querySelector('.shell-dm-preview')?.textContent).toBe('Encrypted message');
+    expect(erin.textContent).not.toMatch(/🔒/);
+    expect(container.querySelector('[data-uses-padlock], .shell-dm-lock, svg[aria-label*="lock" i]')).toBeNull();
+  });
+
+  it('marks only the pending key-change row with a warning', () => {
+    const dms = new Map<string, DMConversation>();
+    dms.set('erin', makeDm('erin'));
+    dms.set('mira', makeDm('mira'));
+    store.setState({
+      ...initialState,
+      channels: new Map(),
+      dms,
+      peerKeyChanges: new Map([['erin', { pinnedKey: 'old', newKey: 'new' }]]),
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+    }, true);
+
+    const { getByRole } = render(() => <ChannelSidebar mode="messages" />);
+    const erin = getByRole('button', { name: /erin/ });
+    const mira = getByRole('button', { name: /mira/ });
+    expect(erin.getAttribute('aria-label')).toBe('DM with erin, device key changed');
+    expect(erin.querySelector('[data-testid="sidebar-dm-keywarn"]')?.textContent).toBe('⚠');
+    expect(mira.getAttribute('aria-label')).toBe('DM with mira');
+    expect(mira.querySelector('[data-testid="sidebar-dm-keywarn"]')).toBeNull();
   });
 });
