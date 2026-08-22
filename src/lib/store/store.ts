@@ -178,9 +178,10 @@ import { isFollowed } from '@/lib/notifications/followed';
 import { loadChannelNotify, saveChannelNotify } from '@/lib/notifications/channelNotifyMemory';
 import {
   loadHighlightWords,
-  parseHighlightWords,
   saveHighlightWords,
 } from '@/lib/notifications/highlightMemory';
+import { addKeyword, removeKeyword } from '@/lib/notifications/keywordList';
+import { matchesAnyKeyword } from '@/lib/notifications/keywordMatch';
 import { channelNotifyMode as computeChannelNotifyMode, shouldNotify as computeShouldNotify, modeToLevel, type NotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { isQuietHoursActive } from '@/lib/notifications/quietHours';
 import { parseScheduledEvent, type ScheduledEvent } from '@/lib/notifications/scheduledEvents';
@@ -15448,7 +15449,7 @@ export const store = createStore<OnyxState>()(
       const owner = selectDeviceMemoryOwner(get());
       if (!owner) return;
       set(s => {
-        const words = parseHighlightWords([...s.highlightWords, word]);
+        const words = addKeyword(s.highlightWords, word);
         saveHighlightWords(words, owner);
         return { highlightWords: words };
       });
@@ -15457,8 +15458,7 @@ export const store = createStore<OnyxState>()(
       const owner = selectDeviceMemoryOwner(get());
       if (!owner) return;
       set(s => {
-        const normalized = word.trim().toLowerCase();
-        const words = s.highlightWords.filter(w => w !== normalized);
+        const words = removeKeyword(s.highlightWords, word);
         saveHighlightWords(words, owner);
         return { highlightWords: words };
       });
@@ -17756,11 +17756,7 @@ function isChannelUnreadHighlight(
   }
   if (message.highlight) return true;
   if (/@(everyone|here)\b/i.test(message.text)) return true;
-  const lower = message.text.toLowerCase();
-  return state.highlightWords.some((word) => {
-    const clean = word.trim().toLowerCase();
-    return clean.length > 0 && lower.includes(clean);
-  });
+  return matchesAnyKeyword(message.text, state.highlightWords);
 }
 
 /**

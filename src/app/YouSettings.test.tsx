@@ -87,6 +87,22 @@ describe('You settings list', () => {
     expect(screen.getByRole('region', { name: 'Protection' })).toBeInTheDocument();
   });
 
+  it('adds and removes notification keywords from You settings', () => {
+    renderYou();
+    fireEvent.click(screen.getByTestId('you-notifications').querySelector('summary')!);
+
+    expect(screen.getByTestId('you-keywords')).toHaveTextContent('They do not replace All, @, or Mute');
+    fireEvent.input(screen.getByLabelText('Word'), { target: { value: '  Release ' } });
+    fireEvent.click(screen.getByTestId('you-keyword-add'));
+
+    expect(store.getState().highlightWords).toEqual(['release']);
+    expect(screen.getByTestId('you-keywords-list')).toHaveTextContent('release');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove release' }));
+    expect(store.getState().highlightWords).toEqual([]);
+    expect(screen.getByTestId('you-keywords-empty')).toBeInTheDocument();
+  });
+
   it('writes text size through the existing preferences store', () => {
     renderYou();
     fireEvent.click(screen.getByTestId('you-text-size').querySelector('summary')!);
