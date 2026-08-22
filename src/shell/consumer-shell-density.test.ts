@@ -18,7 +18,7 @@ const settings = readFileSync(join(here, 'ChannelSettings.tsx'), 'utf8');
 
 function rule(css: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = css.match(new RegExp(`${escaped}\\s*\\{([^}]+)\\}`, 'm'));
+  const match = css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]+)\\}`));
   expect(match, selector).toBeTruthy();
   return match?.[1] ?? '';
 }

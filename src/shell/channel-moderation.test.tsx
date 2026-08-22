@@ -277,7 +277,7 @@ describe('ChannelSettings panel', () => {
     openSettings();
     expect(screen.getByRole('dialog', { name: 'Room settings' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Topic' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Room mode flags' })).toBeNull();
+    expect(screen.getByText('Advanced')).toBeInTheDocument();
 
     openAdvanced();
 

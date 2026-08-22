@@ -17,7 +17,10 @@ import type { Channel, ChannelUser } from '@/lib/irc/types';
 import type { CallState } from '@/lib/cadence-media/types';
 import { PresenceRibbon } from './PresenceRibbon';
 
-vi.mock('@/lib/prefs/preferences', () => ({ openPreferences: vi.fn() }));
+vi.mock('@/lib/prefs/preferences', () => ({
+  openPreferences: vi.fn(),
+  preferences: () => ({ experienceMode: 'standard' }),
+}));
 vi.mock('./NotificationCenter', () => ({ NotificationCenter: () => null }));
 vi.mock('./PresenceHeatline', () => ({ PresenceHeatline: () => null }));
 // Stub preserves Facepile's real root class so hide-CSS coupling is testable.

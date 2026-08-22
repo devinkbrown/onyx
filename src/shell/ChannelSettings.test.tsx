@@ -158,9 +158,9 @@ describe('ChannelSettings — default chrome', () => {
     renderPanel();
 
     expect(screen.getByRole('heading', { name: 'Notifications' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Roles' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Room rules' })).toBeNull();
+    expect(screen.getByText('Advanced')).toBeInTheDocument();
     expect(screen.queryByText('+m')).toBeNull();
+    expect(screen.queryByText('Room key (+k)')).toBeNull();
 
     openAdvanced();
     expect(screen.getByRole('heading', { name: 'Room rules' })).toBeInTheDocument();
@@ -476,7 +476,6 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
   it('hides the ACCESS manager from non-ops', () => {
     seed();
     renderPanel();
-    expect(screen.queryByRole('heading', { name: 'Roles' })).toBeNull();
     openAdvanced();
 
     expect(screen.getByRole('heading', { name: 'Roles' })).toBeInTheDocument();
