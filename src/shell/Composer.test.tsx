@@ -30,6 +30,10 @@ import {
   recordFirstHourHandoff,
   resetFirstHourForTests,
 } from '@/lib/firstHour/firstHour';
+import {
+  hasNotifyFirstSend,
+  resetFirstRunNotifyState,
+} from '@/lib/notifications/firstRunNotify';
 
 const initialState = store.getInitialState();
 
@@ -60,11 +64,14 @@ describe('Composer accessibility', () => {
   beforeEach(() => {
     store.setState(initialState, true);
     resetFirstHourForTests();
+    resetFirstRunNotifyState();
+    localStorage.removeItem('onyx:notify-first-send');
   });
 
   afterEach(() => {
     cleanup();
     resetFirstHourForTests();
+    resetFirstRunNotifyState();
     vi.restoreAllMocks();
   });
 
@@ -528,6 +535,20 @@ describe('Composer accessibility', () => {
     expect(sendSpy).toHaveBeenCalledWith('#room', 'keep this private draft');
     expect(textarea.value).toBe('keep this private draft');
     expect(document.activeElement).toBe(textarea);
+    expect(hasNotifyFirstSend()).toBe(false);
+  });
+
+  it('marks the first successful send so notify can ask after chat, not first paint', async () => {
+    seedActiveChannel();
+    vi.spyOn(store.getState(), 'sendMessage').mockImplementation(() => {});
+    const { getByRole } = render(() => <Composer />);
+    const textarea = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
+    expect(hasNotifyFirstSend()).toBe(false);
+
+    fireEvent.input(textarea, { target: { value: 'hello harbor' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    await waitFor(() => expect(hasNotifyFirstSend()).toBe(true));
   });
 
   it('moves focus into the emoji dialog on open and restores it to the textarea on Escape', async () => {

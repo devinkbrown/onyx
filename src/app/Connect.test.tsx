@@ -156,6 +156,14 @@ describe('Connect screen rendering', () => {
     expect(screen.queryByRole('button', { name: /add to home screen|install/i })).not.toBeInTheDocument();
   });
 
+  it('has no notification permission ask on first-run Connect', () => {
+    render(() => <Connect />);
+    expect(screen.queryByTestId('first-run-notify')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('first-run-notify-enable')).not.toBeInTheDocument();
+    expect(visibleCopy()).not.toMatch(/get a ping when you leave|closed-tab notifications|turn on alerts/i);
+    expect(screen.queryByRole('button', { name: /turn on|enable desktop notifications/i })).not.toBeInTheDocument();
+  });
+
   it('aborts its latency selection when the connect screen unmounts', async () => {
     let selectionSignal: AbortSignal | undefined;
     vi.mocked(selectBestNode).mockImplementationOnce((_nodes, options) => {

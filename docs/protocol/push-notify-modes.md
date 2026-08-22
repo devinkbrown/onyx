@@ -18,7 +18,7 @@ Body text that looks like E2EE envelope is redacted in the **service worker** (`
 | Channel notify mode | Per-channel `all` / `mentions` / `mute` via `channelNotifyMode` |
 | `recoverWebPush` | Re-bind after reconnect / SW update |
 | You → Notifications | Short product page: Mentions, DMs, Calls + existing room mute/mentions-only. Uses this browser's service worker and the server `WEBPUSH` contract — no third-party vendor. |
-| First-run ask | One quiet chip after a real send or receive (never a wall on Connect). The Zig desktop host does not claim system notifications while `notifications: false`. |
+| First-run ask | One quiet sheet after the first successful send on this device (never first paint or Connect; never the marketing site). iOS only from the Home Screen standalone web app — a Safari tab does not claim push. Already granted, denied, or dismissed stays quiet. The Zig desktop host does not claim system notifications while `notifications: false`. |
 
 ## Operator check
 

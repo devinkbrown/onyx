@@ -1,61 +1,74 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * firstRunNotify.ts — one quiet closed-tab permission ask after real chat.
+ * firstRunNotify.ts — one quiet permission ask after the first send.
  *
- * The browser prompt is never a wall on Connect. Offer it once after a real
- * send or receive (or from You → Notifications). Persist activity and dismiss
- * so a returning tab does not nag.
+ * Never a wall on first paint or Connect. Never the marketing site.
+ * iOS may be offered only from the Home Screen standalone web app —
+ * never a Safari tab, where Web Push does not work.
  */
 import { createSignal, type Accessor } from 'solid-js';
 
-import type { ChatMessage, MessageType } from '@/lib/irc/types';
 import type { ClientSurface } from '@/lib/platform';
 
 import type { DesktopNotificationPermission } from './decision';
 
-export const NOTIFY_FIRST_RUN_ACTIVITY_KEY = 'onyx:notify-first-run-activity';
+export const NOTIFY_FIRST_SEND_KEY = 'onyx:notify-first-send';
 export const NOTIFY_FIRST_RUN_DISMISS_KEY = 'onyx:notify-first-run-dismissed';
 
-const REAL_CONVERSATION_TYPES: ReadonlySet<MessageType> = new Set(['msg', 'action', 'whisper']);
+export const FIRST_RUN_NOTIFY_TITLE = 'Get a ping when you leave';
+export const FIRST_RUN_NOTIFY_LEDE =
+  'Mentions, DMs, and calls can reach this browser.';
 
-export type FirstRunNotifyNote = { type: string };
+export type NotifyNavigatorProbe = {
+  userAgent?: string;
+  platform?: string;
+  maxTouchPoints?: number;
+};
 
-export function isRealConversationMessage(message: Pick<ChatMessage, 'type'>): boolean {
-  return REAL_CONVERSATION_TYPES.has(message.type);
+export function isIosSafariLike(input: NotifyNavigatorProbe = {}): boolean {
+  const ua = input.userAgent ?? '';
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  return input.platform === 'MacIntel' && (input.maxTouchPoints ?? 0) > 1;
 }
 
-export function conversationHasRealActivity(
-  messages: readonly Pick<ChatMessage, 'type'>[],
-): boolean {
-  return messages.some(isRealConversationMessage);
+export function readNotifyNavigatorProbe(
+  nav: NotifyNavigatorProbe | null | undefined =
+    typeof navigator !== 'undefined' ? navigator : undefined,
+): NotifyNavigatorProbe {
+  return {
+    userAgent: nav?.userAgent ?? '',
+    platform: nav?.platform ?? '',
+    maxTouchPoints: nav?.maxTouchPoints ?? 0,
+  };
 }
 
-export function inboxHasRealActivity(notes: readonly FirstRunNotifyNote[]): boolean {
-  return notes.some((note) => note.type === 'mention' || note.type === 'dm');
-}
-
-export function stateHasRealConversationActivity(state: {
-  channels: ReadonlyMap<string, { messages: readonly Pick<ChatMessage, 'type'>[] }>;
-  dms: ReadonlyMap<string, { messages: readonly Pick<ChatMessage, 'type'>[] }>;
-  notifications: readonly FirstRunNotifyNote[];
+/** iOS Safari tabs cannot receive Web Push. Home Screen standalone can. */
+export function canClaimClosedTabPush(input: {
+  ios: boolean;
+  standalone: boolean;
 }): boolean {
-  for (const channel of state.channels.values()) {
-    if (conversationHasRealActivity(channel.messages)) return true;
-  }
-  for (const dm of state.dms.values()) {
-    if (conversationHasRealActivity(dm.messages)) return true;
-  }
-  return inboxHasRealActivity(state.notifications);
+  return !(input.ios && !input.standalone);
+}
+
+export function firstRunNotifyCopy(input: {
+  ios: boolean;
+  standalone: boolean;
+}): { title: string; lede: string } | null {
+  if (!canClaimClosedTabPush(input)) return null;
+  return { title: FIRST_RUN_NOTIFY_TITLE, lede: FIRST_RUN_NOTIFY_LEDE };
 }
 
 export function shouldOfferFirstRunNotify(input: {
-  activity: boolean;
+  sent: boolean;
   dismissed: boolean;
   permission: DesktopNotificationPermission;
   surface: ClientSurface;
   hostNotifications: boolean;
+  ios: boolean;
+  standalone: boolean;
 }): boolean {
-  if (!input.activity || input.dismissed) return false;
+  if (!input.sent || input.dismissed) return false;
+  if (!canClaimClosedTabPush(input)) return false;
   if (input.surface === 'zig-desktop' && !input.hostNotifications) return false;
   return input.permission === 'default';
 }
@@ -83,16 +96,16 @@ function writeFlag(key: string, value: boolean): void {
   }
 }
 
-const [activityAccessor, setActivitySignal] = createSignal(readFlag(NOTIFY_FIRST_RUN_ACTIVITY_KEY));
+const [sentAccessor, setSentSignal] = createSignal(readFlag(NOTIFY_FIRST_SEND_KEY));
 const [dismissedAccessor, setDismissedSignal] = createSignal(readFlag(NOTIFY_FIRST_RUN_DISMISS_KEY));
 
-export const hasNotifyActivity: Accessor<boolean> = activityAccessor;
+export const hasNotifyFirstSend: Accessor<boolean> = sentAccessor;
 export const isNotifyAskDismissed: Accessor<boolean> = dismissedAccessor;
 
-export function markNotifyActivity(): void {
-  if (activityAccessor()) return;
-  setActivitySignal(true);
-  writeFlag(NOTIFY_FIRST_RUN_ACTIVITY_KEY, true);
+export function markNotifyFirstSend(): void {
+  if (sentAccessor()) return;
+  setSentSignal(true);
+  writeFlag(NOTIFY_FIRST_SEND_KEY, true);
 }
 
 export function dismissNotifyAsk(): void {
@@ -103,8 +116,8 @@ export function dismissNotifyAsk(): void {
 
 /** Test / boundary reset. */
 export function resetFirstRunNotifyState(): void {
-  setActivitySignal(false);
+  setSentSignal(false);
   setDismissedSignal(false);
-  writeFlag(NOTIFY_FIRST_RUN_ACTIVITY_KEY, false);
+  writeFlag(NOTIFY_FIRST_SEND_KEY, false);
   writeFlag(NOTIFY_FIRST_RUN_DISMISS_KEY, false);
 }

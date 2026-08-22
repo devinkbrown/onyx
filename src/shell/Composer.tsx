@@ -85,6 +85,7 @@ import {
   markFirstHourSeen,
   shouldFocusComposer,
 } from '@/lib/firstHour/firstHour';
+import { markNotifyFirstSend } from '@/lib/notifications/firstRunNotify';
 import { FirstHourCoach } from './FirstHourCoach';
 
 export type ComposerProps = {
@@ -1126,6 +1127,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         focusTextarea();
         return;
       }
+      markNotifyFirstSend();
       resetAfterSend(t);
     } finally {
       if (activeUpload === upload) activeUpload = null;
