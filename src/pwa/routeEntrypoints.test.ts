@@ -23,8 +23,8 @@ const expected = {
     description: 'Learn how Onyx, Cadence media, and the open network work together without closed-platform lock-in.',
   },
   appearance: {
-    title: 'Onyx appearance — themes and backgrounds',
-    description: 'Customize Onyx with accessible OKLCH themes, living backgrounds, and controls for motion, contrast, and transparency.',
+    title: 'Onyx appearance — look, text size, and motion',
+    description: 'Choose an Onyx look, text size, and motion. Theme Studio and extra backgrounds stay under Advanced.',
   },
   stats: {
     title: 'Onyx stats — live room activity',

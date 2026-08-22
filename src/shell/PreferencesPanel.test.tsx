@@ -260,7 +260,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('tabindex', '0');
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Display');
     expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(6);
-    expect(screen.getByRole('button', { name: /Theme and background/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Appearance/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export vault' })).not.toBeInTheDocument();
 
     selectPreferenceCategory('History & data');
@@ -270,7 +270,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName('History & data');
     expect(screen.queryByRole('button', { name: 'Export vault' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Theme and background/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Appearance/i })).not.toBeInTheDocument();
 
     selectPreferenceCategory('Import & export');
 
@@ -701,7 +701,7 @@ describe('PreferencesPanel', () => {
     renderPreferences();
     const sheetBody = document.querySelector<HTMLElement>('.onyx-sheet__body');
     const nav = document.querySelector<HTMLElement>('.pref-category-nav');
-    const appearance = screen.getByRole('button', { name: /Theme and background/i });
+    const appearance = screen.getByRole('button', { name: /^Appearance/i });
     expect(sheetBody).not.toBeNull();
     expect(nav).not.toBeNull();
 
@@ -738,7 +738,7 @@ describe('PreferencesPanel', () => {
     renderPreferences();
     const sheetBody = document.querySelector<HTMLElement>('.onyx-sheet__body');
     const nav = document.querySelector<HTMLElement>('.pref-category-nav');
-    const appearance = screen.getByRole('button', { name: /Theme and background/i });
+    const appearance = screen.getByRole('button', { name: /^Appearance/i });
     expect(sheetBody).not.toBeNull();
     expect(nav).not.toBeNull();
 
@@ -801,10 +801,11 @@ describe('PreferencesPanel', () => {
     renderPreferences();
 
     expect(screen.getByTestId('preferences-panel')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Theme and background/i })).toBeInTheDocument();
-    expect(screen.getByText('Open Appearance for themes, room atmosphere, shared theme import, and background selection.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Appearance/i })).toBeInTheDocument();
+    expect(screen.getByText('Choose a look, text size, and motion.')).toBeInTheDocument();
     selectPreferenceCategory('Conversation');
     expect(screen.getByRole('heading', { name: 'Conversation' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('pref-conversation-advanced').querySelector('summary')!);
     expect(screen.getByRole('switch', { name: /Show 24-hour activity strip/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: /Show join voice\/video controls/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('switch', { name: /Show topic, forum, and follow controls/i })).toHaveAttribute('aria-checked', 'true');
@@ -852,7 +853,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Connect')).toBeInTheDocument();
     expect(screen.getByText('Room settings')).toBeInTheDocument();
     expect(screen.getByText('Voice controls')).toBeInTheDocument();
-    expect(screen.getByText('Appearance')).toBeInTheDocument();
+    expect(screen.getAllByText('Appearance').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Home catch-up')).toBeInTheDocument();
     expect(screen.getByText('Message search')).toBeInTheDocument();
     expect(screen.getByText('Notification center')).toBeInTheDocument();
@@ -1683,7 +1684,7 @@ describe('PreferencesPanel', () => {
   it('opens Appearance from Preferences for mobile theming discoverability', () => {
     renderPreferences();
 
-    fireEvent.click(screen.getByRole('button', { name: /Theme and background/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Appearance/i }));
 
     expect(store.getState().showAppearance).toBe(true);
   });
@@ -1696,7 +1697,7 @@ describe('PreferencesPanel', () => {
         <PreferencesPanel />
       </>
     ));
-    const launcher = screen.getByRole('button', { name: /Theme and background/i });
+    const launcher = screen.getByRole('button', { name: /^Appearance/i });
     launcher.focus();
 
     fireEvent.click(launcher);

@@ -857,6 +857,25 @@
   overflow-wrap: anywhere;
 }
 
+.pref-more {
+  margin-top: var(--space-3);
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ink) 32%, transparent);
+}
+
+.pref-more > summary {
+  min-height: 44px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font: 650 0.85rem var(--font-sans);
+  color: var(--paper);
+}
+
+.pref-more[open] > summary {
+  border-bottom: 1px solid var(--seam-faint);
+}
+
 .pref-action-card {
   display: flex;
   align-items: center;

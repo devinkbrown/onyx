@@ -1282,3 +1282,16 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
 
 export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
 export const DEFAULT_THEME_ID: ThemeId = 'ocean';
+
+/** Ocean-safe faces on the default You / Appearance path. Full catalog stays in Advanced. */
+export const PUBLIC_THEME_IDS = ['ocean', 'pearl'] as const satisfies readonly ThemeId[];
+export type PublicThemeId = (typeof PUBLIC_THEME_IDS)[number];
+
+export const PUBLIC_THEME_LABELS: Record<PublicThemeId, string> = {
+  ocean: 'Ocean · Dark',
+  pearl: 'Pearl · Light',
+};
+
+export function isPublicThemeId(id: string): id is PublicThemeId {
+  return (PUBLIC_THEME_IDS as readonly string[]).includes(id);
+}

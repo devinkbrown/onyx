@@ -64,7 +64,7 @@ import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { openGuestClaimSheet } from '@/shell/guestClaimState';
-import { openPreferences } from '@/lib/prefs/preferences';
+import { YouSettings } from './YouSettings';
 
 export interface AccountPanelProps {
   open: boolean;
@@ -323,12 +323,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     if (!open || ownerChanged) clearLocalAccountState();
   });
 
-  // ── derived ──
-  const flagBits = createMemo(() => {
-    const f = info()?.flags;
-    return typeof f === 'number' ? f : null;
-  });
-
   // The latest cert-list notice (CERTADD/CERTLIST/CERTDEL replies land in the
   // flat serviceNotices list under the "Account" source — surface the most
   // recent fingerprint-shaped lines so the user gets feedback).
@@ -515,46 +509,11 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
       closeLabel="Close account panel"
     >
       <div class="acct" data-testid="account-panel" data-guest={isGuest() ? 'true' : 'false'}>
-        <nav class="acct-hub" aria-label="You workspace">
-          <button
-            type="button"
-            class="acct-hub-link acct-hub-link--current"
-            aria-current="page"
-          >
-            Account
-          </button>
-          <button
-            type="button"
-            class="acct-hub-link"
-            data-testid="you-open-appearance"
-            onClick={() => {
-              local.onOpenChange(false);
-              queueMicrotask(() => getState().openAppearance());
-            }}
-          >
-            Appearance
-          </button>
-          <button
-            type="button"
-            class="acct-hub-link"
-            data-testid="you-open-preferences"
-            onClick={() => {
-              local.onOpenChange(false);
-              queueMicrotask(() => openPreferences());
-            }}
-          >
-            Preferences
-          </button>
-        </nav>
-        <p class="acct-context-cue" role="note">
-          <span>Next</span>
-          <Show
-            when={isGuest()}
-            fallback="Review account protection and recovery on this device. Device keys remain separate from sign-in safeguards."
-          >
-            Keep this name if you want to protect it without disconnecting.
-          </Show>
-        </p>
+        <YouSettings
+          guest={isGuest()}
+          onClose={() => local.onOpenChange(false)}
+          account={(
+            <>
         {/* ── Guest state ── */}
         <Show when={isGuest()}>
           <div class="acct-guest" data-testid="account-guest">
@@ -606,31 +565,13 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                   <dl class="acct-facts">
                     <Show when={detail().email}>
                       <div class="acct-fact">
-                        <dt>email</dt>
+                        <dt>Email</dt>
                         <dd>{detail().email}</dd>
-                      </div>
-                    </Show>
-                    <Show when={flagBits() !== null}>
-                      <div class="acct-fact">
-                        <dt>flags</dt>
-                        <dd>{flagBits()}</dd>
-                      </div>
-                    </Show>
-                    <Show when={detail().secure !== undefined}>
-                      <div class="acct-fact">
-                        <dt>secure</dt>
-                        <dd>{detail().secure ? 'on' : 'off'}</dd>
-                      </div>
-                    </Show>
-                    <Show when={detail().enforce !== undefined}>
-                      <div class="acct-fact">
-                        <dt>enforce</dt>
-                        <dd>{detail().enforce ? 'on' : 'off'}</dd>
                       </div>
                     </Show>
                     <Show when={detail().registered}>
                       <div class="acct-fact">
-                        <dt>registered</dt>
+                        <dt>Registered</dt>
                         <dd>{detail().registered}</dd>
                       </div>
                     </Show>
@@ -729,83 +670,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                 disabled={!newPassword() || !confirmPassword() || !currentPassword()}
               >
                 Change password
-              </Button>
-            </form>
-          </Section>
-
-          {/* Protection */}
-          <Section title="Protection" hint="Name + login protection. Toggling these requires your password.">
-            <PasswordField
-              id="acct-protect-password"
-              label="Account password (to change protection)"
-              autocomplete="current-password"
-              placeholder="needed to toggle below"
-              value={protectPassword()}
-              onInput={setProtectPassword}
-            />
-            <div class="acct-toggle-row">
-              <div class="acct-toggle-body">
-                <span class="acct-toggle-label">Secure</span>
-                <p class="acct-toggle-desc">Recognise this account only via login, never an access-list match.</p>
-              </div>
-              <label class="acct-switch">
-                <input
-                  type="checkbox"
-                  role="switch"
-                  aria-label="Toggle secure"
-                  aria-checked={info()?.secure ? 'true' : 'false'}
-                  checked={!!info()?.secure}
-                  onChange={(e) => toggleProtection('secure', e.currentTarget.checked)}
-                />
-                <span class="acct-switch-track" aria-hidden="true" />
-                <span class="acct-switch-thumb" aria-hidden="true" />
-              </label>
-            </div>
-            <div class="acct-toggle-row">
-              <div class="acct-toggle-body">
-                <span class="acct-toggle-label">Enforce</span>
-                <p class="acct-toggle-desc">Protect your registered name — unauthenticated holders get force-renamed.</p>
-              </div>
-              <label class="acct-switch">
-                <input
-                  type="checkbox"
-                  role="switch"
-                  aria-label="Toggle enforce"
-                  aria-checked={info()?.enforce ? 'true' : 'false'}
-                  checked={!!info()?.enforce}
-                  onChange={(e) => toggleProtection('enforce', e.currentTarget.checked)}
-                />
-                <span class="acct-switch-track" aria-hidden="true" />
-                <span class="acct-switch-thumb" aria-hidden="true" />
-              </label>
-            </div>
-          </Section>
-
-          {/* Certificates */}
-          <Section title="Certificates" hint="Bind a TLS client-certificate fingerprint for password-less login (certificate auth).">
-            <div class="acct-cert-actions">
-              <Button type="button" variant="ghost" size="sm" onClick={bindThisCert}>
-                Bind this connection's certificate
-              </Button>
-            </div>
-            <Show when={certNotices().length > 0}>
-              <ul class="acct-cert-list" aria-label="Certificate notices">
-                <For each={certNotices()}>
-                  {(n) => <li class="acct-cert-item">{n.text}</li>}
-                </For>
-              </ul>
-            </Show>
-            <form onSubmit={removeCert} noValidate aria-label="Remove certificate fingerprint">
-              <FormField
-                id="acct-cert-fp"
-                label="Remove a fingerprint"
-                type="text"
-                placeholder="SHA256:…"
-                value={certFingerprint()}
-                onInput={(e) => setCertFingerprint(e.currentTarget.value)}
-              />
-              <Button type="submit" variant="ghost" size="sm" disabled={!certFingerprint().trim()}>
-                Remove fingerprint
               </Button>
             </form>
           </Section>
@@ -925,12 +789,93 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           {/* Passkeys — WebAuthn passwordless login: register, list, rename, remove */}
           <PasskeysSection account={account()} owner={memoryOwner()} active={local.open} />
 
-          <details class="acct-advanced" data-testid="you-advanced">
-            <summary class="acct-advanced-summary">
-              <span class="acct-advanced-title">Advanced</span>
-              <span class="acct-advanced-hint">Ops tools, room organization, device keys, and personas</span>
-            </summary>
-            <div class="acct-advanced-body">
+          {/* Sign out stays on the default account path */}
+          <Section title="Session" hint="Log out of this account on this connection.">
+            <Button type="button" variant="ghost" size="md" onClick={signOut} data-testid="account-signout">
+              Sign out
+            </Button>
+          </Section>
+        </Show>
+            </>
+          )}
+          advanced={(
+            <>
+              <Show when={!isGuest()}>
+          <Section title="Protection" hint="Name and login protection. Changing these needs your password.">
+            <PasswordField
+              id="acct-protect-password"
+              label="Account password (to change protection)"
+              autocomplete="current-password"
+              placeholder="needed to toggle below"
+              value={protectPassword()}
+              onInput={setProtectPassword}
+            />
+            <div class="acct-toggle-row">
+              <div class="acct-toggle-body">
+                <span class="acct-toggle-label">Require sign-in</span>
+                <p class="acct-toggle-desc">Recognise this account only after you sign in.</p>
+              </div>
+              <label class="acct-switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-label="Toggle secure"
+                  aria-checked={info()?.secure ? 'true' : 'false'}
+                  checked={!!info()?.secure}
+                  onChange={(e) => toggleProtection('secure', e.currentTarget.checked)}
+                />
+                <span class="acct-switch-track" aria-hidden="true" />
+                <span class="acct-switch-thumb" aria-hidden="true" />
+              </label>
+            </div>
+            <div class="acct-toggle-row">
+              <div class="acct-toggle-body">
+                <span class="acct-toggle-label">Hold this name</span>
+                <p class="acct-toggle-desc">Keep your registered name from being used by a guest.</p>
+              </div>
+              <label class="acct-switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-label="Toggle enforce"
+                  aria-checked={info()?.enforce ? 'true' : 'false'}
+                  checked={!!info()?.enforce}
+                  onChange={(e) => toggleProtection('enforce', e.currentTarget.checked)}
+                />
+                <span class="acct-switch-track" aria-hidden="true" />
+                <span class="acct-switch-thumb" aria-hidden="true" />
+              </label>
+            </div>
+          </Section>
+
+          <Section title="Certificates" hint="Bind this browser’s certificate for password-less sign-in.">
+            <div class="acct-cert-actions">
+              <Button type="button" variant="ghost" size="sm" onClick={bindThisCert}>
+                Bind this connection's certificate
+              </Button>
+            </div>
+            <Show when={certNotices().length > 0}>
+              <ul class="acct-cert-list" aria-label="Certificate notices">
+                <For each={certNotices()}>
+                  {(n) => <li class="acct-cert-item">{n.text}</li>}
+                </For>
+              </ul>
+            </Show>
+            <form onSubmit={removeCert} noValidate aria-label="Remove certificate fingerprint">
+              <FormField
+                id="acct-cert-fp"
+                label="Remove a fingerprint"
+                type="text"
+                placeholder="SHA256:…"
+                value={certFingerprint()}
+                onInput={(e) => setCertFingerprint(e.currentTarget.value)}
+              />
+              <Button type="submit" variant="ghost" size="sm" disabled={!certFingerprint().trim()}>
+                Remove fingerprint
+              </Button>
+            </form>
+          </Section>
+
               <OperEventConsole />
               <CapabilityMatrixSection />
               <ChannelOrganizationSection owner={memoryOwner()} />
@@ -1052,8 +997,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               </Show>
             </div>
           </Section>
-            </div>
-          </details>
 
           {/* Recover name */}
           <Section title="Recover a name" hint="Force an unauthenticated holder off your registered name.">
@@ -1083,13 +1026,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                 Recover name
               </Button>
             </form>
-          </Section>
-
-          {/* Sign out */}
-          <Section title="Session" hint="Log out of this account on this connection.">
-            <Button type="button" variant="ghost" size="md" onClick={signOut} data-testid="account-signout">
-              Sign out
-            </Button>
           </Section>
 
           {/* Danger zone — DROP */}
@@ -1160,7 +1096,10 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               </Show>
             </div>
           </section>
-        </Show>
+              </Show>
+            </>
+          )}
+        />
       </div>
     </ModalShell>
   );

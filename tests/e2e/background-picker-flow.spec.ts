@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('previews a living background without applying it', async ({ page }) => {
   await page.goto('/appearance/');
+  await page.getByTestId('appearance-advanced').locator('summary').click();
 
   const picker = page.getByRole('radiogroup', { name: 'Background' });
   const phoenix = picker.getByRole('radio', { name: /Phoenix, scene/i });
@@ -10,12 +11,13 @@ test('previews a living background without applying it', async ({ page }) => {
   await expect(page.locator('.ap > [data-background-canvas][data-background-id="phoenix"]')).toBeVisible();
   await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 
-  await page.getByRole('heading', { name: /Set the atmosphere/i }).hover();
+  await page.getByRole('heading', { name: 'Appearance' }).hover();
   await expect(page.locator('.ap > [data-background-canvas][data-background-id="phoenix"]')).toHaveCount(0);
 });
 
 test('stages, cancels, and applies a background choice', async ({ page }) => {
   await page.goto('/appearance/');
+  await page.getByTestId('appearance-advanced').locator('summary').click();
 
   const picker = page.getByRole('radiogroup', { name: 'Background' });
   const auto = picker.getByRole('radio', { name: /Auto — theme-matched background/i });
@@ -33,5 +35,6 @@ test('stages, cancels, and applies a background choice', async ({ page }) => {
   await page.getByRole('button', { name: 'Apply background' }).click();
   await expect(page.getByText('Saved', { exact: true })).toBeVisible();
   await page.reload();
-  await expect(obsidian).toHaveAttribute('aria-checked', 'true');
+  await page.getByTestId('appearance-advanced').locator('summary').click();
+  await expect(page.getByRole('radio', { name: /Obsidian, solid/i })).toHaveAttribute('aria-checked', 'true');
 });

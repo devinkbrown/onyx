@@ -3396,9 +3396,9 @@ function AppearanceLauncher(): JSX.Element {
       >
         <span class="pref-action-card__icon" aria-hidden="true">◐</span>
         <span class="pref-action-card__body">
-          <span id="pref-appearance-entry-title" class="pref-action-card__title">Theme and background</span>
+          <span id="pref-appearance-entry-title" class="pref-action-card__title">Appearance</span>
           <span class="pref-desc">
-            Open Appearance for themes, room atmosphere, shared theme import, and background selection.
+            Choose a look, text size, and motion.
           </span>
         </span>
       </button>
@@ -3517,37 +3517,40 @@ export function PreferencesPanel(): JSX.Element {
               value={() => preferences().fontScale}
               onSelect={(value) => setPreference('fontScale', value)}
             />
-            <Segmented
-              legend="Conversation width"
-              description="Cap the reading measure, or let the feed run edge-to-edge."
-              options={WIDTHS}
-              labels={WIDTH_LABELS}
-              value={() => preferences().width}
-              onSelect={(value) => setPreference('width', value)}
-            />
-            <Toggle
-              legend="Reader mode"
-              title="Read as a transcript"
-              description="A calm, typographic single-column layout — quiet chrome, the words lead."
-              value={() => preferences().readerMode}
-              onToggle={(value) => setPreference('readerMode', value)}
-            />
-            <Segmented
-              legend="Experience level"
-              description="Standard keeps chat calm. Advanced adds room-management details when you have permission. Network Ops also shows live server operations when your account is an operator."
-              options={EXPERIENCE_MODES}
-              labels={EXPERIENCE_MODE_LABELS}
-              value={() => preferences().experienceMode}
-              onSelect={(value) => setPreference('experienceMode', value)}
-            />
-            <Segmented
-              legend="Clock"
-              description="Timestamp format for messages and room activity."
-              options={CLOCKS}
-              labels={CLOCK_LABELS}
-              value={() => preferences().clock}
-              onSelect={(value) => setPreference('clock', value)}
-            />
+            <details class="pref-more" data-testid="pref-display-advanced">
+              <summary>Advanced</summary>
+              <Segmented
+                legend="Conversation width"
+                description="Cap the reading measure, or let the feed run edge-to-edge."
+                options={WIDTHS}
+                labels={WIDTH_LABELS}
+                value={() => preferences().width}
+                onSelect={(value) => setPreference('width', value)}
+              />
+              <Toggle
+                legend="Reader mode"
+                title="Read as a transcript"
+                description="A calm, typographic single-column layout — quiet chrome, the words lead."
+                value={() => preferences().readerMode}
+                onToggle={(value) => setPreference('readerMode', value)}
+              />
+              <Segmented
+                legend="Experience level"
+                description="Standard keeps chat calm. Advanced adds room-management details when you have permission. Network Ops also shows live server operations when your account is an operator."
+                options={EXPERIENCE_MODES}
+                labels={EXPERIENCE_MODE_LABELS}
+                value={() => preferences().experienceMode}
+                onSelect={(value) => setPreference('experienceMode', value)}
+              />
+              <Segmented
+                legend="Clock"
+                description="Timestamp format for messages and room activity."
+                options={CLOCKS}
+                labels={CLOCK_LABELS}
+                value={() => preferences().clock}
+                onSelect={(value) => setPreference('clock', value)}
+              />
+            </details>
           </section>
 
           <section
@@ -3563,40 +3566,52 @@ export function PreferencesPanel(): JSX.Element {
             />
             <CalmModeControl />
             <Toggle
-              legend="Time scrubber"
-              title="Show 24-hour activity strip"
-              description="Shows the room activity bars and moment jump affordance above the transcript."
-              value={() => preferences().timeScrubber}
-              onToggle={(value) => setPreference('timeScrubber', value)}
-            />
-            <Toggle
-              legend="Voice and video"
-              title="Show join voice/video controls"
-              description="Keeps media available in the app, but removes the room header voice/video controls when off."
-              value={() => preferences().voiceEntry}
-              onToggle={(value) => setPreference('voiceEntry', value)}
-            />
-            <Toggle
-              legend="Topic tools"
-              title="Show topic, forum, and follow controls"
-              description="Removes the topic creation row and forum/follow buttons above room messages."
-              value={() => preferences().topicTools}
-              onToggle={(value) => setPreference('topicTools', value)}
-            />
-            <Toggle
-              legend="Watch together"
-              title="Show shared watch activity"
-              description="Hides the synchronized watch activity strip when a room has one."
-              value={() => preferences().watchTogether}
-              onToggle={(value) => setPreference('watchTogether', value)}
-            />
-            <Toggle
               legend="System events"
               title="Hide join, part & quit"
               description="Removes the quiet system lines from the feed."
               value={() => preferences().hideEvents}
               onToggle={(value) => setPreference('hideEvents', value)}
             />
+            <details class="pref-more" data-testid="pref-conversation-advanced">
+              <summary>Advanced</summary>
+              <Toggle
+                legend="Time scrubber"
+                title="Show 24-hour activity strip"
+                description="Shows the room activity bars and moment jump affordance above the transcript."
+                value={() => preferences().timeScrubber}
+                onToggle={(value) => setPreference('timeScrubber', value)}
+              />
+              <Toggle
+                legend="Voice and video"
+                title="Show join voice/video controls"
+                description="Keeps media available in the app, but removes the room header voice/video controls when off."
+                value={() => preferences().voiceEntry}
+                onToggle={(value) => setPreference('voiceEntry', value)}
+              />
+              <Toggle
+                legend="Topic tools"
+                title="Show topic, forum, and follow controls"
+                description="Removes the topic creation row and forum/follow buttons above room messages."
+                value={() => preferences().topicTools}
+                onToggle={(value) => setPreference('topicTools', value)}
+              />
+              <Toggle
+                legend="Watch together"
+                title="Show shared watch activity"
+                description="Hides the synchronized watch activity strip when a room has one."
+                value={() => preferences().watchTogether}
+                onToggle={(value) => setPreference('watchTogether', value)}
+              />
+              <BlockedHostsControl />
+              <Segmented
+                legend="Reaction density"
+                description="How densely boost and reaction pills render under messages — full chips, fewer chips, a single total, or hidden."
+                options={REACTION_DENSITIES}
+                labels={REACTION_DENSITY_LABELS}
+                value={() => preferences().reactionDensity}
+                onSelect={(value) => setPreference('reactionDensity', value)}
+              />
+            </details>
             <Toggle
               legend="Link previews"
               title="Preview web links"
@@ -3610,15 +3625,6 @@ export function PreferencesPanel(): JSX.Element {
               description="When on, plain http links never fetch a preview or media unfurl. Recommended for privacy."
               value={() => preferences().httpsOnly}
               onToggle={(value) => setPreference('httpsOnly', value)}
-            />
-            <BlockedHostsControl />
-            <Segmented
-              legend="Reaction density"
-              description="How densely boost and reaction pills render under messages — full chips, fewer chips, a single total, or hidden."
-              options={REACTION_DENSITIES}
-              labels={REACTION_DENSITY_LABELS}
-              value={() => preferences().reactionDensity}
-              onSelect={(value) => setPreference('reactionDensity', value)}
             />
             <Toggle
               legend="Encrypted DMs"

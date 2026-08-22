@@ -103,6 +103,53 @@
   margin-bottom: 14px;
 }
 .ap-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+.ap-chips .ap-theme-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: var(--target-min, 44px);
+  padding: 10px 14px;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--paper-dim);
+  background: color-mix(in oklab, var(--surface-face, var(--stone)) 36%, transparent);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.ap-chips .ap-theme-chip--on {
+  color: var(--on-accent, var(--ink));
+  background: var(--lapis);
+  border-color: color-mix(in oklab, var(--lapis) 70%, var(--seam));
+  font-weight: 700;
+}
+.ap-choice-toggles {
+  display: grid;
+  gap: 10px;
+  max-width: 28rem;
+}
+.ap-choice-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--surface-face, var(--stone)) 36%, transparent);
+  color: var(--paper);
+  cursor: pointer;
+  font: 600 0.95rem var(--font-sans);
+}
+.ap-choice-toggle b {
+  font: 650 0.8rem var(--font-sans);
+  color: var(--paper-dim);
+}
+.ap-choice-toggle:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
 .ap-chip {
   display: inline-flex;
   align-items: center;

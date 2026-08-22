@@ -30,3 +30,69 @@
 .ap-panel-background-browser > summary b { font: 600 0.82rem var(--font-sans); }
 .ap-panel-background-browser[open] > summary { border-bottom: 1px solid var(--seam-faint); }
 .ap-panel-background-browser__body { padding: 12px; }
+
+.ap-panel-toggles {
+  display: grid;
+  gap: 8px;
+}
+
+.ap-panel-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 24%, transparent);
+  color: var(--paper);
+  cursor: pointer;
+  text-align: left;
+  font: 600 0.84rem var(--font-sans);
+}
+
+.ap-panel-switch b {
+  font: 650 0.72rem var(--font-sans);
+  color: var(--paper-dim);
+}
+
+.ap-panel-switch:focus-visible {
+  outline: 2px solid var(--accent, var(--lapis));
+  outline-offset: 2px;
+}
+
+.ap-panel-advanced {
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 22%, transparent);
+}
+
+.ap-panel-advanced > summary {
+  display: grid;
+  gap: 4px;
+  min-height: 52px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--paper);
+}
+
+.ap-panel-advanced > summary span {
+  color: var(--paper-mute);
+  font: 0.62rem var(--font-sans);
+  letter-spacing: 0.04em;
+}
+
+.ap-panel-advanced > summary b {
+  font: 600 0.84rem var(--font-sans);
+}
+
+.ap-panel-advanced[open] > summary {
+  border-bottom: 1px solid var(--seam-faint);
+}
+
+.ap-panel-advanced__body {
+  display: grid;
+  gap: 18px;
+  padding: 12px;
+}

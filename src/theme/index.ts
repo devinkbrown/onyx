@@ -24,8 +24,11 @@ export {
   THEMES,
   THEME_IDS,
   DEFAULT_THEME_ID,
+  PUBLIC_THEME_IDS,
+  PUBLIC_THEME_LABELS,
+  isPublicThemeId,
 } from './themes';
-export type { ThemeId, ThemeMeta, TokenMap } from './themes';
+export type { ThemeId, ThemeMeta, TokenMap, PublicThemeId } from './themes';
 
 export {
   isCustomThemeId,

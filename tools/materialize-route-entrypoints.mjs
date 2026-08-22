@@ -27,8 +27,8 @@ export const ROUTE_ENTRYPOINTS = [
   },
   {
     route: 'appearance',
-    title: 'Onyx appearance — themes and backgrounds',
-    description: 'Customize Onyx with accessible OKLCH themes, living backgrounds, and controls for motion, contrast, and transparency.',
+    title: 'Onyx appearance — look, text size, and motion',
+    description: 'Choose an Onyx look, text size, and motion. Theme Studio and extra backgrounds stay under Advanced.',
   },
   {
     route: 'stats',

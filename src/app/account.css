@@ -103,6 +103,152 @@
   padding: var(--space-3);
 }
 
+.you-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.you-settings-item,
+.you-settings-link {
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ink) 40%, transparent);
+  color: var(--paper);
+}
+
+.you-settings-item > summary,
+.you-settings-link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 44px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+  text-align: left;
+  text-decoration: none;
+  font: 650 0.95rem var(--font-sans);
+}
+
+.you-settings-item > summary::-webkit-details-marker {
+  display: none;
+}
+
+.you-settings-item > summary small,
+.you-settings-link small {
+  font: 400 0.78rem var(--font-sans);
+  color: var(--paper-dim);
+}
+
+.you-settings-link {
+  width: 100%;
+  appearance: none;
+  border-color: var(--seam-faint);
+}
+
+.you-settings-link:hover,
+.you-settings-item > summary:hover {
+  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+}
+
+.you-settings-item > summary:focus-visible,
+.you-settings-link:focus-visible,
+.you-settings-switch:focus-visible,
+.you-settings-choice:focus-visible,
+.you-settings-select:focus-visible {
+  outline: 2px solid var(--accent, var(--lapis));
+  outline-offset: 2px;
+}
+
+.you-settings-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 12px 12px;
+}
+
+.you-settings-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--paper-dim);
+}
+
+.you-settings-switch,
+.you-settings-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ink) 28%, transparent);
+  color: var(--paper);
+  cursor: pointer;
+  text-align: left;
+}
+
+.you-settings-switch span,
+.you-settings-link span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.you-settings-switch strong,
+.you-settings-link strong {
+  font: 650 0.9rem var(--font-sans);
+}
+
+.you-settings-switch b {
+  font: 650 0.75rem var(--font-sans);
+  color: var(--paper-dim);
+}
+
+.you-settings-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.you-settings-choice.on {
+  border-color: var(--lapis);
+  background: color-mix(in oklab, var(--lapis-deep) 22%, transparent);
+}
+
+.you-settings-select {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ink) 28%, transparent);
+  color: var(--paper);
+  font: 600 0.9rem var(--font-sans);
+}
+
+.you-settings-support {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.you-settings-support a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--lapis);
+  text-decoration: none;
+  font: 650 0.9rem var(--font-sans);
+}
+
+.you-settings-item--advanced > summary {
+  gap: 4px;
+}
+
 /* Shared sheet cue: explains the immediate task without competing with the
    panel title or claiming that account security enables message encryption. */
 .acct-context-cue {
