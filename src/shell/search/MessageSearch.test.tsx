@@ -537,6 +537,24 @@ describe('MessageSearch', () => {
     expect(input).toHaveValue('q'.repeat(MESSAGE_SEARCH_QUERY_MAX));
   });
 
+  it('keeps hybrid and related-term modes behind Advanced', async () => {
+    store.setState({ ...initialState, activeView: { kind: 'home' } }, true);
+    openMessageSearchWithQuery('release');
+    render(() => <MessageSearch />);
+
+    expect(screen.getByRole('button', { name: 'Advanced' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: 'Text + related' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Related terms' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Device recall matching mode' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+    expect(screen.getByRole('button', { name: 'Advanced' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('group', { name: 'Device recall matching mode' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Text + related' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Related terms' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Exact' })).toBeInTheDocument();
+  });
+
   it('saves, runs, and deletes hybrid Search Center queries', async () => {
     store.setState({ ...initialState, activeView: { kind: 'home' } }, true);
     openMessageSearchWithQuery('release handoff');
@@ -561,6 +579,8 @@ describe('MessageSearch', () => {
     });
     fireEvent.click(run);
     expect(screen.getByRole('searchbox', { name: 'Search messages' })).toHaveValue('release handoff');
+    expect(screen.queryByRole('button', { name: 'Text + related' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
     expect(screen.getByRole('button', { name: 'Text + related' })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete saved search Release trail' }));

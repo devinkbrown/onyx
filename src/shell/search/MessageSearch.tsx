@@ -124,6 +124,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
     'idle' | 'refreshing' | 'saving' | 'deleting' | 'success' | 'error'
   >('idle');
   const [savedStatusMessage, setSavedStatusMessage] = createSignal('');
+  const [advancedOpen, setAdvancedOpen] = createSignal(false);
   const savedBusy = createMemo(() => (
     savedStatus() === 'saving'
     || savedStatus() === 'deleting'
@@ -277,11 +278,12 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
     if (!open || !owner) {
       // The label is a draft for the current query, not a persisted preference.
       // Dropping it with the query prevents a private/irrelevant name from
-      // resurfacing when the always-mounted Search Center opens later.
+      // resurfacing when the always-mounted search overlay opens later.
       setSavedLabel('');
       setSavedStatus('idle');
       setSavedStatusMessage('');
       setSavedSearches([]);
+      setAdvancedOpen(false);
       return;
     }
 
@@ -640,7 +642,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
           <section class="onyx-message-search__saved" aria-label="Saved searches">
             <div class="onyx-message-search__saved-bar">
               <ProvenanceBadge scope="device" subject="Saved searches" />
-              <span class="onyx-message-search__vault-label">Search Center</span>
+              <span class="onyx-message-search__vault-label">Saved</span>
               <span class="onyx-message-search__server-count">
                 {savedSearches().length} saved
               </span>
@@ -801,30 +803,46 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
           </div>
         </Show>
         <Show when={search.query().trim().length >= 2}>
-          <div class="onyx-message-search__recall onyx-message-search__recall--modes">
-            <ProvenanceBadge scope="device" subject="Device recall matching mode" />
-            <span class="onyx-message-search__vault-label">Device recall</span>
-            <div
-              class="onyx-message-search__segmented"
-              role="group"
-              aria-label="Device recall matching mode"
+          <div class="onyx-message-search__advanced">
+            <button
+              type="button"
+              class="onyx-message-search__advanced-toggle"
+              aria-expanded={advancedOpen()}
+              aria-controls="onyx-message-search-advanced"
+              onClick={() => setAdvancedOpen((open) => !open)}
             >
-              <For each={VAULT_MODE_OPTIONS}>
-                {(option) => (
-                  <button
-                    type="button"
-                    class="onyx-message-search__segment"
-                    aria-pressed={search.vaultMode() === option.mode}
-                    data-mode={option.mode}
-                    data-active={search.vaultMode() === option.mode}
-                    title={option.title}
-                    onClick={() => search.setVaultMode(option.mode)}
-                  >
-                    {option.label}
-                  </button>
-                )}
-              </For>
-            </div>
+              Advanced
+            </button>
+            <Show when={advancedOpen()}>
+              <div
+                id="onyx-message-search-advanced"
+                class="onyx-message-search__recall onyx-message-search__recall--modes"
+              >
+                <ProvenanceBadge scope="device" subject="Device recall matching mode" />
+                <span class="onyx-message-search__vault-label">Device recall</span>
+                <div
+                  class="onyx-message-search__segmented"
+                  role="group"
+                  aria-label="Device recall matching mode"
+                >
+                  <For each={VAULT_MODE_OPTIONS}>
+                    {(option) => (
+                      <button
+                        type="button"
+                        class="onyx-message-search__segment"
+                        aria-pressed={search.vaultMode() === option.mode}
+                        data-mode={option.mode}
+                        data-active={search.vaultMode() === option.mode}
+                        title={option.title}
+                        onClick={() => search.setVaultMode(option.mode)}
+                      >
+                        {option.label}
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </div>
+            </Show>
           </div>
         </Show>
         <Show when={search.vaultResults().length > 0}>

@@ -102,7 +102,7 @@ Cmd-K Spotlight + time grammar; message search; reader / jump-to-date / time scr
 | **Z1 Identity** | Sigil + name (copy) · topic ellipsis · secondary heatline/facepile | Name yes; topic if set; secondary may collapse |
 | **Z2 Place** | Call control / call lifecycle status · optional voice occupancy · optional event chip | Call per truth table; chips if data |
 | **Z3 People** | Roster toggle + count | **Always on channel**, including **0** |
-| **Z4 Edge** | Connection status + More · Inbox as reach instrument | Conn + More always |
+| **Z4 Edge** | Search · Inbox · More · connection | Search on room/DM/Status; Conn + More always |
 
 **Not primary / not zones:** pins, mark-read, DND, AI policy (when shown, quiet or in More), **Jump to date** (More → This room / Conversation), heatline/facepile (presence-as-place **secondary** — facepile **hidden at narrow/mobile**; may collapse before Call/People/Conn/name).
 
@@ -113,6 +113,7 @@ Cmd-K Spotlight + time grammar; message search; reader / jump-to-date / time scr
 | Room identity | `#` name | `@` nick | `✦ Status` / `Onyx` |
 | Call | yes (truth table) | no channel join; 1:1 ring via overlays | no |
 | People | yes, count `0…n` | no | no |
+| Search | yes — **Search messages** | yes — **Search messages** | Status yes; Home uses welcome **Search messages** |
 | Connection | always | always | always |
 | More | always | always | always |
 | Event chip | if visible scheduled event | — | — |
@@ -131,7 +132,7 @@ Cmd-K Spotlight + time grammar; message search; reader / jump-to-date / time scr
 
 **ARIA shape:** Visible section kickers are normal text (`p.shell-ribbon-more-label`) **outside** `role=menu`, associated via `aria-labelledby` on the section and its menu. Each `role=menu` contains **only** `role=menuitem` children (no heading nodes inside the menu). Alerts radiogroup stays outside any menu. Roving Arrow/Home/End walks every menuitem under the More panel root.
 
-**Forbidden in More:** Call, People, connection status, live event chip, active voice occupancy.
+**Forbidden in More:** Call, People, Search, connection status, live event chip, active voice occupancy.
 
 **Stable strings:** trigger `More actions` · panel `More channel and workspace actions` · kickers `Alerts` / `This room` / `Conversation` / `Workspace`.
 
@@ -160,7 +161,7 @@ Cmd-K Spotlight + time grammar; message search; reader / jump-to-date / time scr
 ### Secondary facepile
 
 - Rendered in Z1 identity for channels (`shell-ribbon-facepile` wrapper around `Facepile`).
-- **Desktop / roomy conversation only.** Hidden at narrow conversation container (`@container conversation max-width: 760px`), viewport ≤760px, and mobile shell (≤900px) so it cannot crowd Call / People / More / connection.
+- **Desktop / roomy conversation only.** Hidden at narrow conversation container (`@container conversation max-width: 760px`), viewport ≤760px, and mobile shell (≤900px) so it cannot crowd Call / People / Search / More / connection.
 
 ### Member-column persistence — **DEFERRED (not implemented in slice 1)**
 
@@ -181,7 +182,7 @@ Remembering desktop open/closed under an `onyx:` localStorage (or prefs) key is 
 | Sidebar room / message rows | **44px** | **44px** |
 | Composer attach / emoji / More | min **40×40** | min **44×44** |
 | Composer Send | min **40×40** | min **44×44** |
-| Primary Call / People / More | min **40×40** | min **44×44** |
+| Primary Call / People / Search / More | min **40×40** | min **44×44** |
 | Inbox chrome | ≥36 | ≥44 hit area |
 | Jump to date | menuitem in More | menuitem in More |
 | Name | max ~22ch | max ~13–15ch / ~48vw |

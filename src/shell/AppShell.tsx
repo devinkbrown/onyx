@@ -185,7 +185,7 @@ function handleMessageSearchHotkey(event: KeyboardEvent): void {
 
   event.preventDefault();
   // Do not move focus behind a modal Sheet/overlay. The active dialog owns the
-  // keyboard until it closes; Search Center can be opened immediately after.
+  // keyboard until it closes; message search can be opened immediately after.
   if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
   openMessageSearch();
 }
@@ -1317,7 +1317,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                     <MessageView selfNick={displayNick()} />
                   </div>
                 </Show>
-                {/* Search Center is global on every conversation surface. */}
+                {/* Message search is global on every conversation surface. */}
                 <MessageSearch />
               </>
             )}

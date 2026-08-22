@@ -117,6 +117,8 @@ export type UseMessageSearch = {
 };
 
 const [isMessageSearchOpen, setMessageSearchOpen] = createSignal(false);
+/** Shared open state so header chrome can mark Search as pressed. */
+export { isMessageSearchOpen };
 const [messageSearchFocusRequest, setMessageSearchFocusRequest] = createSignal(0);
 // The element focused when the non-modal search overlay opened (the trigger).
 // Captured on open, replayed on close so Escape/close returns the keyboard user

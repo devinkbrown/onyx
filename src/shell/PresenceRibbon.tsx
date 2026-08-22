@@ -6,7 +6,7 @@
  *   Z1 Identity — name · topic · secondary heatline/facepile (facepile desktop-only)
  *   Z2 Place    — event · voice occupancy · Call lifecycle control
  *   Z3 People   — roster toggle + count (always on channel, incl. 0)
- *   Z4 Edge     — Inbox (temp primary) · More · connection (conn never display:none)
+ *   Z4 Edge     — Search · Inbox · More · connection (conn never display:none)
  *
  * More is grouped (Alerts · This room|Conversation · You), not a junk drawer.
  * Jump-to-date lives in More (This room / Conversation). Call presentation reuses
@@ -36,6 +36,7 @@ import { AiPolicyBadge } from './AiPolicyBadge';
 import { GroupControlRoomIndicator } from './GroupControlRoomIndicator';
 import { classifyCallsHubPresentation, type CallsHubPresentation } from './CallsHub';
 import { selectGroupControlRoom } from '@/lib/e2ee/groupControlSelectors';
+import { isMessageSearchOpen, openMessageSearch } from './search/useMessageSearch';
 import type { AiPolicy } from '@/lib/irc/aiPolicyProp';
 import type { Channel } from '@/lib/irc/types';
 
@@ -723,7 +724,36 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           <span class="shell-ribbon-divider" aria-hidden="true" />
         </Show>
 
-        {/* Z4 Edge — Inbox · More · connection (Date lives in More). */}
+        {/* Z4 Edge — Search · Inbox · More · connection (Date lives in More).
+            Home already has a Search messages CTA in the welcome band. */}
+        <Show when={activeView().kind !== 'home'}>
+          <div class="shell-ribbon-group" role="group" aria-label="Search">
+            <button
+              type="button"
+              class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-search"
+              aria-label="Search messages"
+              aria-pressed={isMessageSearchOpen()}
+              title="Search messages"
+              data-testid="ribbon-search"
+              onClick={() => openMessageSearch()}
+            >
+              <svg
+                class="shell-ribbon-ico"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="11" cy="11" r="6.5" />
+                <path d="m16.2 16.2 4.3 4.3" />
+              </svg>
+              <span class="shell-ribbon-action-label">Search</span>
+            </button>
+          </div>
+        </Show>
         <div class="shell-ribbon-group" role="group" aria-label="Inbox">
           <NotificationCenter />
         </div>
