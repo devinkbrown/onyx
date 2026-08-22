@@ -340,7 +340,8 @@ function MacosComingSoonCard(): JSX.Element {
       <p class="dl-note" data-testid="dl-macos-honesty">
         {mac.honesty}
         {' '}
-        Supporting browsers can install Onyx as a PWA from the app shell — same rooms, messages, and calls without a native package.
+        Supporting browsers can put Onyx on the Home Screen or in its own window. No store.
+        Same rooms, messages, and calls without a native package.
       </p>
     </article>
   );
@@ -471,7 +472,8 @@ export default function Download(): JSX.Element {
                 {' '}
                 <a href="/app/">open the browser app</a>
                 {' '}
-                or install the PWA — including on Mac today.
+                — including on Mac today. Supporting browsers can put Onyx on the
+                Home Screen or in its own window. No store.
               </li>
             </ul>
           </div>

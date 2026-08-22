@@ -207,7 +207,7 @@ export const MACOS_COMING_SOON: MacosComingSoonCard = {
   runtime: 'system WKWebView',
   plannedPackage: 'unsigned, unnotarized .app inside a DMG (separate arch lanes)',
   honesty:
-    'Until macOS packages ship, use the browser or install the PWA — the full client, without waiting on a native shell.',
+    'Until macOS packages ship, use the browser. Supporting browsers can put Onyx on the Home Screen or in its own window. No store.',
 } as const;
 
 /** BSD-only subset of DOWNLOAD_CARDS (compat). */

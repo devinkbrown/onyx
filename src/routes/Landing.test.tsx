@@ -33,6 +33,11 @@ describe('Landing', () => {
     expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/download/');
     expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('Download');
     expect(container.textContent).toMatch(/Invite someone\. Join a room\. Talk\./);
+    expect(container.querySelector('.home-desktop-note')?.textContent).toMatch(
+      /Supporting browsers can put Onyx on the Home Screen or in its own window\. No store\./,
+    );
+    expect(container.textContent).not.toMatch(/install Onyx as a PWA/i);
+    expect(container.textContent).not.toMatch(/app store|play store|beforeinstallprompt|iOS push/i);
   });
 
   it('derives public destination links from manifest hrefs', () => {

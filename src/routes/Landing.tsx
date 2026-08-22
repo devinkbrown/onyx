@@ -56,7 +56,7 @@ export default function Landing() {
               <a class="home-secondary-link" href={publicRouteById('download').href}>Download</a>
             </div>
             <p class="home-desktop-note">
-              Open it in the browser — no install, no ads. Invite someone from a room, or use Download as a quieter path.
+              Supporting browsers can put Onyx on the Home Screen or in its own window. No store.
             </p>
             <img
               class="home-mascot"

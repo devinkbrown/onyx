@@ -132,7 +132,9 @@ function isCacheableStaticPath(pathname) {
     || pathname === '/favicon-32.png'
     || pathname === '/apple-touch-icon.png'
     || pathname === '/icon-192.png'
+    || pathname === '/icon-192-maskable.png'
     || pathname === '/icon-512.png'
+    || pathname === '/icon-512-maskable.png'
     || pathname === '/og.png'
     || pathname.startsWith('/brand/')
     || /^\/screenshots\/[^/]+\.png$/.test(pathname);

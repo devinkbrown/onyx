@@ -26,6 +26,7 @@ describe('locked public identity assets', () => {
       'public/og.png',
       'public/icon-192.png',
       'public/icon-512.png',
+      'public/icon-192-maskable.png',
       'public/icon-512-maskable.png',
       'public/apple-touch-icon.png',
       'public/favicon-32.png',
@@ -40,8 +41,12 @@ describe('locked public identity assets', () => {
     expect(pngSize('public/og.png')).toEqual({ width: 1200, height: 630 });
     expect(pngSize('public/brand/og.png')).toEqual({ width: 1200, height: 630 });
     expect(pngSize('public/icon-512.png')).toEqual({ width: 512, height: 512 });
+    expect(pngSize('public/icon-192-maskable.png')).toEqual({ width: 192, height: 192 });
     expect(pngSize('public/icon-512-maskable.png')).toEqual({ width: 512, height: 512 });
-    expect(pngSize('public/apple-touch-icon.png')).toEqual({ width: 180, height: 180 });
+    const apple = readFileSync(join(root, 'public/apple-touch-icon.png'));
+    expect({ width: apple.readUInt32BE(16), height: apple.readUInt32BE(20) }).toEqual({ width: 180, height: 180 });
+    expect(apple[25], 'apple-touch must be opaque RGB, not alpha').toBe(2);
+    expect(apple.equals(readFileSync(join(root, 'public/favicon-32.png')))).toBe(false);
 
     const home = readFileSync(join(root, 'src', 'routes', 'Landing.tsx'), 'utf8');
     const entry = readFileSync(join(root, 'index.html'), 'utf8');

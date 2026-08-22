@@ -249,6 +249,8 @@ describe('SPA route entrypoint materializer', () => {
         .toBe('/favicon.ico');
       expect(document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href'), route)
         .toBe('/apple-touch-icon.png');
+      expect(document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('sizes'), route)
+        .toBe('180x180');
     }
   });
 

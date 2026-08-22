@@ -169,8 +169,11 @@ Procurement materials and legal pages remain **gated**. Not a Home section inven
 | Desktop host scaffold / null compile exists | **Internal / roadmap only** for multi-platform ship claims |
 
 Home may say: **Browser now across desktop and mobile**, with a neutral link to
-`/download/`. Exact native platform support stays on Download. Prefer silence
-over aspirational signed multi-platform CTAs.
+`/download/`. The Home footnote may say supporting browsers can put Onyx on the
+Home Screen or in its own window — no store, no `beforeinstallprompt` UI on
+marketing pages, no iOS-push claim from a Safari tab. Exact native platform
+support stays on Download, below the fold. Prefer silence over aspirational
+signed multi-platform CTAs.
 
 ---
 

@@ -132,13 +132,23 @@ describe('PWA manifest', () => {
     expect(manifest.icons).toEqual([
       expect.objectContaining({ src: '/icon-192.png', sizes: '192x192', purpose: 'any' }),
       expect.objectContaining({ src: '/icon-512.png', sizes: '512x512', purpose: 'any' }),
+      expect.objectContaining({ src: '/icon-192-maskable.png', sizes: '192x192', purpose: 'maskable' }),
       expect.objectContaining({ src: '/icon-512-maskable.png', sizes: '512x512', purpose: 'maskable' }),
     ]);
     expect(manifest.icons?.some((icon) => icon.purpose.split(/\s+/).includes('maskable'))).toBe(true);
+    expect(existsSync(join(root, 'public', 'icon-192-maskable.png'))).toBe(true);
     expect(existsSync(join(root, 'public', 'icon-512-maskable.png'))).toBe(true);
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content'))
-      .toBe(manifest.theme_color);
+      .toBe('#05070a');
+    expect(manifest.theme_color).toBe('#05070a');
+    expect(manifest.theme_color).not.toBe('#000306');
     expect(manifest.background_color).toBe(manifest.theme_color);
+    expect(manifest.start_url).toBe('/app/');
+    expect(manifest.display).toBe('standalone');
+    const apple = document.querySelector('link[rel="apple-touch-icon"]');
+    expect(apple?.getAttribute('href')).toBe('/apple-touch-icon.png');
+    expect(apple?.getAttribute('sizes')).toBe('180x180');
+    expect(readFileSync(entryDocumentPath, 'utf8')).not.toMatch(/beforeinstallprompt/i);
   });
 
   it('references notification icons that exist in public assets', () => {
@@ -250,6 +260,7 @@ describe('PWA manifest', () => {
       'glossary',
       'guidelines',
       'guides',
+      'icon-192-maskable.png',
       'icon-192.png',
       'icon-512-maskable.png',
       'icon-512.png',
