@@ -46,6 +46,7 @@ import { PresenceRibbon } from './PresenceRibbon';
 import { RoomInviteShareHost } from './RoomInviteShare';
 import { StagePanel } from './StagePanel';
 import { GuestClaimPrompt } from './GuestClaimPrompt';
+import { FirstRunNotifyPrompt } from './FirstRunNotifyPrompt';
 import { DmKeyChangeBanner } from './DmKeyChangeBanner';
 import { DmSafetySheet } from './DmSafetySheet';
 import { ReconnectStatusBanner } from './ReconnectStatusBanner';
@@ -97,12 +98,14 @@ import { CallsHub } from './CallsHub';
 const AccountPanel = lazy(() => import('@/app/Account').then((m) => ({ default: m.AccountPanel })));
 const AppearancePanel = lazy(() => import('./AppearancePanel').then((m) => ({ default: m.AppearancePanel })));
 const PreferencesPanel = lazy(() => import('./PreferencesPanel').then((m) => ({ default: m.PreferencesPanel })));
+const YouNotifications = lazy(() => import('./YouNotifications').then((m) => ({ default: m.YouNotifications })));
 const PinnedMessages = lazy(() => import('./PinnedMessages').then((m) => ({ default: m.PinnedMessages })));
 const ScheduledMessagesSheet = lazy(() => import('./ScheduledMessagesSheet').then((m) => ({ default: m.ScheduledMessagesSheet })));
 const JumpToDateSheet = lazy(() => import('./JumpToDateSheet').then((m) => ({ default: m.JumpToDateSheet })));
 import { applyPreferences, closePreferences, isPreferencesOpen, openPreferences, preferences } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
+import { closeNotifications, isNotificationsOpen } from '@/lib/notifications/youNotificationsState';
 const ShortcutsOverlay = lazy(() => import('./ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })));
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { MessageSearch } from './search/MessageSearch';
@@ -618,7 +621,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const [mobileMembersOpen, setMobileMembersOpen] = createSignal(false);
   const [mobileMoreOpen, setMobileMoreOpen] = createSignal(false);
   const [mobileMoreView, setMobileMoreView] = createSignal<'destinations' | 'room-controls'>('destinations');
-  const [mobileMenuReturnSurface, setMobileMenuReturnSurface] = createSignal<'appearance' | 'preferences' | 'you' | null>(null);
+  const [mobileMenuReturnSurface, setMobileMenuReturnSurface] = createSignal<'appearance' | 'preferences' | 'you' | 'notifications' | null>(null);
   let mobileMembersTarget: string | null = null;
   let mobileRoomControlsTarget: string | null = null;
   let sidebarDrawerRef: HTMLDivElement | undefined;
@@ -1001,22 +1004,23 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
     });
   }
 
-  // You / Appearance / Preferences are portaled Sheets. Observe their shared
-  // state rather than relying on one close button so Escape, backdrop clicks,
-  // and You-hub handoffs all return focus through the same contract.
+  // You / Appearance / Preferences / Notifications are portaled Sheets. Observe
+  // their shared state rather than relying on one close button so Escape,
+  // backdrop clicks, and You-hub handoffs all return focus through the same contract.
   createEffect(() => {
     const appearanceOpen = showAppearance();
     const preferencesOpen = isPreferencesOpen();
+    const notificationsOpen = isNotificationsOpen();
     const youOpen = showAccount();
     const returnSurface = mobileMenuReturnSurface();
     if (!returnSurface) return;
 
     if (returnSurface === 'you') {
       if (youOpen) return;
-      // Account closes itself, then opens Appearance/Preferences in a sibling
-      // microtask. Defer two ticks so that handoff can land before we treat
-      // the Account close as a Menu-return (a single microtask races and clears
-      // the armed surface while the nested sheet is still opening).
+      // Account closes itself, then opens Appearance/Preferences/Notifications
+      // in a sibling microtask. Defer two ticks so that handoff can land before
+      // we treat the Account close as a Menu-return (a single microtask races
+      // and clears the armed surface while the nested sheet is still opening).
       const armed = returnSurface;
       queueMicrotask(() => {
         queueMicrotask(() => {
@@ -1029,6 +1033,10 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
             setMobileMenuReturnSurface('preferences');
             return;
           }
+          if (isNotificationsOpen()) {
+            setMobileMenuReturnSurface('notifications');
+            return;
+          }
           if (showAccount()) return;
           setMobileMenuReturnSurface(null);
           restoreMobileMenuTriggerFocus();
@@ -1038,7 +1046,8 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
     }
 
     if ((returnSurface === 'appearance' && appearanceOpen)
-      || (returnSurface === 'preferences' && preferencesOpen)) return;
+      || (returnSurface === 'preferences' && preferencesOpen)
+      || (returnSurface === 'notifications' && notificationsOpen)) return;
     setMobileMenuReturnSurface(null);
     restoreMobileMenuTriggerFocus();
   });
@@ -1331,6 +1340,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                 </Show>
                 <DmSafetySheet />
                 <GuestClaimPrompt />
+                <FirstRunNotifyPrompt />
                 <DmKeyChangeBanner />
                 <Show when={preferences().timeScrubber && !inCall()}>
                   <TimeScrubber />
@@ -1522,6 +1532,11 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
       <Show when={isPreferencesOpen()}>
         <LazySurface label="preferences" onClose={closePreferences}>
           <PreferencesPanel />
+        </LazySurface>
+      </Show>
+      <Show when={isNotificationsOpen()}>
+        <LazySurface label="notifications" onClose={closeNotifications}>
+          <YouNotifications />
         </LazySurface>
       </Show>
 

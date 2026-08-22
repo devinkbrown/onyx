@@ -1,0 +1,107 @@
+/* You → Notifications — short first-week closed-tab page */
+
+.you-notify {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-section, var(--space-4));
+}
+
+.you-notify-lede {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--paper-mute);
+}
+
+.you-notify-status {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--paper);
+}
+
+.you-notify-status[data-kind='host'] {
+  padding: var(--space-3);
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ink) 40%, transparent);
+}
+
+.you-notify-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.you-notify-kind {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ink) 40%, transparent);
+}
+
+.you-notify-kind-mark {
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--paper-mute) 55%, transparent);
+}
+
+.you-notify-kind[data-on='true'] .you-notify-kind-mark {
+  background: var(--lapis, var(--accent));
+}
+
+.you-notify-kind-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--paper);
+}
+
+.you-notify-kind-body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--paper-mute);
+}
+
+.you-notify-room {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.you-notify-room-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--paper);
+}
+
+.you-notify-room-copy {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--paper-mute);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .you-notify-kind-mark {
+    transition: none;
+  }
+}

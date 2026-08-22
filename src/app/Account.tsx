@@ -65,6 +65,7 @@ import { Spinner } from '@/primitives/index';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { openGuestClaimSheet } from '@/shell/guestClaimState';
 import { YouSettings } from './YouSettings';
+import { YouHubNav } from '@/shell/YouHubNav';
 
 export interface AccountPanelProps {
   open: boolean;
@@ -509,11 +510,21 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
       closeLabel="Close account panel"
     >
       <div class="acct" data-testid="account-panel" data-guest={isGuest() ? 'true' : 'false'}>
+        <YouHubNav current="account" onLeave={() => local.onOpenChange(false)} />
         <YouSettings
           guest={isGuest()}
           onClose={() => local.onOpenChange(false)}
           account={(
             <>
+              <p class="acct-context-cue" role="note">
+                <span>Next</span>
+                <Show
+                  when={isGuest()}
+                  fallback="Review account protection and recovery on this device. Device keys remain separate from sign-in safeguards."
+                >
+                  Keep this name if you want to protect it without disconnecting.
+                </Show>
+              </p>
         {/* ── Guest state ── */}
         <Show when={isGuest()}>
           <div class="acct-guest" data-testid="account-guest">

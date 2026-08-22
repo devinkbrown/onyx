@@ -253,8 +253,8 @@ export function NotificationControls(): JSX.Element {
       } else if (result.ok) {
         setWebPushOn(enable);
         current.addToast(enable
-          ? { variant: 'success', title: 'Push on', description: 'DMs reach this browser even with the tab closed.' }
-          : { variant: 'info', title: 'Push off', description: 'This browser will no longer be nudged while closed.' });
+          ? { variant: 'success', title: 'Push on', description: 'Mentions, DMs, and calls can reach this browser when the tab is closed.' }
+          : { variant: 'info', title: 'Push off', description: 'This browser will no longer be pinged for mentions, DMs, or calls while closed.' });
       } else {
         current.addToast({ variant: 'warning', title: 'Push unavailable', description: result.reason });
       }
