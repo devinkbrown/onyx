@@ -265,16 +265,23 @@ describe('ChannelSettings panel', () => {
     return result;
   }
 
+  function openAdvanced() {
+    fireEvent.click(screen.getByText('Advanced'));
+  }
+
   it('opens from the ribbon gear and shows the Topic + Modes sections to an op', () => {
     // Arrange
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
     // Act
     openSettings();
-
-    // Assert — both sections render; op sees mode toggles
     expect(screen.getByRole('dialog', { name: 'Room settings' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Topic' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Room mode flags' })).toBeNull();
+
+    openAdvanced();
+
+    // Assert — operator chrome lives under Advanced
     expect(screen.getByRole('group', { name: 'Room mode flags' })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Moderated/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument();
@@ -287,10 +294,12 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    expect(screen.queryByRole('group', { name: 'Room mode flags' })).toBeNull();
+    openAdvanced();
 
     // Assert — no toggle group; read-only notice present
     expect(screen.queryByRole('group', { name: 'Room mode flags' })).toBeNull();
-    expect(screen.getByText('Only room hosts can change room modes.')).toBeInTheDocument();
+    expect(screen.getByText('Only room hosts can change these rules.')).toBeInTheDocument();
   });
 
   it('toggling a flag dispatches the MODE command', () => {
@@ -299,6 +308,7 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    openAdvanced();
     fireEvent.click(screen.getByRole('switch', { name: /Moderated/ }));
 
     // Assert — +m sent (flag was off)
@@ -311,6 +321,7 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    openAdvanced();
 
     // Assert — the Moderated switch is on
     expect(screen.getByRole('switch', { name: /Moderated/ })).toHaveAttribute('aria-checked', 'true');
@@ -363,6 +374,7 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    openAdvanced();
     fireEvent.change(screen.getByLabelText('Ephemeral history'), { target: { value: '86400' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply retention' }));
 
@@ -377,6 +389,8 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    expect(screen.queryByLabelText('Ephemeral history')).toBeNull();
+    openAdvanced();
 
     // Assert
     expect(screen.queryByLabelText('Ephemeral history')).toBeNull();
@@ -390,6 +404,7 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    openAdvanced();
     fireEvent.change(screen.getByLabelText('Message policy'), { target: { value: 'required' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply policy' }));
 
@@ -404,6 +419,8 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    expect(screen.queryByLabelText('Message policy')).toBeNull();
+    openAdvanced();
 
     // Assert
     expect(screen.queryByLabelText('Message policy')).toBeNull();
@@ -415,6 +432,7 @@ describe('ChannelSettings panel', () => {
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
     openSettings();
+    openAdvanced();
     fireEvent.change(screen.getByLabelText('Who can request history'), { target: { value: 'opers' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply history policy' }));
 
@@ -426,6 +444,8 @@ describe('ChannelSettings panel', () => {
     seedChannel({ ourNick: 'me', users: [makeUser('me', [])], props: { 'history-policy': 'members' } });
 
     openSettings();
+    expect(screen.queryByLabelText('Who can request history')).toBeNull();
+    openAdvanced();
 
     expect(screen.queryByLabelText('Who can request history')).toBeNull();
     expect(screen.getByText('Members only')).toBeInTheDocument();
@@ -438,6 +458,7 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    openAdvanced();
     // Opening settings as op auto-fetches ACCESS LIST; ignore that for webhook asserts.
     client.sendRaw.mockClear();
     fireEvent.input(screen.getByLabelText('Webhook name'), { target: { value: 'deploy' } });
@@ -459,6 +480,7 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    openAdvanced();
 
     // Assert
     expect(screen.getByText(/WEBHOOK: created for #general/)).toBeInTheDocument();
@@ -470,6 +492,8 @@ describe('ChannelSettings panel', () => {
 
     // Act
     openSettings();
+    expect(screen.queryByLabelText('Webhook name')).toBeNull();
+    openAdvanced();
 
     // Assert
     expect(screen.queryByLabelText('Webhook name')).toBeNull();
@@ -486,7 +510,7 @@ describe('ChannelSettings panel', () => {
     // Assert — no editable textarea, lock notice shown
     expect(screen.queryByLabelText('Topic text')).toBeNull();
     expect(
-      screen.getByText('This room is topic-locked (+t). Only room hosts can change the topic.'),
+      screen.getByText('This room is topic-locked. Only room hosts can change the topic.'),
     ).toBeInTheDocument();
   });
 });

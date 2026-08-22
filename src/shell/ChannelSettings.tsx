@@ -83,11 +83,11 @@ import { RoomInsightsStrip } from './RoomInsightsStrip';
 // Common simple channel flags exposed as toggles. Letters match Onyx Server's
 // CHANMODES group D (flags) — see ISUPPORT `imnstCTNMSgWOA`.
 const FLAG_TOGGLES: ReadonlyArray<{ letter: string; label: string; hint: string }> = [
-  { letter: 'm', label: 'Moderated', hint: 'Only voiced members and ops may speak (+m)' },
-  { letter: 'i', label: 'Invite only', hint: 'Members must be invited to join (+i)' },
-  { letter: 't', label: 'Topic locked', hint: 'Only ops may change the topic (+t)' },
-  { letter: 'n', label: 'No external messages', hint: 'Block messages from non-members (+n)' },
-  { letter: 's', label: 'Secret', hint: 'Hide the room from listings (+s)' },
+  { letter: 'm', label: 'Moderated', hint: 'Only voiced members and hosts may speak.' },
+  { letter: 'i', label: 'Invite only', hint: 'People must be invited to join.' },
+  { letter: 't', label: 'Topic locked', hint: 'Only hosts may change the topic.' },
+  { letter: 'n', label: 'No external messages', hint: 'Block messages from people who are not in the room.' },
+  { letter: 's', label: 'Secret', hint: 'Hide the room from listings.' },
 ];
 
 const EPHEMERAL_PRESETS: ReadonlyArray<{ seconds: number; label: string }> = [
@@ -591,18 +591,18 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     const st = modeState();
     const parts: string[] = [];
     for (const f of FLAG_TOGGLES) {
-      if (st.flags.has(f.letter)) parts.push(`+${f.letter}`);
+      if (st.flags.has(f.letter)) parts.push(f.label);
     }
-    if (st.flags.has('k') && st.key) parts.push('+k');
-    if (st.flags.has('l') && st.limit != null) parts.push(`+l ${st.limit}`);
-    return parts.length ? parts.join(' ') : 'no modes set';
+    if (st.flags.has('k') && st.key) parts.push('Join key');
+    if (st.flags.has('l') && st.limit != null) parts.push(`Member limit ${st.limit}`);
+    return parts.length ? parts.join(' · ') : 'No special room rules';
   });
 
   return (
     <Sheet
       open={local.open}
       title="Room settings"
-      description={channel()?.name ?? local.channel}
+      description={(channel()?.name ?? local.channel).replace(/^[#&]/, '')}
       onOpenChange={local.onOpenChange}
       closeLabel="Close room settings"
       data-testid="channel-settings"
@@ -617,7 +617,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               <div class="shell-chset-readonly">
                 <p class="shell-chset-readonly-value">{serverTopic() || 'No topic set'}</p>
                 <p class="shell-chset-hint">
-                  This room is topic-locked (+t). Only room hosts can change the topic.
+                  This room is topic-locked. Only room hosts can change the topic.
                 </p>
               </div>
             }
@@ -650,7 +650,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   fallback="Offline: topic changes stay drafted on this device and can be saved after reconnect."
                 >
                   <Show when={topicLocked()} fallback="Press Save to update the room topic.">
-                    Topic-locked (+t): your op rank lets you edit it.
+                    Topic-locked: your host rank lets you edit it.
                   </Show>
                 </Show>
               </p>
@@ -886,17 +886,23 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
           </form>
         </section>
 
+        <details class="shell-chset-advanced">
+          <summary>Advanced</summary>
+          <p class="shell-chset-advanced-hint">
+            Room rules, roles, insights, and integrations. Everyday alerts stay above.
+          </p>
+
         {/* ── Modes ── */}
         <section class="shell-chset-section" aria-labelledby="chset-modes-heading">
-          <h3 id="chset-modes-heading" class="shell-chset-heading">Modes</h3>
+          <h3 id="chset-modes-heading" class="shell-chset-heading">Room rules</h3>
 
           <Show
             when={isOp()}
             fallback={
               <div class="shell-chset-readonly">
-                <p class="shell-chset-readonly-label">Current modes</p>
-                <p class="shell-chset-readonly-value shell-chset-modes-mono">{modeSummary()}</p>
-                <p class="shell-chset-hint">Only room hosts can change room modes.</p>
+                <p class="shell-chset-readonly-label">Current rules</p>
+                <p class="shell-chset-readonly-value">{modeSummary()}</p>
+                <p class="shell-chset-hint">Only room hosts can change these rules.</p>
               </div>
             }
           >
@@ -920,7 +926,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                         </span>
                         <span class="shell-chset-toggle-text">
                           <span class="shell-chset-toggle-label">
-                            {flag.label} <span class="shell-chset-toggle-letter">+{flag.letter}</span>
+                            {flag.label}
                           </span>
                           <span class="shell-chset-toggle-hint">{flag.hint}</span>
                         </span>
@@ -935,7 +941,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             <form onSubmit={applyKey} class="shell-chset-param">
               <FormField
                 id="chset-key"
-                label="Room key (+k)"
+                label="Join key"
                 description="People must supply this key to join. Leave blank to remove."
                 type="text"
                 value={keyDraft()}
@@ -949,8 +955,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             <form onSubmit={applyLimit} class="shell-chset-param">
               <FormField
                 id="chset-limit"
-                label="User limit (+l)"
-                description="Maximum members allowed. Leave blank to remove."
+                label="Member limit"
+                description="Maximum people allowed. Leave blank to remove."
                 type="number"
                 min="1"
                 inputmode="numeric"
@@ -1003,7 +1009,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
         {/* ── Roles (IRCX ACCESS) ── */}
         <section class="shell-chset-section" aria-labelledby="chset-access-heading">
-          <h3 id="chset-access-heading" class="shell-chset-heading">Roles &amp; access</h3>
+          <h3 id="chset-access-heading" class="shell-chset-heading">Roles</h3>
 
           <Show
             when={isOp()}
@@ -1285,6 +1291,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
             </div>
           </Show>
         </section>
+        </details>
       </div>
     </Sheet>
   );

@@ -382,14 +382,14 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
     <div class="home" role="main" aria-label="Network home">
       <div class="home-inner home-inner--ledger">
         <header class="home-masthead">
-          <p class="home-kicker">Current ledger</p>
+          <p class="home-kicker">Home</p>
           <h1 class="home-title">
             {props.welcomeName() ? `Welcome, ${props.welcomeName()}.` : 'Welcome.'}
           </h1>
           <p class="home-sub">What needs you, and where you continue.</p>
           <p class="home-shortcut-note">
-            <span>Power tip</span>
-            Press <b>/</b> for the palette or <b>?</b> for shortcuts.
+            <span>Tip</span>
+            Press <b>/</b> to search or <b>?</b> for shortcuts.
           </p>
           <div class="home-welcome-actions" role="group" aria-label="Primary home actions">
             <button

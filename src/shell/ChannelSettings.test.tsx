@@ -116,6 +116,10 @@ function renderPanel() {
   ));
 }
 
+function openAdvanced() {
+  fireEvent.click(screen.getByText('Advanced'));
+}
+
 function notifySelect(): HTMLSelectElement {
   return screen.getByRole('combobox', {
     name: /Notifications for #general/i,
@@ -138,12 +142,29 @@ describe('ChannelSettings — Public insights', () => {
   it('deep-links the embedded room insights strip to the room ledger', async () => {
     seed();
     renderPanel();
+    openAdvanced();
 
     expect(await screen.findByTestId('room-insights-open-stats')).toHaveAttribute(
       'href',
       '/stats/?room=%23general',
     );
     expect(screen.getByTestId('room-insights-open-stats')).toHaveTextContent('Room ledger');
+  });
+});
+
+describe('ChannelSettings — default chrome', () => {
+  it('keeps ACCESS and room rules under Advanced', () => {
+    seed();
+    renderPanel();
+
+    expect(screen.getByRole('heading', { name: 'Notifications' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Roles' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Room rules' })).toBeNull();
+    expect(screen.queryByText('+m')).toBeNull();
+
+    openAdvanced();
+    expect(screen.getByRole('heading', { name: 'Room rules' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Roles' })).toBeInTheDocument();
   });
 });
 
@@ -455,8 +476,10 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
   it('hides the ACCESS manager from non-ops', () => {
     seed();
     renderPanel();
+    expect(screen.queryByRole('heading', { name: 'Roles' })).toBeNull();
+    openAdvanced();
 
-    expect(screen.getByRole('heading', { name: 'Roles & access' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Roles' })).toBeInTheDocument();
     expect(screen.getByText(/Access entries grant founder/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add access entry' })).not.toBeInTheDocument();
   });
@@ -477,6 +500,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     });
 
     renderPanel();
+    openAdvanced();
 
     expect(sendRaw).toHaveBeenCalledWith('ACCESS', '#general', 'LIST');
     const list = screen.getByRole('list', { name: 'Room access entries' });
@@ -493,6 +517,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     const addSpy = vi.spyOn(store.getState(), 'addChannelAccess');
 
     renderPanel();
+    openAdvanced();
     fireEvent.change(screen.getByLabelText('Role level'), { target: { value: 'VOICE' } });
     fireEvent.input(screen.getByLabelText('Name or hostmask'), { target: { value: 'carol' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add access entry' }));
@@ -506,6 +531,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     const addSpy = vi.spyOn(store.getState(), 'addChannelAccess');
 
     renderPanel();
+    openAdvanced();
     fireEvent.change(screen.getByLabelText('Role level'), { target: { value: 'DENY' } });
     fireEvent.input(screen.getByLabelText('Name or hostmask'), {
       target: { value: 'bad!*@spam.example' },
@@ -524,6 +550,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     const addSpy = vi.spyOn(store.getState(), 'addChannelAccess');
 
     renderPanel();
+    openAdvanced();
     sendRaw.mockClear();
     fireEvent.click(screen.getByRole('button', { name: 'Add access entry' }));
 
@@ -551,6 +578,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     const delSpy = vi.spyOn(store.getState(), 'deleteChannelAccess');
 
     renderPanel();
+    openAdvanced();
     fireEvent.click(screen.getByRole('button', { name: 'Remove HOST access for bob!*@*' }));
 
     expect(delSpy).toHaveBeenCalledWith('#general', 'HOST', 'bob!*@*');
@@ -560,6 +588,7 @@ describe('ChannelSettings — Roles & access (IRCX ACCESS)', () => {
     const sendRaw = vi.fn(() => true);
     seed(undefined, { op: true, client: { sendRaw } });
     renderPanel();
+    openAdvanced();
 
     expect(screen.getByTestId('chset-access-empty')).toBeInTheDocument();
 

@@ -152,17 +152,19 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   border: 1px solid transparent;
   border-radius: var(--r-md);
   cursor: pointer;
   background: transparent;
   color: var(--paper-dim);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
   transition:
     color var(--dur) var(--ease),
     border-color var(--dur) var(--ease),
@@ -303,11 +305,12 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--lapis-bright);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--paper);
 }
 
 .shell-sidebar-dot {
@@ -330,11 +333,11 @@
 }
 
 .shell-primary-nav-context {
-  padding: 2px 8px 4px;
+  padding: 4px 8px 6px;
   color: var(--paper-mute);
-  font: 700 0.58rem/1 var(--font-mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font: 600 0.72rem/1.2 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .shell-primary-nav-btn {
@@ -342,8 +345,8 @@
   grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  min-height: 32px;
-  padding: 4px 8px;
+  min-height: 40px;
+  padding: 6px 8px;
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
@@ -614,10 +617,10 @@
   background: color-mix(in oklab, var(--lapis-deep, #2a4a7a) 22%, transparent);
   color: var(--paper);
   font-family: var(--font-sans);
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   font-weight: 650;
-  min-height: 2rem;
-  padding: 0.3rem 0.7rem;
+  min-height: 44px;
+  padding: 0.45rem 0.85rem;
 }
 
 .shell-sidebar-browse:hover {
@@ -848,9 +851,9 @@
 .shell-conversation-spine-label {
   margin: 0;
   color: var(--paper-mute);
-  font: 700 0.58rem/1 var(--font-mono);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  font: 600 0.75rem/1.2 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .shell-conversation-spine-content {
@@ -910,12 +913,13 @@
 }
 
 .shell-sidebar-section-label {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-mute);
-  padding: 2px 2px 4px;
+  padding: 4px 2px 6px;
 }
 
 .shell-sidebar-folder-toggle {
@@ -948,8 +952,10 @@
 
 .shell-channel-star {
   flex: 0 0 auto;
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   border: 0;
   border-radius: var(--r-sm);
   background: transparent;
@@ -992,9 +998,9 @@
   gap: 6px;
   width: 100%;
   content-visibility: auto;
-  contain-intrinsic-size: auto 34px;
-  min-height: 34px;
-  padding: 5px 10px;
+  contain-intrinsic-size: auto 44px;
+  min-height: 44px;
+  padding: 8px 10px;
   border-radius: var(--r-sm);
   border: 1px solid transparent;
   cursor: pointer;
@@ -1788,8 +1794,8 @@
   align-items: center;
   gap: var(--space-3);
   padding: 0 clamp(12px, 1.8vw, 20px);
-  /* Commercial header budget — primary Call/People/More targets ≥40px desktop. */
-  height: 48px;
+  /* Commercial header budget — 56px desktop, primary Call/People/More ≥40px. */
+  height: 56px;
   background: color-mix(in oklab, var(--surface-void, var(--ink)) 96%, var(--surface-face, var(--stone)));
   border-bottom: 1px solid var(--seam);
   overflow: hidden;
@@ -2198,10 +2204,11 @@
 .shell-ribbon-more-label {
   margin: 0;
   padding-inline: var(--space-1);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-mute);
 }
 
@@ -2249,7 +2256,7 @@
   gap: var(--space-2);
   align-items: center;
   width: 100%;
-  min-height: 2.25rem; /* 36px — ≥24px target; comfortable for pointer */
+  min-height: 40px;
   padding: var(--space-1) var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--r-sm);
@@ -2308,9 +2315,9 @@
 }
 
 .shell-ribbon-more-item--account .shell-ribbon-account-kicker {
-  font: 700 0.58rem/1 var(--font-mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font: 650 0.68rem/1.2 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-mute);
 }
 
@@ -2889,12 +2896,60 @@
 }
 
 .shell-chset-heading {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--lapis-bright);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--paper);
   margin: 0;
+}
+
+.shell-chset-advanced {
+  display: grid;
+  gap: var(--gap-section);
+  padding: var(--space-3);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 42%, transparent);
+}
+
+.shell-chset-advanced > summary {
+  cursor: pointer;
+  list-style: none;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--paper);
+}
+
+.shell-chset-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.shell-chset-advanced > summary::before {
+  content: '';
+  width: 0.45em;
+  height: 0.45em;
+  margin-right: 0.6em;
+  border-right: 1.5px solid var(--paper-dim);
+  border-bottom: 1.5px solid var(--paper-dim);
+  transform: rotate(-45deg);
+  transition: transform var(--dur) var(--ease);
+}
+
+.shell-chset-advanced[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.shell-chset-advanced-hint {
+  margin: 0 0 var(--space-3);
+  color: var(--paper-mute);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .shell-chset-label {
@@ -5177,10 +5232,10 @@
 
 .shell-composer-tool {
   flex: none;
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
-  min-height: 34px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   margin-bottom: 2px;
   display: grid;
   place-items: center;
@@ -5334,10 +5389,10 @@
 
 .shell-composer-send {
   flex: none;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   margin: 0 1px 1px 0;
   display: grid;
   place-items: center;
@@ -6084,10 +6139,11 @@
 
 .shell-home-kicker {
   margin: 0 0 var(--space-3);
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--gold);
 }
 
@@ -6332,8 +6388,8 @@
   /* Ribbon lives inside the shell, which already applies safe-area-inset-top.
      Do not double-pad; keep a compact identity rail with 44px primary controls. */
   .shell-ribbon {
-    height: 52px;
-    min-height: 52px;
+    height: 56px;
+    min-height: 56px;
     padding: 0 10px;
     background: color-mix(in oklab, var(--ink) 94%, var(--stone));
     border-bottom: 1px solid var(--seam-faint);
@@ -6342,7 +6398,7 @@
 
   .shell-ribbon-inner {
     gap: 6px;
-    min-height: 52px;
+    min-height: 56px;
   }
 
   .shell-ribbon-identity {
@@ -6741,8 +6797,8 @@
     max-height: min(84svh, 760px);
     padding: 0;
   }
-  .shell-mobile-more-sheet__title { margin: 4px 8px 6px; color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
-  .shell-mobile-more-sheet__group-label { margin: 10px 8px 2px; color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+  .shell-mobile-more-sheet__title { margin: 6px 8px 8px; color: var(--paper-mute); font: 650 0.78rem/1.2 var(--font-sans); letter-spacing: 0; text-transform: none; }
+  .shell-mobile-more-sheet__group-label { margin: 10px 8px 2px; color: var(--paper-mute); font: 650 0.75rem/1.2 var(--font-sans); letter-spacing: 0; text-transform: none; }
   .shell-mobile-more-sheet__room-tools { display: grid; gap: var(--space-3); min-width: 0; padding: var(--space-3); }
   .shell-mobile-more-sheet__room-head {
     position: sticky;
@@ -6974,6 +7030,13 @@
   }
 
   .shell-channel-item {
+    min-height: 44px;
+  }
+
+  .shell-channel-star {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
     min-height: 44px;
   }
 }
