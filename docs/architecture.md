@@ -22,7 +22,8 @@ client only: the server is Onyx Server (see [`../ONYX_SERVER_PROTOCOL.md`](../ON
   linger after a deploy.
 - Routes are declared with `@solidjs/router` (`src/index.tsx:86`): `/` (Landing,
   eager), and lazy routes `/about`, `/app` (`AppRoute` → the chat shell),
-  `/appearance`, `/stats`, `/status`, `/roadmap`, `/invite`. **This `<Route>`
+  `/appearance`, `/stats`, `/status`, `/roadmap`, `/invite`, `/guides`,
+  `/community`. **This `<Route>`
   table must stay in sync with `ROUTE_ENTRYPOINTS` in
   `tools/materialize-route-entrypoints.mjs`**, which materialises a document
   with route-correct crawler and unfurl metadata for every SPA entrypoint.
@@ -272,8 +273,10 @@ state). Almost every module has a co-located `*.test.ts`.
 - `./deploy.sh` — the only writer of `out/`. It builds to `dist/`, uses
   `tools/materialize-route-entrypoints.mjs` for route-specific `index.html`
   documents and metadata plus a flat `404.html` with noindex metadata, stamps
-  the service-worker cache name, overlays the community site from the
-  first-party community-site overlay, then `rsync --delete dist/ → out/`.
+  the service-worker cache name, overlays remaining allowlisted legacy
+  support paths from the first-party community-site overlay (`/guides/` and
+  `/community/` are SPA Getting started pages and are never overlaid), then
+  `rsync --delete dist/ → out/`.
   nginx serves `out/`; its source-controlled include preserves real 404 status
   for unknown paths while internally rendering that flat document. The service
   worker only caches/falls back to exact `/` and `/app` or `/app/` navigations,

@@ -61,6 +61,7 @@ describe('PublicFrame', () => {
         { label: 'About', href: '/about/' },
         { label: 'Join', href: '/invite/' },
         { label: 'Download', href: '/download/' },
+        { label: 'Guides', href: '/guides/' },
         { label: 'Status', href: '/status/' },
         { label: 'Roadmap', href: '/roadmap/' },
         { label: 'OnyxOS', href: '/onyxos/' },

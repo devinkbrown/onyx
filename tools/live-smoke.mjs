@@ -13,7 +13,7 @@ const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 200)));
 
 // ── 1. Community site ──
-for (const [path, needle] of [['/', 'A room for your people.'], ['/guides/', 'Everything, written down'], ['/community/', 'napkin']]) {
+for (const [path, needle] of [['/', 'A room for your people.'], ['/guides/', 'Getting started'], ['/community/', 'Getting started']]) {
   const res = await page.goto(`https://eshmaki.me${path}`, { waitUntil: 'domcontentloaded' });
   const body = await page.textContent('body');
   check(`site ${path}`, res.status() === 200 && body.includes(needle));

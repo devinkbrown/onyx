@@ -18,7 +18,7 @@
 # The Vite/Solid Landing (and materialised SPA route documents) is authoritative
 # for the public root and all SPA routes. /home/kain/landing is no longer the
 # public website: it may only contribute explicitly allowlisted, non-conflicting
-# legacy support resources (guides, community, install, …). Root documents
+# legacy support resources (self-host, why, memory, …). Root documents
 # (index.html, 404.html, robots.txt, sitemap.xml, favicons) and SPA-owned paths are never
 # overlaid from landing.
 #
@@ -58,8 +58,6 @@ DRY_RUN="${DEPLOY_DRY_RUN:-0}"
 # Missing entries are skipped; present entries must be regular files or directories
 # (never symlinks or other types).
 LEGACY_SUPPORT_ALLOWLIST=(
-  guides
-  community
   self-host
   why
   memory
@@ -88,6 +86,8 @@ SPA_OWNED_BLOCKLIST=(
   glossary
   integrations
   agents
+  guides
+  community
   downloads
   assets
   manifest.json

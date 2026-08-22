@@ -22,7 +22,9 @@ export type PublicRouteId =
   | 'stats'
   | 'roadmap'
   | 'invite'
-  | 'appearance';
+  | 'appearance'
+  | 'guides'
+  | 'community';
 
 export type PublicRouteMetadata = {
   id: PublicRouteId;
@@ -62,6 +64,8 @@ const PUBLIC_ROUTE_SEEDS = [
   { id: 'roadmap', path: '/roadmap', label: 'Roadmap', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'invite', path: '/invite', label: 'Join', group: 'resources', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 1 },
   { id: 'appearance', path: '/appearance', label: 'Appearance', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
+  { id: 'guides', path: '/guides', label: 'Guides', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
+  { id: 'community', path: '/community', label: 'Community', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
 ] as const satisfies readonly PublicRouteSeed[];
 
 export const PUBLIC_ROUTE_MANIFEST: readonly PublicRouteMetadata[] = PUBLIC_ROUTE_SEEDS.map((route) => ({
@@ -72,7 +76,7 @@ export const PUBLIC_ROUTE_MANIFEST: readonly PublicRouteMetadata[] = PUBLIC_ROUT
 export const PUBLIC_ROUTE_GROUPS: Readonly<Record<PublicRouteGroup, readonly PublicRouteId[]>> = {
   product: ['home', 'about', 'download', 'onyxos'],
   trust: ['status', 'accessibility'],
-  resources: ['integrations', 'agents', 'glossary', 'stats', 'roadmap', 'invite', 'appearance'],
+  resources: ['integrations', 'agents', 'glossary', 'stats', 'roadmap', 'invite', 'appearance', 'guides', 'community'],
 };
 
 export function publicRouteById(id: PublicRouteId): PublicRouteMetadata {

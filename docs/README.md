@@ -38,6 +38,7 @@ The client is licensed under [AGPL-3.0-or-later](../LICENSE). See
 
 | Document | What it answers |
 | --- | --- |
+| Public `/guides/` and `/community/` | How to join a room in the official app, invite a friend, send messages, start a call, and keep Onyx on this device. |
 | [`features.md`](features.md) | Passkeys, Home catch-up, notifications, and everyday client behavior. |
 | [`search-and-history.md`](search-and-history.md) | Device-local history, search modes, time travel, and E2EE privacy boundaries. |
 | [`importing.md`](importing.md) | Local Discord, Slack, and IRC-log imports. |

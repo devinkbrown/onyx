@@ -1,7 +1,9 @@
 # Getting started
 
-This guide is for someone who has just cloned the public Onyx client. It covers
-the local UI first, then the pieces needed for a real server connection.
+Visitors who want to join a room in the official app should use the public
+**Guides** page at `/guides/` (the same how-tos also live at `/community/`).
+This document is for someone who has just cloned the public Onyx client. It
+covers the local UI first, then the pieces needed for a real server connection.
 
 ## Prerequisites
 
