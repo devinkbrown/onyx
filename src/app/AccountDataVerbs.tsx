@@ -3,9 +3,10 @@
  * AccountDataVerbs — Download what we store / Save this device's history /
  * Delete account. Three buttons, three jobs. Not a "Your data" bundle.
  */
-import { createEffect, createMemo, createSignal, onCleanup, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup, type JSX } from 'solid-js';
 
-import { getState, selectDeviceMemoryOwner } from '@/lib/store';
+import { getState, selectDeviceMemoryOwner, useStore } from '@/lib/store';
+import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import {
   ACCOUNT_DATA_VERB_COPY,
   buildAccountStoreRecord,
@@ -24,6 +25,10 @@ export type AccountDataVerbsProps = {
 };
 
 export function AccountDataVerbs(props: AccountDataVerbsProps): JSX.Element {
+  const owner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
   const [busy, setBusy] = createSignal<'store' | 'history' | null>(null);
   const [status, setStatus] = createSignal<string | null>(null);
   const [dropConfirm, setDropConfirm] = createSignal('');
@@ -41,12 +46,14 @@ export function AccountDataVerbs(props: AccountDataVerbsProps): JSX.Element {
   createEffect(() => {
     const open = props.active;
     const account = props.account;
+    const current = owner();
+    const ownerKey = current ? deviceMemoryOwnerKey(current) : account;
     epoch += 1;
     clearDrop();
     setBusy(null);
     setStatus(null);
     if (!open) return;
-    void account;
+    void ownerKey;
   });
 
   onCleanup(() => {
@@ -90,8 +97,7 @@ export function AccountDataVerbs(props: AccountDataVerbsProps): JSX.Element {
     setBusy('history');
     setStatus(null);
     try {
-      const owner = selectDeviceMemoryOwner(getState()) ?? undefined;
-      const copy = await collectDeviceHistoryCopy(owner);
+      const copy = await collectDeviceHistoryCopy(owner() ?? undefined);
       if (disposed || epochNow !== epoch) return;
       const ok = downloadDeviceHistoryCopy(copy);
       if (disposed || epochNow !== epoch) return;

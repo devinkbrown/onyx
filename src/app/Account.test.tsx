@@ -269,9 +269,11 @@ describe('Account panel — signed in', () => {
 
     store.setState({ server: seedServer('alice', 'wss://second.example/ws') });
 
-    await waitFor(() => expect(screen.getByTestId('account-drop-arm')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Confirm account deletion')).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('account-drop-arm')).toBeInTheDocument();
     expect(screen.getByLabelText(/account password \(to change protection\)/i)).toHaveValue('');
-    expect(screen.queryByLabelText('Confirm account deletion')).not.toBeInTheDocument();
   });
 
   it('reports authenticator copy success only after the shared write resolves', async () => {
@@ -375,7 +377,7 @@ describe('Account panel — signed in', () => {
     expect(screen.queryByTestId('theme-studio')).toBeNull();
     expect(screen.queryByRole('radio', { name: /Vermillion/i })).toBeNull();
 
-    fireEvent.click(screen.getByTestId('you-open-appearance'));
+    fireEvent.click(screen.getByTestId('you-settings').querySelector('[data-testid="you-open-appearance"]')!);
     expect(closeSpy).toHaveBeenCalledWith(false);
     await waitFor(() => {
       expect(openAppearance).toHaveBeenCalled();

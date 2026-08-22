@@ -167,6 +167,18 @@ describe('Account data verbs', () => {
     expect(downloadStore).not.toHaveBeenCalled();
     expect(downloadHistory).not.toHaveBeenCalled();
   });
+
+  it('closes the delete sheet when the same account moves to another server', async () => {
+    render(() => <AccountDataVerbs account="alice" active={true} />);
+    fireEvent.click(screen.getByTestId('account-drop-arm'));
+    expect(screen.getByLabelText('Confirm account deletion')).toBeInTheDocument();
+
+    store.setState({ server: { ...seedServer('alice'), url: 'wss://second.example/ws' } });
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Confirm account deletion')).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe('You / Account mounts the three verbs', () => {

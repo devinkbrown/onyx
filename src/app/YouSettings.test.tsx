@@ -81,7 +81,9 @@ describe('You settings list', () => {
     fireEvent.click(screen.getByTestId('you-advanced').querySelector('summary')!);
 
     expect(screen.getByTestId('you-open-theme-studio')).toHaveAttribute('href', '/appearance/');
-    expect(screen.getByTestId('you-open-preferences')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('you-settings').querySelector('[data-testid="you-open-preferences"]'),
+    ).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Protection' })).toBeInTheDocument();
   });
 

@@ -25,7 +25,7 @@ function room(name: string, nick: string) {
       time: new Date('2026-08-01T12:00:00.000Z'),
       from: nick,
       text: 'hello',
-      type: 'msg',
+      type: 'msg' as const,
       target: name,
     }],
   };
