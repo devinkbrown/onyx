@@ -75,7 +75,7 @@ export async function loadInviteRoomPulse(
   if (!room && !detail) return null;
 
   const topic = (room?.topic ?? '').trim() || null;
-  const lastActive = detail?.lastActive || room?.lastActive || 0;
+  const lastActive = detail?.lastActive || room?.last_active || 0;
   const knownEmpty = room !== null
     && room.messages === 0
     && lastActive === 0;

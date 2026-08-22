@@ -5,9 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 
 import * as clipboard from '@/lib/clipboard/writeClipboardText';
+import type { InviteRoomPulse } from '@/lib/invite/inviteRoomPulse';
 import InviteRoute from './Invite';
 
-const loadInviteRoomPulse = vi.hoisted(() => vi.fn(async () => null));
+const loadInviteRoomPulse = vi.hoisted(() =>
+  vi.fn<(channel: string) => Promise<InviteRoomPulse | null>>(async () => null),
+);
 
 vi.mock('@/lib/invite/inviteRoomPulse', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/invite/inviteRoomPulse')>();
