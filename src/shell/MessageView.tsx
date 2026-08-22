@@ -62,6 +62,7 @@ import {
   sanitizePersistedReplyPreviewText,
 } from '@/lib/e2ee/replyPrivacy';
 import { ScheduledEventLine } from './ScheduledEventLine';
+import { openRoomInviteShare } from './roomInviteShareState';
 import type { ChatMessage } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';

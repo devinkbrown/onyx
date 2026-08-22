@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * composeHomeBriefing — pure Current Ledger ordering and caps.
+ * composeHomeBriefing — pure Home inbox ordering and leftover briefing caps.
  *
  * Classifiers stay authoritative: this module never re-derives unread, live
  * occupancy, encryption, or membership. Time is injected. Vault rows are
@@ -10,6 +10,11 @@ import type { CatchUpItem } from '@/lib/notifications/catchUp';
 import { catchUpSummary } from '@/lib/notifications/catchUp';
 import type { AwayDigest } from '@/lib/notifications/awayDigest';
 import type { ResumePoint } from '@/lib/catchup/resumePoints';
+import {
+  composeHomeInbox,
+  type HomeInbox,
+  type HomeInboxInvite,
+} from '@/lib/catchup/homeInbox';
 import type { ScheduledEventItem } from '@/lib/notifications/scheduledEvents';
 import type { HomeMemoryItem } from '@/lib/notifications/homeMemory';
 import type { StatsChannel } from '@/lib/stats/networkIndex';
@@ -70,6 +75,8 @@ export type HomeBriefingInput = {
   directory: readonly StatsChannel[];
   recentRooms: readonly string[];
   coldVaultRooms: readonly HomeMemoryItem[];
+  firstUnreadId?: ReadonlyMap<string, string | null>;
+  invites?: readonly HomeInboxInvite[];
 };
 
 export type HomeBriefing = {
@@ -101,6 +108,8 @@ export type HomeBriefing = {
   directoryRest: readonly StatsChannel[];
   recentRooms: readonly string[];
   exploreOverflow: HomeOverflow | null;
+  inbox: HomeInbox;
+  showQuietEmpty: boolean;
 };
 
 export type HomeCatchUpSourceInput = {
@@ -236,15 +245,22 @@ export function composeHomeBriefing(input: HomeBriefingInput): HomeBriefing {
     'browse-rooms',
   );
 
-  const showCatchUp = input.hasRooms || source.fromMemory;
+  const inbox = composeHomeInbox({
+    items: source.items,
+    firstUnreadId: input.firstUnreadId,
+    invites: input.invites,
+  });
+  const showCatchUp = input.hasRooms || source.fromMemory || inbox.invites.length > 0;
   const continueVisible = resume.length > 0 || followed.length > 0 || continueOverflow !== null;
   const liveNowVisible = liveAll.length > 0;
   const showCaughtUpEmpty = showCatchUp
+    && inbox.empty
     && input.awayDigest.empty
     && input.resumePoints.length === 0
     && !liveNowVisible
     && !showColdVault
     && input.awayDigest.followed.length === 0;
+  const showQuietEmpty = inbox.empty && !showColdVault;
 
   let phase: HomeBriefingPhase;
   if (source.fromMemory || (showColdVault && !connected(input.connectionStatus))) {
@@ -288,7 +304,43 @@ export function composeHomeBriefing(input: HomeBriefingInput): HomeBriefing {
     directoryRest,
     recentRooms,
     exploreOverflow,
+    inbox,
+    showQuietEmpty,
   };
+}
+
+function inboxRowsEqual(
+  a: HomeInbox['mentions'],
+  b: HomeInbox['mentions'],
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((row, index) => {
+    const other = b[index];
+    return Boolean(
+      other
+      && row.key === other.key
+      && row.unread === other.unread
+      && row.highlights === other.highlights
+      && row.lastActivity === other.lastActivity
+      && row.boundaryId === other.boundaryId,
+    );
+  });
+}
+
+function inboxInvitesEqual(a: HomeInbox['invites'], b: HomeInbox['invites']): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((row, index) => {
+    const other = b[index];
+    return Boolean(
+      other
+      && row.key === other.key
+      && row.inviter === other.inviter
+      && row.channel === other.channel
+      && row.at === other.at,
+    );
+  });
 }
 
 export function homeBriefingEqual(a: HomeBriefing, b: HomeBriefing): boolean {
@@ -324,5 +376,9 @@ export function homeBriefingEqual(a: HomeBriefing, b: HomeBriefing): boolean {
       && a.recentRooms === b.recentRooms
       && a.exploreOverflow?.count === b.exploreOverflow?.count
       && a.coldVaultRooms === b.coldVaultRooms
+      && inboxRowsEqual(a.inbox.mentions, b.inbox.mentions)
+      && inboxRowsEqual(a.inbox.missed, b.inbox.missed)
+      && inboxInvitesEqual(a.inbox.invites, b.inbox.invites)
+      && a.showQuietEmpty === b.showQuietEmpty
     );
 }

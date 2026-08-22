@@ -90,13 +90,13 @@
 .home-masthead { margin-bottom: clamp(28px, 4vh, 40px); }
 .home-title {
   margin: 0 0 10px;
-  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  font-family: var(--font-serif, "Fraunces", Georgia, serif);
   font-size: clamp(1.7rem, 1.25rem + 2vw, 2.55rem);
   letter-spacing: var(--tracking-title, -0.02em);
   line-height: var(--leading-tight, 1.15);
   color: var(--paper);
-  font-weight: 600;
-  /* Quiet threshold: no Anton marketing display */
+  font-weight: 500;
+  /* One Fraunces line per Home screen — no Anton, no Inter. */
   font-stretch: normal;
 }
 .home-sub {
@@ -152,6 +152,119 @@
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 20px;
+}
+.home-inbox {
+  display: grid;
+  gap: 22px;
+  margin: 8px 0 32px;
+}
+.home-inbox .home-catchup-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 4px;
+}
+.home-inbox-label {
+  margin: 0 0 6px;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--paper-dim);
+}
+.home-inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.home-inbox-row {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  text-align: left;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--paper);
+  cursor: pointer;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+}
+.home-inbox-row:hover,
+.home-inbox-row:focus-visible {
+  background: color-mix(in oklab, var(--stone) 78%, transparent);
+}
+.home-inbox-row:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
+.home-inbox-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--paper);
+  background: color-mix(in oklab, var(--stone-2) 86%, var(--ink));
+  border: 1px solid var(--line);
+}
+.home-inbox-avatar--person {
+  border-radius: 50%;
+}
+.home-inbox-avatar--room {
+  border-radius: 28%;
+}
+.home-inbox-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 2px;
+}
+.home-inbox-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-inbox-meta {
+  color: var(--paper-mute);
+  font-size: 0.82rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-inbox-unread,
+.home-inbox-join {
+  flex: none;
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.home-inbox-row.is-unread .home-inbox-unread {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--lapis) 22%, transparent);
+}
+.home-inbox-join {
+  color: var(--on-accent, var(--ink));
+  background: var(--lapis);
 }
 .home-offline-note {
   width: fit-content;
@@ -754,13 +867,16 @@
 }
 .home-empty {
   margin: 8px 0 28px;
-  padding: var(--pad-panel, 1rem) var(--pad-panel-lg, 1.25rem);
+  padding: 0;
   max-width: 42ch;
-  border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 48%, transparent);
-  box-shadow: var(--elev-1, none);
-  border-left: 2px solid color-mix(in oklab, var(--lapis) 55%, var(--stone-line));
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.home-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 .home-empty-title {
   margin: 0 0 8px;

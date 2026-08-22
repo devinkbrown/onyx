@@ -55,12 +55,11 @@ describe('HomeView first-hour empty welcome', () => {
 
     render(() => <HomeView />);
 
-    expect(screen.getByRole('heading', { name: 'Welcome, river.' })).toBeInTheDocument();
-    expect(screen.getByText('Home')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'The room is quiet.' })).toBeInTheDocument();
     expect(screen.queryByText('Current ledger')).not.toBeInTheDocument();
     expect(screen.queryByText('Power tip')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Search messages' })).not.toBeInTheDocument();
-    expect(screen.getByTestId('first-hour-coach')).toHaveTextContent('Browse a room');
+    expect(screen.queryByTestId('first-hour-coach')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Browse rooms' }));
     expect(store.getState().showChannelBrowser).toBe(true);
@@ -84,9 +83,7 @@ describe('HomeView first-hour empty welcome', () => {
     expect(isFirstHourSeen()).toBe(true);
   });
 
-  it('invites friends through the existing /invite/ route', () => {
-    const assign = vi.fn();
-    vi.stubGlobal('location', { ...window.location, assign });
+  it('does not tour Invite friends or Theme Studio on an empty Home', () => {
     recordFirstHourHandoff({ landing: 'home', channel: null, guest: true });
     store.setState({
       ...initialState,
@@ -96,8 +93,9 @@ describe('HomeView first-hour empty welcome', () => {
     }, true);
 
     render(() => <HomeView />);
-    fireEvent.click(screen.getByRole('button', { name: 'Invite friends' }));
-    expect(assign).toHaveBeenCalledWith('/invite/');
-    expect(isFirstHourSeen()).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Invite friends' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Appearance' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Browse rooms' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start a room' })).toBeInTheDocument();
   });
 });

@@ -156,7 +156,7 @@ async function goHome(page: Page): Promise<void> {
   const desktopHome = page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Home' });
   if (await desktopHome.isVisible()) await desktopHome.click();
   else await page.getByRole('button', { name: 'Open Home' }).click();
-  await expect(page.getByRole('main', { name: 'Network home' })).toBeVisible();
+  await expect(page.getByRole('main', { name: 'Home' })).toBeVisible();
 }
 
 async function joinRoom(page: Page, room: string): Promise<void> {
@@ -183,17 +183,12 @@ async function assertNoHorizontalOverflow(page: Page): Promise<void> {
   expect(['hidden', 'clip', 'auto']).toContain(geometry.homeOverflowX);
 }
 
-async function assertLedgerOrder(page: Page): Promise<void> {
-  const home = page.getByRole('main', { name: 'Network home' });
-  await expect(home.getByRole('button', { name: 'Browse rooms' })).toBeVisible();
-  await expect(home.getByRole('button', { name: 'Search messages' })).toBeVisible();
-  const order = await home.evaluate((root) => {
-    const needs = root.querySelector('[data-home-band="needs-you"], [data-home-band="caught-up"]');
-    const explore = root.querySelector('[data-home-band="explore"]');
-    if (!needs || !explore) return false;
-    return Boolean(needs.compareDocumentPosition(explore) & Node.DOCUMENT_POSITION_FOLLOWING);
-  });
-  expect(order).toBe(true);
+async function assertInboxOrQuiet(page: Page): Promise<void> {
+  const home = page.getByRole('main', { name: 'Home' });
+  const inbox = home.getByRole('region', { name: 'Catch up on what you missed' });
+  const quiet = home.getByRole('region', { name: 'The room is quiet' });
+  await expect(inbox.or(quiet)).toBeVisible();
+  await expect(home.getByRole('heading', { level: 1 })).toBeVisible();
 }
 
 async function removeGeneratedRoot(root: string): Promise<void> {
@@ -238,14 +233,13 @@ test('connected Current Ledger covers busy, caught-up, offline, and failed-outbo
       actor.send(`PRIVMSG ${room} :${nick}: needs-you seed ${room}`);
     }
 
-    const home = page.getByRole('main', { name: 'Network home' });
-    await expect(home.getByRole('heading', { name: 'Needs you' })).toBeVisible({ timeout: 30_000 });
+    const home = page.getByRole('main', { name: 'Home' });
+    await expect(home.getByRole('heading', { name: 'What did you miss?' })).toBeVisible({ timeout: 30_000 });
     await expect(home.getByText('8 unread')).toBeVisible();
-    await expect(home.getByText('2 more items that need you')).toBeVisible({ timeout: 30_000 });
+    await expect(home.getByRole('group', { name: 'Mentions' })).toBeVisible();
     await expect(home.getByRole('button', { name: /Open #need7/ })).toBeVisible();
-    await home.getByText('2 more items that need you').click();
     await expect(home.getByRole('button', { name: /Open #need0/ })).toBeVisible();
-    await expect(home).not.toContainText(/ONYXDM1|secret body/i);
+    await expect(home).not.toContainText(/ONYXDM1|secret body|Room ledger|people online/i);
     await expect(page.getByRole('region', { name: 'Live now' })).toHaveCount(0);
 
     for (const viewport of VIEWPORTS) {
@@ -259,10 +253,10 @@ test('connected Current Ledger covers busy, caught-up, offline, and failed-outbo
         await expect(guestClaim).toBeVisible();
         const box = await home.boundingBox();
         expect(box?.height ?? 0).toBeGreaterThan(0);
-        const browse = home.getByRole('button', { name: 'Browse rooms' });
-        const search = home.getByRole('button', { name: 'Search messages' });
-        await browse.scrollIntoViewIfNeeded();
-        await expect(browse).toBeVisible();
+        const search = page.getByTestId('ribbon-search');
+        const inbox = home.getByRole('region', { name: 'Catch up on what you missed' });
+        await inbox.scrollIntoViewIfNeeded();
+        await expect(inbox).toBeVisible();
         await search.scrollIntoViewIfNeeded();
         await expect(search).toBeVisible();
 
@@ -270,12 +264,12 @@ test('connected Current Ledger covers busy, caught-up, offline, and failed-outbo
         await expect(guestClaim).toHaveCount(0);
         const boxWithoutGuestClaim = await home.boundingBox();
         expect(boxWithoutGuestClaim?.height ?? 0).toBeGreaterThan(0);
-        await browse.scrollIntoViewIfNeeded();
-        await expect(browse).toBeVisible();
+        await inbox.scrollIntoViewIfNeeded();
+        await expect(inbox).toBeVisible();
         await search.scrollIntoViewIfNeeded();
         await expect(search).toBeVisible();
       }
-      await assertLedgerOrder(page);
+      await assertInboxOrQuiet(page);
       await assertNoHorizontalOverflow(page);
     }
 
@@ -291,21 +285,18 @@ test('connected Current Ledger covers busy, caught-up, offline, and failed-outbo
     expect(media.forced).toBe(true);
     expect(media.motion).toBe(true);
 
-    await home.getByRole('button', { name: 'Browse rooms' }).focus();
-    await expect(home.getByRole('button', { name: 'Browse rooms' })).toBeFocused();
-    await page.keyboard.press('Tab');
-    await expect(home.getByRole('button', { name: 'Search messages' })).toBeFocused();
+    await page.getByTestId('ribbon-search').focus();
+    await expect(page.getByTestId('ribbon-search')).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('searchbox', { name: 'Search messages' })).toBeFocused();
     await page.keyboard.press('Escape');
+    await home.getByRole('button', { name: /Mark all caught up/ }).click();
+    await expect(home.getByRole('region', { name: 'The room is quiet' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Live now' })).toHaveCount(0);
     await home.getByRole('button', { name: 'Browse rooms' }).click();
     await expect(page.locator('[role="dialog"]:visible').first()).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('video')).toHaveCount(0);
-
-    await home.getByRole('button', { name: /Mark all caught up/ }).click();
-    await expect(home.getByRole('region', { name: "You're caught up" })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Live now' })).toHaveCount(0);
 
     await joinRoom(page, hold);
     await mesh.stop();

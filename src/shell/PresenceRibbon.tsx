@@ -788,36 +788,33 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           <span class="shell-ribbon-divider" aria-hidden="true" />
         </Show>
 
-        {/* Z4 Edge — Search · Inbox · More · connection (Date lives in More).
-            Home already has a Search messages CTA in the welcome band. */}
-        <Show when={activeView().kind !== 'home'}>
-          <div class="shell-ribbon-group" role="group" aria-label="Search">
-            <button
-              type="button"
-              class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-search"
-              aria-label="Search messages"
-              aria-pressed={isMessageSearchOpen()}
-              title="Search messages"
-              data-testid="ribbon-search"
-              onClick={() => openMessageSearch()}
+        {/* Z4 Edge — Search · Inbox · More · connection (Date lives in More). */}
+        <div class="shell-ribbon-group" role="group" aria-label="Search">
+          <button
+            type="button"
+            class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-search"
+            aria-label="Search messages"
+            aria-pressed={isMessageSearchOpen()}
+            title="Search messages"
+            data-testid="ribbon-search"
+            onClick={() => openMessageSearch()}
+          >
+            <svg
+              class="shell-ribbon-ico"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             >
-              <svg
-                class="shell-ribbon-ico"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="11" cy="11" r="6.5" />
-                <path d="m16.2 16.2 4.3 4.3" />
-              </svg>
-              <span class="shell-ribbon-action-label">Search</span>
-            </button>
-          </div>
-        </Show>
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m16.2 16.2 4.3 4.3" />
+            </svg>
+            <span class="shell-ribbon-action-label">Search</span>
+          </button>
+        </div>
         <div class="shell-ribbon-group" role="group" aria-label="Inbox">
           <NotificationCenter />
         </div>

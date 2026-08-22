@@ -32,7 +32,7 @@ test('keeps the ordinary landscape shell balanced without activating zoom fallba
   });
 
   const nav = page.getByRole('navigation', { name: 'Mobile navigation' });
-  const home = page.getByRole('main', { name: 'Network home' });
+  const home = page.getByRole('main', { name: 'Home' });
   await expect(nav).toBeVisible();
   await expect(home).toBeVisible();
 

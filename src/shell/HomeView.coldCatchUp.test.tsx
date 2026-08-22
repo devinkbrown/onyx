@@ -107,12 +107,9 @@ describe('HomeView — cold return catch-up from device memory', () => {
     )).toBeInTheDocument();
     expect(within(catchUp).getByRole('button', { name: /Open #general/ })).toBeInTheDocument();
     expect(within(catchUp).getByRole('button', { name: /Open alice/ })).toBeInTheDocument();
-    // Needs you tier surfaces the DM + mention channel.
-    expect(within(catchUp).getByRole('group', { name: 'Mentions and direct messages' }))
-      .toBeInTheDocument();
-    // Recap seeds paint without live buffers.
-    expect(within(catchUp).getByText('Cold vault preview line')).toBeInTheDocument();
-    // Mark-all needs live markRead targets — hidden on pure cold snapshot.
+    expect(within(catchUp).getByRole('group', { name: 'Mentions' })).toBeInTheDocument();
+    expect(within(catchUp).getByRole('group', { name: 'Unread rooms and messages' })).toBeInTheDocument();
+    expect(within(catchUp).queryByText('Cold vault preview line')).not.toBeInTheDocument();
     expect(within(catchUp).queryByRole('button', { name: /Mark all caught up/ })).toBeNull();
   });
 
@@ -210,7 +207,7 @@ describe('HomeView — cold return catch-up from device memory', () => {
     const catchUp = screen.getByLabelText('Catch up on what you missed');
     expect(catchUp).toHaveAttribute('data-catchup-source', 'memory');
     expect(within(catchUp).getByText(/5 unread/)).toBeInTheDocument();
-    expect(within(catchUp).getByText('Cold vault preview line')).toBeInTheDocument();
+    expect(within(catchUp).getByRole('button', { name: /Open #general/ })).toBeInTheDocument();
   });
 
   it('replaces device fallback with live transcript without an empty flash', () => {
@@ -312,6 +309,5 @@ describe('HomeView — cold return catch-up from device memory', () => {
     render(() => <HomeView />);
     expect(screen.queryByLabelText('Catch up on what you missed')).not.toBeInTheDocument();
     expect(screen.queryByText('saved on this device')).not.toBeInTheDocument();
-    expect(screen.queryByText('Cold vault preview line')).not.toBeInTheDocument();
   });
 });
