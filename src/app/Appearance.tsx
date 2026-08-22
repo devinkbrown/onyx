@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup } from 'solid-js';
 import { Background, type BackgroundId } from '@/backgrounds';
 import { BackgroundPicker } from '@/backgrounds/picker/BackgroundPicker';
 import { useTheme, THEMES, THEME_IDS } from '@/theme';

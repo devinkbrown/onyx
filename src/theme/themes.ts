@@ -474,12 +474,6 @@ const pearlTokens: TokenMap = {
 
   '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
   '--dur':  '200ms',
-
-  // Public light face — Instrument Sans, never Anton.
-  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
-  '--font-display': "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
 };
 
 // ---------------------------------------------------------------------------

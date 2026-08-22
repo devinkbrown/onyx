@@ -11,7 +11,7 @@ describe('public appearance faces', () => {
     expect(THEMES.ocean.scheme).toBe('dark');
     expect(THEMES.pearl.scheme).toBe('light');
     expect(THEMES.ocean.tokens['--font-display']).not.toMatch(/Anton/);
-    expect(THEMES.pearl.tokens['--font-display']).not.toMatch(/Anton/);
+    expect(THEMES.pearl.tokens['--font-display']).toBeUndefined();
   });
 
   it('does not put the full catalogue on the default list', () => {
