@@ -225,19 +225,6 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
         </div>
       </details>
 
-      <button
-        type="button"
-        class="you-settings-link"
-        data-testid="you-open-export"
-        aria-haspopup="dialog"
-        onClick={() => leaveThen(props.onClose, () => openPreferences('transfer'))}
-      >
-        <span>
-          <strong>Data export</strong>
-          <small>Copy conversation data off this device</small>
-        </span>
-      </button>
-
       <details class="you-settings-item" data-testid="you-support">
         <summary>Support</summary>
         <div class="you-settings-item__body you-settings-support">
