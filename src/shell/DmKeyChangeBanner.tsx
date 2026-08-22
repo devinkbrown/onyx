@@ -26,6 +26,7 @@
  */
 import { createEffect, createMemo, For, Show, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
+import { DM_KEY_CHANGE_BODY, dmKeyChangeAlert } from '@/lib/e2ee/dmPrivacyChrome';
 import './dm-key-change.css';
 
 /** The active DM peer nick, or null when the active view is not a DM. */
@@ -100,7 +101,7 @@ export function DmKeyChangeBanner(): JSX.Element {
             Keyed by peer so switching to another affected DM announces afresh.
           */}
           <span class="sr-only" role="alert">
-            {name()}'s encryption key changed. Verify the safety number before continuing.
+            {dmKeyChangeAlert(name())}
           </span>
 
           <div class="dm-keychange__rule" aria-hidden="true" />
@@ -109,15 +110,13 @@ export function DmKeyChangeBanner(): JSX.Element {
             <div class="dm-keychange__lede">
               <span class="dm-keychange__kicker">
                 <span class="dm-keychange__glyph" aria-hidden="true">⚠</span>
-                Encryption key changed
+                Device key changed
               </span>
               <h2 id="dm-keychange-title" class="dm-keychange__title">
-                <span class="dm-keychange__peer">{name()}</span>'s key is different
+                <span class="dm-keychange__peer">{name()}</span>'s device key changed
               </h2>
               <p class="dm-keychange__sub">
-                Their device now advertises a new encryption key. This can mean a
-                reinstall — or someone intercepting the conversation. Compare the
-                safety numbers out-of-band before you accept.
+                {DM_KEY_CHANGE_BODY}
               </p>
             </div>
 

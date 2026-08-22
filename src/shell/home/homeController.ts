@@ -27,6 +27,7 @@ import {
   type CatchUpMemoryItem,
 } from '@/lib/catchup/catchUpMemory';
 import { followed } from '@/lib/notifications/followed';
+import { dmListPreviewText } from '@/lib/e2ee/dmPrivacyChrome';
 import {
   buildHomeMemory,
   buildHomeMemoryFromVault,
@@ -522,7 +523,7 @@ export function createHomeController(): HomeController {
           firstMessage: unreadWindow[0]!,
           voices: voices.slice(0, HOME_RECAP_VOICE_LIMIT),
           overflowVoices: Math.max(0, voices.length - HOME_RECAP_VOICE_LIMIT),
-          preview: clipped(latest.plaintext ?? latest.text, 92),
+          preview: dmListPreviewText(latest) ?? clipped(latest.plaintext ?? latest.text, 92),
           messageCount: unreadWindow.length,
           mentionCount: Math.min(item.highlights, unreadWindow.filter((message) => message.highlight).length),
         } satisfies HomeCatchUpRecap;

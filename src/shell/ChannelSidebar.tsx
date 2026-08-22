@@ -2,7 +2,9 @@
 /**
  * ChannelSidebar.tsx — channel list + DM list + join form.
  *
- * Reads store: channels, dms, offlineMemo, activeView, connectionStatus.
+ * Reads store: channels, dms, offlineMemo, peerKeyChanges, activeView,
+ * connectionStatus. Messages rows are name + preview + unread — no list
+ * padlock. A pending key-change may mark that row only.
  * Actions: joinChannel (store), navigate (store). Offline-memo aggregates
  * surface as a calm "N offline" stamp on DM rows; navigate → clearOfflineMemo
  * drops the map entry and the stamp clears reactively.
@@ -31,6 +33,7 @@ import {
 } from '@/lib/channel/sidebarFilter';
 import { normalizeRoomTarget } from './roomIdentity';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
+import { latestDmListPreview } from '@/lib/e2ee/dmPrivacyChrome';
 import { NotificationControls } from './NotificationControls';
 import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
 import { openRoomInviteShare } from './roomInviteShareState';
@@ -239,6 +242,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   // Immutable Map replace on write — Object.is equality is enough; badge
   // rows re-read via .get(nick) when the map identity changes.
   const offlineMemo = useStore((s) => s.offlineMemo);
+  const peerKeyChanges = useStore((s) => s.peerKeyChanges);
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
@@ -849,6 +853,10 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                   const offlineCount = createMemo(
                     () => offlineMemo().get(dm.nick.toLowerCase())?.count ?? 0,
                   );
+                  const preview = createMemo(() => latestDmListPreview(dm.messages));
+                  const keyChanged = createMemo(
+                    () => peerKeyChanges().has(dm.nick.toLowerCase()),
+                  );
 
                   return (
                     <li>
@@ -858,16 +866,34 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                         tabindex={rovingKey() === dmKey(dm) ? 0 : -1}
                         class={[
                           'shell-channel-item',
+                          'shell-channel-item--dm',
                           active() ? 'shell-channel-item--active' : '',
                           hasUnread() && !active() ? 'shell-channel-item--unread' : '',
                           hasHighlight() ? 'shell-channel-item--highlight' : '',
                         ].filter(Boolean).join(' ')}
                         aria-current={active() ? 'location' : undefined}
-                        aria-label={`DM with ${dm.nick}${unreadLabel(dm.unread, dm.highlights)}${offlineMemoLabel(offlineCount())}`}
+                        aria-label={`DM with ${dm.nick}${preview() ? `, ${preview()}` : ''}${keyChanged() ? ', device key changed' : ''}${unreadLabel(dm.unread, dm.highlights)}${offlineMemoLabel(offlineCount())}`}
                         onClick={() => handleDmClick(dm)}
                       >
                         <span class="shell-channel-sigil" aria-hidden="true">@</span>
-                        <span class="shell-channel-name">{dm.nick}</span>
+                        <span class="shell-dm-copy">
+                          <span class="shell-channel-name">{dm.nick}</span>
+                          <Show when={preview()}>
+                            {(text) => (
+                              <span class="shell-dm-preview" aria-hidden="true">{text()}</span>
+                            )}
+                          </Show>
+                        </span>
+                        <Show when={keyChanged()}>
+                          <span
+                            class="shell-dm-keywarn"
+                            data-testid="sidebar-dm-keywarn"
+                            title="Device key changed"
+                            aria-hidden="true"
+                          >
+                            ⚠
+                          </span>
+                        </Show>
                         <Show when={offlineCount() > 0}>
                           <span class="shell-channel-offline" aria-hidden="true">
                             {offlineMemoStamp(offlineCount())}

@@ -13,7 +13,21 @@
 import './dm-safety-sheet.css';
 
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
+import {
+  DM_VERIFY_ACTION,
+  showDmPrivateChip,
+  DM_PRIVATE_CHIP,
+  DM_PRIVATE_CHIP_LABEL,
+} from '@/lib/e2ee/dmPrivacyChrome';
 import { getState, useStore, type ActiveView } from '@/lib/store';
+import { registerDmSafetySheetOpener } from './dmSafetySheetOpen';
+
+export type DmSafetySheetProps = {
+  /** When true, PresenceRibbon owns the Verify action. */
+  hideTrigger?: boolean;
+};
+
+export { openDmSafetySheet } from './dmSafetySheetOpen';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'unavailable';
 
@@ -25,10 +39,11 @@ function safetyGroups(value: string | null): string[] {
   return value?.split(/\s+/).filter(Boolean) ?? [];
 }
 
-export function DmSafetySheet(): JSX.Element {
+export function DmSafetySheet(props: DmSafetySheetProps = {}): JSX.Element {
   const activeView = useStore((state) => state.activeView);
   const peerDmKeys = useStore((state) => state.peerDmKeys);
   const peerDmDeviceKeys = useStore((state) => state.peerDmDeviceKeys);
+  const peerKeyChanges = useStore((state) => state.peerKeyChanges);
   const peerSafetyNumbers = useStore((state) => state.peerSafetyNumbers);
 
   const peer = createMemo(() => dmPeer(activeView()));
@@ -69,6 +84,23 @@ export function DmSafetySheet(): JSX.Element {
     if (n <= 0) return 'Not received';
     if (n === 1) return '1 device received';
     return `${n} devices received`;
+  });
+  const privateChip = createMemo(() => {
+    const name = peer();
+    if (!name) return false;
+    return showDmPrivateChip({
+      peerDmKeys: peerDmKeys(),
+      peerDmDeviceKeys: peerDmDeviceKeys(),
+      peerKeyChanges: peerKeyChanges(),
+    }, name);
+  });
+
+  const openThisSheet = (): void => {
+    if (peer()) setOpen(true);
+  };
+  registerDmSafetySheetOpener(openThisSheet);
+  onCleanup(() => {
+    registerDmSafetySheetOpener(null);
   });
 
   // A verification receipt belongs to exactly one peer. Switching views closes
@@ -124,27 +156,45 @@ export function DmSafetySheet(): JSX.Element {
   return (
     <Show when={peer()}>
       {(name) => (
-        <section class="dm-safety" aria-label={`Encryption verification for ${name()}`}>
-          <button
-            ref={openerRef}
-            type="button"
-            class="dm-safety__trigger"
-            aria-expanded={open()}
-            aria-controls="dm-safety-panel"
-            onClick={() => (open() ? closeAndRestoreFocus() : setOpen(true))}
-          >
-            <svg class="dm-safety__trigger-icon" viewBox="0 0 24 24" aria-hidden="true"
-              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z" />
-              <path d="m9.3 12 1.8 1.8 3.8-4" />
-            </svg>
-            <span>Verify encryption</span>
-            <span
-              class="dm-safety__trigger-state"
-              data-ready={safetyNumber() ? 'true' : 'false'}
-              aria-hidden="true"
-            />
-          </button>
+        <Show when={!props.hideTrigger || open()}>
+        <section
+          class="dm-safety"
+          classList={{ 'dm-safety--header-owned': props.hideTrigger === true }}
+          aria-label={`Safety number for ${name()}`}
+        >
+          <Show when={!props.hideTrigger}>
+            <div class="dm-safety__bar">
+              <Show when={privateChip()}>
+                <span
+                  class="dm-safety__private"
+                  data-testid="dm-safety-private"
+                  aria-label={DM_PRIVATE_CHIP_LABEL}
+                >
+                  {DM_PRIVATE_CHIP}
+                </span>
+              </Show>
+              <button
+                ref={openerRef}
+                type="button"
+                class="dm-safety__trigger"
+                aria-expanded={open()}
+                aria-controls="dm-safety-panel"
+                onClick={() => (open() ? closeAndRestoreFocus() : setOpen(true))}
+              >
+                <svg class="dm-safety__trigger-icon" viewBox="0 0 24 24" aria-hidden="true"
+                  fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z" />
+                  <path d="m9.3 12 1.8 1.8 3.8-4" />
+                </svg>
+                <span>{DM_VERIFY_ACTION}</span>
+                <span
+                  class="dm-safety__trigger-state"
+                  data-ready={safetyNumber() ? 'true' : 'false'}
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+          </Show>
 
           <Show when={open()}>
             <div
@@ -163,13 +213,13 @@ export function DmSafetySheet(): JSX.Element {
               <div class="dm-safety__content">
                 <header class="dm-safety__header">
                   <div>
-                    <p class="dm-safety__kicker">Identity check · first-use trust</p>
-                    <h2 id="dm-safety-title">Verify encryption with {name()}</h2>
+                    <p class="dm-safety__kicker">Safety number</p>
+                    <h2 id="dm-safety-title">Compare this safety number with {name()}</h2>
                   </div>
                   <button
                     type="button"
                     class="dm-safety__close"
-                    aria-label="Close encryption verification"
+                    aria-label="Close safety number"
                     onClick={closeAndRestoreFocus}
                   >×</button>
                 </header>
@@ -178,8 +228,8 @@ export function DmSafetySheet(): JSX.Element {
                   Compare every group with {name()} in person, on a trusted voice call,
                   or through another channel you already trust. A matching number ties
                   this device to {peerDeviceCount() > 1
-                    ? `all ${peerDeviceCount()} of their remembered device keys`
-                    : 'the peer key Onyx remembered'}.
+                    ? `all ${peerDeviceCount()} of their advertised device keys`
+                    : 'the device key they published'}.
                 </p>
 
                 <div class="dm-safety__readiness" role="list" aria-label="Encryption key readiness">
@@ -237,16 +287,16 @@ export function DmSafetySheet(): JSX.Element {
                 </div>
 
                 <p class="dm-safety__warning">
-                  Onyx uses trust on first use: the first key is remembered, not
-                  automatically proven to belong to {name()}. Until you compare this
-                  number, treat the identity as unverified. If their key changes
+                  Until you compare this number, treat the identity as unverified.
+                  If their device key changes
                   {peerDeviceCount() > 1 ? ' or a new device appears' : ''},
-                  encrypted messages fail closed until you review the warning.
+                  messages stay locked until you review it.
                 </p>
               </div>
             </div>
           </Show>
         </section>
+        </Show>
       )}
     </Show>
   );

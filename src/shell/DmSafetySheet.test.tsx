@@ -4,8 +4,16 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { toB64url } from '@/lib/e2ee/dmCipher';
 import { store } from '@/lib/store';
-import { DmSafetySheet } from './DmSafetySheet';
+import { DmSafetySheet, openDmSafetySheet } from './DmSafetySheet';
+
+function validPeerKey(): string {
+  const raw = new Uint8Array(65);
+  raw[0] = 0x04;
+  raw.fill(3, 1);
+  return toB64url(raw);
+}
 
 const initialState = store.getInitialState();
 const SAFETY_NUMBER = '11111 22222 33333 44444 55555 66666 77777 88888 99999 00000 12121 34343';
@@ -49,13 +57,13 @@ describe('DmSafetySheet', () => {
   it('self-gates to DMs and disappears when navigation moves to a channel', () => {
     store.setState({ activeView: { kind: 'channel', channel: '#root' } });
     const view = render(() => <DmSafetySheet />);
-    expect(screen.queryByRole('button', { name: /verify encryption/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^verify$/i })).toBeNull();
 
     seedDm('Trev');
-    expect(screen.getByRole('button', { name: /verify encryption/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^verify$/i })).toBeInTheDocument();
 
     store.setState({ activeView: { kind: 'channel', channel: '#ops' } });
-    expect(screen.queryByRole('button', { name: /verify encryption/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^verify$/i })).toBeNull();
     view.unmount();
   });
 
@@ -68,12 +76,12 @@ describe('DmSafetySheet', () => {
     store.setState({ loadSafetyNumber });
     render(() => <DmSafetySheet />);
 
-    const trigger = screen.getByRole('button', { name: /verify encryption/i });
+    const trigger = screen.getByRole('button', { name: /^verify$/i });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(trigger);
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(await screen.findByRole('region', { name: /verify encryption with Trev/i })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: /compare this safety number with Trev/i })).toBeInTheDocument();
     await waitFor(() => expect(loadSafetyNumber).toHaveBeenCalledTimes(1));
     expect(loadSafetyNumber).toHaveBeenCalledWith('Trev');
 
@@ -100,13 +108,13 @@ describe('DmSafetySheet', () => {
     store.setState({ loadSafetyNumber });
     render(() => <DmSafetySheet />);
 
-    fireEvent.click(screen.getByRole('button', { name: /verify encryption/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^verify$/i }));
     expect(await screen.findByText('3 devices received')).toBeInTheDocument();
     expect(screen.getByText(/Current safety number · 3 devices/i)).toBeInTheDocument();
     expect(
       await screen.findByLabelText(`Safety number for Trev across 3 devices: ${SAFETY_NUMBER}`),
     ).toBeInTheDocument();
-    expect(screen.getByText(/all 3 of their remembered device keys/i)).toBeInTheDocument();
+    expect(screen.getByText(/all 3 of their advertised device keys/i)).toBeInTheDocument();
     expect(screen.getByText(/or a new device appears/i)).toBeInTheDocument();
     // Seal badge reflects advertised device count, never raw keys.
     expect(document.body).not.toHaveTextContent('redacted-device-a');
@@ -123,7 +131,7 @@ describe('DmSafetySheet', () => {
     store.setState({ loadSafetyNumber });
     render(() => <DmSafetySheet />);
 
-    fireEvent.click(screen.getByRole('button', { name: /verify encryption/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^verify$/i }));
     expect(screen.getByRole('status')).toHaveTextContent(/Loading this device’s safety number/i);
     expect(screen.getByText('Not received')).toBeInTheDocument();
     expect(screen.getByText('Not ready to compare')).toBeInTheDocument();
@@ -132,7 +140,8 @@ describe('DmSafetySheet', () => {
     await waitFor(() => {
       expect(screen.getByRole('status')).toHaveTextContent(/Mika’s device key has not arrived yet/i);
     });
-    expect(screen.getByText(/trust on first use/i)).toHaveTextContent(/identity as unverified/i);
+    expect(screen.getByText(/treat the identity as unverified/i)).toBeInTheDocument();
+    expect(screen.queryByText(/trust on first use|TOFU|MITM/i)).toBeNull();
     expect(screen.queryByText(/verified$/i)).toBeNull();
   });
 
@@ -141,15 +150,15 @@ describe('DmSafetySheet', () => {
     store.setState({ loadSafetyNumber: vi.fn(() => Promise.resolve(SAFETY_NUMBER)) });
     render(() => <DmSafetySheet />);
 
-    const trigger = screen.getByRole('button', { name: /verify encryption/i });
+    const trigger = screen.getByRole('button', { name: /^verify$/i });
     fireEvent.click(trigger);
-    const close = screen.getByRole('button', { name: /close encryption verification/i });
+    const close = screen.getByRole('button', { name: /close safety number/i });
     close.focus();
     fireEvent.click(close);
 
     await waitFor(() => expect(document.activeElement).toBe(trigger));
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('region', { name: /verify encryption with Trev/i })).toBeNull();
+    expect(screen.queryByRole('region', { name: /compare this safety number with Trev/i })).toBeNull();
   });
 
   it('closes with Escape, restores focus, and never traps the non-modal panel', async () => {
@@ -157,15 +166,15 @@ describe('DmSafetySheet', () => {
     store.setState({ loadSafetyNumber: vi.fn(() => Promise.resolve(SAFETY_NUMBER)) });
     render(() => <DmSafetySheet />);
 
-    const trigger = screen.getByRole('button', { name: /verify encryption/i });
+    const trigger = screen.getByRole('button', { name: /^verify$/i });
     fireEvent.click(trigger);
-    const close = screen.getByRole('button', { name: /close encryption verification/i });
+    const close = screen.getByRole('button', { name: /close safety number/i });
     close.focus();
     fireEvent.keyDown(close, { key: 'Escape' });
 
     await waitFor(() => expect(document.activeElement).toBe(trigger));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.queryByRole('region', { name: /verify encryption with Trev/i })).toBeNull();
+    expect(screen.queryByRole('region', { name: /compare this safety number with Trev/i })).toBeNull();
   });
 
   it('does not paint a slow peer result after the active DM changes', async () => {
@@ -180,15 +189,48 @@ describe('DmSafetySheet', () => {
     store.setState({ loadSafetyNumber });
     render(() => <DmSafetySheet />);
 
-    fireEvent.click(screen.getByRole('button', { name: /verify encryption/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^verify$/i }));
     expect(screen.getByRole('status')).toHaveTextContent(/Loading/i);
 
     seedDm('Mika', { peerKey: false });
-    expect(screen.getByRole('button', { name: /verify encryption/i })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /^verify$/i })).toHaveAttribute('aria-expanded', 'false');
     resolveTrev(SAFETY_NUMBER);
     await Promise.resolve();
 
     expect(screen.queryByLabelText(/Safety number for Mika/i)).toBeNull();
     expect(document.body).not.toHaveTextContent('11111');
+  });
+
+  it('shows the Private chip only when a peer key is present and the DM can be sealed', () => {
+    seedDm('Trev');
+    const view = render(() => <DmSafetySheet />);
+    expect(screen.queryByTestId('dm-safety-private')).toBeNull();
+
+    store.setState({
+      peerDmKeys: new Map([['trev', validPeerKey()]]),
+    });
+    expect(screen.getByTestId('dm-safety-private')).toHaveAttribute(
+      'aria-label',
+      /only the two of you can read these messages/i,
+    );
+    expect(screen.getByTestId('dm-safety-private')).toHaveTextContent('Private');
+    expect(screen.getByTestId('dm-safety-private')).not.toHaveTextContent(/🔒|lock/i);
+
+    store.setState({
+      peerKeyChanges: new Map([['trev', { pinnedKey: 'old', newKey: 'new' }]]),
+    });
+    expect(screen.queryByTestId('dm-safety-private')).toBeNull();
+    view.unmount();
+  });
+
+  it('opens from the header Verify action without a second list padlock', () => {
+    seedDm('Trev', { safetyNumber: SAFETY_NUMBER });
+    store.setState({ loadSafetyNumber: vi.fn(() => Promise.resolve(SAFETY_NUMBER)) });
+    render(() => <DmSafetySheet hideTrigger />);
+
+    expect(screen.queryByRole('button', { name: /^verify$/i })).toBeNull();
+    openDmSafetySheet();
+    expect(screen.getByRole('region', { name: /compare this safety number with Trev/i })).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('🔒');
   });
 });

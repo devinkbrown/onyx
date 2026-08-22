@@ -37,8 +37,15 @@ import { GroupControlRoomIndicator } from './GroupControlRoomIndicator';
 import { classifyCallsHubPresentation, type CallsHubPresentation } from './CallsHub';
 import { selectGroupControlRoom } from '@/lib/e2ee/groupControlSelectors';
 import { isMessageSearchOpen, openMessageSearch } from './search/useMessageSearch';
+import {
+  DM_PRIVATE_CHIP,
+  DM_PRIVATE_CHIP_LABEL,
+  DM_VERIFY_ACTION,
+  showDmPrivateChip,
+} from '@/lib/e2ee/dmPrivacyChrome';
 import type { AiPolicy } from '@/lib/irc/aiPolicyProp';
 import type { Channel } from '@/lib/irc/types';
+import { openDmSafetySheet } from './dmSafetySheetOpen';
 
 export type PresenceRibbonProps = {
   selfNick?: string;
@@ -150,6 +157,9 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const connectionStatus = useStore((s) => s.connectionStatus);
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
+  const peerDmKeys = useStore((s) => s.peerDmKeys);
+  const peerDmDeviceKeys = useStore((s) => s.peerDmDeviceKeys);
+  const peerKeyChanges = useStore((s) => s.peerKeyChanges);
   // Fallback only when AppShell does not pass membersOpen (unit hosts).
   const showMemberList = useStore((s) => s.showMemberList);
   // selectChannelEvent parses the prop into a fresh object each call; without a
@@ -217,6 +227,16 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     if (view.kind === 'dm') return view.nick;
     if (view.kind === 'status') return 'Activity';
     return null;
+  });
+
+  const dmPrivateChip = createMemo(() => {
+    const view = activeView();
+    if (view.kind !== 'dm') return false;
+    return showDmPrivateChip({
+      peerDmKeys: peerDmKeys(),
+      peerDmDeviceKeys: peerDmDeviceKeys(),
+      peerKeyChanges: peerKeyChanges(),
+    }, view.nick);
   });
 
   const pinCount = useStore((s) => {
@@ -576,6 +596,16 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           )}
         </Show>
 
+        <Show when={activeView().kind === 'dm' && dmPrivateChip()}>
+          <span
+            class="shell-ribbon-private-chip"
+            data-testid="ribbon-dm-private"
+            aria-label={DM_PRIVATE_CHIP_LABEL}
+          >
+            {DM_PRIVATE_CHIP}
+          </span>
+        </Show>
+
         {/* Topic flows after the name on the same baseline, taking the slack. */}
         <Show when={topic()}>
           {(t) => (
@@ -607,6 +637,25 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
       {/* ── RIGHT: Z2 Place · Z3 People · Z4 Edge (commercial sparse chrome) ── */}
       <div class="shell-ribbon-right">
+        <Show when={activeView().kind === 'dm'}>
+          <div class="shell-ribbon-group" role="group" aria-label="Conversation privacy">
+            <button
+              type="button"
+              class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-verify"
+              data-testid="ribbon-dm-verify"
+              aria-label={`Verify safety number with ${channelName()}`}
+              onClick={() => openDmSafetySheet()}
+            >
+              <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z" />
+                <path d="m9.3 12 1.8 1.8 3.8-4" />
+              </svg>
+              <span class="shell-ribbon-action-label">{DM_VERIFY_ACTION}</span>
+            </button>
+          </div>
+          <span class="shell-ribbon-divider" aria-hidden="true" />
+        </Show>
         {/* Z2 Place — event · voice occupancy · Call lifecycle (channels only). */}
         <Show when={activeView().kind === 'channel'}>
           <div class="shell-ribbon-group" role="group" aria-label="Place">

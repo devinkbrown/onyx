@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { ChatMessage } from '@/lib/irc/types';
-import { isEncryptedWireText } from '@/lib/e2ee/replyPrivacy';
+import { dmListPreviewText } from '@/lib/e2ee/dmPrivacyChrome';
 
 export interface HomeMemoryItem {
   target: string;
@@ -48,7 +48,7 @@ export function summarizeHomeMemory(target: string, messages: readonly ChatMessa
     lastAt: last.time,
     lastMessageId: last.id,
     lastFrom: last.from,
-    preview: previewText(last),
+    preview: dmListPreviewText(last) ?? 'Message',
   };
 }
 
@@ -107,15 +107,3 @@ export async function buildHomeMemory(
   return buildHomeMemoryFromVault(vaultedTargets, limit);
 }
 
-function previewText(message: ChatMessage): string {
-  // Fail closed on ciphertext: honor the encrypted flag and detect legacy vault
-  // rows that stored an ONYXDM1/ONYXROOM1 envelope without setting `encrypted`.
-  if ((message.encrypted || isEncryptedWireText(message.text)) && !message.plaintext) {
-    return 'Encrypted message';
-  }
-
-  const text = (message.plaintext ?? message.text).replace(/\s+/g, ' ').trim();
-  if (!text) return message.type === 'action' ? 'Action message' : 'Message';
-  if (text.length <= 96) return text;
-  return `${text.slice(0, 95)}…`;
-}

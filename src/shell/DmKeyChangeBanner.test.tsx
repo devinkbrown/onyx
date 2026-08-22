@@ -67,26 +67,32 @@ afterEach(() => {
 describe('DmKeyChangeBanner', () => {
   it('appears when the active DM peer has a pending key-change', () => {
     seed({ peer: 'Trev' });
-    const region = screen.getByRole('region', { name: /key is different/i });
+    const region = screen.getByRole('region', { name: /device key changed/i });
     expect(region).toBeInTheDocument();
     expect(region).toHaveTextContent(/Trev/);
-    expect(region).toHaveTextContent(/Encryption key changed/i);
+    expect(region).toHaveTextContent(/Device key changed/i);
+    expect(region).toHaveTextContent(/reinstalled Onyx or added a device/i);
+    expect(region).toHaveTextContent(/Messages stay locked until you review it/i);
+    expect(region).not.toHaveTextContent(/intercept/i);
+    expect(region).not.toHaveTextContent(/TOFU|MITM|trust on first use/i);
   });
 
   it('is absent when the active DM peer has no key-change', () => {
     seed({ change: null });
-    expect(screen.queryByRole('region', { name: /key is different/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /device key changed/i })).not.toBeInTheDocument();
   });
 
   it('is absent when the active view is a channel, even with a pending change elsewhere', () => {
     seed({ view: { kind: 'channel', channel: '#root' } });
-    expect(screen.queryByRole('region', { name: /key is different/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /device key changed/i })).not.toBeInTheDocument();
   });
 
   it('announces the change assertively on appear', () => {
     seed({ peer: 'Trev' });
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent(/Trev's encryption key changed/i);
+    expect(alert).toHaveTextContent(
+      /Trev's device key changed\. Compare the new safety number before you continue\./i,
+    );
   });
 
   it('renders BOTH safety numbers as grouped fingerprints', () => {
