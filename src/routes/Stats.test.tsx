@@ -52,7 +52,7 @@ describe('StatsRoute', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.stats-page')).toBeTruthy();
-    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Signal.*Stats/);
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Rooms.*Stats/);
     expect(container.querySelector('.r-ground')).toBeTruthy();
     expect(container.querySelector('.r-flecks')).toBeTruthy();
     expect(container.querySelector('.r-grain')).toBeTruthy();
@@ -143,7 +143,7 @@ describe('StatsRoute', () => {
     expect(document.querySelectorAll('.stats-observation')).toHaveLength(1);
     expect(screen.getByLabelText(/#root recent activity/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /refresh data/i })).toBeInTheDocument();
-    expect(screen.getByText(/activity ledger/i)).toBeInTheDocument();
+    expect(screen.getByText(/Onyx activity/i)).toBeInTheDocument();
     expect(screen.getByText(/export current/i)).toBeInTheDocument();
     expect(screen.getByText('14-day pulse')).toBeInTheDocument();
     expect(document.querySelector('.ui-root.stats-page')).not.toBeNull();

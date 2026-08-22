@@ -66,7 +66,7 @@
      text COLOUR (semantic.css). Letting size and colour share a prefix would
      put `--ui-text-md` one keystroke from `--ui-text-muted`, which is the kind
      of ambiguity that produces a wrong-but-plausible autocomplete. */
-  --ui-type-2xs: var(--text-2xs, 0.625rem);
+  --ui-type-2xs: var(--text-2xs, 0.75rem);
   --ui-type-xs: var(--text-xs, 0.6875rem);
   --ui-type-sm: var(--text-sm, 0.8125rem);
   --ui-type-md: var(--text-md, 0.9375rem);
@@ -92,7 +92,7 @@
   /* ── Leading ───────────────────────────────────────────────────────────── */
   --ui-leading-tight: var(--leading-tight, 1.15);
   --ui-leading-snug: var(--leading-snug, 1.35);
-  --ui-leading-body: var(--leading-body, 1.55);
+  --ui-leading-body: var(--leading-body, 1.5);
   --ui-leading-evidence: 1.5;
 
   /* ── Tracking ──────────────────────────────────────────────────────────── */

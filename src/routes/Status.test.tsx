@@ -45,7 +45,7 @@ describe('StatusRoute', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.status-route')).toBeTruthy();
-    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Ledger.*Status/);
+    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Network.*Status/);
     expect(within(screen.getByRole('navigation', { name: 'Primary navigation' }))
       .queryByRole('link', { name: 'Status' })).toBeNull();
     expect(within(screen.getByRole('navigation', { name: 'Footer navigation' }))

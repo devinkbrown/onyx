@@ -69,7 +69,6 @@ import { formatWebhookNoticeBody } from '@/lib/integrations/webhookBlockKit';
 import { MessageText } from '@/shell/message/MessageText';
 import { MessageMenu } from '@/shell/message/MessageMenu';
 import { activeMessageSearchResultId, openMessageSearchWithQuery } from './search/useMessageSearch';
-import { openRoomInviteShare } from './roomInviteShareState';
 import { TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';
@@ -1970,9 +1969,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     </p>
                   </Show>
                   <Show when={activeView().kind === 'status'}>
-                    <p class="shell-feed-empty-title">Activity</p>
+                    <p class="shell-feed-empty-title">Quiet for now</p>
                     <p class="shell-feed-empty-body">
-                      Connection notices and network detail will land here.
+                      Connection notices will land here.
                     </p>
                   </Show>
                 </div>
@@ -2020,7 +2019,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 {activeView().kind === 'channel' ? (activeView() as { kind: 'channel'; channel: string }).channel : ''}
               </h2>
               <p class="shell-channel-intro-note">
-                This is the very beginning of the conversation. Say something worth scrolling back to.
+                This is the very beginning of the conversation.
               </p>
               <ScheduledEventLine channel={(activeView() as { kind: 'channel'; channel: string }).channel} />
             </div>

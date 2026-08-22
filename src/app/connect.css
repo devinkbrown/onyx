@@ -46,7 +46,7 @@
 .conn-card {
   position: relative;
   width: 100%;
-  border-radius: 2px;
+  border-radius: var(--r-md);
   background: var(--stone);
   border: 1px solid var(--seam);
   box-shadow: none;
@@ -90,10 +90,10 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs, 0.6875rem);
-  letter-spacing: var(--tracking-kicker, 0.12em);
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--paper-dim);
 }
 
@@ -138,10 +138,10 @@
 }
 
 .conn-invite-eyebrow {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs, 0.6875rem);
-  letter-spacing: var(--tracking-kicker, 0.12em);
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--paper-dim);
 }
 
@@ -199,10 +199,10 @@
 
 .conn-resume-eyebrow {
   display: block;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs, 0.6875rem);
-  letter-spacing: var(--tracking-kicker, 0.12em);
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--paper-dim);
 }
 
@@ -273,7 +273,7 @@
 
 .conn-identity-select:focus-visible,
 .conn-identity-forget:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: var(--focus-ring, 1px solid var(--lapis)); outline-offset: var(--focus-offset, -1px);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -336,7 +336,7 @@
 }
 
 .conn-resume-dismiss:hover { color: var(--paper); }
-.conn-resume-dismiss:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 2px; border-radius: 3px; }
+.conn-resume-dismiss:focus-visible { outline: var(--focus-ring, 1px solid var(--lapis)); outline-offset: var(--focus-offset, -1px); border-radius: 3px; }
 
 .conn-fields {
   display: flex;
@@ -378,10 +378,10 @@
   border: 1px solid var(--seam);
   background: color-mix(in oklab, var(--stone-2) 70%, transparent);
   color: var(--paper-dim);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
+  text-transform: none;
   cursor: pointer;
 }
 
@@ -389,7 +389,7 @@
   color: var(--paper);
   border-color: var(--seam);
 }
-.conn-password-toggle:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 2px; }
+.conn-password-toggle:focus-visible { outline: var(--focus-ring, 1px solid var(--lapis)); outline-offset: var(--focus-offset, -1px); }
 .conn-password-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .conn-passkey {
@@ -447,7 +447,7 @@
   background: color-mix(in oklab, var(--lapis) 8%, transparent);
 }
 .conn-password-path-toggle:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: var(--focus-ring, 1px solid var(--lapis)); outline-offset: var(--focus-offset, -1px);
   outline-offset: 2px;
 }
 .conn-password-path-toggle:disabled {
@@ -565,7 +565,7 @@
 }
 
 .conn-toggle-switch input:focus-visible + .conn-toggle-track {
-  outline: 2px solid var(--lapis-bright);
+  outline: var(--focus-ring, 1px solid var(--lapis)); outline-offset: var(--focus-offset, -1px);
   outline-offset: 2px;
 }
 
@@ -670,7 +670,7 @@
   cursor: pointer;
 }
 .conn-auth-required button:hover { color: var(--paper); }
-.conn-auth-required button:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 2px; }
+.conn-auth-required button:focus-visible { outline: var(--focus-ring, 1px solid var(--lapis)); outline-offset: var(--focus-offset, -1px); }
 
 .conn-reclaim { margin-top: 8px; }
 
@@ -693,7 +693,7 @@
 .conn-reclaim-open:hover {
   background: color-mix(in oklab, var(--gold) 14%, transparent);
 }
-.conn-reclaim-open:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 2px; }
+.conn-reclaim-open:focus-visible { outline: var(--focus-ring, 1px solid var(--lapis)); outline-offset: var(--focus-offset, -1px); }
 
 .conn-reclaim-form {
   display: flex;
@@ -734,7 +734,7 @@
   cursor: pointer;
 }
 .conn-reclaim-cancel:hover { color: var(--paper); }
-.conn-reclaim-cancel:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 2px; border-radius: 3px; }
+.conn-reclaim-cancel:focus-visible { outline: var(--focus-ring, 1px solid var(--lapis)); outline-offset: var(--focus-offset, -1px); border-radius: 3px; }
 
 .conn-verify {
   display: flex;
@@ -825,7 +825,7 @@
 }
 
 .conn-alt-link:hover { color: var(--paper); }
-.conn-alt-link:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 3px; border-radius: 4px; }
+.conn-alt-link:focus-visible { outline: var(--focus-ring, 1px solid var(--lapis)); outline-offset: var(--focus-offset, -1px); border-radius: 4px; }
 .conn-alt-link:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .conn-foot {

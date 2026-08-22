@@ -26,8 +26,8 @@ function topologyPresentation(state: PublicMeshFeedState): { label: string; tone
 function feedDetail(state: PublicMeshFeedState): string {
   switch (state) {
     case 'loading': return 'Requesting the public export. No health claim yet.';
-    case 'current': return 'A fresh, complete report observes quorum with no partition.';
-    case 'degraded': return 'The current report observes missing quorum, a partition, or incomplete peer data.';
+    case 'current': return 'A fresh public report is complete and together.';
+    case 'degraded': return 'The latest report is incomplete or split.';
     case 'stale': return 'The last report is too old to support a current health claim.';
     case 'future': return 'The report timestamp is in the future, so it cannot support a current health claim.';
     case 'unknown': return 'The report has no usable timestamp, so freshness cannot be established.';
@@ -61,7 +61,7 @@ export default function StatusRoute() {
       mainLabel="Onyx network status"
       context={(
         <p class="public-frame__current-line">
-          <span class="public-frame__current-kicker">Ledger</span>
+          <span class="public-frame__current-kicker">Network</span>
           <span aria-hidden="true">·</span>
           <span class="public-frame__current-label">Status</span>
         </p>
@@ -69,11 +69,11 @@ export default function StatusRoute() {
     >
       <div class="ui-root r data-page status-route">
         <section class="r-wrap data-hero status-hero" aria-labelledby="status-heading">
-          <p class="r-kicker">network status</p>
+          <p class="r-kicker">Status</p>
           <h1 id="status-heading">Network health,<br /><span class="status-title-accent">in public</span></h1>
           <p class="sub">
-            Node uptime, quorum, peer links, and latency from the exported public
-            observation — including when that observation cannot support a health claim.
+            A public look at whether the rooms are reachable tonight — including
+            when we cannot say.
           </p>
 
           <div

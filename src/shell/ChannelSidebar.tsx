@@ -667,7 +667,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             aria-label={`Room ledger for ${activeChannelLedger()!.channel}`}
             data-testid="sidebar-channel-ledger"
           >
-            Ledger · {activeChannelLedger()!.channel}
+            Activity · {activeChannelLedger()!.channel}
           </a>
         </div>
       </Show>

@@ -97,7 +97,7 @@ const oceanTokens: TokenMap = {
   // Text — cool paper over mineral night
   '--paper':      '#e6e8ec',
   '--paper-dim':  '#8b939e',
-  '--paper-mute': '#5c6570',
+  '--paper-mute': '#848c96',
 
   // Status
   '--ok':      '#5bc78e',
@@ -107,7 +107,7 @@ const oceanTokens: TokenMap = {
   // Seams + bands — fine borders, not glowing current lines
   '--seam':       'color-mix(in oklab, var(--lapis) 28%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 12%, transparent)',
-  '--line':       'color-mix(in oklab, var(--paper) 12%, transparent)',
+  '--line':       'color-mix(in oklab, var(--paper) 40%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--paper) 6%, transparent)',
 
   // Radius — tighter matte professional surfaces

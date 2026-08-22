@@ -47,16 +47,21 @@
      Use these for text sitting on --lapis / --lapis-bright / --gold-bright
      CTAs and on --shu / --danger badges instead of hand-picking a hex per
      component, so the ink tracks the theme's accent.
-     Ocean (canonical) contrast: --on-accent ~6.9 : 1 vs --lapis,
-     ~10 : 1 vs --lapis-bright; --on-danger 7.06 : 1 vs --shu (AAA). */
+     Ocean (canonical) contrast: paper #e6e8ec on ink #05070a ~16.4 : 1 (AAA).
+     --on-accent ~7.2 : 1 vs --lapis, ~10 : 1 vs --lapis-bright;
+     --on-danger 7.06 : 1 vs --shu (AAA).
+     Lapis #5ba3c9 on ink is WCAG 7.23:1 but APCA Lc ≈ −48 — signal only
+     (bar, ring, armed Send), never body or small labels. Use --signal-text
+     (--lapis-bright) or type at --text-lg and up. Unread = weight 600 + paper. */
   --on-accent: #061018;
   --on-secondary: #061018;
   --on-danger: #1c0906;
+  --signal-text: var(--lapis-bright);
 
   /* Text — cool paper over mineral night */
   --paper: #e6e8ec;
   --paper-dim: #8b939e;
-  --paper-mute: #5c6570; /* least important metadata */
+  --paper-mute: #848c96; /* metadata — lifted so timestamps/labels stay readable */
 
   /* Functional status (kept in-palette where possible) */
   --ok: #5bc78e;
@@ -66,15 +71,16 @@
   /* Seams + bands — fine borders, not glowing current lines */
   --seam: color-mix(in oklab, var(--lapis) 28%, transparent);
   --seam-faint: color-mix(in oklab, var(--lapis) 12%, transparent);
-  --line: color-mix(in oklab, var(--paper) 12%, transparent);
-  --line-faint: color-mix(in oklab, var(--paper) 6%, transparent);
+  --line: color-mix(in oklab, var(--paper) 40%, transparent); /* control edges */
+  --line-faint: color-mix(in oklab, var(--paper) 6%, transparent); /* decorative strata */
 
   /* Radius — slightly tighter for matte professional surfaces. */
   --r-0: 0px;
   --r-sm: 4px;
   --r-md: 8px;
-  --r-lg: 12px; /* cards / drawers that need a step above controls */
+  --r-lg: 12px; /* cards / drawers / composer vessel */
   --r-pill: 999px;
+  --composer-radius: var(--r-lg);
 
   /* ── Spacing scale ──────────────────────────────────────────────────────────
      A single 4px-based rhythm shared by the shell and every dialog. Use these
@@ -101,23 +107,23 @@
 
   /* Touch / keyboard interaction floor (WCAG 2.5.5 target size). */
   --target-min: 44px;
-  --focus-ring: 2px solid var(--lapis);
-  --focus-offset: 3px;
+  --focus-ring: 1px solid var(--lapis);
+  --focus-offset: -1px; /* inset hairline; no outer bloom */
 
   /* ── Type scale (commercial reading ladder) ─────────────────────────────────
      Shared landing → connect → shell so titles, ledes, meta, and UI chrome
      stay one voice. Prefer these over ad-hoc rem sizes on product surfaces. */
-  --text-2xs: 0.625rem;  /* 10px — dense mono marks */
+  --text-2xs: 0.75rem;   /* 12px — dense mono marks / timestamps */
   --text-xs: 0.6875rem;  /* 11px — kickers, section labels */
   --text-sm: 0.8125rem;  /* 13px — secondary UI */
-  --text-md: 0.9375rem;  /* 15px — body / control */
+  --text-md: 0.9375rem;  /* 15px — chat body / control */
   --text-lg: 1.0625rem;  /* 17px — lede / intro */
   --text-xl: 1.25rem;    /* 20px — section titles */
   --text-2xl: 1.5rem;    /* 24px — page titles (mobile floor) */
   --leading-tight: 1.15;
   --leading-snug: 1.35;
-  --leading-body: 1.55;
-  --tracking-kicker: 0.12em;
+  --leading-body: 1.5;
+  --tracking-kicker: 0.06em;
   --tracking-title: -0.02em;
 
   /* ── Surface + elevation hierarchy (matte mineral, not glass stack) ───────

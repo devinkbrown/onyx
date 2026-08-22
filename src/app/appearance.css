@@ -17,15 +17,14 @@
   gap: 16px;
   min-height: var(--target-min, 44px);
   padding: 12px clamp(16px, 5vw, 48px);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs, 0.6875rem);
-  letter-spacing: var(--tracking-kicker, 0.12em);
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--paper-dim);
-  background: color-mix(in oklab, var(--surface-void, var(--ink)) 78%, transparent);
+  background: var(--ink);
   border-bottom: 1px solid var(--seam-faint);
-  /* Light matte veil — not noisy glass */
-  backdrop-filter: blur(8px) saturate(110%);
+  backdrop-filter: none;
 }
 .ap-bar a {
   min-height: var(--target-min, 44px);
@@ -37,11 +36,11 @@
 }
 .ap-bar a:hover { color: var(--paper); }
 .ap-bar a:focus-visible {
-  outline: var(--focus-ring, 2px solid var(--lapis));
-  outline-offset: var(--focus-offset, 3px);
+  outline: var(--focus-ring, 1px solid var(--lapis));
+  outline-offset: var(--focus-offset, -1px);
   border-radius: var(--r-sm);
 }
-.ap-bar .ap-tag { color: var(--lapis); }
+.ap-bar .ap-tag { color: var(--signal-text, var(--lapis-bright)); }
 
 /* Chrome must paint above the fixed Background (z-index: -1). Explicit
    stacking keeps a wallpaper swap from ever covering the picker UI. */

@@ -33,9 +33,9 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 2px;
-  border-radius: var(--r-sm);
+  outline: var(--focus-ring, 1px solid var(--lapis));
+  outline-offset: var(--focus-offset, -1px);
+  box-shadow: none;
 }
 
 ::selection {
