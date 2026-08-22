@@ -201,30 +201,73 @@ describe('channel management — raw command dispatch', () => {
     });
   });
 
-  it('createRoom() joins, sets an optional topic, and opens the room', () => {
+  it('createRoom() joins, sets an optional topic, lands in the room, and focuses the composer', () => {
     const client = seed('#general', [makeUser('me')]);
     store.setState({ showChannelBrowser: true, channelBrowserMode: 'create' });
 
-    expect(store.getState().createRoom(' Friends ', ' Weekly reads ')).toBe(true);
+    expect(store.getState().createRoom({
+      name: ' Friends ',
+      topic: ' Weekly reads ',
+      skin: 'friends',
+      hangLabel: 'Saturday 4:00 PM',
+      firstLine: 'hey — this is our room',
+      sharedInvite: true,
+    })).toBe(true);
     expect(client.join).toHaveBeenCalledWith('#friends', undefined);
-    expect(client.sendRaw).toHaveBeenCalledWith('TOPIC', '#friends', 'Weekly reads');
+    expect(client.sendRaw).toHaveBeenCalledWith(
+      'TOPIC',
+      '#friends',
+      'Friends hang · Weekly reads · Next hang: Saturday 4:00 PM',
+    );
+    expect(client.sendRaw.mock.calls.some((args) => String(args[0]) === 'MODE')).toBe(false);
+    expect(client.sendRaw.mock.calls.some((args) => String(args[0]) === 'ACCESS')).toBe(false);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#friends' });
+    expect(store.getState().getComposerDraft('#friends')).toBe('hey — this is our room');
     expect(store.getState().showChannelBrowser).toBe(false);
+    expect(store.getState().channelBrowserMode).toBe('browse');
+  });
+
+  it('createRoom() refuses to finish without a share/invite action', () => {
+    const client = seed('#general', [makeUser('me')]);
+
+    expect(store.getState().createRoom({
+      name: 'friends',
+      sharedInvite: false,
+    })).toBe(false);
+    expect(client.join).not.toHaveBeenCalled();
+    expect(client.sendRaw).not.toHaveBeenCalled();
   });
 
   it('createRoom() refuses an invalid name without sending JOIN', () => {
     const client = seed('#general', [makeUser('me')]);
 
-    expect(store.getState().createRoom('bad,name')).toBe(false);
+    expect(store.getState().createRoom({
+      name: 'bad,name',
+      sharedInvite: true,
+    })).toBe(false);
     expect(client.join).not.toHaveBeenCalled();
     expect(client.sendRaw).not.toHaveBeenCalled();
   });
 
-  it('openCreateRoom() opens the existing browser on the create view', () => {
+  it('createRoom() focuses an empty composer when no first line is suggested', () => {
     seed('#general', [makeUser('me')]);
+
+    expect(store.getState().createRoom({
+      name: 'quiet',
+      sharedInvite: true,
+    })).toBe(true);
+    expect(store.getState().pendingComposerFocusTarget).toBe('#quiet');
+    store.getState().clearPendingComposerFocus();
+    expect(store.getState().pendingComposerFocusTarget).toBeNull();
+  });
+
+  it('openCreateRoom() opens the existing browser on the create view without LIST', () => {
+    const client = seed('#general', [makeUser('me')]);
     store.getState().openCreateRoom();
     expect(store.getState().showChannelBrowser).toBe(true);
     expect(store.getState().channelBrowserMode).toBe('create');
     expect(store.getState().channelListLoading).toBe(false);
+    expect(client.sendRaw).not.toHaveBeenCalled();
   });
 
   it('deduplicates channel browser LIST rows by room name', () => {

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as clipboard from '@/lib/clipboard/writeClipboardText';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { store } from '@/lib/store/store';
 import ChannelBrowser from './ChannelBrowser';
@@ -34,7 +35,10 @@ describe('ChannelBrowser', () => {
     localStorage.clear();
   });
 
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it('shows each listed room only once after duplicate LIST rows', () => {
     store.setState({ channelListLoading: true });
@@ -49,17 +53,17 @@ describe('ChannelBrowser', () => {
     const dialog = screen.getByRole('dialog', { name: 'Browse rooms' });
     expect(within(dialog).getByRole('search', { name: 'Room directory search' })).toBeInTheDocument();
     const directory = within(dialog).getByRole('list', { name: 'Public room directory' });
-    expect(within(directory).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(directory).getAllByRole('listitem')).toHaveLength(1);
     expect(within(dialog).getAllByText('#general')).toHaveLength(1);
     expect(within(dialog).getByText('5 people')).toBeInTheDocument();
     expect(within(dialog).getByText('Launch room')).toBeInTheDocument();
-    expect(within(dialog).getByText('#random')).toBeInTheDocument();
+    expect(within(dialog).queryByText('#random')).not.toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Join #general' })).toBeInTheDocument();
     expect(within(dialog).getByRole('link', { name: 'Room ledger for #general' })).toHaveAttribute(
       'href',
       '/stats/?room=%23general',
     );
-    expect(directory.querySelectorAll('[data-room-card]')).toHaveLength(2);
+    expect(directory.querySelectorAll('[data-room-card]')).toHaveLength(1);
 
     fireEvent.input(within(dialog).getByRole('searchbox', { name: 'Search rooms' }), {
       target: { value: 'off-topic' },
@@ -67,6 +71,8 @@ describe('ChannelBrowser', () => {
 
     expect(within(dialog).queryByText('#general')).not.toBeInTheDocument();
     expect(within(dialog).getByText('#random')).toBeInTheDocument();
+    expect(within(dialog).getByText('Just started')).toBeInTheDocument();
+    expect(within(dialog).queryByText('1 user')).not.toBeInTheDocument();
   });
 
   it('orders equal-count rooms deterministically by name, not LIST arrival order', () => {
@@ -90,7 +96,7 @@ describe('ChannelBrowser', () => {
   it('can sort A–Z explicitly via the sort group', () => {
     store.setState({ channelListLoading: true });
     feed(':server.test 322 me #zebra 9 :');
-    feed(':server.test 322 me #alpha 1 :');
+    feed(':server.test 322 me #alpha 3 :');
     feed(':server.test 323 me :End of LIST');
     store.setState({ showChannelBrowser: true });
 
@@ -125,7 +131,7 @@ describe('ChannelBrowser', () => {
       expect(status).toBeInTheDocument();
 
       vi.advanceTimersByTime(400);
-      expect(status).toHaveTextContent('2 rooms you can join');
+      expect(status).toHaveTextContent('1 room you can join');
 
       fireEvent.input(screen.getByRole('searchbox', { name: 'Search rooms' }), {
         target: { value: 'off-topic' },
@@ -155,32 +161,6 @@ describe('ChannelBrowser', () => {
     }
   });
 
-  it('starts a room from the short form using JOIN and optional topic', () => {
-    const join = vi.fn();
-    const sendRaw = vi.fn();
-    store.setState({
-      client: { join, sendRaw, isupport: { CHANTYPES: '#&' } } as never,
-      showChannelBrowser: true,
-      channelBrowserMode: 'create',
-      connectionStatus: 'connected',
-      ourNick: 'me',
-    });
-
-    render(() => <ChannelBrowser />);
-
-    const dialog = screen.getByRole('dialog', { name: 'Start a room' });
-    expect(within(dialog).queryByText(/MODE|ACCESS|\/join/i)).not.toBeInTheDocument();
-    fireEvent.input(within(dialog).getByLabelText('Room name'), { target: { value: 'book-club' } });
-    fireEvent.input(within(dialog).getByLabelText('Topic (optional)'), {
-      target: { value: 'Weekly reads' },
-    });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Start room' }));
-
-    expect(join).toHaveBeenCalledWith('#book-club', undefined);
-    expect(sendRaw).toHaveBeenCalledWith('TOPIC', '#book-club', 'Weekly reads');
-    expect(store.getState().showChannelBrowser).toBe(false);
-  });
-
   it('switches from an empty directory to Start a room', () => {
     store.setState({ channelListLoading: true });
     feed(':server.test 323 me :End of LIST');
@@ -205,6 +185,48 @@ describe('ChannelBrowser', () => {
     const join = screen.getByRole('button', { name: 'Join #general' });
     expect(join).toHaveClass('chb-join');
     expect(join).not.toHaveClass('chb-join--pill');
+  });
+
+  it('starts a room only after the founder copies the invite, then lands inside', async () => {
+    const join = vi.fn();
+    const sendRaw = vi.fn();
+    const write = vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(true);
+    store.setState({
+      client: {
+        join,
+        sendRaw,
+        isupport: { CHANTYPES: '#&' },
+        negotiatedCaps: new Set<string>(),
+      } as never,
+      showChannelBrowser: true,
+      channelBrowserMode: 'create',
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'Onyx',
+    });
+
+    render(() => <ChannelBrowser />);
+
+    const dialog = screen.getByRole('dialog', { name: 'Start a room' });
+    expect(within(dialog).queryByText(/MODE|ACCESS|you're all set|all set/i)).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Enter the room' })).toBeDisabled();
+
+    fireEvent.input(within(dialog).getByLabelText('Room name'), { target: { value: 'book-club' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Club' }));
+    fireEvent.input(within(dialog).getByLabelText('Add someone by name'), { target: { value: 'ada' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    expect(within(dialog).getByText(/1 of 3 people added/i)).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy invite' }));
+    expect(await screen.findByText(/Invite link copied/i)).toBeInTheDocument();
+    expect(write).toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enter the room' }));
+    expect(join).toHaveBeenCalledWith('#book-club', undefined);
+    expect(sendRaw).toHaveBeenCalledWith('TOPIC', '#book-club', expect.stringContaining('Club hang'));
+    expect(store.getState().showChannelBrowser).toBe(false);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#book-club' });
+    expect(store.getState().getComposerDraft('#book-club')).toMatch(/Saturday|hey|welcome|first meeting/i);
   });
 });
 

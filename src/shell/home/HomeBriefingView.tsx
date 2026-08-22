@@ -922,7 +922,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
               <p class="home-first-room__title">Start with a room.</p>
               <p class="home-first-room__copy">
                 Rooms hold your conversation, files, and calls in one place.
-                Browse what is open now, start one for your friends, or invite friends with a link.
+                Browse what is open now, or start one and invite a few friends.
               </p>
               <div class="home-first-room__actions" role="group" aria-label="Find or start a room">
                 <button

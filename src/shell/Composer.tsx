@@ -537,6 +537,16 @@ export function Composer(props: ComposerProps): JSX.Element {
     }
   });
 
+  const pendingComposerFocusTarget = useStore((s) => s.pendingComposerFocusTarget);
+  createEffect(() => {
+    const want = pendingComposerFocusTarget();
+    const t = target();
+    if (!want || !t) return;
+    if (want.toLowerCase() !== t.toLowerCase()) return;
+    focusTextarea();
+    getState().clearPendingComposerFocus();
+  });
+
   // Focus the textarea when a matching reply is armed so the user can type
   // immediately after clicking Reply (Discord/Slack comfort).
   createEffect(() => {

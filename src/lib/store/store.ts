@@ -143,7 +143,13 @@ import {
 } from '@/lib/irc/channelAccess';
 import { preferences } from '@/lib/prefs/preferences';
 import { formatWebhookNoticeBody } from '@/lib/integrations/webhookBlockKit';
-import { normalizeCreateRoomName, parseEventTime, sanitizeCreateRoomTopic } from '@/lib/deeplink';
+import { parseEventTime } from '@/lib/deeplink';
+import {
+  buildCreateRoomTopic,
+  canFinishCreateRoom,
+  normalizeCreateRoomName,
+  type CreateRoomRequest,
+} from '@/lib/rooms/createRoomFormation';
 import {
   isValidTopicLabel,
   MAX_TOPIC_REGISTRY,
@@ -1090,10 +1096,15 @@ export interface OnyxState {
 
   // ── Channel Browser ───────────────────────────────────────────────────
   showChannelBrowser: boolean;
-  /** Browse list vs Start a room form — same sheet, same LIST store. */
+  /** Browse list vs Start a room formation — same sheet, same LIST store. */
   channelBrowserMode: 'browse' | 'create';
   channelList: ChannelListEntry[];
   channelListLoading: boolean;
+  /**
+   * After Start a room lands in the new channel, Composer focuses this target
+   * once. Cleared after focus so later navigations do not steal the caret.
+   */
+  pendingComposerFocusTarget: string | null;
 
   // ── Audit Log ────────────────────────────────────────────────────────
   auditLog: AuditEntry[];
@@ -1180,9 +1191,13 @@ export interface OnyxState {
 
   /**
    * Start a room: JOIN (creates if new) plus optional TOPIC.
-   * Returns false when the name or topic is not joinable.
+   * Requires an invite share/copy on the default path. Returns false when the
+   * name, topic, or finish gate fails. Never sends MODE or ACCESS.
    */
-  createRoom(name: string, topic?: string): boolean;
+  createRoom(input: CreateRoomRequest): boolean;
+
+  /** Consume the one-shot composer focus after Start a room. */
+  clearPendingComposerFocus(): void;
 
   /** Stash a validated deep-link channel until the connection lands */
   setPendingDeepLinkJoin(channel: string | null, at?: Date | null, topic?: string | null): void;
@@ -5954,6 +5969,7 @@ export const store = createStore<OnyxState>()(
     channelBrowserMode: 'browse',
     channelList: [],
     channelListLoading: false,
+    pendingComposerFocusTarget: null,
     auditLog: [],
     historyLoading: new Map(),
     historyExhausted: new Map(),
@@ -6545,15 +6561,32 @@ export const store = createStore<OnyxState>()(
       get().client?.join(channel, key);
     },
 
-    createRoom(name, topic) {
-      const channel = normalizeCreateRoomName(name);
+    createRoom(input) {
+      if (!canFinishCreateRoom(input)) return false;
+      const channel = normalizeCreateRoomName(input.name);
       if (!channel) return false;
-      const cleanedTopic = sanitizeCreateRoomTopic(topic ?? '');
-      if (cleanedTopic === null) return false;
+      const topic = buildCreateRoomTopic({
+        skin: input.skin ?? null,
+        topic: input.topic ?? '',
+        hangLabel: input.hangLabel ?? null,
+      });
+      if (topic === null) return false;
       get().joinChannel(channel);
-      if (cleanedTopic) get().setTopic(channel, cleanedTopic);
+      if (topic) get().setTopic(channel, topic);
+      const firstLine = input.firstLine?.trim() ?? '';
+      if (firstLine) {
+        get().injectComposerText(channel, firstLine, 'replace');
+      } else {
+        set({ pendingComposerFocusTarget: channel });
+      }
       get().closeChannelBrowser();
+      get().navigate({ kind: 'channel', channel });
       return true;
+    },
+
+    clearPendingComposerFocus() {
+      if (get().pendingComposerFocusTarget === null) return;
+      set({ pendingComposerFocusTarget: null });
     },
 
     setPendingDeepLinkJoin(channel, at, topic) {

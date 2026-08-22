@@ -234,10 +234,11 @@ describe('HomeBriefingView — presentation contract', () => {
       />
     ));
 
-    expect(screen.getByRole('button', { name: 'Browse rooms' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Browse rooms' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Start a room' }).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Invite friends' }));
     expect(openInviteFriends).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/invite friends with a link/i)).toBeInTheDocument();
+    expect(screen.getByText(/start one and invite a few friends/i)).toBeInTheDocument();
     expect(screen.queryByText(/mesh|handshake|claim path|member count/i)).not.toBeInTheDocument();
   });
 
@@ -264,6 +265,7 @@ describe('HomeBriefingView — presentation contract', () => {
     expect(dismissFirstHourTip).toHaveBeenCalledOnce();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
 
   it('opens Start a room from the welcome actions', () => {
     const openCreateRoom = vi.fn();
@@ -331,6 +333,7 @@ describe('HomeBriefingView — presentation contract', () => {
     expect(reshareFormation).toHaveBeenCalledWith('#lounge');
     expect(openFormationRoom).toHaveBeenCalledWith('#lounge');
   });
+
 
   it('keeps mobile reading order: needs, continue, live, explore', () => {
     const liveCatchUp = [item('#mentions', 2, 1)];
