@@ -234,6 +234,16 @@ import {
   type EmojiMemory,
 } from '@/lib/emojiMemory';
 import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
+import { loadHiddenRooms, parseHiddenRooms, saveHiddenRooms } from '@/lib/hiddenRooms';
+import {
+  loadClosedConversations,
+  parseClosedConversations,
+  saveClosedConversations,
+} from '@/lib/closedConversations';
+import {
+  shouldReopenClosedConversation,
+  shouldRevealHiddenRoom,
+} from '@/lib/roomListVerbs';
 import {
   emptyIdentityProfileMemory,
   loadIdentityProfileMemory,
@@ -1789,6 +1799,16 @@ export interface OnyxState {
   muteDM: (nick: string) => void;
   unmuteDM: (nick: string) => void;
   isDMMuted: (nick: string) => boolean;
+
+  // ── Room / conversation list visibility (local; never PART) ───────────────
+  hiddenRooms: Set<string>;
+  hideRoom: (channel: string) => void;
+  unhideRoom: (channel: string) => void;
+  isRoomHidden: (channel: string) => boolean;
+  closedConversations: Set<string>;
+  closeConversation: (nick: string) => void;
+  reopenConversation: (nick: string) => void;
+  isConversationClosed: (nick: string) => boolean;
 
   // ── DM media panel ────────────────────────────────────────────────────────
   showDMMedia: boolean;
@@ -4212,6 +4232,8 @@ function _resetAccountBoundState(
       channelAccess: new Map(),
       channelAccessLoading: new Set(),
       mutedDMs: new Set(),
+      hiddenRooms: new Set(),
+      closedConversations: new Set(),
       userNotes: new Map(),
       topicHistory: {},
       ...emptyChannelNavigationMemory(),
@@ -5168,6 +5190,16 @@ function _loadOwnedMutedDMs(
 ): Set<string> {
   const owner = selectDeviceMemoryOwner(state);
   return owner ? loadMutedDMs(owner) : new Set();
+}
+
+function _loadOwnedRoomListMemory(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): { hiddenRooms: Set<string>; closedConversations: Set<string> } {
+  const owner = selectDeviceMemoryOwner(state);
+  return {
+    hiddenRooms: owner ? loadHiddenRooms(owner) : new Set(),
+    closedConversations: owner ? loadClosedConversations(owner) : new Set(),
+  };
 }
 
 function _loadOwnedFriends(
@@ -6355,6 +6387,7 @@ export const store = createStore<OnyxState>()(
               ..._loadOwnedCtcpConfig({ server, ourNick: newNick }),
               invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: newNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
+              ..._loadOwnedRoomListMemory({ server, ourNick: newNick }),
               friends: _loadOwnedFriends({ server, ourNick: newNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: newNick }),
@@ -6460,6 +6493,7 @@ export const store = createStore<OnyxState>()(
               ..._loadOwnedCtcpConfig({ server: srv, ourNick: get().ourNick }),
               invisibleMode: _loadOwnedInvisibleMode({ server: srv, ourNick: get().ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server: srv, ourNick: get().ourNick }),
+              ..._loadOwnedRoomListMemory({ server: srv, ourNick: get().ourNick }),
               friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
               userNotes: _loadOwnedUserNotes({ server: srv, ourNick: get().ourNick }),
@@ -7502,6 +7536,7 @@ export const store = createStore<OnyxState>()(
         set({ activeView: view });
       }
       if (view.kind === 'dm') {
+        get().reopenConversation(view.nick);
         get().captureUnreadDivider(view.nick);
         get().markRead(view.nick);
         // Clear the unread separator when switching to a DM
@@ -10768,6 +10803,7 @@ export const store = createStore<OnyxState>()(
               ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
               invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
+              ..._loadOwnedRoomListMemory({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
@@ -11003,6 +11039,12 @@ export const store = createStore<OnyxState>()(
                 channelAccessLoading.delete(key);
               }
               const leftStage = s.stageChannel?.toLowerCase() === key;
+              let hiddenRooms = s.hiddenRooms;
+              if (hiddenRooms.has(key)) {
+                hiddenRooms = new Set(hiddenRooms);
+                hiddenRooms.delete(key);
+                if (owner) saveHiddenRooms(hiddenRooms, owner);
+              }
               return {
                 channels,
                 channelFolders,
@@ -11010,6 +11052,7 @@ export const store = createStore<OnyxState>()(
                 activeChannelTopics,
                 channelAccess,
                 channelAccessLoading,
+                hiddenRooms,
                 ...(leftStage
                   ? {
                       stageChannel: null,
@@ -12290,6 +12333,9 @@ export const store = createStore<OnyxState>()(
             // classifier as replay reconciliation so live and retained rows
             // cannot disagree about unread/mention state.
             const classifiedHighlight = isChannelUnreadHighlight(get(), chatMsg);
+            if (shouldRevealHiddenRoom({ isSelf, classifiedHighlight })) {
+              get().unhideRoom(msgTarget);
+            }
             const effectiveHighlight = !isSelf
               && notifyLevel !== 'none'
               && classifiedHighlight;
@@ -12370,6 +12416,9 @@ export const store = createStore<OnyxState>()(
             // those to announcements instead. Self-echo files under msgTarget so
             // it lands in the conversation, not a DM with yourself.
             set(s => _addDMMessage(s, msgTarget, chatMsg, isSelf));
+            if (shouldReopenClosedConversation({ isSelf })) {
+              get().reopenConversation(msgTarget);
+            }
             if (isEncryptedDm) {
               // Decrypt in place; the DM notification fires post-decrypt (we
               // have no plaintext to show yet). Fires async after the store add.
@@ -12489,6 +12538,7 @@ export const store = createStore<OnyxState>()(
                 ..._loadOwnedCtcpConfig({ server, ourNick: newNick }),
                 invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: newNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
+              ..._loadOwnedRoomListMemory({ server, ourNick: newNick }),
                 friends: _loadOwnedFriends({ server, ourNick: newNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
                 userNotes: _loadOwnedUserNotes({ server, ourNick: newNick }),
@@ -14043,6 +14093,7 @@ export const store = createStore<OnyxState>()(
                 ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
                 invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: s.ourNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
+              ..._loadOwnedRoomListMemory({ server, ourNick: s.ourNick }),
                 friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
                 userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
@@ -14099,6 +14150,7 @@ export const store = createStore<OnyxState>()(
               ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
               invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
+              ..._loadOwnedRoomListMemory({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
@@ -15657,6 +15709,56 @@ export const store = createStore<OnyxState>()(
       });
     },
     isDMMuted: (nick) => get().mutedDMs.has(nick.toLowerCase()),
+
+    // ── Room / conversation list visibility (local; never PART) ─────────────
+    hiddenRooms: new Set(),
+    hideRoom: (channel) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const hiddenRooms = parseHiddenRooms([...s.hiddenRooms, channel]);
+        saveHiddenRooms(hiddenRooms, owner);
+        return { hiddenRooms };
+      });
+    },
+    unhideRoom: (channel) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const hiddenRooms = new Set(s.hiddenRooms);
+        hiddenRooms.delete(channel.trim().toLowerCase());
+        saveHiddenRooms(hiddenRooms, owner);
+        return { hiddenRooms };
+      });
+    },
+    isRoomHidden: (channel) => get().hiddenRooms.has(channel.toLowerCase()),
+    closedConversations: new Set(),
+    closeConversation: (nick) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const closedConversations = parseClosedConversations([...s.closedConversations, nick]);
+        saveClosedConversations(closedConversations, owner);
+        const active = s.activeView;
+        const leaveView = active.kind === 'dm'
+          && active.nick.toLowerCase() === nick.trim().toLowerCase();
+        return {
+          closedConversations,
+          ...(leaveView ? { activeView: { kind: 'home' as const } } : {}),
+        };
+      });
+    },
+    reopenConversation: (nick) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const closedConversations = new Set(s.closedConversations);
+        closedConversations.delete(nick.trim().toLowerCase());
+        saveClosedConversations(closedConversations, owner);
+        return { closedConversations };
+      });
+    },
+    isConversationClosed: (nick) => get().closedConversations.has(nick.toLowerCase()),
 
     // ── DM media panel ────────────────────────────────────────────────────────
     showDMMedia: false,

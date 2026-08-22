@@ -622,6 +622,56 @@ describe('ChannelSidebar accessibility', () => {
     expect(store.getState().voice?.callState ?? 'idle').toBe('idle');
   });
 
+  it('drops a hidden room from Rooms while keeping it joined', () => {
+    seed();
+    store.setState({
+      server: {
+        id: 'sidebar',
+        name: 'Sidebar',
+        network: 'Sidebar',
+        url: 'wss://sidebar.test/ws',
+        icon: '',
+        nick: 'me',
+        account: 'me',
+        connected: true,
+      },
+      ourNick: 'me',
+    });
+    store.getState().hideRoom('#alpha');
+
+    const { queryByRole, getByRole } = render(() => (
+      <ChannelSidebar mode="rooms" activeSection="rooms" />
+    ));
+    expect(queryByRole('button', { name: '#alpha' })).toBeNull();
+    expect(getByRole('button', { name: '#bravo, 3 unread, 2 mentions' })).toBeInTheDocument();
+    expect(store.getState().channels.has('#alpha')).toBe(true);
+    expect(getByRole('region', { name: 'Rooms · 3 joined' })).toBeInTheDocument();
+  });
+
+  it('drops a closed conversation from Messages without deleting it', () => {
+    seed();
+    store.setState({
+      server: {
+        id: 'sidebar',
+        name: 'Sidebar',
+        network: 'Sidebar',
+        url: 'wss://sidebar.test/ws',
+        icon: '',
+        nick: 'me',
+        account: 'me',
+        connected: true,
+      },
+      ourNick: 'me',
+    });
+    store.getState().closeConversation('dave');
+
+    const { queryByRole } = render(() => (
+      <ChannelSidebar mode="messages" activeSection="messages" />
+    ));
+    expect(queryByRole('button', { name: /DM with dave/ })).toBeNull();
+    expect(store.getState().dms.has('dave')).toBe(true);
+  });
+
   it('scopes rooms vs messages collections from mode', () => {
     seed();
 

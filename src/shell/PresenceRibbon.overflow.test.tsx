@@ -17,6 +17,8 @@ import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import type { CallState } from '@/lib/cadence-media/types';
 import { PresenceRibbon } from './PresenceRibbon';
+import { HarborConfirmHost } from './HarborConfirmSheet';
+import { closeRoomVerbConfirm } from './roomVerbConfirm';
 
 function validPeerKey(): string {
   const raw = new Uint8Array(65);
@@ -100,6 +102,7 @@ describe('PresenceRibbon commercial room header', () => {
 
   afterEach(() => {
     cleanup();
+    closeRoomVerbConfirm();
     store.setState(initialState, true);
     vi.restoreAllMocks();
   });
@@ -549,6 +552,87 @@ describe('PresenceRibbon commercial room header', () => {
       peerKeyChanges: new Map([['alice', { pinnedKey: 'old', newKey: 'new' }]]),
     });
     expect(screen.queryByTestId('ribbon-dm-private')).toBeNull();
+  });
+
+  it('exposes Mute, Hide room, and Leave room as three overflow verbs', () => {
+    const sendRaw = vi.fn();
+    seedChannel();
+    store.setState({
+      client: { sendRaw } as never,
+      server: {
+        id: 'ribbon',
+        name: 'Ribbon',
+        network: 'Ribbon',
+        url: 'wss://ribbon.test/ws',
+        icon: '',
+        nick: 'alice',
+        account: 'alice',
+        connected: true,
+      },
+      ourNick: 'alice',
+    });
+    render(() => (
+      <>
+        <PresenceRibbon />
+        <HarborConfirmHost />
+      </>
+    ));
+    openMore();
+
+    expect(screen.getByTestId('ribbon-mute-channel')).toHaveTextContent('Mute room');
+    expect(screen.getByTestId('ribbon-hide-room')).toHaveTextContent('Hide room');
+    expect(screen.getByTestId('ribbon-leave-room')).toHaveTextContent('Leave room');
+
+    fireEvent.click(screen.getByTestId('ribbon-hide-room'));
+    expect(store.getState().hiddenRooms.has('#general')).toBe(true);
+    expect(store.getState().channels.has('#general')).toBe(true);
+    expect(sendRaw).not.toHaveBeenCalled();
+
+    openMore();
+    fireEvent.click(screen.getByTestId('ribbon-leave-room'));
+    expect(sendRaw).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('harbor-leave-confirm'));
+    expect(sendRaw).toHaveBeenCalledWith('PART', '#general', 'Goodbye');
+  });
+
+  it('closes a DM from More without PARTing', () => {
+    const sendRaw = vi.fn();
+    store.setState({
+      ...initialState,
+      connectionStatus: 'connected',
+      server: {
+        id: 'ribbon',
+        name: 'Ribbon',
+        network: 'Ribbon',
+        url: 'wss://ribbon.test/ws',
+        icon: '',
+        nick: 'alice',
+        account: 'alice',
+        connected: true,
+      },
+      ourNick: 'alice',
+      client: { sendRaw } as never,
+      activeView: { kind: 'dm', nick: 'mira' },
+      dms: new Map([['mira', {
+        nick: 'mira',
+        account: null,
+        unread: 0,
+        highlights: 0,
+        messages: [],
+      }]]),
+    });
+    render(() => (
+      <>
+        <PresenceRibbon />
+        <HarborConfirmHost />
+      </>
+    ));
+    openMore();
+    expect(screen.getByTestId('ribbon-mute-dm')).toHaveTextContent('Mute conversation');
+    fireEvent.click(screen.getByTestId('ribbon-close-conversation'));
+    fireEvent.click(screen.getByTestId('harbor-close-confirm'));
+    expect(store.getState().closedConversations.has('mira')).toBe(true);
+    expect(sendRaw).not.toHaveBeenCalled();
   });
 
   it('keeps Private and Verify off rooms so group E2EE is not implied', () => {

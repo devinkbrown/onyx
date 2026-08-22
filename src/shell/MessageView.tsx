@@ -69,6 +69,7 @@ import { formatWebhookNoticeBody } from '@/lib/integrations/webhookBlockKit';
 import { MessageText } from '@/shell/message/MessageText';
 import { MessageMenu } from '@/shell/message/MessageMenu';
 import { activeMessageSearchResultId, openMessageSearchWithQuery } from './search/useMessageSearch';
+import { openRoomInviteShare } from './roomInviteShareState';
 import { TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';

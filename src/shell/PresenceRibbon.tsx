@@ -27,6 +27,8 @@ import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { Popover } from '@/primitives/index';
 import { ChannelSettings } from './ChannelSettings';
 import { openRoomInviteShare } from './roomInviteShareState';
+import { openCloseConversationConfirm, openLeaveRoomConfirm } from './roomVerbConfirm';
+import { ROOM_VERB_COPY } from '@/lib/roomListVerbs';
 import { ChannelNotifyControl } from './ChannelNotifyControl';
 import { NotificationCenter } from './NotificationCenter';
 import { PresenceHeatline } from './PresenceHeatline';
@@ -181,6 +183,8 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const speakingNicks = useStore((s) => s.speakingNicks);
   const mutedNicks = useStore((s) => s.mutedNicks);
   const channelNotify = useStore((s) => s.channelNotify);
+  const hiddenRooms = useStore((s) => s.hiddenRooms);
+  const mutedDMs = useStore((s) => s.mutedDMs);
   const [now, setNow] = createSignal(Date.now());
   // Alerts are silenced by manual DND, a timed snooze, or the quiet-hours window.
   const dndEnabled = useStore((s) => s.dndEnabled);
@@ -1014,9 +1018,77 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       </svg>
                       <span>
                         {channelNotifyMode(channelNotify(), settingsChannel() ?? '') === 'mute'
-                          ? 'Unmute room'
-                          : 'Mute room'}
+                          ? ROOM_VERB_COPY.mute.unmuteLabel
+                          : ROOM_VERB_COPY.mute.roomLabel}
                       </span>
+                    </button>
+                    <button
+                      type="button"
+                      class="shell-ribbon-more-item shell-ribbon-more-item--verb"
+                      role="menuitem"
+                      data-testid="ribbon-hide-room"
+                      aria-label={
+                        hiddenRooms().has((settingsChannel() ?? '').toLowerCase())
+                          ? `Show ${settingsChannel()}`
+                          : `Hide ${settingsChannel()}`
+                      }
+                      onClick={() => {
+                        const ch = settingsChannel();
+                        closeMoreThen(() => {
+                          if (!ch) return;
+                          if (getState().isRoomHidden(ch)) {
+                            getState().unhideRoom(ch);
+                            getState().addToast({
+                              variant: 'info',
+                              title: ROOM_VERB_COPY.hide.showLabel,
+                              description: 'This room is back on your list.',
+                            });
+                            return;
+                          }
+                          getState().hideRoom(ch);
+                          getState().addToast({
+                            variant: 'info',
+                            title: ROOM_VERB_COPY.hide.label,
+                            description: ROOM_VERB_COPY.hide.hint,
+                          });
+                        });
+                      }}
+                      onKeyDown={onMoreMenuKeyDown}
+                    >
+                      <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" />
+                        <circle cx="12" cy="12" r="2.5" />
+                        <path d="M4 20 20 4" />
+                      </svg>
+                      <span>
+                        {hiddenRooms().has((settingsChannel() ?? '').toLowerCase())
+                          ? ROOM_VERB_COPY.hide.showLabel
+                          : ROOM_VERB_COPY.hide.label}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      class="shell-ribbon-more-item shell-ribbon-more-item--verb shell-ribbon-more-item--leave"
+                      role="menuitem"
+                      data-testid="ribbon-leave-room"
+                      aria-label={`Leave ${settingsChannel()}`}
+                      onClick={() => {
+                        const ch = settingsChannel();
+                        closeMoreThen(() => {
+                          if (!ch) return;
+                          openLeaveRoomConfirm(ch);
+                        });
+                      }}
+                      onKeyDown={onMoreMenuKeyDown}
+                    >
+                      <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 6H5v12h4" />
+                        <path d="M14 12H8" />
+                        <path d="m16 8 4 4-4 4" />
+                      </svg>
+                      <span>{ROOM_VERB_COPY.leave.label}</span>
                     </button>
                     <button
                       type="button"
@@ -1151,6 +1223,71 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       aria-labelledby="ribbon-more-conv-label"
                     >
                       {jumpDateMenuItem(`Jump to date in DM with ${nick()}`)}
+                      <button
+                        type="button"
+                        class="shell-ribbon-more-item shell-ribbon-more-item--verb"
+                        role="menuitem"
+                        data-testid="ribbon-mute-dm"
+                        aria-label={
+                          mutedDMs().has(nick().toLowerCase())
+                            ? `Unmute ${nick()}`
+                            : `Mute ${nick()}`
+                        }
+                        onClick={() => {
+                          const peer = nick();
+                          closeMoreThen(() => {
+                            if (getState().isDMMuted(peer)) {
+                              getState().unmuteDM(peer);
+                              getState().addToast({
+                                variant: 'info',
+                                title: ROOM_VERB_COPY.mute.dmUnmuteLabel,
+                                description: 'Conversation notifications resume on this device.',
+                              });
+                              return;
+                            }
+                            getState().muteDM(peer);
+                            getState().addToast({
+                              variant: 'info',
+                              title: ROOM_VERB_COPY.mute.dmLabel,
+                              description: ROOM_VERB_COPY.mute.hint,
+                            });
+                          });
+                        }}
+                        onKeyDown={onMoreMenuKeyDown}
+                      >
+                        <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                          <path d="m22 9-6 6" />
+                          <path d="m16 9 6 6" />
+                        </svg>
+                        <span>
+                          {mutedDMs().has(nick().toLowerCase())
+                            ? ROOM_VERB_COPY.mute.dmUnmuteLabel
+                            : ROOM_VERB_COPY.mute.dmLabel}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        class="shell-ribbon-more-item shell-ribbon-more-item--verb"
+                        role="menuitem"
+                        data-testid="ribbon-close-conversation"
+                        aria-label={`Close conversation with ${nick()}`}
+                        onClick={() => {
+                          const peer = nick();
+                          closeMoreThen(() => openCloseConversationConfirm(peer));
+                        }}
+                        onKeyDown={onMoreMenuKeyDown}
+                      >
+                        <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M6 6h12v12H6z" />
+                          <path d="m9 9 6 6" />
+                          <path d="m15 9-6 6" />
+                        </svg>
+                        <span>{ROOM_VERB_COPY.closeConversation.label}</span>
+                      </button>
                     </div>
                   </div>
                 )}

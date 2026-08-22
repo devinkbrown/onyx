@@ -79,6 +79,8 @@ import {
 } from '@/lib/export/conversationExport';
 import { BridgeStatusBadge } from './BridgeStatusBadge';
 import { RoomInsightsStrip } from './RoomInsightsStrip';
+import { openLeaveRoomConfirm } from './roomVerbConfirm';
+import { ROOM_VERB_COPY } from '@/lib/roomListVerbs';
 
 // Common simple channel flags exposed as toggles. Letters match Onyx Server's
 // CHANMODES group D (flags) — see ISUPPORT `imnstCTNMSgWOA`.
@@ -342,7 +344,10 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
   // ── Local transcript export (this device only; never server-complete) ────
   const [exportStatus, setExportStatus] = createSignal('');
-  const [leaveConfirming, setLeaveConfirming] = createSignal(false);
+  const hiddenRooms = useStore((s) => s.hiddenRooms);
+  const roomHidden = createMemo(() =>
+    hiddenRooms().has((channel()?.name ?? local.channel).toLowerCase()),
+  );
   const messageCount = createMemo(() => channel()?.messages.length ?? 0);
 
   function exportTranscript(format: 'txt' | 'json'): void {
@@ -801,64 +806,61 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
           </span>
         </section>
 
-        {/* ── Leave room ── */}
-        <section class="shell-chset-section" aria-labelledby="chset-leave-heading">
-          <h3 id="chset-leave-heading" class="shell-chset-heading">Leave room</h3>
-          <p class="shell-chset-hint" id="chset-leave-hint">
-            Leaves {channel()?.name ?? local.channel} on this connection. You can rejoin later from Browse rooms. Local scrollback stays on this device.
+        {/* ── Hide / leave (distinct from mute) ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-hide-heading">
+          <h3 id="chset-hide-heading" class="shell-chset-heading">{ROOM_VERB_COPY.hide.label}</h3>
+          <p class="shell-chset-hint" id="chset-hide-hint">
+            {ROOM_VERB_COPY.hide.hint}
           </p>
-          <Show
-            when={leaveConfirming()}
-            fallback={
-              <Button
-                type="button"
-                variant="danger"
-                size="sm"
-                data-testid="chset-leave"
-                aria-describedby="chset-leave-hint"
-                disabled={!isConnected()}
-                onClick={() => setLeaveConfirming(true)}
-              >
-                Leave room
-              </Button>
-            }
+          <Button
+            type="button"
+            variant="ghost"
+            size="md"
+            data-testid="chset-hide"
+            aria-describedby="chset-hide-hint"
+            onClick={() => {
+              const name = channel()?.name ?? local.channel;
+              if (getState().isRoomHidden(name)) {
+                getState().unhideRoom(name);
+                getState().addToast({
+                  variant: 'info',
+                  title: ROOM_VERB_COPY.hide.showLabel,
+                  description: 'This room is back on your list.',
+                });
+                return;
+              }
+              getState().hideRoom(name);
+              getState().addToast({
+                variant: 'info',
+                title: ROOM_VERB_COPY.hide.label,
+                description: ROOM_VERB_COPY.hide.hint,
+              });
+            }}
           >
-            <div
-              class="shell-chset-inline-actions"
-              role="group"
-              aria-label={`Confirm leave ${channel()?.name ?? local.channel}`}
-            >
-              <Button
-                type="button"
-                variant="danger"
-                size="sm"
-                data-testid="chset-leave-confirm"
-                disabled={!isConnected()}
-                onClick={() => {
-                  const name = channel()?.name ?? local.channel;
-                  getState().partChannel(name);
-                  setLeaveConfirming(false);
-                  local.onOpenChange(false);
-                  getState().addToast({
-                    variant: 'info',
-                    title: `Left ${name}`,
-                    description: 'You left this room on this connection.',
-                  });
-                }}
-              >
-                Confirm leave
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                data-testid="chset-leave-cancel"
-                onClick={() => setLeaveConfirming(false)}
-              >
-                Stay
-              </Button>
-            </div>
-          </Show>
+            {roomHidden() ? ROOM_VERB_COPY.hide.showLabel : ROOM_VERB_COPY.hide.label}
+          </Button>
+        </section>
+
+        <section class="shell-chset-section" aria-labelledby="chset-leave-heading">
+          <h3 id="chset-leave-heading" class="shell-chset-heading">{ROOM_VERB_COPY.leave.label}</h3>
+          <p class="shell-chset-hint" id="chset-leave-hint">
+            {ROOM_VERB_COPY.leave.body(channel()?.name ?? local.channel)}
+          </p>
+          <Button
+            type="button"
+            variant="danger"
+            size="md"
+            data-testid="chset-leave"
+            aria-describedby="chset-leave-hint"
+            disabled={!isConnected()}
+            onClick={() => {
+              const name = channel()?.name ?? local.channel;
+              local.onOpenChange(false);
+              openLeaveRoomConfirm(name);
+            }}
+          >
+            {ROOM_VERB_COPY.leave.label}
+          </Button>
         </section>
 
         {/* ── Notifications (personal) ── */}

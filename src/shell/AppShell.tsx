@@ -44,6 +44,7 @@ const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
 const WhoisSheet = lazy(() => import('./WhoisSheet').then((m) => ({ default: m.WhoisSheet })));
 import { PresenceRibbon } from './PresenceRibbon';
 import { RoomInviteShareHost } from './RoomInviteShare';
+import { HarborConfirmHost } from './HarborConfirmSheet';
 import { StagePanel } from './StagePanel';
 import { GuestClaimPrompt } from './GuestClaimPrompt';
 import { FirstRunNotifyPrompt } from './FirstRunNotifyPrompt';
@@ -1581,6 +1582,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
       </Show>
 
       <RoomInviteShareHost />
+      <HarborConfirmHost />
 
       {/* Keyboard shortcuts help overlay — opened with "?" or Home shortcuts action */}
       <Show when={showKeyboardShortcuts()}>
