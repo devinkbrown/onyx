@@ -10,10 +10,10 @@ const onyxosCss = readFileSync(resolve(__dirname, 'onyxos.css'), 'utf8');
 /** Manifest order for the shared primary navigation. */
 const PRIMARY_LINKS = [
   ['About', '/about/'],
-  ['OnyxOS', '/onyxos/'],
-  ['Roadmap', '/roadmap/'],
-  ['Status', '/status/'],
   ['Downloads', '/download/'],
+  ['Status', '/status/'],
+  ['Roadmap', '/roadmap/'],
+  ['OnyxOS', '/onyxos/'],
 ] as const;
 
 const STAGE_TABS = ['01 · Oracle', '02 · Clean room', '03 · Gate', '04 · Boot'] as const;

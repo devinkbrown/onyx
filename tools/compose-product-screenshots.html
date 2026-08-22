@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Onyx product screenshot composition</title>
+  <style>
+    :root {
+      --ink: #05070a;
+      --stone: #0c1016;
+      --stone-2: #121820;
+      --stone-3: #1a222c;
+      --paper: #e6e8ec;
+      --paper-dim: #8b939e;
+      --paper-mute: #5c6570;
+      --lapis: #5ba3c9;
+      --on-accent: #061018;
+      --ok: #5bc78e;
+      --line: color-mix(in oklab, var(--paper) 12%, transparent);
+      --sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+      --mono: ui-monospace, "JetBrains Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--ink); color: var(--paper); font-family: var(--sans); }
+    .shell {
+      display: grid;
+      grid-template-columns: 72px 260px 1fr;
+      height: 100%;
+    }
+    .rail {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 0;
+      background: color-mix(in oklab, var(--stone) 42%, var(--ink));
+      border-right: 1px solid var(--line);
+    }
+    .rail i {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: color-mix(in oklab, var(--paper-mute) 28%, transparent);
+    }
+    .rail i.active { background: color-mix(in oklab, var(--lapis) 55%, var(--stone)); }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      background: var(--stone);
+      border-right: 1px solid var(--line);
+    }
+    .sidebar-head { padding: 16px 16px 10px; font-size: 13px; letter-spacing: 0.04em; color: var(--paper-dim); }
+    .room {
+      margin: 4px 10px;
+      padding: 9px 10px;
+      border-radius: 6px;
+      color: var(--paper-dim);
+      font-size: 14px;
+    }
+    .room.active { background: color-mix(in oklab, var(--lapis) 16%, var(--stone-2)); color: var(--paper); }
+    .room.unread::after {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin-left: 8px;
+      border-radius: 50%;
+      background: var(--lapis);
+      vertical-align: middle;
+    }
+    .conversation { display: flex; flex-direction: column; min-width: 0; background: var(--ink); }
+    .roombar {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--stone);
+    }
+    .roombar strong { display: block; font-size: 16px; }
+    .roombar small { color: var(--paper-dim); font-size: 12px; }
+    .stage {
+      margin: 12px 18px 0;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: color-mix(in oklab, var(--lapis) 10%, var(--stone));
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .stage strong { display: block; font-size: 13px; }
+    .stage small { color: var(--paper-dim); font-size: 12px; }
+    .stage em { font-style: normal; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lapis); }
+    .thread { flex: 1; padding: 16px 18px; display: grid; align-content: start; gap: 14px; }
+    .msg time { display: block; color: var(--paper-mute); font: 600 11px/1.4 var(--mono); margin-bottom: 3px; }
+    .msg b { color: var(--paper); }
+    .msg p { margin: 0; color: var(--paper-dim); font-size: 15px; line-height: 1.45; }
+    .composer {
+      margin: 0 18px 16px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--paper-mute);
+      background: var(--stone);
+    }
+    @media (max-width: 520px) {
+      .shell { grid-template-columns: 1fr; }
+      .rail, .sidebar { display: none; }
+    }
+    .label {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      font: 700 10px/1 var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--paper-mute);
+    }
+  </style>
+</head>
+<body>
+  <div class="label">Static preview · not live content</div>
+  <div class="shell">
+    <div class="rail" aria-hidden="true"><i class="active"></i><i></i><i></i></div>
+    <aside class="sidebar">
+      <div class="sidebar-head">Rooms</div>
+      <div class="room">Home</div>
+      <div class="room active">Weekend plans</div>
+      <div class="room unread">Studio hours</div>
+      <div class="room">@mika</div>
+    </aside>
+    <section class="conversation">
+      <header class="roombar">
+        <strong>Weekend plans</strong>
+        <small>Saturday dinner and a porch call</small>
+      </header>
+      <div class="stage">
+        <div>
+          <strong>Porch call</strong>
+          <small>Voice and video · join when ready</small>
+        </div>
+        <em>Call</em>
+      </div>
+      <div class="thread">
+        <div class="msg"><time>19:42</time><p><b>mika</b> dinner’s at 7:30 if that still works</p></div>
+        <div class="msg"><time>19:43</time><p><b>you</b> perfect — I’ll grab bread on the way</p></div>
+        <div class="msg"><time>19:44</time><p><b>jun</b> joining the porch call after the dishes</p></div>
+      </div>
+      <div class="composer">Message Weekend plans</div>
+    </section>
+  </div>
+</body>
+</html>

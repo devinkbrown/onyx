@@ -31,7 +31,7 @@ test.describe('public route lifecycle announcer', () => {
   });
 
   test('keeps one persistent live region, stays silent on first paint, and announces one settled route', async ({ page }) => {
-    const titleOnLanding = 'Onyx — live rooms, messages, and calls';
+    const titleOnLanding = 'Onyx — a room for your people';
     await page.goto('/');
     await expect(page).toHaveTitle(titleOnLanding);
 

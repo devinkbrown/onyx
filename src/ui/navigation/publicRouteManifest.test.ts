@@ -172,6 +172,7 @@ describe('PUBLIC_ROUTE_MANIFEST', () => {
 
   it('looks up canonical metadata by ID', () => {
     expect(publicRouteById('download')).toMatchObject({ href: '/download/', path: '/download', label: 'Downloads' });
+    expect(publicRouteById('about')).toMatchObject({ href: '/about/', path: '/about', label: 'About' });
   });
 
   it('normalizes path identity before lookup without promoting router aliases', () => {

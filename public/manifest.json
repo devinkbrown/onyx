@@ -1,7 +1,7 @@
 {
   "name": "Onyx",
   "short_name": "Onyx",
-  "description": "Open rooms, local-first memory, honest media security, and live Onyx mesh telemetry.",
+  "description": "Rooms, calls, and private DMs on the Onyx mesh — without ads.",
   "id": "/app",
   "start_url": "/app/",
   "scope": "/",
@@ -54,14 +54,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Onyx desktop connect screen"
+      "label": "Onyx desktop room"
     },
     {
       "src": "/screenshots/app-mobile.png",
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Onyx mobile connect screen"
+      "label": "Onyx mobile chat"
     }
   ]
 }

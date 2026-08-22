@@ -24,7 +24,7 @@ Companions:
 |-------|--------|----------|
 | Public Landing route ships as the marketing entry | **DONE** | `src/routes/Landing.tsx` + tests; web build |
 | Company-site contract (one Deep Current product, audience paths, gated IA) | **DONE** | `docs/PUBLIC_COMPANY_SITE.md` |
-| Home proof order: browser → pillars → live → audiences → trust/tech | **DONE** | Landing section order + tests |
+| Home proof order: invite → room preview → trust → community prose → extras | **DONE** | Landing section order + tests |
 | Product pillars are Rooms / Messages / Calls / Continuity | **DONE** | Landing product board; Continuity = resume + local history + on-device import |
 | Desktop installers available on Home | **PENDING** | Explicitly gated; Home says browser-first only until Phase 6 green |
 | Browser SPA is the same product as desktop-hosted SPA | **DONE** | Single Vite `dist/`; no frontend fork |

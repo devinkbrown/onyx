@@ -11,20 +11,21 @@ for (const viewport of [
     const primary = page.locator('.public-frame__open');
     const preview = page.locator('[data-product-preview]');
     const current = page.locator('[data-home-current]');
-    const evidence = page.locator('[data-home-evidence]');
+    const trust = page.locator('[data-home-trust]');
     await expect(primary).toBeVisible();
     await expect(preview).toBeVisible();
-    await expect(preview.getByText('Static product preview')).toBeVisible();
-    await expect(evidence).toBeVisible();
+    await expect(preview.getByText('Static preview')).toBeVisible();
+    await expect(trust).toBeVisible();
     await expect(current.locator('li')).toHaveCount(4);
+    await expect(page.locator('[data-home-evidence]')).toHaveCount(0);
 
     const geometry = await page.evaluate(() => {
       const cta = document.querySelector<HTMLElement>('.public-frame__open')!;
       const preview = document.querySelector<HTMLElement>('[data-product-preview]')!;
-      const evidence = document.querySelector<HTMLElement>('[data-home-evidence]')!;
+      const trust = document.querySelector<HTMLElement>('[data-home-trust]')!;
       const ctaRect = cta.getBoundingClientRect();
       const previewRect = preview.getBoundingClientRect();
-      const evidenceRect = evidence.getBoundingClientRect();
+      const trustRect = trust.getBoundingClientRect();
       return {
         clientWidth: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth,
@@ -33,8 +34,8 @@ for (const viewport of [
         ctaHeight: ctaRect.height,
         previewLeft: previewRect.left,
         previewRight: previewRect.right,
-        evidenceLeft: evidenceRect.left,
-        evidenceRight: evidenceRect.right,
+        trustLeft: trustRect.left,
+        trustRight: trustRect.right,
       };
     });
 
@@ -44,8 +45,8 @@ for (const viewport of [
     expect(geometry.ctaHeight).toBeGreaterThanOrEqual(44);
     expect(geometry.previewLeft).toBeGreaterThanOrEqual(0);
     expect(geometry.previewRight).toBeLessThanOrEqual(viewport.width);
-    expect(geometry.evidenceLeft).toBeGreaterThanOrEqual(0);
-    expect(geometry.evidenceRight).toBeLessThanOrEqual(viewport.width);
+    expect(geometry.trustLeft).toBeGreaterThanOrEqual(0);
+    expect(geometry.trustRight).toBeLessThanOrEqual(viewport.width);
   });
 }
 

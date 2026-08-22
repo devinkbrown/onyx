@@ -58,13 +58,15 @@ describe('PWA manifest', () => {
     expect(title).toBe('Onyx — a room for your people');
     expect(description).toMatch(/Open Onyx in your browser/i);
     expect(description).toMatch(/rooms, messages, calls/i);
+    expect(description).toMatch(/private DMs/i);
+    expect(description).toMatch(/without ads/i);
     expect(description).toMatch(/desktop and mobile/i);
     expect(description).toMatch(/native download/i);
     expect(ogDescription).toBe(description);
     expect(twitterDescription).toBe(description);
 
     // Premature native-ship promises must stay out of entry/share metadata.
-    // Keep patterns specific so form-factor labels like "desktop connect screen"
+    // Keep patterns specific so form-factor labels like "desktop room"
     // in the install manifest are not false positives.
     for (const surface of [entryDocument, entryMetadata]) {
       expect(surface).not.toMatch(/desktop apps are part of the launch/i);
@@ -94,6 +96,8 @@ describe('PWA manifest', () => {
     const retiredScreenshotDigests = new Set([
       'c1542f755f1547ea55895c4f6fe330c40f6a3b2a8851ba0c3d66fae162b81cde',
       'ea3f78127f21dfb9b19151f249575e83da39b88406e568622d284677bd23e800',
+      'a64646f03bc3b5c9dfb269b5299c881aee464248f371ebe4816033aedeba5f3d',
+      '4c4b218173b70b15e7f16ba9e52be8b390f77d0f6da45e2f05d4837c849ed640',
     ]);
 
     expect(manifest.shortcuts?.map((shortcut) => shortcut.url)).toEqual(['/app/', '/status/', '/stats/']);
