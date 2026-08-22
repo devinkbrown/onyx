@@ -25,6 +25,7 @@ import {
 } from '@/lib/topics/topicReadLedger';
 import { isValidTopicLabel, parseTopicRegistry, TOPIC_PROP } from '@/lib/topics/topics';
 import { followed, isFollowed, toggleFollow } from '@/lib/notifications/followed';
+import { matchesAnyKeyword } from '@/lib/notifications/keywordMatch';
 import {
   peerReviewedAnchors,
   planReviewedAnchorRecall,
@@ -1054,8 +1055,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
       .filter(Boolean);
     const isHighlight = (message: ChatMessage): boolean => {
       if (message.highlight || /@(everyone|here)\b/i.test(message.text)) return true;
-      const lower = message.text.toLowerCase();
-      return words.some((word) => lower.includes(word));
+      return matchesAnyKeyword(message.text, words);
     };
     return projectRoomTopicUnread(view.channel, all, topicReadMarkers(), {
       fallbackBoundaryIndex: boundaryIndex < 0 ? all.length : boundaryIndex,

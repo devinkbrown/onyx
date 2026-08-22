@@ -27,6 +27,7 @@ import {
 import { preferredTranslationTarget } from '@/lib/intelligence/localLanguage';
 import { CalmModeControl } from '@/shell/CalmModeControl';
 import { IgnoredUsersControl } from '@/shell/IgnoredUsersControl';
+import { KeywordListControl } from './KeywordListControl';
 import { moveRadioGroup } from '@/theme/publicLooks';
 
 const DENSITY_LABELS: Record<Density, string> = { compact: 'Compact', cozy: 'Cozy', roomy: 'Roomy' };
@@ -65,6 +66,7 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
         <div class="you-settings-item__body">
           <p class="you-settings-hint">How loudly this device tells you about mentions and messages.</p>
           <CalmModeControl />
+          <KeywordListControl />
         </div>
       </details>
 
