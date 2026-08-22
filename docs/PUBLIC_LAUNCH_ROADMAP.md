@@ -39,7 +39,7 @@ Companions:
 | Public desktop downloads | **PARTIAL** | `/download` six-lane surface (win/linux/macos-x86_64/macos-arm64/fbsd/obsd) + site-local `/downloads/v0.1.3/` staging; artifacts not committed; deploy stages only with explicit env; macOS via matching-arch Darwin/GHA matrix |
 | Desktop deploy to production hosts | **PENDING** | Only web `deploy.sh` → `out/` for the SPA site |
 | Dedicated Product / Communities / Organizations / Trust routes | **PENDING** | Contracted in `PUBLIC_COMPANY_SITE.md`; Home has pillars + audience entries only |
-| Contact / legal pages | **PENDING** | Gated — no fake legal copy |
+| Contact / legal pages | **PARTIAL** | Founder-voice `/privacy`, `/guidelines`, `/contact` ship; no invented Terms, mailbox, or binding legal |
 | Chromium/CEF parity | **NOT CLAIMED** | System WebView only |
 | Zig 0.17-dev as host toolchain | **DONE (pinned)** | Official pin `0.17.0-dev.1476+91a29d707` + pnpm patch; Linux Xvfb runtime is green, while other platform runtimes/signing/updater/deploy remain separate |
 
@@ -57,7 +57,7 @@ Companions:
 | Audience proof paths on Home (incl. Gaming & Organizations) | **DONE** (entries only; dedicated routes gated) |
 | Desktop-download CTAs claiming shippable installers | **PARTIAL** — Home may link `/download/` for unsigned native packages; no signed multi-platform ship claim |
 | About / product explanation pages | **PARTIAL** — `/about/` exists; Product/Communities/Organizations/Trust pages gated |
-| Contact / legal | **PENDING** — do not invent copy |
+| Contact / legal | **PARTIAL** — short facts + house rules; no Terms/arbitration/mailbox invention |
 
 ---
 
@@ -168,7 +168,7 @@ Current matrix (`PlatformCapabilities`): `bridge`, `notifications`, `deepLinks`,
 | Trust page (protection honesty + status + ownership) | **PENDING** |
 | Technology / Onyx Server page | **PENDING** (About/roadmap partial today) |
 | Download page (browser/PWA now; six unsigned native lanes) | **PARTIAL** — `/download/` ships win/linux/macos Intel+Apple Silicon/fbsd/obsd truthful surface; signed multi-platform still pending |
-| Short contact + real legal | **PENDING** |
+| Short contact + real legal | **PARTIAL** — `/contact`, `/privacy`, `/guidelines`; binding Terms still skipped |
 
 ---
 

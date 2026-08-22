@@ -37,7 +37,7 @@ test('keeps the PublicFrame About route compact and navigable at 400% zoom', asy
   const primary = header.getByRole('navigation', { name: 'Primary navigation' });
   await expect(primary).toBeVisible();
   const primaryNames = (await primary.getByRole('link').allTextContents()).map((name) => name.trim());
-  expect(primaryNames).toEqual(['About', 'Join', 'Download']);
+  expect(primaryNames).toEqual(['About', 'Download']);
   expect(primaryNames).not.toContain('Stats');
   await expect(primary.getByRole('link', { name: 'Stats' })).toHaveCount(0);
 

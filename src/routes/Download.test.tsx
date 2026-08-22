@@ -63,7 +63,8 @@ describe('downloadMeta', () => {
     expect(MACOS_COMING_SOON.statusLabel).toMatch(/coming soon/i);
     expect(MACOS_COMING_SOON.arches.map((a) => a.arch)).toEqual(['x86_64', 'arm64']);
     expect(MACOS_COMING_SOON.summary).toMatch(/no DMG|not.*yet|coming/i);
-    expect(MACOS_COMING_SOON.honesty).toMatch(/browser|PWA/i);
+    expect(MACOS_COMING_SOON.honesty).toMatch(/browser|Home Screen/i);
+    expect(MACOS_COMING_SOON.honesty).toMatch(/No store/);
     expect(plannedMacosAssetBase('x86_64')).toBe(
       'onyx-0.1.3-macos-x86_64-ReleaseFast-unsigned',
     );
@@ -180,12 +181,12 @@ describe('Download page', () => {
     window.history.replaceState(null, '', '/install/');
     const { getByRole } = render(() => <Download />);
 
-    expect(document.title).toBe('Install Onyx on this device — browser first');
+    expect(document.title).toBe('Get Onyx on this device — browser first');
     expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
       'href',
-      'http://localhost:3000/install/',
+      'http://localhost:3000/download/',
     );
-    expect(getByRole('heading', { name: 'Install Onyx on this device' })).toBeInTheDocument();
+    expect(getByRole('heading', { name: 'Get Onyx on this device' })).toBeInTheDocument();
     expect(getByRole('heading', { name: /install on linux/i })).toBeInTheDocument();
     expect(getByRole('main', { name: 'Get Onyx' })).toHaveAttribute('id', 'public-main');
     expect(within(getByRole('navigation', { name: 'Primary navigation' }))
@@ -243,7 +244,9 @@ describe('Download page', () => {
     expect(getByTestId('dl-macos-open-app')).toHaveClass('r-btn', 'ghost');
     expect(getByTestId('dl-macos-open-app')).not.toHaveClass('primary');
     expect(queryByTestId('dl-macos-pwa-hint')).not.toBeInTheDocument();
-    expect(getByTestId('dl-macos-honesty').textContent).toMatch(/PWA|browser/i);
+    expect(getByTestId('dl-macos-honesty').textContent).toMatch(/Home Screen|browser/i);
+    expect(getByTestId('download-page').textContent).toMatch(/No store/);
+    expect(getByTestId('download-page').textContent).not.toMatch(/beforeinstallprompt|iOS push|App Store|Play Store/i);
     expect(getByTestId('download-page').textContent).toMatch(/coming soon/i);
     expect(getByTestId('download-page').textContent).toMatch(/never fabricated/i);
     expect(getByTestId('download-page').textContent).toMatch(/does not claim third-party virus-free/i);

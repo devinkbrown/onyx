@@ -52,9 +52,22 @@ const expected = {
       'Get Onyx on this device in your browser. Keep it here from a supporting browser. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
   },
   install: {
-    title: 'Install Onyx on this device — browser first',
+    title: 'Get Onyx on this device — browser first',
     description:
-      'Install Onyx in your browser, or keep it on this device. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
+      'Get Onyx on this device in your browser. Keep it here from a supporting browser. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
+    canonical: 'https://eshmaki.me/download/',
+  },
+  privacy: {
+    title: 'Onyx privacy — what stays here',
+    description: 'Short facts about what the server stores, history on this device, and that this site does not sell ads.',
+  },
+  guidelines: {
+    title: 'Onyx house rules',
+    description: 'How we treat each other in the rooms, how to report harm, and that Onyx is not 911.',
+  },
+  contact: {
+    title: 'Onyx contact',
+    description: 'How to reach the project for ordinary questions and security reports. No invented mailbox.',
   },
   accessibility: {
     title: 'Onyx accessibility — access is a requirement',
@@ -196,7 +209,9 @@ describe('SPA route entrypoint materializer', () => {
     for (const [route, meta] of Object.entries(expected)) {
       const html = readFileSync(join(dist, route, 'index.html'), 'utf8');
       const document = new DOMParser().parseFromString(html, 'text/html');
-      const canonical = `https://eshmaki.me/${route}/`;
+      const canonical = 'canonical' in meta && typeof meta.canonical === 'string'
+        ? meta.canonical
+        : `https://eshmaki.me/${route}/`;
 
       expect(html, route).not.toMatch(/IRCXNet/i);
       expect(document.title, route).toBe(meta.title);
@@ -213,25 +228,29 @@ describe('SPA route entrypoint materializer', () => {
       expect(document.querySelector('meta[property="og:site_name"]')?.getAttribute('content'), route)
         .toBe('Onyx');
       expect(document.querySelector('meta[property="og:image"]')?.getAttribute('content'), route)
-        .toBe('https://eshmaki.me/icon-512.png');
+        .toBe('https://eshmaki.me/og.png');
       expect(document.querySelector('meta[property="og:image:width"]')?.getAttribute('content'), route)
-        .toBe('512');
+        .toBe('1200');
       expect(document.querySelector('meta[property="og:image:height"]')?.getAttribute('content'), route)
-        .toBe('512');
+        .toBe('630');
       expect(document.querySelector('meta[property="og:image:alt"]')?.getAttribute('content'), route)
-        .toMatch(/Onyx water-current mark/i);
+        .toMatch(/quiet harbor/i);
+      expect(document.querySelector('meta[name="twitter:card"]')?.getAttribute('content'), route)
+        .toBe('summary_large_image');
       expect(document.querySelector('meta[name="twitter:title"]')?.getAttribute('content'), route)
         .toBe(meta.title);
       expect(document.querySelector('meta[name="twitter:description"]')?.getAttribute('content'), route)
         .toBe(meta.description);
       expect(document.querySelector('meta[name="twitter:image"]')?.getAttribute('content'), route)
-        .toBe('https://eshmaki.me/icon-512.png');
+        .toBe('https://eshmaki.me/og.png');
       expect(document.querySelector('meta[name="twitter:image:alt"]')?.getAttribute('content'), route)
-        .toMatch(/Onyx water-current mark/i);
+        .toMatch(/quiet harbor/i);
       expect(document.querySelector('link[rel="icon"]')?.getAttribute('href'), route)
         .toBe('/favicon.ico');
       expect(document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href'), route)
-        .toBe('/icon-192.png');
+        .toBe('/apple-touch-icon.png');
+      expect(document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('sizes'), route)
+        .toBe('180x180');
     }
   });
 

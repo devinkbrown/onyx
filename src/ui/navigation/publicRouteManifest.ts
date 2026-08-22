@@ -24,7 +24,10 @@ export type PublicRouteId =
   | 'invite'
   | 'appearance'
   | 'guides'
-  | 'community';
+  | 'community'
+  | 'privacy'
+  | 'guidelines'
+  | 'contact';
 
 export type PublicRouteMetadata = {
   id: PublicRouteId;
@@ -53,16 +56,19 @@ type PublicRouteSeed = Omit<PublicRouteMetadata, 'href'>;
 const PUBLIC_ROUTE_SEEDS = [
   { id: 'home', path: '/', label: 'Home', group: 'product', placement: 'brand', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'about', path: '/about', label: 'About', group: 'product', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 0 },
-  { id: 'download', path: '/download', label: 'Download', group: 'product', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 2 },
+  { id: 'download', path: '/download', label: 'Download', group: 'product', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 1 },
   { id: 'onyxos', path: '/onyxos', label: 'OnyxOS', group: 'product', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'status', path: '/status', label: 'Status', group: 'trust', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'accessibility', path: '/accessibility', label: 'Accessibility', group: 'trust', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
+  { id: 'privacy', path: '/privacy', label: 'Privacy', group: 'trust', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
+  { id: 'guidelines', path: '/guidelines', label: 'House rules', group: 'trust', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
+  { id: 'contact', path: '/contact', label: 'Contact', group: 'trust', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'integrations', path: '/integrations', label: 'Integrations', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'agents', path: '/agents', label: 'Agents', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'glossary', path: '/glossary', label: 'Glossary', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'stats', path: '/stats', label: 'Stats', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'roadmap', path: '/roadmap', label: 'Roadmap', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
-  { id: 'invite', path: '/invite', label: 'Join', group: 'resources', placement: 'primary', navigation: { desktop: true, mobile: true }, navigationOrder: 1 },
+  { id: 'invite', path: '/invite', label: 'Join', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'appearance', path: '/appearance', label: 'Appearance', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'guides', path: '/guides', label: 'Guides', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
   { id: 'community', path: '/community', label: 'Community', group: 'resources', placement: 'none', navigation: { desktop: false, mobile: false }, navigationOrder: null },
@@ -75,7 +81,7 @@ export const PUBLIC_ROUTE_MANIFEST: readonly PublicRouteMetadata[] = PUBLIC_ROUT
 
 export const PUBLIC_ROUTE_GROUPS: Readonly<Record<PublicRouteGroup, readonly PublicRouteId[]>> = {
   product: ['home', 'about', 'download', 'onyxos'],
-  trust: ['status', 'accessibility'],
+  trust: ['status', 'accessibility', 'privacy', 'guidelines', 'contact'],
   resources: ['integrations', 'agents', 'glossary', 'stats', 'roadmap', 'invite', 'appearance', 'guides', 'community'],
 };
 

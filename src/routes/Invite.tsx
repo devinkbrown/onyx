@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './invite.css';
-import { createEffect, createMemo, createResource, createSignal, Index, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import {
   buildInviteCard,
@@ -10,12 +10,10 @@ import {
   inviteHeadline,
   inviteTitle,
   inviteWelcome,
-  mergeInviteFaces,
   parseGuestName,
 } from '@/lib/invite/inviteCard';
 import { buildInviteLink } from '@/lib/invite/inviteLink';
-import { loadInviteRoomPulse } from '@/lib/invite/inviteRoomPulse';
-import { Avatar, FormField } from '@/primitives/index';
+import { FormField } from '@/primitives/index';
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
 
@@ -46,13 +44,6 @@ export default function InviteRoute() {
   const headline = createMemo(() => inviteHeadline(card()));
   const description = createMemo(() => inviteDescription(card()));
   const welcome = createMemo(() => inviteWelcome(card()));
-  const [pulse] = createResource(
-    () => card().channel,
-    (channel) => loadInviteRoomPulse(channel),
-  );
-  const purpose = createMemo(() => card().topic ?? pulse()?.topic ?? null);
-  const faces = createMemo(() => mergeInviteFaces(card().faces, pulse()?.faces));
-  const lastPulse = createMemo(() => pulse()?.lastPulse ?? null);
 
   createEffect(() => {
     const suggested = card().guestName;
@@ -68,8 +59,6 @@ export default function InviteRoute() {
         at: card().at,
         topic: card().topic,
         reader: card().readerMode,
-        inviter: card().inviter,
-        faces: card().faces,
       },
       { network: NETWORK_NAME, origin: currentOrigin(), appOrigin: '/app/' },
     ).appHref;
@@ -117,7 +106,7 @@ export default function InviteRoute() {
       mainLabel="Onyx invite"
       context={(
         <p class="public-frame__current-line">
-          <span class="public-frame__current-kicker">Room</span>
+          <span class="public-frame__current-kicker">Friends</span>
           <span aria-hidden="true">·</span>
           <span class="public-frame__current-label">Invite</span>
         </p>
@@ -133,51 +122,31 @@ export default function InviteRoute() {
       </svg>
       <div class="r-grain" aria-hidden="true" />
 
-      <section class="invite-card" aria-labelledby="invite-heading">
-        <p class="invite-eyebrow">{card().channel ? 'Room' : 'Onyx'}</p>
+      <section class="invite-door" aria-labelledby="invite-heading">
+        <img
+          class="invite-mascot"
+          src="/brand/mascot-wave.png"
+          width="160"
+          height="160"
+          alt=""
+          decoding="async"
+        />
+        <p class="invite-eyebrow">A friend invited you</p>
         <h1 id="invite-heading">{headline()}</h1>
-        <Show when={purpose()}>
-          {(topic) => <p class="invite-purpose">{topic()}</p>}
-        </Show>
         <p class="invite-lede">{welcome()}</p>
 
-        <Show when={card().inviter || faces().length > 0 || lastPulse()}>
-          <dl class="invite-facts">
-            <Show when={card().inviter}>
-              {(inviter) => (
-                <div data-testid="invite-inviter">
-                  <dt>Invited by</dt>
-                  <dd>{inviter()}</dd>
-                </div>
-              )}
-            </Show>
-            <Show when={faces().length > 0}>
-              <div data-testid="invite-faces">
-                <dt>Already in</dt>
-                <dd>
-                  <ul class="invite-faces">
-                    <Index each={faces()}>
-                      {(nick) => (
-                        <li class="invite-face">
-                          <Avatar name={nick()} size="sm" />
-                          <span>{nick()}</span>
-                        </li>
-                      )}
-                    </Index>
-                  </ul>
-                </dd>
-              </div>
-            </Show>
-            <Show when={lastPulse()}>
-              {(label) => (
-                <div data-testid="invite-pulse">
-                  <dt>Last pulse</dt>
-                  <dd>{label()}</dd>
-                </div>
-              )}
-            </Show>
-          </dl>
-        </Show>
+        <div class="invite-preview" role="note" aria-label="Invite preview">
+          <span class="invite-preview-eyebrow">Invite</span>
+          <h2 class="invite-preview-title">{title()}</h2>
+          <p class="invite-preview-desc">{description()}</p>
+          <Show when={card().topic}>
+            {(topic) => (
+              <p class="invite-preview-topic">
+                {topic()}
+              </p>
+            )}
+          </Show>
+        </div>
 
         <form
           class="invite-join"
@@ -203,7 +172,7 @@ export default function InviteRoute() {
             onInput={(event) => onNameInput(event.currentTarget.value)}
           />
           <div class="invite-actions">
-            <a class="r-btn primary" href={joinHref()} data-testid="invite-join">
+            <a class="r-btn primary" href={joinHref()}>
               Join
             </a>
             <button

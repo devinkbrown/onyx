@@ -63,9 +63,25 @@ export const ROUTE_ENTRYPOINTS = [
   },
   {
     route: 'install',
-    title: 'Install Onyx on this device — browser first',
+    title: 'Get Onyx on this device — browser first',
     description:
-      'Install Onyx in your browser, or keep it on this device. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
+      'Get Onyx on this device in your browser. Keep it here from a supporting browser. Desktop packages are optional and unsigned. macOS native packages are coming soon.',
+    canonicalRoute: 'download',
+  },
+  {
+    route: 'privacy',
+    title: 'Onyx privacy — what stays here',
+    description: 'Short facts about what the server stores, history on this device, and that this site does not sell ads.',
+  },
+  {
+    route: 'guidelines',
+    title: 'Onyx house rules',
+    description: 'How we treat each other in the rooms, how to report harm, and that Onyx is not 911.',
+  },
+  {
+    route: 'contact',
+    title: 'Onyx contact',
+    description: 'How to reach the project for ordinary questions and security reports. No invented mailbox.',
   },
   {
     route: 'accessibility',
@@ -118,7 +134,8 @@ function replaceExactlyOnce(html, pattern, replacement, label) {
 export function stampRouteMetadata(html, entrypoint) {
   const title = escapeHtml(entrypoint.title);
   const description = escapeHtml(entrypoint.description);
-  const canonical = `${ORIGIN}/${entrypoint.route}/`;
+  const canonicalRoute = entrypoint.canonicalRoute ?? entrypoint.route;
+  const canonical = `${ORIGIN}/${canonicalRoute}/`;
   let stamped = html;
 
   stamped = replaceExactlyOnce(stamped, /<title>[\s\S]*?<\/title>/, `<title>${title}</title>`, 'title');

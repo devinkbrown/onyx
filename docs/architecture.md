@@ -23,7 +23,7 @@ client only: the server is Onyx Server (see [`../ONYX_SERVER_PROTOCOL.md`](../ON
 - Routes are declared with `@solidjs/router` (`src/index.tsx:86`): `/` (Landing,
   eager), and lazy routes `/about`, `/app` (`AppRoute` → the chat shell),
   `/appearance`, `/stats`, `/status`, `/roadmap`, `/invite`, `/guides`,
-  `/community`. **This `<Route>`
+  `/community`, `/privacy`, `/guidelines`, `/contact`. **This `<Route>`
   table must stay in sync with `ROUTE_ENTRYPOINTS` in
   `tools/materialize-route-entrypoints.mjs`**, which materialises a document
   with route-correct crawler and unfurl metadata for every SPA entrypoint.

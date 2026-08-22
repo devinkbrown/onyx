@@ -19,11 +19,11 @@
 .dl-kicker {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--public-current, var(--lapis-bright));
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--paper-dim);
 }
 
 .dl-hero h1 {
@@ -34,15 +34,25 @@
   text-transform: none;
 }
 
-.dl-hero .serif-pull {
+.dl-lede {
   margin: 22px 0 0;
-  max-width: 28ch;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 360;
-  font-size: clamp(1.15rem, 1rem + 0.6vw, 1.55rem);
-  line-height: 1.4;
+  max-width: 32ch;
+  font-family: var(--font-sans);
+  font-weight: 450;
+  font-size: clamp(1.08rem, 1rem + 0.4vw, 1.3rem);
+  line-height: 1.45;
   color: var(--paper);
+}
+.dl-page .dl-section-title {
+  font-family: var(--font-sans);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+.dl-page .dl-status {
+  font-family: var(--font-sans);
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 .dl-cta {
@@ -121,12 +131,12 @@
 
 .dl-page .dl-card h3 {
   margin: 12px 0 0;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(2rem, 1.2rem + 2.6vw, 4rem);
-  line-height: 0.96;
-  letter-spacing: 0;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-weight: 650;
+  font-size: clamp(1.35rem, 1.1rem + 1.2vw, 1.9rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-transform: none;
   color: var(--paper);
   overflow-wrap: anywhere;
 }

@@ -32,6 +32,27 @@ a {
   text-decoration: none;
 }
 
+.html-shell-skip {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 1rem;
+  border-radius: 4px;
+  color: var(--on-accent, #081018);
+  background: var(--lapis, #5ba3c9);
+  font: 700 0.875rem/1 var(--font-sans, sans-serif);
+  transform: translateY(calc(-100% - 1rem));
+}
+
+.html-shell-skip:focus,
+.html-shell-skip:focus-visible {
+  transform: translateY(0);
+}
+
 :focus-visible {
   outline: var(--focus-ring, 1px solid var(--lapis));
   outline-offset: var(--focus-offset, -1px);

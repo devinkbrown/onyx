@@ -3,36 +3,34 @@ import './landing.css';
 import './home.css';
 import { For } from 'solid-js';
 import { PublicFrame } from '@/ui/public';
-import { PUBLIC_ROUTE_MANIFEST, publicRouteById } from '@/ui/navigation/publicRouteManifest';
-import { setPageMeta } from './pageMeta';
+import { publicRouteById } from '@/ui/navigation/publicRouteManifest';
+import { PUBLIC_HOME_DESCRIPTION, setPageMeta } from './pageMeta';
 import { ProductPreview } from './ProductPreview';
 
 const LANDING_SHELF_ITEMS = [
-  [PUBLIC_ROUTE_MANIFEST[4]!.href, 'Status'],
-  [PUBLIC_ROUTE_MANIFEST[9]!.href, 'Stats'],
-  [PUBLIC_ROUTE_MANIFEST[10]!.href, 'Roadmap'],
-  [PUBLIC_ROUTE_MANIFEST[1]!.href, 'About'],
-  [PUBLIC_ROUTE_MANIFEST[2]!.href, 'Download'],
-  [`${PUBLIC_ROUTE_MANIFEST[11]!.href}?join=%23root`, 'Invite'],
+  [publicRouteById('status').href, 'Status'],
+  [publicRouteById('roadmap').href, 'Roadmap'],
+  [publicRouteById('about').href, 'About'],
+  [publicRouteById('download').href, 'Download'],
+  [publicRouteById('guides').href, 'Guides'],
+  [`${publicRouteById('invite').href}?join=%23root`, 'Invite'],
 ] as const;
 
 const TRUST_CLAIMS = [
   ['No ads', 'Nobody is selling your attention in the room.'],
   ['No third-party trackers', 'This site does not load analytics pixels or ad tags.'],
-  ['Private DMs', 'Side conversations can stay between people. Room text is not end-to-end.'],
-  ['History on your device', 'Catch-up and drafts stay with you on this device.'],
+  ['Private DMs', 'Only the two of you. The words stay on this device.'],
+  ['History on this device', 'About 400 recent messages per room stay here.'],
 ] as const;
 
 /**
- * Onyx public homepage — a community door.
+ * Onyx public homepage — quiet harbor, community door.
  * Contract: docs/PUBLIC_COMPANY_SITE.md
- * Proof order: invite/join hero → labeled room preview → trust strip →
- * community prose → quiet extras shelf. Header owns Open Onyx → /app/.
  */
 export default function Landing() {
   setPageMeta(
     'Onyx — a room for your people',
-    'A place for friends, clubs, and class groups to hang out. Open Onyx in your browser, invite someone, and join a room — without ads.',
+    PUBLIC_HOME_DESCRIPTION,
     '/',
   );
 
@@ -40,13 +38,6 @@ export default function Landing() {
     <PublicFrame
       currentPath="/"
       mainLabel="Onyx home"
-      context={(
-        <p class="public-frame__current-line">
-          <span class="public-frame__current-kicker">Community</span>
-          <span aria-hidden="true">·</span>
-          <span class="public-frame__current-label">Home</span>
-        </p>
-      )}
     >
       <div class="ui-root r r-landing home">
       <div class="r-ground home-ground" aria-hidden="true" />
@@ -62,11 +53,19 @@ export default function Landing() {
             </p>
             <div class="home-cta-row">
               <a class="home-cta-primary" href="/app/">Join free</a>
-              <a class="home-secondary-link" href={`${publicRouteById('invite').href}?join=%23root`}>Invite someone</a>
+              <a class="home-secondary-link" href={publicRouteById('download').href}>Download</a>
             </div>
             <p class="home-desktop-note">
-              Open it in the browser — no install, no ads. Hosts and downloads live below.
+              Supporting browsers can put Onyx on the Home Screen or in its own window. No store.
             </p>
+            <img
+              class="home-mascot"
+              src="/brand/mascot.png"
+              width="220"
+              height="220"
+              alt=""
+              decoding="async"
+            />
           </div>
 
           <ProductPreview />
@@ -109,7 +108,7 @@ export default function Landing() {
         </ul>
         <div class="home-capability-chapters" aria-label="More ways in">
           <a href={`${publicRouteById('invite').href}?join=%23root`}><strong>Invite someone</strong><span>Send a room link to a friend</span></a>
-          <a href={publicRouteById('stats').href}><strong>See what's happening</strong><span>Public room activity, when it is published</span></a>
+          <a href={publicRouteById('download').href}><strong>Keep it here</strong><span>Browser first. Packages stay further down.</span></a>
           <a href={publicRouteById('about').href}><strong>How the rooms work</strong><span>A short, plain walkthrough</span></a>
         </div>
       </section>
@@ -118,9 +117,9 @@ export default function Landing() {
         id="extras"
         class="r-wrap home-shelf"
         data-home-shelf
-        aria-label="Hosting and extras"
+        aria-label="Also here"
       >
-        <p class="home-shelf-label">Hosting and extras</p>
+        <p class="home-shelf-label">Also here</p>
         <ul class="home-shelf-list">
           <For each={LANDING_SHELF_ITEMS}>
             {(item) => <li><a href={item[0]}>{item[1]}</a></li>}

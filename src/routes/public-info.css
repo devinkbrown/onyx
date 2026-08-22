@@ -26,6 +26,31 @@
   color: var(--info-current);
 }
 
+.public-info-page .data-hero .r-kicker {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.public-info-page .data-hero h1 {
+  font-family: var(--font-sans);
+  font-weight: 650;
+  text-transform: none;
+}
+
+.trust-rules {
+  margin: 0 0 1.25rem;
+  padding-left: 1.25rem;
+}
+
+.trust-rules li {
+  margin: 0 0 0.65rem;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
 .public-info-page .public-info-card {
   border-color: color-mix(in oklab, var(--info-current) 32%, var(--public-line));
   background: color-mix(in oklab, var(--info-current) 6%, var(--public-raised));

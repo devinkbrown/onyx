@@ -23,11 +23,11 @@
 .ab-eyebrow {
   display: block;
   font-family: var(--font-sans);
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ab-current);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--paper-dim);
 }
 
 .ab-hero h1 {
@@ -43,15 +43,14 @@
   text-wrap: balance;
 }
 
-.ab-hero .serif-pull {
+.ab-lede {
   margin: 22px 0 0;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 360;
-  font-size: clamp(1.2rem, 1rem + 0.8vw, 1.7rem);
-  line-height: 1.4;
+  font-family: var(--font-sans);
+  font-weight: 450;
+  font-size: clamp(1.1rem, 1rem + 0.5vw, 1.35rem);
+  line-height: 1.45;
   color: var(--paper);
-  max-width: 32ch;
+  max-width: 36ch;
 }
 
 .ab-hero p.sub,
@@ -189,6 +188,31 @@
   color: var(--paper-dim);
 }
 
+.ab-quiet-note {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 36rem;
+  margin-top: 2rem;
+}
+
+.ab-mascot {
+  display: block;
+  width: 5.5rem;
+  height: auto;
+  flex: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ab-quiet-note p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--paper-dim);
+}
+
 .ab-quiet-links {
   display: flex;
   flex-wrap: wrap;
@@ -217,7 +241,8 @@
   .ab-hero,
   .ab-section,
   .ab-pillars,
-  .ab-who {
+  .ab-who,
+  .ab-quiet-note {
     min-width: 0;
     max-width: 100%;
   }

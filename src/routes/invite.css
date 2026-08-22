@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
-/* Invite landing — a room card you can walk into, not a signup wall. */
+/* Invite landing — same ocean door as Connect: room preview, name, join. */
 
 .invite-page {
   position: relative;
@@ -21,7 +21,7 @@
   pointer-events: none;
 }
 
-.invite-card {
+.invite-door {
   position: relative;
   z-index: 1;
   width: min(28rem, 100%);
@@ -30,20 +30,29 @@
   gap: 1rem;
   padding: clamp(22px, 4vw, 32px);
   border: 1px solid var(--seam);
-  border-radius: var(--r-md);
+  border-radius: 2px;
   background: var(--stone);
+}
+
+.invite-mascot {
+  display: block;
+  width: 7.5rem;
+  height: auto;
+  margin: 0 auto 0.35rem;
+  pointer-events: none;
+  user-select: none;
 }
 
 .invite-eyebrow {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font-size: 0.95rem;
   letter-spacing: 0.01em;
   text-transform: none;
   color: var(--paper-mute);
 }
 
-.invite-card h1 {
+.invite-door h1 {
   margin: 0;
   max-width: 16ch;
   font-family: var(--font-sans);
@@ -53,17 +62,6 @@
   letter-spacing: -0.03em;
   text-transform: none;
   color: var(--paper);
-  overflow-wrap: anywhere;
-}
-
-.invite-purpose {
-  margin: 0;
-  max-width: 42ch;
-  color: var(--paper);
-  font-size: 1.02rem;
-  font-weight: 550;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
 }
 
 .invite-lede {
@@ -74,62 +72,45 @@
   line-height: 1.5;
 }
 
-.invite-facts {
+.invite-preview {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  margin: 0;
-  padding: 0.9rem 0 0;
-  border-top: 1px solid var(--seam-faint);
-}
-
-.invite-facts > div,
-.invite-facts dt,
-.invite-facts dd {
-  min-width: 0;
-  margin: 0;
-}
-
-.invite-facts dt {
-  color: var(--paper-mute);
-  font: 600 0.66rem/1.4 var(--font-mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 2px;
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 55%, var(--stone));
 }
 
 .invite-preview-eyebrow {
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font-size: 0.85rem;
   letter-spacing: 0.01em;
   text-transform: none;
   color: var(--paper-dim);
 }
 
-.invite-facts dd {
-  margin-top: 0.35rem;
-  color: var(--paper);
-  font: 500 0.92rem/1.45 var(--font-sans);
-  overflow-wrap: anywhere;
-}
-
-.invite-faces {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem 1rem;
+.invite-preview-title {
   margin: 0;
-  padding: 0;
-  list-style: none;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  color: var(--paper);
 }
 
-.invite-face {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-width: 0;
+.invite-preview-desc,
+.invite-preview-topic {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--paper-dim);
 }
 
-.invite-face .onyx-avatar {
-  flex: 0 0 auto;
+.invite-preview-topic {
+  font-weight: 650;
+  color: var(--paper);
 }
 
 .invite-join {
@@ -162,23 +143,15 @@
 
 @media (max-width: 42rem) and (max-height: 30rem) {
   .invite-page,
-  .invite-card {
+  .invite-door {
     min-width: 0;
     max-width: 100%;
   }
 
-  .invite-card h1 {
+  .invite-door h1 {
     max-width: none;
     font-size: 48px;
     line-height: 1;
-  }
-
-  .invite-facts dt {
-    font-size: 11px;
-  }
-
-  .invite-facts dd {
-    font-size: 16px;
   }
 }
 
@@ -190,8 +163,8 @@
 }
 
 @media (forced-colors: active) {
-  .invite-card,
-  .invite-facts {
+  .invite-door,
+  .invite-preview {
     border-color: CanvasText;
   }
 

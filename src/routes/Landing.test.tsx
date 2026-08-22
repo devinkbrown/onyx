@@ -18,7 +18,7 @@ describe('Landing', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.home')).toBeTruthy();
-    expect(container.querySelector('.public-frame__context')).toHaveTextContent(/Community\s*·\s*Home/);
+    expect(container.querySelector('.public-frame__context')).toBeNull();
   });
 
   it('opens with a community invitation and a single header Open Onyx', () => {
@@ -30,30 +30,35 @@ describe('Landing', () => {
     expect(getByRole('heading', { level: 1 })).toHaveTextContent('A room for your people.');
     expect(container.querySelector('a.home-cta-primary')).toHaveAttribute('href', '/app/');
     expect(container.querySelector('a.home-cta-primary')).toHaveTextContent('Join free');
-    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/invite/?join=%23root');
-    expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('Invite someone');
+    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/download/');
+    expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('Download');
     expect(container.textContent).toMatch(/Invite someone\. Join a room\. Talk\./);
+    expect(container.querySelector('.home-desktop-note')?.textContent).toMatch(
+      /Supporting browsers can put Onyx on the Home Screen or in its own window\. No store\./,
+    );
+    expect(container.textContent).not.toMatch(/install Onyx as a PWA/i);
+    expect(container.textContent).not.toMatch(/app store|play store|beforeinstallprompt|iOS push/i);
   });
 
   it('derives public destination links from manifest hrefs', () => {
     const { container, getByRole } = render(() => <Landing />);
-    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/invite/?join=%23root');
-    expect(getByRole('link', { name: /see what's happening/i })).toHaveAttribute('href', '/stats/');
+    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/download/');
+    expect(getByRole('link', { name: /keep it here/i })).toHaveAttribute('href', '/download/');
     expect(getByRole('link', { name: /how the rooms work/i })).toHaveAttribute('href', '/about/');
   });
 
   it('keeps hosting extras below the fold in manifest destination order', () => {
     const { getByRole } = render(() => <Landing />);
-    const shelf = getByRole('navigation', { name: 'Hosting and extras' });
+    const shelf = getByRole('navigation', { name: 'Also here' });
     expect([...shelf.querySelectorAll('a')].map((link) => ({
       label: link.textContent,
       href: link.getAttribute('href'),
     }))).toEqual([
       { label: 'Status', href: '/status/' },
-      { label: 'Stats', href: '/stats/' },
       { label: 'Roadmap', href: '/roadmap/' },
       { label: 'About', href: '/about/' },
       { label: 'Download', href: '/download/' },
+      { label: 'Guides', href: '/guides/' },
       { label: 'Invite', href: '/invite/?join=%23root' },
     ]);
   });
@@ -62,7 +67,8 @@ describe('Landing', () => {
     const { getByRole, getByText, container } = render(() => <Landing />);
     const preview = container.querySelector('[data-product-preview]');
     expect(preview).toHaveAttribute('data-preview-state', 'room');
-    expect(getByText(/not live rooms, people, messages/i)).toBeInTheDocument();
+    expect(getByText('Preview')).toBeInTheDocument();
+    expect(preview!.textContent).toMatch(/labeled conversation/i);
     expect(preview!.querySelector('.product-preview__roombar')?.textContent).toMatch(/Weekend plans/);
     expect(preview!.textContent).toMatch(/dinner/);
     fireEvent.keyDown(getByRole('tab', { name: 'Room' }), { key: 'ArrowRight' });
@@ -77,8 +83,19 @@ describe('Landing', () => {
     expect(trust).toHaveTextContent('No ads');
     expect(trust).toHaveTextContent('No third-party trackers');
     expect(trust).toHaveTextContent('Private DMs');
-    expect(trust).toHaveTextContent('History on your device');
-    expect(container.textContent).not.toMatch(/fully encrypted|group E2EE|passkey|Discord-killer|nobody.s product|Open engine/i);
+    expect(trust).toHaveTextContent('History on this device');
+    expect(container.textContent).not.toMatch(/fully encrypted|group E2EE|passkey|Discord-killer|nobody.s product|cloud history/i);
+  });
+
+  it('uses the locked mark and mascot without naming the seal', () => {
+    const { container } = render(() => <Landing />);
+    expect(container.querySelector('.public-frame__mark')?.getAttribute('src')).toBe('/brand/mark.png');
+    expect(container.querySelector('.public-frame__lockup')?.getAttribute('src')).toBe('/brand/lockup.png');
+    expect(container.querySelector('.public-frame__wordmark')?.getAttribute('src')).toBe('/brand/wordmark.png');
+    expect(container.querySelector('img.home-mascot')?.getAttribute('src')).toBe('/brand/mascot.png');
+    expect(container.querySelectorAll('img.home-mascot')).toHaveLength(1);
+    expect(container.textContent).not.toMatch(/Pebble/i);
+    expect(container.textContent).not.toMatch(/Meet Pebble/i);
   });
 
   it('does not put an operator evidence desk or unavailable telemetry on Home', () => {

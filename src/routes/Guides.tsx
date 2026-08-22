@@ -112,7 +112,7 @@ export const GUIDE_HOWTOS = [
     optional: true,
     body: [
       'The official Onyx app in the browser is the usual way in.',
-      'If you already use another chat client, you can still sit in the same rooms. That path is optional and not how most people join.',
+      'WeeChat, irssi, and similar clients can sit in the same rooms. That path is last, optional, and not how most people join.',
       'Running your own copy of the engine is for people who want to operate a server.',
     ],
     links: [

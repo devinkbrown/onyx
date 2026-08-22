@@ -10,7 +10,6 @@ const onyxosCss = readFileSync(resolve(__dirname, 'onyxos.css'), 'utf8');
 /** Manifest order for the shared primary navigation. */
 const PRIMARY_LINKS = [
   ['About', '/about/'],
-  ['Join', '/invite/'],
   ['Download', '/download/'],
 ] as const;
 

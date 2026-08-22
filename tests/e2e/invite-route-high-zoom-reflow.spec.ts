@@ -19,15 +19,15 @@ test('keeps the PublicFrame Invite route usable at 400% zoom', async ({ page }) 
   await expect(frame.locator('main#public-main')).toHaveCount(1);
   await expect(frame.locator('header.public-frame__header')).toHaveCount(1);
   await expect(frame.locator('footer.public-frame__footer')).toHaveCount(1);
-  await expect(header.locator('a[href="/invite/"]')).toHaveAttribute('aria-current', 'page');
-  await expect(main.getByRole('heading', { name: '#root', exact: true })).toBeVisible();
-  await expect(main.locator('.invite-card')).toBeVisible();
-  await expect(main.getByTestId('invite-join')).toHaveAttribute(
+  await expect(header.locator('a[href="/invite/"]')).toHaveCount(0);
+  await expect(main.getByRole('heading', { name: 'Join #root', exact: true })).toBeVisible();
+  await expect(main.getByRole('note', { name: 'Invite preview' })).toBeVisible();
+  await expect(main.getByRole('link', { name: 'Join' })).toHaveAttribute(
     'href',
     '/app/?join=%23root',
   );
   await expect(main.getByRole('button', { name: 'Copy link' })).toBeVisible();
-  await expect(main.getByLabel('Display name')).toBeVisible();
+  await expect(main.getByLabelText('Display name')).toBeVisible();
 
   await page.keyboard.press('Tab');
   await expect(skip).toBeFocused();
@@ -43,7 +43,9 @@ test('keeps the PublicFrame Invite route usable at 400% zoom', async ({ page }) 
   await expect(menuToggle).toHaveAccessibleName('Close navigation menu');
   const primary = header.getByRole('navigation', { name: 'Primary navigation' });
   await expect(primary).toBeVisible();
-  await expect(primary.getByRole('link', { name: 'Join' })).toBeVisible();
+  await expect(primary.getByRole('link', { name: 'About' })).toBeVisible();
+  await expect(primary.getByRole('link', { name: 'Download' })).toBeVisible();
+  await expect(primary.getByRole('link', { name: 'Join' })).toHaveCount(0);
   await expect(primary.getByRole('link', { name: 'Status' })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(menuToggle).toHaveAttribute('aria-expanded', 'false');
@@ -51,7 +53,8 @@ test('keeps the PublicFrame Invite route usable at 400% zoom', async ({ page }) 
 
   await footer.scrollIntoViewIfNeeded();
   await expect(footer.getByRole('navigation', { name: 'Footer navigation' })).toBeVisible();
-  await expect(footer.getByRole('link', { name: 'Join' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'House rules' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Join' })).toHaveCount(0);
   await primaryAction.focus();
   await expect(primaryAction).toBeFocused();
 

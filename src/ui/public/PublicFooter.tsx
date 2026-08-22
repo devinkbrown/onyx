@@ -1,21 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { For, type JSX } from 'solid-js';
-import { publicRouteById, type PublicRouteId } from '@/ui/navigation/publicRouteManifest';
+import { publicRouteById } from '@/ui/navigation/publicRouteManifest';
 
-const FOOTER_ROUTE_IDS = ['about', 'invite', 'download', 'guides', 'status', 'roadmap', 'accessibility'] as const satisfies readonly PublicRouteId[];
-const FOOTER_ROUTES = FOOTER_ROUTE_IDS.map(publicRouteById);
+const FOOTER_LINKS = [
+  { href: '/guidelines/', label: 'House rules' },
+  { href: '/privacy/', label: 'Privacy' },
+  { href: '/contact/', label: 'Contact' },
+  { href: '/status/', label: 'Status' },
+  { href: '/guides/', label: 'Guides' },
+] as const;
 
 export function PublicFooter(): JSX.Element {
   return (
     <footer class="public-frame__footer">
       <div class="public-frame__footer-inner">
         <div>
-          <a class="public-frame__footer-brand" href={publicRouteById('home').href}>Onyx</a>
+          <a class="public-frame__footer-brand" href={publicRouteById('home').href}>
+            <img class="public-frame__mark" src="/brand/mark.png" width="28" height="28" alt="" />
+            <span>Onyx</span>
+          </a>
           <p>Rooms, messages, and calls for friends, clubs, and creators.</p>
         </div>
         <nav aria-label="Footer navigation">
-          <For each={FOOTER_ROUTES}>
-            {(route) => <a href={route.href}>{route.label}</a>}
+          <For each={FOOTER_LINKS}>
+            {(link) => <a href={link.href}>{link.label}</a>}
           </For>
         </nav>
       </div>

@@ -138,12 +138,15 @@ describe('route lifecycle identity helpers', () => {
       '/app',
       '/appearance',
       '/community',
+      '/contact',
       '/download',
       '/glossary',
+      '/guidelines',
       '/guides',
       '/integrations',
       '/invite',
       '/onyxos',
+      '/privacy',
       '/roadmap',
       '/stats',
       '/status',
@@ -153,7 +156,10 @@ describe('route lifecycle identity helpers', () => {
     expect(resolveRouteLifecycleLabel('/install/?src=alias')).toBe('Download');
     expect(resolveRouteLifecycleLabel('/download')).toBe('Download');
     expect(resolveRouteLifecycleLabel('/invite/')).toBe('Join');
-    expect(resolveRouteLifecycleEntry('/invite')?.publicNavigation).toBe(true);
+    expect(resolveRouteLifecycleEntry('/invite')?.publicNavigation).toBe(false);
+    expect(resolveRouteLifecycleLabel('/guidelines/')).toBe('House rules');
+    expect(resolveRouteLifecycleEntry('/privacy')?.publicNavigation).toBe(false);
+    expect(resolveRouteLifecycleEntry('/contact')?.publicNavigation).toBe(false);
     expect(resolveRouteLifecycleEntry('/status')?.publicNavigation).toBe(false);
     expect(resolveRouteLifecycleLabel('/app/')).toBe(ROUTE_LIFECYCLE_APP_LABEL);
     expect(resolveRouteLifecycleEntry('/app')?.publicNavigation).toBe(false);

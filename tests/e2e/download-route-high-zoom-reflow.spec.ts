@@ -138,9 +138,9 @@ test('keeps the PublicFrame Download route usable at 400% zoom', async ({ page }
 test('keeps the /install/ alias on the same PublicFrame download surface', async ({ page }) => {
   await page.goto('/install/');
 
-  await expect(page).toHaveTitle(/Install Onyx/);
+  await expect(page).toHaveTitle(/Get Onyx on this device/);
   await expect(page.getByRole('main', { name: 'Get Onyx' })).toHaveCount(1);
-  await expect(page.getByRole('heading', { name: 'Install Onyx on this device' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Get Onyx on this device' })).toBeVisible();
   await expect(page.locator('.public-frame__header a[href="/download/"]')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('dl-card-linux')).toBeVisible();
   await expect(page.getByTestId('dl-install-linux')).toContainText('install.sh');

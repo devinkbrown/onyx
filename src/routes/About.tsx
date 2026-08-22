@@ -34,7 +34,7 @@ export default function About() {
       <section class="r-wrap ab-hero" aria-labelledby="about-hero-heading">
         <p class="ab-kicker">a community</p>
         <h1 id="about-hero-heading">Rooms for people you already like.</h1>
-        <p class="serif-pull">
+        <p class="ab-lede">
           Friends, clubs, and creators hanging out — not a status board.
         </p>
         <div class="ab-seam" aria-hidden="true" />
@@ -114,6 +114,17 @@ export default function About() {
             <p>A room and a stage for the people who already showed up, without ads in the way.</p>
           </article>
         </div>
+        <aside class="ab-quiet-note">
+          <img
+            class="ab-mascot"
+            src="/brand/mascot-still.png"
+            width="148"
+            height="148"
+            alt=""
+            decoding="async"
+          />
+          <p>A quiet harbor. The rooms stay open when you come back.</p>
+        </aside>
       </section>
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
