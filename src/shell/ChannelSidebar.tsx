@@ -813,14 +813,6 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                           >
                             Invite friends
                           </button>
-                          <button
-                            type="button"
-                            class="shell-sidebar-browse"
-                            data-testid="sidebar-start-room"
-                            onClick={() => getState().openCreateRoom()}
-                          >
-                            Start a room
-                          </button>
                         </li>
                       </Show>
                     }

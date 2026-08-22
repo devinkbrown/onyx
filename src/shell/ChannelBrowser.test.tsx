@@ -55,7 +55,7 @@ describe('ChannelBrowser', () => {
     const directory = within(dialog).getByRole('list', { name: 'Public room directory' });
     expect(within(directory).getAllByRole('listitem')).toHaveLength(1);
     expect(within(dialog).getAllByText('#general')).toHaveLength(1);
-    expect(within(dialog).getByText('5 people')).toBeInTheDocument();
+    expect(within(dialog).getByText('5 users')).toBeInTheDocument();
     expect(within(dialog).getByText('Launch room')).toBeInTheDocument();
     expect(within(dialog).queryByText('#random')).not.toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Join #general' })).toBeInTheDocument();
