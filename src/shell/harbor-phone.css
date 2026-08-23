@@ -369,7 +369,9 @@
     display: none;
   }
 
-  /* You / Appearance: sentence-case Instrument Sans, 44px rows. */
+  /* You / Appearance: sentence-case Instrument Sans, 44px rows.
+     Higher specificity than account.css / primitives.css so lazy sheets
+     cannot bring uppercase mono kickers back onto the default path. */
   .you-settings,
   .acct,
   .ap-panel {
@@ -377,21 +379,45 @@
     font-size: var(--harbor-phone-body);
   }
 
-  .onyx-sheet__kicker,
-  .onyx-modal__kicker,
-  .acct-identity-eyebrow,
-  .acct-advanced-title,
-  .ap-kicker {
+  .onyx-sheet .onyx-sheet__kicker,
+  .onyx-modal .onyx-modal__kicker {
+    display: none;
+  }
+
+  .acct .acct-identity-eyebrow,
+  .acct .acct-advanced-title,
+  .acct .acct-context-cue > span,
+  .acct .onyx-field__label,
+  .ap-panel .ap-kicker,
+  .ap-panel .ap-panel-label,
+  .shell-members .shell-members-head,
+  .shell-members .shell-members-group-label {
     font-family: var(--font-sans);
     letter-spacing: 0;
     text-transform: none;
   }
 
-  .onyx-sheet__header h2,
-  .onyx-modal__header h2 {
+  .acct .acct-identity-avatar {
+    border-radius: 50%;
+  }
+
+  .ap-panel .ap-panel-label,
+  .shell-members .shell-members-group-label {
+    font-size: 0.82rem;
+    color: var(--paper-mute);
+  }
+
+  .shell-members .shell-members-head {
+    font-size: 0.92rem;
+    color: var(--paper-dim);
+  }
+
+  .onyx-sheet .onyx-sheet__header h2,
+  .onyx-modal .onyx-modal__header h2 {
     font-family: var(--font-serif);
     font-size: 1.4rem;
     font-weight: 520;
+    letter-spacing: 0;
     text-transform: none;
   }
 

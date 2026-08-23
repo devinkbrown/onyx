@@ -63,6 +63,10 @@ describe('Harbor phone — connected client', () => {
     expect(connect).toMatch(/\.conn-status-phase[\s\S]*text-transform:\s*none/);
     expect(connect).toMatch(/\.conn-title[\s\S]*font-family:\s*var\(--font-serif\)/);
     expect(connect).toMatch(/\.conn-sub[\s\S]*font-family:\s*var\(--font-sans\)/);
+    expect(phone).toMatch(/\.onyx-modal \.onyx-modal__kicker[\s\S]*display:\s*none/);
+    expect(phone).toMatch(/\.ap-panel \.ap-panel-label[\s\S]*text-transform:\s*none/);
+    expect(phone).toMatch(/\.shell-members \.shell-members-group-label[\s\S]*text-transform:\s*none/);
+    expect(phone).toMatch(/\.acct \.onyx-field__label[\s\S]*text-transform:\s*none/);
     expect(phone).not.toMatch(/Anton|#[456][0-5][0-9a-f]{3}ff|#5865F2/i);
   });
 
