@@ -310,10 +310,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
   const connLabel = createMemo(() => {
     const s = connectionStatus();
-    if (s === 'connected') return 'connected';
-    if (s === 'reconnecting') return 'reconnecting';
-    if (s === 'connecting') return 'connecting';
-    return 'disconnected';
+    if (s === 'connected') return 'Connected';
+    if (s === 'reconnecting') return 'Reconnecting…';
+    if (s === 'connecting') return 'Connecting…';
+    return 'Disconnected';
   });
 
   const voiceParticipants = createMemo(() => {
@@ -1432,13 +1432,15 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           class="shell-ribbon-conn"
           data-testid="ribbon-conn"
           data-state={connectionStatus()}
-          title={`Connection: ${connLabel()}`}
+          title={connLabel()}
           aria-live="polite"
           aria-atomic="true"
         >
           <span class="shell-ribbon-conn-dot" aria-hidden="true" />
-          <span class="shell-ribbon-conn-label" aria-hidden="true">{connLabel()}</span>
-          <span class="sr-only">Connection: {connLabel()}</span>
+          <Show when={!local.contextActionsOnly}>
+            <span class="shell-ribbon-conn-label" aria-hidden="true">{connLabel()}</span>
+          </Show>
+          <span class="sr-only">{connLabel()}</span>
         </span>
       </div>
       </div>

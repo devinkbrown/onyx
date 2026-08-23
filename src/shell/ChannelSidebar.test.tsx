@@ -147,6 +147,16 @@ describe('ChannelSidebar accessibility', () => {
     expect(network).not.toHaveTextContent('IRCXNet');
   });
 
+  it('does not mount N/R/♪/D/Q letter chips on the phone path', () => {
+    seed();
+    setPreference('experienceMode', 'advanced');
+
+    const { container } = render(() => <ChannelSidebar hideOperatorChips />);
+
+    expect(container.querySelector('.shell-notify-controls')).toBeNull();
+    expect(container.textContent).not.toMatch(/♪/);
+  });
+
   it('links the active channel to its public ledger in rooms mode', () => {
     seed();
 

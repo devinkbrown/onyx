@@ -7621,7 +7621,7 @@
   }
 
   .shell-ribbon-conn-label {
-    display: inline;
+    display: none;
   }
 
   .shell-ribbon-divider {

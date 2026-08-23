@@ -1240,6 +1240,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
               setPrimarySurface('conversation');
             }}
             onMobileClose={closeMobileSidebar}
+            hideOperatorChips={isMobile()}
           />
         </RoomSwitcherSheet>
 
