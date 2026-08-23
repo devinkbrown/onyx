@@ -2,7 +2,7 @@
 import { cleanup, render, waitFor } from '@solidjs/testing-library';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Dynamic } from 'solid-js/web';
-import { Background, selectBackgroundId } from './Background';
+import { Background, DEFAULT_BACKGROUND_ID, selectBackgroundId } from './Background';
 import {
   BackgroundEngine,
   DEFAULT_FRAME_CAP_FPS,
@@ -25,7 +25,7 @@ import {
   backgroundsInFamily,
   getSignatureFamily,
 } from './catalogue';
-import { loadBackgroundVariant } from './loader';
+import { FALLBACK_BACKGROUND_VARIANT, loadBackgroundVariant } from './loader';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { resetSceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 
@@ -163,6 +163,14 @@ describe('background registry', () => {
     }
     // An unknown id resolves to undefined rather than throwing.
     expect(await loadBackgroundVariant('does-not-exist')).toBeUndefined();
+  });
+
+  it('defaults unknown ids to the ocean scene and serves it from the eager fallback', async () => {
+    expect(DEFAULT_BACKGROUND_ID).toBe('deep-current');
+    expect(selectBackgroundId(undefined, false)).toBe('deep-current');
+    expect(selectBackgroundId('removed-scene', true)).toBe('deep-current');
+    expect(FALLBACK_BACKGROUND_VARIANT.id).toBe('deep-current');
+    expect(await loadBackgroundVariant('deep-current')).toBe(FALLBACK_BACKGROUND_VARIANT);
   });
 });
 
@@ -320,6 +328,7 @@ describe('BackgroundEngine lifecycle', () => {
   });
 
   it('holds canvas animation while the window is blurred and resumes at full cadence on focus', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
     const hidden = Object.getOwnPropertyDescriptor(document, 'hidden');
     const raf = installControlledAnimationFrame();
     const now = vi.spyOn(performance, 'now').mockReturnValue(0);
@@ -351,6 +360,29 @@ describe('BackgroundEngine lifecycle', () => {
       now.mockRestore();
       raf.restore();
       restoreDocumentHidden(hidden);
+    }
+  });
+
+  it('keeps a visible phone tab animating when Safari reports no window focus', () => {
+    const widthDescriptor = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    const hidden = Object.getOwnPropertyDescriptor(document, 'hidden');
+    const raf = installControlledAnimationFrame();
+    const variant = createVariant();
+    const engine = new BackgroundEngine({ canvas: createCanvas(), variant });
+
+    try {
+      setDocumentHidden(false);
+      engine.start();
+      expect(raf.pendingCount()).toBe(1);
+      window.dispatchEvent(new Event('blur'));
+      expect(raf.pendingCount()).toBe(1);
+    } finally {
+      engine.dispose();
+      raf.restore();
+      restoreDocumentHidden(hidden);
+      if (widthDescriptor) Object.defineProperty(window, 'innerWidth', widthDescriptor);
+      else Reflect.deleteProperty(window, 'innerWidth');
     }
   });
 
@@ -949,6 +981,24 @@ describe('Background policy application', () => {
     expect(fps).toBeGreaterThanOrEqual(18);
     expect(fps).toBeLessThanOrEqual(24);
     expect(canvas.getAttribute('data-background-dpr-cap')).toBe('1.5');
+  });
+
+  it('paints Adaptive on a 390 phone as a still of the theme scene, not Off', async () => {
+    stubDesktopMedia();
+    setViewport(390, 3);
+    setSceneMotion('adaptive');
+
+    const { container } = render(() => <Background id="deep-current" quality="high" />);
+    const canvas = await waitFor(() => {
+      const el = container.querySelector('canvas');
+      expect(el).not.toBeNull();
+      return el as HTMLCanvasElement;
+    });
+
+    expect(canvas.getAttribute('data-background-id')).toBe('deep-current');
+    expect(canvas.getAttribute('data-background-mode')).toBe('still');
+    expect(canvas.getAttribute('data-background-reason')).toBe('adaptive');
+    expect(canvas.getAttribute('data-background-kind')).toBe('solid');
   });
 
   it('caps a desktop DPR2+ wallpaper at high/full and dpr 2', async () => {

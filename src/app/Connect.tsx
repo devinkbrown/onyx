@@ -60,7 +60,10 @@ import {
   type SavedCredentials,
 } from '@/lib/credentials';
 import { normalizeRoomTarget } from '@/shell/roomIdentity';
+import { resolveBackgroundId } from '@/shell/themeBackground';
 import { recordFirstHourHandoff } from '@/lib/firstHour/firstHour';
+import { useThemeOptional } from '@/theme';
+import { Background } from '@/backgrounds/Background';
 import { initialNode, NODES, selectBestNode, type IrcNode } from './nodes';
 import { installConnectPageLifecycle } from './connectPageLifecycle';
 
@@ -69,11 +72,15 @@ import { installConnectPageLifecycle } from './connectPageLifecycle';
 // keep it out of the connection chunk and warm it while the socket handshakes.
 const AppShell = lazy(() => import('@/shell/AppShell').then((module) => ({ default: module.AppShell })));
 
-// Quiet dark field only — no poster glow, grid, or decorative motion.
+// Theme signature scene behind the door. Grain stays as a finishing veil;
+// the old opaque --ink "sea-depth" hid the wallpaper as a flat void.
 function Atmosphere(): JSX.Element {
+  const bgId = useStore((s) => s.backgroundId);
+  const theme = useThemeOptional();
+  const sceneId = createMemo(() => resolveBackgroundId(bgId(), theme.themeId()));
   return (
     <>
-      <div class="conn-sea-depth" aria-hidden="true" />
+      <Background id={sceneId()} />
       <div class="conn-sea-grain" aria-hidden="true" />
     </>
   );

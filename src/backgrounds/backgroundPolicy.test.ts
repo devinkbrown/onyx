@@ -9,6 +9,7 @@ import {
   DESKTOP_DPR_CAP,
   DESKTOP_FRAME_CAP_FPS,
   isNarrowSurface,
+  shouldPauseWhenUnfocused,
   minQuality,
   minSceneDetail,
   MOBILE_DPR_CAP,
@@ -45,6 +46,15 @@ describe('narrow surface detection', () => {
   it('treats a coarse pointer as a narrow surface even on a wide viewport', () => {
     expect(isNarrowSurface(1024, true)).toBe(true);
     expect(isNarrowSurface(1440, false)).toBe(false);
+  });
+});
+
+describe('shouldPauseWhenUnfocused', () => {
+  it('holds desktop window switches and ignores phone / coarse focus lies', () => {
+    expect(shouldPauseWhenUnfocused(1440, false)).toBe(true);
+    expect(shouldPauseWhenUnfocused(390, false)).toBe(false);
+    expect(shouldPauseWhenUnfocused(320, false)).toBe(false);
+    expect(shouldPauseWhenUnfocused(1024, true)).toBe(false);
   });
 });
 

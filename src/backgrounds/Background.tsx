@@ -9,11 +9,14 @@ import {
   type SceneVariant,
 } from './engine';
 import { resolveBackgroundId, type BackgroundId } from './catalogue';
-import { loadBackgroundVariant } from './loader';
+import { FALLBACK_BACKGROUND_VARIANT, loadBackgroundVariant } from './loader';
 import { sceneMotion, type SceneMotion } from '@/lib/prefs/sceneMotion';
 import {
   applyBackgroundPolicyDataset,
   applyBackgroundRuntime,
+  readCoarsePointer,
+  readViewportWidth,
+  shouldPauseWhenUnfocused,
   type BackgroundPolicy,
 } from './backgroundPolicy';
 import { createAppearanceRuntime } from './appearanceRuntime';
@@ -29,7 +32,7 @@ export interface BackgroundProps {
   motionOverride?: SceneMotion;
 }
 
-export const DEFAULT_BACKGROUND_ID: BackgroundId = 'gold-veins';
+export const DEFAULT_BACKGROUND_ID: BackgroundId = 'deep-current';
 export const REDUCED_MOTION_BACKGROUND_ID: BackgroundId = 'lapis-gradient';
 
 /**
@@ -78,9 +81,11 @@ export function Background(props: BackgroundProps) {
   // wallpaper. Fail closed to "no variant" instead.
   const [variant] = createResource(activeId, async (id) => {
     try {
-      return await loadBackgroundVariant(id);
+      return await loadBackgroundVariant(id) ?? FALLBACK_BACKGROUND_VARIANT;
     } catch {
-      return undefined;
+      // Stale hashed chunk or network miss. Paint the eager ocean default so
+      // fail-closed does not look like Off.
+      return FALLBACK_BACKGROUND_VARIANT;
     }
   });
 
@@ -200,7 +205,7 @@ function BackgroundPlaceholder(props: {
         'z-index': '0',
         'pointer-events': 'none',
         background:
-          'radial-gradient(120% 120% at 50% 0%, color-mix(in oklab, var(--lapis) 22%, var(--ink)) 0%, var(--ink) 60%)',
+          'radial-gradient(120% 140% at 50% 8%, color-mix(in oklab, var(--lapis) 34%, var(--ink)) 0%, color-mix(in oklab, var(--lapis-deep, var(--lapis)) 16%, var(--ink)) 42%, var(--ink) 78%)',
       }}
     />
   );
@@ -296,13 +301,19 @@ function SceneBackground(props: {
     return id;
   });
   onMount(() => {
+    const pauseWhenUnfocused = (): boolean =>
+      shouldPauseWhenUnfocused(readViewportWidth(), readCoarsePointer());
     const syncHostPause = (): void => {
       const hidden = typeof document !== 'undefined' && document.hidden;
-      const unfocused = typeof document?.hasFocus === 'function' && !document.hasFocus();
+      // Mobile Safari often reports !hasFocus() on a visible tab. Only treat
+      // that as a hold on desktop / fine-pointer surfaces.
+      const unfocused = pauseWhenUnfocused()
+        && typeof document?.hasFocus === 'function'
+        && !document.hasFocus();
       setRuntimePaused(hidden || unfocused);
     };
     const handleBlur = (): void => {
-      setRuntimePaused(true);
+      if (pauseWhenUnfocused()) setRuntimePaused(true);
     };
     syncHostPause();
     if (typeof window !== 'undefined') {

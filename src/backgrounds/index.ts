@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-export { Background, default, selectBackgroundId } from './Background';
+export { Background, default, DEFAULT_BACKGROUND_ID, selectBackgroundId } from './Background';
 export type { BackgroundProps } from './Background';
 export { BackgroundEngine, isSceneVariant } from './engine';
 export type {
@@ -17,6 +17,7 @@ export {
   applyBackgroundPolicyDataset,
   applyBackgroundRuntime,
   deriveBackgroundPolicy,
+  shouldPauseWhenUnfocused,
   DESKTOP_DPR_CAP,
   DESKTOP_FRAME_CAP_FPS,
   MOBILE_DPR_CAP,
@@ -33,10 +34,9 @@ export type {
   BackgroundRuntimeView,
   SceneDetail,
 } from './backgroundPolicy';
-// Picker metadata + on-demand loader only — NO eager variant render code. The
-// eager registry (allBackgroundVariants / backgroundRegistry / getBackground)
-// is test-only and imported directly from './registry', so it never reaches the
-// app chunk through this barrel.
+// Picker metadata + on-demand loader. The ocean default (`deep-current`) is
+// eager so a stale hashed lazy chunk cannot 404 the flagship scene. The full
+// registry remains test-only (`./registry`) and does not ship through this barrel.
 export {
   BACKGROUND_CATALOGUE,
   SIGNATURE_FAMILIES,

@@ -10,12 +10,19 @@
  */
 import type { AnyBackgroundVariant, BackgroundVariant, SceneVariant } from './engine';
 import { resolveBackgroundId } from './catalogue';
+import { deepCurrent } from './variants/deep-current';
+
+/**
+ * Ocean default, bundled with the wallpaper host so a stale hashed lazy chunk
+ * cannot 404 the flagship scene into a void after deploy.
+ */
+export const FALLBACK_BACKGROUND_VARIANT = deepCurrent;
 
 type VariantLoader = () => Promise<BackgroundVariant>;
 type SceneLoader = () => Promise<SceneVariant>;
 
 const CANVAS_LOADERS: Record<string, VariantLoader> = {
-  'deep-current': () => import('./variants/deep-current').then((m) => m.deepCurrent),
+  'deep-current': () => Promise.resolve(FALLBACK_BACKGROUND_VARIANT),
   bioluminescence: () => import('./variants/bioluminescence').then((m) => m.bioluminescence),
   caustics: () => import('./variants/caustics').then((m) => m.caustics),
   aurora: () => import('./variants/aurora').then((m) => m.aurora),
@@ -65,8 +72,8 @@ export async function loadBackgroundVariant(id: string | null | undefined): Prom
     return undefined;
   } catch {
     // Stale/missing/network chunk failure. Do not poison createResource's error
-    // channel (which would throw on read and can blank the shell). Placeholder +
-    // later selection is the recovery path.
-    return undefined;
+    // channel (which would throw on read and can blank the shell). Paint the
+    // eager ocean default instead of an empty wash that reads as "Off".
+    return FALLBACK_BACKGROUND_VARIANT;
   }
 }

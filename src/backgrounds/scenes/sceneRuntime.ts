@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /** Central lifecycle policy for CSS-animated DOM/SVG background scenes. */
 import { ACTIVITY_THROTTLE_MS, IDLE_HOLD_AFTER_MS } from '../engine';
+import {
+  readCoarsePointer,
+  readViewportWidth,
+  shouldPauseWhenUnfocused,
+} from '../backgroundPolicy';
 
 /** DOM/SVG scenes and canvas backgrounds enter their full hold together. */
 export const SCENE_IDLE_HOLD_MS = IDLE_HOLD_AFTER_MS;
@@ -34,8 +39,12 @@ export function startSceneRuntime(
 
   const idleHoldMs = options.idleHoldMs ?? SCENE_IDLE_HOLD_MS;
   const now = options.now ?? defaultNow;
+  const pauseWhenUnfocused = (): boolean =>
+    shouldPauseWhenUnfocused(readViewportWidth(), readCoarsePointer());
   let hidden = documentIsHidden();
-  let blurred = typeof document.hasFocus === 'function' ? !document.hasFocus() : false;
+  let blurred = pauseWhenUnfocused() && typeof document.hasFocus === 'function'
+    ? !document.hasFocus()
+    : false;
   let paused = false;
   let disposed = false;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -86,6 +95,7 @@ export function startSceneRuntime(
   };
 
   const handleBlur = (): void => {
+    if (!pauseWhenUnfocused()) return;
     blurred = true;
     lastActivityAt = null;
     clearIdleTimer();
