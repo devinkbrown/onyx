@@ -55,6 +55,8 @@ export type ChannelSidebarProps = {
   /** Primary product navigation callbacks are owned by AppShell. */
   onModeChange?: (mode: 'rooms' | 'messages') => void;
   onConversationOpen?: () => void;
+  /** Phone path: never mount N/R/♪/D/Q letter chips. Notifications live in You. */
+  hideOperatorChips?: boolean;
 };
 
 type NavigationViewTransition = {
@@ -149,6 +151,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     'onConversationOpen',
     'activeSection',
     'youDialogOpen',
+    'hideOperatorChips',
   ]);
   let navigationEpoch = 0;
   let activeNavigationTransition: NavigationViewTransition | null = null;
@@ -594,7 +597,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             {`Connection ${statusLabel()}`}
           </span>
         </span>
-        <Show when={preferences().experienceMode !== 'standard'}>
+        <Show when={!local.hideOperatorChips && preferences().experienceMode !== 'standard'}>
           <NotificationControls />
         </Show>
       </div>

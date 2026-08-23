@@ -235,6 +235,17 @@ describe('PresenceRibbon commercial room header', () => {
     expect(people).not.toHaveAttribute('aria-pressed');
   });
 
+  it('does not paint a CONNECTING kicker on the phone ribbon', () => {
+    seedChannel();
+    store.setState({ connectionStatus: 'connecting' });
+    render(() => <PresenceRibbon contextActionsOnly />);
+
+    const conn = screen.getByTestId('ribbon-conn');
+    expect(conn.querySelector('.shell-ribbon-conn-label')).toBeNull();
+    expect(conn.textContent).toMatch(/Connecting…/);
+    expect(conn.textContent).not.toMatch(/CONNECTING/);
+  });
+
   it('keeps connection status present with a11y text (narrow-safe structure)', () => {
     seedChannel();
     render(() => <PresenceRibbon />);
@@ -244,7 +255,7 @@ describe('PresenceRibbon commercial room header', () => {
     expect(conn).toHaveAttribute('aria-live', 'polite');
     expect(conn).toHaveAttribute('data-state', 'connected');
     expect(conn.querySelector('.shell-ribbon-conn-dot')).toBeTruthy();
-    expect(conn.textContent).toMatch(/Connection:\s*connected/i);
+    expect(conn.textContent).toMatch(/Connected/);
     // Must not carry a display-none utility class; compact is CSS-only.
     expect(conn).not.toHaveClass('hidden');
   });

@@ -20,6 +20,8 @@ describe('Harbor phone — connected client', () => {
   const shell = read('shell/AppShell.tsx');
   const nav = read('shell/PrimaryNavigation.tsx');
   const sidebar = read('shell/ChannelSidebar.tsx');
+  const ribbon = read('shell/PresenceRibbon.tsx');
+  const composer = read('shell/Composer.tsx');
   const connect = read('app/connect.css');
 
   it('is imported after the desktop shell so 390-wide chrome wins', () => {
@@ -56,7 +58,12 @@ describe('Harbor phone — connected client', () => {
   it('kills operator leftovers on the default phone path', () => {
     expect(sidebar).toContain('placeholder="Room name"');
     expect(sidebar).not.toContain('join #room');
-    expect(sidebar).toMatch(/experienceMode !== 'standard'[\s\S]*<NotificationControls/);
+    expect(shell).toContain('hideOperatorChips={isMobile()}');
+    expect(sidebar).toMatch(/!local.hideOperatorChips && preferences\(\)\.experienceMode !== 'standard'/);
+    expect(ribbon).toMatch(/contextActionsOnly[\s\S]*shell-ribbon-conn-label/);
+    expect(ribbon).toContain("return 'Connecting…'");
+    expect(composer).toMatch(/return `Message \$\{t\}`/);
+    expect(composer).not.toContain('join #room');
     expect(phone).toMatch(/\.shell-notify-controls[\s\S]*display:\s*none/);
     expect(phone).toMatch(/\.stage-panel\[data-active='false'\][\s\S]*display:\s*none/);
     expect(phone).toMatch(/\.shell-topic-filter[\s\S]*display:\s*none/);
