@@ -941,8 +941,8 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    min-height: 100svh;
-    min-height: 100dvh;
+    min-height: calc(100svh - 24px);
+    min-height: calc(100dvh - 24px);
     border-radius: 0;
     border: 0;
     background: transparent;
