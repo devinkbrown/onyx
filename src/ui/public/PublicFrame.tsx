@@ -2,6 +2,7 @@
 import { Show, type JSX, type ParentProps } from 'solid-js';
 import '@/ui/tokens/index.css';
 import './public-frame.css';
+import { SceneAtmosphere } from '@/backgrounds/SceneAtmosphere';
 import { PublicFooter } from './PublicFooter';
 import { PublicHeader } from './PublicHeader';
 import { PublicSkipLink } from './PublicSkipLink';
@@ -21,6 +22,9 @@ export function PublicFrame(props: ParentProps<{
 }>): JSX.Element {
   return (
     <div class="public-frame">
+      <div class="public-atmosphere" aria-hidden="true" data-testid="public-atmosphere">
+        <SceneAtmosphere />
+      </div>
       <PublicSkipLink />
       <PublicHeader currentPath={props.currentPath} navItems={props.navItems} />
       <Show when={props.context}>

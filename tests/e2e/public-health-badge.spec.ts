@@ -8,11 +8,11 @@ type HealthScenario = {
 };
 
 const scenarios: HealthScenario[] = [
-  { path: '/status/', state: 'current', label: 'network online', selector: '.status-observation' },
-  { path: '/status/', state: 'degraded', label: 'network degraded', selector: '.status-observation' },
-  { path: '/status/', state: 'stale', label: 'status stale', selector: '.status-observation' },
-  { path: '/status/', state: 'future', label: 'status time mismatch', selector: '.status-observation' },
-  { path: '/status/', state: 'unavailable', label: 'status unavailable', selector: '.status-observation' },
+  { path: '/status/', state: 'current', label: 'The rooms are reachable tonight.', selector: '.status-observation' },
+  { path: '/status/', state: 'degraded', label: 'The rooms are having trouble', selector: '.status-observation' },
+  { path: '/status/', state: 'stale', label: 'too old to claim', selector: '.status-observation' },
+  { path: '/status/', state: 'future', label: 'does not make sense', selector: '.status-observation' },
+  { path: '/status/', state: 'unavailable', label: 'no public report', selector: '.status-observation' },
 ];
 
 async function mockPublicStatus(page: Page, state: HealthScenario['state']): Promise<void> {

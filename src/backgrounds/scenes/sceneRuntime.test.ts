@@ -54,6 +54,7 @@ describe('scene runtime lifecycle', () => {
   });
 
   it('pauses immediately while hidden or blurred and resumes on visibility/focus', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
     const changes: boolean[] = [];
     const dispose = startSceneRuntime((paused) => changes.push(paused), { idleHoldMs: 1000 });
 
@@ -74,6 +75,22 @@ describe('scene runtime lifecycle', () => {
     expect(changes.at(-1)).toBe(false);
 
     dispose();
+  });
+
+  it('does not freeze a visible phone tab when hasFocus is false', () => {
+    const widthDescriptor = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false });
+    const changes: boolean[] = [];
+    const dispose = startSceneRuntime((paused) => changes.push(paused), { idleHoldMs: 1000 });
+
+    expect(changes).toEqual([]);
+    window.dispatchEvent(new Event('blur'));
+    expect(changes).toEqual([]);
+
+    dispose();
+    if (widthDescriptor) Object.defineProperty(window, 'innerWidth', widthDescriptor);
+    else Reflect.deleteProperty(window, 'innerWidth');
   });
 
   it('removes every listener symmetrically and cancels the idle hold', () => {

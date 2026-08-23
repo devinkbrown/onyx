@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { JSX } from 'solid-js';
-import type { SceneDetail } from './backgroundPolicy';
+import {
+  readCoarsePointer,
+  readViewportWidth,
+  shouldPauseWhenUnfocused,
+  type SceneDetail,
+} from './backgroundPolicy';
 import { bumpThemeEpoch } from './theme-epoch';
 
 export type BackgroundQuality = 'low' | 'med' | 'high';
@@ -828,6 +833,7 @@ export class BackgroundEngine {
    * idle policy this is a full hold: there is no value in painting an obscured
    * or background window at even the minimum cadence. */
   private readonly handleWindowBlur = (): void => {
+    if (!shouldPauseWhenUnfocused(readViewportWidth(), readCoarsePointer())) return;
     this.windowBlurred = true;
     this.cancelFrame();
     this.lastFrameAt = null;

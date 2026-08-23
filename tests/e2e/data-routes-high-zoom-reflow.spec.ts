@@ -3,15 +3,15 @@ import { expect, test } from '@playwright/test';
 const routes = [
   {
     path: '/roadmap/',
-    heading: 'A place for your people that you can trust',
-    heroSelector: '.r-section h1',
-    copySelector: '.r-card p',
+    heading: 'Rooms, calls, catch-up, and a Home Screen.',
+    heroSelector: '.roadmap-hero h1',
+    copySelector: '.roadmap-summary',
   },
   {
     path: '/status/',
-    heading: 'Network health, in public',
-    heroSelector: '.data-hero h1',
-    copySelector: '.data-card p',
+    heading: 'Are the rooms up tonight?',
+    heroSelector: '.status-hero h1',
+    copySelector: '.status-lede',
   },
   {
     path: '/stats/',

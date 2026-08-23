@@ -56,6 +56,7 @@ describe('SceneShell signature finishing layers', () => {
 
 describe('SceneShell SVG timeline lifecycle', () => {
   it('pauses and resumes SMIL with visibility, focus, idle, and activity', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
     const timeline = createTimelineSpies();
     const { container } = render(() => (
       <SceneShell reducedMotion={false} base="#05070b">

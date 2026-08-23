@@ -4,7 +4,11 @@
  */
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { describe, expect, it, beforeAll } from 'vitest';
+import { describe, expect, it, beforeAll, vi } from 'vitest';
+
+vi.mock('@/backgrounds/SceneAtmosphere', () => ({
+  SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
+}));
 
 const ABOUT_SRC_PATH = resolve(__dirname, 'About.tsx');
 const CSS_SRC_PATH = resolve(__dirname, 'about.css');

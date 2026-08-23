@@ -7,6 +7,10 @@ import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-lib
 import * as clipboard from '@/lib/clipboard/writeClipboardText';
 import InviteRoute from './Invite';
 
+vi.mock('@/backgrounds/SceneAtmosphere', () => ({
+  SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
+}));
+
 const src = readFileSync(resolve(__dirname, 'Invite.tsx'), 'utf8');
 
 afterEach(() => {

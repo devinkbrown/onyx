@@ -1,14 +1,14 @@
 /* Onyx launch site — mineral-night public shell.
    Atmosphere nodes stay in the tree for Invite/Stats/About contracts but
-   do not paint. PublicFrame owns document chrome on live routes.
+   do not paint. PublicFrame owns the scene host and document chrome.
    NOTE: the .r-* atmosphere + shell classes are shared with /about. */
 
-.r { position: relative; min-height: 100svh; display: flex; flex-direction: column; isolation: isolate; font-family: var(--font-sans); color: var(--paper); background: var(--ink); }
+.r { position: relative; min-height: 100svh; display: flex; flex-direction: column; isolation: isolate; font-family: var(--font-sans); color: var(--paper); background: transparent; }
 
-/* ───────── Atmosphere: void ground (selectors kept for Invite/Stats/About) ───────── */
+/* ───────── Atmosphere: leftover ground (selectors kept for Invite/Stats/About) ───────── */
 .r-ground {
   position: fixed; inset: 0; z-index: -3;
-  background: var(--ink);
+  background: transparent;
 }
 .r-ground::before,
 .r-ground::after {

@@ -33,6 +33,16 @@ vi.mock('@/shell/AppShell', () => ({
   ),
 }));
 
+vi.mock('@/backgrounds/SceneAtmosphere', () => ({
+  SceneAtmosphere: () => (
+    <div
+      data-testid="connect-atmosphere"
+      data-background-canvas="true"
+      data-background-id="deep-current"
+    />
+  ),
+}));
+
 // The connect screen probes node latency through lightweight HTTPS on mount.
 // In jsdom that would hit the live web tiers, so stub the probe + selector here —
 // real latency routing is exercised in the browser / e2e, not in unit tests.
@@ -132,6 +142,7 @@ describe('Connect screen rendering', () => {
   it('renders the guest join heading', () => {
     render(() => <Connect />);
     expect(screen.getByRole('heading', { name: /join a room/i })).toBeInTheDocument();
+    expect(screen.getByTestId('connect-atmosphere')).toHaveAttribute('data-background-id', 'deep-current');
   });
 
   it('does not expose a server picker or any node hostnames', () => {

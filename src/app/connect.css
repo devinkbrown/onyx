@@ -13,7 +13,7 @@
   justify-content: center;
   overflow: hidden;
   font-family: var(--font-sans);
-  background: var(--ink);
+  background: transparent;
   padding-top: max(24px, calc(env(safe-area-inset-top, 0px) + 16px));
   padding-bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px));
   padding-inline: 20px;
@@ -24,7 +24,7 @@
   inset: 0;
   z-index: -3;
   pointer-events: none;
-  background: var(--ink);
+  background: transparent;
 }
 
 .conn-sea-horizon {
@@ -915,8 +915,12 @@
     align-items: stretch;
     justify-content: flex-end;
     overflow-y: auto;
-    padding: 0;
-    background: var(--ink);
+    padding:
+      max(12px, env(safe-area-inset-top, 0px))
+      max(12px, env(safe-area-inset-right, 0px))
+      max(12px, env(safe-area-inset-bottom, 0px))
+      max(12px, env(safe-area-inset-left, 0px));
+    background: transparent;
   }
 
   .conn-sea-horizon {
@@ -937,8 +941,8 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    min-height: 100svh;
-    min-height: 100dvh;
+    min-height: calc(100svh - 24px);
+    min-height: calc(100dvh - 24px);
     border-radius: 0;
     border: 0;
     background: transparent;
@@ -1002,7 +1006,7 @@
     bottom: 0;
     margin-top: 8px;
     padding: 10px 0 max(4px, env(safe-area-inset-bottom, 0px));
-    background: var(--ink);
+    background: color-mix(in oklab, var(--ink) 62%, transparent);
   }
 
   .conn-auth-required { align-items: stretch; flex-direction: column; }
