@@ -4,9 +4,22 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadBackgroundVariant = vi.hoisted(() => vi.fn());
+const fallbackVariant = vi.hoisted(() => ({
+  id: 'deep-current',
+  label: 'Deep Current',
+  kind: 'scene' as const,
+  component: () => <div data-test-fallback-scene="true" />,
+}));
 const hasFocusDescriptor = Object.getOwnPropertyDescriptor(document, 'hasFocus');
 
-vi.mock('./loader', () => ({ loadBackgroundVariant }));
+vi.mock('./loader', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./loader')>();
+  return {
+    ...actual,
+    loadBackgroundVariant,
+    FALLBACK_BACKGROUND_VARIANT: fallbackVariant,
+  };
+});
 
 import { Background } from './Background';
 import { SceneShell } from './scenes/SceneShell';
@@ -58,6 +71,7 @@ describe('Background lazy resource gating', () => {
   });
 
   it('loads and mounts normally when switching from Off to Animated', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
     setSceneMotion('off');
     const { container } = render(() => <Background id="starfield" />);
     expect(loadBackgroundVariant).not.toHaveBeenCalled();
@@ -89,6 +103,27 @@ describe('Background lazy resource gating', () => {
     window.dispatchEvent(new Event('focus'));
     expect(scene?.hasAttribute('data-scene-runtime-paused')).toBe(false);
     expect(host?.hasAttribute('data-background-paused')).toBe(false);
+  });
+
+  it('does not start an explicit Animated phone scene paused when hasFocus is false', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false });
+    setSceneMotion('animated');
+
+    const { container } = render(() => <Background id="starfield" />);
+    const host = await waitFor(() => {
+      const element = container.querySelector('[data-background-id="starfield"]');
+      expect(element).not.toBeNull();
+      return element;
+    });
+    const scene = host?.querySelector('.onyx-scene');
+    expect(host?.getAttribute('data-background-mode')).toBe('animated');
+    expect(host?.hasAttribute('data-background-paused')).toBe(false);
+    expect(scene?.hasAttribute('data-scene-runtime-paused')).toBe(false);
+
+    window.dispatchEvent(new Event('blur'));
+    expect(host?.hasAttribute('data-background-paused')).toBe(false);
+    expect(scene?.hasAttribute('data-scene-runtime-paused')).toBe(false);
   });
 
   it('keeps a static branded frame and skips the render chunk under Data Saver', async () => {
@@ -151,7 +186,7 @@ describe('Background lazy resource gating', () => {
       .toBe('0');
   });
 
-  it('keeps the inert placeholder when a wallpaper chunk rejects (shell stays usable)', async () => {
+  it('paints the eager ocean default when a wallpaper chunk rejects (shell stays usable)', async () => {
     loadBackgroundVariant.mockRejectedValueOnce(
       new TypeError('Failed to fetch dynamically imported module: /assets/Starfield-deadbeef.js'),
     );
@@ -164,12 +199,12 @@ describe('Background lazy resource gating', () => {
     ));
 
     await waitFor(() => {
-      expect(container.querySelector('[data-background-placeholder="true"]')).not.toBeNull();
-      expect(container.querySelector('[data-background-load-failed="true"]')).not.toBeNull();
+      expect(container.querySelector('[data-background-id="deep-current"]')).not.toBeNull();
     });
     // Interface chrome is not unmounted by a wallpaper load failure.
     expect(container.querySelector('[data-testid="shell-chrome"] button')).toHaveTextContent('Open room');
     expect(container.querySelector('[data-background-id="starfield"]')).toBeNull();
+    expect(container.querySelector('[data-background-placeholder="true"]')).toBeNull();
   });
 
   it('recovers when a later different wallpaper selection succeeds after a rejected chunk', async () => {
@@ -185,7 +220,7 @@ describe('Background lazy resource gating', () => {
     const [id, setId] = createSignal('starfield');
     const { container } = render(() => <Background id={id()} />);
     await waitFor(() => {
-      expect(container.querySelector('[data-background-load-failed="true"]')).not.toBeNull();
+      expect(container.querySelector('[data-background-id="deep-current"]')).not.toBeNull();
     });
 
     setId('lightning');
@@ -193,7 +228,7 @@ describe('Background lazy resource gating', () => {
     await waitFor(() => {
       expect(container.querySelector('[data-background-id="lightning"]')).not.toBeNull();
     });
-    expect(container.querySelector('[data-background-load-failed="true"]')).toBeNull();
+    expect(container.querySelector('[data-background-id="deep-current"]')).toBeNull();
     expect(loadBackgroundVariant.mock.calls.some((c) => c[0] === 'lightning')).toBe(true);
   });
 });

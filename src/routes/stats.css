@@ -32,7 +32,7 @@
 }
 
 .stats-page .r-ground {
-  background: var(--ink);
+  background: transparent;
 }
 
 .stats-page .r-ground::before,

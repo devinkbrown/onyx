@@ -112,8 +112,22 @@ export function backgroundPolicyIsStatic(policy: BackgroundPolicy): boolean {
 }
 
 /**
- * Combine the presentation contract with visibility/focus. Hidden or unfocused
- * surfaces pause — they do not change mode to Off or Still.
+ * Desktop window switches should hold animation. Phone / coarse surfaces must
+ * not: Mobile Safari often reports `!document.hasFocus()` while the tab is the
+ * only visible surface, which would freeze an explicit Animated scene forever.
+ */
+export function shouldPauseWhenUnfocused(
+  viewportWidth: number,
+  coarsePointer: boolean,
+): boolean {
+  return !isNarrowSurface(viewportWidth, coarsePointer);
+}
+
+/**
+ * Combine the presentation contract with visibility/focus. Hidden or (on a
+ * desktop surface) unfocused windows pause — they do not change mode to Off
+ * or Still. Narrow / coarse hosts must omit `unfocused` rather than rely on
+ * `hasFocus()`.
  */
 export function applyBackgroundRuntime(
   policy: BackgroundPolicy,

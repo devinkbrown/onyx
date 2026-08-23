@@ -84,12 +84,28 @@ export function groundLayer(ctx: BackgroundFrameContext, theme: BackgroundTheme,
     ctx.height * 0.12,
     Math.max(ctx.width, ctx.height) * 0.8,
   );
-  glow.addColorStop(0, rgba(capLuminance(theme.lapisDeep, 0.3), 0.1));
+  glow.addColorStop(0, rgba(capLuminance(theme.lapisDeep, 0.3), ctx.qualityScale < 1 ? 0.34 : 0.1));
   glow.addColorStop(1, rgba(base, 0));
   c.save();
   c.globalCompositeOperation = 'screen';
   c.fillStyle = glow;
   c.fillRect(0, 0, ctx.width, ctx.height);
+  if (ctx.qualityScale < 1) {
+    // Phone/med surfaces recede the painter; a quiet lapis pool keeps Adaptive
+    // still readable as water instead of a second ink void.
+    const pool = c.createRadialGradient(
+      ctx.width * 0.5,
+      ctx.height * 0.38,
+      0,
+      ctx.width * 0.5,
+      ctx.height * 0.42,
+      Math.max(ctx.width, ctx.height) * 0.72,
+    );
+    pool.addColorStop(0, rgba(capLuminance(theme.lapis, 0.28), 0.2));
+    pool.addColorStop(1, rgba(base, 0));
+    c.fillStyle = pool;
+    c.fillRect(0, 0, ctx.width, ctx.height);
+  }
   c.restore();
 }
 

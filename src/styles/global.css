@@ -67,26 +67,28 @@ a {
 /* ── Background canvas visibility ────────────────────────────────────────────
    Backgrounds are atmosphere, never the contrast surface. ThemeProvider marks
    the root with the resolved light/dark scheme so the painter layer can recede
-   into that theme's own --ink. The former mobile brightness(1.36) pass happened
-   after renderer luminance caps and made light themes muddy beneath dark text. */
+   into that theme's own --ink. Adaptive-still on a phone must still be *seen*:
+   the former 0.58 / 0.20 mobile opacities hid a valid still frame as a void. */
 [data-background-canvas] {
-  filter: saturate(1.08) contrast(0.96);
-  opacity: 0.68;
+  filter: saturate(1.1) contrast(0.98);
+  opacity: 0.9;
 }
 
 :root[data-theme-scheme='light'] [data-background-canvas] {
   filter: saturate(0.78) contrast(0.9);
-  opacity: 0.24;
+  opacity: 0.42;
 }
 
 @media (max-width: 680px) {
+  /* Adaptive-still is a frozen frame of this theme's scene. Recede it, but
+     never hide it: the previous 0.58 / contrast-down pass read as Off. */
   [data-background-canvas] {
-    filter: saturate(1.04) contrast(0.94);
-    opacity: 0.58;
+    filter: saturate(1.16) contrast(1.04) brightness(1.22);
+    opacity: 0.96;
   }
 
   :root[data-theme-scheme='light'] [data-background-canvas] {
-    filter: saturate(0.72) contrast(0.88);
-    opacity: 0.2;
+    filter: saturate(0.78) contrast(0.92) brightness(1.04);
+    opacity: 0.5;
   }
 }

@@ -7,6 +7,10 @@ import { Suspense } from 'solid-js';
 
 import StatsRoute, { revealStatsInspector, roomDeepLink, STATS_INSPECTOR_ID } from './Stats';
 
+vi.mock('@/backgrounds/SceneAtmosphere', () => ({
+  SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
+}));
+
 const src = readFileSync(resolve(__dirname, 'Stats.tsx'), 'utf8');
 
 function channelDetailPayload(channel: string, now: number, extras: Record<string, unknown> = {}) {

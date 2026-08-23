@@ -6479,7 +6479,9 @@
     --mnav-h: max(56px, 2.25rem);
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr);
-    /* Sit above the fixed bottom tab bar; clear the notch up top. */
+    /* Sit above the fixed bottom tab bar; clear the notch up top.
+       Transparent so the page-layer scene is the harbor, not a second ink void. */
+    background: transparent;
     height: calc(
       100svh
       - var(--mnav-h)
@@ -6606,8 +6608,9 @@
     border-radius: 0;
     box-shadow: none;
     min-width: 0;
-    /* Preserve the selected Onyx backdrop instead of burying it under opaque ink. */
-    background: color-mix(in oklab, var(--ink) 76%, transparent);
+    /* Reading plane over the harbor — translucent enough that Adaptive-still
+       and Animated scenes remain visible atmosphere, not a second ink void. */
+    background: color-mix(in oklab, var(--ink) 38%, transparent);
   }
 
   .shell-context-rail,
