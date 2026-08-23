@@ -73,6 +73,7 @@ describe('Composer accessibility', () => {
     resetFirstHourForTests();
     resetFirstRunNotifyState();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('gives the textarea an accessible name and labels the tool buttons', () => {
@@ -262,12 +263,15 @@ describe('Composer accessibility', () => {
 
   it('keeps a failed upload attached and says Couldn\'t send. Try again.', async () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fail');
+    vi.stubGlobal('XMLHttpRequest', undefined);
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('upload unavailable'));
     seedActiveChannel();
-    const { getByLabelText, getByRole, getByText, findByRole } = render(() => <Composer />);
+    const { getByLabelText, getByRole, getByText, findByRole, findByText } = render(() => <Composer />);
     const input = getByLabelText('Choose files to attach') as HTMLInputElement;
     const file = new File(['x'], 'shot.png', { type: 'image/png' });
     Object.defineProperty(input, 'files', { value: [file], configurable: true });
     fireEvent.change(input);
+    await findByText('shot.png');
     fireEvent.click(getByRole('button', { name: 'Send message' }));
     expect(await findByRole('alert')).toHaveTextContent("Couldn't send. Try again.");
     expect(getByText('shot.png')).toBeDefined();

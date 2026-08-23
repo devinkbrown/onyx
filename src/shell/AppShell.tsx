@@ -31,7 +31,7 @@ import './harbor-phone.css';
 // the lazy VoiceStage chunk arrives — without this, the panel looks unstyled/missing.
 import './voice/voice.css';
 
-import { lazy, createEffect, createMemo, createSignal, ErrorBoundary, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, Suspense, type JSX } from 'solid-js';
+import { lazy, createEffect, createMemo, createSignal, ErrorBoundary, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, Suspense, untrack, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { AddToHomeScreenSheet } from '@/pwa/AddToHomeScreenSheet';
 import { useThemeOptional } from '@/theme';
@@ -1001,22 +1001,24 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
       const armed = returnSurface;
       queueMicrotask(() => {
         queueMicrotask(() => {
-          if (mobileMenuReturnSurface() !== armed) return;
-          if (showAppearance()) {
-            setMobileMenuReturnSurface('appearance');
-            return;
-          }
-          if (isPreferencesOpen()) {
-            setMobileMenuReturnSurface('preferences');
-            return;
-          }
-          if (isNotificationsOpen()) {
-            setMobileMenuReturnSurface('notifications');
-            return;
-          }
-          if (showAccount()) return;
-          setMobileMenuReturnSurface(null);
-          restoreMobileMenuTriggerFocus();
+          untrack(() => {
+            if (mobileMenuReturnSurface() !== armed) return;
+            if (showAppearance()) {
+              setMobileMenuReturnSurface('appearance');
+              return;
+            }
+            if (isPreferencesOpen()) {
+              setMobileMenuReturnSurface('preferences');
+              return;
+            }
+            if (isNotificationsOpen()) {
+              setMobileMenuReturnSurface('notifications');
+              return;
+            }
+            if (showAccount()) return;
+            setMobileMenuReturnSurface(null);
+            restoreMobileMenuTriggerFocus();
+          });
         });
       });
       return;
