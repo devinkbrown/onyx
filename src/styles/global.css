@@ -70,23 +70,25 @@ a {
    into that theme's own --ink. Adaptive-still on a phone must still be *seen*:
    the former 0.58 / 0.20 mobile opacities hid a valid still frame as a void. */
 [data-background-canvas] {
-  filter: saturate(1.08) contrast(0.96);
-  opacity: 0.82;
+  filter: saturate(1.1) contrast(0.98);
+  opacity: 0.9;
 }
 
 :root[data-theme-scheme='light'] [data-background-canvas] {
   filter: saturate(0.78) contrast(0.9);
-  opacity: 0.4;
+  opacity: 0.42;
 }
 
 @media (max-width: 680px) {
+  /* Adaptive-still is a frozen frame of this theme's scene. Recede it, but
+     never hide it: the previous 0.58 / contrast-down pass read as Off. */
   [data-background-canvas] {
-    filter: saturate(1.06) contrast(0.96);
-    opacity: 0.88;
+    filter: saturate(1.16) contrast(1.04) brightness(1.22);
+    opacity: 0.96;
   }
 
   :root[data-theme-scheme='light'] [data-background-canvas] {
-    filter: saturate(0.76) contrast(0.9);
-    opacity: 0.46;
+    filter: saturate(0.78) contrast(0.92) brightness(1.04);
+    opacity: 0.5;
   }
 }

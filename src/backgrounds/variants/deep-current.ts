@@ -29,6 +29,15 @@ export const deepCurrent = {
   dispose() {},
 } satisfies BackgroundVariant;
 
+/** Med/low paint fewer strokes (qualityScale 0.76/0.52). Lift their presence
+ *  so a phone Adaptive-still still reads as water, not a void. High stays the
+ *  quiet desktop harbor. */
+function harborInkGain(quality: BackgroundFrameContext['quality']): number {
+  if (quality === 'high') return 1;
+  if (quality === 'med') return 2.2;
+  return 2.6;
+}
+
 function drawCausticBands(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: number): void {
   const c = ctx.context;
   const count = Math.max(3, Math.floor(5 * ctx.qualityScale));
@@ -47,8 +56,8 @@ function drawCausticBands(ctx: BackgroundFrameContext, theme: BackgroundTheme, t
     const y = topLimit * (0.12 + i * 0.17) + Math.sin(time * 0.00012 + seed) * 7;
     const amplitude = 5 + seeded(seed) * 8;
 
-    c.globalAlpha = 0.028 + seeded(seed + 1) * 0.026;
-    c.lineWidth = 0.7 + seeded(seed + 2) * 0.75;
+    c.globalAlpha = (0.028 + seeded(seed + 1) * 0.026) * harborInkGain(ctx.quality);
+    c.lineWidth = 0.7 + seeded(seed + 2) * 0.75 + (ctx.quality === 'high' ? 0 : 0.45);
     c.setLineDash([70 + seeded(seed + 3) * 70, 46 + seeded(seed + 4) * 54]);
     c.lineDashOffset = -time * (0.006 + seeded(seed + 5) * 0.004) - i * 38;
     traceWave(ctx, y, amplitude, time * 0.00011 + i * 1.4, 0.0045, 92);
@@ -79,7 +88,7 @@ function drawCurrentPaths(ctx: BackgroundFrameContext, theme: BackgroundTheme, t
 
     c.shadowColor = rgba(theme.lapisBright, 0.13);
     c.shadowBlur = 16 + seeded(seed + 5) * 14;
-    c.globalAlpha = (0.05 + seeded(seed + 6) * 0.045) * depthFade;
+    c.globalAlpha = (0.05 + seeded(seed + 6) * 0.045) * depthFade * harborInkGain(ctx.quality);
     c.strokeStyle = rgba(i % 3 === 0 ? theme.lapisBright : theme.lapisDeep, 0.72);
     c.lineWidth = 14 + seeded(seed + 7) * 22;
     c.setLineDash([]);
@@ -87,7 +96,7 @@ function drawCurrentPaths(ctx: BackgroundFrameContext, theme: BackgroundTheme, t
     c.stroke();
 
     c.shadowBlur = 8;
-    c.globalAlpha = (0.14 + seeded(seed + 8) * 0.11) * depthFade;
+    c.globalAlpha = (0.14 + seeded(seed + 8) * 0.11) * depthFade * Math.min(1.8, harborInkGain(ctx.quality));
     c.strokeStyle = theme.lapis;
     c.lineWidth = 0.9 + seeded(seed + 9) * 1.5;
     c.setLineDash([110 + seeded(seed + 10) * 70, 150 + seeded(seed + 11) * 120]);
@@ -125,7 +134,7 @@ function drawBioluminescence(ctx: BackgroundFrameContext, theme: BackgroundTheme
     const pulse = 0.66 + Math.sin(time * (0.00055 + seeded(seed + 6) * 0.00042) + seed) * 0.26;
     const depthFade = 1 - Math.min(0.42, y / Math.max(1, ctx.height) * 0.34);
 
-    c.globalAlpha = (0.1 + seeded(seed + 7) * 0.24) * pulse * depthFade * (pale ? 0.48 : 1);
+    c.globalAlpha = (0.1 + seeded(seed + 7) * 0.24) * pulse * depthFade * (pale ? 0.48 : 1) * Math.min(1.6, harborInkGain(ctx.quality));
     c.fillStyle = color;
     c.shadowColor = rgba(color, pale ? 0.22 : 0.3);
     c.shadowBlur = 5 + radius * 4;

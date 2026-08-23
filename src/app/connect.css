@@ -921,7 +921,7 @@
     min-height: calc(100dvh - 24px);
     border-radius: var(--r-md);
     border: 1px solid var(--seam-faint);
-    background: color-mix(in oklab, var(--ink) 68%, transparent);
+    background: color-mix(in oklab, var(--ink) 38%, transparent);
   }
 
   .conn-body {

@@ -6610,7 +6610,7 @@
     min-width: 0;
     /* Reading plane over the harbor — translucent enough that Adaptive-still
        and Animated scenes remain visible atmosphere, not a second ink void. */
-    background: color-mix(in oklab, var(--ink) 64%, transparent);
+    background: color-mix(in oklab, var(--ink) 38%, transparent);
   }
 
   .shell-context-rail,
