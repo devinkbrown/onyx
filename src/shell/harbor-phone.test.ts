@@ -83,6 +83,11 @@ describe('Harbor phone — connected client', () => {
     expect(phone).toMatch(/\.shell-mobile-nav-btn--active \.shell-mobile-nav-icon[\s\S]*background:\s*var\(--lapis\)/);
     expect(phone).not.toMatch(/linear-gradient\(135deg/);
   });
+
+  it('names the People door instead of leaving a bare count on phones', () => {
+    expect(phone).toMatch(/\.shell-ribbon-members[\s\S]*width:\s*auto/);
+    expect(phone).toMatch(/\.shell-ribbon-members \.shell-ribbon-action-label[\s\S]*display:\s*inline/);
+  });
 });
 
 describe('Harbor phone — public site', () => {

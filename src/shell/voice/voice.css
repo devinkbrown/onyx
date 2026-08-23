@@ -290,6 +290,13 @@
   z-index: 1;
 }
 
+/* The generic child stacking rule must not pull the size switcher back into
+   flex flow; it is overlay chrome, not a blank row above the participant. */
+.voice-stage > .voice-stage__chrome {
+  position: absolute;
+  z-index: 5;
+}
+
 /* Grid layout adapts to participant count */
 .voice-stage__grid {
   display: grid;
@@ -1505,6 +1512,168 @@
   .voice-bar__channel-name { max-width: 70px; }
   .voice-cq__rate { display: none; }
   .voice-sec__label { display: none; }
+}
+
+/* Phone call dock: a compact harbor console with one context row and one
+   decisive control row. Keep the transcript usable instead of allowing flex
+   wrapping to turn five primary actions into a tall control wall. */
+@media (max-width: 640px) and (min-height: 30.01rem) {
+  .voice-stage {
+    width: calc(100% - 16px);
+    margin: 8px;
+    border-color: color-mix(in oklab, var(--lapis) 24%, var(--seam-faint));
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at 50% 24%, color-mix(in oklab, var(--lapis-deep) 24%, transparent), transparent 55%),
+      color-mix(in oklab, var(--stone-2) 70%, var(--ink));
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, var(--paper) 9%, transparent),
+      0 16px 34px -28px color-mix(in oklab, var(--lapis) 62%, transparent);
+  }
+
+  .voice-stage__chrome {
+    top: 8px;
+    right: auto;
+    left: 8px;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 14px;
+  }
+
+  .voice-stage__size-btn {
+    width: 40px;
+    height: 36px;
+    border-radius: 11px;
+    font-size: 14px;
+  }
+
+  .voice-stage--size-compact {
+    padding: 10px;
+    max-height: 13rem;
+  }
+
+  .voice-stage--size-compact .voice-tile {
+    width: min(100%, 15rem);
+    max-width: 15rem;
+    border-radius: 16px;
+  }
+
+  .voice-stage--size-compact .voice-stage__grid[data-count='1'] .voice-tile {
+    width: min(100%, 20rem);
+    max-width: 20rem;
+  }
+
+  .voice-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'identity status'
+      'controls controls';
+    align-items: center;
+    gap: 5px 10px;
+    min-height: 96px;
+    padding: 5px 12px 7px;
+    overflow: visible;
+    border-top-color: color-mix(in oklab, var(--lapis) 22%, var(--seam-faint));
+    background:
+      radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--lapis-deep) 20%, transparent), transparent 44%),
+      color-mix(in oklab, var(--ink) 92%, var(--stone));
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent),
+      0 -16px 28px -28px color-mix(in oklab, var(--lapis) 64%, transparent);
+  }
+
+  .voice-bar__identity {
+    grid-area: identity;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  .voice-bar__people {
+    gap: 9px;
+  }
+
+  .voice-bar__people-faces .onyx-avatar {
+    width: 36px;
+    height: 36px;
+    box-shadow:
+      0 0 0 2px color-mix(in oklab, var(--ink) 88%, transparent),
+      0 0 0 3px color-mix(in oklab, var(--lapis) 38%, transparent);
+  }
+
+  .voice-bar__people-names {
+    max-width: 14ch;
+    font-size: 14px;
+    font-weight: 680;
+  }
+
+  .voice-bar__channel-name,
+  .voice-bar__timer,
+  .voice-bar__count {
+    font-size: 10px;
+  }
+
+  .voice-bar > .voice-bar__sep {
+    display: none;
+  }
+
+  .voice-bar__controls {
+    grid-area: controls;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .voice-bar__group {
+    flex: none;
+    gap: 5px;
+  }
+
+  .voice-bar__action,
+  .voice-bar__leave.onyx-icon-button {
+    width: 52px;
+    min-width: 52px;
+    height: 48px;
+    min-height: 48px;
+    padding: 4px 5px;
+    border-radius: 15px;
+  }
+
+  .voice-bar .voice-bar__action:not(.voice-bar__leave) {
+    background: color-mix(in oklab, var(--stone-2) 58%, transparent);
+    border-color: color-mix(in oklab, var(--paper) 10%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 7%, transparent);
+  }
+
+  .voice-bar__action-icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .voice-bar__action-label {
+    font-size: 10px;
+  }
+
+  .voice-bar__right {
+    grid-area: status;
+    gap: 5px;
+    margin: 0;
+  }
+
+  .voice-bar__right .voice-sfu {
+    display: none;
+  }
+
+  .voice-bar__right .voice-sec,
+  .voice-bar__right .voice-cq {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 6px 8px;
+    justify-content: center;
+  }
 }
 
 /* Multiple 16:9 tiles become too narrow to expose their action clusters at

@@ -118,6 +118,28 @@
     background: transparent;
   }
 
+  .shell-ribbon-members {
+    width: auto;
+    min-width: 74px;
+    max-width: 92px;
+    padding: 0 10px;
+    gap: 6px;
+    border-color: color-mix(in oklab, var(--lapis) 24%, var(--seam-faint));
+    border-radius: 14px;
+    background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+    color: var(--paper-dim);
+  }
+
+  .shell-ribbon-members .shell-ribbon-action-label {
+    display: inline;
+    font-size: 0.72rem;
+    font-weight: 620;
+  }
+
+  .shell-ribbon-members .shell-ribbon-count {
+    font-size: 0.68rem;
+  }
+
   /* ── Transcript: air, 17px, people as circles. ── */
   .shell-feed {
     padding: 10px 0 8px;

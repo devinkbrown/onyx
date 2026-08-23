@@ -107,7 +107,9 @@ describe('Landing', () => {
     expect(container.querySelector('.public-frame__mark')?.getAttribute('src')).toBe('/brand/mark.png');
     expect(container.querySelector('.public-frame__lockup')?.getAttribute('src')).toBe('/brand/lockup.png');
     expect(container.querySelector('.public-frame__wordmark')?.getAttribute('src')).toBe('/brand/wordmark.png');
-    expect(container.querySelector('img.home-mascot')?.getAttribute('src')).toBe('/brand/mascot.png');
+    expect(container.querySelector('img.home-mascot')?.getAttribute('src')).toBe('/brand/mascot-transparent.png');
+    expect(container.querySelector('.home-mascot-scene img.home-mascot')).toBeInTheDocument();
+    expect(container.querySelector('.home-mascot-wake')).toHaveAttribute('aria-hidden', 'true');
     expect(container.querySelectorAll('img.home-mascot')).toHaveLength(1);
     expect(container.textContent).not.toMatch(/Pebble/i);
     expect(container.textContent).not.toMatch(/Meet Pebble/i);

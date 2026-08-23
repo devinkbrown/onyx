@@ -16,6 +16,54 @@ const voiceStageCompactRule = voiceCss.match(/\.voice-stage--size-compact\s*\{[^
 const voiceStageExpandedRule = voiceCss.match(/\.voice-stage--size-expanded\s*\{[^}]+\}/u)?.[0] ?? '';
 const voiceStageDockBundle = `${voiceStageDockRule}\n${voiceStageCompactRule}\n${voiceStageExpandedRule}`;
 
+test('lets one participant own the compact phone stage instead of floating alone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setContent(`
+    <!doctype html>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <main class="voice-stage voice-stage--size-compact voice-stage--audio" data-testid="voice-stage">
+      <div class="voice-stage__chrome"><button class="voice-stage__size-btn">−</button></div>
+      <div class="voice-stage__grid" data-count="1">
+        <article class="voice-tile" data-testid="voice-tile">
+          <div class="voice-tile__avatar-wrap"><span class="onyx-avatar">DJ</span></div>
+          <div class="voice-tile__bar"><span class="voice-tile__nick">Dje</span></div>
+        </article>
+      </div>
+    </main>
+  `);
+  await page.addStyleTag({ content: `
+    *, *::before, *::after { box-sizing:border-box; }
+    :root { --ink:#020a12; --stone:#123; --stone-2:#234; --stone-3:#345; --paper:#fff; --paper-dim:#ddd; --paper-mute:#aaa; --seam:#456; --seam-faint:#234; --stone-line:#456; --lapis:#168ce0; --lapis-bright:#55baff; --lapis-deep:#075080; --gold:#c90; --gold-bright:#fd5; --shu:#c34; --ok:#4ade80; --r-sm:6px; --r-md:10px; --r-pill:999px; --font-sans:sans-serif; --font-mono:monospace; --dur:0ms; --ease:linear; }
+    html, body { margin:0; width:100%; overflow:hidden; background:var(--ink); }
+    .onyx-avatar { display:grid; place-items:center; width:64px; height:64px; border-radius:50%; }
+    ${voiceCss}
+  ` });
+  const geometry = await page.getByTestId('voice-stage').evaluate((element) => {
+    const stage = element.getBoundingClientRect();
+    const tile = element.querySelector<HTMLElement>('.voice-tile')!.getBoundingClientRect();
+    const chrome = element.querySelector<HTMLElement>('.voice-stage__chrome')!;
+    return {
+      stageWidth: stage.width,
+      stageHeight: stage.height,
+      tileWidth: tile.width,
+      tileHeight: tile.height,
+      topGap: tile.top - stage.top,
+      bottomGap: stage.bottom - tile.bottom,
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      chromePosition: getComputedStyle(chrome).position,
+      chromeZIndex: Number.parseInt(getComputedStyle(chrome).zIndex, 10),
+    };
+  });
+  expect(geometry.scrollWidth).toBe(geometry.clientWidth);
+  expect(geometry.tileWidth).toBeGreaterThanOrEqual(geometry.stageWidth * 0.8);
+  expect(geometry.stageHeight).toBeLessThanOrEqual(220);
+  expect(geometry.topGap).toBeLessThanOrEqual(16);
+  expect(geometry.bottomGap).toBeLessThanOrEqual(16);
+  expect(geometry.chromePosition).toBe('absolute');
+  expect(geometry.chromeZIndex).toBeGreaterThan(1);
+});
+
 test('reflows participant tiles and exposes their actions at 400% short zoom', async ({ page }) => {
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 320, height: 256 });

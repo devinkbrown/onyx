@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { Show, type JSX, type ParentProps } from 'solid-js';
+import { onCleanup, onMount, Show, type JSX, type ParentProps } from 'solid-js';
 import '@/ui/tokens/index.css';
 import './public-frame.css';
 import { SceneAtmosphere } from '@/backgrounds/SceneAtmosphere';
@@ -20,6 +20,16 @@ export function PublicFrame(props: ParentProps<{
   mainLabel?: string;
   context?: JSX.Element;
 }>): JSX.Element {
+  onMount(() => {
+    const bootstrapSkip = document.querySelector<HTMLElement>('body > .html-shell-skip');
+    if (!bootstrapSkip) return;
+
+    bootstrapSkip.hidden = true;
+    onCleanup(() => {
+      bootstrapSkip.hidden = false;
+    });
+  });
+
   return (
     <div class="public-frame">
       <div class="public-atmosphere" aria-hidden="true" data-testid="public-atmosphere">

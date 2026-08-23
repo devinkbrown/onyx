@@ -23,6 +23,7 @@ describe('locked public identity assets', () => {
       'public/brand/lockup.png',
       'public/brand/wordmark.png',
       'public/brand/mascot.png',
+      'public/brand/mascot-transparent.png',
       'public/brand/mascot-wave.png',
       'public/brand/mascot-still.png',
       'public/brand/app-icon.png',
@@ -56,7 +57,9 @@ describe('locked public identity assets', () => {
     const home = read('src/routes/Landing.tsx');
     const entry = read('index.html');
     expect(home).not.toMatch(/Pebble/);
-    expect(home).toContain('/brand/mascot.png');
+    expect(home).toContain('/brand/mascot-transparent.png');
+    const transparentMascot = readFileSync(join(root, 'public/brand/mascot-transparent.png'));
+    expect(transparentMascot[25], 'landing mascot must use RGBA pixels').toBe(6);
     expect(entry).toContain('https://eshmaki.me/og.png');
     expect(entry).not.toContain('https://eshmaki.me/icon-512.png');
     expect(entry).toContain('summary_large_image');
@@ -95,7 +98,7 @@ describe('locked public identity assets', () => {
     const home = read('src/routes/Landing.tsx');
     const about = read('src/routes/About.tsx');
     const invite = read('src/routes/Invite.tsx');
-    expect(home.match(/\/brand\/mascot[^"]*/g)).toEqual(['/brand/mascot.png']);
+    expect(home.match(/\/brand\/mascot[^"]*/g)).toEqual(['/brand/mascot-transparent.png']);
     expect(about.match(/\/brand\/mascot[^"]*/g)).toEqual(['/brand/mascot-still.png']);
     expect(invite.match(/\/brand\/mascot[^"]*/g)).toEqual(['/brand/mascot-wave.png']);
     expect(about).not.toMatch(/Pebble/);

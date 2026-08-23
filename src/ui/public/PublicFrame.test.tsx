@@ -16,6 +16,22 @@ afterEach(() => {
 });
 
 describe('PublicFrame', () => {
+  it('retires the bootstrap skip link while the route-specific frame is mounted', () => {
+    const bootstrapSkip = document.createElement('a');
+    bootstrapSkip.className = 'html-shell-skip';
+    bootstrapSkip.href = '#root';
+    bootstrapSkip.textContent = 'Skip to content';
+    document.body.prepend(bootstrapSkip);
+
+    const view = render(() => <PublicFrame>Content</PublicFrame>);
+    expect(bootstrapSkip).toHaveAttribute('hidden');
+    expect(screen.getAllByRole('link', { name: 'Skip to content' })).toHaveLength(1);
+
+    view.unmount();
+    expect(bootstrapSkip).not.toHaveAttribute('hidden');
+    bootstrapSkip.remove();
+  });
+
   it('provides one semantic document frame and focuses its skip target', () => {
     const { container } = render(() => <PublicFrame currentPath="/status/"><h1>Status</h1></PublicFrame>);
     const skip = screen.getByRole('link', { name: 'Skip to content' });

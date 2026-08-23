@@ -58,14 +58,17 @@ export default function Landing() {
             <p class="home-desktop-note">
               Supporting browsers can put Onyx on the Home Screen or in its own window. No store.
             </p>
-            <img
-              class="home-mascot"
-              src="/brand/mascot.png"
-              width="220"
-              height="220"
-              alt=""
-              decoding="async"
-            />
+            <div class="home-mascot-scene" aria-hidden="true">
+              <span class="home-mascot-wake" aria-hidden="true" />
+              <img
+                class="home-mascot"
+                src="/brand/mascot-transparent.png"
+                width="220"
+                height="220"
+                alt=""
+                decoding="async"
+              />
+            </div>
           </div>
 
           <ProductPreview />
