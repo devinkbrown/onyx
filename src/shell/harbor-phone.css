@@ -1,0 +1,451 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Harbor phone — 390-wide is the product.
+
+   Quiet harbor at night. Chrome recedes into ink. Conversation is the only
+   bright plane. Instrument Sans UI, Fraunces once per screen, JetBrains Mono
+   only for timestamps. Lapis only when something is alive (Join, Send,
+   you-are-here). No glass, glow, Discord purple, or operator letter chips.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .shell {
+    --harbor-phone-body: var(--text-lg, 1.0625rem);
+    --harbor-phone-plane: var(--stone);
+    --mnav-h: max(56px, 2.25rem);
+    color: var(--paper);
+    /* Atmosphere from the phone-harbor lane: the page-layer scene stays visible.
+       Ribbon, composer, and the tab rail still recede into ink below. */
+    background: transparent;
+  }
+
+  /* Conversation is the lifted plane; keep it stone without burying the harbor. */
+  .shell-conversation {
+    background: color-mix(in oklab, var(--harbor-phone-plane) 72%, transparent);
+    border-radius: 18px 18px 0 0;
+    box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 6%, transparent);
+  }
+
+  .shell-conversation::before {
+    display: none;
+  }
+
+  /* ── Ribbon: identity only. Recede Call / People / Search chrome. ── */
+  .shell-ribbon {
+    height: 52px;
+    min-height: 52px;
+    padding: 0 12px;
+    background: var(--ink);
+    border-bottom: 1px solid color-mix(in oklab, var(--paper) 8%, transparent);
+    box-shadow: none;
+  }
+
+  .shell-ribbon::after,
+  .shell[data-room-identity] .shell-ribbon::after {
+    display: none;
+  }
+
+  .shell[data-room-identity] .shell-ribbon {
+    background: var(--ink);
+    border-bottom-color: color-mix(in oklab, var(--paper) 8%, transparent);
+    box-shadow: none;
+  }
+
+  .shell-ribbon-inner {
+    min-height: 52px;
+    gap: 8px;
+  }
+
+  .shell-ribbon-channel {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(52vw, 16ch);
+    font-family: var(--font-sans);
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--paper);
+  }
+
+  .shell-ribbon-sigil {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-right: 0;
+    border: 1px solid color-mix(in oklab, var(--paper) 12%, transparent);
+    background: var(--stone-2);
+    color: var(--paper-dim);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 650;
+    border-radius: 28%;
+  }
+
+  .shell-ribbon-sigil--dm {
+    border-radius: 50%;
+  }
+
+  .shell-ribbon-event-chip,
+  .shell-ribbon-voice-chip,
+  .shell-ribbon-call-status,
+  .shell-ribbon-search,
+  .shell-ribbon-conn-label,
+  .shell-notify-controls,
+  .stage-panel[data-active='false'],
+  .shell-topic-filter {
+    display: none !important;
+  }
+
+  .shell-ribbon-iconbtn,
+  .shell-ribbon-more-trigger,
+  .shell-ribbon-members,
+  .shell-ribbon-conn {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+    border-color: transparent;
+    background: transparent;
+    color: var(--paper-mute);
+    box-shadow: none;
+  }
+
+  .shell-ribbon-call {
+    color: var(--paper-mute);
+    border-color: transparent;
+    background: transparent;
+  }
+
+  /* ── Transcript: air, 17px, people as circles. ── */
+  .shell-feed {
+    padding: 10px 0 8px;
+    background: transparent;
+  }
+
+  .shell-msg-group {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 0 10px;
+    margin-top: 14px;
+    padding: 10px 14px 6px;
+    border-radius: 12px;
+  }
+
+  .shell-msg-cont {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 0 10px;
+    padding: 2px 14px;
+  }
+
+  .shell-msg-group--system,
+  .shell-msg-system {
+    padding: 4px 14px 4px 60px;
+  }
+
+  .shell-msg-avatar .onyx-avatar {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 50%;
+    font-size: 0.72rem;
+  }
+
+  .shell-msg-author {
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--paper-dim);
+  }
+
+  .shell-msg-ts,
+  .shell-msg-cont-ts {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: 0.01em;
+    color: var(--paper-mute);
+    text-transform: none;
+  }
+
+  .shell-msg-text {
+    font-family: var(--font-sans);
+    font-size: var(--harbor-phone-body);
+    line-height: var(--leading-body, 1.5);
+    color: var(--paper);
+  }
+
+  .shell-day-divider-label {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 0.92rem;
+    font-weight: 450;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--paper-mute);
+  }
+
+  .shell-feed-empty-title {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 1.25rem;
+  }
+
+  /* ── Composer: Message field + lapis Send when armed. ── */
+  .shell-composer {
+    padding: 8px 10px 8px;
+    background: var(--ink);
+    border-top: 1px solid color-mix(in oklab, var(--paper) 8%, transparent);
+  }
+
+  .shell-composer-brief {
+    display: none;
+  }
+
+  .shell-composer-inner {
+    gap: 4px;
+    padding: 4px;
+    border-radius: 18px;
+    border: 1px solid color-mix(in oklab, var(--paper) 10%, transparent);
+    background: var(--stone-2);
+  }
+
+  .shell-composer-textarea {
+    --composer-field-height: 44px;
+    min-height: 44px;
+    font-family: var(--font-sans);
+    font-size: var(--harbor-phone-body);
+    line-height: 1.4;
+    letter-spacing: 0;
+  }
+
+  .shell-composer-tool,
+  .shell-composer-send {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 14px;
+    color: var(--paper-mute);
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .shell-composer-send:not(:disabled) {
+    color: var(--on-accent);
+    background: var(--lapis);
+    border-color: transparent;
+  }
+
+  /* ── Bottom nav: Home / Rooms / Messages / Calls / You ── */
+  .shell-mobile-nav {
+    --mnav-h: max(56px, 2.25rem);
+    background: var(--ink);
+    border-top: 1px solid color-mix(in oklab, var(--paper) 8%, transparent);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .shell-mobile-nav-btn {
+    --mobile-accent: var(--lapis);
+    flex: 1 0 20%;
+    gap: 3px;
+    min-width: var(--target-min, 44px);
+    min-height: var(--target-min, 44px);
+    padding: 6px 2px 8px;
+    color: var(--paper-mute);
+    font-family: var(--font-sans);
+    font-size: 0.68rem;
+    font-weight: 550;
+    letter-spacing: 0;
+    text-transform: none;
+    box-shadow: none;
+  }
+
+  .shell-mobile-nav-icon {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    color: inherit;
+  }
+
+  .shell-mobile-nav-btn[data-section='rooms'] .shell-mobile-nav-icon {
+    border-radius: 28%;
+    background: color-mix(in oklab, var(--stone-2) 70%, transparent);
+  }
+
+  .shell-mobile-nav-btn--active {
+    color: var(--paper);
+  }
+
+  .shell-mobile-nav-btn--active .shell-mobile-nav-icon {
+    color: var(--on-accent);
+    background: var(--lapis);
+  }
+
+  .shell-mobile-nav-btn--active::after {
+    left: 42%;
+    right: 42%;
+    top: auto;
+    bottom: 4px;
+    height: 3px;
+    border-radius: 99px;
+    background: var(--lapis);
+    box-shadow: none;
+  }
+
+  .shell-mobile-nav-btn--selected:not(.shell-mobile-nav-btn--active) {
+    color: var(--paper);
+    box-shadow: none;
+  }
+
+  .shell-mobile-nav-btn--dialog-open,
+  .shell-mobile-nav-btn--dialog-open .shell-mobile-nav-icon {
+    color: var(--paper);
+  }
+
+  .shell-mobile-nav-btn--dialog-open {
+    box-shadow: none;
+  }
+
+  .shell-mobile-nav-btn--dialog-open .shell-mobile-nav-icon {
+    background: var(--lapis);
+    color: var(--on-accent);
+  }
+
+  /* Rooms / people marks in the drawer */
+  .shell-channel-sigil {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 28%;
+    background: var(--stone-2);
+    color: var(--paper-dim);
+    font-family: var(--font-sans);
+  }
+
+  .shell-sidebar .shell-notify-controls {
+    display: none;
+  }
+
+  .shell-join-input {
+    min-height: 44px;
+    font-size: 17px;
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+  }
+
+  /* People card: circle face, 44px verbs, no operator desk on first glance. */
+  .shell-people-card {
+    padding: 16px;
+    border-radius: 18px;
+    background: var(--stone);
+  }
+
+  .shell-people-card-avatar,
+  .shell-people-card .onyx-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+  }
+
+  .shell-people-card-name {
+    font-family: var(--font-sans);
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+
+  .shell-people-card-actions .onyx-button,
+  .shell-people-card-advanced-toggle {
+    min-height: 44px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: var(--font-sans);
+  }
+
+  .shell-role-badge {
+    display: none;
+  }
+
+  /* You / Appearance: sentence-case Instrument Sans, 44px rows.
+     Higher specificity than account.css / primitives.css so lazy sheets
+     cannot bring uppercase mono kickers back onto the default path. */
+  .you-settings,
+  .acct,
+  .ap-panel {
+    font-family: var(--font-sans);
+    font-size: var(--harbor-phone-body);
+  }
+
+  .onyx-sheet .onyx-sheet__kicker,
+  .onyx-modal .onyx-modal__kicker {
+    display: none;
+  }
+
+  .acct .acct-identity-eyebrow,
+  .acct .acct-advanced-title,
+  .acct .acct-context-cue > span,
+  .acct .onyx-field__label,
+  .ap-panel .ap-kicker,
+  .ap-panel .ap-panel-label,
+  .shell-members .shell-members-head,
+  .shell-members .shell-members-group-label {
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .acct .acct-identity-avatar {
+    border-radius: 50%;
+  }
+
+  .ap-panel .ap-panel-label,
+  .shell-members .shell-members-group-label {
+    font-size: 0.82rem;
+    color: var(--paper-mute);
+  }
+
+  .shell-members .shell-members-head {
+    font-size: 0.92rem;
+    color: var(--paper-dim);
+  }
+
+  .onyx-sheet .onyx-sheet__header h2,
+  .onyx-modal .onyx-modal__header h2 {
+    font-family: var(--font-serif);
+    font-size: 1.4rem;
+    font-weight: 520;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .you-settings-item > summary,
+  .you-settings-link,
+  .you-settings-switch,
+  .acct-advanced-summary,
+  .ap-panel-switch {
+    min-height: 44px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: var(--font-sans);
+  }
+}
+
+@media (max-width: 480px) {
+  .shell-ribbon-channel {
+    font-size: 1rem;
+    max-width: min(48vw, 14ch);
+  }
+
+  .shell-composer {
+    padding: 6px 8px 8px;
+  }
+
+  .shell-msg-text {
+    font-size: 17px;
+  }
+}

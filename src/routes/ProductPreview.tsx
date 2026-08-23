@@ -122,7 +122,10 @@ export function ProductPreview(): JSX.Element {
         <div class="product-preview__window" aria-hidden="true">
           <div class="product-preview__rail">
             <For each={current().rooms}>{(room) => (
-              <span classList={{ 'is-active': !!room.active, 'is-unread': !!room.unread, 'is-person': room.kind === 'person', 'is-room': room.kind === 'room' }}>{room.name}</span>
+              <span classList={{ 'is-active': !!room.active, 'is-unread': !!room.unread, 'is-person': room.kind === 'person', 'is-room': room.kind === 'room' }}>
+                <b aria-hidden="true">{room.kind === 'person' ? room.name.replace(/^@/, '').slice(0, 1).toUpperCase() : room.name.slice(0, 1)}</b>
+                <em>{room.name}</em>
+              </span>
             )}</For>
           </div>
           <div class="product-preview__content">

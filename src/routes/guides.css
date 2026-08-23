@@ -17,8 +17,8 @@
 .guides-page .r-kicker::before { content: none; }
 
 .guides-page .data-hero h1 {
-  font-family: var(--font-sans);
-  font-weight: 650;
+  font-family: var(--font-serif);
+  font-weight: 520;
   font-size: clamp(2rem, 1.4rem + 2vw, 3rem);
   line-height: 1.15;
   letter-spacing: -0.02em;
@@ -80,6 +80,15 @@
   max-width: 46rem;
 }
 
+.guides-page .data-card .label,
+.guides-page .public-info-card .label {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 550;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .guides-card--optional {
   border-color: var(--public-line, var(--seam-faint));
   background: var(--public-raised, var(--stone-2));
@@ -92,6 +101,34 @@
 
   .guides-page .guides-card h2 {
     font-size: 22px;
+  }
+}
+
+@media (max-width: 34rem) {
+  .guides-page .data-hero {
+    padding-block: 20px 16px;
+  }
+
+  .guides-page .data-hero h1 {
+    font-size: clamp(2rem, 10vw, 2.45rem);
+  }
+
+  .guides-page .data-hero .sub,
+  .guides-page .guides-card p {
+    font-size: 17px;
+  }
+
+  .guides-hero-actions,
+  .guides-card-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .guides-action {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1.05rem;
+    border-radius: 16px;
   }
 }
 

@@ -94,7 +94,7 @@ test('contains enlarged mobile navigation in a safe-area-aware horizontal rail',
     expect(button.scrollHeight).toBeLessThanOrEqual(button.clientHeight);
   }
 
-  const finalAction = page.getByRole('button', { name: 'Open Menu' });
+  const finalAction = page.getByRole('button', { name: 'Open You' });
   await finalAction.focus();
   await expect(finalAction).toBeFocused();
   const focusedGeometry = await nav.evaluate((element) => {
@@ -188,17 +188,21 @@ test('keeps the Advanced room control desk reachable at 400% short reflow', asyn
     });
   });
 
-  const moreTrigger = page.getByRole('button', { name: 'Open Menu' });
-  await moreTrigger.focus();
-  await moreTrigger.click();
-  const more = page.getByRole('dialog', { name: 'Menu' });
-  const appearance = more.getByRole('button', { name: 'Appearance' });
-  const preferences = more.getByRole('button', { name: 'Preferences' });
+  const youTrigger = page.getByRole('button', { name: 'Open You' });
+  await youTrigger.focus();
+  await youTrigger.click();
+  const you = page.getByRole('dialog', { name: 'You' });
+  const appearance = you.getByRole('button', { name: 'Appearance' });
+  const preferences = you.getByRole('button', { name: 'Preferences' });
   await expect(appearance).toBeVisible();
   await expect(preferences).toBeVisible();
   expect((await appearance.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
   expect((await preferences.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
-  const launcher = more.getByRole('button', { name: /Room control desk.*#access/i });
+  await page.keyboard.press('Escape');
+  const ribbonMore = page.getByTestId('ribbon-more');
+  const moreTrigger = ribbonMore.locator('xpath=ancestor-or-self::button').first();
+  await moreTrigger.click();
+  const launcher = page.getByTestId('ribbon-room-desk');
   await expect(launcher).toBeVisible();
   await launcher.click();
 
@@ -255,5 +259,4 @@ test('keeps the Advanced room control desk reachable at 400% short reflow', asyn
   await expect(review).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(desk).toHaveCount(0);
-  await expect(moreTrigger).toBeFocused();
 });

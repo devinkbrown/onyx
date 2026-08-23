@@ -55,13 +55,13 @@
 
 .ap-kicker {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm, 0.8125rem);
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--paper-mute);
 }
-.ap-kicker::before { content: '// '; color: var(--paper-mute); }
+.ap-kicker::before { content: none; }
 
 .ap-h1 {
   margin: 12px 0 0;

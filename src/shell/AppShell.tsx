@@ -26,6 +26,7 @@
  */
 
 import './shell.css';
+import './harbor-phone.css';
 // Eager voice stage styles: the call tray can paint (provisional loading) before
 // the lazy VoiceStage chunk arrives — without this, the panel looks unstyled/missing.
 import './voice/voice.css';
@@ -630,9 +631,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
   let mobileRoomControlsTarget: string | null = null;
   let sidebarDrawerRef: HTMLDivElement | undefined;
   let mobileRoomsButtonRef: HTMLButtonElement | undefined;
-  let mobileMenuButtonRef: HTMLButtonElement | undefined;
+  let mobileYouButtonRef: HTMLButtonElement | undefined;
   let mobileMoreRef: HTMLDivElement | undefined;
-  let mobileRoomControlsLauncherRef: HTMLButtonElement | undefined;
   let mobileRoomControlsBackRef: HTMLButtonElement | undefined;
   let contextTriggerRef: HTMLButtonElement | undefined;
   let mobileDrawerRestoreTarget: HTMLElement | null = null;
@@ -923,15 +923,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
   function openYou(): void {
     closeActiveMobileDrawer(false);
     getState().openAccount();
-  }
-
-  function openMobileMore(): void {
-    rememberMobileDrawerTrigger();
-    getState().closeMobileSidebar();
-    setMobileMembersOpen(false);
-    setMobileMoreView('destinations');
-    setMobileMoreOpen(true);
-    queueMicrotask(() => focusFirstInMobileDrawer(mobileMoreRef));
+    setMobileMenuReturnSurface('you');
   }
 
   function closeMobileMore(): void {
@@ -941,25 +933,19 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
     restoreMobileDrawerFocus();
   }
 
-  function closeMobileMoreForSurface(): void {
-    setMobileMoreOpen(false);
-    setMobileMoreView('destinations');
-    mobileRoomControlsTarget = null;
-    // The destination Sheet now owns keyboard focus. Its close transition
-    // restores focus to the persistent Menu trigger below.
-    mobileDrawerRestoreTarget = null;
-  }
-
-  function openMobileRoomControls(): void {
+  function openMobileRoomDeskFromRibbon(): void {
     const view = activeView();
     if (view.kind !== 'channel') return;
+    rememberMobileDrawerTrigger();
+    getState().closeMobileSidebar();
+    setMobileMembersOpen(false);
     mobileRoomControlsTarget = view.channel.toLowerCase();
     setMobileMoreView('room-controls');
+    setMobileMoreOpen(true);
   }
 
   function returnToMobileMore(): void {
-    setMobileMoreView('destinations');
-    queueMicrotask(() => mobileRoomControlsLauncherRef?.focus({ preventScroll: true }));
+    closeMobileMore();
   }
 
   function closeContextRail(): void {
@@ -969,39 +955,26 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
     });
   }
 
-  function selectMobileMore(destination: 'calls' | 'you'): void {
-    if (destination === 'you') {
-      closeMobileMoreForSurface();
-      getState().openAccount();
-      // Arm after open so the lifecycle effect does not treat the pre-open
-      // state as an immediate close.
-      setMobileMenuReturnSurface('you');
-      return;
-    }
-    closeMobileMore();
-    openCalls();
-  }
-
   function mobileMoreDialogLabel(): string {
     const view = activeView();
-    return mobileMoreView() === 'room-controls' && view.kind === 'channel'
+    return view.kind === 'channel'
       ? `Room controls for ${view.channel}`
-      : 'Menu';
+      : 'Room control desk';
   }
 
   function restoreMobileMenuTriggerFocus(): void {
     const returnToMobile = isMobile();
     queueMicrotask(() => {
       const mobileFallback = document.querySelector<HTMLElement>(
-        '[data-primary-navigation-variant="mobile"] [aria-label="Open Menu"]',
+        '[data-primary-navigation-variant="mobile"] [aria-label="Open You"]',
       );
       const desktopNav = document.querySelector<HTMLElement>(
         '[data-primary-navigation-variant="desktop"]',
       );
       const desktopFallback = desktopNav?.querySelector<HTMLElement>('[aria-current="page"]')
         ?? desktopNav?.querySelector<HTMLElement>('button');
-      const mobileTarget = mobileMenuButtonRef?.isConnected
-        ? mobileMenuButtonRef
+      const mobileTarget = mobileYouButtonRef?.isConnected
+        ? mobileYouButtonRef
         : mobileFallback?.isConnected ? mobileFallback : null;
       const target = returnToMobile ? mobileTarget : desktopFallback;
       target?.focus({ preventScroll: true });
@@ -1285,6 +1258,11 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
             membersOpen={asideOccupant() === 'members'}
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
+            onOpenRoomDesk={
+              isMobile() && preferences().experienceMode !== 'standard'
+                ? openMobileRoomDeskFromRibbon
+                : undefined
+            }
             onOpenDm={openMemberDm}
             onOpenWhois={openMemberWhois}
           />
@@ -1420,91 +1398,59 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
         selectedCollection={sidebarMode()}
         expandedCollection={mobileSidebarOpen() ? sidebarMode() : null}
         youDialogOpen={showAccount()}
-        moreOpen={mobileMoreOpen()}
-        onOpenMore={openMobileMore}
         mobileRoomsButtonRef={(element) => { mobileRoomsButtonRef = element; }}
-        mobileMenuButtonRef={(element) => { mobileMenuButtonRef = element; }}
+        mobileYouButtonRef={(element) => { mobileYouButtonRef = element; }}
         onSelect={handlePrimaryNavigation}
       />
       <Show when={mobileMoreOpen()}>
         <div class="shell-mobile-more-backdrop" aria-hidden="true" onClick={closeMobileMore} />
       </Show>
-      <div
-        ref={(element) => { mobileMoreRef = element; }}
-        class={`shell-mobile-more-sheet${mobileMoreOpen() ? ' shell-mobile-more-sheet--open' : ''}${mobileMoreView() === 'room-controls' ? ' shell-mobile-more-sheet--room-controls' : ''}`}
-        role={mobileMoreOpen() ? 'dialog' : undefined}
-        aria-modal={mobileMoreOpen() ? 'true' : undefined}
-        aria-label={mobileMoreOpen() ? mobileMoreDialogLabel() : undefined}
-        tabindex={mobileMoreOpen() ? -1 : undefined}
-      >
-        <Show
-          when={mobileMoreView() === 'destinations'}
-          fallback={(
-            <Show when={activeView().kind === 'channel'}>
-              <section class="shell-mobile-more-sheet__room-tools" aria-label="Room control desk">
-                <header class="shell-mobile-more-sheet__room-head">
-                  <button
-                    ref={(element) => { mobileRoomControlsBackRef = element; }}
-                    type="button"
-                    class="shell-mobile-more-sheet__back"
-                    onClick={returnToMobileMore}
-                  >Back</button>
-                  <div>
-                    <p class="shell-mobile-more-sheet__title">Room control desk</p>
-                    <div class="shell-mobile-more-sheet__room-title">
-                      <h2>{(activeView() as { channel: string }).channel}</h2>
-                      <Show when={/^[#&]/.test((activeView() as { channel: string }).channel.trim())}>
-                        <a
-                          class="shell-mobile-more-sheet__ledger shell-ribbon-stats"
-                          href={statsRoomHref((activeView() as { channel: string }).channel)}
-                          aria-label={`Room ledger for ${(activeView() as { channel: string }).channel}`}
-                          data-testid="mobile-room-ledger"
-                        >
-                          Ledger
-                        </a>
-                      </Show>
-                    </div>
-                  </div>
-                  <button type="button" class="shell-mobile-more-sheet__close" onClick={closeMobileMore}>Close</button>
-                </header>
-                <RoomInsightsStrip />
-                <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
-                <Show when={preferences().experienceMode === 'network-ops' && isOper()}>
-                  <OperEventConsole />
-                </Show>
-                <Show when={preferences().experienceMode === 'network-ops' && !isOper()}>
-                  <p class="shell-context-rail__empty" role="status">Operator tools appear here after this account is granted access.</p>
-                </Show>
-              </section>
-            </Show>
-          )}
+      <Show when={mobileMoreOpen() && mobileMoreView() === 'room-controls' && activeView().kind === 'channel'}>
+        <div
+          ref={(element) => { mobileMoreRef = element; }}
+          class="shell-mobile-more-sheet shell-mobile-more-sheet--open shell-mobile-more-sheet--room-controls"
+          role="dialog"
+          aria-modal="true"
+          aria-label={mobileMoreDialogLabel()}
+          tabindex={-1}
         >
-          <p class="shell-mobile-more-sheet__title">Menu</p>
-          <Show when={activeView().kind === 'channel' && preferences().experienceMode !== 'standard'}>
-            <button
-              ref={(element) => { mobileRoomControlsLauncherRef = element; }}
-              type="button"
-              class="shell-mobile-more-sheet__room-launcher"
-              onClick={openMobileRoomControls}
-            >
-              <span aria-hidden="true">#</span>
-              <span>Room control desk</span>
-              <small>{(activeView() as { channel: string }).channel}</small>
-            </button>
-          </Show>
-          <p class="shell-mobile-more-sheet__group-label">Navigate</p>
-          <button type="button" onClick={() => selectMobileMore('calls')}>Calls</button>
-          <p class="shell-mobile-more-sheet__group-label">You</p>
-          <button
-            type="button"
-            aria-label="You — account, appearance, and preferences"
-            onClick={() => selectMobileMore('you')}
-          >
-            You
-          </button>
-          <button type="button" onClick={closeMobileMore}>Close</button>
-        </Show>
-      </div>
+          <section class="shell-mobile-more-sheet__room-tools" aria-label="Room control desk">
+            <header class="shell-mobile-more-sheet__room-head">
+              <button
+                ref={(element) => { mobileRoomControlsBackRef = element; }}
+                type="button"
+                class="shell-mobile-more-sheet__back"
+                onClick={returnToMobileMore}
+              >Back</button>
+              <div>
+                <p class="shell-mobile-more-sheet__title">Room control desk</p>
+                <div class="shell-mobile-more-sheet__room-title">
+                  <h2>{(activeView() as { channel: string }).channel}</h2>
+                  <Show when={/^[#&]/.test((activeView() as { channel: string }).channel.trim())}>
+                    <a
+                      class="shell-mobile-more-sheet__ledger shell-ribbon-stats"
+                      href={statsRoomHref((activeView() as { channel: string }).channel)}
+                      aria-label={`Room ledger for ${(activeView() as { channel: string }).channel}`}
+                      data-testid="mobile-room-ledger"
+                    >
+                      Ledger
+                    </a>
+                  </Show>
+                </div>
+              </div>
+              <button type="button" class="shell-mobile-more-sheet__close" onClick={closeMobileMore}>Close</button>
+            </header>
+            <RoomInsightsStrip />
+            <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
+            <Show when={preferences().experienceMode === 'network-ops' && isOper()}>
+              <OperEventConsole />
+            </Show>
+            <Show when={preferences().experienceMode === 'network-ops' && !isOper()}>
+              <p class="shell-context-rail__empty" role="status">Operator tools appear here after this account is granted access.</p>
+            </Show>
+          </section>
+        </div>
+      </Show>
 
       {/* Account management panel — portal modal, gated on store.showAccount */}
       <Show when={showAccount()}>

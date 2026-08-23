@@ -39,6 +39,7 @@ import { latestDmListPreview } from '@/lib/e2ee/dmPrivacyChrome';
 import { NotificationControls } from './NotificationControls';
 import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
 import { openRoomInviteShare } from './roomInviteShareState';
+import { preferences } from '@/lib/prefs/preferences';
 
 export type ChannelSidebarProps = {
   /** Called when mobile close is triggered */
@@ -593,7 +594,9 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             {`Connection ${statusLabel()}`}
           </span>
         </span>
-        <NotificationControls />
+        <Show when={preferences().experienceMode !== 'standard'}>
+          <NotificationControls />
+        </Show>
       </div>
 
       <Show when={Boolean(local.onOpenHome || local.onOpenCalls || local.onOpenYou || local.activeSection || local.youDialogOpen)}>
@@ -947,7 +950,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
           id="shell-join-input"
           class="shell-join-input"
           type="text"
-          placeholder="join #room"
+          placeholder="Room name"
           autocomplete="off"
           spellcheck={false}
           value={joinInput()}

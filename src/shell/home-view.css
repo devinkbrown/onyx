@@ -105,7 +105,7 @@
   color: color-mix(in oklab, var(--paper) 86%, var(--paper-dim));
   font-size: var(--text-lg, 1.0625rem);
   line-height: var(--leading-body, 1.55);
-  font-family: var(--font-serif, "Fraunces", Georgia, serif);
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
   font-weight: 400;
 }
 .home-sub b {
@@ -1611,8 +1611,22 @@
     margin-bottom: 18px;
   }
   .home-title {
-    font-size: clamp(1.55rem, 1.15rem + 3.2vw, 2.05rem);
-    margin-bottom: 8px;
+    font-size: clamp(1.85rem, 1.2rem + 4vw, 2.25rem);
+    margin-bottom: 10px;
+  }
+  .home-inbox-row {
+    min-height: 64px;
+    padding: 12px 12px;
+    border-radius: 16px;
+    background: color-mix(in oklab, var(--stone) 78%, transparent);
+  }
+  .home-inbox-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 0.95rem;
+  }
+  .home-inbox-name {
+    font-size: 17px;
   }
   .home-sub {
     max-width: none;
@@ -1683,20 +1697,21 @@
     color: color-mix(in oklab, var(--gold) 78%, var(--paper));
   }
   .home-section-label {
-    letter-spacing: 0.14em;
+    letter-spacing: 0;
+    text-transform: none;
   }
 }
 
-/* Compact phones 320–390: tighter type, full-width resume rows. */
+/* 390-wide is the product: keep 17px reading and one Fraunces title. */
 @media (max-width: 390px) {
   .home-inner {
     padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px));
   }
   .home-title {
-    font-size: 1.5rem;
+    font-size: clamp(1.85rem, 8vw, 2.15rem);
   }
   .home-sub {
-    font-size: 0.94rem;
+    font-size: 17px;
   }
   .home-resume-meta,
   .home-catchup-meta {

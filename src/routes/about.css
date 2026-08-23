@@ -33,8 +33,8 @@
 .ab-hero h1 {
   margin: 18px 0 0;
   max-width: 16ch;
-  font-family: var(--font-sans);
-  font-weight: 650;
+  font-family: var(--font-serif);
+  font-weight: 520;
   font-size: clamp(2.2rem, 1.4rem + 4vw, 4.4rem);
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -233,6 +233,45 @@
 .ab-quiet-links a:hover,
 .ab-quiet-links a:focus-visible {
   color: var(--ab-current-strong);
+}
+
+@media (max-width: 34rem) {
+  .ab-hero {
+    padding-block: 20px 16px;
+  }
+
+  .ab-hero h1 {
+    max-width: 12ch;
+    font-size: clamp(2rem, 10vw, 2.55rem);
+  }
+
+  .ab-lede,
+  .ab-hero p.sub,
+  .ab-copy {
+    max-width: none;
+    font-size: 17px;
+  }
+
+  .ab-cta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .ab-cta .r-btn {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1.05rem;
+  }
+
+  .ab-topics {
+    gap: 8px;
+  }
+
+  .ab-topics a {
+    min-height: 44px;
+    font-size: 0.95rem;
+  }
 }
 
 @media (max-width: 42rem) and (max-height: 30rem) {

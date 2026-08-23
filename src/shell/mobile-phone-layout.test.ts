@@ -88,9 +88,9 @@ describe('Calls / Connect / Appearance phone contracts', () => {
     expect(callsCss).not.toMatch(/content:\s*['"][^'"]*(Join call|Accept|Start ringing)/i);
   });
 
-  it('Connect front door uses 16px inputs and sticky primary on phone', () => {
+  it('Connect front door uses 17px inputs and sticky primary on phone', () => {
     expect(connectCss).toMatch(/@media \(max-width:\s*520px\)/);
-    expect(connectCss).toMatch(/font-size:\s*16px/);
+    expect(connectCss).toMatch(/\.conn \.onyx-field__input,\s*\n\s*\.conn-password-toggle,\s*\n\s*\.conn-passkey-button,\s*\n\s*\.conn-submit\s*\{[^}]*font-size:\s*17px/s);
     expect(connectCss).toMatch(/\.conn-actions\s*\{[^}]*position:\s*sticky/s);
     expect(connectCss).toMatch(/min-height:\s*48px/);
   });

@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, within } from '@solidjs/testing-library';
 import { createComponent } from 'solid-js';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { PrimaryNavigation } from '../PrimaryNavigation';
 import { createShellNavigationModel } from './shellNavigationModel';
 
@@ -92,15 +92,13 @@ describe('createShellNavigationModel', () => {
     }
   });
 
-  it('keeps mobile focused on Home, Rooms, Inbox, and Menu while preserving Calls and You in Menu', () => {
-    const onOpenMore = vi.fn();
+  it('keeps the same five destinations on the mobile rail, with You as the account dialog', () => {
     const rendered = render(() => createComponent(PrimaryNavigation, {
       variant: 'mobile',
       currentSection: 'rooms',
       selectedCollection: 'messages',
       expandedCollection: 'messages',
-      moreOpen: true,
-      onOpenMore,
+      youDialogOpen: true,
       onSelect: () => undefined,
     }));
     const nav = within(rendered.container).getByRole('navigation', { name: 'Mobile navigation' });
@@ -108,14 +106,13 @@ describe('createShellNavigationModel', () => {
     expect(within(nav).getAllByRole('button').map((button) => button.textContent)).toEqual([
       '⌂Home',
       '#Rooms',
-      '@Inbox',
-      '•••Menu',
+      '@Messages',
+      '◉Calls',
+      '◇You',
     ]);
-    expect(within(nav).queryByRole('button', { name: /Calls|You/ })).toBeNull();
-    const more = within(nav).getByRole('button', { name: 'Open Menu' });
-    expect(more).toHaveAttribute('aria-haspopup', 'dialog');
-    expect(more).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(more);
-    expect(onOpenMore).toHaveBeenCalledOnce();
+    const you = within(nav).getByRole('button', { name: 'Open You' });
+    expect(you).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(you).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(you);
   });
 });
