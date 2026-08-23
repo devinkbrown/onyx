@@ -82,7 +82,7 @@ describe('You settings list', () => {
 
     expect(screen.getByTestId('you-open-theme-studio')).toHaveAttribute('href', '/appearance/');
     expect(
-      screen.getByTestId('you-settings').querySelector('[data-testid="you-open-preferences"]'),
+      screen.getByTestId('you-settings').querySelector('[data-testid="you-settings-open-preferences"]'),
     ).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Protection' })).toBeInTheDocument();
   });

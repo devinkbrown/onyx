@@ -377,7 +377,7 @@ describe('Account panel — signed in', () => {
     expect(screen.queryByTestId('theme-studio')).toBeNull();
     expect(screen.queryByRole('radio', { name: /Vermillion/i })).toBeNull();
 
-    fireEvent.click(screen.getByTestId('you-settings').querySelector('[data-testid="you-open-appearance"]')!);
+    fireEvent.click(screen.getByTestId('you-settings').querySelector('[data-testid="you-settings-open-appearance"]')!);
     expect(closeSpy).toHaveBeenCalledWith(false);
     await waitFor(() => {
       expect(openAppearance).toHaveBeenCalled();

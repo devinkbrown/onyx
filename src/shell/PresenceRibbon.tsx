@@ -979,7 +979,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                         aria-label={`Room control desk for ${settingsChannel()}`}
                         aria-haspopup="dialog"
                         data-testid="ribbon-room-desk"
-                        onClick={() => closeMoreThen(() => local.onOpenRoomDesk?.())}
+                        onClick={() => {
+                          const openRoomDesk = local.onOpenRoomDesk;
+                          closeMoreThen(() => openRoomDesk?.());
+                        }}
                         onKeyDown={onMoreMenuKeyDown}
                       >
                         <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"

@@ -113,7 +113,7 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       <button
         type="button"
         class="you-settings-link"
-        data-testid="you-open-appearance"
+        data-testid="you-settings-open-appearance"
         aria-haspopup="dialog"
         onClick={() => leaveThen(props.onClose, () => getState().openAppearance())}
       >
@@ -244,7 +244,7 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
           <button
             type="button"
             class="you-settings-link"
-            data-testid="you-open-preferences"
+            data-testid="you-settings-open-preferences"
             aria-haspopup="dialog"
             onClick={() => leaveThen(props.onClose, () => openPreferences())}
           >

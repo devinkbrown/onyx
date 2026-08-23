@@ -201,7 +201,7 @@ export function statsRoomHref(channel: string): string {
  */
 export function parseStatsRoomQuery(search: string): string {
   const query = search.startsWith('?') ? search.slice(1) : search;
-  let raw = '';
+  let raw: string;
   try {
     raw = (new URLSearchParams(query).get('room') ?? '').trim();
   } catch {

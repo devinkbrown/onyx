@@ -75,8 +75,8 @@ describe('InviteRoute', () => {
 
     render(() => <InviteRoute />);
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Join #general' })).toBeInTheDocument();
-    expect(screen.getByText('Choose a display name to enter this room.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: '#general' })).toBeInTheDocument();
+    expect(screen.getByText('Choose a display name to walk in.')).toBeInTheDocument();
     expect(screen.getByRole('note', { name: 'Invite preview' })).toHaveTextContent('Join #general on Onyx');
     expect(screen.getByRole('note', { name: 'Invite preview' })).toHaveTextContent('release train');
     expect(screen.getByLabelText('Display name')).toHaveValue('yuki');

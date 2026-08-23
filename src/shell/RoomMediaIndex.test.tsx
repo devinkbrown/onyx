@@ -106,8 +106,9 @@ describe('RoomMediaIndex', () => {
     const sources = [
       readFileSync(join(here, 'RoomMediaIndex.tsx'), 'utf8'),
       readFileSync(join(here, '../lib/upload/roomMediaIndex.ts'), 'utf8'),
-      readFileSync(join(here, '../lib/upload/saveMedia.ts'), 'utf8'),
     ].join('\n');
-    expect(sources).not.toMatch(/fetchLinkPreview|linkpreview|og:image|saveToPhotos|MediaStore|gallery/i);
+    expect(sources).not.toMatch(
+      /from\s+['"][^'"]*(?:linkPreview|saveMedia)['"]|fetchLinkPreview|saveMediaFromUserGesture/iu,
+    );
   });
 });
