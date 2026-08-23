@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@solidjs/testing-library';
 
 import RoadmapRoute, { RoadmapBridge } from './Roadmap';
+
+vi.mock('@/backgrounds/SceneAtmosphere', () => ({
+  SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
+}));
 
 const src = readFileSync(resolve(__dirname, 'Roadmap.tsx'), 'utf8');
 const css = readFileSync(resolve(__dirname, 'roadmap.css'), 'utf8');

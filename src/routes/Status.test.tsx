@@ -7,6 +7,10 @@ import { Suspense } from 'solid-js';
 
 import StatusRoute from './Status';
 
+vi.mock('@/backgrounds/SceneAtmosphere', () => ({
+  SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
+}));
+
 const src = readFileSync(resolve(__dirname, 'Status.tsx'), 'utf8');
 const css = readFileSync(resolve(__dirname, 'status.css'), 'utf8');
 const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, '');

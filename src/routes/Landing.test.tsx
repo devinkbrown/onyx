@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { afterEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@solidjs/testing-library';
 import Landing from './Landing';
+
+vi.mock('@/backgrounds/SceneAtmosphere', () => ({
+  SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
+}));
 
 describe('Landing', () => {
   afterEach(() => {
@@ -19,6 +25,15 @@ describe('Landing', () => {
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.home')).toBeTruthy();
     expect(container.querySelector('.public-frame__context')).toBeNull();
+    expect(container.querySelector('[data-testid="public-atmosphere"]')).toBeTruthy();
+  });
+
+  it('keeps leftover ground nodes from painting over the shared scene', () => {
+    const landingCss = readFileSync(resolve(__dirname, 'landing.css'), 'utf8');
+    const homeCss = readFileSync(resolve(__dirname, 'home.css'), 'utf8');
+    expect(landingCss).toMatch(/\.r \{[^}]*background: transparent/);
+    expect(landingCss).toMatch(/\.r-ground \{[^}]*background: transparent/);
+    expect(homeCss).toMatch(/\.r-landing\.home \.r-ground\.home-ground \{\s*background: transparent;/);
   });
 
   it('opens with a community invitation and a single header Open Onyx', () => {

@@ -4,6 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PublicFrame } from './PublicFrame';
 import { PublicSkipLink } from './PublicSkipLink';
 
+vi.mock('@/backgrounds/SceneAtmosphere', () => ({
+  SceneAtmosphere: () => (
+    <div data-background-canvas="true" data-background-id="deep-current" />
+  ),
+}));
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -17,6 +23,10 @@ describe('PublicFrame', () => {
     expect(container.querySelectorAll('header')).toHaveLength(1);
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelectorAll('footer')).toHaveLength(1);
+    const atmosphere = container.querySelector('[data-testid="public-atmosphere"]');
+    expect(atmosphere).toBeTruthy();
+    expect(atmosphere).toHaveAttribute('aria-hidden', 'true');
+    expect(atmosphere!.querySelector('[data-background-canvas="true"]')).toBeTruthy();
     expect(skip).toHaveAttribute('href', '#public-main');
     expect(main).toHaveAttribute('id', 'public-main');
     expect(main).toHaveAttribute('tabindex', '-1');

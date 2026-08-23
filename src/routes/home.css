@@ -24,13 +24,13 @@
   --mn-mono: var(--public-mono);
 
   color: var(--mn-text);
-  background: var(--mn-void);
+  background: transparent;
   font-family: var(--mn-sans);
 }
 
 .r-landing.home .home-ground,
 .r-landing.home .r-ground.home-ground {
-  background: var(--mn-void);
+  background: transparent;
 }
 .r-landing.home .home-ground::before,
 .r-landing.home .home-ground::after,

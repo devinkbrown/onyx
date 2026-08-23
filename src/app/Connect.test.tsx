@@ -33,12 +33,12 @@ vi.mock('@/shell/AppShell', () => ({
   ),
 }));
 
-vi.mock('@/backgrounds/Background', () => ({
-  Background: (props: { id?: string }) => (
+vi.mock('@/backgrounds/SceneAtmosphere', () => ({
+  SceneAtmosphere: () => (
     <div
       data-testid="connect-atmosphere"
       data-background-canvas="true"
-      data-background-id={props.id ?? 'deep-current'}
+      data-background-id="deep-current"
     />
   ),
 }));

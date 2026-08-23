@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export { Background, default, DEFAULT_BACKGROUND_ID, selectBackgroundId } from './Background';
 export type { BackgroundProps } from './Background';
+export { SceneAtmosphere } from './SceneAtmosphere';
 export { BackgroundEngine, isSceneVariant } from './engine';
 export type {
   AnyBackgroundVariant,

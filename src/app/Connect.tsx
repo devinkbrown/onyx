@@ -60,10 +60,8 @@ import {
   type SavedCredentials,
 } from '@/lib/credentials';
 import { normalizeRoomTarget } from '@/shell/roomIdentity';
-import { resolveBackgroundId } from '@/shell/themeBackground';
 import { recordFirstHourHandoff } from '@/lib/firstHour/firstHour';
-import { useThemeOptional } from '@/theme';
-import { Background } from '@/backgrounds/Background';
+import { SceneAtmosphere } from '@/backgrounds/SceneAtmosphere';
 import { initialNode, NODES, selectBestNode, type IrcNode } from './nodes';
 import { installConnectPageLifecycle } from './connectPageLifecycle';
 
@@ -75,12 +73,9 @@ const AppShell = lazy(() => import('@/shell/AppShell').then((module) => ({ defau
 // Theme signature scene behind the door. Grain stays as a finishing veil;
 // the old opaque --ink "sea-depth" hid the wallpaper as a flat void.
 function Atmosphere(): JSX.Element {
-  const bgId = useStore((s) => s.backgroundId);
-  const theme = useThemeOptional();
-  const sceneId = createMemo(() => resolveBackgroundId(bgId(), theme.themeId()));
   return (
     <>
-      <Background id={sceneId()} />
+      <SceneAtmosphere />
       <div class="conn-sea-grain" aria-hidden="true" />
     </>
   );

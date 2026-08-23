@@ -4,6 +4,10 @@ import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import Download from './Download';
+
+vi.mock('@/backgrounds/SceneAtmosphere', () => ({
+  SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
+}));
 import {
   BSD_DOWNLOAD_CARDS,
   DOWNLOAD_CARDS,
