@@ -13,6 +13,10 @@ export default defineConfig({
     outDir: 'dist', // build target — deploy.sh syncs this into the live-served out/
     emptyOutDir: true,
     target: 'es2022',
+    // AppShell is the connected-client route (172 kB gzip), not landing-page
+    // startup work. Keep a deliberate 600 kB uncompressed ceiling so Vite
+    // warns on real growth instead of warning on the current routed shell.
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         manualChunks(id) {
