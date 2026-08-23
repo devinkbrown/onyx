@@ -14,12 +14,14 @@
     --harbor-phone-plane: var(--stone);
     --mnav-h: max(56px, 2.25rem);
     color: var(--paper);
-    background: var(--ink);
+    /* Atmosphere from the phone-harbor lane: the page-layer scene stays visible.
+       Ribbon, composer, and the tab rail still recede into ink below. */
+    background: transparent;
   }
 
-  /* Conversation is the lifted plane; chrome around it stays ink. */
+  /* Conversation is the lifted plane; keep it stone without burying the harbor. */
   .shell-conversation {
-    background: var(--harbor-phone-plane);
+    background: color-mix(in oklab, var(--harbor-phone-plane) 72%, transparent);
     border-radius: 18px 18px 0 0;
     box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 6%, transparent);
   }

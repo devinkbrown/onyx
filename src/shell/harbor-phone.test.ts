@@ -43,7 +43,8 @@ describe('Harbor phone — connected client', () => {
     expect(phone).toMatch(/\.shell-msg-text[\s\S]*font-size:\s*var\(--harbor-phone-body\)/);
     expect(phone).toMatch(/\.shell-composer-textarea[\s\S]*min-height:\s*44px/);
     expect(phone).toMatch(/\.shell-composer-send[\s\S]*min-width:\s*44px/);
-    expect(phone).toMatch(/\.shell-conversation[\s\S]*background:\s*var\(--harbor-phone-plane\)/);
+    expect(phone).toMatch(/\.shell\s*\{[\s\S]*?background:\s*transparent;/);
+    expect(phone).toMatch(/\.shell-conversation[\s\S]*background:\s*color-mix\(in oklab, var\(--harbor-phone-plane\)/);
     expect(phone).toMatch(/\.shell-ribbon::after[\s\S]*display:\s*none/);
     expect(phone).toMatch(/backdrop-filter:\s*none/);
   });
