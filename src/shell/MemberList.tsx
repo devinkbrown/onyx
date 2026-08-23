@@ -37,8 +37,12 @@ import { createGroupReconciler, type ResolvedRole } from '@/lib/memberGroups';
 import {
   computeMemberWindow,
   flattenMemberRows,
+  MEMBER_MOBILE_WINDOW_METRICS,
+  MEMBER_WINDOW_METRICS,
   memberPrefixHeight,
+  memberWindowSectionsEqual,
   sectionMemberWindow,
+  type MemberWindowSection,
 } from './memberWindow';
 import type { ModerationActionDraft } from '@/lib/moderation/actionModel';
 import { applyMemberModeration } from '@/lib/moderation/applyMemberModeration';
@@ -186,11 +190,20 @@ function MemberRow(props: MemberRowProps): JSX.Element {
                 aria-hidden="true"
               />
             </span>
-            <span
-              class={`shell-member-nick${props.user.away ? ' shell-member-nick--away' : ''}`}
-              aria-hidden="true"
-            >
-              {props.user.nick}
+            <span class="shell-member-identity">
+              <span
+                class={`shell-member-nick${props.user.away ? ' shell-member-nick--away' : ''}`}
+                aria-hidden="true"
+              >
+                {props.user.nick}
+              </span>
+              <span class="shell-member-meta" aria-hidden="true">
+                <span>{props.role.label}</span>
+                <Show when={props.user.away}>
+                  <span class="shell-member-meta-separator">·</span>
+                  <span>Away</span>
+                </Show>
+              </span>
             </span>
             <span class="sr-only">
               Open member details for {props.user.nick}, {props.role.label}{props.user.away ? ', away' : ''}
@@ -319,16 +332,31 @@ export function MemberList(props: MemberListProps): JSX.Element {
   });
 
   const [scrollTop, setScrollTop] = createSignal(0);
+  const windowMetrics = createMemo(() => (
+    local.modal ? MEMBER_MOBILE_WINDOW_METRICS : MEMBER_WINDOW_METRICS
+  ));
   const flatRows = createMemo(() => flattenMemberRows(visibleGroups()));
-  const memberWindow = createMemo(() => computeMemberWindow(flatRows(), scrollTop()));
-  const windowedSections = createMemo(() => {
+  const memberWindow = createMemo(() => computeMemberWindow(
+    flatRows(),
+    scrollTop(),
+    undefined,
+    windowMetrics(),
+  ));
+  const windowedSections = createMemo<MemberWindowSection[]>((previous) => {
     const win = memberWindow();
-    return sectionMemberWindow(flatRows(), win.start, win.end);
-  });
-  const padBefore = createMemo(() => memberPrefixHeight(flatRows(), memberWindow().start));
+    const next = sectionMemberWindow(flatRows(), win.start, win.end);
+    return memberWindowSectionsEqual(previous, next) ? previous : next;
+  }, []);
+  const padBefore = createMemo(() => memberPrefixHeight(
+    flatRows(),
+    memberWindow().start,
+    windowMetrics(),
+  ));
   const padAfter = createMemo(() => {
     const rows = flatRows();
-    return memberPrefixHeight(rows, rows.length) - memberPrefixHeight(rows, memberWindow().end);
+    const metrics = windowMetrics();
+    return memberPrefixHeight(rows, rows.length, metrics)
+      - memberPrefixHeight(rows, memberWindow().end, metrics);
   });
 
   createEffect(() => {
@@ -379,7 +407,12 @@ export function MemberList(props: MemberListProps): JSX.Element {
       tabindex={!local.hidden ? -1 : undefined}
     >
       <div class="shell-members-head">
-        <span class="shell-members-title">People</span>
+        <span class="shell-members-heading">
+          <span class="shell-members-title">People</span>
+          <Show when={local.modal && activeChannel()}>
+            {(channel) => <span class="shell-members-channel">{channel().name}</span>}
+          </Show>
+        </span>
         {/*
           Not a live region: on a busy channel the count churns on every
           join/leave (and on history replay / ?at= time-travel / roster
@@ -413,7 +446,9 @@ export function MemberList(props: MemberListProps): JSX.Element {
                   : `${totalCount()} member${totalCount() === 1 ? '' : 's'}`
               }
             >
-              {memberFilter().trim() ? `${visibleCount()}/${totalCount()}` : totalCount()}
+              {memberFilter().trim()
+                ? local.modal ? `${visibleCount()} of ${totalCount()}` : `${visibleCount()}/${totalCount()}`
+                : local.modal ? `${totalCount()} here` : totalCount()}
             </span>
           </span>
           <Show when={local.modal && !local.hidden && local.onClose}>
@@ -437,7 +472,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
             class="shell-members-filter-input"
             type="search"
             data-testid="member-filter"
-            placeholder="Filter members"
+            placeholder={local.modal ? 'Find someone' : 'Filter members'}
             autocomplete="off"
             spellcheck={false}
             value={memberFilter()}

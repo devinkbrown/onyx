@@ -5675,6 +5675,25 @@
   overflow-wrap: anywhere;
 }
 
+.shell-members-heading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shell-members-channel {
+  overflow: hidden;
+  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 520;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .shell-members-head-actions {
   min-width: 0;
   max-width: 100%;
@@ -5934,15 +5953,27 @@
   outline-offset: -2px;
 }
 
+.shell-member-identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
 .shell-member-nick {
   flex: 1;
   min-width: 0;
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.84rem;
   color: var(--paper-dim);
   transition: color var(--dur) var(--ease);
+}
+
+.shell-member-meta {
+  display: none;
 }
 
 .shell-member-row:hover .shell-member-nick { color: var(--paper); }

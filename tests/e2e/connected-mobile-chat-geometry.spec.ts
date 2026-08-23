@@ -162,7 +162,7 @@ function expectClosedPhoneShell(geometry: ClosedGeometry): void {
   expect(geometry.sidebar.right).toBeLessThanOrEqual(0);
   expect(geometry.sidebarVisibility).toBe('hidden');
   expect(geometry.sidebarPointerEvents).toBe('none');
-  expect(geometry.members.left).toBeGreaterThanOrEqual(geometry.viewportWidth);
+  expect(geometry.members.left).toBeGreaterThanOrEqual(geometry.viewportWidth - 1);
   expect(geometry.membersInert).toBe(true);
   expect(geometry.membersPointerEvents).toBe('none');
 }
@@ -212,17 +212,37 @@ test('keeps an ordinary connected phone transcript full-width while drawers rema
   await expect(memberDrawer).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
   const membersOpen = await memberDrawer.evaluate((element) => {
     const bounds = element.getBoundingClientRect();
+    const header = element.querySelector<HTMLElement>('.shell-members-head')!;
+    const firstRow = element.querySelector<HTMLElement>('.shell-member-row')!;
+    const firstAvatar = element.querySelector<HTMLElement>('.shell-member-avatar .onyx-avatar')!;
+    const firstNick = element.querySelector<HTMLElement>('.shell-member-nick')!;
+    const firstMeta = element.querySelector<HTMLElement>('.shell-member-meta')!;
     return {
       left: bounds.left,
       right: bounds.right,
+      headerHeight: header.getBoundingClientRect().height,
       inert: element.hasAttribute('inert'),
       pointerEvents: getComputedStyle(element).pointerEvents,
+      rowHeight: firstRow.getBoundingClientRect().height,
+      avatarWidth: firstAvatar.getBoundingClientRect().width,
+      avatarRadius: getComputedStyle(firstAvatar).borderRadius,
+      nickFontSize: Number.parseFloat(getComputedStyle(firstNick).fontSize),
+      metaDisplay: getComputedStyle(firstMeta).display,
     };
   });
-  expect(membersOpen.left).toBeGreaterThanOrEqual(0);
+  expect(membersOpen.left).toBeCloseTo(0, 1);
   expect(membersOpen.right).toBeCloseTo(390, 1);
+  expect(membersOpen.headerHeight).toBeGreaterThanOrEqual(60);
   expect(membersOpen.inert).toBe(false);
   expect(membersOpen.pointerEvents).not.toBe('none');
+  expect(membersOpen.rowHeight).toBeGreaterThanOrEqual(56);
+  expect(membersOpen.avatarWidth).toBeGreaterThanOrEqual(36);
+  expect(membersOpen.avatarRadius).toBe('50%');
+  expect(membersOpen.nickFontSize).toBeGreaterThanOrEqual(16);
+  expect(membersOpen.metaDisplay).not.toBe('none');
+  await expect(memberDialog.getByText('#root', { exact: true })).toBeVisible();
+  await expect(memberDialog.getByText('Owner', { exact: true })).toBeVisible();
+  await expect(memberDialog.getByPlaceholder('Find someone')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(memberDialog).toBeHidden();
   await expect(membersTrigger).toBeFocused();

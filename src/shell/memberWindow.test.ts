@@ -5,10 +5,14 @@ import {
   computeMemberWindow,
   flattenMemberRows,
   MEMBER_GROUP_ROW_PX,
+  MEMBER_MOBILE_GROUP_ROW_PX,
+  MEMBER_MOBILE_USER_ROW_PX,
+  MEMBER_MOBILE_WINDOW_METRICS,
   MEMBER_USER_ROW_PX,
   MEMBER_WINDOW_SIZE,
   memberIndexAtOffset,
   memberPrefixHeight,
+  memberWindowSectionsEqual,
   sectionMemberWindow,
 } from './memberWindow';
 
@@ -71,11 +75,35 @@ describe('computeMemberWindow', () => {
     expect(memberPrefixHeight(rows, 2)).toBe(MEMBER_GROUP_ROW_PX + MEMBER_USER_ROW_PX);
   });
 
+  it('uses the taller phone identity rows when mobile metrics are supplied', () => {
+    const rows = flattenMemberRows([group('member', 'members', ['a', 'b', 'c'])]);
+    expect(memberIndexAtOffset(rows, MEMBER_MOBILE_GROUP_ROW_PX, MEMBER_MOBILE_WINDOW_METRICS)).toBe(1);
+    expect(memberIndexAtOffset(
+      rows,
+      MEMBER_MOBILE_GROUP_ROW_PX + MEMBER_MOBILE_USER_ROW_PX,
+      MEMBER_MOBILE_WINDOW_METRICS,
+    )).toBe(2);
+    expect(memberPrefixHeight(rows, 2, MEMBER_MOBILE_WINDOW_METRICS))
+      .toBe(MEMBER_MOBILE_GROUP_ROW_PX + MEMBER_MOBILE_USER_ROW_PX);
+  });
+
   it('rebuilds a continuation section when the window starts mid-group', () => {
     const rows = flattenMemberRows([group('member', 'members', ['a', 'b', 'c', 'd'])]);
     const sections = sectionMemberWindow(rows, 2, 4);
     expect(sections).toHaveLength(1);
     expect(sections[0]).toMatchObject({ key: 'member', continuation: true, count: 4 });
     expect(sections[0]!.members.map((entry) => entry.user.nick)).toEqual(['b', 'c']);
+  });
+
+  it('recognizes an equivalent window so mounted member controls retain focus', () => {
+    const rows = flattenMemberRows([group('member', 'members', ['a', 'b'])]);
+    const first = sectionMemberWindow(rows, 0, rows.length);
+    const second = sectionMemberWindow(rows, 0, rows.length);
+    expect(second).not.toBe(first);
+    expect(memberWindowSectionsEqual(first, second)).toBe(true);
+
+    const changedRows = flattenMemberRows([group('member', 'members', ['a', 'c'])]);
+    expect(memberWindowSectionsEqual(first, sectionMemberWindow(changedRows, 0, changedRows.length)))
+      .toBe(false);
   });
 });

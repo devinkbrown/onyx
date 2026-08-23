@@ -13,6 +13,23 @@ import { computeMessageWindow, type MessageWindow } from './messageWindow';
 export const MEMBER_WINDOW_SIZE = 96;
 export const MEMBER_GROUP_ROW_PX = 28;
 export const MEMBER_USER_ROW_PX = 36;
+export const MEMBER_MOBILE_GROUP_ROW_PX = 32;
+export const MEMBER_MOBILE_USER_ROW_PX = 56;
+
+export type MemberWindowMetrics = {
+  groupRowPx: number;
+  userRowPx: number;
+};
+
+export const MEMBER_WINDOW_METRICS: MemberWindowMetrics = {
+  groupRowPx: MEMBER_GROUP_ROW_PX,
+  userRowPx: MEMBER_USER_ROW_PX,
+};
+
+export const MEMBER_MOBILE_WINDOW_METRICS: MemberWindowMetrics = {
+  groupRowPx: MEMBER_MOBILE_GROUP_ROW_PX,
+  userRowPx: MEMBER_MOBILE_USER_ROW_PX,
+};
 
 export type MemberFlatRow =
   | { kind: 'group'; key: string; label: string; count: number }
@@ -34,25 +51,36 @@ export function flattenMemberRows(groups: readonly GroupEntry[]): MemberFlatRow[
   return rows;
 }
 
-export function memberRowHeight(row: MemberFlatRow): number {
-  return row.kind === 'group' ? MEMBER_GROUP_ROW_PX : MEMBER_USER_ROW_PX;
+export function memberRowHeight(
+  row: MemberFlatRow,
+  metrics: MemberWindowMetrics = MEMBER_WINDOW_METRICS,
+): number {
+  return row.kind === 'group' ? metrics.groupRowPx : metrics.userRowPx;
 }
 
-export function memberIndexAtOffset(rows: readonly MemberFlatRow[], offsetPx: number): number {
+export function memberIndexAtOffset(
+  rows: readonly MemberFlatRow[],
+  offsetPx: number,
+  metrics: MemberWindowMetrics = MEMBER_WINDOW_METRICS,
+): number {
   const offset = Number.isFinite(offsetPx) ? Math.max(0, offsetPx) : 0;
   let y = 0;
   for (let i = 0; i < rows.length; i += 1) {
-    const next = y + memberRowHeight(rows[i]!);
+    const next = y + memberRowHeight(rows[i]!, metrics);
     if (offset < next) return i;
     y = next;
   }
   return rows.length;
 }
 
-export function memberPrefixHeight(rows: readonly MemberFlatRow[], end: number): number {
+export function memberPrefixHeight(
+  rows: readonly MemberFlatRow[],
+  end: number,
+  metrics: MemberWindowMetrics = MEMBER_WINDOW_METRICS,
+): number {
   const last = Math.max(0, Math.min(rows.length, Math.floor(end)));
   let y = 0;
-  for (let i = 0; i < last; i += 1) y += memberRowHeight(rows[i]!);
+  for (let i = 0; i < last; i += 1) y += memberRowHeight(rows[i]!, metrics);
   return y;
 }
 
@@ -60,11 +88,12 @@ export function computeMemberWindow(
   rows: readonly MemberFlatRow[],
   scrollTopPx: number,
   windowSize = MEMBER_WINDOW_SIZE,
+  metrics: MemberWindowMetrics = MEMBER_WINDOW_METRICS,
 ): MessageWindow {
   return computeMessageWindow({
     total: rows.length,
     windowSize,
-    pageStart: memberIndexAtOffset(rows, scrollTopPx),
+    pageStart: memberIndexAtOffset(rows, scrollTopPx, metrics),
   });
 }
 
@@ -75,6 +104,26 @@ export type MemberWindowSection = {
   continuation: boolean;
   members: MemberEntry[];
 };
+
+/** Preserve mounted member rows when only the viewport presentation changes. */
+export function memberWindowSectionsEqual(
+  previous: readonly MemberWindowSection[],
+  next: readonly MemberWindowSection[],
+): boolean {
+  if (previous.length !== next.length) return false;
+  return previous.every((section, sectionIndex) => {
+    const candidate = next[sectionIndex];
+    if (!candidate
+      || section.key !== candidate.key
+      || section.label !== candidate.label
+      || section.count !== candidate.count
+      || section.continuation !== candidate.continuation
+      || section.members.length !== candidate.members.length) {
+      return false;
+    }
+    return section.members.every((member, memberIndex) => member === candidate.members[memberIndex]);
+  });
+}
 
 /** Rebuild grouped sections from a windowed flat slice so list semantics stay intact. */
 export function sectionMemberWindow(
