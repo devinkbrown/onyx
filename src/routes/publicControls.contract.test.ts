@@ -42,6 +42,8 @@ describe('public shared controls — mineral-night contract', () => {
   it('shared .r-btn enforces 44px target floor via tokens', () => {
     const btn = ruleBlock(landing, '.r-btn');
     expect(btn).toMatch(/min-height:\s*var\(--target-min,\s*44px\)/);
+    expect(btn).toMatch(/font-family:\s*var\(--font-sans\)/);
+    expect(btn).toMatch(/text-transform:\s*none/);
   });
 
   it('header .enter matches the same flat mineral primary language', () => {

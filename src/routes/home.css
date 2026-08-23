@@ -202,6 +202,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.r-landing.home .product-preview__rail span b {
+  display: none;
+}
+.r-landing.home .product-preview__rail span em {
+  font-style: normal;
+  font-weight: inherit;
+}
 .r-landing.home .product-preview__rail span.is-person {
   border-radius: 999px;
 }
@@ -590,16 +597,99 @@
 }
 
 @media (max-width: 480px) {
-  .r-landing.home .home-hero { padding-block: 24px 16px; }
-  .r-landing.home .home-h1 { font-size: clamp(1.85rem, 9vw, 2.3rem); }
-  .r-landing.home .home-lede { max-width: none; }
+  .r-landing.home .home-hero { padding-block: 20px 12px; }
+  .r-landing.home .home-h1 {
+    font-size: clamp(2rem, 10vw, 2.55rem);
+    max-width: 12ch;
+  }
+  .r-landing.home .home-lede {
+    max-width: none;
+    font-size: 17px;
+  }
   .r-landing.home .home-cta-row {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
+  }
+  .r-landing.home .home-cta-primary {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1.05rem;
+    border-radius: 16px;
   }
   .r-landing.home .home-secondary-link {
     justify-content: center;
     width: 100%;
+  }
+  .r-landing.home .home-mascot {
+    width: min(7.5rem, 38vw);
+    margin-top: 1.25rem;
+  }
+  .r-landing.home .product-preview {
+    padding: 14px;
+    border-radius: 22px;
+  }
+  .r-landing.home .product-preview__canvas {
+    grid-template-columns: 1fr;
+  }
+  .r-landing.home .product-preview__window {
+    grid-template-columns: 1fr;
+    min-height: 320px;
+    border-radius: 22px;
+  }
+  .r-landing.home .product-preview__rail {
+    display: flex;
+    gap: 6px;
+    padding: 10px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--mn-edge);
+  }
+  .r-landing.home .product-preview__rail span {
+    flex: none;
+    border-radius: 28%;
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    overflow: hidden;
+  }
+  .r-landing.home .product-preview__rail span b {
+    display: inline-grid;
+    place-items: center;
+    font-size: 0.85rem;
+    font-weight: 650;
+  }
+  .r-landing.home .product-preview__rail span em {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+  .r-landing.home .product-preview__rail span.is-person {
+    border-radius: 50%;
+  }
+  .r-landing.home .product-preview__roombar strong {
+    font-size: 1rem;
+  }
+  .r-landing.home .product-preview__msg p {
+    font-size: 17px;
+  }
+  .r-landing.home .product-preview__composer {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    border-radius: 16px;
+    font-size: 0.95rem;
+  }
+  .r-landing.home .product-preview__proof {
+    display: none;
+  }
+  .r-landing.home .home-trust-strip,
+  .r-landing.home .home-capability-chapters {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -63,8 +63,10 @@ export type PresenceRibbonProps = {
   membersOpen?: boolean;
   showJoinVoice?: boolean;
   onJoinVoice?: (withVideo: boolean) => void;
-  /** Mobile uses the persistent Menu for workspace settings; keep this overflow contextual. */
+  /** Mobile overflow is room-contextual; You / Calls live on the bottom nav. */
   contextActionsOnly?: boolean;
+  /** Advanced / network-ops room desk — never a default-path tab. */
+  onOpenRoomDesk?: () => void;
   onOpenDm?: (nick: string) => void;
   onOpenWhois?: (nick: string, returnFocus: HTMLElement) => void;
 };
@@ -154,6 +156,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     'showJoinVoice',
     'onJoinVoice',
     'contextActionsOnly',
+    'onOpenRoomDesk',
     'onOpenDm',
     'onOpenWhois',
   ]);
@@ -968,6 +971,26 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       </svg>
                       <span>Room settings</span>
                     </button>
+                    <Show when={local.onOpenRoomDesk && preferences().experienceMode !== 'standard'}>
+                      <button
+                        type="button"
+                        class="shell-ribbon-more-item"
+                        role="menuitem"
+                        aria-label={`Room control desk for ${settingsChannel()}`}
+                        aria-haspopup="dialog"
+                        data-testid="ribbon-room-desk"
+                        onClick={() => closeMoreThen(() => local.onOpenRoomDesk?.())}
+                        onKeyDown={onMoreMenuKeyDown}
+                      >
+                        <svg class="shell-ribbon-more-ico" viewBox="0 0 24 24" aria-hidden="true"
+                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="4" y="5" width="16" height="14" rx="2" />
+                          <path d="M8 9h8" />
+                          <path d="M8 13h5" />
+                        </svg>
+                        <span>Room control desk</span>
+                      </button>
+                    </Show>
                     <Show when={isConsumerStewardshipRoom(activeUsers()?.size ?? 0)}>
                       <button
                         type="button"

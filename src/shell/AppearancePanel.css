@@ -23,9 +23,9 @@
 .ap-panel-background-browser > summary::marker { color: var(--lapis); }
 .ap-panel-background-browser > summary span {
   color: var(--paper-mute);
-  font: 0.62rem var(--font-mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font: 0.75rem var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
 }
 .ap-panel-background-browser > summary b { font: 600 0.82rem var(--font-sans); }
 .ap-panel-background-browser[open] > summary { border-bottom: 1px solid var(--seam-faint); }

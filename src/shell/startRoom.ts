@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * startRoom — focus the existing sidebar "join #room" field.
+ * startRoom — focus the existing sidebar room-name field.
  *
  * Home's "Start a room" reuses ChannelSidebar's join form and AppShell's rooms
  * collection. No parallel store, no second create-room ritual.

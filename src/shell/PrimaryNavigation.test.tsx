@@ -47,13 +47,19 @@ describe('PrimaryNavigation', () => {
       />
     ));
     const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
-    expect(within(mobileNav).getAllByRole('button')).toHaveLength(4);
+    expect(within(mobileNav).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      '⌂Home',
+      '#Rooms',
+      '@Messages',
+      '◉Calls',
+      '◇You',
+    ]);
     expect(mobileNav.querySelector('.shell-mobile-nav-icon')).toBeInTheDocument();
     expect(within(mobileNav).getByRole('button', { name: 'Open Rooms' })).toHaveAttribute('aria-current', 'page');
     expect(within(mobileNav).getByRole('button', { name: 'Open Rooms' })).toHaveAttribute('title', 'Open Rooms');
     expect(mobileNav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
-    expect(within(mobileNav).getByRole('button', { name: 'Open Inbox' })).toBeInTheDocument();
-    expect(within(mobileNav).getByRole('button', { name: 'Open Menu' })).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(within(mobileNav).getByRole('button', { name: 'Open Messages' })).toBeInTheDocument();
+    expect(within(mobileNav).getByRole('button', { name: 'Open You' })).toHaveAttribute('aria-haspopup', 'dialog');
   });
 
   it('keeps current location separate from selected and expanded collections', () => {
@@ -69,7 +75,7 @@ describe('PrimaryNavigation', () => {
     ));
 
     const rooms = screen.getByRole('button', { name: 'Open Rooms' });
-    const messages = screen.getByRole('button', { name: 'Open Inbox' });
+    const messages = screen.getByRole('button', { name: 'Open Messages' });
     expect(rooms).toHaveAttribute('aria-current', 'page');
     expect(rooms).toHaveAttribute('aria-pressed', 'false');
     expect(rooms).toHaveAttribute('aria-expanded', 'false');

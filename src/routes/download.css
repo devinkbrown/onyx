@@ -26,10 +26,11 @@
   color: var(--paper-dim);
 }
 
+.dl-page .dl-hero h1,
 .dl-hero h1 {
   max-width: 16ch;
-  font-family: var(--font-sans);
-  font-weight: 650;
+  font-family: var(--font-serif);
+  font-weight: 520;
   letter-spacing: -0.03em;
   text-transform: none;
 }
@@ -164,6 +165,43 @@
 .dl-page .dl-copy:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 3px;
+}
+
+@media (max-width: 34rem) {
+  .dl-hero {
+    padding-block: 20px 16px;
+  }
+
+  .dl-hero h1 {
+    max-width: 12ch;
+    font-size: clamp(2rem, 10vw, 2.45rem);
+  }
+
+  .dl-lede,
+  .dl-hero .sub,
+  .dl-browser p {
+    max-width: none;
+    font-size: 17px;
+  }
+
+  .dl-cta,
+  .dl-browser {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dl-cta .r-btn,
+  .dl-browser .r-btn {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1.05rem;
+  }
+
+  .dl-catalog-receipt {
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+    text-transform: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

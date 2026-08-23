@@ -152,9 +152,9 @@ describe('About page — CSS source', () => {
     expect(css.includes('.ab-mascot')).toBe(true);
   });
 
-  it('uses Instrument Sans, not Fraunces, Anton, or gold', () => {
+  it('uses Instrument Sans for UI and Fraunces once on the hero, never Anton or gold', () => {
     expect(css.includes('var(--font-sans)')).toBe(true);
-    expect(css.includes('var(--font-serif)')).toBe(false);
+    expect(css).toMatch(/\.ab-hero h1\s*\{[^}]*font-family:\s*var\(--font-serif\)/s);
     expect(css.replace(/\/\*[\s\S]*?\*\//g, '').includes('Anton')).toBe(false);
     const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
     expect(cssNoComments.includes('var(--gold)')).toBe(false);

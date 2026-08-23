@@ -183,12 +183,12 @@
   min-height: var(--target-min, 44px);
   padding: 0.72rem 1rem;
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
-  font-family: var(--font-mono);
-  font-size: 0.86rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  border-radius: 14px;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   cursor: pointer;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }

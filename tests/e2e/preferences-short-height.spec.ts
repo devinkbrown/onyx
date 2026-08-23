@@ -49,8 +49,7 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
     });
   });
 
-  await page.getByRole('button', { name: 'Open Menu' }).click();
-  await page.getByRole('button', { name: 'You — account, appearance, and preferences' }).click();
+  await page.getByRole('button', { name: 'Open You' }).click();
   await page.getByRole('dialog', { name: 'You' }).getByRole('button', { name: 'Preferences', exact: true }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Preferences' });

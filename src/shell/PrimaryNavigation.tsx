@@ -11,7 +11,7 @@
  * so the IA stays single-sourced.
  */
 
-import { For, Show, createMemo, splitProps, type JSX } from 'solid-js';
+import { For, createMemo, splitProps, type JSX } from 'solid-js';
 import {
   createShellNavigationModel,
   type ShellCollectionId,
@@ -37,11 +37,8 @@ export type PrimaryNavigationProps = {
   youDialogOpen?: boolean;
   /** Focus return target for the mobile Rooms drawer trigger. */
   mobileRoomsButtonRef?: (element: HTMLButtonElement) => void;
-  /** Focus return target for the canonical mobile workspace Menu. */
-  mobileMenuButtonRef?: (element: HTMLButtonElement) => void;
-  /** Mobile keeps secondary destinations in the Menu without crowding the core rail. */
-  moreOpen?: boolean;
-  onOpenMore?: () => void;
+  /** Focus return target for the mobile You dialog trigger. */
+  mobileYouButtonRef?: (element: HTMLButtonElement) => void;
   onSelect: (section: PrimarySection) => void;
 };
 
@@ -52,8 +49,6 @@ const GLYPHS: Record<ShellNavigationId, string> = {
   calls: '◉',
   you: '◇',
 };
-
-const MOBILE_SECTIONS: readonly ShellNavigationId[] = ['home', 'rooms', 'messages'];
 
 function isCollection(section: PrimarySection): section is PrimaryCollection {
   return section === 'rooms' || section === 'messages';
@@ -67,9 +62,7 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
     'expandedCollection',
     'youDialogOpen',
     'mobileRoomsButtonRef',
-    'mobileMenuButtonRef',
-    'moreOpen',
-    'onOpenMore',
+    'mobileYouButtonRef',
     'onSelect',
   ]);
 
@@ -81,11 +74,7 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
     expandedCollection: local.expandedCollection,
     youDialogOpen: local.youDialogOpen,
   }));
-  const items = createMemo(() => {
-    const all = model();
-    if (!isMobile()) return [...all];
-    return all.filter((item) => MOBILE_SECTIONS.includes(item.id));
-  });
+  const items = createMemo(() => [...model()]);
 
   const renderItem = (item: ShellNavigationItem): JSX.Element => {
     const className = (): string => {
@@ -96,23 +85,27 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
       if (item.id === 'you' && local.youDialogOpen) classes.push(`${base}--dialog-open`);
       return classes.join(' ');
     };
-    const displayLabel = isMobile() && item.id === 'messages' ? 'Inbox' : item.label;
-
     return (
       <button
         type="button"
-        ref={item.id === 'rooms' ? local.mobileRoomsButtonRef : undefined}
+        ref={
+          item.id === 'rooms'
+            ? local.mobileRoomsButtonRef
+            : item.id === 'you'
+              ? local.mobileYouButtonRef
+              : undefined
+        }
         class={className()}
         data-primary-nav-item
         data-section={item.id}
         data-selected={item.selected ? 'true' : undefined}
         data-expanded={item.expanded === true ? 'true' : item.expanded === false ? 'false' : undefined}
-        aria-label={isMobile() ? `Open ${displayLabel}` : undefined}
+        aria-label={isMobile() ? `Open ${item.label}` : undefined}
         aria-current={item.current ? 'page' : undefined}
         aria-pressed={isCollection(item.id) ? item.selected : undefined}
         aria-expanded={isCollection(item.id) ? item.expanded : item.id === 'you' ? local.youDialogOpen : undefined}
         aria-haspopup={item.hasPopup}
-        title={isMobile() ? `Open ${displayLabel}` : `Quick switch to ${item.label}`}
+        title={isMobile() ? `Open ${item.label}` : `Quick switch to ${item.label}`}
         onClick={() => local.onSelect(item.id)}
       >
         {isMobile() ? (
@@ -120,28 +113,10 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
         ) : (
           <span class="shell-primary-nav-icon" aria-hidden="true">{GLYPHS[item.id]}</span>
         )}
-        {displayLabel}
+        {item.label}
       </button>
     );
   };
-
-  const renderMore = (): JSX.Element => (
-    <button
-      type="button"
-      ref={local.mobileMenuButtonRef}
-      class={`shell-mobile-nav-btn${local.moreOpen ? ' shell-mobile-nav-btn--dialog-open' : ''}`}
-      data-primary-nav-item
-      data-section="more"
-      aria-label="Open Menu"
-      aria-expanded={local.moreOpen}
-      aria-haspopup="dialog"
-      title="Open Menu"
-      onClick={() => local.onOpenMore?.()}
-    >
-      <span class="shell-mobile-nav-icon" aria-hidden="true">•••</span>
-      Menu
-    </button>
-  );
 
   return (
     <nav
@@ -152,7 +127,6 @@ export function PrimaryNavigation(props: PrimaryNavigationProps): JSX.Element {
     >
       {!isMobile() && <span class="shell-primary-nav-context">Quick switch</span>}
       <For each={items()}>{renderItem}</For>
-      <Show when={isMobile()}>{renderMore()}</Show>
     </nav>
   );
 }

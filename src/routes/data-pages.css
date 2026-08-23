@@ -1,11 +1,11 @@
 /* ── /download release surface ─────────────────────────────────────────────── */
 .dl-page .dl-section-title {
   margin: 0 0 16px;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(1.6rem, 1rem + 2vw, 2.4rem);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-weight: 650;
+  font-size: clamp(1.4rem, 1rem + 1.6vw, 2rem);
+  letter-spacing: -0.02em;
+  text-transform: none;
   color: var(--paper);
 }
 
@@ -50,14 +50,14 @@
   min-height: 28px;
   padding: 4px 10px;
   border: 1px solid color-mix(in oklab, var(--lapis) 42%, var(--seam-faint));
-  border-radius: 2px;
+  border-radius: 12px;
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
-  color: var(--lapis-bright);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   white-space: nowrap;
 }
 

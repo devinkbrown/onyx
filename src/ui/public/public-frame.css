@@ -2,6 +2,7 @@
 /* Public company-site identity. The --public-* spine aliases canonical
    src/styles/tokens.css values so public routes share one authority. */
 .public-frame {
+  --public-phone-body: 1.0625rem;
   --public-void: var(--ink);
   --public-surface: var(--stone);
   --public-raised: var(--stone-2);
@@ -209,12 +210,29 @@
 }
 
 @media (max-width: 34rem) {
-  .public-frame__header-inner { gap: 0.5rem; }
+  .public-frame {
+    font-size: var(--public-phone-body);
+  }
+  .public-frame__header-inner { gap: 0.5rem; padding-inline: max(0.75rem, env(safe-area-inset-left, 0px)) max(0.75rem, env(safe-area-inset-right, 0px)); }
   .public-frame__brand .public-frame__wordmark { display: none; }
   .public-frame__nav-cluster { gap: 0.5rem; }
-  .public-frame__open { min-width: 0; padding-inline: 0.65rem; font-size: 0.72rem; }
+  .public-frame__open {
+    min-width: 44px;
+    min-height: 44px;
+    padding-inline: 0.9rem;
+    font-size: 0.92rem;
+    font-weight: 650;
+  }
+  .public-frame__main {
+    padding-block: 0.5rem 1.5rem;
+    font-size: var(--public-phone-body);
+  }
   .public-frame__footer-inner { grid-template-columns: 1fr; }
   .public-frame__footer nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .public-frame__footer a:not(.public-frame__footer-brand) {
+    min-height: 44px;
+    font-size: 0.95rem;
+  }
 }
 
 /* At extreme text zoom a sticky header can consume most of a short viewport

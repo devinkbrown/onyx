@@ -23,7 +23,7 @@ export function RoomSwitcherSheet(props: RoomSwitcherSheetProps): JSX.Element {
       class={`shell-sidebar-slot${local.open ? ' shell-sidebar--mobile-open' : ''}`}
       role={local.open ? 'dialog' : undefined}
       aria-modal={local.open ? 'true' : undefined}
-      aria-label={local.open ? `${local.mode === 'rooms' ? 'Room' : 'Inbox'} switcher` : undefined}
+      aria-label={local.open ? `${local.mode === 'rooms' ? 'Room' : 'Messages'} switcher` : undefined}
       tabindex={local.open ? -1 : undefined}
       data-room-switcher-sheet
     >

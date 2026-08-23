@@ -74,6 +74,7 @@ function Atmosphere(): JSX.Element {
   return (
     <>
       <div class="conn-sea-depth" aria-hidden="true" />
+      <div class="conn-sea-horizon" aria-hidden="true" />
       <div class="conn-sea-grain" aria-hidden="true" />
     </>
   );
