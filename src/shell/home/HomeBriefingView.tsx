@@ -158,6 +158,35 @@ function ColdMemoryCard(props: {
   );
 }
 
+function CatchUpSignalStrip(props: { plan: () => CaughtUpPlan }): JSX.Element {
+  const plan = () => props.plan();
+
+  return (
+    <section class="home-signal-strip" data-home-band="signal" aria-label="Catch-up summary">
+      <div class="home-signal-strip__lead">
+        <span class="home-signal-strip__eyebrow">Catch-up signal</span>
+        <p class="home-signal-strip__headline">
+          <span class="home-signal-strip__count">{plan().rooms}</span>
+          {' '}
+          <span>
+            {plan().rooms === 1 ? 'conversation needs you' : 'conversations need you'}
+          </span>
+        </p>
+      </div>
+      <dl class="home-signal-strip__metrics">
+        <div class="home-signal-strip__metric">
+          <dt>Unread</dt>
+          <dd>{plan().unread}</dd>
+        </div>
+        <div class="home-signal-strip__metric">
+          <dt>Mentions</dt>
+          <dd>{plan().mentions}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
 export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
   const inbox = () => props.briefing().inbox;
   const title = () => inbox().empty ? 'The room is quiet.' : 'What did you miss?';
@@ -174,6 +203,9 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
             <p class="home-offline-note" role="status">
               {props.localMemoryStatus()}
             </p>
+          </Show>
+          <Show when={!props.briefing().catchUpFromMemory && props.caughtUpPlan().rooms > 0}>
+            <CatchUpSignalStrip plan={props.caughtUpPlan} />
           </Show>
         </header>
 

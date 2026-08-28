@@ -106,12 +106,14 @@ function renderView(over: Partial<{
   confirm: string | null;
   caughtUpRooms: number;
   caughtUpUnread: number;
+  caughtUpMentions: number;
   firstHourWelcome: boolean;
   formation: HomeBriefingViewProps['formationStrip'] extends () => infer T ? T : never;
 }> = {}) {
   const model = over.briefing ?? briefing();
   const rooms = over.caughtUpRooms ?? (model.catchUpFromMemory ? 0 : Math.max(1, model.inbox.mentions.length + model.inbox.missed.length));
   const unread = over.caughtUpUnread ?? model.catchUpTotals.unread;
+  const mentions = over.caughtUpMentions ?? model.catchUpTotals.mentions;
   return render(() => (
     <HomeBriefingView
       nowMs={() => NOW}
@@ -131,7 +133,7 @@ function renderView(over: Partial<{
       formationStrip={() => over.formation ?? null}
       isJoined={() => false}
       caughtUpPlan={() => rooms > 0
-        ? { targets: [{ kind: 'channel', target: '#mentions', unread, highlights: 0 }], rooms, unread, mentions: 0 }
+        ? { targets: [{ kind: 'channel', target: '#mentions', unread, highlights: 0 }], rooms, unread, mentions }
         : EMPTY_CAUGHT_UP}
       actions={over.actions ?? actions()}
     />
@@ -170,6 +172,17 @@ describe('HomeBriefingView — presentation contract', () => {
     expect(screen.queryByRole('heading', { name: 'Needs you' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Explore' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Room ledger|people online|Current ledger/i)).not.toBeInTheDocument();
+  });
+
+  it('surfaces the full caught-up plan as a compact queue summary', () => {
+    renderView({ caughtUpRooms: 3, caughtUpUnread: 8, caughtUpMentions: 2 });
+    const summary = screen.getByRole('region', { name: 'Catch-up summary' });
+
+    expect(summary).toHaveTextContent(/3\s+conversations need you/);
+    expect(within(summary).getByText('Unread')).toBeInTheDocument();
+    expect(within(summary).getByText('8')).toBeInTheDocument();
+    expect(within(summary).getByText('Mentions')).toBeInTheDocument();
+    expect(within(summary).getByText('2')).toBeInTheDocument();
   });
 
   it('lists an unread room without a mention in the unread group', () => {
