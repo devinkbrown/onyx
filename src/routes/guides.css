@@ -66,6 +66,119 @@
   padding-block-start: 0;
 }
 
+/* A quiet route map: it turns the existing newcomer sequence into a path
+   without competing with the how-to copy below it. */
+.guides-progress {
+  position: relative;
+  display: grid;
+  gap: 0.8rem;
+  padding: clamp(1rem, 2.6vw, 1.5rem);
+  border: 1px solid color-mix(in oklab, var(--guides-current) 38%, var(--public-line, var(--seam-faint)));
+  border-inline-start: 5px solid var(--guides-current);
+  background:
+    linear-gradient(105deg, color-mix(in oklab, var(--guides-current) 13%, transparent), transparent 48%),
+    var(--public-raised, var(--stone-2));
+}
+
+.guides-progress__head,
+.guides-card__meta,
+.guides-progress__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.guides-progress__eyebrow,
+.guides-progress__count {
+  margin: 0;
+  color: var(--guides-muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.guides-progress h2 {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.35rem, 1.1rem + 0.9vw, 1.85rem);
+  font-weight: 520;
+  letter-spacing: -0.018em;
+}
+
+.guides-progress__count {
+  flex: 0 0 auto;
+  color: var(--guides-paper);
+  text-transform: none;
+}
+
+.guides-progress__meter {
+  width: 100%;
+  height: 0.45rem;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--guides-current) 16%, var(--public-line, var(--seam-faint)));
+}
+
+.guides-progress__meter::-webkit-progress-bar {
+  background: color-mix(in oklab, var(--guides-current) 16%, var(--public-line, var(--seam-faint)));
+}
+
+.guides-progress__meter::-webkit-progress-value {
+  background: var(--guides-current);
+}
+
+.guides-progress__meter::-moz-progress-bar {
+  background: var(--guides-current);
+}
+
+.guides-progress__status {
+  margin: 0;
+  color: var(--guides-muted);
+  font-family: var(--font-sans);
+}
+
+.guides-progress__actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.guides-reset,
+.guides-step-toggle {
+  min-height: 40px;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid color-mix(in oklab, var(--guides-current) 42%, var(--public-line, var(--seam-faint)));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--guides-paper);
+  font: 600 0.9rem var(--font-sans);
+  cursor: pointer;
+}
+
+.guides-reset:hover,
+.guides-reset:focus-visible,
+.guides-step-toggle:hover,
+.guides-step-toggle:focus-visible {
+  background: color-mix(in oklab, var(--guides-current) 14%, transparent);
+}
+
+.guides-card__meta {
+  align-items: flex-start;
+}
+
+.guides-card--complete {
+  border-inline-start: 3px solid var(--guides-current);
+}
+
+.guides-card--complete .guides-step-toggle {
+  border-color: var(--guides-current);
+  background: color-mix(in oklab, var(--guides-current) 14%, transparent);
+}
+
 .guides-page .guides-card h2 {
   font-family: var(--font-sans);
   font-size: clamp(1.2rem, 1rem + 0.8vw, 1.55rem);
@@ -119,7 +232,8 @@
   }
 
   .guides-hero-actions,
-  .guides-card-actions {
+  .guides-card-actions,
+  .guides-progress__actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
@@ -130,10 +244,27 @@
     font-size: 1.05rem;
     border-radius: 16px;
   }
+
+  .guides-progress__head,
+  .guides-card__meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .guides-progress__count {
+    margin-top: -0.25rem;
+  }
+
+  .guides-reset,
+  .guides-step-toggle {
+    min-height: 44px;
+  }
 }
 
 @media (forced-colors: active) {
-  .guides-action {
+  .guides-action,
+  .guides-reset,
+  .guides-step-toggle {
     border-color: CanvasText;
     background: Canvas;
     color: CanvasText;

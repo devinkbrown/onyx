@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@solidjs/testing-library';
 
 vi.mock('@/backgrounds/SceneAtmosphere', () => ({
@@ -12,6 +12,7 @@ import {
   resolveGuidesSurface,
   type GuidesSurface,
 } from './Guides';
+import { GUIDE_PROGRESS_STORAGE_KEY } from '@/lib/guides/progress';
 
 const PRIMARY_LINKS = [
   ['About', '/about/'],
@@ -21,6 +22,10 @@ const PRIMARY_LINKS = [
 const FORBIDDEN = /mIRC|\bmirc\b|IRCv3|\bIRC\b|Discord killer|\bmesh\b|handshake|claim path|group E2EE live|passkey as/i;
 
 const SURFACES = ['guides', 'community'] as const satisfies readonly GuidesSurface[];
+
+afterEach(() => {
+  localStorage.removeItem(GUIDE_PROGRESS_STORAGE_KEY);
+});
 
 describe.each(SURFACES)('Guides /$surface/', (surface) => {
   const meta = GUIDE_PAGE_META[surface];
@@ -75,6 +80,7 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
 
     const headings = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
     expect(headings).toEqual([
+      'One small step at a time',
       'Be kind, then talk',
       ...GUIDE_HOWTOS.map((howto) => howto.title),
     ]);
@@ -136,6 +142,35 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveFocus();
+  });
+
+  it('turns the newcomer order into a local, resettable first-room plan', () => {
+    localStorage.removeItem(GUIDE_PROGRESS_STORAGE_KEY);
+    render(() => <Guides surface={surface} />);
+
+    expect(screen.getByRole('heading', { name: 'One small step at a time' })).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Guide plan progress' })).toHaveAttribute('value', '0');
+    expect(screen.getByRole('link', { name: 'Go to: Join a room' })).toHaveAttribute('href', '#join');
+
+    const join = screen.getByRole('button', { name: 'Mark Join a room complete' });
+    fireEvent.click(join);
+    expect(join).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('progressbar', { name: 'Guide plan progress' })).toHaveAttribute('value', '1');
+    expect(screen.getByRole('link', { name: 'Go to: Invite a friend' })).toHaveAttribute('href', '#invite');
+    expect(localStorage.getItem(GUIDE_PROGRESS_STORAGE_KEY)).toBe(JSON.stringify(['join']));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset plan' }));
+    expect(screen.getByRole('progressbar', { name: 'Guide plan progress' })).toHaveAttribute('value', '0');
+    expect(screen.getByRole('button', { name: 'Mark Join a room complete' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('restores only the supported guide steps from this browser', () => {
+    localStorage.setItem(GUIDE_PROGRESS_STORAGE_KEY, JSON.stringify(['join', 'unknown']));
+    render(() => <Guides surface={surface} />);
+
+    expect(screen.getByRole('progressbar', { name: 'Guide plan progress' })).toHaveAttribute('value', '1');
+    expect(screen.getByRole('button', { name: 'Mark Join a room not complete' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Mark Invite a friend complete' })).toHaveAttribute('aria-pressed', 'false');
   });
 });
 

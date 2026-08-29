@@ -3,11 +3,16 @@ import './landing.css';
 import './data-pages.css';
 import './public-info.css';
 import './guides.css';
-import { createEffect, createMemo, For, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onMount, Show } from 'solid-js';
 import { useLocation } from '@solidjs/router';
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
 import NotFoundPage from './NotFound';
+import {
+  guideProgressSummary,
+  readGuideProgress,
+  writeGuideProgress,
+} from '@/lib/guides/progress';
 
 export type GuidesSurface = 'guides' | 'community';
 
@@ -122,8 +127,36 @@ export const GUIDE_HOWTOS = [
   },
 ] as const;
 
+const REQUIRED_GUIDE_IDS = GUIDE_HOWTOS.filter((howto) => !howto.optional).map((howto) => howto.id);
+
+function guideTitle(id: string): string {
+  return GUIDE_HOWTOS.find((howto) => howto.id === id)?.title ?? 'the next step';
+}
+
 export function Guides(props: { surface: GuidesSurface }) {
   const meta = createMemo(() => GUIDE_PAGE_META[props.surface]);
+  const [completed, setCompleted] = createSignal<ReadonlySet<string>>(new Set());
+  const progress = createMemo(() => guideProgressSummary(REQUIRED_GUIDE_IDS, completed()));
+
+  onMount(() => {
+    setCompleted(readGuideProgress(window.localStorage, REQUIRED_GUIDE_IDS));
+  });
+
+  function toggleStep(id: string): void {
+    setCompleted((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      writeGuideProgress(window.localStorage, REQUIRED_GUIDE_IDS, next);
+      return next;
+    });
+  }
+
+  function resetPlan(): void {
+    const next = new Set<string>();
+    setCompleted(next);
+    writeGuideProgress(window.localStorage, REQUIRED_GUIDE_IDS, next);
+  }
 
   createEffect(() => {
     const item = meta();
@@ -157,6 +190,40 @@ export function Guides(props: { surface: GuidesSurface }) {
           </p>
         </section>
         <section class="r-wrap r-section guides-body">
+          <section class="guides-progress" aria-labelledby="guides-progress-title">
+            <div class="guides-progress__head">
+              <div>
+                <p class="guides-progress__eyebrow">Your first room plan</p>
+                <h2 id="guides-progress-title">One small step at a time</h2>
+              </div>
+              <span class="guides-progress__count">{progress().complete} of {progress().total}</span>
+            </div>
+            <progress
+              class="guides-progress__meter"
+              aria-label="Guide plan progress"
+              max={progress().total}
+              value={progress().complete}
+              aria-describedby="guides-progress-status"
+            >
+              {progress().complete} of {progress().total}
+            </progress>
+            <p class="guides-progress__status" id="guides-progress-status" role="status">
+              <Show
+                when={progress().done}
+                fallback={<>Your progress stays in this browser. Next: {guideTitle(progress().nextId ?? '')}.</>}
+              >
+                You have your bearings. Start a conversation when you are ready.
+              </Show>
+            </p>
+            <div class="guides-progress__actions">
+              <Show when={progress().nextId}>
+                {(nextId) => <a class="guides-action" href={`#${nextId()}`}>Go to: {guideTitle(nextId())}</a>}
+              </Show>
+              <Show when={progress().complete > 0}>
+                <button class="guides-reset" type="button" onClick={resetPlan}>Reset plan</button>
+              </Show>
+            </div>
+          </section>
           <article class="data-card public-info-card guides-card" id="together">
             <div class="label">How we treat each other</div>
             <h2>Be kind, then talk</h2>
@@ -170,10 +237,26 @@ export function Guides(props: { surface: GuidesSurface }) {
             {(howto) => (
               <article
                 class="data-card public-info-card guides-card"
-                classList={{ 'guides-card--optional': howto.optional }}
+                classList={{
+                  'guides-card--optional': howto.optional,
+                  'guides-card--complete': !howto.optional && completed().has(howto.id),
+                }}
                 id={howto.id}
               >
-                <div class="label">{howto.optional ? 'Optional' : 'How-to'}</div>
+                <div class="guides-card__meta">
+                  <div class="label">{howto.optional ? 'Optional' : 'How-to'}</div>
+                  <Show when={!howto.optional}>
+                    <button
+                      class="guides-step-toggle"
+                      type="button"
+                      aria-pressed={completed().has(howto.id)}
+                      aria-label={`Mark ${howto.title} ${completed().has(howto.id) ? 'not complete' : 'complete'}`}
+                      onClick={() => toggleStep(howto.id)}
+                    >
+                      {completed().has(howto.id) ? 'Done' : 'Mark done'}
+                    </button>
+                  </Show>
+                </div>
                 <h2>{howto.title}</h2>
                 <For each={howto.body}>
                   {(paragraph) => <p>{paragraph}</p>}
