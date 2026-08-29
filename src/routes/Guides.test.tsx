@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@solidjs/testing-library';
+import { fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 
 vi.mock('@/backgrounds/SceneAtmosphere', () => ({
   SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
@@ -13,6 +13,7 @@ import {
   type GuidesSurface,
 } from './Guides';
 import { GUIDE_PROGRESS_STORAGE_KEY } from '@/lib/guides/progress';
+import * as clipboard from '@/lib/clipboard/writeClipboardText';
 
 const PRIMARY_LINKS = [
   ['About', '/about/'],
@@ -25,6 +26,7 @@ const SURFACES = ['guides', 'community'] as const satisfies readonly GuidesSurfa
 
 afterEach(() => {
   localStorage.removeItem(GUIDE_PROGRESS_STORAGE_KEY);
+  vi.restoreAllMocks();
 });
 
 describe.each(SURFACES)('Guides /$surface/', (surface) => {
@@ -92,9 +94,11 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
     expect(screen.getByRole('heading', { name: 'Calls when you want them' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Keep it on this device' })).toBeInTheDocument();
 
-    expect(screen.getByText(/Direct messages are one-to-one/)).toBeInTheDocument();
-    expect(screen.getByText(/can be private/)).toBeInTheDocument();
-    expect(screen.getByText(/Group rooms are not end-to-end encrypted/)).toBeInTheDocument();
+    const messagesCard = screen.getByRole('heading', { name: 'Messages and private DMs' }).closest('article');
+    expect(messagesCard).not.toBeNull();
+    expect(within(messagesCard as HTMLElement).getByText(/Direct messages are one-to-one/)).toBeInTheDocument();
+    expect(within(messagesCard as HTMLElement).getByText(/can be private/)).toBeInTheDocument();
+    expect(within(messagesCard as HTMLElement).getByText(/Group rooms are not end-to-end encrypted/)).toBeInTheDocument();
     expect(screen.getByText(/Passkeys are not the everyday way to sign in/)).toBeInTheDocument();
     expect(screen.getByText(/Add to Home Screen/)).toBeInTheDocument();
     expect(screen.getByText(/usual way in/)).toBeInTheDocument();
@@ -151,6 +155,19 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
     expect(screen.getByRole('heading', { name: 'One small step at a time' })).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Guide plan progress' })).toHaveAttribute('value', '0');
     expect(screen.getByRole('link', { name: 'Go to: Join a room' })).toHaveAttribute('href', '#join');
+    const route = screen.getByRole('list', { name: 'First room route' });
+    const routeLinks = within(route).getAllByRole('link');
+    expect(routeLinks.map((link) => link.getAttribute('href'))).toEqual([
+      '#join',
+      '#invite',
+      '#messages',
+      '#calls',
+      '#this-device',
+    ]);
+    expect(route.querySelector('[aria-current="step"]')).toHaveAttribute('href', '#join');
+    expect(route.querySelector('[data-state="later"]')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Privacy and safety, at a glance' })).toBeInTheDocument();
+    expect(screen.getByText('Calls are opt-in and are not recorded.')).toBeInTheDocument();
 
     const join = screen.getByRole('button', { name: 'Mark Join a room complete' });
     fireEvent.click(join);
@@ -158,10 +175,45 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
     expect(screen.getByRole('progressbar', { name: 'Guide plan progress' })).toHaveAttribute('value', '1');
     expect(screen.getByRole('link', { name: 'Go to: Invite a friend' })).toHaveAttribute('href', '#invite');
     expect(localStorage.getItem(GUIDE_PROGRESS_STORAGE_KEY)).toBe(JSON.stringify(['join']));
+    expect(route.querySelector('[aria-current="step"]')).toHaveAttribute('href', '#invite');
+    expect(route.querySelector('[data-state="done"]')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset plan' }));
     expect(screen.getByRole('progressbar', { name: 'Guide plan progress' })).toHaveAttribute('value', '0');
     expect(screen.getByRole('button', { name: 'Mark Join a room complete' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('creates a local-only first-room handoff for copy or text download', async () => {
+    const writeClipboardText = vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(true);
+    render(() => <Guides surface={surface} />);
+
+    const download = screen.getByRole('link', { name: 'Download text' });
+    expect(download).toHaveAttribute('download', 'onyx-first-room-plan.txt');
+    expect(download.getAttribute('href')).toMatch(/^data:text\/plain;charset=utf-8,/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy first-room plan' }));
+
+    await waitFor(() => {
+      expect(writeClipboardText).toHaveBeenCalledWith(expect.stringContaining('Onyx first-room plan'));
+    });
+    expect(writeClipboardText).toHaveBeenCalledWith(expect.stringContaining('This plan is not sent anywhere.'));
+    await waitFor(() => {
+      expect(screen.getByRole('status', { name: 'Plan share status' }))
+        .toHaveTextContent('First-room plan copied. It was created here and nothing was sent.');
+    });
+    expect(localStorage.getItem(GUIDE_PROGRESS_STORAGE_KEY)).toBeNull();
+  });
+
+  it('keeps the local boundary explicit when copying cannot complete', async () => {
+    vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(false);
+    render(() => <Guides surface={surface} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy first-room plan' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status', { name: 'Plan share status' }))
+        .toHaveTextContent('Copy did not complete. Download the text instead; nothing was sent.');
+    });
   });
 
   it('restores only the supported guide steps from this browser', () => {

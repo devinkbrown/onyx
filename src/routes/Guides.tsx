@@ -3,7 +3,7 @@ import './landing.css';
 import './data-pages.css';
 import './public-info.css';
 import './guides.css';
-import { createEffect, createMemo, createSignal, For, onMount, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 import { useLocation } from '@solidjs/router';
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
@@ -13,6 +13,13 @@ import {
   readGuideProgress,
   writeGuideProgress,
 } from '@/lib/guides/progress';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
+import {
+  buildRoomStarterExport,
+  buildRoomStarterRoute,
+  ROOM_STARTER_EXPORT_FILENAME,
+  ROOM_STARTER_SAFETY_NOTES,
+} from '@/lib/guides/roomStarter';
 
 export type GuidesSurface = 'guides' | 'community';
 
@@ -128,6 +135,9 @@ export const GUIDE_HOWTOS = [
 ] as const;
 
 const REQUIRED_GUIDE_IDS = GUIDE_HOWTOS.filter((howto) => !howto.optional).map((howto) => howto.id);
+const REQUIRED_GUIDE_STEPS = GUIDE_HOWTOS.filter((howto) => !howto.optional).map(({ id, title }) => ({ id, title }));
+
+type RoomStarterShareState = 'idle' | 'copying' | 'copied' | 'failed';
 
 function guideTitle(id: string): string {
   return GUIDE_HOWTOS.find((howto) => howto.id === id)?.title ?? 'the next step';
@@ -137,6 +147,14 @@ export function Guides(props: { surface: GuidesSurface }) {
   const meta = createMemo(() => GUIDE_PAGE_META[props.surface]);
   const [completed, setCompleted] = createSignal<ReadonlySet<string>>(new Set());
   const progress = createMemo(() => guideProgressSummary(REQUIRED_GUIDE_IDS, completed()));
+  const roomStarterRoute = createMemo(() => buildRoomStarterRoute(REQUIRED_GUIDE_STEPS, completed()));
+  const roomStarterExport = createMemo(() => buildRoomStarterExport(REQUIRED_GUIDE_STEPS, completed()));
+  const roomStarterDownload = createMemo(
+    () => `data:text/plain;charset=utf-8,${encodeURIComponent(roomStarterExport())}`,
+  );
+  const [shareState, setShareState] = createSignal<RoomStarterShareState>('idle');
+  let shareAttempt = 0;
+  let disposed = false;
 
   onMount(() => {
     setCompleted(readGuideProgress(window.localStorage, REQUIRED_GUIDE_IDS));
@@ -157,6 +175,27 @@ export function Guides(props: { surface: GuidesSurface }) {
     setCompleted(next);
     writeGuideProgress(window.localStorage, REQUIRED_GUIDE_IDS, next);
   }
+
+  async function copyRoomStarterPlan(): Promise<void> {
+    if (shareState() === 'copying') return;
+
+    const attempt = ++shareAttempt;
+    setShareState('copying');
+    const copied = await writeClipboardText(roomStarterExport()).catch(() => false);
+    if (disposed || attempt !== shareAttempt) return;
+    setShareState(copied ? 'copied' : 'failed');
+  }
+
+  createEffect(() => {
+    completed();
+    shareAttempt += 1;
+    setShareState('idle');
+  });
+
+  onCleanup(() => {
+    disposed = true;
+    shareAttempt += 1;
+  });
 
   createEffect(() => {
     const item = meta();
@@ -215,6 +254,84 @@ export function Guides(props: { surface: GuidesSurface }) {
                 You have your bearings. Start a conversation when you are ready.
               </Show>
             </p>
+            <section class="guides-route-map" aria-labelledby="guides-route-title">
+              <div class="guides-route-map__head">
+                <p class="guides-route-map__eyebrow">Room starter</p>
+                <h3 id="guides-route-title">A route for the first room</h3>
+              </div>
+              <ol class="guides-route" aria-label="First room route">
+                <For each={roomStarterRoute()}>
+                  {(step) => (
+                    <li class="guides-route__item" data-state={step.state}>
+                      <a
+                        class="guides-route__card"
+                        href={`#${step.id}`}
+                        aria-current={step.state === 'current' ? 'step' : undefined}
+                      >
+                        <span class="guides-route__number" aria-hidden="true">{step.number}</span>
+                        <span class="guides-route__copy">
+                          <span class="guides-route__state">{step.stateLabel}</span>
+                          <span class="guides-route__title">{step.title}</span>
+                        </span>
+                      </a>
+                    </li>
+                  )}
+                </For>
+              </ol>
+            </section>
+            <div class="guides-starter-details">
+              <section class="guides-snapshot" aria-labelledby="guides-snapshot-title">
+                <p class="guides-snapshot__eyebrow">Before you enter</p>
+                <h3 id="guides-snapshot-title">Privacy and safety, at a glance</h3>
+                <ul>
+                  <For each={ROOM_STARTER_SAFETY_NOTES}>
+                    {(note) => <li>{note}</li>}
+                  </For>
+                </ul>
+              </section>
+              <section class="guides-share" aria-labelledby="guides-share-title">
+                <p class="guides-share__eyebrow">Your handoff slip</p>
+                <h3 id="guides-share-title">Share this plan locally</h3>
+                <p>Copy or download this small text plan. Onyx does not send it anywhere.</p>
+                <div class="guides-share__actions">
+                  <button
+                    class="guides-copy"
+                    type="button"
+                    aria-label="Copy first-room plan"
+                    aria-describedby="guides-share-status"
+                    disabled={shareState() === 'copying'}
+                    onClick={copyRoomStarterPlan}
+                  >
+                    <Show when={shareState() === 'copying'} fallback="Copy plan">Copying plan…</Show>
+                  </button>
+                  <a
+                    class="guides-download"
+                    href={roomStarterDownload()}
+                    download={ROOM_STARTER_EXPORT_FILENAME}
+                  >
+                    Download text
+                  </a>
+                </div>
+                <p
+                  class="guides-share__status"
+                  id="guides-share-status"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  aria-label="Plan share status"
+                >
+                  <Show when={shareState() === 'copying'}>
+                    Creating your local plan…
+                  </Show>
+                  <Show when={shareState() === 'copied'}>
+                    First-room plan copied. It was created here and nothing was sent.
+                  </Show>
+                  <Show when={shareState() === 'failed'}>
+                    Copy did not complete. Download the text instead; nothing was sent.
+                  </Show>
+                </p>
+              </section>
+            </div>
             <div class="guides-progress__actions">
               <Show when={progress().nextId}>
                 {(nextId) => <a class="guides-action" href={`#${nextId()}`}>Go to: {guideTitle(nextId())}</a>}
