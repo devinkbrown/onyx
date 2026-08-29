@@ -53,9 +53,16 @@ export function RoadmapBridge() {
             system, and not a dated promise.
           </p>
           <div class="roadmap-legend" role="group" aria-label="Roadmap state legend">
-            <span data-state="now">Now</span>
-            <span data-state="next">Next</span>
-            <span data-state="later">Later</span>
+            <For each={ROADMAP_ITEMS}>
+              {(item, index) => (
+                <a href={`#roadmap-${item.state}`} data-state={item.state}>
+                  <span class="roadmap-legend__marker" aria-hidden="true">
+                    {String(index() + 1).padStart(2, '0')}
+                  </span>
+                  <span>{item.label}</span>
+                </a>
+              )}
+            </For>
           </div>
         </section>
 
@@ -64,11 +71,17 @@ export function RoadmapBridge() {
         <section class="r-wrap r-section roadmap-grid" aria-label="Current Onyx product priorities">
           <For each={ROADMAP_ITEMS}>
             {(item) => (
-              <article class="roadmap-card" data-state={item.state}>
+              <article
+                id={`roadmap-${item.state}`}
+                class="roadmap-card"
+                data-state={item.state}
+                aria-labelledby={`roadmap-${item.state}-title`}
+                tabindex="-1"
+              >
                 <div class="roadmap-card-head">
                   <span class="roadmap-state">{item.label}</span>
                 </div>
-                <h2>{item.title}</h2>
+                <h2 id={`roadmap-${item.state}-title`}>{item.title}</h2>
                 <p class="roadmap-summary">{item.summary}</p>
               </article>
             )}

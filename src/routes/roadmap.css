@@ -48,16 +48,31 @@
 }
 
 .roadmap-legend {
-  display: flex;
-  flex-wrap: wrap;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 24px;
 }
 
-.roadmap-legend span,
+.roadmap-legend::before {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  right: 22px;
+  left: 22px;
+  height: 1px;
+  content: '';
+  background: var(--seam);
+}
+
+.roadmap-legend a,
 .roadmap-state {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
+  min-width: 0;
   min-height: var(--target-min, 44px);
   padding: 5px 12px;
   border: 1px solid var(--seam-faint);
@@ -66,24 +81,57 @@
   font-size: 0.9rem;
   font-weight: 550;
   letter-spacing: 0.01em;
+  line-height: 1.25;
   text-transform: none;
 }
 
-.roadmap-legend span[data-state='now'],
+.roadmap-legend a {
+  position: relative;
+  color: var(--paper-dim);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: border-color var(--dur, 200ms) var(--ease), color var(--dur, 200ms) var(--ease), background var(--dur, 200ms) var(--ease);
+}
+
+.roadmap-legend a:hover {
+  border-color: var(--stone-line);
+  color: var(--paper);
+}
+
+.roadmap-legend a:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
+}
+
+.roadmap-legend__marker {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 0.65em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.roadmap-legend a[data-state='now'],
 .roadmap-card[data-state='now'] .roadmap-state {
   color: var(--roadmap-current-strong);
   border-color: color-mix(in oklab, var(--roadmap-current) 48%, var(--seam-faint));
   background: color-mix(in oklab, var(--roadmap-current) 14%, transparent);
 }
 
-.roadmap-legend span[data-state='next'],
+.roadmap-legend a[data-state='next'],
 .roadmap-card[data-state='next'] .roadmap-state {
   color: var(--roadmap-warm);
   border-color: color-mix(in oklab, var(--roadmap-warm) 38%, var(--seam-faint));
   background: color-mix(in oklab, var(--roadmap-warm) 10%, transparent);
 }
 
-.roadmap-legend span[data-state='later'],
+.roadmap-legend a[data-state='later'],
 .roadmap-card[data-state='later'] .roadmap-state {
   color: var(--paper-mute);
   background: color-mix(in oklab, var(--stone-3) 42%, transparent);
@@ -102,6 +150,11 @@
   overflow: hidden;
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
+}
+
+.roadmap-card:focus {
+  outline: var(--focus-ring, 2px solid var(--lapis));
+  outline-offset: var(--focus-offset, 3px);
 }
 
 .roadmap-card::before {
@@ -152,6 +205,26 @@
 }
 
 @media (max-width: 680px) {
+  .roadmap-legend {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding-left: 0;
+  }
+
+  .roadmap-legend::before {
+    top: 22px;
+    right: auto;
+    bottom: 22px;
+    left: 22px;
+    width: 1px;
+    height: auto;
+  }
+
+  .roadmap-legend a {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
   .roadmap-grid {
     grid-template-columns: 1fr;
   }
@@ -181,7 +254,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .roadmap-legend span,
+  .roadmap-legend a,
   .roadmap-state,
   .roadmap-card {
     transition: none;
@@ -195,16 +268,18 @@
     color: CanvasText;
   }
 
-  .roadmap-legend span,
+  .roadmap-legend a,
+  .roadmap-legend__marker,
   .roadmap-state,
-  .roadmap-card::before {
+  .roadmap-card::before,
+  .roadmap-legend::before {
     border-color: CanvasText;
     color: CanvasText;
     background: Canvas;
     forced-color-adjust: none;
   }
 
-  .roadmap-legend span[data-state='now'],
+  .roadmap-legend a[data-state='now'],
   .roadmap-card[data-state='now'] .roadmap-state,
   .roadmap-card[data-state='now']::before {
     border-color: Highlight;
@@ -212,17 +287,22 @@
     background: Highlight;
   }
 
-  .roadmap-legend span[data-state='next'],
+  .roadmap-legend a[data-state='next'],
   .roadmap-card[data-state='next'] .roadmap-state,
   .roadmap-card[data-state='next']::before {
     border-color: LinkText;
     color: LinkText;
   }
 
-  .roadmap-legend span[data-state='later'],
+  .roadmap-legend a[data-state='later'],
   .roadmap-card[data-state='later'] .roadmap-state,
   .roadmap-card[data-state='later']::before {
     border-color: GrayText;
     color: GrayText;
+  }
+
+  .roadmap-legend a:focus-visible,
+  .roadmap-card:focus {
+    outline-color: Highlight;
   }
 }

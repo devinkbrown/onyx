@@ -87,6 +87,28 @@ describe('RoadmapRoute', () => {
     expect(screen.queryByText(/OnyxOS/i)).toBeNull();
   });
 
+  it('turns the state legend into a keyboard-navigable sequence of priorities', () => {
+    render(() => <RoadmapBridge />);
+    const legend = screen.getByRole('group', { name: 'Roadmap state legend' });
+    const sequence = [
+      ['now', 'Rooms that stay open'],
+      ['next', 'Calls and catch-up'],
+      ['later', 'Home Screen on this device'],
+    ] as const;
+
+    for (const [state, title] of sequence) {
+      const link = within(legend).getByRole('link', { name: new RegExp(`^${state}$`, 'i') });
+      const card = document.querySelector(`#roadmap-${state}`);
+      expect(link).toHaveAttribute('href', `#roadmap-${state}`);
+      expect(card).toHaveAttribute(
+        'aria-labelledby',
+        `roadmap-${state}-title`,
+      );
+      expect(card).toHaveAttribute('tabindex', '-1');
+      expect(document.querySelector(`#roadmap-${state}-title`)).toHaveTextContent(title);
+    }
+  });
+
   it('stamps community metadata', () => {
     render(() => <RoadmapRoute />);
     expect(document.title).toBe('Onyx roadmap — rooms, calls, catch-up');
