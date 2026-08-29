@@ -42,12 +42,12 @@ describe('Landing', () => {
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');
     expect(openOnyx[0]).toHaveClass('public-frame__open');
-    expect(getByRole('heading', { level: 1 })).toHaveTextContent('A room for your people.');
+    expect(getByRole('heading', { level: 1 })).toHaveTextContent('Find your people. Keep the room.');
     expect(container.querySelector('a.home-cta-primary')).toHaveAttribute('href', '/app/');
     expect(container.querySelector('a.home-cta-primary')).toHaveTextContent('Join free');
     expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/download/');
     expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('Download');
-    expect(container.textContent).toMatch(/Invite someone\. Join a room\. Talk\./);
+    expect(container.textContent).toMatch(/A calm place to begin a conversation/);
     expect(container.querySelector('.home-desktop-note')?.textContent).toMatch(
       /Supporting browsers can put Onyx on the Home Screen or in its own window\. No store\./,
     );
@@ -106,6 +106,33 @@ describe('Landing', () => {
     expect(homeCss).toContain('min-height: var(--target-min, 44px)');
     expect(homeCss).toContain('.product-preview__tabs button:focus-visible');
     expect(homeCss).toContain(".product-preview__tabs button[aria-selected='true']");
+  });
+
+  it('uses an honest, keyboard-operable first-room switchboard', async () => {
+    const { container, getByRole } = render(() => <Landing />);
+    const board = container.querySelector('[data-home-room-board]');
+    expect(board).toHaveAttribute('data-room-intent', 'public-room');
+    expect(getByRole('link', { name: 'Open the public room' })).toHaveAttribute('href', '/invite/?join=%23root');
+    expect(board).toHaveTextContent(/not a live list of who is online/i);
+
+    const publicRoom = getByRole('tab', { name: 'Meet people' });
+    publicRoom.focus();
+    fireEvent.keyDown(publicRoom, { key: 'ArrowRight' });
+    await waitFor(() => expect(getByRole('tab', { name: 'Bring people' })).toHaveFocus());
+    expect(board).toHaveAttribute('data-room-intent', 'bring-people');
+    expect(board?.querySelector('a.home-room-board__action')).toHaveAttribute('href', '/app/');
+
+    fireEvent.keyDown(getByRole('tab', { name: 'Bring people' }), { key: 'ArrowRight' });
+    await waitFor(() => expect(getByRole('tab', { name: 'Get oriented' })).toHaveFocus());
+    expect(getByRole('link', { name: 'Read the first-room guide' })).toHaveAttribute('href', '/guides/');
+
+    fireEvent.keyDown(getByRole('tab', { name: 'Get oriented' }), { key: 'Home' });
+    await waitFor(() => expect(getByRole('tab', { name: 'Meet people' })).toHaveFocus());
+    expect(board).toHaveAttribute('data-room-intent', 'public-room');
+
+    fireEvent.keyDown(getByRole('tab', { name: 'Meet people' }), { key: 'End' });
+    await waitFor(() => expect(getByRole('tab', { name: 'Get oriented' })).toHaveFocus());
+    expect(board).toHaveAttribute('data-room-intent', 'learn');
   });
 
   it('states only trust claims the rooms can stand behind', () => {

@@ -6,6 +6,7 @@ import { PublicFrame } from '@/ui/public';
 import { publicRouteById } from '@/ui/navigation/publicRouteManifest';
 import { PUBLIC_HOME_DESCRIPTION, setPageMeta } from './pageMeta';
 import { ProductPreview } from './ProductPreview';
+import { HomeRoomBoard } from './HomeRoomBoard';
 
 const LANDING_SHELF_ITEMS = [
   [publicRouteById('status').href, 'Status'],
@@ -47,9 +48,9 @@ export default function Landing() {
         <div class="home-hero-grid">
           <div class="home-hero-copy">
             <p class="home-kicker">Friends · clubs · rooms</p>
-            <h1 id="hero-heading" class="home-h1">A room for your people.</h1>
+            <h1 id="hero-heading" class="home-h1">Find your people. Keep the room.</h1>
             <p class="home-lede">
-              Invite someone. Join a room. Talk.
+              A calm place to begin a conversation, return to it later, and make room for more people.
             </p>
             <div class="home-cta-row">
               <a class="home-cta-primary" href="/app/">Join free</a>
@@ -73,6 +74,10 @@ export default function Landing() {
 
           <ProductPreview />
         </div>
+      </section>
+
+      <section class="r-wrap home-room-board-wrap" aria-label="First-room switchboard">
+        <HomeRoomBoard />
       </section>
 
       <section class="r-wrap home-trust" aria-labelledby="trust-heading">
