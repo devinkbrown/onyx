@@ -108,6 +108,40 @@
   border-style: dashed;
 }
 
+.status-check {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.status-check__button {
+  min-width: var(--target-min, 44px);
+  min-height: var(--target-min, 44px);
+  padding-inline: 15px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
+  color: var(--paper-dim);
+  background: color-mix(in oklab, var(--stone) 52%, transparent);
+  font: 650 0.78rem/1 var(--font-sans);
+}
+
+.status-check__button:hover:not(:disabled),
+.status-check__button:focus-visible {
+  border-color: color-mix(in oklab, var(--public-current, var(--lapis-bright)) 55%, var(--seam-faint));
+  color: var(--paper);
+  background: color-mix(in oklab, var(--public-current, var(--lapis)) 13%, var(--stone));
+}
+
+.status-check__button:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--public-current, var(--lapis-bright)));
+  outline-offset: 2px;
+}
+
+.status-check__button:disabled {
+  cursor: progress;
+  opacity: 0.68;
+}
+
 .status-quiet {
   padding-block: clamp(2.4rem, 6vw, 4.8rem);
 }
@@ -188,10 +222,16 @@
     width: 100%;
     min-height: 44px;
   }
+
+  .status-check__button {
+    width: 100%;
+    min-height: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .status-quiet-link {
+  .status-quiet-link,
+  .status-check__button {
     transition: none;
   }
 }
@@ -216,5 +256,15 @@
 
   .status-observation[data-feed-state='current'] .status-observation__marker {
     background: Highlight;
+  }
+
+  .status-check__button {
+    border-color: CanvasText;
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .status-check__button:focus-visible {
+    outline-color: Highlight;
   }
 }

@@ -25,6 +25,7 @@ test('keeps the PublicFrame status route usable at 400% zoom', async ({ page }) 
   await expect(header.locator('a[href="/stats/"], a[href="/onyxos/"]')).toHaveCount(0);
   await expect(footer.locator('a[href="/stats/"], a[href="/onyxos/"]')).toHaveCount(0);
   await expect(frame.getByRole('status')).toContainText(/Checking|We cannot say/i);
+  await expect(frame.getByRole('button', { name: /check again|checking status/i })).toBeVisible();
 
   await page.keyboard.press('Tab');
   await expect(skip).toBeFocused();
@@ -76,7 +77,7 @@ test('keeps the PublicFrame status route usable at 400% zoom', async ({ page }) 
       controls: Array.from(document.querySelectorAll<HTMLElement>(
         '.public-frame__header a, .public-frame__header button, .public-frame__footer a',
       )).filter(visible).map(bounds),
-      routeActions: Array.from(document.querySelectorAll<HTMLElement>('.status-route .r-btn'))
+      routeActions: Array.from(document.querySelectorAll<HTMLElement>('.status-route .r-btn, .status-route .status-check__button'))
         .filter(visible).map(bounds),
       overflowContributors: Array.from(document.querySelectorAll<HTMLElement>('.public-frame *'))
         .filter(visible)

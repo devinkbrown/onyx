@@ -95,6 +95,7 @@ export default function StatusRoute() {
 
           <div
             class="status-observation"
+            id="status-observation"
             data-feed-state={feedState()}
             role="status"
             aria-live="polite"
@@ -103,6 +104,19 @@ export default function StatusRoute() {
             <span class="status-observation__marker" aria-hidden="true" />
             <span class="status-observation__label">{voice().label}</span>
             <span class="status-observation__detail">{voice().sentence}</span>
+          </div>
+
+          <div class="status-check">
+            <button
+              type="button"
+              class="status-check__button"
+              onClick={() => void refetchStatus()}
+              aria-describedby="status-observation"
+              aria-busy={status.loading || undefined}
+              disabled={status.loading}
+            >
+              {status.loading ? 'Checking status…' : 'Check again'}
+            </button>
           </div>
         </section>
 

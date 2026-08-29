@@ -60,6 +60,7 @@ describe('StatusRoute — community copy', () => {
     expect(src).not.toMatch(/fully encrypted|group E2EE|passkeys?/i);
     expect(src).not.toMatch(/href="\/terms\/"/);
     expect(src).toContain('href="/roadmap/"');
+    expect(src).toContain('refetchStatus()');
   });
 
   it('keeps quiet-harbor type: Instrument Sans, Fraunces once, no Anton or glass', () => {
@@ -154,6 +155,34 @@ describe('StatusRoute', () => {
     expect(screen.queryByText(/users online/i)).toBeNull();
   });
 
+  it('lets people recheck the public report without retaining an old health claim', async () => {
+    let resolveRefresh: (response: Response) => void = () => {};
+    const refresh = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const fetch = vi.fn()
+      .mockImplementationOnce(statusResponse(meshStatus()))
+      .mockImplementationOnce(() => refresh);
+    vi.stubGlobal('fetch', fetch);
+    render(() => <StatusRoute />);
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveAttribute('data-feed-state', 'current'));
+    const checkAgain = screen.getByRole('button', { name: 'Check again' });
+    checkAgain.focus();
+    expect(checkAgain).toHaveFocus();
+    fireEvent.click(checkAgain);
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Checking status…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Checking status…' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('status')).toHaveAttribute('data-feed-state', 'loading');
+    expect(screen.getByRole('status')).toHaveTextContent('No health claim yet.');
+
+    resolveRefresh(new Response(JSON.stringify(meshStatus()), { status: 200 }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveAttribute('data-feed-state', 'current'));
+    expect(screen.getByRole('button', { name: 'Check again' })).not.toBeDisabled();
+  });
+
   it('does not relabel degraded or stale observations as reachable', async () => {
     const cases = [
       {
@@ -190,5 +219,12 @@ describe('StatusRoute', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveFocus();
+  });
+
+  it('keeps the manual status check in the responsive and forced-color contract', () => {
+    expect(css).toContain('status-check__button');
+    expect(css).toContain('min-height: var(--target-min, 44px)');
+    expect(css).toContain('.status-check__button:focus-visible');
+    expect(css).toContain('@media (forced-colors: active)');
   });
 });
