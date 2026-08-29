@@ -1,0 +1,455 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Public observatory plane — compare room-level signals, never people. */
+.public-room-comparison {
+  --comparison-cyan: var(--public-current, var(--lapis-bright));
+  --comparison-blue: var(--public-current, var(--lapis));
+  --comparison-green: var(--ok);
+  --comparison-coral: var(--public-ember, var(--shu-bright));
+  --comparison-border: color-mix(in oklab, var(--lapis-bright) 20%, var(--seam-faint));
+  width: min(calc(100% - clamp(32px, 10vw, 112px)), 1268px);
+  min-width: 0;
+  margin-block: 8px clamp(42px, 6vw, 76px);
+  padding: clamp(24px, 3.8vw, 46px);
+  border: 1px solid var(--comparison-border);
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--stone-2) 74%, transparent);
+  box-shadow: none;
+}
+
+.public-room-comparison,
+.public-room-comparison * {
+  max-width: 100%;
+}
+
+.public-room-comparison__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  min-width: 0;
+}
+
+.public-room-comparison__head > div {
+  min-width: 0;
+}
+
+.public-room-comparison__head .r-eyebrow {
+  color: var(--comparison-cyan);
+}
+
+.public-room-comparison__head .r-title {
+  max-width: 14ch;
+  margin-top: 16px;
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 4vw, 3.7rem);
+  font-weight: 690;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+  text-transform: none;
+}
+
+.public-room-comparison__lede {
+  max-width: 54ch;
+  margin: 16px 0 0;
+  color: var(--paper-dim);
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.public-room-comparison__clear,
+.public-room-comparison__chip {
+  appearance: none;
+  min-width: var(--target-min, 44px);
+  min-height: var(--target-min, 44px);
+  border: 1px solid var(--comparison-border);
+  color: var(--paper-dim);
+  background: color-mix(in oklab, var(--stone) 54%, transparent);
+  font: 650 0.76rem/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.public-room-comparison__clear {
+  flex: none;
+  padding-inline: 14px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+.public-room-comparison__clear:hover,
+.public-room-comparison__clear:focus-visible,
+.public-room-comparison__chip:hover,
+.public-room-comparison__chip:focus-visible {
+  border-color: color-mix(in oklab, var(--comparison-cyan) 54%, var(--comparison-border));
+  color: var(--paper);
+  background: color-mix(in oklab, var(--comparison-blue) 16%, var(--stone));
+}
+
+.public-room-comparison__clear:focus-visible,
+.public-room-comparison__chip:focus-visible,
+.public-room-comparison__table-wrap:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--comparison-cyan));
+  outline-offset: 2px;
+}
+
+.public-room-comparison__ledger {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 26px;
+  padding: 12px 0;
+  border-block: 1px solid var(--comparison-border);
+}
+
+.public-room-comparison__ledger p {
+  min-width: 0;
+  margin: 0;
+  color: var(--paper-mute);
+  font: 0.76rem/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.public-room-comparison__marker {
+  width: 10px;
+  height: 10px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--paper-mute);
+  background: transparent;
+}
+
+.public-room-comparison__ledger[data-state='current'] .public-room-comparison__marker {
+  color: var(--comparison-green);
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 12%, transparent);
+}
+
+.public-room-comparison__ledger[data-state='snapshot'] .public-room-comparison__marker {
+  color: var(--comparison-coral);
+  background: currentColor;
+}
+
+.public-room-comparison__ledger[data-state='loading'] .public-room-comparison__marker {
+  color: var(--comparison-cyan);
+  border-style: dashed;
+}
+
+.public-room-comparison__selection {
+  min-height: 1.5em;
+  margin: 20px 0 0;
+  color: var(--paper-mute);
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+
+.public-room-comparison__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.public-room-comparison__chips > div {
+  display: flex;
+  min-width: 0;
+}
+
+.public-room-comparison__chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-inline: 13px;
+  border-radius: var(--r-pill);
+  color: var(--paper);
+}
+
+.public-room-comparison__chip > span:last-child {
+  color: var(--comparison-cyan);
+  font-size: 1.05rem;
+}
+
+.public-room-comparison__missing {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 12px;
+  border: 1px dashed var(--comparison-border);
+  border-radius: var(--r-pill);
+  color: var(--paper-mute);
+  font: 0.68rem/1.2 var(--font-mono);
+  text-transform: uppercase;
+}
+
+.public-room-comparison__prompt,
+.public-room-comparison__empty {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px dashed var(--comparison-border);
+  background: color-mix(in oklab, var(--comparison-blue) 5%, transparent);
+}
+
+.public-room-comparison__prompt-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--comparison-cyan);
+  border-radius: 50%;
+  color: var(--comparison-cyan);
+  font: 1.2rem/1 var(--font-sans);
+}
+
+.public-room-comparison__prompt p,
+.public-room-comparison__empty p {
+  margin: 0;
+  color: var(--paper-dim);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.public-room-comparison__empty {
+  display: block;
+}
+
+.public-room-comparison__empty strong {
+  color: var(--paper);
+  font-size: 0.92rem;
+}
+
+.public-room-comparison__empty p {
+  margin-top: 6px;
+}
+
+.public-room-comparison__table-wrap {
+  max-width: none;
+  margin-top: 18px;
+  overflow-x: auto;
+  scrollbar-color: var(--comparison-cyan) transparent;
+}
+
+.public-room-comparison__table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  border: 1px solid var(--comparison-border);
+  background: color-mix(in oklab, var(--ink) 82%, var(--stone));
+  font-size: 0.86rem;
+}
+
+.public-room-comparison__table th,
+.public-room-comparison__table td {
+  min-width: 140px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--comparison-border);
+  color: var(--paper-dim);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.public-room-comparison__table tr:last-child th,
+.public-room-comparison__table tr:last-child td {
+  border-bottom: 0;
+}
+
+.public-room-comparison__table thead th {
+  color: var(--comparison-cyan);
+  font: 700 0.7rem/1.2 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.public-room-comparison__table thead th:not(:first-child) {
+  color: var(--paper);
+}
+
+.public-room-comparison__table tbody th {
+  width: 28%;
+  color: var(--paper-mute);
+  font: 650 0.72rem/1.3 var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.public-room-comparison__table td {
+  color: var(--paper);
+  font-family: var(--font-sans);
+}
+
+.public-room-comparison__table td strong {
+  display: block;
+  color: var(--comparison-cyan);
+  font: 720 1.25rem/1 var(--font-sans);
+  letter-spacing: -0.03em;
+}
+
+.public-room-comparison__bar {
+  display: block;
+  height: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--comparison-cyan) 12%, var(--ink));
+}
+
+.public-room-comparison__bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--comparison-cyan);
+  transition: width 380ms var(--ease);
+}
+
+.public-room-comparison__headline {
+  min-height: 1.5em;
+  margin: 12px 0 0;
+  color: var(--paper-dim);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.public-room-comparison__privacy {
+  margin: 22px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--comparison-border);
+  color: var(--paper-mute);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .public-room-comparison {
+    width: calc(100% - 32px);
+  }
+
+  .public-room-comparison__head {
+    gap: 16px;
+  }
+
+  .public-room-comparison__head .r-title {
+    max-width: 16ch;
+  }
+}
+
+@media (max-width: 560px) {
+  .public-room-comparison {
+    width: calc(100% - 24px);
+    margin-block: 0 38px;
+    padding: 20px 14px;
+  }
+
+  .public-room-comparison__head {
+    display: block;
+  }
+
+  .public-room-comparison__head .r-title {
+    margin-top: 13px;
+    font-size: clamp(2rem, 11vw, 3.2rem);
+  }
+
+  .public-room-comparison__clear {
+    width: 100%;
+    margin-top: 16px;
+  }
+
+  .public-room-comparison__ledger {
+    margin-top: 20px;
+  }
+
+  .public-room-comparison__prompt,
+  .public-room-comparison__empty {
+    padding: 14px;
+  }
+
+  .public-room-comparison__table th,
+  .public-room-comparison__table td {
+    min-width: 132px;
+    padding: 13px 12px;
+  }
+}
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .public-room-comparison,
+  .public-room-comparison * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .public-room-comparison {
+    width: calc(100% - 20px);
+    padding: 16px 12px;
+  }
+
+  .public-room-comparison__table-wrap {
+    overflow-x: auto;
+  }
+
+  .public-room-comparison__table {
+    min-width: 520px;
+    max-width: none;
+  }
+
+  .public-room-comparison__clear,
+  .public-room-comparison__chip {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-room-comparison__bar i {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .public-room-comparison,
+  .public-room-comparison__ledger,
+  .public-room-comparison__clear,
+  .public-room-comparison__chip,
+  .public-room-comparison__prompt,
+  .public-room-comparison__empty,
+  .public-room-comparison__table,
+  .public-room-comparison__table th,
+  .public-room-comparison__table td {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .public-room-comparison .r-eyebrow,
+  .public-room-comparison__table thead th,
+  .public-room-comparison__table td strong,
+  .public-room-comparison__prompt-mark {
+    color: LinkText;
+  }
+
+  .public-room-comparison__marker,
+  .public-room-comparison__ledger[data-state='current'] .public-room-comparison__marker {
+    border-color: CanvasText;
+    color: CanvasText;
+    background: Highlight;
+    box-shadow: none;
+  }
+
+  .public-room-comparison__bar {
+    background: CanvasText;
+  }
+
+  .public-room-comparison__bar i {
+    background: Highlight;
+  }
+
+  .public-room-comparison__clear:focus-visible,
+  .public-room-comparison__chip:focus-visible,
+  .public-room-comparison__table-wrap:focus-visible {
+    outline-color: Highlight;
+  }
+}

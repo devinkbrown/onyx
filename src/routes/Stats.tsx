@@ -16,6 +16,11 @@ import { fetchStatsIndex, relTime, type NetworkDay, type StatsChannel } from '@/
 import { publicFeedFreshness, type PublicFeedFreshness } from '@/lib/stats/feedBounds';
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
+import PublicRoomComparison, {
+  MAX_COMPARE_ROOMS,
+  parseStatsCompareQuery,
+  statsCompareQuery,
+} from './PublicRoomComparison';
 
 export type StatsFeedState = PublicFeedFreshness | 'partial' | 'loading' | 'unavailable';
 
@@ -265,7 +270,12 @@ function ChannelRow(props: {
   rank: number;
   selected: boolean;
   inspectorId: string;
+  comparisonId: string;
+  comparisonHelpId: string;
+  compared: boolean;
+  compareDisabled: boolean;
   onInspect: (channel: string) => void;
+  onToggleCompare: (channel: string) => void;
 }) {
   const c = () => props.channel;
   const maxSpark = createMemo(() => Math.max(0, ...c().spark));
@@ -305,6 +315,18 @@ function ChannelRow(props: {
         <div class="data-room-actions">
           <button
             type="button"
+            class="data-action data-action--compare"
+            aria-pressed={props.compared}
+            aria-controls={props.comparisonId}
+            aria-describedby={props.comparisonHelpId}
+            aria-label={props.compared ? `Remove ${c().channel} from comparison` : `Compare ${c().channel}`}
+            disabled={props.compareDisabled && !props.compared}
+            onClick={() => props.onToggleCompare(c().channel)}
+          >
+            {props.compared ? 'Compared' : 'Compare'}
+          </button>
+          <button
+            type="button"
             class="data-action data-action--inspect"
             aria-pressed={props.selected}
             aria-controls={props.inspectorId}
@@ -331,6 +353,9 @@ export default function StatsRoute() {
   const [roomSort, setRoomSort] = createSignal<RoomSort>('messages');
   const [roomScope, setRoomScope] = createSignal<RoomScope>('all');
   const [roomQuery, setRoomQuery] = createSignal('');
+  const [compareRooms, setCompareRooms] = createSignal<string[]>(
+    typeof window === 'undefined' ? [] : parseStatsCompareQuery(window.location.search),
+  );
   const [activityWindow, setActivityWindow] = createSignal<StatsWindow>(
     typeof window === 'undefined' ? 14 : parseStatsWindowQuery(window.location.search),
   );
@@ -386,6 +411,38 @@ export default function StatsRoute() {
     }
     // Defer until after Solid commits selected state so scroll/focus target the current inspector.
     queueMicrotask(() => revealStatsInspector());
+  };
+  const toggleCompareRoom = (channel: string): void => {
+    const current = compareRooms();
+    const key = channel.toLocaleLowerCase('en');
+    const existing = current.findIndex((room) => room.toLocaleLowerCase('en') === key);
+    const next = existing >= 0
+      ? current.filter((_, index) => index !== existing)
+      : current.length >= MAX_COMPARE_ROOMS
+        ? current
+        : [...current, channel];
+    if (next === current) return;
+    setCompareRooms(next);
+    try {
+      const url = new URL(window.location.href);
+      const serialized = statsCompareQuery(next);
+      if (serialized) url.searchParams.set('compare', serialized);
+      else url.searchParams.delete('compare');
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // jsdom / sandboxed documents may reject URL mutation
+    }
+  };
+  const clearCompareRooms = (): void => {
+    if (compareRooms().length === 0) return;
+    setCompareRooms([]);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('compare');
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // jsdom / sandboxed documents may reject URL mutation
+    }
   };
   const visibleChannels = createMemo(() => {
     const query = roomQuery().trim().toLocaleLowerCase('en');
@@ -594,7 +651,8 @@ export default function StatsRoute() {
       <nav class="r-wrap stats-view-nav" aria-label="Stats sections">
         <a href="#network-overview"><span>01</span> Network pulse</a>
         <a href={`#${STATS_INSPECTOR_ID}`}><span>02</span> Room inspector</a>
-        <a href="#rooms"><span>03</span> All rooms</a>
+        <a href="#room-comparison"><span>03</span> Compare rooms</a>
+        <a href="#rooms"><span>04</span> All rooms</a>
       </nav>
 
       <section id="network-overview" class="r-wrap r-section data-grid stats-overview" aria-label="Activity detail">
@@ -914,6 +972,16 @@ export default function StatsRoute() {
         </Show>
       </section>
 
+      <PublicRoomComparison
+        channels={channels}
+        selectedChannels={compareRooms}
+        feedState={feedState}
+        totalMessages={totalMessages}
+        nowMs={nowMs}
+        onToggle={toggleCompareRoom}
+        onClear={clearCompareRooms}
+      />
+
       <section id="rooms" class="r-wrap r-section stats-rooms-section" aria-labelledby="rooms-heading">
         <span class="r-eyebrow">public room directory</span>
         <h2 class="r-title" id="rooms-heading">Find the conversation</h2>
@@ -953,7 +1021,12 @@ export default function StatsRoute() {
                   rank={index() + 1}
                   selected={inspectedChannel().toLowerCase() === channel.channel.toLowerCase()}
                   inspectorId={STATS_INSPECTOR_ID}
+                  comparisonId="room-comparison"
+                  comparisonHelpId="room-comparison-help"
+                  compared={compareRooms().some((room) => room.toLowerCase() === channel.channel.toLowerCase())}
+                  compareDisabled={compareRooms().length >= MAX_COMPARE_ROOMS}
                   onInspect={inspectRoom}
+                  onToggleCompare={toggleCompareRoom}
                 />
               )}
             </For>

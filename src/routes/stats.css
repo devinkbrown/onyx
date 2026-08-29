@@ -1043,6 +1043,17 @@
   color: var(--paper);
 }
 
+.stats-page .data-action--compare[aria-pressed='true'] {
+  border-color: color-mix(in oklab, var(--stats-green) 58%, var(--stats-border));
+  background: color-mix(in oklab, var(--stats-green) 13%, var(--stone));
+  color: var(--paper);
+}
+
+.stats-page .data-action--compare:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
 /* ── Responsive behavior ───────────────────────────────────────────────── */
 
 @media (max-width: 1040px) {
@@ -1540,6 +1551,7 @@
 
   .stats-page .data-room-row[data-selected='true'],
   .stats-page .data-action--inspect[aria-pressed='true'],
+  .stats-page .data-action--compare[aria-pressed='true'],
   .stats-page .stats-control-group button.is-active,
   .stats-page .stats-window-options button[aria-pressed='true'],
   .stats-page .r-btn.primary {
