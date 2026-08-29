@@ -14,6 +14,88 @@
   gap: var(--gap-section);
 }
 
+/* The account surface is intentionally long: keep a quiet map in reach while
+   the modal body scrolls. It behaves like a section index, not a second
+   navigation destination, so every item points at an existing named region. */
+.acct-section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0 0 var(--space-2);
+  padding: 4px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+  border: 1px solid var(--seam-faint);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--stone-2) 94%, var(--ink));
+}
+
+.acct-section-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.acct-section-nav__label {
+  flex: none;
+  padding: 0 6px;
+  color: var(--paper-mute);
+  font: 700 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.acct-section-nav__items {
+  display: flex;
+  flex: 1 0 auto;
+  gap: 3px;
+  min-width: max-content;
+}
+
+.acct-section-nav__item {
+  flex: none;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--paper-mute);
+  background: transparent;
+  cursor: pointer;
+  font: 650 0.75rem/1.2 var(--font-sans);
+  white-space: nowrap;
+  transition:
+    color var(--dur, 200ms) var(--ease),
+    border-color var(--dur, 200ms) var(--ease),
+    background-color var(--dur, 200ms) var(--ease);
+}
+
+.acct-section-nav__item:hover {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+
+.acct-section-nav__item.is-active,
+.acct-section-nav__item[aria-current='location'] {
+  color: var(--paper);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 30%, transparent);
+  box-shadow: inset 0 2px 0 var(--lapis-bright);
+}
+
+.acct-section-nav__item:focus-visible {
+  outline: 2px solid var(--accent, var(--lapis));
+  outline-offset: 1px;
+}
+
+.acct-identity,
+.acct-section-title {
+  scroll-margin-top: 5.5rem;
+}
+
 .acct-advanced {
   border: 1px solid var(--seam-faint);
   border-radius: 4px;
@@ -737,6 +819,27 @@
   .acct-password-toggle {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .acct-section-nav,
+  .acct-section-nav__item {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .acct-section-nav__item[aria-current='location'] {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: inset 0 2px 0 HighlightText;
+  }
+
+  .acct-section-nav__item:focus-visible {
+    outline-color: Highlight;
   }
 }
 

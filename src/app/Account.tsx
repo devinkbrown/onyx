@@ -38,6 +38,7 @@ import {
   createSignal,
   For,
   onCleanup,
+  onMount,
   Show,
   splitProps,
   type JSX,
@@ -68,6 +69,7 @@ import { openGuestClaimSheet } from '@/shell/guestClaimState';
 import { YouSettings } from './YouSettings';
 import { YouHubNav } from '@/shell/YouHubNav';
 import { AccountDataVerbs } from './AccountDataVerbs';
+import { prefersReducedMotionForInteraction } from '@/lib/a11y/reducedMotion';
 
 export interface AccountPanelProps {
   open: boolean;
@@ -177,6 +179,87 @@ function Section(props: SectionProps): JSX.Element {
       </div>
       <div class="acct-section-body">{local.children}</div>
     </section>
+  );
+}
+
+type AccountSectionId =
+  | 'acct-identity'
+  | 'acct-email-title'
+  | 'acct-password-title'
+  | 'acct-sessions-title'
+  | 'acct-recovery-title'
+  | 'acct-passkeys-title'
+  | 'acct-download-store-title';
+
+const ACCOUNT_SECTION_NAV: readonly { id: AccountSectionId; label: string }[] = [
+  { id: 'acct-identity', label: 'Overview' },
+  { id: 'acct-email-title', label: 'Email' },
+  { id: 'acct-password-title', label: 'Password' },
+  { id: 'acct-sessions-title', label: 'Devices' },
+  { id: 'acct-recovery-title', label: 'Recovery' },
+  { id: 'acct-passkeys-title', label: 'Passkeys' },
+  { id: 'acct-download-store-title', label: 'Data' },
+];
+
+function AccountSectionNav(): JSX.Element {
+  const [activeId, setActiveId] = createSignal<AccountSectionId>('acct-identity');
+  let navRef: HTMLElement | undefined;
+
+  onMount(() => {
+    if (typeof IntersectionObserver === 'undefined' || !navRef) return;
+    const observed = ACCOUNT_SECTION_NAV
+      .map(({ id }) => document.getElementById(id))
+      .filter((element): element is HTMLElement => element !== null);
+    if (observed.length === 0) return;
+
+    const visibility = new Map<Element, IntersectionObserverEntry>();
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => visibility.set(entry.target, entry));
+      const current = [...visibility.values()]
+        .filter((entry) => entry.isIntersecting)
+        .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top)[0];
+      const currentId = current?.target.id as AccountSectionId | undefined;
+      if (currentId) setActiveId(currentId);
+    }, {
+      root: navRef.closest('.onyx-modal__body'),
+      rootMargin: '-8% 0px -64% 0px',
+      threshold: [0, 0.25, 0.6],
+    });
+
+    observed.forEach((element) => observer.observe(element));
+    onCleanup(() => observer.disconnect());
+  });
+
+  const jumpTo = (id: AccountSectionId): void => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    setActiveId(id);
+    target.scrollIntoView({
+      block: 'start',
+      behavior: prefersReducedMotionForInteraction() ? 'auto' : 'smooth',
+    });
+  };
+
+  return (
+    <nav ref={navRef} class="acct-section-nav" aria-label="Account sections" data-testid="account-section-nav">
+      <span class="acct-section-nav__label">On this page</span>
+      <div class="acct-section-nav__items">
+        <For each={ACCOUNT_SECTION_NAV}>
+          {(item) => (
+            <button
+              type="button"
+              class="acct-section-nav__item"
+              classList={{ 'is-active': activeId() === item.id }}
+              aria-current={activeId() === item.id ? 'location' : undefined}
+              aria-controls={item.id}
+              onClick={() => jumpTo(item.id)}
+            >
+              {item.label}
+            </button>
+          )}
+        </For>
+      </div>
+    </nav>
   );
 }
 
@@ -504,6 +587,9 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                   Keep this name if you want to protect it without disconnecting.
                 </Show>
               </p>
+        <Show when={!isGuest()}>
+          <AccountSectionNav />
+        </Show>
         {/* ── Guest state ── */}
         <Show when={isGuest()}>
           <div class="acct-guest" data-testid="account-guest">
@@ -538,7 +624,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
         {/* ── Signed-in state ── */}
         <Show when={!isGuest()}>
           {/* Identity card */}
-          <section class="acct-identity" aria-label="Account summary">
+          <section id="acct-identity" class="acct-identity" aria-label="Account summary">
             <div class="acct-identity-avatar" aria-hidden="true">
               {(account() ?? '?').slice(0, 2).toUpperCase()}
             </div>

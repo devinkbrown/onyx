@@ -361,6 +361,31 @@ describe('Account panel — signed in', () => {
     expect(screen.getByRole('region', { name: 'Device encryption keys' })).toBeInTheDocument();
   });
 
+  it('provides an account section map that scrolls to existing regions', () => {
+    renderPanel({ account: 'alice' });
+
+    const nav = screen.getByRole('navigation', { name: 'Account sections' });
+    const overview = screen.getByRole('button', { name: 'Overview' });
+    const email = screen.getByRole('button', { name: 'Email' });
+    const emailHeading = document.getElementById('acct-email-title');
+    if (!emailHeading) throw new Error('Email section heading was not rendered');
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(emailHeading, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    expect(nav).toHaveAttribute('data-testid', 'account-section-nav');
+    expect(overview).toHaveAttribute('aria-current', 'location');
+    expect(email).toHaveAttribute('aria-controls', 'acct-email-title');
+
+    fireEvent.click(email);
+
+    expect(email).toHaveAttribute('aria-current', 'location');
+    expect(email).toHaveClass('is-active');
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'smooth' });
+  });
+
   it('exposes a You settings list into Appearance', async () => {
     const openAppearance = vi.spyOn(getState(), 'openAppearance');
     const closeSpy = vi.fn();
