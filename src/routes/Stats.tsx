@@ -369,6 +369,17 @@ export default function StatsRoute() {
   onCleanup(() => clearInterval(timer));
 
   const channels = createMemo(() => [...(stats.latest?.channels ?? [])].sort((a, b) => b.messages - a.messages));
+  const comparisonShareHref = createMemo(() => {
+    const selected = statsCompareQuery(compareRooms());
+    if (!selected || typeof window === 'undefined') return '';
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('compare', selected);
+      return url.href;
+    } catch {
+      return '';
+    }
+  });
   const totalMessages = createMemo(() => channels().reduce((sum, c) => sum + c.messages, 0));
   const busiest = createMemo(() => channels()[0] ?? null);
   const days = createMemo(() => stats.latest?.network_days ?? []);
@@ -978,6 +989,7 @@ export default function StatsRoute() {
         feedState={feedState}
         totalMessages={totalMessages}
         nowMs={nowMs}
+        shareHref={comparisonShareHref}
         onToggle={toggleCompareRoom}
         onClear={clearCompareRooms}
       />

@@ -8,7 +8,8 @@
  * and an honest feed-state caveat.
  */
 import './public-room-comparison.css';
-import { createMemo, For, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
+import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { relTime, type StatsChannel } from '@/lib/stats/networkIndex';
 import type { StatsFeedState } from './Stats';
 
@@ -23,6 +24,7 @@ export type PublicRoomComparisonProps = {
   feedState: () => StatsFeedState;
   totalMessages: () => number;
   nowMs: () => number;
+  shareHref: () => string;
   onToggle: (channel: string) => void;
   onClear: () => void;
 };
@@ -112,6 +114,24 @@ function stepState(state: StatsFeedState): 'loading' | 'unavailable' | 'snapshot
 }
 
 export function PublicRoomComparison(props: PublicRoomComparisonProps): JSX.Element {
+  const [shareState, setShareState] = createSignal<'idle' | 'copying' | 'copied' | 'failed'>('idle');
+  let shareEpoch = 0;
+  let disposed = false;
+
+  // The URL is the comparison's source of truth. A clipboard result for a
+  // previous selection must never announce that the newly rendered rooms were
+  // copied.
+  createEffect(() => {
+    props.shareHref();
+    shareEpoch += 1;
+    setShareState('idle');
+  });
+
+  onCleanup(() => {
+    disposed = true;
+    shareEpoch += 1;
+  });
+
   const selectedRooms = createMemo(() => props.selectedChannels()
     .map((selected) => props.channels().find((channel) => channel.channel.toLocaleLowerCase('en') === selected.toLocaleLowerCase('en')))
     .filter((channel): channel is StatsChannel => Boolean(channel)));
@@ -126,6 +146,22 @@ export function PublicRoomComparison(props: PublicRoomComparisonProps): JSX.Elem
     const leader = left!.messages > right!.messages ? left : right;
     return `${leader!.channel} leads by ${formatCount(difference)} tracked ${difference === 1 ? 'message' : 'messages'}.`;
   });
+
+  const copyComparisonLink = async (): Promise<void> => {
+    if (shareState() === 'copying') return;
+    const href = props.shareHref();
+    if (!href) return;
+    const epoch = ++shareEpoch;
+    setShareState('copying');
+    let copied: boolean;
+    try {
+      copied = await writeClipboardText(href);
+    } catch {
+      copied = false;
+    }
+    if (disposed || epoch !== shareEpoch) return;
+    setShareState(copied ? 'copied' : 'failed');
+  };
 
   return (
     <section
@@ -144,16 +180,40 @@ export function PublicRoomComparison(props: PublicRoomComparisonProps): JSX.Elem
           </p>
         </div>
         <Show when={props.selectedChannels().length > 0}>
-          <button
-            type="button"
-            class="public-room-comparison__clear"
-            onClick={() => props.onClear()}
-            aria-label="Clear room comparison"
-          >
-            Clear selection
-          </button>
+          <div class="public-room-comparison__actions">
+            <button
+              type="button"
+              class="public-room-comparison__share"
+              onClick={() => void copyComparisonLink()}
+              aria-label="Copy comparison link"
+              aria-busy={shareState() === 'copying' || undefined}
+              disabled={shareState() === 'copying'}
+            >
+              {shareState() === 'copying' ? 'Copying…' : shareState() === 'copied' ? 'Link copied' : 'Copy link'}
+            </button>
+            <button
+              type="button"
+              class="public-room-comparison__clear"
+              onClick={() => props.onClear()}
+              aria-label="Clear room comparison"
+            >
+              Clear selection
+            </button>
+          </div>
         </Show>
       </div>
+
+      <Show when={shareState() === 'copied' || shareState() === 'failed'}>
+        <p
+          class="public-room-comparison__share-status"
+          role={shareState() === 'failed' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          {shareState() === 'copied'
+            ? 'Comparison link copied to clipboard.'
+            : 'Copy failed. Use your browser address bar to share this comparison.'}
+        </p>
+      </Show>
 
       <div class="public-room-comparison__ledger" data-state={stepState(props.feedState())}>
         <span class="public-room-comparison__marker" aria-hidden="true" />

@@ -2,9 +2,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { createSignal } from 'solid-js';
 import type { StatsChannel } from '@/lib/stats/networkIndex';
+import * as clipboard from '@/lib/clipboard/writeClipboardText';
 import PublicRoomComparison, {
   parseStatsCompareQuery,
   statsCompareQuery,
@@ -46,11 +47,12 @@ function renderComparison(
       feedState={() => feedState}
       totalMessages={() => channels.reduce((sum, entry) => sum + entry.messages, 0)}
       nowMs={() => Date.now()}
+      shareHref={() => `https://onyx.example/stats/?compare=${encodeURIComponent(selected().join(','))}`}
       onToggle={onToggle}
       onClear={onClear}
     />
   ));
-  return { onToggle, onClear };
+  return { onToggle, onClear, setSelected };
 }
 
 describe('PublicRoomComparison URL state', () => {
@@ -64,7 +66,10 @@ describe('PublicRoomComparison URL state', () => {
 });
 
 describe('PublicRoomComparison', () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it('renders aggregate comparison values and lets keyboard users remove a room', () => {
     const { onToggle, onClear } = renderComparison('current', ['#root', '#quiet']);
@@ -83,6 +88,40 @@ describe('PublicRoomComparison', () => {
     const clear = screen.getByRole('button', { name: 'Clear room comparison' });
     fireEvent.click(clear);
     expect(onClear).toHaveBeenCalledOnce();
+  });
+
+  it('copies the current comparison link only after the clipboard confirms it', async () => {
+    const writeClipboardText = vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(true);
+    renderComparison('current', ['#root', '#quiet']);
+
+    const copy = screen.getByRole('button', { name: 'Copy comparison link' });
+    copy.focus();
+    expect(copy).toHaveFocus();
+    fireEvent.click(copy);
+
+    await waitFor(() => expect(writeClipboardText).toHaveBeenCalledWith(
+      'https://onyx.example/stats/?compare=%23root%2C%23quiet',
+    ));
+    expect(await screen.findByText('Comparison link copied to clipboard.')).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('button', { name: 'Copy comparison link' })).toHaveTextContent('Link copied');
+  });
+
+  it('does not announce a copied link after its room selection changes in flight', async () => {
+    let resolveCopy: (copied: boolean) => void = () => {};
+    const pending = new Promise<boolean>((resolve) => {
+      resolveCopy = resolve;
+    });
+    vi.spyOn(clipboard, 'writeClipboardText').mockReturnValue(pending);
+    const { setSelected } = renderComparison('current', ['#root']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy comparison link' }));
+    setSelected(['#quiet']);
+    resolveCopy(true);
+    await pending;
+    await Promise.resolve();
+
+    expect(screen.queryByText('Comparison link copied to clipboard.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy comparison link' })).toHaveTextContent('Copy link');
   });
 
   it('keeps loading and unavailable feeds explicit before a room index exists', () => {
@@ -115,6 +154,7 @@ describe('PublicRoomComparison', () => {
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');
     expect(css).toContain('@media (forced-colors: active)');
     expect(css).toContain('overflow-x: auto');
+    expect(css).toContain('public-room-comparison__share');
     expect(css).toContain('public-room-comparison__table-wrap:focus-visible');
   });
 });
