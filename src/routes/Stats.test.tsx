@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { Suspense } from 'solid-js';
 
-import StatsRoute, { revealStatsInspector, roomDeepLink, STATS_INSPECTOR_ID } from './Stats';
+import StatsRoute, { parseStatsWindowQuery, revealStatsInspector, roomDeepLink, STATS_INSPECTOR_ID } from './Stats';
 
 vi.mock('@/backgrounds/SceneAtmosphere', () => ({
   SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
@@ -119,6 +119,62 @@ describe('StatsRoute', () => {
     expect(observation).toHaveTextContent('stats unavailable');
     expect(screen.getByText('stats unavailable')).toHaveAttribute('data-feed-state', 'unavailable');
     expect(screen.queryByText(/stats are waiting/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('stats-window-control')).toHaveAttribute('data-window-state', 'unavailable');
+    expect(screen.getByRole('button', { name: 'Latest 7 days' })).toBeDisabled();
+    expect(screen.getByText(/window controls are unavailable/i)).toBeInTheDocument();
+  });
+
+  it('keeps the network window keyboard-first, shareable, and bounded to public daily data', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const previous = `${window.location.pathname}${window.location.search}`;
+    const networkDays = Array.from({ length: 14 }, (_, index) => ({
+      date: `2026-07-${String(8 + index).padStart(2, '0')}`,
+      messages: index + 1,
+    }));
+    window.history.replaceState(null, '', '/stats/?room=%23root&window=7');
+
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/root.json')) {
+        return new Response(JSON.stringify(channelDetailPayload('#root', now)));
+      }
+      return new Response(JSON.stringify({
+        generated_at: now,
+        network: 'Onyx',
+        users_online: 8,
+        network_days: networkDays,
+        channels: [
+          { channel: '#root', messages: 42, present: 2, last_active: now - 60, topic: 'root', spark: [1, 3] },
+          { channel: '#quiet', messages: 18, present: 0, last_active: now - 120, topic: 'quiet', spark: [2, 1] },
+        ],
+      }), { status: 200 });
+    }));
+
+    try {
+      render(() => <StatsRoute />);
+      const control = await screen.findByTestId('stats-window-control');
+      const shortWindow = screen.getByRole('button', { name: 'Latest 7 days' });
+      const fullWindow = screen.getByRole('button', { name: 'Latest 14 days' });
+      const totals = await screen.findByRole('list', { name: 'Daily message totals' });
+
+      expect(parseStatsWindowQuery('?window=7')).toBe(7);
+      expect(parseStatsWindowQuery('?window=14')).toBe(14);
+      expect(parseStatsWindowQuery('?window=garbage')).toBe(14);
+      expect(control).toHaveAttribute('data-window-state', 'current');
+      expect(shortWindow).toHaveAttribute('aria-pressed', 'true');
+      expect(fullWindow).toHaveAttribute('aria-pressed', 'false');
+      expect(totals.querySelectorAll('li')).toHaveLength(7);
+
+      shortWindow.focus();
+      expect(shortWindow).toHaveFocus();
+      fireEvent.click(fullWindow);
+      expect(fullWindow).toHaveAttribute('aria-pressed', 'true');
+      expect(totals.querySelectorAll('li')).toHaveLength(14);
+      expect(window.location.search).toContain('window=14');
+      expect(control).toHaveTextContent('latest 14 days');
+    } finally {
+      window.history.replaceState(null, '', previous || '/');
+    }
   });
 
   it('includes the recent activity graph surface for room rows', async () => {
@@ -210,6 +266,7 @@ describe('StatsRoute', () => {
       const view = render(() => <StatsRoute />);
       expect(await view.findByText(entry.label)).toHaveAttribute('data-feed-state', entry.state);
       expect(view.container.querySelector('.stats-observation')).toHaveAttribute('data-feed-state', entry.state);
+      expect(view.container.querySelector('[data-testid="stats-window-control"]')).toHaveAttribute('data-window-state', 'stale');
       expect(view.container.textContent).toMatch(/export stale|export time mismatch|export undated/);
       expect(view.container.textContent).not.toMatch(/export current/);
       view.unmount();
@@ -306,6 +363,8 @@ describe('StatsRoute', () => {
     expect(screen.getByText(/stats are waiting for the next exported feed/i)).toBeInTheDocument();
     expect(screen.queryByText(/stats unavailable/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/no public stats export is available/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('stats-window-control')).toHaveAttribute('data-window-state', 'loading');
+    expect(screen.getByRole('button', { name: 'Latest 7 days' })).toBeDisabled();
   });
 
   it('does not steal focus or scroll on initial load when the default room auto-inspects', async () => {

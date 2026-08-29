@@ -87,6 +87,17 @@ const roomSortLabels: Record<RoomSort, string> = {
 
 const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
+export type StatsWindow = 7 | 14;
+
+/** Parse the shareable network activity window, defaulting to the full feed. */
+export function parseStatsWindowQuery(search: string): StatsWindow {
+  try {
+    return new URLSearchParams(search).get('window') === '7' ? 7 : 14;
+  } catch {
+    return 14;
+  }
+}
+
 function formatHour(hour: number | null): string {
   if (hour === null) return '—';
   return `${String(hour).padStart(2, '0')}:00 UTC`;
@@ -207,6 +218,9 @@ export default function StatsRoute() {
   const [roomSort, setRoomSort] = createSignal<RoomSort>('messages');
   const [roomScope, setRoomScope] = createSignal<RoomScope>('all');
   const [roomQuery, setRoomQuery] = createSignal('');
+  const [activityWindow, setActivityWindow] = createSignal<StatsWindow>(
+    typeof window === 'undefined' ? 14 : parseStatsWindowQuery(window.location.search),
+  );
   const [inspectedRoom, setInspectedRoom] = createSignal(
     typeof window === 'undefined' ? '' : parseStatsRoomQuery(window.location.search),
   );
@@ -220,11 +234,12 @@ export default function StatsRoute() {
   const totalMessages = createMemo(() => channels().reduce((sum, c) => sum + c.messages, 0));
   const busiest = createMemo(() => channels()[0] ?? null);
   const days = createMemo(() => stats.latest?.network_days ?? []);
-  const maxDay = createMemo(() => Math.max(0, ...days().map((d) => d.messages)));
-  const totalDayMessages = createMemo(() => days().reduce((sum, day) => sum + day.messages, 0));
-  const dailyAverage = createMemo(() => days().length === 0 ? 0 : Math.round(totalDayMessages() / days().length));
-  const latestDay = createMemo(() => days()[days().length - 1] ?? null);
-  const previousDay = createMemo(() => days()[days().length - 2] ?? null);
+  const windowDays = createMemo(() => days().slice(-activityWindow()));
+  const maxDay = createMemo(() => Math.max(0, ...windowDays().map((d) => d.messages)));
+  const totalDayMessages = createMemo(() => windowDays().reduce((sum, day) => sum + day.messages, 0));
+  const dailyAverage = createMemo(() => windowDays().length === 0 ? 0 : Math.round(totalDayMessages() / windowDays().length));
+  const latestDay = createMemo(() => windowDays()[windowDays().length - 1] ?? null);
+  const previousDay = createMemo(() => windowDays()[windowDays().length - 2] ?? null);
   const tideDelta = createMemo(() => (latestDay()?.messages ?? 0) - (previousDay()?.messages ?? 0));
   const activeRooms = createMemo(() => channels().filter((channel) => roomActiveRecently(channel, nowMs())).length);
   const roomsWithPeople = createMemo(() => channels().filter((channel) => channel.present > 0).length);
@@ -289,6 +304,37 @@ export default function StatsRoute() {
       ? 'partial'
       : freshness;
   });
+  const activityWindowState = createMemo<'current' | 'loading' | 'stale' | 'unavailable'>(() => {
+    const state = feedState();
+    if (state === 'loading') return 'loading';
+    if (state === 'unavailable' || windowDays().length === 0) return 'unavailable';
+    return state === 'current' ? 'current' : 'stale';
+  });
+  const activityWindowStatus = createMemo(() => {
+    switch (activityWindowState()) {
+      case 'loading':
+        return 'Waiting for the public feed before choosing a window.';
+      case 'unavailable':
+        return 'Window controls are unavailable until daily public activity is exported.';
+      case 'stale':
+        return `Showing the latest ${activityWindow()} days from a ${feedLedgerPhrase(feedState())}. Treat this as a snapshot.`;
+      default: {
+        const samples = windowDays().length;
+        const suffix = samples < activityWindow() ? ` · ${samples} exported ${samples === 1 ? 'day' : 'days'} available` : '';
+        return `Showing the latest ${activityWindow()} days of public network activity${suffix}.`;
+      }
+    }
+  });
+  const updateActivityWindow = (next: StatsWindow): void => {
+    setActivityWindow(next);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('window', String(next));
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // jsdom / sandboxed documents may reject URL mutation
+    }
+  };
 
   return (
     <PublicFrame
@@ -400,13 +446,50 @@ export default function StatsRoute() {
         <article class="data-card">
           <div class="stats-card-heading">
             <span class="label">network pulse</span>
-            <span class="stats-card-quiet">{days().length} samples</span>
+            <span class="stats-card-quiet">{windowDays().length}/{days().length} samples</span>
           </div>
           <h2>Conversation current</h2>
-          <Show when={days().length > 0} fallback={<p>No daily series has been exported yet.</p>}>
+          <div
+            class="stats-window-control"
+            data-window-state={activityWindowState()}
+            data-testid="stats-window-control"
+            role="group"
+            aria-labelledby="stats-window-heading"
+          >
+            <div class="stats-window-copy">
+              <span class="label" id="stats-window-heading">network window</span>
+              <p id="stats-window-help">Use a shorter or fuller public activity horizon.</p>
+            </div>
+            <div class="stats-window-options" role="group" aria-label="Network activity window">
+              <button
+                type="button"
+                aria-label="Latest 7 days"
+                aria-pressed={activityWindow() === 7}
+                aria-describedby="stats-window-help"
+                disabled={activityWindowState() === 'loading' || activityWindowState() === 'unavailable'}
+                onClick={() => updateActivityWindow(7)}
+              >
+                7 days
+              </button>
+              <button
+                type="button"
+                aria-label="Latest 14 days"
+                aria-pressed={activityWindow() === 14}
+                aria-describedby="stats-window-help"
+                disabled={activityWindowState() === 'loading' || activityWindowState() === 'unavailable'}
+                onClick={() => updateActivityWindow(14)}
+              >
+                14 days
+              </button>
+            </div>
+            <p class="stats-window-status" data-window-state={activityWindowState()} role="status" aria-live="polite">
+              {activityWindowStatus()}
+            </p>
+          </div>
+          <Show when={windowDays().length > 0} fallback={<p>No daily series has been exported yet.</p>}>
             <figure class="data-chart" aria-labelledby="network-tide-caption">
               <div class="data-bars" aria-hidden="true">
-                <For each={days()}>
+                <For each={windowDays()}>
                   {(day) => (
                     <span
                       class="data-bar"
@@ -417,15 +500,15 @@ export default function StatsRoute() {
                 </For>
               </div>
               <div class="stats-chart-caption" aria-hidden="true">
-                <span>{days()[0]?.date ?? '—'}</span>
+                <span>{windowDays()[0]?.date ?? '—'}</span>
                 <strong>{latestDay() ? `${formatCount(latestDay()!.messages)} messages` : '—'}</strong>
                 <span>{latestDay()?.date ?? '—'}</span>
               </div>
               <figcaption id="network-tide-caption" class="sr-only">
-                Daily message totals, oldest to newest.
+                Daily message totals, oldest to newest. Showing the latest {activityWindow()} days.
               </figcaption>
               <ol class="sr-only" aria-label="Daily message totals">
-                <For each={days()}>
+                <For each={windowDays()}>
                   {(day) => (
                     <li>
                       <time datetime={day.date}>{day.date}</time>: {day.messages.toLocaleString('en-US')} messages
@@ -436,7 +519,7 @@ export default function StatsRoute() {
             </figure>
           </Show>
           <p class="stats-chart-note">
-            Network-wide public messages per exported day, oldest to newest.
+            Network-wide public messages for the latest {activityWindow()} exported days, oldest to newest.
             {!stats.latest?.network_days_complete ? ' Some malformed or duplicate day rows were omitted. ' : ' '}
             This is observed activity, not a forecast.
           </p>
