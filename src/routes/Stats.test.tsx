@@ -5,13 +5,29 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { Suspense } from 'solid-js';
 
-import StatsRoute, { parseStatsWindowQuery, revealStatsInspector, roomDeepLink, STATS_INSPECTOR_ID } from './Stats';
+import StatsRoute, { parseStatsWindowQuery, revealStatsInspector, roomDeepLink, statsFeedTimeline, STATS_INSPECTOR_ID } from './Stats';
 
 vi.mock('@/backgrounds/SceneAtmosphere', () => ({
   SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
 }));
 
 const src = readFileSync(resolve(__dirname, 'Stats.tsx'), 'utf8');
+
+describe('statsFeedTimeline', () => {
+  it.each([
+    ['loading', false, ['pending', 'pending', 'pending']],
+    ['unavailable', false, ['unavailable', 'unavailable', 'unavailable']],
+    ['current', true, ['observed', 'observed', 'observed']],
+    ['partial', true, ['observed', 'attention', 'attention']],
+    ['stale', true, ['observed', 'attention', 'observed']],
+    ['future', true, ['observed', 'attention', 'observed']],
+    ['unknown', true, ['observed', 'attention', 'observed']],
+  ] as const)('maps %s into report, freshness, and scope checkpoints', (state, hasData, expected) => {
+    const steps = statsFeedTimeline(state, hasData);
+    expect(steps.map((step) => step.state)).toEqual(expected);
+    expect(steps.map((step) => step.id)).toEqual(['report', 'freshness', 'scope']);
+  });
+});
 
 function channelDetailPayload(channel: string, now: number, extras: Record<string, unknown> = {}) {
   return {
@@ -122,6 +138,10 @@ describe('StatsRoute', () => {
     expect(screen.getByTestId('stats-window-control')).toHaveAttribute('data-window-state', 'unavailable');
     expect(screen.getByRole('button', { name: 'Latest 7 days' })).toBeDisabled();
     expect(screen.getByText(/window controls are unavailable/i)).toBeInTheDocument();
+    const timeline = screen.getByTestId('stats-feed-timeline');
+    expect(timeline).toHaveAttribute('data-feed-state', 'unavailable');
+    expect(within(timeline).getByRole('list', { name: 'Public stats feed checks' })).toHaveTextContent('not found');
+    expect(within(timeline).getByText(/no activity claim is made/i)).toBeInTheDocument();
   });
 
   it('keeps the network window keyboard-first, shareable, and bounded to public daily data', async () => {
@@ -210,6 +230,10 @@ describe('StatsRoute', () => {
     expect(screen.getByRole('button', { name: /refresh data/i })).toBeInTheDocument();
     expect(screen.getByText(/Onyx activity/i)).toBeInTheDocument();
     expect(screen.getByText(/export current/i)).toBeInTheDocument();
+    const timeline = screen.getByTestId('stats-feed-timeline');
+    expect(timeline).toHaveAttribute('data-feed-state', 'current');
+    expect(within(timeline).getByText('within window')).toBeInTheDocument();
+    expect(within(timeline).getByText('aggregate-only')).toBeInTheDocument();
     expect(screen.getByText('14-day pulse')).toBeInTheDocument();
     expect(document.querySelector('.ui-root.stats-page')).not.toBeNull();
     expect(document.querySelector('main.stats-page')).toBeNull();
@@ -245,6 +269,8 @@ describe('StatsRoute', () => {
 
     expect(await screen.findByText('stats incomplete')).toHaveAttribute('data-feed-state', 'partial');
     expect(document.querySelector('.stats-observation')).toHaveAttribute('data-feed-state', 'partial');
+    expect(screen.getByTestId('stats-feed-timeline')).toHaveAttribute('data-feed-state', 'partial');
+    expect(screen.getByTestId('stats-feed-timeline')).toHaveTextContent('partial aggregate');
     expect(screen.getAllByText(/partial public room index/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/duplicate day rows were omitted/i)).toBeInTheDocument();
   });
@@ -267,6 +293,7 @@ describe('StatsRoute', () => {
       expect(await view.findByText(entry.label)).toHaveAttribute('data-feed-state', entry.state);
       expect(view.container.querySelector('.stats-observation')).toHaveAttribute('data-feed-state', entry.state);
       expect(view.container.querySelector('[data-testid="stats-window-control"]')).toHaveAttribute('data-window-state', 'stale');
+      expect(view.container.querySelector('[data-testid="stats-feed-timeline"]')).toHaveAttribute('data-feed-state', entry.state);
       expect(view.container.textContent).toMatch(/export stale|export time mismatch|export undated/);
       expect(view.container.textContent).not.toMatch(/export current/);
       view.unmount();
@@ -365,6 +392,10 @@ describe('StatsRoute', () => {
     expect(screen.queryByText(/no public stats export is available/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('stats-window-control')).toHaveAttribute('data-window-state', 'loading');
     expect(screen.getByRole('button', { name: 'Latest 7 days' })).toBeDisabled();
+    const timeline = screen.getByTestId('stats-feed-timeline');
+    expect(timeline).toHaveAttribute('data-feed-state', 'loading');
+    expect(within(timeline).getByText('waiting')).toBeInTheDocument();
+    expect(within(timeline).getByText(/no activity claim yet/i)).toBeInTheDocument();
   });
 
   it('does not steal focus or scroll on initial load when the default room auto-inspects', async () => {

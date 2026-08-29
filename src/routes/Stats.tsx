@@ -17,7 +17,120 @@ import { publicFeedFreshness, type PublicFeedFreshness } from '@/lib/stats/feedB
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
 
-type StatsFeedState = PublicFeedFreshness | 'partial' | 'loading' | 'unavailable';
+export type StatsFeedState = PublicFeedFreshness | 'partial' | 'loading' | 'unavailable';
+
+export type StatsFeedTimelineStep = {
+  id: 'report' | 'freshness' | 'scope';
+  label: string;
+  status: string;
+  detail: string;
+  state: 'pending' | 'observed' | 'attention' | 'unavailable';
+};
+
+/**
+ * Keep the public feed legible without turning a snapshot into an operator
+ * dashboard: first confirm that a report arrived, then qualify its freshness,
+ * then state exactly what the page is allowed to expose.
+ */
+export function statsFeedTimeline(state: StatsFeedState, hasData: boolean): StatsFeedTimelineStep[] {
+  const report: StatsFeedTimelineStep = state === 'loading'
+    ? {
+      id: 'report',
+      label: 'Report',
+      status: 'waiting',
+      detail: 'Waiting for the next public export.',
+      state: 'pending',
+    }
+    : state === 'unavailable' || !hasData
+      ? {
+        id: 'report',
+        label: 'Report',
+        status: 'not found',
+        detail: 'No public export is available to inspect.',
+        state: 'unavailable',
+      }
+      : {
+        id: 'report',
+        label: 'Report',
+        status: 'received',
+        detail: 'A public aggregate export is available.',
+        state: 'observed',
+      };
+
+  const freshness: StatsFeedTimelineStep = state === 'loading'
+    ? {
+      id: 'freshness',
+      label: 'Freshness',
+      status: 'pending',
+      detail: 'Freshness is checked after a report arrives.',
+      state: 'pending',
+    }
+    : state === 'unavailable' || !hasData
+      ? {
+        id: 'freshness',
+        label: 'Freshness',
+        status: 'not checked',
+        detail: 'There is no timestamp to qualify.',
+        state: 'unavailable',
+      }
+      : state === 'current'
+        ? {
+          id: 'freshness',
+          label: 'Freshness',
+          status: 'within window',
+          detail: 'The report is inside the public freshness window.',
+          state: 'observed',
+        }
+        : state === 'partial'
+          ? {
+            id: 'freshness',
+            label: 'Freshness',
+            status: 'within window',
+            detail: 'The report is current, but some rows need review.',
+            state: 'attention',
+          }
+          : {
+            id: 'freshness',
+            label: 'Freshness',
+            status: state === 'future' ? 'time mismatch' : state === 'unknown' ? 'undated' : 'outside window',
+            detail: 'The snapshot stays visible, but it cannot support a current claim.',
+            state: 'attention',
+          };
+
+  const scope: StatsFeedTimelineStep = state === 'loading'
+    ? {
+      id: 'scope',
+      label: 'Scope',
+      status: 'pending',
+      detail: 'Privacy boundaries are applied when data is read.',
+      state: 'pending',
+    }
+    : state === 'unavailable' || !hasData
+      ? {
+        id: 'scope',
+        label: 'Scope',
+        status: 'not available',
+        detail: 'No feed means no activity claim.',
+        state: 'unavailable',
+      }
+      : state === 'partial'
+        ? {
+          id: 'scope',
+          label: 'Scope',
+          status: 'partial aggregate',
+          detail: 'Only validated room and day rows are counted.',
+          state: 'attention',
+        }
+        : {
+          id: 'scope',
+          label: 'Scope',
+          status: 'aggregate-only',
+          detail: 'Room totals and daily counts; no message text or rankings.',
+          state: 'observed',
+        };
+
+  return [report, freshness, scope];
+}
 
 function feedStateLabel(state: StatsFeedState): string {
   switch (state) {
@@ -304,6 +417,17 @@ export default function StatsRoute() {
       ? 'partial'
       : freshness;
   });
+  const feedTimeline = createMemo(() => statsFeedTimeline(feedState(), Boolean(stats.latest)));
+  const feedTimelineNote = createMemo(() => {
+    const state = feedState();
+    if (state === 'loading') return 'Checking the public export. No activity claim yet.';
+    if (state === 'unavailable') return 'The public export is unavailable. No activity claim is made.';
+    const generatedAt = stats.latest?.generated_at ?? 0;
+    const age = generatedAt > 0 ? `Last report ${relTime(generatedAt, nowMs())}.` : 'The report has no usable timestamp.';
+    if (state === 'partial') return `${age} Some aggregate rows were omitted, so read this as an incomplete snapshot.`;
+    if (state === 'current') return `${age} The visible network totals are inside the public freshness window.`;
+    return `${age} This snapshot remains visible for context, not as a current health claim.`;
+  });
   const activityWindowState = createMemo<'current' | 'loading' | 'stale' | 'unavailable'>(() => {
     const state = feedState();
     if (state === 'loading') return 'loading';
@@ -434,6 +558,37 @@ export default function StatsRoute() {
             </>
           )}
         </Show>
+        <section
+          class="stats-feed-timeline"
+          data-feed-state={feedState()}
+          data-testid="stats-feed-timeline"
+          aria-labelledby="stats-feed-timeline-heading"
+        >
+          <div class="stats-feed-timeline-head">
+            <div>
+              <span class="label">signal path</span>
+              <h2 id="stats-feed-timeline-heading">Three checks before a claim</h2>
+            </div>
+            <p class="stats-feed-cadence"><span aria-hidden="true">↻</span> auto-check · 30 sec</p>
+          </div>
+          <ol class="stats-feed-timeline-list" aria-label="Public stats feed checks">
+            <For each={feedTimeline()}>
+              {(step, index) => (
+                <li class="stats-feed-step" data-step={step.id} data-step-state={step.state}>
+                  <span class="stats-feed-step__index" aria-hidden="true">{String(index() + 1).padStart(2, '0')}</span>
+                  <div class="stats-feed-step__body">
+                    <div class="stats-feed-step__heading">
+                      <span>{step.label}</span>
+                      <strong>{step.status}</strong>
+                    </div>
+                    <p>{step.detail}</p>
+                  </div>
+                </li>
+              )}
+            </For>
+          </ol>
+          <p class="stats-feed-timeline-note" aria-live="polite" aria-atomic="true">{feedTimelineNote()}</p>
+        </section>
       </section>
 
       <nav class="r-wrap stats-view-nav" aria-label="Stats sections">
