@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render } from '@solidjs/testing-library';
+import { fireEvent, render, waitFor } from '@solidjs/testing-library';
 import Landing from './Landing';
 
 vi.mock('@/backgrounds/SceneAtmosphere', () => ({
@@ -86,10 +86,26 @@ describe('Landing', () => {
     expect(preview!.textContent).toMatch(/labeled conversation/i);
     expect(preview!.querySelector('.product-preview__roombar')?.textContent).toMatch(/Weekend plans/);
     expect(preview!.textContent).toMatch(/dinner/);
-    fireEvent.keyDown(getByRole('tab', { name: 'Room' }), { key: 'ArrowRight' });
+    const roomTab = getByRole('tab', { name: 'Room' });
+    roomTab.focus();
+    fireEvent.keyDown(roomTab, { key: 'ArrowRight' });
     expect(preview).toHaveAttribute('data-preview-state', 'home');
-    expect(getByRole('tab', { name: 'Home' })).toHaveAttribute('aria-selected', 'true');
+    const homeTab = getByRole('tab', { name: 'Home' });
+    expect(homeTab).toHaveAttribute('aria-selected', 'true');
     expect(preview!.textContent).not.toMatch(/mira|Room is open|12,482|CONNECT/i);
+  });
+
+  it('keeps preview tabs at a usable target size with visible focus and forced-color selection', async () => {
+    const homeCss = readFileSync(resolve(__dirname, 'home.css'), 'utf8');
+    const { getByRole } = render(() => <Landing />);
+    const roomTab = getByRole('tab', { name: 'Room' });
+    roomTab.focus();
+    fireEvent.keyDown(roomTab, { key: 'ArrowRight' });
+
+    await waitFor(() => expect(getByRole('tab', { name: 'Home' })).toHaveFocus());
+    expect(homeCss).toContain('min-height: var(--target-min, 44px)');
+    expect(homeCss).toContain('.product-preview__tabs button:focus-visible');
+    expect(homeCss).toContain(".product-preview__tabs button[aria-selected='true']");
   });
 
   it('states only trust claims the rooms can stand behind', () => {
