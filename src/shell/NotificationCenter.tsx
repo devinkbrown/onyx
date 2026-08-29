@@ -27,6 +27,20 @@ const TYPE_GLYPH: Record<Notification['type'], string> = {
   error: '!',
 };
 
+type InboxFilter = 'all' | 'attention' | 'other';
+
+const INBOX_FILTERS: readonly { id: InboxFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'attention', label: 'Needs you' },
+  { id: 'other', label: 'Other' },
+];
+
+function isAttentionNotification(notification: Notification): boolean {
+  return notification.type === 'mention'
+    || notification.type === 'dm'
+    || notification.type === 'follow';
+}
+
 function clipped(text: string, max = 72): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
@@ -59,6 +73,7 @@ export function NotificationCenter(): JSX.Element {
   const notifications = useStore((s) => s.notifications);
   const readIds = useStore((s) => s.readNotificationIds);
   const [inboxOpen, setInboxOpen] = createSignal(false);
+  const [filter, setFilter] = createSignal<InboxFilter>('all');
   const [nowMs, setNowMs] = createSignal(Date.now());
   let centerRef: HTMLDivElement | undefined;
   let closeRef: HTMLButtonElement | undefined;
@@ -67,10 +82,30 @@ export function NotificationCenter(): JSX.Element {
   const ordered = createMemo(() => [...notifications()].reverse());
   const unreadCount = createMemo(
     () =>
-      notifications().filter(
-        (n) => (n.type === 'mention' || n.type === 'dm' || n.type === 'follow') && !readIds().has(n.id),
-      ).length,
+      notifications().filter((n) => isAttentionNotification(n) && !readIds().has(n.id)).length,
   );
+  const filterCounts = createMemo(() => {
+    const current = notifications();
+    return {
+      all: current.length,
+      attention: current.filter(isAttentionNotification).length,
+      other: current.filter((notification) => !isAttentionNotification(notification)).length,
+    } satisfies Record<InboxFilter, number>;
+  });
+  const visibleNotifications = createMemo(() => {
+    const selected = filter();
+    return ordered().filter((notification) => (
+      selected === 'all'
+      || (selected === 'attention' && isAttentionNotification(notification))
+      || (selected === 'other' && !isAttentionNotification(notification))
+    ));
+  });
+  const emptyCopy = createMemo(() => {
+    if (notifications().length === 0) return 'Nothing yet — mentions and messages land here.';
+    if (filter() === 'attention') return 'No mentions, follows, or direct messages yet.';
+    if (filter() === 'other') return 'No other notifications yet.';
+    return 'Nothing yet — mentions and messages land here.';
+  });
 
   createEffect(() => {
     if (!inboxOpen()) return;
@@ -110,7 +145,7 @@ export function NotificationCenter(): JSX.Element {
     // Keep this effect subscribed to row membership as well as open state.
     // A synchronized dismissal can remove the focused control without going
     // through dismissNotification(), which otherwise leaves focus on <body>.
-    const empty = ordered().length === 0;
+    const empty = visibleNotifications().length === 0;
     queueMicrotask(() => {
       if (!untrack(inboxOpen) || !centerRef || centerRef.contains(document.activeElement)) return;
       // Empty inbox: land on Close (not the always-present ledger link).
@@ -235,8 +270,13 @@ export function NotificationCenter(): JSX.Element {
       >
         <div ref={centerRef} class="notif-center" data-testid="notification-center" onKeyDown={handleDialogKeyDown}>
           <header class="notif-center__head">
-            <h2>Inbox</h2>
-            <Show when={notifications().length > 0}>
+            <div class="notif-center__heading">
+              <h2>Inbox</h2>
+              <span class="notif-center__summary" aria-live="polite" aria-atomic="true">
+                {unreadCount() > 0 ? `${unreadCount()} unread` : 'No unread conversations'}
+              </span>
+            </div>
+            <Show when={unreadCount() > 0}>
               <button type="button" class="notif-center__action" onClick={() => getState().markAllNotificationsRead()}>
                 Mark all read
               </button>
@@ -255,16 +295,33 @@ export function NotificationCenter(): JSX.Element {
             </button>
           </header>
 
+          <div class="notif-center__filters" role="group" aria-label="Filter notification inbox">
+            <For each={INBOX_FILTERS}>
+              {(option) => (
+                <button
+                  type="button"
+                  class="notif-center__filter"
+                  classList={{ 'is-selected': filter() === option.id }}
+                  aria-pressed={filter() === option.id ? 'true' : 'false'}
+                  onClick={() => setFilter(option.id)}
+                >
+                  <span>{option.label}</span>
+                  <span class="notif-center__filter-count" aria-hidden="true">{filterCounts()[option.id]}</span>
+                </button>
+              )}
+            </For>
+          </div>
+
           <Show
-            when={ordered().length > 0}
+            when={visibleNotifications().length > 0}
             fallback={
               <p class="notif-center__empty">
-                Nothing yet — mentions and messages land here.
+                {emptyCopy()}
               </p>
             }
           >
             <ul class="notif-center__list" role="list" aria-label="Notification inbox items">
-              <For each={ordered()}>
+              <For each={visibleNotifications()}>
                 {(n) => {
                   const jumpable = targetOf(n) !== null;
                   return (

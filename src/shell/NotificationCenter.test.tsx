@@ -84,7 +84,7 @@ describe('<NotificationCenter>', () => {
     );
   });
 
-  it('counts only unread mentions and DMs in the badge', () => {
+  it('counts only unread attention notifications in the badge', () => {
     store.setState({
       notifications: [
         note({ id: 'a', type: 'mention', from: 'trev', channel: '#root' }),
@@ -97,6 +97,43 @@ describe('<NotificationCenter>', () => {
     });
     render(() => <NotificationCenter />);
     expect(screen.getByRole('button', { name: 'Inbox — 3 unread notifications' })).toBeInTheDocument();
+  });
+
+  it('summarizes unread attention and filters the inbox without changing notification order', () => {
+    store.setState({
+      notifications: [
+        note({ id: 'system', type: 'system', text: 'connected' }),
+        note({ id: 'mention', type: 'mention', from: 'trev', channel: '#root', text: 'ping' }),
+        note({ id: 'dm', type: 'dm', from: 'mizu', text: 'hello' }),
+      ],
+      readNotificationIds: new Set(['dm']),
+    });
+    render(() => <NotificationCenter />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Inbox — 1 unread notification' }));
+    const dialog = screen.getByRole('dialog', { name: 'Notification inbox' });
+    expect(within(dialog).getByText('1 unread')).toBeInTheDocument();
+
+    const filters = within(dialog).getByRole('group', { name: 'Filter notification inbox' });
+    const all = within(filters).getByRole('button', { name: 'All' });
+    const attention = within(filters).getByRole('button', { name: 'Needs you' });
+    const other = within(filters).getByRole('button', { name: 'Other' });
+    expect(all).toHaveAttribute('aria-pressed', 'true');
+    expect(attention).toHaveAttribute('aria-pressed', 'false');
+    expect(other).toHaveAttribute('aria-pressed', 'false');
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(3);
+
+    fireEvent.click(attention);
+    expect(attention).toHaveAttribute('aria-pressed', 'true');
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(dialog).getByText('hello')).toBeInTheDocument();
+    expect(within(dialog).queryByText('connected')).toBeNull();
+
+    fireEvent.click(other);
+    expect(other).toHaveAttribute('aria-pressed', 'true');
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(dialog).getByText('connected')).toBeInTheDocument();
+    expect(within(dialog).queryByText('ping')).toBeNull();
   });
 
   it('clicking a mention marks it read and navigates to the channel', () => {
