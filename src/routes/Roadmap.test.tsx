@@ -2,9 +2,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@solidjs/testing-library';
+import { fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 
-import RoadmapRoute, { RoadmapBridge } from './Roadmap';
+import RoadmapRoute, {
+  focusRoadmapPriority,
+  RoadmapBridge,
+  roadmapPriorityFromHash,
+} from './Roadmap';
 
 vi.mock('@/backgrounds/SceneAtmosphere', () => ({
   SceneAtmosphere: () => <div data-background-canvas="true" data-background-id="deep-current" />,
@@ -109,6 +113,39 @@ describe('RoadmapRoute', () => {
     }
   });
 
+  it('syncs an anchored priority into the current reading path', async () => {
+    const previous = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState(null, '', '/roadmap/#roadmap-next');
+    try {
+      render(() => <RoadmapBridge />);
+      const next = screen.getByRole('link', { name: 'Next' });
+      const nextCard = document.getElementById('roadmap-next');
+      await waitFor(() => expect(next).toHaveAttribute('aria-current', 'location'));
+      expect(nextCard).toHaveAttribute('data-current', 'true');
+    } finally {
+      window.history.replaceState(null, '', previous || '/');
+    }
+  });
+
+  it('moves focus to the selected priority after an ordinary legend click', async () => {
+    render(() => <RoadmapBridge />);
+    const later = screen.getByRole('link', { name: 'Later' });
+    const laterCard = document.getElementById('roadmap-later');
+    fireEvent.click(later);
+
+    await waitFor(() => expect(laterCard).toHaveFocus());
+    expect(later).toHaveAttribute('aria-current', 'location');
+    expect(laterCard).toHaveAttribute('data-current', 'true');
+  });
+
+  it('accepts only the three roadmap hashes and ignores a missing focus target', () => {
+    expect(roadmapPriorityFromHash('#roadmap-now')).toBe('now');
+    expect(roadmapPriorityFromHash('roadmap-next')).toBe('next');
+    expect(roadmapPriorityFromHash('#roadmap-later')).toBe('later');
+    expect(roadmapPriorityFromHash('#roadmap-unplanned')).toBeNull();
+    expect(() => focusRoadmapPriority(null)).not.toThrow();
+  });
+
   it('stamps community metadata', () => {
     render(() => <RoadmapRoute />);
     expect(document.title).toBe('Onyx roadmap — rooms, calls, catch-up');
@@ -135,5 +172,11 @@ describe('RoadmapRoute', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveFocus();
+  });
+
+  it('keeps selected priority markers visible in forced colors', () => {
+    expect(css).toContain(".roadmap-legend a[aria-current='location']");
+    expect(css).toContain(".roadmap-card[data-current='true']");
+    expect(css).toContain('@media (forced-colors: active)');
   });
 });

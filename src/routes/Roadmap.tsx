@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './roadmap.css';
-import { For } from 'solid-js';
+import { createSignal, For, onCleanup, onMount } from 'solid-js';
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
 
@@ -26,7 +26,41 @@ const ROADMAP_ITEMS = [
   },
 ] as const;
 
+type RoadmapPriority = typeof ROADMAP_ITEMS[number]['state'];
+
+export function roadmapPriorityFromHash(hash: string): RoadmapPriority | null {
+  const value = hash.startsWith('#') ? hash.slice(1) : hash;
+  const match = ROADMAP_ITEMS.find((item) => `roadmap-${item.state}` === value);
+  return match?.state ?? null;
+}
+
+/** Focus an anchor target after its native hash navigation has moved it into view. */
+export function focusRoadmapPriority(target: HTMLElement | null): void {
+  if (!target || typeof target.focus !== 'function') return;
+  target.focus({ preventScroll: true });
+}
+
 export function RoadmapBridge() {
+  const [activePriority, setActivePriority] = createSignal<RoadmapPriority | null>(null);
+  const syncPriorityFromHash = () => {
+    if (typeof window === 'undefined') return;
+    setActivePriority(roadmapPriorityFromHash(window.location.hash));
+  };
+
+  onMount(() => {
+    syncPriorityFromHash();
+    window.addEventListener('hashchange', syncPriorityFromHash);
+    onCleanup(() => window.removeEventListener('hashchange', syncPriorityFromHash));
+  });
+
+  const selectPriority = (event: MouseEvent, state: RoadmapPriority): void => {
+    // Modified clicks preserve their normal browser behavior and must not move
+    // focus in the current tab.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    setActivePriority(state);
+    queueMicrotask(() => focusRoadmapPriority(document.getElementById(`roadmap-${state}`)));
+  };
+
   return (
     <PublicFrame
       currentPath="/roadmap/"
@@ -55,7 +89,12 @@ export function RoadmapBridge() {
           <div class="roadmap-legend" role="group" aria-label="Roadmap state legend">
             <For each={ROADMAP_ITEMS}>
               {(item, index) => (
-                <a href={`#roadmap-${item.state}`} data-state={item.state}>
+                <a
+                  href={`#roadmap-${item.state}`}
+                  data-state={item.state}
+                  aria-current={activePriority() === item.state ? 'location' : undefined}
+                  onClick={(event) => selectPriority(event, item.state)}
+                >
                   <span class="roadmap-legend__marker" aria-hidden="true">
                     {String(index() + 1).padStart(2, '0')}
                   </span>
@@ -75,6 +114,7 @@ export function RoadmapBridge() {
                 id={`roadmap-${item.state}`}
                 class="roadmap-card"
                 data-state={item.state}
+                data-current={activePriority() === item.state ? 'true' : undefined}
                 aria-labelledby={`roadmap-${item.state}-title`}
                 tabindex="-1"
               >

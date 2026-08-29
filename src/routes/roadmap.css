@@ -98,6 +98,12 @@
   color: var(--paper);
 }
 
+.roadmap-legend a[aria-current='location'] {
+  border-color: var(--roadmap-current-strong);
+  color: var(--paper);
+  background: color-mix(in oklab, var(--roadmap-current) 18%, var(--stone));
+}
+
 .roadmap-legend a:focus-visible {
   outline: var(--focus-ring, 2px solid var(--lapis));
   outline-offset: var(--focus-offset, 3px);
@@ -155,6 +161,12 @@
 .roadmap-card:focus {
   outline: var(--focus-ring, 2px solid var(--lapis));
   outline-offset: var(--focus-offset, 3px);
+}
+
+.roadmap-card:target,
+.roadmap-card[data-current='true'] {
+  border-color: color-mix(in oklab, var(--roadmap-current) 58%, var(--seam-faint));
+  background: color-mix(in oklab, var(--roadmap-current) 6%, transparent);
 }
 
 .roadmap-card::before {
@@ -304,5 +316,13 @@
   .roadmap-legend a:focus-visible,
   .roadmap-card:focus {
     outline-color: Highlight;
+  }
+
+  .roadmap-legend a[aria-current='location'],
+  .roadmap-card:target,
+  .roadmap-card[data-current='true'] {
+    border-color: Highlight;
+    color: CanvasText;
+    background: Canvas;
   }
 }
