@@ -137,6 +137,21 @@
   gap: 0.5rem;
 }
 
+.room-insights__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.45rem;
+  margin: -0.2rem 0 0;
+  color: var(--paper-mute, var(--muted, #9aa3b2));
+  font: 0.64rem/1.35 var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.room-insights__meta-quiet {
+  color: var(--shu, var(--lapis-bright, #6ea8fe));
+}
+
 .room-insights__title {
   margin: 0;
   font-size: var(--text-sm, 0.85rem);
@@ -194,6 +209,147 @@
   font-size: var(--text-md, 0.95rem);
   color: var(--paper);
   font-variant-numeric: tabular-nums;
+}
+
+.room-insights__metric-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-insights__rhythm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.65rem 0.7rem 0.55rem;
+  border: 1px solid color-mix(in oklab, var(--lapis, #6ea8fe) 20%, var(--seam-faint, var(--line)));
+  border-radius: var(--r-sm, 0.35rem);
+  background: color-mix(in oklab, var(--lapis, #6ea8fe) 5%, var(--surface-void, var(--ink)));
+}
+
+.room-insights__rhythm-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.room-insights__rhythm-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.room-insights__rhythm-kicker {
+  color: var(--lapis-bright, var(--lapis, #6ea8fe));
+  font: 700 0.58rem/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.room-insights__rhythm-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--paper);
+  font-size: var(--text-sm, 0.82rem);
+  font-weight: 650;
+}
+
+.room-insights__rhythm-peak {
+  flex: none;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid color-mix(in oklab, var(--shu, #ff6f61) 42%, var(--seam-faint, var(--line)));
+  border-radius: var(--r-pill, 999px);
+  color: var(--paper);
+  background: color-mix(in oklab, var(--shu, #ff6f61) 11%, transparent);
+  font: 650 0.62rem/1 var(--font-mono);
+  white-space: nowrap;
+}
+
+.room-insights__rhythm-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  height: 4.25rem;
+  padding: 0.35rem 0.15rem 0.2rem;
+  border-bottom: 1px solid var(--seam-faint, var(--line));
+}
+
+.room-insights__rhythm-bar {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  align-self: stretch;
+  min-width: 2px;
+}
+
+.room-insights__rhythm-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: color-mix(in oklab, var(--lapis, #6ea8fe) 62%, var(--seam-faint, transparent));
+  transform: scaleY(calc(0.08 + var(--room-heat, 0) * 0.92));
+  transform-origin: bottom;
+  transition: transform 180ms var(--ease, ease-out), background-color 180ms var(--ease, ease-out);
+}
+
+.room-insights__rhythm-bar--peak .room-insights__rhythm-fill {
+  background: var(--shu, var(--lapis-bright, #6ea8fe));
+}
+
+.room-insights__rhythm-axis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  color: var(--paper-mute, var(--muted, #9aa3b2));
+  font: 0.58rem/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.room-insights__rhythm-axis span:nth-child(n + 2) {
+  text-align: center;
+}
+
+.room-insights__rhythm-axis span:last-child {
+  text-align: right;
+}
+
+.room-insights__rhythm-caption {
+  color: var(--paper-mute, var(--muted, #9aa3b2));
+  font: 0.62rem/1.3 var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-insights__rhythm-fill {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .room-insights__rhythm {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+
+  .room-insights__rhythm-fill {
+    background: CanvasText;
+  }
+
+  .room-insights__rhythm-bar--peak .room-insights__rhythm-fill,
+  .room-insights__rhythm-peak {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
 }
 
 .oper-event-console {

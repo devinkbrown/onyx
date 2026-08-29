@@ -55,7 +55,15 @@ describe('RoomInsightsStrip', () => {
     });
     expect(screen.getByText('1.5k')).toBeInTheDocument();
     expect(screen.getByText('+3')).toBeInTheDocument();
+    expect(screen.getByText('alice')).toBeInTheDocument();
     expect(screen.getByText('14:00 UTC')).toBeInTheDocument();
+    expect(screen.getByTestId('room-insights-meta')).toHaveTextContent('Public aggregate');
+    const rhythm = screen.getByTestId('room-insights-rhythm');
+    expect(rhythm).toHaveTextContent('24-hour rhythm');
+    expect(rhythm).toHaveTextContent('peak 14:00 utc');
+    expect(screen.getByTestId('room-insights-rhythm-bars')).toHaveAttribute('role', 'img');
+    expect(rhythm.querySelectorAll('.room-insights__rhythm-bar')).toHaveLength(24);
+    expect(rhythm.querySelectorAll('.room-insights__rhythm-bar--peak')).toHaveLength(1);
     expect(screen.getByTestId('room-insights-open-stats')).toHaveAttribute(
       'href',
       '/stats/?room=%23root',
