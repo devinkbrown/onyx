@@ -1,0 +1,114 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/*
+ * session-reclaim-banner.css — SessionReclaimBanner.tsx
+ * Neutral (restoring) / success (reclaimed) / alert (reclaim-failed,
+ * sign-in-again) variants over the same layout, styled off shared tokens.
+ */
+
+.session-reclaim-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin: 0 var(--space-3, 12px);
+  padding: 8px 12px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
+  color: var(--paper);
+  font: 500 13px/1.35 var(--font-sans);
+}
+
+.session-reclaim-banner--success {
+  border-color: color-mix(in oklab, var(--ok) 45%, var(--seam-faint));
+  background: color-mix(in oklab, var(--ok) 14%, var(--ink));
+}
+
+.session-reclaim-banner--alert {
+  border-color: color-mix(in oklab, var(--shu) 45%, var(--seam-faint));
+  background: color-mix(in oklab, var(--shu) 16%, var(--ink));
+}
+
+.session-reclaim-banner__glyph {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.session-reclaim-banner--success .session-reclaim-banner__glyph {
+  color: var(--ok);
+}
+
+.session-reclaim-banner--alert .session-reclaim-banner__glyph {
+  color: var(--shu-bright);
+}
+
+.session-reclaim-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.session-reclaim-banner__title {
+  font-weight: 650;
+  color: var(--paper);
+}
+
+.session-reclaim-banner__detail {
+  color: color-mix(in oklab, var(--paper) 68%, transparent);
+  font-size: 12px;
+}
+
+.session-reclaim-banner__signin {
+  appearance: none;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--shu) 30%, var(--stone));
+  color: var(--paper);
+  font: 650 13px/1.2 var(--font-sans);
+  cursor: pointer;
+}
+
+.session-reclaim-banner__signin:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.session-reclaim-banner__dismiss {
+  appearance: none;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: color-mix(in oklab, var(--paper) 68%, transparent);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.session-reclaim-banner__dismiss:hover {
+  background: color-mix(in oklab, var(--paper) 12%, transparent);
+  color: var(--paper);
+}
+
+.session-reclaim-banner__dismiss:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-reclaim-banner {
+    transition: none;
+  }
+}

@@ -55,6 +55,7 @@ import { FirstRunNotifyPrompt } from './FirstRunNotifyPrompt';
 import { DmKeyChangeBanner } from './DmKeyChangeBanner';
 import { DmSafetySheet } from './DmSafetySheet';
 import { ReconnectStatusBanner } from './ReconnectStatusBanner';
+import { SessionReclaimBanner } from './SessionReclaimBanner';
 import { OfflineMemoToast } from './OfflineMemoToast';
 import { CapabilityMatrixSection } from './CapabilityMatrixSection';
 import { TimeScrubber } from './TimeScrubber';
@@ -1252,6 +1253,8 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
         <div class="shell-conversation">
           {/* Disconnected banner */}
           <ReconnectStatusBanner />
+          {/* Automatic session-resume status (sessionReclaim.ts) */}
+          <SessionReclaimBanner />
 
           {/* Presence ribbon */}
           <PresenceRibbon

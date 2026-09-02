@@ -13,6 +13,7 @@ import {
   type ChannelNavigationMemory,
 } from '@/lib/channelNavigationMemory';
 import { IRCClient } from '@/lib/irc/client';
+import type { ReclaimTokenKind } from '@/lib/irc/sessionReclaim';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
 import {
@@ -694,6 +695,16 @@ export interface PeerKeyChange {
   newKey: string;
 }
 
+/** Visible phase of the automatic session-reclaim handshake (see `sessionReclaim` below). */
+export type SessionReclaimPhase = 'restoring' | 'reclaimed' | 'reclaim-failed' | 'sign-in-again';
+
+/** UI-facing projection of an IRCClient `onSessionReclaim` callback. */
+export interface SessionReclaimNotice {
+  phase: SessionReclaimPhase;
+  /** Which bearer is in play; present for 'restoring' and 'reclaimed' only. */
+  kind?: ReclaimTokenKind;
+}
+
 export interface OnyxState {
   // ── Connection ──────────────────────────────────────────────────────
   status: ConnectionStatus;
@@ -715,6 +726,19 @@ export interface OnyxState {
    * disconnect, or when the user discards the last queued send.
    */
   outboxDeliveryFailed: boolean;
+  /**
+   * Visible status for the automatic resume handshake IRCClient runs on every
+   * `001` (`sessionReclaim.ts` `planSessionReclaim`, surfaced via the client's
+   * `onSessionReclaim`). `null` covers both non-user-facing skip reasons —
+   * `unauthenticated` (pre-auth socket) and `none-held` (ordinary guest / first
+   * connect) — so a first-time guest never sees a banner. A held-but-lapsed
+   * bearer (`expired`) and an async `FAIL SESSION INVALID_TOKEN`/`NO_SESSION`
+   * rejecting an attempted resume both fail CLOSED to an actionable banner
+   * rather than silently continuing as a fresh guest under the old identity.
+   */
+  sessionReclaim: SessionReclaimNotice | null;
+  /** Dismiss the current session-reclaim banner without acting on it. */
+  dismissSessionReclaim(): void;
 
   setConnectionStatus(status: 'connected' | 'connecting' | 'disconnected' | 'reconnecting'): void;
   setReconnectIn(seconds: number): void;
@@ -3870,6 +3894,24 @@ function _startNickReclaim(desiredNick: string) {
   }, 30_000);
 }
 
+// ── Session reclaim banner timer (module-level) ──────────────────────────────
+/**
+ * `restoring` is a live guess made synchronously on `001`, before the server
+ * can answer `SESSION RESUME`. Promote it to a brief `reclaimed` success toast
+ * if nothing rejects it within this window, mirroring ReconnectStatusBanner's
+ * own "Back online" timer; then auto-dismiss the toast.
+ */
+const SESSION_RECLAIM_CONFIRM_MS = 2_000;
+const SESSION_RECLAIM_DISMISS_MS = 3_000;
+let _sessionReclaimTimer: ReturnType<typeof setTimeout> | null = null;
+
+function _clearSessionReclaimTimer(): void {
+  if (_sessionReclaimTimer) {
+    clearTimeout(_sessionReclaimTimer);
+    _sessionReclaimTimer = null;
+  }
+}
+
 function _reconnectDelay(attempt: number): number {
   const baseDelay = Math.min(5 * Math.pow(2, attempt), _RECONNECT_DELAY_CAP_SECONDS);
   const jitterWindow = Math.max(1, Math.floor(baseDelay * _RECONNECT_JITTER_RATIO));
@@ -5878,6 +5920,7 @@ export const store = createStore<OnyxState>()(
     autoReconnect: false,
     groupControlRuntime: null,
     outboxDeliveryFailed: false,
+    sessionReclaim: null,
     latencyMs: null,
     serverStats: null,
     activeView: { kind: 'home' },
@@ -6085,6 +6128,10 @@ export const store = createStore<OnyxState>()(
     setReconnectIn(reconnectIn) {
       set({ reconnectIn });
     },
+    dismissSessionReclaim() {
+      _clearSessionReclaimTimer();
+      set({ sessionReclaim: null });
+    },
     setLatency(ms) {
       set({ latencyMs: ms });
       get().addLatencyReading(ms);
@@ -6170,6 +6217,7 @@ export const store = createStore<OnyxState>()(
       // left the previous channels/members in place — and NAMES merges rather
       // than replaces, so the old nicks "stuck around". Auto-reconnect uses a
       // different path (reconnectNow → client.connect) and is unaffected.
+      _clearSessionReclaimTimer();
       set({
         status: 'connecting',
         connectionStatus: 'connecting',
@@ -6184,6 +6232,7 @@ export const store = createStore<OnyxState>()(
         rosterSyncing: new Set(),
         activeView: { kind: 'home' },
         firstUnreadId: new Map(),
+        sessionReclaim: null,
         ...(searchWasPending
           ? {
               serverSearch: {
@@ -6411,6 +6460,47 @@ export const store = createStore<OnyxState>()(
             _replaceOwnedMonitorContacts(get, set, true);
           }
         },
+        // Observational: IRCClient has already sent (or skipped) `SESSION
+        // RESUME` by the time this fires — see sessionReclaim.ts
+        // planSessionReclaim, called synchronously on every `001` just before
+        // onConnected. This only projects that decision into a visible banner.
+        onSessionReclaim(plan) {
+          if (get().client !== client) return;
+          _clearSessionReclaimTimer();
+          if (plan.attempt) {
+            const kind = plan.kind;
+            set({ sessionReclaim: { phase: 'restoring', kind } });
+            _sessionReclaimTimer = setTimeout(() => {
+              _sessionReclaimTimer = null;
+              if (get().client !== client) return;
+              // Nothing rejected the resume within the confirm window (the
+              // FAIL SESSION handler below would have overwritten this phase
+              // already) — treat it as held and show a brief success toast.
+              if (get().sessionReclaim?.phase === 'restoring') {
+                set({ sessionReclaim: { phase: 'reclaimed', kind } });
+              }
+              _sessionReclaimTimer = setTimeout(() => {
+                _sessionReclaimTimer = null;
+                if (get().client !== client) return;
+                if (get().sessionReclaim?.phase === 'reclaimed') {
+                  set({ sessionReclaim: null });
+                }
+              }, SESSION_RECLAIM_DISMISS_MS);
+            }, SESSION_RECLAIM_CONFIRM_MS);
+            return;
+          }
+          if (plan.reason === 'expired') {
+            // A bearer was held but has lapsed — fail CLOSED to an explicit
+            // re-auth prompt rather than silently continuing as a fresh guest
+            // under the old identity.
+            set({ sessionReclaim: { phase: 'sign-in-again' } });
+            return;
+          }
+          // 'none-held' (ordinary guest / first connect) and 'unauthenticated'
+          // (pre-auth socket — the live call site always passes `authenticated:
+          // true`, so this is defensive) are not user-facing.
+          set({ sessionReclaim: null });
+        },
         onMessage(msg) {
           if (get().client !== client) return;
           get()._handleMessage(msg);
@@ -6528,6 +6618,7 @@ export const store = createStore<OnyxState>()(
     disconnect() {
       _clearReconnectCountdown();
       _stopNickReclaim();
+      _clearSessionReclaimTimer();
       _reconnectAttempts = 0;
       _connectNick  = '';
       _saslAccount  = null;
@@ -6586,6 +6677,7 @@ export const store = createStore<OnyxState>()(
         accountSessionsPending: false,
         accountSessionsError: null,
         operEventReplay: emptyEventReplayFeed(),
+        sessionReclaim: null,
         ...(searchWasPending
           ? {
               serverSearch: {
@@ -10162,6 +10254,12 @@ export const store = createStore<OnyxState>()(
           const resumeCredentialRejected = standard.code === 'INVALID_TOKEN'
             || standard.code === 'NO_SESSION';
           if (resumeCredentialRejected) {
+            // Terminal answer to the `SESSION RESUME` this same client just
+            // sent (see onSessionReclaim above) — supersede any 'restoring'
+            // guess with the real outcome instead of letting it time out into
+            // a false 'reclaimed' success toast.
+            _clearSessionReclaimTimer();
+            set({ sessionReclaim: { phase: 'reclaim-failed' } });
             clearSessionToken(get().server?.url, _connectNick || get().ourNick);
             // A terminal resume failure invalidates the stale bearer, but a 900
             // may already have authenticated this socket independently. Keep
