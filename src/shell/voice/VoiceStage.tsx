@@ -290,25 +290,25 @@ export function VoiceStage() {
             }
           >
             {/* ── Spotlight / active-speaker layout ── */}
+            {/* Props are read through `spotlightSlot()` per attribute so the
+                tile is created once and updated in place. Resolving the slot
+                in a JSX expression body instead would make the whole subtree
+                reactive: every speaking/mute tick rebuilds the slot object,
+                which would recreate the tile and remount its <video>. */}
             <div class="voice-stage__primary" data-testid="spotlight-primary">
-              {(() => {
-                const slot = spotlightSlot();
-                return (
-                  <ParticipantTile
-                    nick={slot.nick}
-                    peer={slot.peer}
-                    stream={slot.stream}
-                    isSelf={slot.isSelf}
-                    speaking={slot.isSelf ? slot.speaking : undefined}
-                    muted={slot.muted}
-                    deafened={slot.isSelf ? voice().deafened : undefined}
-                    handRaised={slot.handRaised}
-                    pinned={voice().pinnedParticipant === slot.nick}
-                    onPin={handlePin}
-                    channelUser={userFor(slot.nick)}
-                  />
-                );
-              })()}
+              <ParticipantTile
+                nick={spotlightSlot().nick}
+                peer={spotlightSlot().peer}
+                stream={spotlightSlot().stream}
+                isSelf={spotlightSlot().isSelf}
+                speaking={spotlightSlot().isSelf ? spotlightSlot().speaking : undefined}
+                muted={spotlightSlot().muted}
+                deafened={spotlightSlot().isSelf ? voice().deafened : undefined}
+                handRaised={spotlightSlot().handRaised}
+                pinned={voice().pinnedParticipant === spotlightSlot().nick}
+                onPin={handlePin}
+                channelUser={userFor(spotlightSlot().nick)}
+              />
             </div>
 
             <Show when={filmstripSlots().length > 0}>

@@ -370,6 +370,78 @@ describe('VoiceStage', () => {
     expect(assignments).toBe(0);
   });
 
+  it('keeps the spotlight subject video mounted while its speaking status flips', () => {
+    // Arrange — pin Alice so the spotlight subject cannot change; only her
+    // speaking flag moves. A talking participant must not blink her own feed.
+    const stream = {
+      getTracks: () => [],
+      getVideoTracks: () => [],
+    } as unknown as MediaStream;
+    seedVoiceStore(
+      [makePeer('alice', { hasVideo: true })],
+      [],
+      {
+        callLayout: 'spotlight',
+        pinnedParticipant: 'alice',
+        videoParticipants: new Map([['alice', stream]]),
+      },
+    );
+
+    const view = render(() => <VoiceStage />);
+    const primary = view.getByTestId('spotlight-primary');
+    const video = within(primary).getByTestId('tile-video') as HTMLVideoElement;
+    let attached = video.srcObject;
+    let assignments = 0;
+    Object.defineProperty(video, 'srcObject', {
+      configurable: true,
+      get: () => attached,
+      set: value => {
+        assignments += 1;
+        attached = value;
+      },
+    });
+
+    // Act — a burst of talk activity: peer speaking, then the flat event-plane
+    // set, then silence again.
+    store.getState().setVoiceParticipantSpeaking('alice', true);
+    store.getState().setSpeakingNick('alice', true);
+    store.getState().setSpeakingNick('alice', false);
+
+    // Assert — same element, same stream, never re-assigned.
+    const current = within(view.getByTestId('spotlight-primary')).getByTestId('tile-video');
+    expect(current).toBe(video);
+    expect(video.srcObject).toBe(stream);
+    expect(assignments).toBe(0);
+  });
+
+  it('updates the spotlight subject tile in place across unrelated voice updates', () => {
+    // Arrange
+    const stream = {
+      getTracks: () => [],
+      getVideoTracks: () => [],
+    } as unknown as MediaStream;
+    seedVoiceStore(
+      [makePeer('alice', { hasVideo: true })],
+      [],
+      {
+        callLayout: 'spotlight',
+        pinnedParticipant: 'alice',
+        videoParticipants: new Map([['alice', stream]]),
+      },
+    );
+
+    const view = render(() => <VoiceStage />);
+    const video = within(view.getByTestId('spotlight-primary')).getByTestId('tile-video');
+
+    // Act — a mute badge change must repaint the badge, not the video element.
+    store.getState().setVoiceParticipantMuted('alice', true);
+
+    // Assert — element identity survives; the badge still reflects the update.
+    const tile = within(view.getByTestId('spotlight-primary')).getByTestId('participant-tile');
+    expect(within(view.getByTestId('spotlight-primary')).getByTestId('tile-video')).toBe(video);
+    expect(tile).toHaveAttribute('aria-label', 'alice, muted');
+  });
+
   it('keeps roster-only cross-node participants in the screenshare filmstrip without duplicates', () => {
     // Arrange — Alice is a decoded peer while differently-cased Alice and bob
     // also arrive through the mesh-wide room roster.

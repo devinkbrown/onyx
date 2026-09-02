@@ -464,6 +464,44 @@ describe('CadenceMediaEngine control payload boundary', () => {
     expect(internals.negotiatedBitrate.size).toBe(0);
   });
 
+  it('reports only speaking edges so a held floor cannot re-render the stage', () => {
+    // Arrange — a rostered peer whose speaking state starts false.
+    const onPeerState = vi.fn();
+    const onPeerSpeaking = vi.fn();
+    const engine = new CadenceMediaEngine(callbacks({ onPeerState, onPeerSpeaking }), { kind: 'voice' });
+    engine.handleMediaMessage('server', '#room', 'ROSTER', JSON.stringify({ voice: ['Alice'] }));
+    onPeerState.mockClear();
+
+    // Act — the server repeats the current value while Alice holds the floor.
+    engine.handleMediaMessage('Alice', '#room', 'SPEAKING', 'Alice 1');
+    engine.handleMediaMessage('Alice', '#room', 'SPEAKING', 'Alice 1');
+    engine.handleMediaMessage('Alice', '#room', 'SPEAKING', 'Alice 1');
+    engine.handleMediaMessage('Alice', '#room', 'SPEAKING', 'Alice 0');
+    engine.handleMediaMessage('Alice', '#room', 'SPEAKING', 'Alice 0');
+
+    // Assert — two transitions, two notifications.
+    expect(onPeerSpeaking.mock.calls).toEqual([['Alice', true], ['Alice', false]]);
+    expect(onPeerState).toHaveBeenCalledTimes(2);
+    expect(engine.getPeers().get('Alice')?.speaking).toBe(false);
+  });
+
+  it('reports only voice-activity edges', () => {
+    // Arrange
+    const onPeerState = vi.fn();
+    const engine = new CadenceMediaEngine(callbacks({ onPeerState }), { kind: 'voice' });
+    engine.handleMediaMessage('server', '#room', 'ROSTER', JSON.stringify({ voice: ['Alice'] }));
+    onPeerState.mockClear();
+
+    // Act
+    engine.handleMediaMessage('Alice', '#room', 'VOICE_ACTIVITY', '1');
+    engine.handleMediaMessage('Alice', '#room', 'VOICE_ACTIVITY', '1');
+    engine.handleMediaMessage('Alice', '#room', 'VOICE_SPEAKING', 'true');
+
+    // Assert
+    expect(onPeerState).toHaveBeenCalledOnce();
+    expect(engine.getPeers().get('Alice')?.speaking).toBe(true);
+  });
+
   it('clamps hostile VIDEO_JOIN capture geometry before peer allocation', () => {
     const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
     engine.handleMediaMessage('alice', '#room', 'VIDEO_JOIN', '999999 999999 200 999 true');

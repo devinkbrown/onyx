@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, Index, onCleanup, Show } from 'solid-js';
 
 import { Avatar, Button, Tooltip } from '@/primitives';
 import { getState, useStore } from '@/lib/store';
@@ -373,21 +373,28 @@ export function VoicePip() {
 
         <div class="voice-pip__body">
           <div class="voice-pip__participants" aria-label={`${participantSummary().total} voice participants`}>
-            <For each={participantSummary().visible}>
+            {/* `<Index>` because the summary rebuilds its participant objects
+                on every speaking/mute tick and re-sorts speakers first — `<For>`
+                keys on those objects, so each tick would remount every chip. */}
+            <Index each={participantSummary().visible}>
               {(participant) => (
                 <Tooltip
-                  content={`${participant.nick}${participant.speaking ? ' is speaking' : ''}${participant.muted ? ' is muted' : ''}`}
+                  content={`${participant().nick}${participant().speaking ? ' is speaking' : ''}${participant().muted ? ' is muted' : ''}`}
                 >
                   <span
                     class="voice-pip__participant"
-                    data-speaking={participant.speaking ? 'true' : 'false'}
-                    data-muted={participant.muted ? 'true' : 'false'}
+                    data-speaking={participant().speaking ? 'true' : 'false'}
+                    data-muted={participant().muted ? 'true' : 'false'}
                   >
-                    <Avatar name={participant.self ? 'You' : participant.nick} size="sm" owner={participant.self} />
+                    <Avatar
+                      name={participant().self ? 'You' : participant().nick}
+                      size="sm"
+                      owner={participant().self}
+                    />
                   </span>
                 </Tooltip>
               )}
-            </For>
+            </Index>
             <Show when={hiddenParticipantCount() > 0}>
               <span class="voice-pip__more">+{hiddenParticipantCount()}</span>
             </Show>

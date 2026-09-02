@@ -2199,12 +2199,16 @@ export class CadenceMediaEngine {
         });
         break;
       }
+      // Speaking control events repeat the current value for as long as a peer
+      // holds the floor. Emitting on every repeat rebuilds the store's peer map
+      // and re-renders the call stage many times per talk burst, so — like the
+      // local VAD meter and the decode-path detector — only edges are reported.
       case 'SPEAKING': {
         const parts = payload.split(' ');
         const peerNick = parts[0] ?? fromNick;
         const speaking = (parts[2] ?? parts[1] ?? '0') === '1';
         const pm = this.registry.get(peerNick);
-        if (pm) {
+        if (pm && pm.state.speaking !== speaking) {
           pm.state.speaking = speaking;
           this.cb.onPeerState?.(pm.state); this.cb.onPeerSpeaking?.(peerNick, speaking);
         }
@@ -2214,7 +2218,10 @@ export class CadenceMediaEngine {
       case 'VOICE_SPEAKING': {
         const speaking = payload === '1' || payload === 'true';
         const pm = this.registry.get(fromNick);
-        if (pm) { pm.state.speaking = speaking; this.cb.onPeerState?.(pm.state); }
+        if (pm && pm.state.speaking !== speaking) {
+          pm.state.speaking = speaking;
+          this.cb.onPeerState?.(pm.state);
+        }
         break;
       }
       case 'RECORD_REQ':
