@@ -6201,6 +6201,14 @@ export const store = createStore<OnyxState>()(
       const canRestoreRememberedSession = Boolean(
         password || hasClientCert || savedCreds?.sessionToken || savedCreds?.meshToken,
       );
+      // meshTokenExpiry is persisted as an ISO string; the live client tracks an
+      // epoch-ms deadline (sessionReclaim.ts) so a long-lived tab's later reconnect
+      // can tell a lapsed mesh bearer from the local fallback instead of replaying
+      // it blind. loadCredentials() already purged an expired token on this read,
+      // but the deadline still has to travel with it for reconnects further out.
+      const savedMeshExpiryMs = savedCreds?.meshTokenExpiry
+        ? new Date(savedCreds.meshTokenExpiry).getTime()
+        : NaN;
 
       // Per-client flag: true once this client has registered at least once, so
       // onConnected can tell a fresh connect from a reconnect/session-resume.
@@ -6218,6 +6226,7 @@ export const store = createStore<OnyxState>()(
         password,
         sessionToken: savedCreds?.sessionToken,
         meshToken: savedCreds?.meshToken,
+        meshTokenExpiresAt: Number.isFinite(savedMeshExpiryMs) ? savedMeshExpiryMs : undefined,
         // EXTERNAL/CERTFP intent: only meaningful when the transport actually
         // presents a client cert. selectSaslMechanism picks EXTERNAL when a cert
         // is present and no password drives PLAIN/SCRAM.
@@ -10134,7 +10143,14 @@ export const store = createStore<OnyxState>()(
             if (target) storeMeshToken(cred.token, cred.expiresAt, target, canonicalNick);
             // Prefer the mesh token on the live client so a reconnect landing on a
             // different node resumes correctly (updateResumeTokens merges, not clobbers).
-            get().client?.updateResumeTokens({ meshToken: cred.token });
+            // Forward the deadline too — sessionReclaim.ts falls through to the local
+            // bearer once this expires, and a stale/undefined deadline here would
+            // make a lapsed mesh token look live forever on this live instance.
+            // cred.expiresAt is unix-SECONDS off the wire; the client field is epoch-ms.
+            get().client?.updateResumeTokens({
+              meshToken: cred.token,
+              meshTokenExpiresAt: cred.expiresAt === undefined ? undefined : cred.expiresAt * 1000,
+            });
           }
           return;
         }
@@ -11637,7 +11653,13 @@ export const store = createStore<OnyxState>()(
                   _saslAccount ?? undefined,
                 );
               }
-              get().client?.updateResumeTokens({ meshToken: meshCred.token });
+              // Forward the deadline alongside the token — see the NOTE MTOKEN
+              // path above for why an unforwarded expiry defeats the fall-through.
+              // meshCred.expiresAt is unix-SECONDS off the wire; the client field is epoch-ms.
+              get().client?.updateResumeTokens({
+                meshToken: meshCred.token,
+                meshTokenExpiresAt: meshCred.expiresAt === undefined ? undefined : meshCred.expiresAt * 1000,
+              });
               break;
             }
 

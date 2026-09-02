@@ -12,6 +12,7 @@ import {
   type SaslMechanism,
 } from './parser';
 import { activitySubscribeArgs } from './activitySubscribe';
+import { planSessionReclaim, type SessionReclaimPlan } from './sessionReclaim';
 import type { IRCMessage, ISupport } from './types';
 import { AccountAttribution } from './attribution';
 import { serializeWatchTogetherProp } from '../media/watchTogetherController';
@@ -215,6 +216,12 @@ export interface IRCClientOptions {
   password?: string;     // SASL PLAIN password
   sessionToken?: string; // Onyx Server SESSION RESUME token (local node)
   meshToken?: string;    // Onyx Server mesh-sealed reclaim token (any node)
+  /**
+   * Absolute epoch-ms deadline for `meshToken`. Without it a long-lived tab
+   * replays a lapsed mesh bearer, and the resulting FAIL wipes the still-valid
+   * local bearer too. See sessionReclaim.ts.
+   */
+  meshTokenExpiresAt?: number;
   hasClientCert?: boolean;
   /** called for every parsed message */
   onMessage: IRCEventHandler;
@@ -225,6 +232,13 @@ export interface IRCClientOptions {
   onDisconnected?: (reason: string) => void;
   onError?: (err: string) => void;
   onNickChanged?: (newNick: string) => void;
+  /**
+   * Fires once per registration with the reclaim decision taken at 001, so the
+   * store can surface "Restoring your session…" and distinguish an expired
+   * bearer (sign in again) from an ordinary guest connect (nothing to restore).
+   * Observational only — it never gates the send.
+   */
+  onSessionReclaim?: (plan: SessionReclaimPlan) => void;
 }
 
 const RECONNECT_BASE = 2000;
@@ -359,6 +373,7 @@ export class IRCClient {
       ...opts,
       sessionToken: isValidSessionCredential(opts.sessionToken) ? opts.sessionToken : undefined,
       meshToken: isValidSessionCredential(opts.meshToken) ? opts.meshToken : undefined,
+      meshTokenExpiresAt: opts.meshTokenExpiresAt,
     };
     this._attribution = new AccountAttribution(this, opts.url);
     // Save before any nick mutations (433 collision appends '_')
@@ -725,13 +740,21 @@ export class IRCClient {
    * replaced with garbage that would become a multi-word / control-bearing
    * `SESSION RESUME` on the next 001. Immutable: a new opts object is assigned.
    */
-  updateResumeTokens(tokens: { sessionToken?: string; meshToken?: string }): void {
-    const next: { sessionToken?: string; meshToken?: string } = {};
+  updateResumeTokens(tokens: {
+    sessionToken?: string;
+    meshToken?: string;
+    meshTokenExpiresAt?: number;
+  }): void {
+    const next: { sessionToken?: string; meshToken?: string; meshTokenExpiresAt?: number } = {};
     if (tokens.sessionToken !== undefined && isValidSessionCredential(tokens.sessionToken)) {
       next.sessionToken = tokens.sessionToken;
     }
     if (tokens.meshToken !== undefined && isValidSessionCredential(tokens.meshToken)) {
       next.meshToken = tokens.meshToken;
+      // The deadline belongs to the bearer it arrived with. Adopt the new one
+      // even when absent, so a legacy expiry-less rotation cannot leave a stale
+      // deadline attached to a token it never described.
+      next.meshTokenExpiresAt = tokens.meshTokenExpiresAt;
     }
     if (next.sessionToken === undefined && next.meshToken === undefined) return;
     this.opts = { ...this.opts, ...next };
@@ -747,6 +770,7 @@ export class IRCClient {
       ...this.opts,
       sessionToken: undefined,
       meshToken: undefined,
+      meshTokenExpiresAt: undefined,
     };
   }
 
@@ -1226,16 +1250,21 @@ export class IRCClient {
   private _sendSessionCommandsAfterAuthentication(): void {
     if (this._sessionCommandsSent || !this._registered || !this._loggedIn) return;
     this._sessionCommandsSent = true;
-    // Prefer a valid mesh token; fall through to a valid local token. Never
-    // emit SESSION RESUME with an empty / whitespace / control-bearing value
-    // even if construction-time opts were poisoned — formatIRCLine would only
-    // strip CR/LF, not refuse the atom.
-    const resumeToken = isValidSessionCredential(this.opts.meshToken)
-      ? this.opts.meshToken
-      : isValidSessionCredential(this.opts.sessionToken)
-        ? this.opts.sessionToken
-        : null;
-    if (resumeToken) this.send(buildSessionResumeLine(resumeToken));
+    // Prefer a LIVE mesh token; fall through to the local one when the mesh
+    // bearer is lapsed or malformed. Never emit SESSION RESUME with an empty /
+    // whitespace / control-bearing value even if construction-time opts were
+    // poisoned — formatIRCLine would only strip CR/LF, not refuse the atom.
+    const plan = planSessionReclaim(
+      {
+        sessionToken: this.opts.sessionToken,
+        meshToken: this.opts.meshToken,
+        meshTokenExpiresAt: this.opts.meshTokenExpiresAt,
+      },
+      { now: Date.now(), authenticated: true },
+    );
+    if (plan.attempt) this.send(buildSessionResumeLine(plan.token));
+    // A subscriber must never be able to stop the token rotation below.
+    try { this.opts.onSessionReclaim?.(plan); } catch { /* observational only */ }
     this.sendRaw('SESSION', 'TOKEN');
   }
 

@@ -5,6 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { IRCClient, MAX_CLIENT_ISUPPORT_TOKENS } from './client';
 import { _resetDeviceSigningForTests } from '../e2ee/deviceSign';
 import type { IRCMessage } from './types';
+import type { SessionReclaimPlan } from './sessionReclaim';
 
 const MIB = 1024 * 1024;
 const SRM2_LOCAL = 'srm2l.00112233445566778899aabbccddeeff.aabbccddeeff00112233445566778899';
@@ -599,7 +600,12 @@ describe('IRCClient bounded WebSocket sends', () => {
 describe('IRCClient session-resume token lifecycle', () => {
   /** Attach a fake OPEN socket that captures every outbound line. */
   function makeSessionClient(
-    opts?: { sessionToken?: string; meshToken?: string },
+    opts?: {
+      sessionToken?: string;
+      meshToken?: string;
+      meshTokenExpiresAt?: number;
+      onSessionReclaim?: (plan: SessionReclaimPlan) => void;
+    },
     loggedIn = false,
   ) {
     const sent: string[] = [];
@@ -609,6 +615,8 @@ describe('IRCClient session-resume token lifecycle', () => {
       onMessage: () => {},
       sessionToken: opts?.sessionToken,
       meshToken: opts?.meshToken,
+      meshTokenExpiresAt: opts?.meshTokenExpiresAt,
+      ...(opts?.onSessionReclaim ? { onSessionReclaim: opts.onSessionReclaim } : {}),
     });
     const priv = client as unknown as {
       ws: { readyState: number; bufferedAmount: number; send(l: string): void };
