@@ -555,3 +555,7 @@ verification against the running daemon — not against a document.
 Deployment remains a separate, explicit operator decision. Nothing in this
 roadmap authorizes writing `out/`, changing production nginx, restarting
 services, or pushing to a public remote.
+
+## Related docs
+
+- [`docs/features/GAME-CHANGERS-50.md`](features/GAME-CHANGERS-50.md) — the **client view** of a cross-repo 50-feature catalog spanning this client and the Onyx Server daemon (15 `Both` · 20 `Server` · 15 `Client`). Seven of its Top-10 must-ship-for-0.7 items need client work; the two structural entries are the 18,389-line `src/lib/store/store.ts` strangler and the missing extension sandbox host. Master catalog with full per-feature detail: [`onyx-server/docs/features/GAME-CHANGERS-50.md`](../../onyx-server/docs/features/GAME-CHANGERS-50.md).

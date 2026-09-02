@@ -54,6 +54,7 @@ Full descriptions in [`ROADMAP-2026-Q4.md`](ROADMAP-2026-Q4.md).
 ## Era-3 game-changers and product phases
 
 - **Era-3 game-changers (40 items):** [`docs/era3-40-game-changers.md`](era3-40-game-changers.md) — acceptance ledger. None required for 0.7.
+- **Cross-repo 50 game-changers:** [`docs/features/GAME-CHANGERS-50.md`](features/GAME-CHANGERS-50.md) — GB/GS/GC-01…50 spanning daemon and client (15 `Both` · 20 `Server` · 15 `Client`); Top-10 must-ship-for-0.7 shortlist. Carries a **declared overlap table** against `INVENTED-FEATURES-CATALOG.md` F-01…F-68 (see § Relationship to F-01…F-68). Master catalog: [`onyx-server/docs/features/GAME-CHANGERS-50.md`](../../onyx-server/docs/features/GAME-CHANGERS-50.md).
 - **Product overhaul phases (P0–P6):** [`docs/PRODUCT_OVERHAUL_ROADMAP.md`](PRODUCT_OVERHAUL_ROADMAP.md)
 - **Desktop / packaging / signing:** [`docs/PUBLIC_LAUNCH_ROADMAP.md`](PUBLIC_LAUNCH_ROADMAP.md)
 
