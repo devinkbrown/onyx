@@ -62,6 +62,7 @@ The client is licensed under [AGPL-3.0-or-later](../LICENSE). See
 | [`../SECURITY.md`](../SECURITY.md) | How to report a vulnerability privately. |
 | [`protocol/group-e2ee-c1.md`](protocol/group-e2ee-c1.md) | The group-room E2EE control payload and its explicit staged boundary. |
 | [`../ROADMAP.md`](../ROADMAP.md) | Historical strategy and item-level implementation archaeology. |
+| [`ROADMAP-2026-Q4.md`](ROADMAP-2026-Q4.md) | Q4 2026 client feature waves (Now / Next / Later / Moonshot), priorities, and cross-stack dependencies. |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | Public-source milestones and notable changes. |
 | [`../AGENTS.md`](../AGENTS.md) | Agent-specific implementation rules for this checkout. |
 
