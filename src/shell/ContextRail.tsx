@@ -10,6 +10,7 @@ import { useStore } from '@/lib/store';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { RoomInsightsStrip } from './RoomInsightsStrip';
 import { ModerationCockpit } from './ModerationCockpit';
+import { OperDesk } from './OperDesk';
 import { OperEventConsole } from './OperEventConsole';
 import { preferences } from '@/lib/prefs/preferences';
 
@@ -93,8 +94,15 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
           <Show when={experienceMode() !== 'standard'}>
             <>
               <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
-              <Show when={experienceMode() === 'network-ops' && isOper()}>
-                <OperEventConsole />
+              {/* Operator surfaces follow the grant, not the experience mode: an
+                  oper who prefers the calmer advanced layout still needs the desk
+                  and the event feed, and gating them behind network-ops hid the
+                  only UI for the store's operAction. */}
+              <Show when={isOper()}>
+                <>
+                  <OperDesk />
+                  <OperEventConsole />
+                </>
               </Show>
               <Show when={experienceMode() === 'network-ops' && !isOper()}>
                 <p class="shell-context-rail__empty" role="status">Operator tools appear here after this account is granted access.</p>

@@ -17,6 +17,7 @@ import {
   parseChannelModeString,
   _beginNamesBurstForTests,
   _resetNamesBurstsForTests,
+  _resetWhoisRequestTimerForTests,
 } from './store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
@@ -96,6 +97,7 @@ beforeEach(() => {
   // NAMES-burst + roster-refresh tracking is module-level state that survives a
   // setState reset; clear it so an armed 'expect' can't leak across tests.
   _resetNamesBurstsForTests();
+  _resetWhoisRequestTimerForTests();
   for (const key of followed()) unfollow(key);
   localStorage.clear();
 });
@@ -387,6 +389,28 @@ describe('channel management — raw command dispatch', () => {
     expect(store.getState().whoisData.get('departed-user')).toMatchObject({
       loading: false,
       error: 'No profile was found for departed-user. They may have left the network.',
+    });
+  });
+
+  it('merges multi-line WHOIS channel lists and accumulates special notes', () => {
+    seed('#general', [makeUser('me', ['o'])]);
+    store.getState().whois('alice');
+
+    feed(':server 319 me alice :@#root');
+    feed(':server 319 me alice :+#chat');
+    feed(':server 320 me alice :Geo: US');
+    feed(':server 320 me alice :Caller-ID enabled');
+    feed(':server 313 me alice :is a Network Administrator');
+    feed(':server 671 me alice :is using a secure connection');
+    feed(':server 318 me alice :End of /WHOIS list');
+
+    expect(store.getState().whoisData.get('alice')).toMatchObject({
+      loading: false,
+      channels: ['@#root', '+#chat'],
+      specialNotes: ['Geo: US', 'Caller-ID enabled'],
+      operRole: 'Network Administrator',
+      isOper: true,
+      secureConnection: 'is using a secure connection',
     });
   });
 

@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { store } from '@/lib/store/store';
+import { store, WHOIS_REQUEST_TIMEOUT_MS, _resetWhoisRequestTimerForTests } from '@/lib/store/store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { WhoisSheet } from './WhoisSheet';
 
 const initialState = store.getInitialState();
 
 beforeEach(() => {
+  _resetWhoisRequestTimerForTests();
   store.setState(initialState, true);
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  _resetWhoisRequestTimerForTests();
+  vi.useRealTimers();
+  cleanup();
+});
 
 describe('WhoisSheet', () => {
   it('renders incremental WHOIS details and closes through the store action', async () => {
@@ -37,10 +42,15 @@ describe('WhoisSheet', () => {
         server: 'irc.example',
         serverInfo: 'Example edge',
         isOper: true,
+        operRole: 'Network Administrator',
         idleSecs: 125,
         signOnTs: 1_700_000_000,
         channels: ['#root', '#very-long-shared-channel-name'],
-        special: 'Uses a secure connection',
+        awayMessage: 'Writing tests',
+        secureConnection: 'is using a secure connection (TLS_AES_128_GCM_SHA256)',
+        certfp: 'has client certificate fingerprint SHA256:abc',
+        bot: true,
+        specialNotes: ['Uses a secure connection', 'Only accepts PMs from registered users'],
       }]]),
     });
 
@@ -49,8 +59,12 @@ describe('WhoisSheet', () => {
       expect(within(dialog).getByText('alice-account')).toBeInTheDocument();
       expect(within(dialog).getByText('alice-user@cloak.example')).toBeInTheDocument();
       expect(within(dialog).getByText('Alice Example')).toBeInTheDocument();
-      expect(within(dialog).getByText('Network operator')).toBeInTheDocument();
+      expect(within(dialog).getByText('Network Administrator')).toBeInTheDocument();
+      expect(within(dialog).getByText('Bot account')).toBeInTheDocument();
+      expect(within(dialog).getByText('Writing tests')).toBeInTheDocument();
       expect(within(dialog).getByText('2 minutes')).toBeInTheDocument();
+      expect(within(dialog).getByText(/TLS_AES_128_GCM_SHA256/)).toBeInTheDocument();
+      expect(within(dialog).getByRole('list', { name: 'Network notes for alice' })).toBeInTheDocument();
       expect(within(dialog).getByRole('list', { name: 'Rooms shared with alice' })).toBeInTheDocument();
       expect(within(dialog).getByRole('link', { name: 'Room ledger for #root' })).toHaveAttribute(
         'href',
@@ -106,5 +120,26 @@ describe('WhoisSheet', () => {
         'No profile was found for departed-user. They may have left the network.',
       );
     });
+  });
+
+  it('announces a hung WHOIS instead of leaving the empty-details fallback', async () => {
+    vi.useFakeTimers();
+    store.setState({
+      client: {
+        sendRaw: vi.fn(),
+        isupport: { CHANTYPES: '#&' },
+      } as never,
+      connectionStatus: 'connected',
+      ourNick: 'me',
+    });
+    store.getState().whois('silent-user');
+    render(() => <WhoisSheet />);
+    expect(screen.getByRole('status')).toHaveTextContent('Asking the network');
+
+    await vi.advanceTimersByTimeAsync(WHOIS_REQUEST_TIMEOUT_MS);
+
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent('did not answer in time');
+    expect(screen.queryByText('The network returned no additional profile details.')).toBeNull();
   });
 });

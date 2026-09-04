@@ -286,6 +286,7 @@ import {
 } from '@/lib/webauthn/passkey';
 import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from '@/theme/themes';
 import { normalizeThemeId, persistThemeId, readThemeId } from '@/theme/themeStorage';
+import { parseOperSlashCommand, planOperAction } from '@/lib/oper/operDesk';
 
 export const BACKGROUND_STORAGE_KEY = 'onyx:bg';
 
@@ -340,11 +341,36 @@ export interface WhoisInfo {
   server?: string;
   serverInfo?: string;
   isOper?: boolean;
+  /**
+   * The operator role exactly as the network worded it in 313
+   * (RPL_WHOISOPERATOR), e.g. "is a Network Administrator". Kept verbatim
+   * rather than mapped to an enum: the wording is the network's to choose, and
+   * a client that guesses at a fixed ladder mislabels anyone outside it.
+   */
+  operRole?: string;
   idleSecs?: number;
   signOnTs?: number;
   channels?: string[];
   account?: string;
   special?: string;
+  /**
+   * Every 320 (RPL_WHOISSPECIAL) line for this nick, in arrival order. The
+   * numeric is explicitly repeatable, so these accumulate; `special` keeps the
+   * most recent single line for callers that only want one.
+   */
+  specialNotes?: string[];
+  /** 301 (RPL_AWAY) reply text — present only while the nick is away. */
+  awayMessage?: string;
+  /**
+   * 671 (RPL_WHOISSECURE) reply text, kept verbatim because the server states
+   * the transport and often the negotiated cipher suite there — strictly more
+   * useful than a boolean, and the sheet renders it as the "Transport" value.
+   */
+  secureConnection?: string;
+  /** 276 (RPL_WHOISCERTFP) client-certificate fingerprint. */
+  certfp?: string;
+  /** 335 (RPL_WHOISBOT) — the nick self-identifies as a bot. */
+  bot?: boolean;
   realHost?: string;
   loading: boolean;
   error?: string;
@@ -1648,6 +1674,14 @@ export interface OnyxState {
 
   // ── IRC Operator ────────────────────────────────────────────────────
   isOper: boolean;
+  /**
+   * True only when the network's own oper-role wording names an administrator
+   * (381's text, or 313 for our own nick). It is a LABEL, never a permission:
+   * every operator verb is still authorized server-side, and this flag is
+   * cleared alongside `isOper` on de-op so a downgraded session cannot keep
+   * presenting an admin badge.
+   */
+  isNetworkAdmin: boolean;
   operUsername: string;
   showOperPanel: boolean;
   openOperPanel: () => void;
@@ -2414,6 +2448,10 @@ export const MAX_USER_METADATA_KEY_LENGTH = 128;
 export const MAX_USER_METADATA_VALUE_LENGTH = 8 * 1024;
 export const MAX_WHOIS_CACHE_ENTRIES = 64;
 export const MAX_WHOIS_CHANNELS = 256;
+/** How long a WHOIS may sit in `loading` before the sheet shows an explicit timeout. */
+export const WHOIS_REQUEST_TIMEOUT_MS = 8_000;
+export const WHOIS_TIMEOUT_ERROR =
+  'The network did not answer in time. Try again, or they may have left.';
 const MAX_PROFILE_LINKS = 8;
 const UNSAFE_METADATA_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 export const MAX_LIVE_PROP_TARGETS = 256;
@@ -2886,6 +2924,43 @@ function _boundedWhoisChannels(value: string | undefined): string[] {
     .split(/\s+/u)
     .filter((channel) => _validInboundWireToken(channel, MAX_VAULT_TARGET_LENGTH))
     .slice(0, MAX_WHOIS_CHANNELS);
+}
+
+/**
+ * 320 (RPL_WHOISSPECIAL) is explicitly repeatable, so its lines accumulate.
+ * A remote server controls both how many arrive and how long each is, so the
+ * list is capped: without a bound a hostile or chatty server could grow one
+ * cache entry without limit for as long as the sheet stays open.
+ */
+const MAX_WHOIS_SPECIAL_NOTES = 12;
+
+function _appendWhoisNote(existing: string[] | undefined, line: string | undefined): string[] {
+  const note = _boundedWhoisText(line)?.trim();
+  const current = existing ?? [];
+  // Servers re-send the same line across repeat WHOIS calls; keep the list a
+  // set so reopening the sheet does not stack duplicates.
+  if (!note || current.includes(note)) return current;
+  return [...current, note].slice(-MAX_WHOIS_SPECIAL_NOTES);
+}
+
+/**
+ * Whether an operator-role line names an administrator. The wording is the
+ * network's own (313 / 381 text) — this only decides a badge label, never a
+ * permission, so a conservative word match is correct and a miss is harmless.
+ */
+function _isAdminOperRole(text: string | undefined): boolean {
+  return /\badmin(?:istrator)?\b/iu.test(text ?? '');
+}
+
+/**
+ * 313 arrives as an English sentence fragment ("is a Network Administrator"),
+ * but both surfaces that consume `operRole` render it as a badge LABEL, where
+ * the leading copula reads as a bug. Strip only that lead-in and a trailing
+ * period; the role wording itself stays the network's to choose.
+ */
+function _whoisOperRole(text: string | undefined): string | undefined {
+  const role = text?.replace(/^is\s+(?:an?|the)\s+/iu, '').replace(/\.\s*$/u, '').trim();
+  return role ? role : undefined;
 }
 
 function _normalizeMetadataKey(value: string): string | null {
@@ -3944,6 +4019,47 @@ export function _resetReconnectBackoffForTests(): void {
 
 type SetFn = (partial: Partial<OnyxState> | ((s: OnyxState) => Partial<OnyxState>)) => void;
 type GetFn = () => OnyxState;
+
+let _whoisRequestTimer: ReturnType<typeof setTimeout> | null = null;
+let _whoisRequestGeneration = 0;
+let _whoisRequestNick: string | null = null;
+
+function _clearWhoisRequestTimer(): void {
+  if (_whoisRequestTimer) clearTimeout(_whoisRequestTimer);
+  _whoisRequestTimer = null;
+  _whoisRequestNick = null;
+  _whoisRequestGeneration += 1;
+}
+
+export function _resetWhoisRequestTimerForTests(): void {
+  _clearWhoisRequestTimer();
+}
+
+function _armWhoisRequestTimer(set: SetFn, nick: string): void {
+  _clearWhoisRequestTimer();
+  const generation = _whoisRequestGeneration;
+  _whoisRequestNick = nick;
+  _whoisRequestTimer = setTimeout(() => {
+    if (_whoisRequestGeneration !== generation) return;
+    const expected = _whoisRequestNick;
+    _whoisRequestTimer = null;
+    _whoisRequestNick = null;
+    if (!expected) return;
+    const key = expected.toLowerCase();
+    set((s) => {
+      if (s.whoisNick?.toLowerCase() !== key) return {};
+      const existing = s.whoisData.get(key);
+      if (!existing?.loading) return {};
+      const whoisData = new Map(s.whoisData);
+      whoisData.set(key, {
+        ...existing,
+        loading: false,
+        error: WHOIS_TIMEOUT_ERROR,
+      });
+      return { whoisData };
+    });
+  }, WHOIS_REQUEST_TIMEOUT_MS);
+}
 
 function _writeBanListMeta(
   map: Map<string, BanListMeta>,
@@ -8105,6 +8221,41 @@ export const store = createStore<OnyxState>()(
           });
           return;
         }
+        if (lc === 'whois') {
+          // Replies only fold into whoisData while whoisNick is set, so a
+          // composer /whois that skipped openWhois would send the query and
+          // then drop every numeric. Double-nick lives in openWhois (317).
+          const nick = (args[0] ?? '').trim();
+          if (!nick) {
+            get().addToast({
+              variant: 'warning',
+              title: 'Profile details',
+              description: 'Use /whois <nick>.',
+            });
+            return;
+          }
+          get().openWhois(nick);
+          return;
+        }
+        {
+          // Oper verbs share planOperAction + operAction with the desk so
+          // /wallops cannot emit the absent WALLOPS command, and a revoked
+          // session cannot push KILL/EVENT from a stale composer.
+          const operIntent = parseOperSlashCommand(lc, args);
+          if (operIntent) {
+            const plan = planOperAction(operIntent);
+            if (!plan.ok) {
+              get().addToast({
+                variant: 'warning',
+                title: 'Operator command',
+                description: plan.errors.join(' '),
+              });
+              return;
+            }
+            get().operAction(plan.command.command, ...plan.command.params);
+            return;
+          }
+        }
         client.sendRaw(cmd!.toUpperCase(), ...args);
         return;
       }
@@ -9404,7 +9555,12 @@ export const store = createStore<OnyxState>()(
         return { showWhois: true, whoisNick: safeNick, whoisData };
       });
       // WHOIS nick nick — double nick requests idle time (RPL_WHOISIDLE 317)
-      if (canRequest) client.sendRaw('WHOIS', safeNick, safeNick);
+      if (canRequest) {
+        _armWhoisRequestTimer(set, safeNick);
+        client.sendRaw('WHOIS', safeNick, safeNick);
+      } else {
+        _clearWhoisRequestTimer();
+      }
     },
     closeWhois() {
       set({ showWhois: false, whoisNick: null });
@@ -12885,7 +13041,11 @@ export const store = createStore<OnyxState>()(
           } else if (target.toLowerCase() === get().ourNick.toLowerCase()) {
             const modeStr = params[1] ?? '';
             if (modeStr.includes('+') && modeStr.includes('o')) set({ isOper: true });
-            if (modeStr.includes('-') && modeStr.includes('o')) set({ isOper: false });
+            // De-op clears the admin badge with it: a label that outlives the
+            // privilege would keep presenting admin UI from a downgraded session.
+            if (modeStr.includes('-') && modeStr.includes('o')) {
+              set({ isOper: false, isNetworkAdmin: false });
+            }
             const byWhom = nick && nick.toLowerCase() !== target.toLowerCase() ? `${nick} set ` : '';
             get().addServerLog(`${byWhom}your user mode: ${modeText}`.trim());
           }
@@ -14311,6 +14471,7 @@ export const store = createStore<OnyxState>()(
           const target401 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!target401) break;
           const key401 = target401.toLowerCase();
+          _clearWhoisRequestTimer();
           set(s => {
             if (!key401 || s.whoisNick?.toLowerCase() !== key401) return {};
             const existing = s.whoisData.get(key401);
@@ -14721,12 +14882,44 @@ export const store = createStore<OnyxState>()(
         }
 
         case '491': { // ERR_NOOPERHOST
-          set({ isOper: false, operUsername: '' });
+          set({ isOper: false, isNetworkAdmin: false, operUsername: '' });
           get().addNotification({ type: 'error', text: 'OPER not authorized from your host' });
           break;
         }
 
         // ── WHOIS numerics ────────────────────────────────────────────────
+        // 276 RPL_WHOISCERTFP  :server 276 me nick :has client certificate fingerprint <fp>
+        case '276': {
+          const whoisNick276 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
+          if (!whoisNick276) break;
+          const certfp276 = _boundedWhoisText(params[2])?.trim();
+          if (!certfp276) break;
+          set(s => {
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick276, {
+              certfp: certfp276,
+            });
+            return whoisData ? { whoisData } : {};
+          });
+          break;
+        }
+
+        // 301 RPL_AWAY  :server 301 me nick :away reason
+        // Also arrives unsolicited when messaging an away nick, so the WHOIS
+        // patch is guarded by _updateActiveWhois returning null off-target.
+        case '301': {
+          const whoisNick301 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
+          if (!whoisNick301) break;
+          const away301 = _boundedWhoisText(params[2])?.trim();
+          set(s => {
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick301, {
+              awayMessage: away301 || undefined,
+            });
+            return whoisData ? { whoisData } : {};
+          });
+          get().setUserProfile(whoisNick301, { away: true, awayMessage: away301 });
+          break;
+        }
+
         // 311 RPL_WHOISUSER  :server 311 me nick user host * :realname
         case '311': {
           const whoisNick311 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
@@ -14764,20 +14957,30 @@ export const store = createStore<OnyxState>()(
           break;
         }
 
-        // 313 RPL_WHOISOPERATOR
+        // 313 RPL_WHOISOPERATOR  :server 313 me nick :is a Network Administrator
         case '313': {
           const whoisNick313 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick313) break;
+          const operRole313 = _whoisOperRole(_boundedWhoisText(params[2]));
           set(s => {
             const whoisData = _updateActiveWhois(
               s.whoisData,
               s.whoisNick,
               whoisNick313,
-              { isOper: true },
+              { isOper: true, ...(operRole313 ? { operRole: operRole313 } : {}) },
             );
             return whoisData ? { whoisData } : {};
           });
           get().setUserProfile(whoisNick313, { ircOperator: true });
+          // WHOIS on ourselves is the one place the network states OUR role, so
+          // it is also where the admin badge is learned. Guarded on our own nick
+          // so another oper's 313 can never promote the local badge.
+          if (
+            whoisNick313.toLowerCase() === get().ourNick.toLowerCase()
+            && _isAdminOperRole(operRole313)
+          ) {
+            set({ isNetworkAdmin: true });
+          }
           break;
         }
 
@@ -14805,6 +15008,7 @@ export const store = createStore<OnyxState>()(
         case '318': {
           const whoisNick318 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick318) break;
+          _clearWhoisRequestTimer();
           set(s => {
             const whoisData = _updateActiveWhois(
               s.whoisData,
@@ -14817,28 +15021,36 @@ export const store = createStore<OnyxState>()(
           break;
         }
 
-        // 319 RPL_WHOISCHANNELS
+        // 319 RPL_WHOISCHANNELS — a long membership list arrives across several
+        // lines, so MERGE. Replacing left the sheet showing only the final
+        // fragment, which reads as "this user left every other channel".
         case '319': {
           const whoisNick319 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick319) break;
-          const channels319 = _boundedWhoisChannels(params[2]);
+          const incoming319 = _boundedWhoisChannels(params[2]);
+          const key319 = whoisNick319.toLowerCase();
+          const merged319 = [
+            ...new Set([...(get().whoisData.get(key319)?.channels ?? []), ...incoming319]),
+          ].slice(0, MAX_WHOIS_CHANNELS);
           set(s => {
             const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick319, {
-              channels: channels319,
+              channels: merged319,
             });
             return whoisData ? { whoisData } : {};
           });
-          get().setUserProfile(whoisNick319, { channels: channels319 });
+          get().setUserProfile(whoisNick319, { channels: merged319 });
           break;
         }
 
-        // 320 RPL_WHOISSPECIAL
+        // 320 RPL_WHOISSPECIAL — repeatable, so lines accumulate
         case '320': {
           const whoisNick320 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick320) break;
           set(s => {
+            const key320 = whoisNick320.toLowerCase();
             const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick320, {
               special: _boundedWhoisText(params[2]),
+              specialNotes: _appendWhoisNote(s.whoisData.get(key320)?.specialNotes, params[2]),
             });
             return whoisData ? { whoisData } : {};
           });
@@ -14872,6 +15084,35 @@ export const store = createStore<OnyxState>()(
           break;
         }
 
+        // 335 RPL_WHOISBOT — the nick self-identifies as a bot
+        case '335': {
+          const whoisNick335 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
+          if (!whoisNick335) break;
+          set(s => {
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick335, {
+              bot: true,
+            });
+            return whoisData ? { whoisData } : {};
+          });
+          get().setUserProfile(whoisNick335, { bot: true });
+          break;
+        }
+
+        // 671 RPL_WHOISSECURE — TLS transport, usually naming the cipher suite
+        case '671': {
+          const whoisNick671 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
+          if (!whoisNick671) break;
+          const secure671 = _boundedWhoisText(params[2])?.trim();
+          if (!secure671) break;
+          set(s => {
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick671, {
+              secureConnection: secure671,
+            });
+            return whoisData ? { whoisData } : {};
+          });
+          break;
+        }
+
         // 305 RPL_UNAWAY — server confirms we are no longer away
         case '305': set({ isAway: false, awayMessage: '' }); break;
 
@@ -14880,7 +15121,7 @@ export const store = createStore<OnyxState>()(
 
         // 381 RPL_YOUREOPER — we are now an IRC operator
         case '381':
-          set({ isOper: true });
+          set({ isOper: true, isNetworkAdmin: _isAdminOperRole(params[1]) });
           get().addServerLog(params[1] ?? 'You are now an IRC operator.', msg.prefix ?? '');
           break;
 
@@ -15093,6 +15334,7 @@ export const store = createStore<OnyxState>()(
 
     // ── IRC Operator ────────────────────────────────────────────────────
     isOper: false,
+    isNetworkAdmin: false,
     operUsername: '',
     showOperPanel: false,
     openOperPanel: () => set({ showOperPanel: true }),
@@ -15106,7 +15348,30 @@ export const store = createStore<OnyxState>()(
       set({ operUsername: username });
     },
     operAction: (command, ...args) => {
-      get().client?.sendRaw(command, ...args);
+      // Fail closed at the single choke point every operator surface shares
+      // (the desk, the composer's /kill, /broadcast, …). Oper status comes from
+      // the SASL account and can be revoked mid-session by a MODE -o (:12887)
+      // or refused by 491, so a stale render must never push an operator verb
+      // from a downgraded session. The server would answer 481 anyway, but a
+      // client that asks is a client that leaks intent.
+      if (!get().isOper) {
+        get().addToast({
+          variant: 'error',
+          title: 'Operator access required',
+          description: 'This network grants operator status from the signed-in account.',
+        });
+        return;
+      }
+      const client = get().client;
+      if (!client || get().connectionStatus !== 'connected') {
+        get().addToast({
+          variant: 'error',
+          title: 'Not connected',
+          description: 'Reconnect before sending operator commands.',
+        });
+        return;
+      }
+      client.sendRaw(command, ...args);
     },
 
     // ── Scheduled Messages ──────────────────────────────────────────────

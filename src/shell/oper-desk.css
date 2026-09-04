@@ -1,0 +1,282 @@
+/* Operator desk — network authority rail, Event Spine controls, reviewed sends.
+   Deliberately mirrors the room-safety desk's visual language so the two read
+   as one family; only the danger accents differ (network-wide vs one room). */
+
+.oper-desk {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--seam-faint);
+}
+
+.oper-desk__head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.oper-desk__head h3,
+.oper-desk__eyebrow,
+.oper-desk__hint,
+.oper-desk__offline {
+  margin: 0;
+}
+
+.oper-desk__head h3 {
+  color: var(--paper);
+  font-size: var(--text-md);
+}
+
+.oper-desk__eyebrow {
+  color: var(--paper-mute);
+  font: 700 var(--text-2xs)/1 var(--font-mono);
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+}
+
+.oper-desk__rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.oper-desk__rail > div {
+  display: flex;
+  gap: 6px;
+  min-height: 24px;
+  align-items: baseline;
+}
+
+.oper-desk__rail dt {
+  margin: 0;
+  color: var(--paper-mute);
+  font: 700 var(--text-2xs)/1.2 var(--font-mono);
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+}
+
+.oper-desk__rail dd {
+  margin: 0;
+  color: var(--paper);
+  font: 650 var(--text-sm)/1.2 var(--font-sans);
+}
+
+.oper-desk__offline {
+  color: var(--warn);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.oper-desk__hint {
+  color: var(--paper-mute);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.oper-desk__errors {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 8px 9px 8px 24px;
+  border: 1px solid color-mix(in oklab, var(--shu) 42%, var(--seam));
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--shu) 10%, transparent);
+  color: var(--paper);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.oper-desk__form {
+  display: grid;
+  gap: 6px;
+}
+
+.oper-desk__form label {
+  color: var(--paper-dim);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.oper-desk__form > div {
+  display: flex;
+  gap: 6px;
+}
+
+.oper-desk__form input,
+.oper-desk__form select {
+  min-width: 0;
+  flex: 1;
+  min-height: 40px;
+  padding: 7px 9px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: var(--surface-void);
+  color: var(--paper);
+  font: var(--text-sm) var(--font-sans);
+}
+
+.oper-desk__form button,
+.oper-desk__actions button {
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-sm);
+  background: var(--surface-raised);
+  color: var(--paper);
+  font: 650 var(--text-sm)/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.oper-desk__form button:disabled,
+.oper-desk__actions button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.oper-desk__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Network-wide or session-ending: carry the same red seam the room desk uses
+   for a server-side block, so the weight of the click is legible before it. */
+.oper-desk__danger,
+.oper-desk__form--danger > div button {
+  border-color: color-mix(in oklab, var(--shu) 55%, var(--seam));
+}
+
+.oper-desk__review {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid color-mix(in oklab, var(--shu) 42%, var(--seam));
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--shu) 10%, transparent);
+}
+
+.oper-desk__review-summary {
+  margin: 0;
+  color: var(--paper);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.oper-desk__wire {
+  display: block;
+  padding: 7px 8px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: var(--surface-void);
+  color: var(--paper-dim);
+  font: var(--text-2xs) var(--font-mono);
+}
+
+.oper-desk__protocol {
+  color: var(--paper-mute);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.oper-desk__protocol summary {
+  min-height: 32px;
+  color: var(--paper-dim);
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.oper-desk__protocol p {
+  margin: 6px 0;
+}
+
+.oper-desk__protocol code {
+  display: block;
+  padding: 7px 8px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: var(--surface-void);
+  color: var(--paper-dim);
+  font: var(--text-2xs) var(--font-mono);
+}
+
+@media (max-width: 320px) {
+  .oper-desk__rail,
+  .oper-desk__actions,
+  .oper-desk__form > div {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .oper-desk__actions button,
+  .oper-desk__form > div button {
+    width: 100%;
+  }
+}
+
+/* The mobile room-tools sheet raises every control to a 16px/44px touch target
+   so iOS never zooms the viewport on focus, matching the room desk's rules. */
+@media (max-width: 900px) {
+  .shell-mobile-more-sheet__room-tools .oper-desk {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .shell-mobile-more-sheet__room-tools .oper-desk__head h3,
+  .shell-mobile-more-sheet__room-tools .oper-desk__form label,
+  .shell-mobile-more-sheet__room-tools .oper-desk__hint,
+  .shell-mobile-more-sheet__room-tools .oper-desk__offline,
+  .shell-mobile-more-sheet__room-tools .oper-desk__protocol,
+  .shell-mobile-more-sheet__room-tools .oper-desk__review-summary {
+    font-size: 16px;
+  }
+
+  .shell-mobile-more-sheet__room-tools .oper-desk__eyebrow,
+  .shell-mobile-more-sheet__room-tools .oper-desk__rail dt {
+    font-size: 12px;
+  }
+
+  .shell-mobile-more-sheet__room-tools .oper-desk__form input,
+  .shell-mobile-more-sheet__room-tools .oper-desk__form select,
+  .shell-mobile-more-sheet__room-tools .oper-desk__form button,
+  .shell-mobile-more-sheet__room-tools .oper-desk__actions button {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .shell-mobile-more-sheet__room-tools .oper-desk__form > div {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oper-desk,
+  .oper-desk__review {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .oper-desk__review,
+  .oper-desk__errors,
+  .oper-desk__wire {
+    border: 1px solid ButtonText;
+  }
+
+  .oper-desk__errors,
+  .oper-desk__offline {
+    color: Mark;
+  }
+
+  .oper-desk__form button:focus-visible,
+  .oper-desk__actions button:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+}

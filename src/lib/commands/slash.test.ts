@@ -47,4 +47,23 @@ describe('slash command registry', () => {
     expect(getSlashCommandSuggestions('/sno').map((c) => c.name)).toContain('snooze');
     expect(getSlashCommandSuggestions('/exp').map((c) => c.name)).toEqual(['export']);
   });
+
+  it('hides operator commands from members and reveals them to opers', () => {
+    expect(getSlashCommandSuggestions('/kil').map((c) => c.name)).toEqual([]);
+    expect(getSlashCommandSuggestions('/kil', 8, { isOper: true }).map((c) => c.name)).toEqual(['kill']);
+    expect(getSlashCommandSuggestions('/reh', 8, { isOper: false }).map((c) => c.name)).toEqual([]);
+    expect(getSlashCommandSuggestions('/reh', 8, { isOper: true }).map((c) => c.name)).toEqual(['rehash']);
+    // `/wallops` is an alias for the real EVENT BROADCAST verb (§16: no +w).
+    expect(getSlashCommandSuggestions('/wall', 8, { isOper: true }).map((c) => c.name)).toEqual(['broadcast']);
+  });
+
+  it('still resolves operator commands by name so /help can describe them', () => {
+    expect(findSlashCommand('kill')?.oper).toBe(true);
+    expect(findSlashCommand('wallops')?.name).toBe('broadcast');
+    expect(findSlashCommand('observe')?.usage).toContain('/observe');
+  });
+
+  it('leaves ordinary suggestions untouched when oper status is on', () => {
+    expect(getSlashCommandSuggestions('/jo', 8, { isOper: true }).map((c) => c.name)).toEqual(['join']);
+  });
 });

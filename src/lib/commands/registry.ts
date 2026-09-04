@@ -202,6 +202,13 @@ export type SlashCommand = {
   kind: SlashCommandKind;
   aliases?: readonly string[];
   insertText?: string;
+  /**
+   * Network-operator command. Suggestions hide these unless the session holds
+   * oper status, so ordinary members are never shown a verb the daemon would
+   * answer with 481. `findSlashCommand` still resolves them, so `/help kill`
+   * explains the command and the store keeps one validation path.
+   */
+  oper?: true;
 };
 
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
@@ -252,6 +259,15 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: 'history', usage: '/history', description: 'Open message search / history tools.', kind: 'irc' },
   { name: 'search', usage: '/search <query>', description: 'Open message search with a query.', kind: 'irc' },
   { name: 'help', usage: '/help [command]', description: 'List local slash commands or describe one command.', kind: 'irc' },
+  // Network operator desk. WIRE TRUTH (ONYX_SERVER_PROTOCOL.md §11, §16): this
+  // daemon has no `OPER` command and no `+w` WALLOPS — a broadcast rides
+  // `EVENT BROADCAST`, so `/wallops` is kept only as a familiar alias for it.
+  { name: 'broadcast', usage: '/broadcast <text>', description: 'Announce to every member on the network (opers).', kind: 'irc', aliases: ['wallops'], oper: true },
+  { name: 'kill', usage: '/kill <nick> <reason>', description: 'Disconnect someone from the network; the reason is recorded (opers).', kind: 'irc', oper: true },
+  { name: 'rehash', usage: '/rehash', description: 'Ask this node to reload its configuration (opers).', kind: 'irc', oper: true },
+  { name: 'privs', usage: '/privs', description: 'Show the operator privileges this session holds (opers).', kind: 'irc', oper: true },
+  { name: 'events', usage: '/events <list|add|del> [category]', description: 'Manage Event Spine category subscriptions (opers).', kind: 'irc', oper: true },
+  { name: 'observe', usage: '/observe <mask|list|off> [connect quit nick oper]', description: 'Watch a nick!user@host mask network-wide (opers).', kind: 'irc', oper: true },
   { name: 'shrug', usage: '/shrug', description: 'Insert a shrug.', kind: 'text', insertText: String.raw`¯\_(ツ)_/¯` },
   { name: 'tableflip', usage: '/tableflip', description: 'Insert a table flip.', kind: 'text', insertText: '(╯°□°）╯︵ ┻━┻' },
   { name: 'unflip', usage: '/unflip', description: 'Insert a table restore.', kind: 'text', insertText: '┬─┬ ノ( ゜-゜ノ)' },
@@ -275,11 +291,21 @@ export function findSlashCommand(name: string): SlashCommand | null {
   ) ?? null;
 }
 
-export function getSlashCommandSuggestions(text: string, limit = 8): SlashCommand[] {
+export type SlashSuggestionOptions = {
+  /** Session holds IRC operator status; unlocks the oper-only verbs. */
+  isOper?: boolean;
+};
+
+export function getSlashCommandSuggestions(
+  text: string,
+  limit = 8,
+  options: SlashSuggestionOptions = {},
+): SlashCommand[] {
   const query = slashCommandQuery(text);
   if (query === null) return [];
 
   const matches = SLASH_COMMANDS.filter((command) => {
+    if (command.oper && !options.isOper) return false;
     if (command.name.startsWith(query)) return true;
     return command.aliases?.some((alias) => alias.startsWith(query)) ?? false;
   });

@@ -143,6 +143,7 @@ export function Composer(props: ComposerProps): JSX.Element {
   const activeChannelTopics = useStore((s) => s.activeChannelTopics);
   const replyingTo = useStore((s) => s.replyingTo);
   const editingMessage = useStore((s) => s.editingMessage);
+  const isOper = useStore((s) => s.isOper);
   const scheduledCount = useStore(selectOwnedScheduledMessageCount);
   const memoryOwner = useStore(
     selectDeviceMemoryOwner,
@@ -316,7 +317,7 @@ export function Composer(props: ComposerProps): JSX.Element {
   });
 
   const emojiMatches = createMemo(() => searchEmojis(emojiQuery(), 36));
-  const slashCommands = createMemo(() => getSlashCommandSuggestions(text(), 8));
+  const slashCommands = createMemo(() => getSlashCommandSuggestions(text(), 8, { isOper: isOper() }));
   const slashVisible = createMemo(() => !slashDismissed() && slashCommands().length > 0);
 
   // Nick Tab-complete candidates for the active room (channel roster or DM peer).

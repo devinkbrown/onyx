@@ -94,6 +94,13 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
   const away = createMemo(() => rosterUser().away === true);
   const account = createMemo(() => rosterUser().account?.trim() || whois()?.account?.trim() || '');
   const hostmask = createMemo(() => hostmaskFromWhois(whois()));
+  // 313 carries the operator line; `operRole` is the parsed label from it, so
+  // fall back to the generic word only when the server sent no detail.
+  const networkRole = createMemo(() => {
+    const info = whois();
+    if (!info?.isOper) return '';
+    return info.operRole?.trim() || 'IRC operator';
+  });
   const roomLedger = createMemo(() => {
     const channel = local.channel.trim();
     if (!/^[#&]/.test(channel)) return null;
@@ -355,6 +362,13 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
             <p class="shell-people-card-meta">
               {role().label} in {local.channel}
             </p>
+          </Show>
+          <Show when={networkRole()}>
+            {(value) => (
+              <p class="shell-people-card-meta" data-testid="people-profile-oper-role">
+                {value()} on this network
+              </p>
+            )}
           </Show>
           <Show when={hostmask()}>
             {(value) => (

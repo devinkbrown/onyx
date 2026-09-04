@@ -65,6 +65,7 @@ import { TypingIndicator } from './TypingIndicator';
 import { Composer } from './Composer';
 import { ContextRail } from './ContextRail';
 import { ModerationCockpit } from './ModerationCockpit';
+import { OperDesk } from './OperDesk';
 import { OperEventConsole } from './OperEventConsole';
 import { RoomInsightsStrip } from './RoomInsightsStrip';
 import { RoomSwitcherSheet } from './RoomSwitcherSheet';
@@ -1448,8 +1449,13 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
             </header>
             <RoomInsightsStrip />
             <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
-            <Show when={preferences().experienceMode === 'network-ops' && isOper()}>
-              <OperEventConsole />
+            {/* Mobile parity with ContextRail: the desk follows the grant, not
+                the experience mode. */}
+            <Show when={isOper()}>
+              <>
+                <OperDesk />
+                <OperEventConsole />
+              </>
             </Show>
             <Show when={preferences().experienceMode === 'network-ops' && !isOper()}>
               <p class="shell-context-rail__empty" role="status">Operator tools appear here after this account is granted access.</p>

@@ -101,6 +101,45 @@
   font-weight: 700;
 }
 
+.shell-whois-badge {
+  display: inline-block;
+  margin: var(--space-1) 0 0;
+  padding: 0.12rem 0.42rem;
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shell-whois-badge-bot {
+  border: 1px solid color-mix(in oklab, var(--warn) 45%, var(--seam-faint));
+  background: color-mix(in oklab, var(--warn) 12%, transparent);
+  color: var(--warn);
+}
+
+.shell-whois-certfp {
+  display: block;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.shell-whois-notes {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shell-whois-notes li {
+  color: var(--paper-dim);
+  line-height: 1.45;
+}
+
 .shell-whois-channels {
   display: flex;
   flex-wrap: wrap;

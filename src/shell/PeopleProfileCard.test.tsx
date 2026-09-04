@@ -117,6 +117,40 @@ describe('PeopleProfileCard', () => {
     expect(screen.getByRole('button', { name: 'Kick bob from #general' })).toBeInTheDocument();
   });
 
+  it('surfaces the WHOIS operator role under Advanced when 313 named one', () => {
+    seedRoom([makeUser('me', { modes: new Set(['o']) }), makeUser('root')]);
+    store.setState({
+      whoisData: new Map([['root', {
+        nick: 'root', isOper: true, operRole: 'Network administrator', loading: false,
+      }]]),
+    });
+
+    render(() => <PeopleProfileCard nick="root" channel="#general" />);
+    expect(screen.getByTestId('people-profile-oper-role'))
+      .toHaveTextContent('Network administrator on this network');
+  });
+
+  it('falls back to the generic operator label when 313 carried no detail', () => {
+    seedRoom([makeUser('me', { modes: new Set(['o']) }), makeUser('root')]);
+    store.setState({
+      whoisData: new Map([['root', { nick: 'root', isOper: true, loading: false }]]),
+    });
+
+    render(() => <PeopleProfileCard nick="root" channel="#general" />);
+    expect(screen.getByTestId('people-profile-oper-role'))
+      .toHaveTextContent('IRC operator on this network');
+  });
+
+  it('shows no network role for a member WHOIS never marked as an operator', () => {
+    seedRoom([makeUser('me', { modes: new Set(['o']) }), makeUser('bob')]);
+    store.setState({
+      whoisData: new Map([['bob', { nick: 'bob', loading: false }]]),
+    });
+
+    render(() => <PeopleProfileCard nick="bob" channel="#general" />);
+    expect(screen.queryByTestId('people-profile-oper-role')).toBeNull();
+  });
+
   it('hides Message, Block, and Report on your own card', () => {
     seedRoom([makeUser('me', { modes: new Set(['o']) })]);
 
