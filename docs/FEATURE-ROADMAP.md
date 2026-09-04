@@ -5,8 +5,14 @@
 
 This is the **client-half planning index** for the 0.7 release.
 
-For the authoritative cross-repo view (daemon P0/P1/P2, drift reconciliation,
-exit criteria, and all document links), see:
+**0.7 is an extremely major release (same version).** IRCX adaptation
+(LISTX, MODEX, WHISPER compose, PROP settings, EVENT for people) is in 0.7,
+not a later train: [`ROADMAP-0.7-IRCX.md`](ROADMAP-0.7-IRCX.md). Server-side
+kernel unique features (KX) and Armor TLS/CLI (AX) live in the same tag.
+Cross-repo major plan:
+[`onyx-server/docs/releases/0.7-MAJOR-ROADMAP.md`](../../onyx-server/docs/releases/0.7-MAJOR-ROADMAP.md).
+
+For the original P0/P1/P2 index, drift reconciliation, and document links, see:
 
 > **[`onyx-server/docs/FEATURE-ROADMAP.md`](../../onyx-server/docs/FEATURE-ROADMAP.md)**
 
@@ -19,6 +25,7 @@ exit criteria, and all document links), see:
 | **C-01** | Full identity surface (WHOIS → profile). Account, cloaked host, E2EE key, local note, presence — one component, one data path. In-flight: `WhoisSheet.tsx` (+43), `PeopleProfileCard.tsx` (+14). | `onyx-ui` (`onyx-irc` data path) | `pnpm typecheck && pnpm test` |
 | **C-02** | Store strangler — first three domains (connection, roster, messages). Extract behind facades; `store.ts` shrinks; NAMES append guard and `useStore` reactivity contract preserved. | `onyx-store` | `pnpm typecheck && pnpm test` |
 | **C-10** | Group E2EE product path. Room owner enables encryption, sees exact member+device set, re-key on member removal, fail-closed on seal failure. **Server S-12 is DONE — this item is now unblocked.** | `onyx-crypto` | `pnpm typecheck && pnpm test && pnpm check:server-contract-v2` |
+| **CX-1…CX-4, CX-6** | IRCX-native UI: LISTX browser, MODEX named modes, WHISPER compose, PROP settings, ACCESS finish. Detail: [ROADMAP-0.7-IRCX.md](ROADMAP-0.7-IRCX.md). | `onyx-irc` · `onyx-ui` · `onyx-store` | `pnpm typecheck && pnpm lint && pnpm test` |
 
 ---
 
@@ -34,6 +41,8 @@ exit criteria, and all document links), see:
 | [C-09](ROADMAP-2026-Q4.md#c-09--public-roadmap-honesty-pass) | Roadmap cross-link honesty pass | `doc-writer` | (manual) |
 | [CL-01…CL-06](ROADMAP-2026-Q4.md#release-track--polish-cl-xx) | Polish track (command discoverability, a11y enforcement, dead surfaces) | `solidjs-coder` · `onyx-a11y` | `pnpm typecheck && pnpm lint && pnpm test` |
 | [CP-01…CP-06](ROADMAP-2026-Q4.md#release-track--performance-cp-xx) | Performance track (render budget, bundle budget, store cost) | `onyx-perf` | `pnpm typecheck && pnpm test && pnpm build` |
+| **CX-5…CX-10** | EVENT for people, auditorium roster, DATA lines, WHOIS+PROP identity, IRCX slash verbs | `onyx-irc` · `onyx-ui` · `onyx-store` · `onyx-cmdk` | `pnpm typecheck && pnpm test` |
+| **HX-11…HX-14** | Client harden: render XSS, store poison, E2EE notify fail-closed, origin-strict WSS | `onyx-render` · `onyx-store` · `onyx-crypto` · `onyx-irc` | `pnpm test` |
 
 ---
 
