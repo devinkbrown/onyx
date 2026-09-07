@@ -25,6 +25,8 @@
   background: var(--ink);
   color: var(--paper);
   box-shadow: 0 18px 40px color-mix(in oklab, black 35%, transparent);
+  max-height: min(90vh, 36rem);
+  overflow: auto;
 }
 
 .harbor-confirm__title {
@@ -67,4 +69,16 @@
   .harbor-confirm__panel {
     transition: none;
   }
+}
+
+@media (max-width:  30rem) {
+  .harbor-confirm__panel { width: calc(100vw - 1rem); padding: 1rem; }
+  .harbor-confirm__actions { flex-direction: column-reverse; }
+  .harbor-confirm__actions .onyx-button { width: 100%; }
+}
+
+@media (forced-colors: active) {
+  .harbor-confirm__backdrop { background: Canvas; opacity: 0.9; }
+  .harbor-confirm__panel { border: 2px solid CanvasText; background: Canvas; color: CanvasText; box-shadow: none; }
+  .harbor-confirm__title, .harbor-confirm__body { color: CanvasText; }
 }

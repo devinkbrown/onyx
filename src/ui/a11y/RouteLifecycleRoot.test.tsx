@@ -396,7 +396,7 @@ describe('RouteLifecycleRoot host isolation', () => {
     const source = sourceWithoutComments('RouteLifecycle.tsx');
     expect(source).not.toMatch(/^let |^var /m);
     const root = sourceWithoutComments('RouteLifecycleRoot.tsx');
-    expect(root).toMatch(/lazy\(/);
+    expect(root).toMatch(/retryableLazy\(/);
     expect(root).toMatch(/props\.children/);
     expect(root).not.toMatch(/useIsRouting/);
     expect(root).not.toMatch(/from ['"]\.\/RouteAnnouncer['"]/);

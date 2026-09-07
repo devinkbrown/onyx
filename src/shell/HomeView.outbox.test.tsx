@@ -51,11 +51,11 @@ describe('HomeView queued-send journal', () => {
 
   it('reacts to committed queue changes without exposing message bodies on Home', async () => {
     render(() => <HomeView />);
-    expect(screen.queryByRole('heading', { name: 'Queued on this device' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Saved on this device' })).not.toBeInTheDocument();
 
     await queueOutbox('#private-room', 'sensitive body stays in the conversation', OWNER);
 
-    expect(await screen.findByRole('heading', { name: 'Queued on this device' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Saved on this device' })).toBeInTheDocument();
     expect(screen.getByText('#private-room')).toBeInTheDocument();
     expect(screen.queryByText('sensitive body stays in the conversation')).not.toBeInTheDocument();
     expect(screen.getByText(/Message bodies stay inside their conversations/)).toBeInTheDocument();
@@ -86,7 +86,7 @@ describe('HomeView queued-send journal', () => {
 
     await waitFor(async () => expect(await loadOutbox()).toHaveLength(0));
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Queued on this device' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Saved on this device' })).not.toBeInTheDocument();
     });
   });
 
@@ -95,7 +95,7 @@ describe('HomeView queued-send journal', () => {
     const flushSpy = vi.spyOn(store.getState(), 'flushOutbox').mockImplementation(() => {});
     render(() => <HomeView />);
 
-    expect(await screen.findByRole('heading', { name: 'Queued on this device' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Saved on this device' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Try sending now' })).not.toBeInTheDocument();
     expect(screen.getByText(/will send when you reconnect/i)).toBeInTheDocument();
 
@@ -110,8 +110,8 @@ describe('HomeView queued-send journal', () => {
     store.setState({ connectionStatus: 'connected', outboxDeliveryFailed: true });
     render(() => <HomeView />);
 
-    expect(await screen.findByRole('heading', { name: 'Queued on this device' })).toBeInTheDocument();
-    expect(screen.getByText(/could not be delivered/i)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Retryable messages' })).toBeInTheDocument();
+    expect(screen.getByText(/could not be sent yet/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try sending now' })).toBeInTheDocument();
     expect(screen.queryByText('stuck body never shown')).not.toBeInTheDocument();
   });
@@ -141,7 +141,7 @@ describe('HomeView queued-send journal', () => {
     store.setState({ connectionStatus: 'disconnected' });
     render(() => <HomeView />);
 
-    expect(await screen.findByRole('heading', { name: 'Queued on this device' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Saved on this device' })).toBeInTheDocument();
 
     // Status copy lives in <time class="home-outbox__age"> as
     // `${statusLabel} · ${relativeAge}` — assert each TTL band without body text.

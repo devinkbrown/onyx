@@ -115,6 +115,33 @@ describe('NotificationControls accessibility', () => {
     expect(screen.getByRole('button', { name: /Notification mode Regular/i })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('button', { name: /Mute notification sound/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Turn on do not disturb/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /Quiet hours — quiet hours off/i })).toBeInTheDocument();
+  });
+
+  it('labels followed-conversation tiers for Calm and Regular modes', () => {
+    render(() => <NotificationControls />);
+
+    expect(screen.getByRole('button', { name: /Notification mode Regular/i })).toHaveAttribute('title', expect.stringContaining('followed conversations notify'));
+    fireEvent.click(screen.getByRole('button', { name: /Notification mode Regular/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Notification mode Power/i }));
+    expect(screen.getByRole('button', { name: /Notification mode Calm/i })).toHaveAttribute('title', expect.stringContaining('followed conversations can add a badge'));
+    expect(screen.getByText(/followed conversations have their own tier in Calm mode/i)).toBeInTheDocument();
+  });
+
+  it('opens quiet hours from a keyboard-targetable button', () => {
+    render(() => <NotificationControls />);
+    const quiet = screen.getByRole('button', { name: /Quiet hours — quiet hours off/i });
+    expect(quiet).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(quiet);
+    expect(quiet).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('combobox', { name: 'Quiet hours start' })).toBeInTheDocument();
+  });
+
+  it('uses exactly one button for the quiet-hours trigger', () => {
+    render(() => <NotificationControls />);
+    const quiet = screen.getByRole('button', { name: /Quiet hours — quiet hours off/i });
+    expect(quiet.querySelector('button')).not.toBeInTheDocument();
+    expect(quiet).toHaveAttribute('aria-haspopup', 'dialog');
   });
 
   it('tracks browser permission changes without prompting or automatically enabling notifications', async () => {
@@ -217,12 +244,30 @@ describe('NotificationControls accessibility', () => {
     store.setState({ dndEnabled: false, dndUntil: now.getTime() + 60_000 });
 
     const view = render(() => <NotificationControls />);
-    expect(vi.getTimerCount()).toBe(1);
+    expect(vi.getTimerCount()).toBe(2);
 
     store.setState({ dndUntil: now.getTime() + 120_000 });
-    expect(vi.getTimerCount()).toBe(1);
+    expect(vi.getTimerCount()).toBe(2);
     vi.advanceTimersByTime(60_001);
     expect(screen.getByRole('button', { name: 'Turn off do not disturb' })).toHaveAttribute('aria-pressed', 'true');
+
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('refreshes quiet-hours state at the next minute and cleans up its clock timer', async () => {
+    vi.useFakeTimers();
+    const now = new Date(2026, 6, 16, 7, 59, 30);
+    vi.setSystemTime(now);
+    store.setState({ dndQuietStart: 8, dndQuietEnd: 9 });
+    const view = render(() => <NotificationControls />);
+
+    const quiet = screen.getByRole('button', { name: /Quiet hours — quiet hours 8:00 AM to 9:00 AM/i });
+    expect(quiet.querySelector('.shell-notify-quiet-trigger')).not.toHaveClass('shell-notify-quiet-trigger--active');
+    vi.setSystemTime(new Date(2026, 6, 16, 8, 0, 1));
+    await vi.advanceTimersByTimeAsync(30_001);
+    await vi.runAllTicks();
+    expect(quiet.querySelector('.shell-notify-quiet-trigger')).toHaveClass('shell-notify-quiet-trigger--active');
 
     view.unmount();
     expect(vi.getTimerCount()).toBe(0);
@@ -246,7 +291,7 @@ describe('NotificationControls accessibility', () => {
     store.setState({ dndQuietStart: 22, dndQuietEnd: 8 });
     render(() => <NotificationControls />);
 
-    const quietHours = screen.getByRole('button', { name: 'Quiet hours' });
+    const quietHours = screen.getByRole('button', { name: /Quiet hours — quiet hours 10:00 PM to 8:00 AM/i });
     expect(quietHours).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('combobox', { name: 'Quiet hours start' })).not.toBeInTheDocument();
     fireEvent.click(quietHours);
@@ -436,10 +481,8 @@ describe('NotificationControls accessibility', () => {
     store.setState({ server: server('bob') });
     result.resolve({ ok: true });
 
-    await waitFor(() => expect(store.getState().toasts.at(-1)).toMatchObject({
-      title: 'Push setup changed',
-      variant: 'warning',
-    }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Enable web push' })).toBeEnabled());
+    expect(store.getState().toasts).toEqual([]);
     expect(screen.getByRole('button', { name: 'Enable web push' })).toHaveAttribute('aria-pressed', 'false');
   });
 

@@ -1,0 +1,8 @@
+@import './watch-together-core.css';
+.shell-watch-together__transparency { color: var(--paper-mute); font-size: .78rem; line-height: 1.4; }
+.shell-watch-together button, .shell-watch-together a, .shell-watch-start button { min-height: 44px; }
+.shell-watch-together__close { margin-left: auto; padding-inline: 10px; }
+.shell-watch-together :focus-visible, .shell-watch-start :focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 3px; }
+@media (max-width: 560px) { .shell-watch-together { grid-template-columns: 1fr; } .shell-watch-together__transparency { grid-column: 1; } }
+@media (prefers-reduced-motion: reduce) { .shell-watch-together *, .shell-watch-start * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+@media (forced-colors: active) { .shell-watch-together button, .shell-watch-together a, .shell-watch-start button { border: 1px solid ButtonText; } }

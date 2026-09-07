@@ -9,6 +9,8 @@ import { CALL_JOIN_FAILED_COPY } from '@/lib/media/callJoinCopy';
 
 export type CallJoinBannerProps = {
   onRetry: () => void;
+  /** Optional detail for a known, user-safe failure. No protocol errors. */
+  message?: string;
 };
 
 export function CallJoinBanner(props: CallJoinBannerProps): JSX.Element {
@@ -18,7 +20,7 @@ export function CallJoinBanner(props: CallJoinBannerProps): JSX.Element {
       role="status"
       data-testid="call-join-banner"
     >
-      <p class="call-join-banner__copy">{CALL_JOIN_FAILED_COPY}</p>
+      <p class="call-join-banner__copy">{props.message ?? CALL_JOIN_FAILED_COPY}</p>
       <button
         type="button"
         class="call-join-banner__retry"

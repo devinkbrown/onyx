@@ -8,7 +8,7 @@
  */
 import { createMemo, createSignal, onCleanup, Show, type JSX } from 'solid-js';
 import { useStore, getState, selectChannelEvent, selectIsChannelOp } from '@/lib/store';
-import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
+import { eventCountdown, isValidScheduledTimestamp, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
 
 type ScheduledEventLineProps = { channel: string };
 
@@ -46,7 +46,10 @@ export function ScheduledEventLine(props: ScheduledEventLineProps): JSX.Element 
   const timer = setInterval(() => setNow(Date.now()), 30_000);
   onCleanup(() => clearInterval(timer));
 
-  const startMs = createMemo(() => (event()?.at ?? 0) * 1000);
+  const startMs = createMemo(() => {
+    const at = event()?.at;
+    return at !== undefined && isValidScheduledTimestamp(at) ? at * 1000 : 0;
+  });
   // Hide an event more than an hour after it started (it has happened).
   const visible = createMemo(() => {
     const e = event();
@@ -79,12 +82,12 @@ export function ScheduledEventLine(props: ScheduledEventLineProps): JSX.Element 
 
   return (
     <Show when={visible()}>
-      <div class={`shell-event-line${live() ? ' shell-event-line--live' : ''}`} data-testid="scheduled-event">
+      <div class={`shell-event-line${live() ? ' shell-event-line--live' : ''}`} data-testid="scheduled-event" role="region" aria-label={`Scheduled event: ${event()!.title}`}>
         <span class="shell-event-cal" aria-hidden="true">📅</span>
         <span class="shell-event-main">
           <span class="shell-event-title">{event()!.title}</span>
           <span class="shell-event-when">
-            {whenLabel()} · <strong>{countdown()}</strong>
+            <time dateTime={new Date(startMs()).toISOString()}>{whenLabel()}</time> · <strong>{countdown()}</strong>
           </span>
         </span>
         <span class="shell-event-actions">

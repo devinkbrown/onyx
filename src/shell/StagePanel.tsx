@@ -56,6 +56,8 @@ export function StagePanel(): JSX.Element {
   });
 
   const connected = createMemo(() => connectionStatus() === 'connected');
+  const availability = createMemo(() => connected() ? 'available' : 'unavailable');
+  const live = createMemo(() => activeHere() || stagePropOn());
 
   // Show when this room is a live stage, or ops can start one on a channel.
   const visible = createMemo(() => {
@@ -63,7 +65,7 @@ export function StagePanel(): JSX.Element {
     if (!ch) return false;
     if (activeHere() || stagePropOn()) return true;
     // Ops see a dormant strip so they can start a stage without a hidden menu.
-    return isOp() && connected();
+    return isOp();
   });
 
   function start(): void {
@@ -85,28 +87,36 @@ export function StagePanel(): JSX.Element {
       <section
         class="stage-panel"
         data-testid="stage-panel"
-        data-active={activeHere() || stagePropOn() ? 'true' : 'false'}
-        aria-label="Stage"
+        data-active={live() ? 'true' : 'false'}
+        data-availability={availability()}
+        aria-labelledby="stage-panel-title"
+        aria-describedby="stage-panel-hint"
       >
         <div class="stage-panel__head">
           <h2 class="stage-panel__title" id="stage-panel-title">
             Stage
           </h2>
-          <p class="stage-panel__hint" id="stage-panel-hint" role="status" aria-live="polite">
+          <p class="stage-panel__hint" id="stage-panel-hint">
             <Show
-              when={activeHere() || stagePropOn()}
-              fallback="Start a stage to host speakers with a raised-hand queue."
+              when={live()}
+              fallback={connected()
+                ? 'Stage is available here. Start one to host speakers with a raised-hand queue.'
+                : 'Stage is unavailable while Onyx reconnects. Your room is unchanged.'}
             >
               {isSpeaker() ? 'You are a speaker.' : 'You are in the audience.'}
               {moderated() ? ' Room is moderated (+m).' : ''}
               {raisedHands().length > 0
                 ? ` ${raisedHands().length} raised hand${raisedHands().length === 1 ? '' : 's'}.`
                 : ''}
+              {' Speaking role and microphone access are managed separately.'}
             </Show>
           </p>
+          <span class="stage-panel__availability" role="status" aria-live="polite" aria-label={connected() ? 'Stage controls available' : 'Stage controls unavailable while reconnecting'}>
+            {connected() ? 'Available' : 'Unavailable · reconnecting'}
+          </span>
         </div>
 
-        <div class="stage-panel__actions">
+        <div class="stage-panel__actions" aria-label="Stage actions">
           <Show when={!activeHere() && !stagePropOn() && isOp()}>
             <Button
               type="button"
@@ -168,7 +178,7 @@ export function StagePanel(): JSX.Element {
 
         <Show when={pendingInvite()}>
           {(from) => (
-            <div class="stage-panel__invite" role="status" data-testid="stage-invite">
+            <div class="stage-panel__invite" role="alert" aria-live="assertive" data-testid="stage-invite">
               <p>
                 <strong>{from()}</strong> invited you to speak.
               </p>

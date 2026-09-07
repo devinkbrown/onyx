@@ -65,6 +65,109 @@ afterEach(() => {
 });
 
 describe('DmKeyChangeBanner overlapping peer-key rotations', () => {
+  it('keeps a legitimate delayed persistence pending beyond the old 1,200ms watchdog', async () => {
+    vi.useFakeTimers();
+    const persistence = deferred<boolean>();
+    store.setState({
+      activeView: { kind: 'dm', nick: PEER },
+      peerSafetyNumbers: new Map([[KEY, PINNED_A]]),
+      pendingKeySafetyNumbers: new Map([[KEY, B_SAFETY]]),
+      peerKeyChanges: new Map([[KEY, { pinnedKey: PINNED_A, newKey: STALE_B }]]),
+      acceptPeerKeyChange: vi.fn(() => persistence.promise),
+    });
+    render(() => <DmKeyChangeBanner />);
+
+    fireEvent.click(screen.getByRole('button', { name: /accept new device key/i }));
+    vi.advanceTimersByTime(1201);
+    expect(screen.getByRole('button', { name: /saving trusted key/i })).toBeDisabled();
+    expect(screen.queryByText(/new key was not saved/i)).not.toBeInTheDocument();
+
+    persistence.resolve(true);
+    await waitFor(() => expect(screen.getByRole('button', { name: /accept new device key/i })).toBeEnabled());
+
+    store.setState({
+      peerKeyChanges: new Map([[KEY, { pinnedKey: PINNED_A, newKey: CURRENT_C }]]),
+      pendingKeySafetyNumbers: new Map([[KEY, C_SAFETY]]),
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: /accept new device key/i })).toBeEnabled());
+
+    expect(screen.queryByText(/new key was not saved/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /accept new device key/i })).toBeEnabled();
+
+    vi.useRealTimers();
+  });
+
+  it('shows a real persistence failure and permits retry', async () => {
+    const acceptPeerKeyChange = vi.fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    store.setState({
+      activeView: { kind: 'dm', nick: PEER },
+      peerSafetyNumbers: new Map([[KEY, PINNED_A]]),
+      pendingKeySafetyNumbers: new Map([[KEY, B_SAFETY]]),
+      peerKeyChanges: new Map([[KEY, { pinnedKey: PINNED_A, newKey: STALE_B }]]),
+      acceptPeerKeyChange,
+    });
+    render(() => <DmKeyChangeBanner />);
+
+    fireEvent.click(screen.getByRole('button', { name: /accept new device key/i }));
+    expect(await screen.findByText(/new key was not saved/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry saving trusted key/i })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /retry saving trusted key/i }));
+    await waitFor(() => expect(acceptPeerKeyChange).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/new key was not saved/i)).not.toBeInTheDocument();
+  });
+
+  it('surfaces a rejected persistence promise, keeps the warning, and permits retry', async () => {
+    const acceptPeerKeyChange = vi.fn()
+      .mockRejectedValueOnce(new Error('indexeddb unavailable'))
+      .mockResolvedValueOnce(true);
+    store.setState({
+      activeView: { kind: 'dm', nick: PEER },
+      peerSafetyNumbers: new Map([[KEY, PINNED_A]]),
+      pendingKeySafetyNumbers: new Map([[KEY, B_SAFETY]]),
+      peerKeyChanges: new Map([[KEY, { pinnedKey: PINNED_A, newKey: STALE_B }]]),
+      acceptPeerKeyChange,
+    });
+    render(() => <DmKeyChangeBanner />);
+
+    fireEvent.click(screen.getByRole('button', { name: /accept new device key/i }));
+    expect(screen.getByRole('button', { name: /saving trusted key/i })).toBeDisabled();
+
+    const failure = await screen.findByText(/new key was not saved/i);
+    expect(failure).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /device identity changed/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry saving trusted key/i })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /retry saving trusted key/i }));
+    await waitFor(() => expect(acceptPeerKeyChange).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/saving trusted key/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/new key was not saved/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /device identity changed/i })).toBeInTheDocument();
+  });
+
+  it('reloads C safety evidence after B is evicted and the pending key advances', async () => {
+    const loadPendingKeySafetyNumber = vi.fn(() => Promise.resolve(null));
+    store.setState({
+      activeView: { kind: 'dm', nick: PEER },
+      peerKeyChanges: new Map([[KEY, { pinnedKey: PINNED_A, newKey: STALE_B }]]),
+      loadSafetyNumber: vi.fn(() => Promise.resolve(null)),
+      loadPendingKeySafetyNumber,
+    });
+    render(() => <DmKeyChangeBanner />);
+    expect(loadPendingKeySafetyNumber).toHaveBeenCalledTimes(1);
+
+    // The store evicts B's pending evidence when the advertised key advances.
+    store.setState({
+      peerKeyChanges: new Map([[KEY, { pinnedKey: PINNED_A, newKey: CURRENT_C }]]),
+      pendingKeySafetyNumbers: new Map(),
+    });
+
+    await waitFor(() => expect(loadPendingKeySafetyNumber).toHaveBeenCalledTimes(2));
+    expect(loadPendingKeySafetyNumber).toHaveBeenLastCalledWith(PEER);
+  });
+
   it('never displays or pins stale B after the advertised key advances to C', async () => {
     const stalePinRead = deferred<string | null>();
     const currentSafetyLoad = deferred<string>();
@@ -87,7 +190,8 @@ describe('DmKeyChangeBanner overlapping peer-key rotations', () => {
 
     store.setState({
       activeView: { kind: 'dm', nick: PEER },
-      loadSafetyNumber: vi.fn(() => Promise.resolve(null)),
+      peerSafetyNumbers: new Map([[KEY, PINNED_A]]),
+      loadSafetyNumber: vi.fn(() => Promise.resolve(PINNED_A)),
       loadPendingKeySafetyNumber: vi.fn(() => currentSafetyLoad.promise.then((safety) => {
         if (store.getState().peerKeyChanges.get(KEY)?.newKey !== CURRENT_C) return null;
         store.setState((state) => {
@@ -113,7 +217,7 @@ describe('DmKeyChangeBanner overlapping peer-key rotations', () => {
     expect(pending).toHaveTextContent('99999');
     expect(pending).not.toHaveTextContent('11111');
 
-    fireEvent.click(screen.getByRole('button', { name: /accept new key/i }));
+    fireEvent.click(screen.getByRole('button', { name: /accept new device key/i }));
     await waitFor(() => expect(keyPinningMocks.pinPeerKey).toHaveBeenCalledOnce());
     expect(keyPinningMocks.pinPeerKey).toHaveBeenCalledWith(PEER, CURRENT_C, MEMORY_OWNER);
     expect(keyPinningMocks.pinPeerKey).not.toHaveBeenCalledWith(PEER, STALE_B, MEMORY_OWNER);

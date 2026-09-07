@@ -42,9 +42,29 @@ describe('StagePanel', () => {
   it('lets an op start a stage in the active room', () => {
     const start = vi.spyOn(store.getState(), 'startStage');
     render(() => <StagePanel />);
+    expect(screen.getByRole('status', { name: 'Stage controls available' })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('stage-start'));
     expect(start).toHaveBeenCalledWith('#stage');
     start.mockRestore();
+  });
+
+  it('names the unavailable reconnecting state and disables mutations', () => {
+    store.setState({ connectionStatus: 'connecting' });
+    render(() => <StagePanel />);
+    expect(screen.getByRole('status', { name: /Stage controls unavailable while reconnecting/i })).toBeInTheDocument();
+    expect(screen.getByText(/unavailable while Onyx reconnects/i)).toBeInTheDocument();
+    expect(screen.getByTestId('stage-start')).toBeDisabled();
+  });
+
+  it('keeps speaking and microphone readiness truthful for an active audience member', () => {
+    store.setState({
+      stageChannel: '#stage',
+      channelProps: new Map([['#stage', { STAGE: '1' }]]),
+    });
+    render(() => <StagePanel />);
+    expect(screen.getByText(/you are in the audience/i)).toBeInTheDocument();
+    expect(screen.getByText(/microphone access are managed separately/i)).toBeInTheDocument();
+    expect(screen.getByTestId('stage-hand')).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('shows raised hands and invite for the host', () => {
@@ -73,6 +93,7 @@ describe('StagePanel', () => {
     });
     const accept = vi.spyOn(store.getState(), 'acceptSpeakInvite');
     render(() => <StagePanel />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/host invited you to speak/i);
     fireEvent.click(screen.getByTestId('stage-accept'));
     expect(accept).toHaveBeenCalled();
     accept.mockRestore();

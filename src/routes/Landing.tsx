@@ -20,7 +20,7 @@ const LANDING_SHELF_ITEMS = [
 const TRUST_CLAIMS = [
   ['No ads', 'Nobody is selling your attention in the room.'],
   ['No third-party trackers', 'This site does not load analytics pixels or ad tags.'],
-  ['Private DMs', 'Only the two of you. The words stay on this device.'],
+  ['Private DMs', 'Encrypted DM message text is intended for the two people in the conversation.'],
   ['History on this device', 'About 400 recent messages per room stay here.'],
 ] as const;
 
@@ -40,21 +40,22 @@ export default function Landing() {
       currentPath="/"
       mainLabel="Onyx home"
     >
-      <div class="ui-root r r-landing home">
+      <div class="ui-root ui-commercial r r-landing home">
       <div class="r-ground home-ground" aria-hidden="true" />
       <div class="r-grain home-grain" aria-hidden="true" />
 
       <section class="r-wrap home-hero" aria-labelledby="hero-heading">
         <div class="home-hero-grid">
           <div class="home-hero-copy">
-            <p class="home-kicker">Friends · clubs · rooms</p>
-            <h1 id="hero-heading" class="home-h1">Find your people. Keep the room.</h1>
+            <p class="home-kicker">A room for your people</p>
+            <h1 id="hero-heading" class="home-h1">Come for the conversation. Return to the room.</h1>
             <p class="home-lede">
-              A calm place to begin a conversation, return to it later, and make room for more people.
+              Onyx is a calm place for rooms, private conversations, and calls that remember where you stopped.
             </p>
             <div class="home-cta-row">
-              <a class="home-cta-primary" href="/app/">Join free</a>
-              <a class="home-secondary-link" href={publicRouteById('download').href}>Download</a>
+              <a class="home-cta-primary" href={`${publicRouteById('invite').href}?join=%23root`}>Start in the public room</a>
+              <a class="home-secondary-link" href="/app/">Open the app</a>
+              <a class="home-local-link" href={publicRouteById('download').href}>Try Onyx locally</a>
             </div>
             <p class="home-desktop-note">
               Supporting browsers can put Onyx on the Home Screen or in its own window. No store.

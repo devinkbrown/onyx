@@ -14,6 +14,7 @@ import {
   BLOCK_KIT_CONFIRM_TITLE,
   BlockKitActionConfirmationContent,
 } from './BlockKitActionConfirmation';
+import './blockkit-commercial.css';
 
 export type BlockKitModalProps = {
   block: BlockKitLiteModalBlock;
@@ -89,6 +90,7 @@ function ModalButton(props: {
             <>
               <button
                 type="button"
+                class="shell-msg-blockkit-control"
                 disabled={!local.button.value}
                 title={local.button.value ? `Copy ${local.button.value}` : undefined}
                 aria-label={local.button.value ? `Copy value for ${local.button.label}` : local.button.label}
@@ -114,6 +116,9 @@ function ModalButton(props: {
           {(action) => (
             <button
               type="button"
+              class="shell-msg-blockkit-control shell-msg-blockkit-control--action"
+              aria-label={local.button.label}
+              title="Review this action before sending"
               onClick={(event) => local.onAction?.(action(), undefined, event.currentTarget)}
             >
               {local.button.label}
@@ -123,7 +128,7 @@ function ModalButton(props: {
       )}
     >
       {(url) => (
-        <a href={url()} target="_blank" rel="noopener noreferrer">
+        <a class="shell-msg-blockkit-control shell-msg-blockkit-control--link" href={url()} target="_blank" rel="noopener noreferrer">
           {local.button.label}
         </a>
       )}
@@ -148,8 +153,9 @@ function ModalSelect(props: {
   }
 
   return (
-    <label>
-      <span>{local.select.label}</span>
+    <label class="shell-msg-blockkit-select">
+      <span class="shell-msg-blockkit-select__label">{local.select.label}</span>
+      <span class="shell-msg-blockkit-select__hint">Choose an option to review its message</span>
       <select aria-label={local.select.label} onChange={handleChange}>
         <Show when={local.select.action}>
           <option value="">Choose...</option>
@@ -182,7 +188,9 @@ export function BlockKitModal(props: BlockKitModalProps): JSX.Element {
       onOpenChange={local.onOpenChange}
       closeLabel={confirming() ? 'Cancel sending message' : 'Close block details'}
     >
-      <div hidden={confirming()}>
+      <div class="shell-msg-blockkit-inspect" hidden={confirming()}>
+        <p class="shell-msg-blockkit-eyebrow">Inspect structured data</p>
+        <p class="shell-msg-blockkit-intro">Review the fields and destinations below. Actions open a separate confirmation before anything is sent.</p>
         <Show when={local.block.fields.length > 0}>
           <dl class="shell-msg-blockkit-fields">
             <For each={local.block.fields}>
@@ -203,7 +211,7 @@ export function BlockKitModal(props: BlockKitModalProps): JSX.Element {
           </div>
         </Show>
         <Show when={local.block.buttons.length > 0}>
-          <div class="shell-msg-blockkit-actions">
+          <div class="shell-msg-blockkit-actions" aria-label="Structured actions">
             <For each={local.block.buttons}>
               {(button) => <ModalButton button={button} onAction={local.onAction} />}
             </For>

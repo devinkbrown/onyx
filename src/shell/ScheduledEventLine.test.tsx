@@ -56,6 +56,8 @@ describe('<ScheduledEventLine>', () => {
     render(() => <ScheduledEventLine channel={activeChannel()} />);
 
     expect(screen.getByText('Alpha call')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Scheduled event: Alpha call' })).toBeInTheDocument();
+    expect(screen.getByRole('time')).toHaveAttribute('datetime');
     expect(screen.queryByRole('button', { name: 'Join call' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Clear scheduled event' })).toBeInTheDocument();
 

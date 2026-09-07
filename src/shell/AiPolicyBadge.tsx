@@ -6,21 +6,21 @@ import './ProvenanceBadge.css';
 export function aiPolicyBadgeText(policy: AiPolicy): { label: string; description: string; scope: 'server' | 'external' } {
   if (policy === 'open') {
     return {
-      label: 'AI open',
-      description: 'AI surfaces are allowed for this room.',
+      label: 'AI allowed',
+      description: 'AI features are allowed in this room. Check each feature for its destination and permissions.',
       scope: 'server',
     };
   }
   if (policy === 'no-ai') {
     return {
       label: 'No AI',
-      description: 'AI surfaces are disabled for this room.',
+      description: 'AI features are disabled in this room. Nothing is sent to an AI service from this room.',
       scope: 'external',
     };
   }
   return {
     label: 'Local only',
-    description: 'Only local AI surfaces are allowed for this room.',
+    description: 'Only AI that runs on this device is allowed in this room. External AI services are not allowed.',
     scope: 'server',
   };
 }

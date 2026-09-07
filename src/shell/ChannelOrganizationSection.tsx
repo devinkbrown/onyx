@@ -6,6 +6,7 @@ import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 import { useStore, getState } from '@/lib/store';
 import { Button } from '@/primitives/index';
+import './ChannelOrganizationSection.css';
 
 export interface ChannelOrganizationSectionProps {
   owner: DeviceMemoryOwner | null;
@@ -54,7 +55,7 @@ export function ChannelOrganizationSection(props: ChannelOrganizationSectionProp
   return (
     <Show when={props.owner}>
       <section
-        class="acct-section"
+        class="acct-section channel-organization-section"
         aria-labelledby="acct-org-title"
         aria-describedby="acct-org-hint"
         data-testid="channel-organization-section"
@@ -70,7 +71,9 @@ export function ChannelOrganizationSection(props: ChannelOrganizationSectionProp
         </div>
         <div class="acct-section-body">
           <div class="acct-cert-actions">
-            <input
+            <label class="channel-organization-field">
+              <span>New folder</span>
+              <input
               type="text"
               data-testid="org-folder-name"
               placeholder="Folder name"
@@ -86,14 +89,17 @@ export function ChannelOrganizationSection(props: ChannelOrganizationSectionProp
                 color: 'var(--paper)',
                 'border-radius': 'var(--r-sm)',
               }}
-            />
+              />
+            </label>
             <Button type="button" variant="ghost" size="sm" data-testid="org-folder-create" onClick={onCreate}>
               Create folder
             </Button>
           </div>
 
           <div class="acct-cert-actions">
-            <select
+            <label class="channel-organization-field">
+              <span>Folder</span>
+              <select
               data-testid="org-assign-folder"
               value={assignFolder()}
               onChange={(e) => setAssignFolder(e.currentTarget.value)}
@@ -102,8 +108,11 @@ export function ChannelOrganizationSection(props: ChannelOrganizationSectionProp
               <For each={customFolders()}>
                 {(cat) => <option value={cat.id}>{cat.name}</option>}
               </For>
-            </select>
-            <select
+              </select>
+            </label>
+            <label class="channel-organization-field">
+              <span>Room</span>
+              <select
               data-testid="org-assign-channel"
               value={assignTarget()}
               onChange={(e) => setAssignTarget(e.currentTarget.value)}
@@ -112,7 +121,8 @@ export function ChannelOrganizationSection(props: ChannelOrganizationSectionProp
               <For each={channelNames()}>
                 {(name) => <option value={name}>{name}</option>}
               </For>
-            </select>
+              </select>
+            </label>
             <Button type="button" variant="ghost" size="sm" data-testid="org-assign" onClick={onAssign}>
               Assign
             </Button>

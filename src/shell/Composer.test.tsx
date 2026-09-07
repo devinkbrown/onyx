@@ -76,7 +76,7 @@ describe('Composer accessibility', () => {
     vi.unstubAllGlobals();
   });
 
-  it('gives the textarea an accessible name and labels the tool buttons', () => {
+  it('gives the textarea an accessible name and labels the tool buttons', async () => {
     // Arrange
     seedActiveChannel();
 
@@ -92,6 +92,10 @@ describe('Composer accessibility', () => {
     expect(getByRole('button', { name: 'Insert emoji' })).toBeDefined();
     expect(getByRole('button', { name: 'More tools' })).toBeDefined();
     expect(getByRole('button', { name: 'Send message' })).toBeDefined();
+    expect(screen.getByText('Attach')).toBeVisible();
+    expect(screen.getByText('Emoji')).toBeVisible();
+    expect(screen.getByText('More')).toBeVisible();
+    expect(screen.getByText('Send')).toBeVisible();
     // Advanced controls stay out of the primary row until More opens.
     expect(queryByRole('button', { name: 'Jump to date in conversation history' })).toBeNull();
     expect(queryByRole('button', { name: 'Schedule message to send later' })).toBeNull();
@@ -99,7 +103,7 @@ describe('Composer accessibility', () => {
     expect(screen.getByRole('note', { name: 'Current compose context' })).toHaveTextContent('To #roomReady to send');
   });
 
-  it('uses Message @nick as the DM placeholder without lock chrome', () => {
+  it('uses Message @nick as the DM placeholder without lock chrome', async () => {
     store.setState(
       {
         ...initialState,
@@ -140,7 +144,7 @@ describe('Composer accessibility', () => {
     expect(store.getState().pendingComposerFocusTarget).toBeNull();
   });
 
-  it('locks Standard primary control order: attach, message, emoji, more, send', () => {
+  it('locks Standard primary control order: attach, message, emoji, more, send', async () => {
     seedActiveChannel();
     const { container } = render(() => <Composer />);
     const row = container.querySelector('[data-composer-primary-row]') as HTMLElement;
@@ -187,7 +191,17 @@ describe('Composer accessibility', () => {
     expect(document.activeElement).toBe(more);
   });
 
-  it('opens the jump-to-date sheet from More tools and closes the tray', () => {
+  it('offers an explicit cancel action when Send later is open', async () => {
+    seedActiveChannel();
+    const { getByRole, queryByRole } = render(() => <Composer />);
+    fireEvent.input(getByRole('textbox', { name: /message #room/i }), { target: { value: 'later' } });
+    fireEvent.click(getByRole('button', { name: 'More tools' }));
+    fireEvent.click(getByRole('button', { name: 'Schedule message to send later' }));
+    fireEvent.click(getByRole('button', { name: 'Cancel scheduling' }));
+    expect(queryByRole('button', { name: 'Cancel scheduling' })).toBeNull();
+  });
+
+  it('opens the jump-to-date sheet from More tools and closes the tray', async () => {
     seedActiveChannel();
     const { getByRole, queryByTestId } = render(() => <Composer />);
 
@@ -235,7 +249,7 @@ describe('Composer accessibility', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:alice-private');
   });
 
-  it('attaches a pasted image from the clipboard', () => {
+  it('attaches a pasted image from the clipboard', async () => {
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pasted');
     seedActiveChannel();
     const { getByRole, getByText } = render(() => <Composer />);
@@ -247,7 +261,7 @@ describe('Composer accessibility', () => {
     expect(createObjectURL).toHaveBeenCalledWith(file);
   });
 
-  it('attaches a clipboard item image when files is empty', () => {
+  it('attaches a clipboard item image when files is empty', async () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:item-paste');
     seedActiveChannel();
     const { getByRole, getByText } = render(() => <Composer />);
@@ -277,7 +291,7 @@ describe('Composer accessibility', () => {
     expect(getByText('shot.png')).toBeDefined();
   });
 
-  it('previews an unlocked encrypted reply from transient plaintext only', () => {
+  it('previews an unlocked encrypted reply from transient plaintext only', async () => {
     seedActiveChannel();
     store.setState({
       replyingTo: {
@@ -298,7 +312,7 @@ describe('Composer accessibility', () => {
     expect(queryByText(/ONYXDM1 ciphertext-envelope/)).toBeNull();
   });
 
-  it('uses the fixed locked placeholder and never an encrypted reply envelope', () => {
+  it('uses the fixed locked placeholder and never an encrypted reply envelope', async () => {
     seedActiveChannel();
     store.setState({
       replyingTo: {
@@ -318,7 +332,7 @@ describe('Composer accessibility', () => {
     expect(queryByText(/ONYXDM1 locked-envelope/)).toBeNull();
   });
 
-  it('clears a legacy encrypted edit context instead of exposing or submitting it', () => {
+  it('clears a legacy encrypted edit context instead of exposing or submitting it', async () => {
     seedActiveChannel();
     store.setState({
       editingMessage: {
@@ -340,7 +354,7 @@ describe('Composer accessibility', () => {
     expect(queryByText(/private edit|ONYXDM1 edit-envelope/)).toBeNull();
   });
 
-  it('hides a reply banner when the armed parent belongs to another target', () => {
+  it('hides a reply banner when the armed parent belongs to another target', async () => {
     seedActiveChannel();
     store.setState({
       replyingTo: {
@@ -361,7 +375,7 @@ describe('Composer accessibility', () => {
     expect(store.getState().replyingTo).toMatchObject({ id: 'other-parent', target: '#ops' });
   });
 
-  it('shows a matching reply banner and cancels it with Escape', () => {
+  it('shows a matching reply banner and cancels it with Escape', async () => {
     seedActiveChannel();
     store.setState({
       replyingTo: {
@@ -385,7 +399,7 @@ describe('Composer accessibility', () => {
     expect(queryByText(/replying to alice/i)).toBeNull();
   });
 
-  it('cancels an edit with Escape and restores the room draft', () => {
+  it('cancels an edit with Escape and restores the room draft', async () => {
     seedActiveChannel();
     store.getState().setComposerDraft('#room', 'saved draft');
     store.setState({
@@ -416,7 +430,7 @@ describe('Composer accessibility', () => {
     expect(getByRole('textbox', { name: /message #room/i })).toBeDefined();
   });
 
-  it('drops the reply banner when an edit is armed (mutual exclusivity)', () => {
+  it('drops the reply banner when an edit is armed (mutual exclusivity)', async () => {
     seedActiveChannel();
     store.setState({
       replyingTo: {
@@ -448,7 +462,7 @@ describe('Composer accessibility', () => {
   });
 
 
-  it('exposes the slash-command popup as a labelled listbox of options', () => {
+  it('exposes the slash-command popup as a labelled listbox of options', async () => {
     // Arrange
     seedActiveChannel();
     const { getByRole } = render(() => <Composer />);
@@ -463,7 +477,7 @@ describe('Composer accessibility', () => {
     expect(listbox.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
   });
 
-  it('advertises the active command via aria-activedescendant and moves it with ArrowDown', () => {
+  it('advertises the active command via aria-activedescendant and moves it with ArrowDown', async () => {
     // Arrange
     seedActiveChannel();
     const { getByRole } = render(() => <Composer />);
@@ -542,9 +556,51 @@ describe('Composer accessibility', () => {
     expect(hasNotifyFirstSend()).toBe(false);
   });
 
+  it('clears only the admitted draft revision after delayed offline admission', async () => {
+    seedActiveChannel();
+    let resolveAdmission!: (value: boolean) => void;
+    const admission = new Promise<boolean>((resolve) => { resolveAdmission = resolve; });
+    const sendSpy = vi.spyOn(store.getState(), 'sendMessage').mockReturnValue(admission);
+    const { getByRole } = render(() => <Composer />);
+    const textarea = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
+
+    fireEvent.input(textarea, { target: { value: 'original' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    fireEvent.input(textarea, { target: { value: 'newer text' } });
+    resolveAdmission(true);
+    await waitFor(() => expect(textarea.value).toBe('newer text'));
+    expect(sendSpy).toHaveBeenCalledWith('#room', 'original');
+    expect(store.getState().getComposerDraft('#room')).toBe('newer text');
+  });
+
+  it('does not clear an admitted draft across target, owner, or unmount transitions', async () => {
+    for (const transition of ['target', 'owner', 'unmount'] as const) {
+      cleanup();
+      seedActiveChannel();
+      let resolveAdmission!: (value: boolean) => void;
+      const admission = new Promise<boolean>((resolve) => { resolveAdmission = resolve; });
+      const sendSpy = vi.spyOn(store.getState(), 'sendMessage').mockReturnValue(admission);
+      const view = render(() => <Composer />);
+      const textarea = view.getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
+      fireEvent.input(textarea, { target: { value: `draft-${transition}` } });
+      fireEvent.keyDown(textarea, { key: 'Enter' });
+      if (transition === 'target') {
+        store.setState({ activeView: { kind: 'channel', channel: '#other' } });
+      } else if (transition === 'owner') {
+        store.setState({ ourNick: 'other', server: { ...store.getState().server!, nick: 'other', account: 'other' } });
+      } else {
+        view.unmount();
+      }
+      resolveAdmission(true);
+      await Promise.resolve();
+      expect(store.getState().getComposerDraft('#room')).toBe(`draft-${transition}`);
+      sendSpy.mockRestore();
+    }
+  });
+
   it('marks the first successful send so notify can ask after chat, not first paint', async () => {
     seedActiveChannel();
-    vi.spyOn(store.getState(), 'sendMessage').mockImplementation(() => {});
+    vi.spyOn(store.getState(), 'sendMessage').mockReturnValue(true);
     const { getByRole } = render(() => <Composer />);
     const textarea = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
     expect(hasNotifyFirstSend()).toBe(false);
@@ -590,7 +646,7 @@ describe('Composer accessibility', () => {
     expect(document.activeElement).toBe(textarea);
   });
 
-  it('announces composer errors through a role="alert" live region', () => {
+  it('announces composer errors through a role="alert" live region', async () => {
     // Arrange
     seedActiveChannel();
     const { getByRole, queryByRole, getByLabelText } = render(() => <Composer />);
@@ -612,7 +668,7 @@ describe('Composer accessibility', () => {
     expect(alert.textContent).toBe('huge.bin is larger than 25 MB.');
   });
 
-  it('rejects a sixth file with the published 5-file copy', () => {
+  it('rejects a sixth file with the published 5-file copy', async () => {
     seedActiveChannel();
     const { getByRole, getByLabelText, getAllByRole } = render(() => <Composer />);
     const fileInput = getByLabelText('Choose files to attach') as HTMLInputElement;
@@ -659,7 +715,7 @@ describe('Composer schedule (send later)', () => {
     fireEvent.click(getByRole('button', { name: 'Schedule message to send later' }));
   }
 
-  it('disables the schedule control until there is plain text (truthful in More)', () => {
+  it('disables the schedule control until there is plain text (truthful in More)', async () => {
     seedActiveChannel();
     const { getByRole, queryByRole } = render(() => <Composer />);
     // Schedule is not a primary control.
@@ -685,7 +741,7 @@ describe('Composer schedule (send later)', () => {
     expect(scheduleBtn.textContent).toMatch(/Slash commands cannot be scheduled/i);
   });
 
-  it('round-trips: More → schedule preset queues the composer text and clears it', () => {
+  it('round-trips: More → schedule preset queues the composer text and clears it', async () => {
     seedActiveChannel();
     const { getByRole, queryByTestId } = render(() => <Composer />);
     const textarea = getByRole('textbox', {
@@ -705,6 +761,7 @@ describe('Composer schedule (send later)', () => {
 
     // Assert — the store queued exactly one future message and the composer
     // reset (DOM updated after the store change — the reactivity guard).
+    await waitFor(() => expect(store.getState().scheduledMessages).toHaveLength(1));
     const queued = store.getState().scheduledMessages;
     expect(queued).toHaveLength(1);
     expect(queued[0]!.channel).toBe('#room');
@@ -714,9 +771,9 @@ describe('Composer schedule (send later)', () => {
     expect(textarea.value).toBe('');
   });
 
-  it('counts only scheduled messages owned by the current account', () => {
+  it('counts only scheduled messages owned by the current account', async () => {
     seedActiveChannel();
-    store.getState().scheduleMessage('#room', 'Alice only', Date.now() + 3_600_000);
+    await store.getState().scheduleMessage('#room', 'Alice only', Date.now() + 3_600_000);
     const aliceServer = store.getState().server!;
     store.setState({
       ourNick: 'bob',
@@ -732,10 +789,10 @@ describe('Composer schedule (send later)', () => {
     expect(queryByRole('button', { name: 'View 1 scheduled' })).toBeNull();
 
     store.setState({ ourNick: 'me', server: aliceServer });
-    expect(getByRole('button', { name: 'View 1 scheduled' })).toBeDefined();
+    await waitFor(() => expect(getByRole('button', { name: 'View 1 scheduled' })).toBeDefined());
   });
 
-  it('exposes the schedule popover as a labelled dialog with presets', () => {
+  it('exposes the schedule popover as a labelled dialog with presets', async () => {
     seedActiveChannel();
     const { getByRole } = render(() => <Composer />);
     const textarea = getByRole('textbox', { name: /message #room/i });
@@ -791,7 +848,7 @@ describe('Composer schedule (send later)', () => {
     disposeKb?.();
   });
 
-  it('bridge stays disabled when the composer cannot schedule (More still closed)', () => {
+  it('bridge stays disabled when the composer cannot schedule (More still closed)', async () => {
     seedActiveChannel();
     const { queryByRole } = render(() => <Composer />);
     // Empty text → cannot schedule; bridge mirrors canSchedule.
@@ -816,12 +873,12 @@ describe('Composer outbox status chrome', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows empty-offline honesty when disconnected with nothing queued', () => {
+  it('shows empty-offline honesty when disconnected with nothing queued', async () => {
     seedActiveChannel();
     store.setState({ connectionStatus: 'disconnected' });
     render(() => <Composer />);
 
-    expect(screen.getByText(/Offline · Messages queue on this device/i)).toBeInTheDocument();
+    expect(screen.getByText(/Offline · Saved on this device/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Try sending now' })).not.toBeInTheDocument();
   });
 
@@ -831,7 +888,7 @@ describe('Composer outbox status chrome', () => {
     await queueOutbox('#room', 'body stays out of chrome', owner);
     render(() => <Composer />);
 
-    expect(await screen.findByText(/Queued \(1\) · Will send on reconnect/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Saved \(1\) · Sends when you reconnect/i)).toBeInTheDocument();
     expect(screen.queryByText('body stays out of chrome')).not.toBeInTheDocument();
   });
 
@@ -842,7 +899,7 @@ describe('Composer outbox status chrome', () => {
     const flushSpy = vi.spyOn(store.getState(), 'flushOutbox').mockImplementation(() => {});
     render(() => <Composer />);
 
-    expect(await screen.findByText(/Couldn't send/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Retryable/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try sending now' }));
     expect(flushSpy).toHaveBeenCalledOnce();
   });
@@ -853,19 +910,19 @@ describe('Composer outbox status chrome', () => {
     // Connected + remaining queue, auto-retry not yet exhausted → waiting chrome.
     render(() => <Composer />);
 
-    expect(await screen.findByText(/Queued \(1\) · Waiting to send/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Awaiting send \(1\) · Still waiting/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try sending now' })).toBeInTheDocument();
     expect(screen.queryByText('waiting body stays private')).not.toBeInTheDocument();
   });
 
-  it('hides outbox chrome when online and the queue is empty', () => {
+  it('hides outbox chrome when online and the queue is empty', async () => {
     seedActiveChannel();
     render(() => <Composer />);
     expect(screen.queryByText(/Queued \(/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Messages queue on this device/i)).not.toBeInTheDocument();
   });
 
-  it('quotes a reply fragment above the field and keeps the primary Send action', () => {
+  it('quotes a reply fragment above the field and keeps the primary Send action', async () => {
     seedActiveChannel();
     store.setState({
       replyingTo: {
@@ -908,7 +965,7 @@ describe('Composer first-hour room landing', () => {
     expect(screen.getByTestId('first-hour-coach')).toHaveTextContent('Say hi');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss tip' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss quick start tip' }));
     expect(isFirstHourSeen()).toBe(true);
     expect(screen.queryByTestId('first-hour-coach')).not.toBeInTheDocument();
   });

@@ -8,7 +8,13 @@ import {
   readClientExtensionActions,
   recordClientExtensionActionRun,
 } from '@/lib/extensions/clientActions';
-import { closePreferences, openPreferences, preferences, resetPreferences } from '@/lib/prefs/preferences';
+import {
+  _resetPreferencePersistenceStateForTests,
+  closePreferences,
+  openPreferences,
+  preferences,
+  resetPreferences,
+} from '@/lib/prefs/preferences';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import { defaultVaultSearchMode, resetDefaultVaultSearchMode } from '@/lib/prefs/vaultSearchMode';
 import { setVaultMode, vaultSearchMode } from '@/shell/search/useMessageSearch';
@@ -31,6 +37,7 @@ import {
   type SavedSearchInput,
 } from '@/lib/vault/savedSearches';
 import { RETENTION_POLICY_STORAGE_KEY } from '@/lib/vault/retentionPolicy';
+import { focusableElements } from '@/primitives/focusTrap';
 import {
   markTopicRead as markScopedTopicRead,
   readTopicReadMarker as readScopedTopicReadMarker,
@@ -222,7 +229,7 @@ describe('PreferencesPanel', () => {
       ourNick: MEMORY_OWNER.identity,
       server: {
         id: 'preferences-test',
-        name: 'Preferences',
+        name: 'Device preferences',
         network: 'Preferences',
         url: MEMORY_OWNER.serverUrl,
         icon: '',
@@ -260,7 +267,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('tabindex', '0');
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Display');
     expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(6);
-    expect(screen.getByRole('button', { name: /^Appearance/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open appearance settings' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export vault' })).not.toBeInTheDocument();
 
     selectPreferenceCategory('History & data');
@@ -270,7 +277,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName('History & data');
     expect(screen.queryByRole('button', { name: 'Export vault' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Appearance/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open appearance settings' })).not.toBeInTheDocument();
 
     selectPreferenceCategory('Import & export');
 
@@ -597,7 +604,7 @@ describe('PreferencesPanel', () => {
       renderPreferences();
       selectPreferenceCategory('Accessibility');
       closePreferences();
-      expect(screen.queryByRole('dialog', { name: 'Preferences' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Device preferences' })).not.toBeInTheDocument();
       scrollTo.mockClear();
 
       openPreferences();
@@ -701,7 +708,7 @@ describe('PreferencesPanel', () => {
     renderPreferences();
     const sheetBody = document.querySelector<HTMLElement>('.onyx-sheet__body');
     const nav = document.querySelector<HTMLElement>('.pref-category-nav');
-    const appearance = screen.getByRole('button', { name: /^Appearance/i });
+    const appearance = screen.getByRole('button', { name: 'Open appearance settings' });
     expect(sheetBody).not.toBeNull();
     expect(nav).not.toBeNull();
 
@@ -738,7 +745,7 @@ describe('PreferencesPanel', () => {
     renderPreferences();
     const sheetBody = document.querySelector<HTMLElement>('.onyx-sheet__body');
     const nav = document.querySelector<HTMLElement>('.pref-category-nav');
-    const appearance = screen.getByRole('button', { name: /^Appearance/i });
+    const appearance = screen.getByRole('button', { name: 'Open appearance settings' });
     expect(sheetBody).not.toBeNull();
     expect(nav).not.toBeNull();
 
@@ -785,7 +792,13 @@ describe('PreferencesPanel', () => {
   it('traps focus around visible controls while inactive category panes stay mounted', () => {
     renderPreferences();
     const close = screen.getByRole('button', { name: 'Close preferences' });
-    const lastVisible = screen.getByRole('radio', { name: '24-hour' });
+    const advanced = screen.getByTestId('pref-conversation-advanced');
+    expect(advanced.querySelector('summary')).toBeTruthy();
+    expect(within(advanced).queryByRole('switch', { name: /Show 24-hour activity strip/i })).toBeNull();
+    fireEvent.click(advanced.querySelector('summary')!);
+    const panel = screen.getByTestId('preferences-panel').closest<HTMLElement>('[role="dialog"]')!;
+    const focusable = () => focusableElements(panel);
+    const lastVisible = focusable().at(-1)!;
 
     lastVisible.focus();
     fireEvent.keyDown(lastVisible, { key: 'Tab' });
@@ -801,7 +814,7 @@ describe('PreferencesPanel', () => {
     renderPreferences();
 
     expect(screen.getByTestId('preferences-panel')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Appearance/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open appearance settings' })).toBeInTheDocument();
     expect(screen.getByText('Choose a look, text size, and motion.')).toBeInTheDocument();
     selectPreferenceCategory('Conversation');
     expect(screen.getByRole('heading', { name: 'Conversation' })).toBeInTheDocument();
@@ -1684,7 +1697,7 @@ describe('PreferencesPanel', () => {
   it('opens Appearance from Preferences for mobile theming discoverability', () => {
     renderPreferences();
 
-    fireEvent.click(screen.getByRole('button', { name: /^Appearance/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open appearance settings' }));
 
     expect(store.getState().showAppearance).toBe(true);
   });
@@ -1697,12 +1710,12 @@ describe('PreferencesPanel', () => {
         <PreferencesPanel />
       </>
     ));
-    const launcher = screen.getByRole('button', { name: /^Appearance/i });
+    const launcher = screen.getByRole('button', { name: 'Open appearance settings' });
     launcher.focus();
 
     fireEvent.click(launcher);
 
-    expect(screen.getByRole('dialog', { name: 'Preferences' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Device preferences', hidden: true })).toBeInTheDocument();
     const appearance = screen.getByRole('dialog', { name: 'Appearance' });
     await waitFor(() => expect(within(appearance).getByRole('button', { name: 'Close appearance' })).toHaveFocus());
 
@@ -1710,7 +1723,7 @@ describe('PreferencesPanel', () => {
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Appearance' })).toBeNull();
-      expect(screen.getByRole('dialog', { name: 'Preferences' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Device preferences' })).toBeInTheDocument();
       expect(launcher).toHaveFocus();
     });
   });
@@ -2108,7 +2121,7 @@ describe('PreferencesPanel', () => {
       ourNick: 'bob',
       server: {
         id: 'preferences-test',
-        name: 'Preferences',
+        name: 'Device preferences',
         network: 'Preferences',
         url: MEMORY_OWNER.serverUrl,
         icon: '',
@@ -2224,6 +2237,33 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Could not save reviewed actions on this device.')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Reviewed extension actions' })).toBeInTheDocument();
     expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
+  });
+
+  it('reports preference storage failure without claiming the change was saved', () => {
+    renderPreferences();
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Roomy' }));
+
+    expect(screen.getByText('Device storage unavailable; changes apply for this session.')).toBeInTheDocument();
+    expect(screen.queryByText('Saved on this device.')).not.toBeInTheDocument();
+  });
+
+  it('does not claim initial storage is saved before a preference write is verified', () => {
+    _resetPreferencePersistenceStateForTests();
+    renderPreferences();
+
+    expect(screen.getByText('Storage not yet verified; change a preference to test saving.')).toBeInTheDocument();
+    expect(screen.queryByText('Saved on this device.')).not.toBeInTheDocument();
+  });
+
+  it('reports a successful preference write as saved on this device', () => {
+    renderPreferences();
+    fireEvent.click(screen.getByRole('radio', { name: 'Roomy' }));
+
+    expect(screen.getByText('Saved on this device.')).toBeInTheDocument();
   });
 
   it('selects a default vault search mode, persisting it and applying it live', () => {

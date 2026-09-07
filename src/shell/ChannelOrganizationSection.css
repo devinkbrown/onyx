@@ -1,0 +1,6 @@
+.channel-organization-section .acct-cert-actions { align-items: end; gap: var(--space-3, .75rem); }
+.channel-organization-field { display: grid; gap: .35rem; min-width: 9rem; flex: 1 1 10rem; color: var(--ink-muted, inherit); font-size: .8rem; }
+.channel-organization-field input, .channel-organization-field select { min-height: 44px; width: 100%; box-sizing: border-box; }
+.channel-organization-section :is(button, input, select):focus-visible { outline: 3px solid var(--focus-ring, Highlight); outline-offset: 2px; }
+@media (max-width: 560px) { .channel-organization-section .acct-cert-actions { display: grid; } .channel-organization-field { min-width: 0; } }
+@media (forced-colors: active) { .channel-organization-section :is(button, input, select):focus-visible { outline-color: Highlight; } }

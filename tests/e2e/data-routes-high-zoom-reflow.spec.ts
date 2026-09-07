@@ -32,7 +32,10 @@ for (const route of routes) {
 
     const heading = page.getByRole('heading', { name: route.heading, exact: true });
     await expect(heading).toBeVisible();
-    await page.locator('.r-section').first().scrollIntoViewIfNeeded();
+    const scrollTarget = route.path === '/status/'
+      ? page.locator('.status-hero')
+      : page.locator('.r-section').first();
+    await scrollTarget.scrollIntoViewIfNeeded();
 
     const geometry = await page.evaluate(({ heroSelector, copySelector }) => {
       const surfaces = Array.from(document.querySelectorAll<HTMLElement>(

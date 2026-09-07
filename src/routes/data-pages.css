@@ -1337,6 +1337,19 @@
     overflow-wrap: anywhere;
   }
 
+  /* At short heights, 400% text zoom must keep explanatory copy within the
+     readable reflow band; ordinary zoom keeps the fluid body size above. */
+  .data-card p,
+  .roadmap-phase p,
+  .roadmap-page .roadmap-card p,
+  .roadmap-page .roadmap-note p,
+  .status-route .status-lede,
+  .roadmap-summary,
+  .status-lede {
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+  }
+
   .stats-card-heading,
   .stats-chart-caption {
     display: flex;

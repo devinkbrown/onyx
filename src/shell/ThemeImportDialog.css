@@ -48,6 +48,8 @@
   line-height: 1.4;
 }
 
+.theme-import-dialog__hint { max-width: 42rem; }
+
 .theme-import-dialog__textarea,
 .theme-import-dialog__input {
   width: 100%;
@@ -195,4 +197,17 @@
   .theme-import-dialog__button {
     width: 100%;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-import-dialog * { transition: none !important; }
+}
+
+@media (forced-colors: active) {
+  .theme-import-dialog__textarea,
+  .theme-import-dialog__input,
+  .theme-import-dialog__button { border-color: CanvasText; }
+  .theme-import-dialog__textarea:focus-visible,
+  .theme-import-dialog__input:focus-visible,
+  .theme-import-dialog__button:focus-visible { outline: 3px solid Highlight; box-shadow: none; }
 }

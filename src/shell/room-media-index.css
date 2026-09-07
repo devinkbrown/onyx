@@ -12,6 +12,7 @@
 .room-media-index {
   display: grid;
   gap: var(--space-3, 12px);
+  min-width: 0;
 }
 
 .room-media-index-filters {
@@ -31,6 +32,7 @@
   font-family: var(--font-sans, 'Instrument Sans', system-ui, sans-serif);
   font-size: 0.88rem;
   cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
 }
 
 .room-media-index-filter[aria-selected='true'] {
@@ -48,6 +50,59 @@
   color: var(--paper-mute);
   font-size: 0.95rem;
   line-height: 1.45;
+}
+
+.room-media-index-status {
+  margin: 18px 0 0;
+  color: var(--paper-mute);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  min-height: 24px;
+}
+
+.room-media-index-status--loading {
+  display: grid;
+  gap: 10px;
+}
+
+.room-media-index-skeleton {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--stone-2) 58%, transparent);
+  animation: room-media-index-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes room-media-index-pulse {
+  50% { opacity: 0.42; }
+}
+
+.room-media-index-status--error p {
+  margin: 0 0 10px;
+}
+
+.room-media-index-retry {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--seam-faint);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--paper);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.room-media-index-retry:hover,
+.room-media-index-jump:hover {
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone-2) 36%, transparent);
+}
+
+.room-media-index-retry:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
 }
 
 .room-media-index-list {
@@ -149,9 +204,52 @@
   gap: 6px;
 }
 
+.room-media-index-panel {
+  min-width: 0;
+  outline: none;
+}
+
 .room-media-index-jump {
   padding: 0 12px;
   border: 1px solid var(--seam-faint);
   border-radius: 999px;
   color: var(--paper-mute);
+}
+
+@media (max-width: 480px) {
+  .room-media-index-filter {
+    flex: 1 1 0;
+    padding-inline: 10px;
+  }
+
+  .room-media-index-link {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-height: 560px) {
+  .room-media-index-list {
+    gap: 2px;
+  }
+
+  .room-media-index-row {
+    min-height: 40px;
+  }
+
+  .room-media-index-squircle,
+  .room-media-index-filemark {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-media-index-filter,
+  .room-media-index-retry {
+    transition: none;
+  }
+
+  .room-media-index-skeleton {
+    animation: none;
+  }
 }

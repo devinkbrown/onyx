@@ -294,6 +294,9 @@ export function NotificationCenter(): JSX.Element {
               ×
             </button>
           </header>
+          <p class="notif-center__explanation">
+            This is your notification history. It does not change browser permission, room notification policy, or sound settings.
+          </p>
 
           <div class="notif-center__filters" role="group" aria-label="Filter notification inbox">
             <For each={INBOX_FILTERS}>
@@ -329,6 +332,7 @@ export function NotificationCenter(): JSX.Element {
                       class="notif-center__row"
                       data-type={n.type}
                       data-unread={readIds().has(n.id) ? 'false' : 'true'}
+                      aria-label={`${readIds().has(n.id) ? 'Read' : 'Unread'} notification`}
                     >
                       <button
                         type="button"

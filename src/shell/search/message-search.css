@@ -318,6 +318,21 @@
   font-size: 0.78rem;
 }
 
+.onyx-message-search__empty {
+  pointer-events: auto;
+  width: min(42rem, 100%);
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--seam);
+  border-radius: 2px;
+  color: var(--paper-dim);
+  background: var(--ink);
+  font-size: 0.82rem;
+}
+
+.onyx-message-search__empty strong { color: var(--paper); }
+
 /* ── Advanced device-recall modes (hybrid / related terms) ───────────── */
 .onyx-message-search__advanced {
   pointer-events: auto;
@@ -621,6 +636,7 @@
   }
 
   .onyx-message-search__recall,
+  .onyx-message-search__empty,
   .onyx-message-search__saved,
   .onyx-message-search__history-off,
   .onyx-message-search__server,
@@ -676,6 +692,18 @@
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+  }
+}
+
+@media (forced-colors: active) {
+  .onyx-message-search__button:focus-visible,
+  .onyx-message-search__deep:focus-visible,
+  .onyx-message-search__server-row:focus-visible,
+  .onyx-message-search__saved-run:focus-visible,
+  .onyx-message-search__saved-delete:focus-visible,
+  .onyx-message-search__segment:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
   }
 }
 

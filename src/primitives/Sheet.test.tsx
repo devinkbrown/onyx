@@ -24,6 +24,63 @@ describe('Sheet', () => {
     expect(screen.getByRole('button', { name: 'Message' })).toBeTruthy();
   });
 
+  it('isolates the app background while open and restores its exact attributes on close', async () => {
+    const appBackground = document.createElement('main');
+    appBackground.setAttribute('inert', 'original-inert');
+    appBackground.setAttribute('aria-hidden', 'false');
+    document.body.append(appBackground);
+
+    function Harness() {
+      const [open, setOpen] = createSignal(true);
+      return <Sheet open={open()} title="Menu" onOpenChange={setOpen}><button type="button">Action</button></Sheet>;
+    }
+
+    render(() => <Harness />);
+    await tick();
+
+    expect(appBackground).toHaveAttribute('inert', '');
+    expect(appBackground).toHaveAttribute('aria-hidden', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close panel' }));
+    await tick();
+
+    expect(appBackground).toHaveAttribute('inert', 'original-inert');
+    expect(appBackground).toHaveAttribute('aria-hidden', 'false');
+    appBackground.remove();
+  });
+
+  it('keeps labels unique for concurrent sheets with the same title', () => {
+    render(() => (
+      <>
+        <Sheet open title="Details" onOpenChange={() => undefined}><p>One</p></Sheet>
+        <Sheet open title="Details" onOpenChange={() => undefined}><p>Two</p></Sheet>
+      </>
+    ));
+
+    const dialogs = screen.getAllByRole('dialog', { name: 'Details' });
+    expect(dialogs[0]?.getAttribute('aria-labelledby')).not.toBe(dialogs[1]?.getAttribute('aria-labelledby'));
+  });
+
+  it('uses the fallback when the opener becomes aria-hidden before close', async () => {
+    const opener = document.createElement('button');
+    const fallback = document.createElement('button');
+    document.body.append(opener, fallback);
+
+    function Harness() {
+      const [open, setOpen] = createSignal(true);
+      return <Sheet open={open()} title="Profile" returnFocus={opener} returnFocusFallback={fallback} onOpenChange={setOpen}><p>Body</p></Sheet>;
+    }
+
+    render(() => <Harness />);
+    opener.setAttribute('aria-hidden', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Close panel' }));
+    await tick();
+
+    expect(fallback).toHaveFocus();
+    opener.remove();
+    fallback.remove();
+  });
+
   it('moves initial focus past disabled and roving-tab controls that are out of the tab order', () => {
     const panel = document.createElement('div');
     panel.innerHTML = `

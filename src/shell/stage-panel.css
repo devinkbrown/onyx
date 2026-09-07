@@ -2,6 +2,7 @@
    Mineral tokens; dormant stages stay scannable without crowding chat. */
 
 .stage-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 0.5rem);
@@ -11,11 +12,28 @@
   box-shadow: var(--elev-1, none);
 }
 
+.stage-panel:focus-within {
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--lapis, #6ea8fe) 55%, transparent);
+}
+
 .stage-panel__head {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.35rem 0.75rem;
+}
+
+.stage-panel__availability {
+  flex: none;
+  padding: 4px 7px;
+  border: 1px solid var(--line, var(--seam-faint));
+  border-radius: 999px;
+  color: var(--paper-dim, var(--muted));
+  font: 600 .68rem/1.1 var(--font-mono);
+}
+
+.stage-panel[data-availability='unavailable'] .stage-panel__availability {
+  color: var(--gold, #e7bd69);
 }
 
 .stage-panel__title {
@@ -29,6 +47,8 @@
 }
 
 .stage-panel__hint {
+  flex: 1 1 18rem;
+  min-width: min(18rem, 100%);
   margin: 0;
   font-size: var(--text-sm, 0.8125rem);
   line-height: var(--leading-snug, 1.35);
@@ -36,9 +56,40 @@
 }
 
 .stage-panel__actions {
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2, 0.35rem);
+}
+
+.stage-panel .onyx-button {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+
+.stage-panel .onyx-button:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis, #6ea8fe));
+  outline-offset: var(--focus-offset, 3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-panel *,
+  .stage-panel *::before,
+  .stage-panel *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .stage-panel { border-color: CanvasText; }
+  .stage-panel:focus-within { box-shadow: inset 0 0 0 2px Highlight; }
+  .stage-panel__availability { border-color: CanvasText; color: CanvasText; }
+  .stage-panel .onyx-button:focus-visible { outline: 2px solid Highlight; }
 }
 
 .stage-panel__invite {
@@ -94,7 +145,8 @@
   }
 
   .stage-panel[data-active='false'] .stage-panel__head {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .stage-panel[data-active='false'] .stage-panel__hint {
@@ -113,6 +165,14 @@
     min-width: 0;
   }
 
+  .stage-panel[data-active='false'] .stage-panel__actions {
+    flex: 0 1 auto;
+  }
+
+  .stage-panel[data-active='false'] .stage-panel__availability {
+    white-space: nowrap;
+  }
+
   .stage-panel__actions .onyx-button {
     min-height: var(--target-min, 44px);
   }
@@ -121,6 +181,22 @@
   .stage-panel__hand-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .stage-panel__hand-row .onyx-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .stage-panel[data-active='false'] {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stage-panel[data-active='false'] .stage-panel__actions,
+  .stage-panel[data-active='false'] .stage-panel__actions .onyx-button {
+    width: 100%;
   }
 }
 

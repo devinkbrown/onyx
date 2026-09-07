@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { cleanup, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
@@ -37,6 +37,7 @@ describe('ReconnectStatusBanner', () => {
     expect(status).toHaveTextContent(/Reconnect when you are ready/);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByTestId('reconnect-status-banner')).toHaveTextContent(/Reconnect when you are ready/);
+    expect(screen.getByRole('button', { name: 'Try again now' })).toBeInTheDocument();
   });
 
   it('keeps countdown in the visible banner while status stays a phase announcement', () => {
@@ -45,13 +46,23 @@ describe('ReconnectStatusBanner', () => {
 
     const status = screen.getByRole('status');
     const banner = screen.getByTestId('reconnect-status-banner');
-    expect(banner).toHaveAttribute('aria-hidden', 'true');
+    expect(banner).toHaveAttribute('role', 'region');
     expect(banner).toHaveTextContent(/5s/);
     expect(status).toHaveTextContent(/Reconnecting/);
 
     store.setState({ reconnectIn: 4 });
     expect(screen.getByTestId('reconnect-status-banner')).toHaveTextContent(/4s/);
     expect(screen.getByRole('status')).toBe(status);
+  });
+
+  it('offers an immediate reconnect action without exposing changing countdown text live', () => {
+    seed('reconnecting', 5);
+    render(() => <ReconnectStatusBanner />);
+    const reconnectNow = vi.spyOn(store.getState(), 'reconnectNow');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again now' }));
+    expect(reconnectNow).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('status')).toHaveTextContent(/Reconnecting/);
+    reconnectNow.mockRestore();
   });
 
   it('announces phase boundaries and briefly shows Back online after the handshake', () => {

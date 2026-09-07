@@ -36,6 +36,22 @@ export const MAX_SCHEDULED_SENDS = MAX_SCHEDULED_MESSAGES;
 /** Alias for the store queue row shape (docs / era ledger home path). */
 export type ScheduledSend = ScheduledMessage;
 
+export type ScheduledMessageDisplayState = 'future' | 'overdue-disconnected' | 'protected' | 'encryption-required' | 'due';
+
+/** UI state derived only from locally observable facts; never implies delivery. */
+export function classifyScheduledMessage(input: {
+  sendAt: number;
+  now: number;
+  connected: boolean;
+  protected: boolean;
+  encryptionRequired?: boolean;
+}): ScheduledMessageDisplayState {
+  if (input.encryptionRequired) return 'encryption-required';
+  if (input.protected) return 'protected';
+  if (input.sendAt > input.now) return 'future';
+  return input.connected ? 'due' : 'overdue-disconnected';
+}
+
 /** Control / space class rejected on wire tokens (matches store inbound guard). */
 const INVALID_CHANNEL = /[\u0000-\u0020\u007f]/u;
 

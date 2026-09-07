@@ -4,6 +4,7 @@
  */
 
 import { parseAtParam, parseJoinParam, parseReaderParam, parseTopicParam } from '@/lib/deeplink';
+import { nicknameError, parseNickname } from '@/lib/identity/nickname';
 
 export const INVITE_FACE_MAX = 3;
 
@@ -30,24 +31,13 @@ export interface InviteCard {
  * control characters (NUL, CR/LF) are rejected, so a crafted invite can never
  * seat a corrupt nick, garble the Open Graph meta, or bloat the canonical URL.
  */
-const GUEST_NICK_RE = /^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/;
-const GUEST_NICK_MAX = 64;
-
 export function parseGuestName(raw: string | null): string | null {
-  const trimmed = raw?.trim() ?? '';
-  if (trimmed.length === 0 || trimmed.length > GUEST_NICK_MAX) return null;
-  return GUEST_NICK_RE.test(trimmed) ? trimmed : null;
+  return parseNickname(raw);
 }
 
 /** Empty is allowed (the recipient can still join and pick a name later). */
 export function guestNameError(raw: string): string | undefined {
-  const trimmed = raw.trim();
-  if (!trimmed) return undefined;
-  if (trimmed.length > GUEST_NICK_MAX) return 'Name must be 64 characters or fewer.';
-  if (!GUEST_NICK_RE.test(trimmed)) {
-    return 'Start with a letter. Use letters, numbers, or -[]\\`_^{|}.';
-  }
-  return undefined;
+  return nicknameError(raw, { allowEmpty: true });
 }
 
 /** Deduped, validated nicks, capped at three. Later lists fill gaps only. */

@@ -38,6 +38,10 @@
   border-color: color-mix(in oklab, var(--shu) 44%, var(--seam-faint));
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .shell-group-control-indicator { transition: none; }
+}
+
 @container conversation (max-width: 33rem) {
   .shell-group-control-indicator-detail {
     position: absolute;

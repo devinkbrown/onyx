@@ -70,6 +70,8 @@
    without competing with the how-to copy below it. */
 .guides-progress {
   position: relative;
+  min-width: 0;
+  box-sizing: border-box;
   display: grid;
   gap: 0.8rem;
   padding: clamp(1rem, 2.6vw, 1.5rem);
@@ -78,6 +80,16 @@
   background:
     linear-gradient(105deg, color-mix(in oklab, var(--guides-current) 13%, transparent), transparent 48%),
     var(--public-raised, var(--stone-2));
+}
+
+.guides-progress *,
+.guides-route-map *,
+.guides-route__item,
+.guides-route__card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
 }
 
 .guides-progress__head,
@@ -116,6 +128,8 @@
 
 .guides-progress__meter {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   height: 0.45rem;
   appearance: none;
   border: 0;
@@ -144,9 +158,18 @@
 
 .guides-route-map {
   display: grid;
+  min-width: 0;
+  box-sizing: border-box;
   gap: 0.7rem;
   padding-block: 0.75rem 0.2rem;
   border-block: 1px solid color-mix(in oklab, var(--guides-current) 24%, var(--public-line, var(--seam-faint)));
+}
+
+.guides-progress,
+.guides-route-map,
+.guides-route,
+.guides-route__card {
+  overflow: clip;
 }
 
 .guides-route-map__head,
@@ -174,6 +197,10 @@
 
 .guides-route {
   position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.55rem;
@@ -197,6 +224,10 @@
 
 .guides-route__card {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.45rem;
@@ -227,12 +258,20 @@
 
 .guides-route__copy {
   display: grid;
+  width: 100%;
+  max-width: 100%;
   align-content: start;
   gap: 0.3rem;
   min-width: 0;
 }
 
 .guides-route__state {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   color: var(--guides-muted);
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -242,7 +281,12 @@
 }
 
 .guides-route__title {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   overflow-wrap: anywhere;
+  word-break: break-word;
   font-size: 0.86rem;
   font-weight: 620;
   line-height: 1.2;
@@ -426,7 +470,7 @@
 
 @media (max-width: 920px) {
   .guides-page .data-hero h1 {
-    font-size: 40px;
+    font-size: 40px !important;
   }
 
   .guides-page .guides-card h2 {
@@ -463,7 +507,7 @@
 
   .guides-page .data-hero .sub,
   .guides-page .guides-card p {
-    font-size: 17px;
+    font-size: 17px !important;
   }
 
   .guides-hero-actions,
@@ -497,7 +541,10 @@
 
   .guides-route__card {
     min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
   }
+
+  .guides-route__number { justify-self: start; }
 
   .guides-copy,
   .guides-download {
@@ -509,6 +556,148 @@
   .guides-reset,
   .guides-step-toggle {
     min-height: 44px;
+  }
+}
+
+/* The root-font-size fixture turns the ordinary mobile breakpoint into a
+   narrow physical viewport. Keep each named route-map descendant's own
+   scrollable width bounded, rather than relying on an ancestor clip. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  /* At extreme root-font zoom, rem padding becomes wider than the physical
+     card. Keep the route-map panels content-box bounded and let their text
+     wrap inside the available column. */
+  .guides-page .guides-progress,
+  .guides-page .guides-snapshot,
+  .guides-page .guides-share {
+    padding: 8px;
+    gap: 8px;
+    min-width: 0;
+    min-inline-size: 0;
+    max-width: 100%;
+    max-inline-size: 100%;
+    box-sizing: border-box;
+  }
+
+  .guides-page .data-hero h1 {
+    font-size: 40px;
+  }
+
+  .guides-page .data-hero .sub,
+  .guides-page .guides-card p {
+    font-size: 17px;
+  }
+
+  .guides-page .guides-starter-details,
+  .guides-page .guides-snapshot,
+  .guides-page .guides-share,
+  .guides-page .guides-snapshot ul,
+  .guides-page .guides-snapshot li,
+  .guides-page .guides-share__eyebrow,
+  .guides-page .guides-snapshot__eyebrow,
+  .guides-page .guides-snapshot h3,
+  .guides-page .guides-share h3 {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+  }
+
+  .guides-page .guides-starter-details {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    box-sizing: content-box;
+  }
+
+  .guides-page .guides-snapshot ul {
+    width: 100%;
+    inline-size: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    margin-top: 8px;
+    padding-inline-start: 16px;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    overflow: clip;
+  }
+
+  .guides-page .guides-starter-details * {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    overflow: clip;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box;
+    overflow-x: hidden !important;
+    overflow-y: visible;
+  }
+
+  .guides-page .guides-share > *,
+  .guides-page .guides-share__actions > *,
+  .guides-page .guides-share__status,
+  .guides-page .guides-share p,
+  .guides-page .guides-share h3,
+  .guides-page .guides-snapshot p,
+  .guides-page .guides-snapshot h3 {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .guides-page .guides-share__eyebrow,
+  .guides-page .guides-snapshot__eyebrow {
+    font-size: 12px;
+  }
+
+  .guides-page .guides-share__actions {
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .guides-page .guides-copy,
+  .guides-page .guides-download {
+    max-width: 100%;
+    padding-inline: 8px;
+    font-size: 14px;
+  }
+
+  .guides-page .guides-route {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .guides-page .guides-route__card,
+  .guides-page .guides-route__copy {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .guides-page .guides-route__state,
+  .guides-page .guides-route__title,
+  .guides-page .guides-starter-details,
+  .guides-page .guides-starter-details > * {
+    width: 100%;
+    inline-size: 100%;
+    min-width: 0;
+    min-inline-size: 0;
+    max-width: 100%;
+    max-inline-size: 100%;
+    box-sizing: border-box;
+  }
+
+  .guides-page .guides-starter-details,
+  .guides-page .guides-starter-details * {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
 

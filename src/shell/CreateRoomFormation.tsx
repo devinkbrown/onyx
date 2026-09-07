@@ -27,11 +27,20 @@ import {
 } from '@/lib/rooms/createRoomFormation';
 import { useStore, getState } from '@/lib/store';
 import { Button, FormField } from '@/primitives/index';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
 
 export default function CreateRoomFormation(): JSX.Element {
   const friends = useStore((s) => s.friends);
   const networkName = useStore((s) => s.networkName);
   const ourNick = useStore((s) => s.ourNick);
+  const connectionStatus = useStore((s) => s.connectionStatus);
+  let releaseUpdateHold: (() => void) | null = null;
+  createEffect(() => {
+    const protectedWork = Boolean(nameInput().trim() || firstLine().trim() || inviteeDraft().trim() || invitees().length || sharedInvite());
+    if (protectedWork && !releaseUpdateHold) releaseUpdateHold = updateCoordinator.hold('create-room-form');
+    if (!protectedWork && releaseUpdateHold) { releaseUpdateHold(); releaseUpdateHold = null; }
+  });
+  onCleanup(() => { releaseUpdateHold?.(); releaseUpdateHold = null; });
 
   const [nameInput, setNameInput] = createSignal('');
   const [skin, setSkin] = createSignal<RoomSkin | null>(null);
@@ -44,10 +53,12 @@ export default function CreateRoomFormation(): JSX.Element {
   const [nameError, setNameError] = createSignal('');
   const [sharedInvite, setSharedInvite] = createSignal(false);
   const [copyStatus, setCopyStatus] = createSignal('');
+  const [createError, setCreateError] = createSignal('');
   const [shareBusy, setShareBusy] = createSignal(false);
   const [copyBusy, setCopyBusy] = createSignal(false);
-  let shareEpoch = 0;
-  let copyEpoch = 0;
+  type ShareOperation = { id: number; kind: 'share' | 'copy' };
+  let nextOperationId = 0;
+  let currentOperation: ShareOperation | null = null;
 
   const hangLabel = createMemo(() => formatHangLabel(nextSaturdayHang()));
   const channel = createMemo(() => normalizeCreateRoomName(nameInput()));
@@ -72,6 +83,22 @@ export default function CreateRoomFormation(): JSX.Element {
   const canEnter = createMemo(() =>
     canFinishCreateRoom({ sharedInvite: sharedInvite() }) && channel() !== null,
   );
+  const connected = createMemo(() => connectionStatus() === 'connected');
+
+  // A receipt is valid only for the exact invite payload that was shared.
+  // Renaming the room (or changing its derived URL) requires a fresh receipt.
+  let lastInvitePayload = '';
+  createEffect(() => {
+    const current = payload().shareUrl;
+    if (lastInvitePayload && current !== lastInvitePayload) {
+      setSharedInvite(false);
+      setCopyStatus('Room name changed. Share or copy the new invite before entering.');
+      currentOperation = null;
+      setShareBusy(false);
+      setCopyBusy(false);
+    }
+    lastInvitePayload = current;
+  });
 
   createEffect(() => {
     const next = suggestedFirstLine(skin());
@@ -88,8 +115,7 @@ export default function CreateRoomFormation(): JSX.Element {
   });
 
   onCleanup(() => {
-    shareEpoch += 1;
-    copyEpoch += 1;
+    currentOperation = null;
   });
 
   const addInvitee = (raw: string): void => {
@@ -110,37 +136,45 @@ export default function CreateRoomFormation(): JSX.Element {
 
   async function shareInvite(): Promise<void> {
     if (!channel() || !canShare() || shareBusy() || copyBusy()) return;
-    const epoch = ++shareEpoch;
+    const operation = { id: ++nextOperationId, kind: 'share' as const };
+    currentOperation = operation;
     const data = shareData();
     setShareBusy(true);
     setCopyStatus('Opening your device share sheet.');
     try {
       await navigator.share(data);
-      if (epoch === shareEpoch) markShared('Invite shared.');
+      if (currentOperation === operation) markShared('Invite shared.');
     } catch (err) {
-      if (epoch !== shareEpoch) return;
+      if (currentOperation !== operation) return;
       if (err instanceof DOMException && err.name === 'AbortError') {
         setCopyStatus('Share cancelled. Copy the link to finish starting the room.');
       } else {
         setCopyStatus('Could not open the share sheet. Copy the link instead.');
       }
     } finally {
-      if (epoch === shareEpoch) setShareBusy(false);
+      if (currentOperation === operation) {
+        currentOperation = null;
+        setShareBusy(false);
+      }
     }
   }
 
   async function copyInviteLink(): Promise<void> {
     if (!channel() || copyBusy() || shareBusy()) return;
-    const epoch = ++copyEpoch;
+    const operation = { id: ++nextOperationId, kind: 'copy' as const };
+    currentOperation = operation;
     const url = payload().shareUrl;
     setCopyBusy(true);
     try {
       const copied = await writeClipboardText(url);
-      if (epoch !== copyEpoch) return;
+      if (currentOperation !== operation) return;
       if (copied) markShared('Invite link copied. Enter the room when you are ready.');
       else setCopyStatus('Copy failed. Select and copy the link shown above.');
     } finally {
-      if (epoch === copyEpoch) setCopyBusy(false);
+      if (currentOperation === operation) {
+        currentOperation = null;
+        setCopyBusy(false);
+      }
     }
   }
 
@@ -156,18 +190,33 @@ export default function CreateRoomFormation(): JSX.Element {
       return;
     }
     setNameError('');
-    getState().createRoom({
+    setCreateError('');
+    const admitted = getState().createRoom({
       name,
       skin: skin(),
       hangLabel: includeHang() ? hangLabel() : null,
       firstLine: includeFirstLine() ? firstLine() : null,
       sharedInvite: true,
     });
+    if (!admitted) {
+      setCreateError('The room could not be started on this connection. Reconnect and try again; your form is still here.');
+    }
   };
 
   return (
     <form class="chb-create" onSubmit={enterRoom} data-testid="create-room-formation">
-      <p class="chb-create-lead">{FORMATION_COPY}</p>
+      <header class="chb-create-header">
+        <span class="chb-eyebrow">Create</span>
+        <h2>Start a room</h2>
+        <p class="chb-create-lead">A room is a shared conversation. Name it, choose an optional look, and share the invite before you enter.</p>
+      </header>
+      <p class="chb-create-note">{FORMATION_COPY}</p>
+      <Show when={!connected()}>
+        <p class="chb-state chb-state--offline" role="status"><strong>You’re offline.</strong> Reconnect to create or join this room. Your form will stay here.</p>
+      </Show>
+      <Show when={createError()}>
+        <p class="chb-state chb-state--offline" role="alert">{createError()}</p>
+      </Show>
 
       <FormField
         id="chb-create-name"
@@ -353,8 +402,8 @@ export default function CreateRoomFormation(): JSX.Element {
         <Button type="button" variant="ghost" onClick={() => getState().openChannelBrowser()}>
           Browse rooms
         </Button>
-        <Button type="submit" disabled={!canEnter()}>
-          Enter the room
+        <Button type="submit" disabled={!canEnter() || !connected()}>
+          Create and enter room
         </Button>
       </div>
     </form>

@@ -97,7 +97,9 @@ beforeEach(() => {
 
 describe('offline outbox', () => {
   it('queues a message composed while disconnected and shows a pending placeholder', async () => {
-    store.getState().sendMessage('#room', 'written in the dark');
+    const admitted = store.getState().sendMessage('#room', 'written in the dark');
+    expect(admitted).toBeInstanceOf(Promise);
+    await expect(admitted).resolves.toBe(true);
 
     await until(async () => (await loadOutbox()).length === 1);
     const [entry] = await loadOutbox();
@@ -127,11 +129,14 @@ describe('offline outbox', () => {
     store.getState().flushOutbox();
 
     await until(async () => (await loadOutbox()).length === 0);
-    expect(sendRaw).toHaveBeenCalledWith('PRIVMSG', '#room', 'delayed hello');
+    expect(sendRaw).toHaveBeenCalledWith('PRIVMSG', expect.objectContaining({ onUncertain: expect.any(Function) }), '#room', 'delayed hello');
     // Placeholder gone; the no-echo local append replaced it.
     const msgs = store.getState().channels.get('#room')!.messages;
     expect(msgs.some((m) => m.pending)).toBe(false);
-    expect(store.getState().toasts.some((t) => t.title.includes('sent'))).toBe(true);
+    const toast = store.getState().toasts.find((t) => t.title === 'Queued message admitted');
+    expect(toast).toMatchObject({
+      description: 'Admitted to this device connection; recipient delivery confirmation pending.',
+    });
   });
 
   it.each([
@@ -151,12 +156,12 @@ describe('offline outbox', () => {
     store.getState().flushOutbox();
     await until(() => sendRaw.mock.calls.length > 0);
 
-    expect(sendRaw).toHaveBeenCalledWith('PRIVMSG', target, text);
+    expect(sendRaw).toHaveBeenCalledWith('PRIVMSG', expect.objectContaining({ onUncertain: expect.any(Function) }), target, text);
     expect(await loadOutbox()).toEqual([entryBefore]);
     expect(messagesFor(target)).toHaveLength(1);
     expect(messagesFor(target)[0]).toBe(placeholderBefore);
     expect(messagesFor(target)[0]?.pending).toBe(true);
-    expect(store.getState().toasts.some((toast) => toast.title.includes('sent'))).toBe(false);
+    expect(store.getState().toasts.some((toast) => toast.title.includes('admitted'))).toBe(false);
     // Still within auto-retry budget — not a terminal failure yet.
     expect(store.getState().outboxDeliveryFailed).toBe(false);
   });
@@ -294,7 +299,7 @@ describe('offline outbox', () => {
     store.getState().flushOutbox();
     await until(async () => (await loadOutbox()).length === 0);
 
-    expect(aliceSendRaw).toHaveBeenCalledWith('PRIVMSG', '#room', 'Alice only');
+    expect(aliceSendRaw).toHaveBeenCalledWith('PRIVMSG', expect.objectContaining({ onUncertain: expect.any(Function) }), '#room', 'Alice only');
   });
 
   it('expires entries older than a day instead of sending them', async () => {
@@ -360,7 +365,7 @@ describe('offline outbox', () => {
       await new Promise((r) => setTimeout(r, 40));
 
       expect(sendRaw).toHaveBeenCalledTimes(1);
-      expect(sendRaw).toHaveBeenCalledWith('PRIVMSG', '#room', 'admit once only');
+      expect(sendRaw).toHaveBeenCalledWith('PRIVMSG', expect.objectContaining({ onUncertain: expect.any(Function) }), '#room', 'admit once only');
       expect(await loadOutbox()).toHaveLength(1);
       expect(store.getState().toasts.some((t) => t.title.includes('stuck on this device'))).toBe(true);
 
@@ -490,6 +495,6 @@ describe('offline outbox — E2EE DMs never persist plaintext', () => {
     expect(messagesFor('trev')).toHaveLength(1);
     expect(messagesFor('trev')[0]).toBe(placeholderBefore);
     expect(messagesFor('trev')[0]?.pending).toBe(true);
-    expect(store.getState().toasts.some((toast) => toast.title.includes('Queued message sent'))).toBe(false);
+    expect(store.getState().toasts.some((toast) => toast.title.includes('Queued message admitted'))).toBe(false);
   });
 });

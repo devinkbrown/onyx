@@ -101,9 +101,10 @@ describe('RoomStewardshipHost', () => {
     render(() => <RoomStewardshipHost />);
 
     const remove = screen.getByTestId('harbor-steward-delete');
-    expect(remove).toBeDisabled();
+    expect(remove).not.toBeDisabled();
     fireEvent.click(remove);
     expect(sendRaw).not.toHaveBeenCalled();
+    expect(remove).toHaveTextContent('Delete room');
 
     fireEvent.input(screen.getByTestId('harbor-steward-delete-name'), {
       target: { value: '#harbor' },

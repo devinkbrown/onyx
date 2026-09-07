@@ -568,7 +568,7 @@ describe('PresenceRibbon commercial room header', () => {
     });
     expect(screen.getByTestId('ribbon-dm-private')).toHaveTextContent('Private');
     expect(screen.getByTestId('ribbon-dm-private').getAttribute('aria-label') ?? '').toMatch(
-      /only the two of you can read these messages/i,
+      /message text is encrypted for you and the other person.*plaintext drafts and attachments may remain on this device/i,
     );
 
     store.setState({

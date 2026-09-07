@@ -18,6 +18,7 @@ import {
   showDmPrivateChip,
   DM_PRIVATE_CHIP,
   DM_PRIVATE_CHIP_LABEL,
+  DM_PRIVACY_SCOPE,
 } from '@/lib/e2ee/dmPrivacyChrome';
 import { getState, useStore, type ActiveView } from '@/lib/store';
 import { registerDmSafetySheetOpener } from './dmSafetySheetOpen';
@@ -61,6 +62,11 @@ export function DmSafetySheet(props: DmSafetySheetProps = {}): JSX.Element {
     const key = peerKey();
     return key === null ? null : peerSafetyNumbers().get(key) ?? null;
   });
+  const safetyIdentity = createMemo(() => {
+    const key = peerKey();
+    const trustedKey = key === null ? null : peerDmKeys().get(key) ?? null;
+    return `${key ?? ''}\u0000${trustedKey ?? ''}\u0000${cachedSafetyNumber() ?? ''}`;
+  });
 
   const [open, setOpen] = createSignal(false);
   const [loadState, setLoadState] = createSignal<LoadState>('idle');
@@ -68,6 +74,9 @@ export function DmSafetySheet(props: DmSafetySheetProps = {}): JSX.Element {
   let openerRef: HTMLButtonElement | undefined;
   let requestEpoch = 0;
   let previousPeer: string | null = null;
+  let requestedSafetyIdentity: string | null = null;
+  let requestedTrustedKey: string | null = null;
+  let displayedSafetyNumber: string | null = null;
 
   onCleanup(() => {
     requestEpoch += 1;
@@ -114,17 +123,36 @@ export function DmSafetySheet(props: DmSafetySheetProps = {}): JSX.Element {
     setOpen(false);
     setLoadedSafetyNumber(null);
     setLoadState('idle');
+    requestedSafetyIdentity = null;
+    requestedTrustedKey = null;
+    displayedSafetyNumber = null;
   });
 
   createEffect(() => {
     const name = peer();
     if (!open() || !name) return;
 
+    const identity = safetyIdentity();
+    if (identity === requestedSafetyIdentity) return;
+    const key = peerKey();
+    const trustedKey = key === null ? null : peerDmKeys().get(key) ?? null;
+    const cached = cachedSafetyNumber();
+    // loadSafetyNumber publishes its result into peerSafetyNumbers. Ignore
+    // that write when it is the same identity this request already displayed;
+    // a changed trusted key or number still enters the path below.
+    if (
+      requestedSafetyIdentity !== null
+      && requestedTrustedKey === trustedKey
+      && displayedSafetyNumber === cached
+    ) {
+      requestedSafetyIdentity = identity;
+      return;
+    }
+    requestedSafetyIdentity = identity;
+    requestedTrustedKey = trustedKey;
+
     const epoch = ++requestEpoch;
-    // Snapshot the cache rather than subscribing this request effect to it.
-    // loadSafetyNumber writes that map on success; a reactive read here would
-    // turn the write into a second load for the same open panel.
-    const cached = getState().peerSafetyNumbers.get(name.toLowerCase()) ?? null;
+    displayedSafetyNumber = cached;
     setLoadedSafetyNumber(cached);
     setLoadState(cached ? 'ready' : 'loading');
 
@@ -142,6 +170,11 @@ export function DmSafetySheet(props: DmSafetySheetProps = {}): JSX.Element {
   function closeAndRestoreFocus(): void {
     requestEpoch += 1;
     setOpen(false);
+    setLoadedSafetyNumber(null);
+    setLoadState('idle');
+    requestedSafetyIdentity = null;
+    requestedTrustedKey = null;
+    displayedSafetyNumber = null;
     queueMicrotask(() => {
       if (openerRef?.isConnected) openerRef.focus();
     });
@@ -214,7 +247,7 @@ export function DmSafetySheet(props: DmSafetySheetProps = {}): JSX.Element {
                 <header class="dm-safety__header">
                   <div>
                     <p class="dm-safety__kicker">Safety number</p>
-                    <h2 id="dm-safety-title">Compare this safety number with {name()}</h2>
+                  <h2 id="dm-safety-title">Review this safety number with {name()}</h2>
                   </div>
                   <button
                     type="button"
@@ -226,24 +259,25 @@ export function DmSafetySheet(props: DmSafetySheetProps = {}): JSX.Element {
 
                 <p id="dm-safety-guidance" class="dm-safety__guidance">
                   Compare every group with {name()} in person, on a trusted voice call,
-                  or through another channel you already trust. A matching number ties
+                  or through another channel you already trust. A matching number helps
                   this device to {peerDeviceCount() > 1
                     ? `all ${peerDeviceCount()} of their advertised device keys`
                     : 'the device key they published'}.
                 </p>
+                <p class="dm-safety__scope">{DM_PRIVACY_SCOPE}</p>
 
                 <div class="dm-safety__readiness" role="list" aria-label="Encryption key readiness">
                   <div class="dm-safety__readiness-row" role="listitem">
-                    <span>Your device</span>
-                    <strong>{safetyNumber() ? 'Ready to compare' : 'Not ready to compare'}</strong>
+                        <span>Your device</span>
+                    <strong>{safetyNumber() ? 'Number available' : 'Number unavailable'}</strong>
                   </div>
                   <div class="dm-safety__readiness-row" role="listitem">
                     <span>{name()}'s device keys</span>
                     <strong>{peerDeviceReadiness()}</strong>
                   </div>
                   <div class="dm-safety__readiness-row" role="listitem">
-                    <span>Manual comparison</span>
-                    <strong>Required</strong>
+                  <span>Review with {name()}</span>
+                  <strong>Still required</strong>
                   </div>
                 </div>
 
@@ -287,7 +321,8 @@ export function DmSafetySheet(props: DmSafetySheetProps = {}): JSX.Element {
                 </div>
 
                 <p class="dm-safety__warning">
-                  Until you compare this number, treat the identity as unverified.
+                  This number is a review aid, not proof by itself. Until you compare it,
+                  treat the identity as unverified.
                   If their device key changes
                   {peerDeviceCount() > 1 ? ' or a new device appears' : ''},
                   messages stay locked until you review it.

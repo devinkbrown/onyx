@@ -1,0 +1,37 @@
+.bridge-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: .45rem .75rem;
+  border: 1px solid var(--bridge-status-color, var(--seam));
+  border-radius: .8rem;
+  background: color-mix(in srgb, var(--bridge-status-color, currentColor) 9%, transparent);
+  color: var(--bridge-status-color, var(--paper));
+  font-size: .78rem;
+  line-height: 1.2;
+}
+.bridge-status-badge__dot { width: .55rem; height: .55rem; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
+.bridge-status-badge__copy { display: grid; gap: .12rem; min-width: 0; }
+.bridge-status-badge__label { font-weight: 750; overflow-wrap: anywhere; }
+.bridge-status-badge__action { color: color-mix(in srgb, currentColor 78%, transparent); font-size: .72rem; font-weight: 500; overflow-wrap: anywhere; }
+.bridge-status-badge__seen { align-self: center; color: currentColor; opacity: .78; font-size: .7rem; font-weight: 500; white-space: nowrap; }
+.bridge-status-badge:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+.bridge-status-badge[data-bridged='false'] { --bridge-status-color: var(--paper-mute); }
+.bridge-status-badge[data-state='up'] { --bridge-status-color: var(--success, #15803d); }
+.bridge-status-badge[data-state='down'] { --bridge-status-color: var(--danger, #b91c1c); }
+.bridge-status-badge[data-state='degraded'] { --bridge-status-color: var(--warning, #b45309); }
+@media (max-width: 30rem) {
+  .bridge-status-badge { align-items: flex-start; width: 100%; }
+  .bridge-status-badge__seen { margin-inline-start: auto; white-space: normal; text-align: end; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bridge-status-badge__dot { transition: box-shadow 180ms ease; }
+  .bridge-status-badge[data-state='up'] .bridge-status-badge__dot { box-shadow: 0 0 0 .2rem color-mix(in srgb, currentColor 14%, transparent); }
+}
+@media (forced-colors: active) {
+  .bridge-status-badge { border-color: CanvasText; background: Canvas; color: CanvasText; }
+  .bridge-status-badge__action { color: CanvasText; }
+  .bridge-status-badge__dot { background: CanvasText; forced-color-adjust: none; }
+}

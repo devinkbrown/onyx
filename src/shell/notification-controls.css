@@ -1,0 +1,39 @@
+/* NotificationControls: local explanation and resilient interaction states. */
+.shell-notify-explanation {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.shell-notify-quiet-trigger {
+  appearance: none;
+  margin: 0;
+  font: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-notify-btn,
+  .shell-notify-select,
+  .shell-notify-quiet-trigger {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .shell-notify-btn,
+  .shell-notify-quiet-trigger {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+
+  .shell-notify-btn:focus-visible,
+  .shell-notify-quiet-trigger:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

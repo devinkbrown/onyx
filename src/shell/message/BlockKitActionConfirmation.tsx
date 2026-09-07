@@ -2,6 +2,7 @@
 import { onMount, splitProps, type JSX } from 'solid-js';
 import type { PreparedBlockKitAction } from '@/lib/integrations/blockKitLite';
 import { ModalShell } from '@/primitives';
+import './blockkit-commercial.css';
 
 export const BLOCK_KIT_CONFIRM_TITLE = 'Send message from structured control?';
 export const BLOCK_KIT_CONFIRM_DESCRIPTION =
@@ -28,11 +29,13 @@ export function BlockKitActionConfirmationContent(
   });
 
   return (
-    <div class="shell-msg-blockkit-confirm">
+    <div class="shell-msg-blockkit-confirm" aria-label="Send review">
+      <p class="shell-msg-blockkit-eyebrow">Action review</p>
+      <p class="shell-msg-blockkit-confirm__intro">This is the exact request that will be sent. Check both destination and message before continuing.</p>
       <dl class="shell-msg-blockkit-confirm__preview">
         <div>
           <dt>Target</dt>
-          <dd><code>{local.prepared.target}</code></dd>
+          <dd><code aria-label={`Destination ${local.prepared.target}`}>{local.prepared.target}</code></dd>
         </div>
         <div>
           <dt>Message</dt>
@@ -42,6 +45,7 @@ export function BlockKitActionConfirmationContent(
       <p class="shell-msg-blockkit-confirm__warning">
         This message will be sent as you.
       </p>
+      <p class="shell-msg-blockkit-confirm__status" role="status" aria-live="polite">Waiting for your confirmation.</p>
       <div class="shell-msg-blockkit-confirm__actions">
         <button ref={cancelRef} type="button" onClick={() => local.onCancel()}>
           Cancel

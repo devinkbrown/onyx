@@ -260,31 +260,32 @@ describe('MemberList moderation', () => {
 // ── ChannelSettings panel ─────────────────────────────────────────────────────
 
 describe('ChannelSettings panel', () => {
-  function openSettings() {
+  async function openSettings() {
     const result = render(() => <PresenceRibbon selfNick="me" />);
     // A8: settings lives in the ribbon More disclosure, not the primary strip.
     const moreSurface = screen.getByTestId('ribbon-more');
     fireEvent.click(moreSurface.closest('button') ?? moreSurface);
     const gear = screen.getByTestId('ribbon-settings-gear');
     fireEvent.click(gear);
+    await screen.findByRole('dialog', { name: 'Room settings' });
     return result;
   }
 
-  function openAdvanced() {
-    fireEvent.click(screen.getByText('Advanced'));
+  async function openAdvanced() {
+    fireEvent.click(await screen.findByText('Advanced'));
   }
 
-  it('opens from the ribbon gear and shows the Topic + Modes sections to an op', () => {
+  it('opens from the ribbon gear and shows the Topic + Modes sections to an op', async () => {
     // Arrange
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
     // Act
-    openSettings();
+    await openSettings();
     expect(screen.getByRole('dialog', { name: 'Room settings' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Topic' })).toBeInTheDocument();
     expect(screen.getByText('Advanced')).toBeInTheDocument();
 
-    openAdvanced();
+    await openAdvanced();
 
     // Assert — operator chrome lives under Advanced
     expect(screen.getByRole('group', { name: 'Room mode flags' })).toBeInTheDocument();
@@ -293,51 +294,51 @@ describe('ChannelSettings panel', () => {
     expect(screen.getByRole('heading', { name: 'Encryption' })).toBeInTheDocument();
   });
 
-  it('shows a read-only modes view to a non-op', () => {
+  it('shows a read-only modes view to a non-op', async () => {
     // Arrange — plain member
     seedChannel({ ourNick: 'me', users: [makeUser('me', [])] });
 
     // Act
-    openSettings();
+    await openSettings();
     expect(screen.queryByRole('group', { name: 'Room mode flags' })).toBeNull();
-    openAdvanced();
+    await openAdvanced();
 
     // Assert — no toggle group; read-only notice present
     expect(screen.queryByRole('group', { name: 'Room mode flags' })).toBeNull();
     expect(screen.getByText('Only room hosts can change these rules.')).toBeInTheDocument();
   });
 
-  it('toggling a flag dispatches the MODE command', () => {
+  it('toggling a flag dispatches the MODE command', async () => {
     // Arrange — op, channel currently has no modes
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
     // Act
-    openSettings();
-    openAdvanced();
+    await openSettings();
+    await openAdvanced();
     fireEvent.click(screen.getByRole('switch', { name: /Moderated/ }));
 
     // Assert — +m sent (flag was off)
     expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#general', '+m');
   });
 
-  it('reflects current modes: an already-set +m flag renders as checked', () => {
+  it('reflects current modes: an already-set +m flag renders as checked', async () => {
     // Arrange — op, channel is +m
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])], modes: '+m' });
 
     // Act
-    openSettings();
-    openAdvanced();
+    await openSettings();
+    await openAdvanced();
 
     // Assert — the Moderated switch is on
     expect(screen.getByRole('switch', { name: /Moderated/ })).toHaveAttribute('aria-checked', 'true');
   });
 
-  it('saving the topic dispatches TOPIC', () => {
+  it('saving the topic dispatches TOPIC', async () => {
     // Arrange — op
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
     // Act
-    openSettings();
+    await openSettings();
     const textarea = screen.getByLabelText('Topic text') as HTMLTextAreaElement;
     fireEvent.input(textarea, { target: { value: 'A brand new topic' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save topic' }));
@@ -346,13 +347,13 @@ describe('ChannelSettings panel', () => {
     expect(client.sendRaw).toHaveBeenCalledWith('TOPIC', '#general', 'A brand new topic');
   });
 
-  it('keeps an offline topic draft until reconnect', () => {
+  it('keeps an offline topic draft until reconnect', async () => {
     // Arrange — op with the channel settings sheet available, but transport down.
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
     store.setState({ connectionStatus: 'disconnected' });
 
     // Act — draft while offline.
-    openSettings();
+    await openSettings();
     const textarea = screen.getByLabelText('Topic text') as HTMLTextAreaElement;
     fireEvent.input(textarea, { target: { value: 'Drafted during a tunnel drop' } });
 
@@ -364,7 +365,7 @@ describe('ChannelSettings panel', () => {
 
     // Act — reopen later and reconnect.
     cleanup();
-    openSettings();
+    await openSettings();
     expect(screen.getByLabelText('Topic text')).toHaveValue('Drafted during a tunnel drop');
     store.setState({ connectionStatus: 'connected' });
     fireEvent.click(screen.getByRole('button', { name: 'Save topic' }));
@@ -373,13 +374,13 @@ describe('ChannelSettings panel', () => {
     expect(client.sendRaw).toHaveBeenCalledWith('TOPIC', '#general', 'Drafted during a tunnel drop');
   });
 
-  it('lets an op set ephemeral history retention', () => {
+  it('lets an op set ephemeral history retention', async () => {
     // Arrange — op, no retention currently set
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
     // Act
-    openSettings();
-    openAdvanced();
+    await openSettings();
+    await openAdvanced();
     fireEvent.change(screen.getByLabelText('Ephemeral history'), { target: { value: '86400' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply retention' }));
 
@@ -388,14 +389,14 @@ describe('ChannelSettings panel', () => {
     expect(store.getState().channelProps.get('#general')?.EPHEMERAL).toBe('86400');
   });
 
-  it('shows ephemeral retention read-only to a non-op', () => {
+  it('shows ephemeral retention read-only to a non-op', async () => {
     // Arrange — plain member, retention already set
     seedChannel({ ourNick: 'me', users: [makeUser('me', [])], props: { EPHEMERAL: '3600' } });
 
     // Act
-    openSettings();
+    await openSettings();
     expect(screen.queryByLabelText('Ephemeral history')).toBeNull();
-    openAdvanced();
+    await openAdvanced();
 
     // Assert
     expect(screen.queryByLabelText('Ephemeral history')).toBeNull();
@@ -403,13 +404,13 @@ describe('ChannelSettings panel', () => {
     expect(screen.getByText('Only room hosts can change history retention.')).toBeInTheDocument();
   });
 
-  it('lets an op set the channel encryption policy', () => {
+  it('lets an op set the channel encryption policy', async () => {
     // Arrange — op, default policy off
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
     // Act
-    openSettings();
-    openAdvanced();
+    await openSettings();
+    await openAdvanced();
     fireEvent.change(screen.getByLabelText('Message policy'), { target: { value: 'required' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply policy' }));
 
@@ -418,14 +419,14 @@ describe('ChannelSettings panel', () => {
     expect(store.getState().channelProps.get('#general')?.['encryption-policy']).toBe('required');
   });
 
-  it('shows encryption policy read-only to a non-op', () => {
+  it('shows encryption policy read-only to a non-op', async () => {
     // Arrange — plain member, encryption required
     seedChannel({ ourNick: 'me', users: [makeUser('me', [])], props: { 'encryption-policy': 'required' } });
 
     // Act
-    openSettings();
+    await openSettings();
     expect(screen.queryByLabelText('Message policy')).toBeNull();
-    openAdvanced();
+    await openAdvanced();
 
     // Assert
     expect(screen.queryByLabelText('Message policy')).toBeNull();
@@ -433,11 +434,11 @@ describe('ChannelSettings panel', () => {
     expect(screen.getByText('Only room hosts can change the room encryption policy.')).toBeInTheDocument();
   });
 
-  it('lets an op set the channel history-policy', () => {
+  it('lets an op set the channel history-policy', async () => {
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
-    openSettings();
-    openAdvanced();
+    await openSettings();
+    await openAdvanced();
     fireEvent.change(screen.getByLabelText('Who can request history'), { target: { value: 'opers' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply history policy' }));
 
@@ -445,25 +446,25 @@ describe('ChannelSettings panel', () => {
     expect(store.getState().channelProps.get('#general')?.['history-policy']).toBe('opers');
   });
 
-  it('shows history policy read-only to a non-op', () => {
+  it('shows history policy read-only to a non-op', async () => {
     seedChannel({ ourNick: 'me', users: [makeUser('me', [])], props: { 'history-policy': 'members' } });
 
-    openSettings();
+    await openSettings();
     expect(screen.queryByLabelText('Who can request history')).toBeNull();
-    openAdvanced();
+    await openAdvanced();
 
     expect(screen.queryByLabelText('Who can request history')).toBeNull();
     expect(screen.getByText('Members only')).toBeInTheDocument();
     expect(screen.getByText('Only room hosts can change the room history policy.')).toBeInTheDocument();
   });
 
-  it('lets an op create, list, and delete webhooks', () => {
+  it('lets an op create, list, and delete webhooks', async () => {
     // Arrange — op
     const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
 
     // Act
-    openSettings();
-    openAdvanced();
+    await openSettings();
+    await openAdvanced();
     // Opening settings as op auto-fetches ACCESS LIST; ignore that for webhook asserts.
     client.sendRaw.mockClear();
     fireEvent.input(screen.getByLabelText('Webhook name'), { target: { value: 'deploy' } });
@@ -478,39 +479,39 @@ describe('ChannelSettings panel', () => {
     expect(client.sendRaw).toHaveBeenNthCalledWith(3, 'WEBHOOK', 'DELETE', 'wh_123');
   });
 
-  it('shows recent webhook notices in channel settings', () => {
+  it('shows recent webhook notices in channel settings', async () => {
     // Arrange — op with a previously-created webhook URL notice
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
     store.getState().addServiceNotice('Webhook', 'WEBHOOK: created for #general - POST Discord webhook JSON to https://chat.example/api/webhooks/id/token');
 
     // Act
-    openSettings();
-    openAdvanced();
+    await openSettings();
+    await openAdvanced();
 
     // Assert
     expect(screen.getByText(/WEBHOOK: created for #general/)).toBeInTheDocument();
   });
 
-  it('shows webhook controls read-only to a non-op', () => {
+  it('shows webhook controls read-only to a non-op', async () => {
     // Arrange — plain member
     seedChannel({ ourNick: 'me', users: [makeUser('me', [])] });
 
     // Act
-    openSettings();
+    await openSettings();
     expect(screen.queryByLabelText('Webhook name')).toBeNull();
-    openAdvanced();
+    await openAdvanced();
 
     // Assert
     expect(screen.queryByLabelText('Webhook name')).toBeNull();
     expect(screen.getByText('Discord-compatible webhook URLs can post into this room.')).toBeInTheDocument();
   });
 
-  it('makes the topic read-only for a non-op in a +t channel', () => {
+  it('makes the topic read-only for a non-op in a +t channel', async () => {
     // Arrange — plain member, topic-locked channel
     seedChannel({ ourNick: 'me', users: [makeUser('me', [])], modes: '+t' });
 
     // Act
-    openSettings();
+    await openSettings();
 
     // Assert — no editable textarea, lock notice shown
     expect(screen.queryByLabelText('Topic text')).toBeNull();

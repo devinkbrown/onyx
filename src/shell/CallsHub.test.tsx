@@ -49,7 +49,7 @@ describe('CallsHub', () => {
     expect(
       screen.getByRole('heading', { name: 'Talk where the conversation already lives.' }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('calls-hub-status')).toHaveTextContent(/Idle/i);
+    expect(screen.getByTestId('calls-hub-status')).toHaveTextContent(/Idle.*Pre-join/i);
     expect(screen.getByRole('button', { name: 'Choose a room' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Return to call' })).toBeNull();
     expect(document.querySelector('[data-call-presentation="idle"]')).not.toBeNull();
@@ -178,5 +178,11 @@ describe('CallsHub', () => {
       expect(screen.queryByRole('button', { name: /accept|join|start/i })).toBeNull();
       unmount();
     }
+  });
+
+  it('explains that the hub is not a media surface', () => {
+    renderHub();
+    expect(screen.getByRole('note')).toHaveTextContent(/does not join or start a call/i);
+    expect(screen.getByText(/Controls belong to the room/i)).toBeInTheDocument();
   });
 });

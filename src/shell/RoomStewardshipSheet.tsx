@@ -68,6 +68,7 @@ export function RoomStewardshipHost() {
   const [typedName, setTypedName] = createSignal('');
   const [status, setStatus] = createSignal('');
   const [closing, setClosing] = createSignal(false);
+  const [deleting, setDeleting] = createSignal(false);
   let panelRef: HTMLElement | undefined;
 
   createDialogFocus({
@@ -88,6 +89,7 @@ export function RoomStewardshipHost() {
     setTypedName('');
     setStatus('');
     setClosing(false);
+    setDeleting(false);
   });
 
   const channelName = createMemo(() => target()?.channel ?? '');
@@ -257,6 +259,7 @@ export function RoomStewardshipHost() {
                     </Show>
 
                     <Show when={isOwner()}>
+                      <p class="harbor-steward__room-context"><span>Managing</span> {current().channel} · Community room</p>
                       <section class="harbor-steward__section" aria-labelledby="harbor-steward-hand">
                         <h3 id="harbor-steward-hand" class="harbor-steward__label">
                           Hand the room to someone
@@ -381,39 +384,34 @@ export function RoomStewardshipHost() {
                       <section class="harbor-steward__section" aria-labelledby="harbor-steward-delete">
                         <h3 id="harbor-steward-delete" class="harbor-steward__label">Delete this room</h3>
                         <p class="harbor-steward__body">{STEWARDSHIP_COPY.deleteBody}</p>
-                        <label class="harbor-steward__label" for="harbor-steward-delete-name">
-                          Type {current().channel} to delete
-                        </label>
-                        <input
-                          id="harbor-steward-delete-name"
-                          class="harbor-steward__field"
-                          data-testid="harbor-steward-delete-name"
-                          value={typedName()}
-                          autocomplete="off"
-                          onInput={(event) => setTypedName(event.currentTarget.value)}
-                        />
+                        <Show when={deleting()}>
+                          <p class="harbor-steward__status" role="alert">This permanently removes the room for everyone. To continue, type the exact room name.</p>
+                          <label class="harbor-steward__label" for="harbor-steward-delete-name">Type {current().channel} to delete</label>
+                          <input id="harbor-steward-delete-name" class="harbor-steward__field" data-testid="harbor-steward-delete-name" value={typedName()} autocomplete="off" onInput={(event) => setTypedName(event.currentTarget.value)} />
+                        </Show>
                         <div class="harbor-steward__actions">
                           <Button
                             type="button"
-                            variant="danger"
+                            variant={deleting() ? 'danger' : 'ghost'}
                             size="md"
                             data-testid="harbor-steward-delete"
-                            disabled={
+                            disabled={deleting() && (
                               !connected()
                               || !canDeleteRoom({
                                 actorIsOwner: true,
                                 typedName: typedName(),
                                 room: current().channel,
                               })
-                            }
+                            )}
                             onClick={() => {
+                              if (!deleting()) { setDeleting(true); return; }
                               const room = current().channel;
                               const result = deleteConsumerRoom(room, typedName());
                               note(result);
                               if (result.ok) closeRoomStewardship();
                             }}
                           >
-                            {STEWARDSHIP_COPY.deleteConfirm}
+                            {deleting() ? STEWARDSHIP_COPY.deleteConfirm : 'Review deletion'}
                           </Button>
                         </div>
                       </section>

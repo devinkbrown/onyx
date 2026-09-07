@@ -650,7 +650,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   return (
     <div class="msg-menu" role="group" aria-label={`Actions for message from ${local.msg.from}`}>
       <div class="msg-menu-bar">
-        {/* Overlay chrome: React · Reply · More. Edit/Delete stay in overflow. */}
+        {/* Calm default actions: Reply · React · Copy. Everything else stays in More. */}
         {/* React → emoji picker */}
         <Show when={caps().canReact}>
           <Popover
@@ -715,6 +715,17 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
             onClick={reply}
           >
             <ReplyIcon class="msg-menu-icon" />
+          </button>
+        </Show>
+
+        <Show when={caps().canCopy}>
+          <button
+            type="button"
+            class="msg-menu-btn"
+            aria-label={`Copy text from ${messageActionTarget()}`}
+            onClick={() => void copyText()}
+          >
+            <CopyIcon class="msg-menu-icon" />
           </button>
         </Show>
 
@@ -785,18 +796,6 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                 aria-label={`More actions for ${messageActionTarget()}`}
                 onKeyDown={onMenuKeyDown}
               >
-            <Show when={caps().canCopy}>
-              <button
-                type="button"
-                class="msg-menu-item"
-                role="menuitem"
-                aria-label={`Copy text from ${messageActionTarget()}`}
-                onClick={() => void copyText()}
-              >
-                <CopyIcon class="msg-menu-item-icon" />
-                <span>Copy text</span>
-              </button>
-            </Show>
             <Show when={caps().canQuote}>
               <button
                 type="button"
@@ -871,18 +870,6 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
               >
                 <TranslateIcon class="msg-menu-item-icon" />
                 <span>Translate on this device</span>
-              </button>
-            </Show>
-            <Show when={caps().canReply}>
-              <button
-                type="button"
-                class="msg-menu-item"
-                role="menuitem"
-                aria-label={`Reply to ${messageActionTarget()}`}
-                onClick={reply}
-              >
-                <ReplyIcon class="msg-menu-item-icon" />
-                <span>Reply</span>
               </button>
             </Show>
             <Show when={caps().canStartTopic}>

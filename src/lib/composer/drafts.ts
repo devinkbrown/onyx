@@ -18,6 +18,22 @@ const INVALID_DRAFT_TARGET_CHARACTERS = /[\s,\x00-\x1f\x7f]/u;
 
 export type ComposerDrafts = Record<string, string>;
 
+export type ComposerDraftPersistenceStatus =
+  | 'saved'
+  | 'only-in-tab'
+  | 'limit-reached'
+  | 'malformed';
+
+export interface ComposerDraftPersistenceResult {
+  status: ComposerDraftPersistenceStatus;
+  drafts: ComposerDrafts;
+}
+
+function draftsHitLimit(drafts: ComposerDrafts): boolean {
+  return Object.keys(drafts).length > MAX_COMPOSER_DRAFTS
+    || Object.values(drafts).some((draft) => draft.length > MAX_DRAFT_LEN);
+}
+
 /**
  * Enforce the count bound deterministically. Drafts carry no timestamp, so we
  * retain an insertion-stable subset: the first {@link MAX_COMPOSER_DRAFTS}
@@ -84,24 +100,55 @@ export function loadComposerDrafts(
   }
 }
 
+export function loadComposerDraftsWithStatus(
+  storage?: DraftStorage,
+  owner?: DeviceMemoryOwner,
+): ComposerDraftPersistenceResult {
+  const resolved = storageOrDefault(storage);
+  const storageKey = deviceMemoryStorageKey(COMPOSER_DRAFTS_KEY, owner);
+  if (!resolved || !storageKey) return { status: 'only-in-tab', drafts: {} };
+  try {
+    const raw = resolved.getItem(storageKey);
+    if (!raw) return { status: 'saved', drafts: {} };
+    if (raw.length > MAX_COMPOSER_DRAFTS_STORAGE_CHARS) {
+      return { status: 'malformed', drafts: {} };
+    }
+    const parsed = JSON.parse(raw);
+    return { status: 'saved', drafts: sanitizeComposerDrafts(parsed) };
+  } catch {
+    return { status: 'malformed', drafts: {} };
+  }
+}
+
 export function saveComposerDrafts(
   drafts: ComposerDrafts,
   storage?: DraftStorage,
   owner?: DeviceMemoryOwner,
-): void {
+): ComposerDraftPersistenceResult {
   const resolved = storageOrDefault(storage);
-  if (!resolved) return;
-  const storageKey = deviceMemoryStorageKey(COMPOSER_DRAFTS_KEY, owner);
-  if (!storageKey) return;
-
   const sanitized = sanitizeComposerDrafts(drafts);
+  const limited = draftsHitLimit(drafts);
+  if (!resolved) return { status: limited ? 'limit-reached' : 'only-in-tab', drafts: sanitized };
+  const storageKey = deviceMemoryStorageKey(COMPOSER_DRAFTS_KEY, owner);
+  if (!storageKey) return { status: limited ? 'limit-reached' : 'only-in-tab', drafts: sanitized };
+
   try {
     if (Object.keys(sanitized).length === 0) {
       resolved.removeItem(storageKey);
-      return;
+      if (resolved.getItem(storageKey) !== null) {
+        return { status: 'only-in-tab', drafts: sanitized };
+      }
+      return { status: limited ? 'limit-reached' : 'saved', drafts: sanitized };
     }
-    resolved.setItem(storageKey, JSON.stringify(sanitized));
-  } catch {}
+    const serialized = JSON.stringify(sanitized);
+    resolved.setItem(storageKey, serialized);
+    if (resolved.getItem(storageKey) !== serialized) {
+      return { status: 'only-in-tab', drafts: sanitized };
+    }
+    return { status: limited ? 'limit-reached' : 'saved', drafts: sanitized };
+  } catch {
+    return { status: 'only-in-tab', drafts: sanitized };
+  }
 }
 
 export interface ClearRoomComposerDraftsResult {

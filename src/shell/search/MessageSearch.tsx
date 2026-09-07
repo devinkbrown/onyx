@@ -525,10 +525,10 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
             aria-controls={controlledResults()}
             aria-keyshortcuts="Enter Shift+Enter Control+Enter Meta+Enter Escape"
             placeholder={search.hasConversation()
-              ? 'Find in conversation'
+              ? `Find messages in ${search.targetLabel()}`
               : search.localHistoryEnabled()
-                ? 'Search all remembered messages'
-                : 'Device history is off'}
+                ? 'Search messages saved on this device'
+                : 'Device history is turned off'}
             disabled={!search.hasConversation() && !search.localHistoryEnabled()}
             onInput={handleInput}
             onCompositionEnd={handleCompositionEnd}
@@ -642,7 +642,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
           <section class="onyx-message-search__saved" aria-label="Saved searches">
             <div class="onyx-message-search__saved-bar">
               <ProvenanceBadge scope="device" subject="Saved searches" />
-              <span class="onyx-message-search__vault-label">Saved</span>
+              <span class="onyx-message-search__vault-label">Saved on this device</span>
               <span class="onyx-message-search__server-count">
                 {savedSearches().length} saved
               </span>
@@ -655,7 +655,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
                   class="onyx-message-search__save-input"
                   value={savedLabel()}
                   maxlength="120"
-                  placeholder="Name this search"
+                  placeholder="Name this device search"
                   onInput={(event) => setSavedLabel(event.currentTarget.value)}
                 />
                 <button
@@ -749,7 +749,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
               >
                 {search.serverStatus() === 'pending'
                   ? 'Searching archived history…'
-                  : 'Search full history ↵'}
+                  : 'Search full server history'}
               </button>
               <Show when={search.serverStatus() === 'done'}>
                 <span class="onyx-message-search__server-count">
@@ -800,6 +800,12 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
           <div class="onyx-message-search__history-off" role="status">
             Encrypted DM search stays on this device. Loaded decrypted lines are searched here;
             query text and ciphertext history are not sent to server search.
+          </div>
+        </Show>
+        <Show when={search.query().trim().length >= 2 && search.serverStatus() !== 'pending' && search.vaultStatus() !== 'pending' && search.resultCount() === 0 && search.serverResults().length === 0 && search.vaultResults().length === 0}>
+          <div class="onyx-message-search__empty" role="status">
+            <strong>No matches yet</strong>
+            <span>Try a shorter phrase, or search full server history if it’s available.</span>
           </div>
         </Show>
         <Show when={search.query().trim().length >= 2}>

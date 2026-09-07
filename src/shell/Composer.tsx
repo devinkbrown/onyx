@@ -25,7 +25,7 @@ import {
 } from 'solid-js';
 import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import { blockedDmComposeCopy, isBlockedDmTarget } from '@/lib/people/personSafety';
-import { useStore, getState, setState, selectDeviceMemoryOwner, selectOwnedScheduledMessageCount } from '@/lib/store';
+import { useStore, getState, isDmE2eeDesignated, setState, selectDeviceMemoryOwner, selectOwnedScheduledMessageCount } from '@/lib/store';
 import { searchEmojis } from '@/lib/emoji/emoji';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import {
@@ -41,7 +41,7 @@ import {
   rankNickCompletions,
 } from '@/lib/composer/nickComplete';
 import { mergeComposerInsert } from '@/lib/composer/composerInject';
-import { composerDraftKey } from '@/lib/composer/drafts';
+import { composerDraftKey, loadComposerDraftsWithStatus, type ComposerDraftPersistenceStatus } from '@/lib/composer/drafts';
 import { uploadFile } from '@/lib/upload/upload';
 import { ATTACHMENT_SEND_FAILED, buildAttachmentMessage } from '@/lib/upload/attachmentMessage';
 import {
@@ -66,6 +66,8 @@ import {
   activeReplyPreviewText,
   hasEncryptedMessageBoundary,
 } from '@/lib/e2ee/replyPrivacy';
+import { DM_ATTACHMENT_BLOCKED } from '@/lib/e2ee/dmPrivacyChrome';
+import { subscribeVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import {
   activeReplyForTarget,
   messageContextMatchesTarget,
@@ -87,6 +89,8 @@ import {
 } from '@/lib/firstHour/firstHour';
 import { markNotifyFirstSend } from '@/lib/notifications/firstRunNotify';
 import { FirstHourCoach } from './FirstHourCoach';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
+import './Composer.css';
 
 export type ComposerProps = {
   /** Optionally override the active target; defaults to deriving from activeView */
@@ -149,6 +153,13 @@ export function Composer(props: ComposerProps): JSX.Element {
     selectDeviceMemoryOwner,
     (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
   );
+  // These are explicit reactive inputs for DM attachment presentation. The
+  // designation can change while this composer stays mounted (for example
+  // when a peer key or encrypted history arrives).
+  const peerDmKeys = useStore((s) => s.peerDmKeys);
+  const peerDmDeviceKeys = useStore((s) => s.peerDmDeviceKeys);
+  const peerKeyChanges = useStore((s) => s.peerKeyChanges);
+  const dms = useStore((s) => s.dms);
 
   // Device-local outbox journal — same substrate Home reads. Metadata only in
   // chrome (count + delivery state); message bodies stay in the conversation.
@@ -178,6 +189,8 @@ export function Composer(props: ComposerProps): JSX.Element {
   const [scheduleError, setScheduleError] = createSignal<string | null>(null);
   /** Standard primary "More tools" disclosure (schedule / jump / command tip). */
   const [toolsOpen, setToolsOpen] = createSignal(false);
+  const [draftPersistenceStatus, setDraftPersistenceStatus] = createSignal<ComposerDraftPersistenceStatus>('saved');
+  const [privacyRevision, setPrivacyRevision] = createSignal(0);
 
   let textareaRef!: HTMLTextAreaElement;
   let fileInputRef!: HTMLInputElement;
@@ -187,6 +200,17 @@ export function Composer(props: ComposerProps): JSX.Element {
   const previewUrls = new Set<string>();
   let attachmentScopeKey: string | undefined;
   let activeUpload: AbortController | null = null;
+  let mounted = true;
+  let continuityHeld = false;
+  let draftRevision = 0;
+
+  onCleanup(subscribeVaultDmSearchPrivacy(() => setPrivacyRevision((value) => value + 1)));
+
+  createEffect(() => {
+    const active = Boolean(text().trim() || attachments().length || isSending());
+    if (active && !continuityHeld) { updateCoordinator.begin('composer'); continuityHeld = true; }
+    if (!active && continuityHeld) { updateCoordinator.end('composer'); continuityHeld = false; }
+  });
 
   function clearAttachments(): void {
     setAttachments((items) => {
@@ -200,6 +224,8 @@ export function Composer(props: ComposerProps): JSX.Element {
   }
 
   onCleanup(() => {
+    mounted = false;
+    if (continuityHeld) updateCoordinator.end('composer');
     activeUpload?.abort();
     activeUpload = null;
     for (const url of previewUrls) URL.revokeObjectURL(url);
@@ -241,6 +267,25 @@ export function Composer(props: ComposerProps): JSX.Element {
     return messageContextMatchesTarget(edit, t) ? edit : null;
   });
 
+  // The durable receipt belongs to this owner and target. Re-read it whenever
+  // either changes so a remount, navigation, or account switch cannot inherit
+  // the optimistic default from a previous composer instance.
+  createEffect(() => {
+    const currentTarget = target();
+    const owner = memoryOwner();
+    if (!currentTarget || activeEditing()) {
+      setDraftPersistenceStatus('saved');
+      return;
+    }
+    const result = loadComposerDraftsWithStatus(undefined, owner ?? undefined);
+    const liveText = getState().getComposerDraft(currentTarget);
+    const receipt = getState().getComposerDraftReceipt(currentTarget, liveText);
+    const persistedText = result.drafts[composerDraftKey(currentTarget)];
+    setDraftPersistenceStatus(receipt ?? (liveText
+      ? (persistedText === liveText ? result.status : 'only-in-tab')
+      : result.status));
+  });
+
   // Reply banner is target-scoped the same way edit is: a reply armed in one
   // room must not paint (or send as) a reply while the composer is elsewhere.
   const activeReply = createMemo(() => activeReplyForTarget(replyingTo(), target()));
@@ -257,6 +302,18 @@ export function Composer(props: ComposerProps): JSX.Element {
   // Attachments are the exception: uploads need the network right now.
   const isOffline = createMemo(() => connectionStatus() !== 'connected');
   const isEnabled = createMemo(() => !!target());
+  const protectedDm = createMemo(() => {
+    const t = target();
+    if (!t) return false;
+    // Touch all designation inputs so delayed key/history/privacy changes
+    // invalidate the presentation even when the target string is unchanged.
+    peerDmKeys();
+    peerDmDeviceKeys();
+    peerKeyChanges();
+    dms();
+    privacyRevision();
+    return isDmE2eeDesignated(getState(), t);
+  });
   const activeTopic = createMemo(() => {
     const view = activeView();
     if (view.kind !== 'channel') return null;
@@ -471,7 +528,7 @@ export function Composer(props: ComposerProps): JSX.Element {
   }
 
   /** Queue the current composer text for `epoch`, then reset like a send. */
-  function scheduleAt(epoch: number): void {
+  async function scheduleAt(epoch: number): Promise<void> {
     const t = target();
     const body = text().trim();
     if (!t || !body || body.startsWith('/')) return;
@@ -479,8 +536,15 @@ export function Composer(props: ComposerProps): JSX.Element {
       setScheduleError('Pick a time at least a minute from now.');
       return;
     }
-    if (!getState().scheduleMessage(t, body, epoch)) {
-      setScheduleError('Protected room messages cannot be stored for later. Send while connected.');
+    const revision = draftRevision;
+    const owner = memoryOwner();
+    const ownerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    setIsSending(true);
+    let admitted = false;
+    try { admitted = await getState().scheduleMessage(t, body, epoch); } catch { admitted = false; }
+    setIsSending(false);
+    if (!admitted) {
+      setScheduleError('Message was not durably scheduled. Your draft is still here; try again.');
       return;
     }
     getState().addToast({
@@ -490,7 +554,10 @@ export function Composer(props: ComposerProps): JSX.Element {
     });
     setScheduleWhen('');
     closeSchedule(false);
-    resetAfterSend(t);
+    const currentOwner = memoryOwner();
+    if (mounted && revision === draftRevision && text() === body
+      && ownerKey === (currentOwner ? deviceMemoryOwnerKey(currentOwner) : null)
+      && target()?.toLowerCase() === t.toLowerCase()) resetAfterSend(t);
   }
 
   /** Schedule from the custom datetime-local field. */
@@ -500,7 +567,7 @@ export function Composer(props: ComposerProps): JSX.Element {
       setScheduleError('Enter a valid time at least a minute from now.');
       return;
     }
-    scheduleAt(epoch);
+    void scheduleAt(epoch);
   }
 
   let loadedTarget: string | null = null;
@@ -532,7 +599,14 @@ export function Composer(props: ComposerProps): JSX.Element {
 
     if (t !== loadedTarget) {
       loadedTarget = t;
-      setComposerText(t ? getState().getComposerDraft(t) : '', false);
+      const restored = t ? getState().getComposerDraft(t) : '';
+      setComposerText(restored, false);
+      if (t) {
+        const receipt = getState().getComposerDraftReceipt(t, restored);
+        setDraftPersistenceStatus(receipt ?? (restored ? 'only-in-tab' : 'saved'));
+      } else {
+        setDraftPersistenceStatus('saved');
+      }
     }
   });
 
@@ -608,11 +682,13 @@ export function Composer(props: ComposerProps): JSX.Element {
   function persistDraft(nextText: string): void {
     const t = target();
     if (!t || activeEditing()) return;
-    getState().setComposerDraft(t, nextText);
+    const receipt = getState().setComposerDraft(t, nextText);
+    setDraftPersistenceStatus(receipt);
   }
 
   function setComposerText(nextText: string, persist = true): void {
     setText(nextText);
+    if (persist) draftRevision += 1;
     if (persist) persistDraft(nextText);
     queueMicrotask(autoResize);
   }
@@ -813,6 +889,10 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   function addFiles(files: File[]): void {
     if (files.length === 0) return;
+    if (protectedDm()) {
+      setComposerError(DM_ATTACHMENT_BLOCKED);
+      return;
+    }
     if (activeEditing()) {
       setComposerError('Finish editing before attaching files.');
       return;
@@ -905,7 +985,10 @@ export function Composer(props: ComposerProps): JSX.Element {
   }
 
   function handleAttachClick(): void {
-    if (!isEnabled() || activeEditing()) return;
+    if (!isEnabled() || activeEditing() || protectedDm()) {
+      if (protectedDm()) setComposerError(DM_ATTACHMENT_BLOCKED);
+      return;
+    }
     fileInputRef?.click();
   }
 
@@ -954,7 +1037,11 @@ export function Composer(props: ComposerProps): JSX.Element {
     addFiles(Array.from(e.dataTransfer?.files ?? []));
   }
 
-  async function uploadPendingAttachments(signal: AbortSignal): Promise<string[] | null> {
+  async function uploadPendingAttachments(
+    signal: AbortSignal,
+    sendAttachments: ComposerAttachment[],
+    context: { target: string; ownerKey: string | null; protectedMessage: boolean },
+  ): Promise<string[] | null> {
     const uploaded: string[] = [];
     // Production default: same-origin '/upload' (nginx proxies it to the
     // nexus-upload service). Dev has no default — uploads surface a config
@@ -963,8 +1050,25 @@ export function Composer(props: ComposerProps): JSX.Element {
       (import.meta.env.VITE_MEDIA_URL as string | undefined) ||
       (import.meta.env.PROD ? '/upload' : '');
 
-    for (const item of attachments()) {
+    for (const item of sendAttachments) {
       if (signal.aborted) return null;
+      const currentOwner = memoryOwner();
+      const currentOwnerKey = currentOwner ? deviceMemoryOwnerKey(currentOwner) : null;
+      const currentTarget = target();
+      const currentProtected = Boolean(
+        currentTarget && isDmE2eeDesignated(getState(), currentTarget),
+      );
+      if (
+        currentTarget?.toLowerCase() !== context.target.toLowerCase()
+        || currentOwnerKey !== context.ownerKey
+      ) {
+        setComposerError('Upload stopped because the conversation or account changed. Your draft is still here.');
+        return null;
+      }
+      if (context.protectedMessage || currentProtected) {
+        setComposerError(DM_ATTACHMENT_BLOCKED);
+        return null;
+      }
       if (item.uploadedUrl) {
         uploaded.push(item.uploadedUrl);
         continue;
@@ -980,6 +1084,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         const result = await uploadFile(fileToUpload(item), {
           mediaUrl,
           signal,
+          protectedMessage: context.protectedMessage,
           onProgress: (progress) => {
             if (signal.aborted) return;
             updateAttachment(item.id, {
@@ -1058,36 +1163,83 @@ export function Composer(props: ComposerProps): JSX.Element {
       }
       const content = text().trim();
       if (!content) return;
-      // Mark edit as intentionally finished BEFORE clearing store state so the
-      // load-effect does not restore the pre-edit draft over the empty send.
-      loadedEditId = null;
-      getState().editMessage(t, edit.id, content);
-      getState().setComposerEditingMessage(null);
-      setComposerText('', false);
+      const outcome = getState().editMessage(t, edit.id, content);
+      if (outcome === 'admitted') {
+        getState().setComposerEditingMessage(null);
+        setText('');
+        setComposerError(null);
+      } else if (outcome === 'uncertain') {
+        setComposerError('Edit admission is uncertain. Check the conversation before retrying.');
+      } else {
+        setComposerError('Edit was refused. Your replacement text is still here.');
+      }
       return;
     }
 
-    markFirstHourSeen();
+    const sendOwnerKey = (() => {
+      const owner = memoryOwner();
+      return owner ? deviceMemoryOwnerKey(owner) : null;
+    })();
+    const sendDraftRevision = draftRevision;
+    const sendText = text();
+    const sendReplyId = activeReply()?.id ?? null;
+    const sendAttachments = attachments().slice();
+    if (protectedDm() && sendAttachments.length > 0) {
+      setComposerError(DM_ATTACHMENT_BLOCKED);
+      focusTextarea();
+      return;
+    }
     setIsSending(true);
+    const sendAttachmentKey = sendAttachments.map((item) => [
+      item.id,
+      item.file.name,
+      item.file.size,
+      item.treatAs,
+      item.quality,
+      item.sendOriginal,
+    ]).join('|');
+    const canClearAdmittedDraft = (): boolean => {
+      const owner = memoryOwner();
+      const currentOwnerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+      const currentAttachmentKey = attachments().map((item) => [
+        item.id,
+        item.file.name,
+        item.file.size,
+        item.treatAs,
+        item.quality,
+        item.sendOriginal,
+      ]).join('|');
+      return draftRevision === sendDraftRevision
+        && text() === sendText
+        && currentOwnerKey === sendOwnerKey
+        && target()?.toLowerCase() === t.toLowerCase()
+        && (activeReply()?.id ?? null) === sendReplyId
+        && currentAttachmentKey === sendAttachmentKey;
+    };
     const upload = new AbortController();
     activeUpload?.abort();
     activeUpload = upload;
     const sendScopeKey = attachmentScopeKey;
     try {
-      const urls = await uploadPendingAttachments(upload.signal);
+      const urls = await uploadPendingAttachments(upload.signal, sendAttachments, {
+        target: t,
+        ownerKey: sendOwnerKey,
+        protectedMessage: protectedDm(),
+      });
       if (!urls) return;
       if (
-        upload.signal.aborted
+        !mounted
+        || upload.signal.aborted
         || sendScopeKey !== attachmentScopeKey
         || target()?.toLowerCase() !== t.toLowerCase()
       ) return;
 
-      const baseContent = expandSlashTextCommand(text().trim());
+      const baseContent = expandSlashTextCommand(sendText.trim());
       // Prefer safe attachment lines (caption + [file: name] url) over bare URLs.
       const attachmentLines: string[] = [];
       for (let i = 0; i < urls.length; i += 1) {
         const url = urls[i]!;
-        const item = attachments().find((a) => a.uploadedUrl === url) ?? attachments()[i];
+        const item = sendAttachments.find((a) => a.uploadedUrl === url) ?? sendAttachments[i];
         const outgoing = item ? fileToUpload(item) : null;
         const line = buildAttachmentMessage({
           url,
@@ -1128,8 +1280,17 @@ export function Composer(props: ComposerProps): JSX.Element {
         focusTextarea();
         return;
       }
+      if (admitted !== true) {
+        setComposerError('May have sent. Delivery is uncertain; your draft is still here. Do not retry blindly.');
+        focusTextarea();
+        return;
+      }
+      markFirstHourSeen();
       markNotifyFirstSend();
-      resetAfterSend(t);
+      if (mounted && canClearAdmittedDraft()) resetAfterSend(t);
+    } catch {
+      setComposerError('May have sent. Delivery is uncertain; your draft is still here. Do not retry blindly.');
+      focusTextarea();
     } finally {
       if (activeUpload === upload) activeUpload = null;
       setIsSending(false);
@@ -1175,6 +1336,14 @@ export function Composer(props: ComposerProps): JSX.Element {
       onDrop={handleDrop}
     >
       <div class="shell-composer-measure">
+        <Show when={text() && !activeEditing()}>
+          <div class="shell-composer-draft-status" role="status" aria-live="polite">
+            {draftPersistenceStatus() === 'saved' ? 'Saved here'
+              : draftPersistenceStatus() === 'only-in-tab' ? 'Only on this tab'
+                : draftPersistenceStatus() === 'limit-reached' ? 'Saved with limits; full text remains here'
+                  : 'Could not save; full text remains here'}
+          </div>
+        </Show>
         <div class="shell-composer-brief" role="note" aria-label="Current compose context">
           <span class="shell-composer-brief-destination">{composerBrief().destination}</span>
           <span class="shell-composer-brief-state">{composerBrief().state}</span>
@@ -1294,12 +1463,12 @@ export function Composer(props: ComposerProps): JSX.Element {
                     </div>
                   </Show>
                   <Show when={item.status === 'uploading'}>
-                    <progress
-                      class="shell-attachment-progress"
-                      max="100"
-                      value={item.progress ?? 0}
-                      aria-label={`Uploading ${item.file.name}`}
-                    />
+                    <>
+                      <span class="shell-attachment-status" role="status">
+                        Uploading{item.progress !== null ? ` ${item.progress}%` : '…'}
+                      </span>
+                      <progress class="shell-attachment-progress" max="100" value={item.progress ?? 0} aria-label={`Uploading ${item.file.name}`} />
+                    </>
                   </Show>
                   <Show when={item.error}>
                     {(error) => <span class="shell-attachment-error">{error()}</span>}
@@ -1439,7 +1608,15 @@ export function Composer(props: ComposerProps): JSX.Element {
               }
             }}
           >
-            <p class="shell-schedule-heading">Send later</p>
+            <div class="shell-schedule-header">
+              <div>
+                <p class="shell-schedule-heading">Send later</p>
+                <p class="shell-schedule-subheading">This message will stay in your scheduled list until it sends.</p>
+              </div>
+              <button type="button" class="shell-schedule-close" aria-label="Cancel scheduling" onClick={() => closeSchedule()}>
+                ×
+              </button>
+            </div>
             <div class="shell-schedule-presets">
               <For each={SCHEDULE_PRESETS}>
                 {(preset, i) => (
@@ -1510,14 +1687,16 @@ export function Composer(props: ComposerProps): JSX.Element {
           type="button"
           class="shell-composer-tool shell-composer-tool--attach"
           data-composer-primary="attach"
-          disabled={!isEnabled() || !!activeEditing() || isOffline()}
+          disabled={!isEnabled() || !!activeEditing() || isOffline() || protectedDm()}
           aria-label="Attach files"
-          title="Attach files"
+          title={protectedDm() ? DM_ATTACHMENT_BLOCKED : 'Attach files'}
+          aria-describedby={protectedDm() ? 'shell-composer-attachment-restriction' : undefined}
           onClick={handleAttachClick}
         >
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
             <path d="M8 3.2v9.6M3.2 8h9.6" />
           </svg>
+          <span class="shell-composer-action-label">Attach</span>
         </button>
         <input
           ref={fileInputRef!}
@@ -1527,6 +1706,9 @@ export function Composer(props: ComposerProps): JSX.Element {
           aria-label="Choose files to attach"
           onChange={handleFileInput}
         />
+        <Show when={protectedDm()}>
+          <span id="shell-composer-attachment-restriction" class="sr-only">{DM_ATTACHMENT_BLOCKED}</span>
+        </Show>
 
         <label for="shell-composer-input" class="sr-only">
           <Show when={target()} fallback="Message input (no active room)">
@@ -1591,6 +1773,7 @@ export function Composer(props: ComposerProps): JSX.Element {
             <circle cx="6" cy="6.4" r="0.5" fill="currentColor" stroke="none" />
             <circle cx="10" cy="6.4" r="0.5" fill="currentColor" stroke="none" />
           </svg>
+          <span class="shell-composer-action-label">Emoji</span>
         </button>
 
         <div class="shell-composer-more-wrap">
@@ -1613,6 +1796,7 @@ export function Composer(props: ComposerProps): JSX.Element {
               <circle cx="8" cy="8" r="1.15" />
               <circle cx="12.5" cy="8" r="1.15" />
             </svg>
+            <span class="shell-composer-action-label">More</span>
           </button>
 
           {/*
@@ -1741,6 +1925,7 @@ export function Composer(props: ComposerProps): JSX.Element {
               <path d="m3 8.5 3.4 3.4L13 5.2" />
             </svg>
           </Show>
+          <span class="shell-composer-action-label">{activeEditing() ? 'Save' : 'Send'}</span>
         </button>
       </div>
       <Show when={composerError()}>

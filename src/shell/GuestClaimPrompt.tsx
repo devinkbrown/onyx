@@ -391,7 +391,7 @@ export function GuestClaimPrompt(): JSX.Element {
           }
         }}
         title="Keep this name"
-        description="Register the name you are using on this connection. You stay connected — passkeys and multi-device tools are available after the account exists."
+        description="Create an account for the name you are using. You stay connected while it is set up."
         closeLabel="Close claim panel"
         returnFocus={chipKeepButton}
       >

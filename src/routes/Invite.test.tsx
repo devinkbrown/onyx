@@ -84,6 +84,10 @@ describe('InviteRoute', () => {
       'href',
       '/app/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki',
     );
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/app/?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki&signin=1',
+    );
     expect(screen.queryByText(/handoff receipt|room ledger|claim a name|open graph|handshake|claim path/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/\bmesh\b|\bIRC\b|\bMODE\b/)).not.toBeInTheDocument();
   });
@@ -96,6 +100,7 @@ describe('InviteRoute', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Join Onyx' })).toBeInTheDocument();
     expect(screen.getByText('Choose a display name, then pick a room once you are in.')).toBeInTheDocument();
     expect(within(screen.getByRole('main')).getByRole('link', { name: 'Join' })).toHaveAttribute('href', '/app/');
+    expect(screen.getByText(/This link does not name a room/)).toBeInTheDocument();
     expect(screen.queryByText(/#root|#general/)).not.toBeInTheDocument();
   });
 
@@ -119,6 +124,70 @@ describe('InviteRoute', () => {
       'href',
       '/app/?join=%23lounge&as=River',
     );
+  });
+
+  it('keeps valid Join clicks native, including modified clicks', () => {
+    window.history.pushState({}, '', '/invite/?join=%23lounge');
+    render(() => <InviteRoute />);
+    fireEvent.input(screen.getByLabelText('Display name'), { target: { value: 'River' } });
+    const join = screen.getByTestId('invite-join');
+    const preventDefault = vi.spyOn(Event.prototype, 'preventDefault');
+
+    fireEvent.click(join, { ctrlKey: true });
+
+    expect(join).toHaveAttribute('href', '/app/?join=%23lounge&as=River');
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(screen.queryByText(/name must start|contain only letters/i)).not.toBeInTheDocument();
+  });
+
+  it.each(['33alice', 'alice smith'])('blocks invalid Join click without navigation or as (%s)', (name) => {
+    window.history.pushState({}, '', '/invite/?join=%23lounge');
+    render(() => <InviteRoute />);
+    const input = screen.getByLabelText('Display name');
+    fireEvent.input(input, { target: { value: name } });
+    const join = screen.getByTestId('invite-join');
+    const before = window.location.href;
+
+    fireEvent.click(join);
+
+    expect(window.location.href).toBe(before);
+    expect(join).not.toHaveAttribute('href');
+    expect(join.getAttribute('href') ?? '').not.toContain('as=');
+    expect(input).toHaveFocus();
+    expect(screen.getByText(/name must start|contain only letters/i)).toBeInTheDocument();
+  });
+
+  it('blocks invalid Enter submission without navigation or as', () => {
+    window.history.pushState({}, '', '/invite/?join=%23lounge');
+    render(() => <InviteRoute />);
+    const input = screen.getByLabelText('Display name');
+    fireEvent.input(input, { target: { value: '33alice' } });
+    const form = input.closest('form')!;
+    const before = window.location.href;
+
+    fireEvent.submit(form);
+
+    expect(window.location.href).toBe(before);
+    expect(screen.getByTestId('invite-join').getAttribute('href') ?? '').not.toContain('as=');
+    expect(input).toHaveFocus();
+    expect(screen.getByText(/start with a letter/i)).toBeInTheDocument();
+  });
+
+  it('hands off a valid Enter submission exactly once', () => {
+    window.history.pushState({}, '', '/invite/?join=%23lounge');
+    const assign = vi.fn();
+    vi.spyOn(window, 'location', 'get').mockReturnValue({
+      ...window.location,
+      assign,
+    } as unknown as Location);
+    render(() => <InviteRoute />);
+    const input = screen.getByLabelText('Display name');
+    fireEvent.input(input, { target: { value: 'River' } });
+
+    fireEvent.submit(input.closest('form')!);
+
+    expect(assign).toHaveBeenCalledOnce();
+    expect(assign).toHaveBeenCalledWith('/app/?join=%23lounge&as=River');
   });
 
   it('sets invite-specific metadata', () => {

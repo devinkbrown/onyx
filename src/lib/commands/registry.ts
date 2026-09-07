@@ -262,12 +262,12 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   // Network operator desk. WIRE TRUTH (ONYX_SERVER_PROTOCOL.md §11, §16): this
   // daemon has no `OPER` command and no `+w` WALLOPS — a broadcast rides
   // `EVENT BROADCAST`, so `/wallops` is kept only as a familiar alias for it.
-  { name: 'broadcast', usage: '/broadcast <text>', description: 'Announce to every member on the network (opers).', kind: 'irc', aliases: ['wallops'], oper: true },
+  { name: 'broadcast', usage: '/broadcast <text>', description: 'Announce to operators subscribed to ANNOUNCE (opers).', kind: 'irc', aliases: ['wallops'], oper: true },
   { name: 'kill', usage: '/kill <nick> <reason>', description: 'Disconnect someone from the network; the reason is recorded (opers).', kind: 'irc', oper: true },
   { name: 'rehash', usage: '/rehash', description: 'Ask this node to reload its configuration (opers).', kind: 'irc', oper: true },
   { name: 'privs', usage: '/privs', description: 'Show the operator privileges this session holds (opers).', kind: 'irc', oper: true },
   { name: 'events', usage: '/events <list|add|del> [category]', description: 'Manage Event Spine category subscriptions (opers).', kind: 'irc', oper: true },
-  { name: 'observe', usage: '/observe <mask|list|off> [connect quit nick oper]', description: 'Watch a nick!user@host mask network-wide (opers).', kind: 'irc', oper: true },
+  { name: 'observe', usage: '/observe <mask|list|off> [connect quit nick join part host oper]', description: 'Watch a nick!user@host mask network-wide (opers).', kind: 'irc', oper: true },
   { name: 'shrug', usage: '/shrug', description: 'Insert a shrug.', kind: 'text', insertText: String.raw`¯\_(ツ)_/¯` },
   { name: 'tableflip', usage: '/tableflip', description: 'Insert a table flip.', kind: 'text', insertText: '(╯°□°）╯︵ ┻━┻' },
   { name: 'unflip', usage: '/unflip', description: 'Insert a table restore.', kind: 'text', insertText: '┬─┬ ノ( ゜-゜ノ)' },

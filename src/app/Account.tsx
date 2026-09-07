@@ -70,6 +70,7 @@ import { YouSettings } from './YouSettings';
 import { YouHubNav } from '@/shell/YouHubNav';
 import { AccountDataVerbs } from './AccountDataVerbs';
 import { prefersReducedMotionForInteraction } from '@/lib/a11y/reducedMotion';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
 
 export interface AccountPanelProps {
   open: boolean;
@@ -522,7 +523,17 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     event.preventDefault();
     const nick = recoverNick().trim();
     if (!nick) return;
-    getState().recover(nick, recoverPassword().trim() || undefined);
+    const release = updateCoordinator.hold('account-recovery');
+    try {
+      getState().recover(nick, recoverPassword().trim() || undefined);
+    } catch (error) {
+      release();
+      throw error;
+    }
+    // RECOVER is a single command admission; the store owns its reply and
+    // does not expose a promise. Keep the transition guarded through the
+    // command turn, without pretending the server-side recovery is durable.
+    queueMicrotask(release);
     setRecoverNick('');
     setRecoverPassword('');
   }
@@ -578,6 +589,10 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           onClose={() => local.onOpenChange(false)}
           account={(
             <>
+              <div class="acct-surface-intro">
+                <h2 class="acct-surface-intro__title">Account controls</h2>
+                <p class="acct-surface-intro__body">Identity, sign-in, recovery, and account data. These choices travel with your account.</p>
+              </div>
               <p class="acct-context-cue" role="note">
                 <span>Next</span>
                 <Show

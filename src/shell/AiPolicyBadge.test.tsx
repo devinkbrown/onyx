@@ -15,7 +15,7 @@ describe('AiPolicyBadge', () => {
     render(() => <AiPolicyBadge policy="no-ai" channel="#room" />);
 
     expect(screen.getByText('No AI')).toHaveAccessibleName(
-      'AI policy for #room: AI surfaces are disabled for this room.',
+      'AI policy for #room: AI features are disabled in this room. Nothing is sent to an AI service from this room.',
     );
   });
 
@@ -23,12 +23,12 @@ describe('AiPolicyBadge', () => {
     render(() => <AiPolicyBadge policy="local-only" channel="#room" />);
 
     expect(screen.getByText('Local only')).toHaveAccessibleName(
-      'AI policy for #room: Only local AI surfaces are allowed for this room.',
+      'AI policy for #room: Only AI that runs on this device is allowed in this room. External AI services are not allowed.',
     );
   });
 
   it('keeps badge copy centralized for the header', () => {
-    expect(aiPolicyBadgeText('open')).toMatchObject({ label: 'AI open', scope: 'server' });
+    expect(aiPolicyBadgeText('open')).toMatchObject({ label: 'AI allowed', scope: 'server' });
     expect(aiPolicyBadgeText('no-ai')).toMatchObject({ label: 'No AI', scope: 'external' });
     expect(aiPolicyBadgeText('local-only')).toMatchObject({ label: 'Local only', scope: 'server' });
   });

@@ -204,6 +204,21 @@ export function VoiceStage() {
   // Ready once the store marks the call started — stream can briefly be null
   // during a camera toggle without unmounting the whole stage.
   const callReady = createMemo(() => voice().callStartedAt !== null);
+  const stageState = createMemo(() => {
+    const state = voice().callState;
+    if (state === 'ringing_in') return 'prejoin';
+    if (state === 'ringing_out') return 'connecting';
+    if (state === 'in_call' && !callReady()) return 'connecting';
+    if (state === 'in_call' && !voice().localStream && !hasLiveVideo()) return 'media-unavailable';
+    return state === 'in_call' ? 'active' : 'idle';
+  });
+  const stageStatusCopy = createMemo(() => ({
+    prejoin: 'Ready to join. Your microphone and camera are off until you choose to enable them.',
+    connecting: 'Connecting to the call…',
+    'media-unavailable': 'The call is connected, but local media is unavailable. You can stay and listen.',
+    active: 'Call is live',
+    idle: 'Call ended',
+  }[stageState()] ?? 'Call status unavailable'));
 
   return (
     <div
@@ -214,6 +229,7 @@ export function VoiceStage() {
       data-mode={hasLiveVideo() ? 'video' : 'audio'}
       data-size={stageSize()}
       data-layout={screenshareActive() ? 'screenshare' : voice().callLayout}
+      data-call-state={stageState()}
     >
       {/* Size chrome — compact by default; expand / fullscreen on demand. */}
       <div class="voice-stage__chrome" role="toolbar" aria-label="Call stage size">
@@ -253,6 +269,9 @@ export function VoiceStage() {
       </div>
       {/* Polite roster announcements (joins/leaves) for screen-reader users — SC 4.1.3. */}
       <CallStatusAnnouncer />
+      <p class="voice-stage__state" role="status" aria-live="polite" data-testid="voice-stage-state">
+        {stageStatusCopy()}
+      </p>
       <Show
         when={callReady()}
         fallback={

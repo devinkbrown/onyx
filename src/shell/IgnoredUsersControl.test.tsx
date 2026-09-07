@@ -52,7 +52,7 @@ describe('IgnoredUsersControl', () => {
 
   it('shows empty state when nobody is ignored', () => {
     render(() => <IgnoredUsersControl />);
-    expect(screen.getByTestId('pref-ignored-users-empty')).toHaveTextContent('Nobody blocked');
+    expect(screen.getByTestId('pref-ignored-users-empty')).toHaveTextContent('Your list is clear');
     expect(screen.getByTestId('pref-ignored-users-count')).toHaveTextContent('None');
   });
 
@@ -90,5 +90,26 @@ describe('IgnoredUsersControl', () => {
     fireEvent.click(screen.getByTestId('pref-ignore-add'));
     expect(screen.getByTestId('pref-ignore-error')).toHaveTextContent(/yourself/i);
     expect(store.getState().ignoredUsers.size).toBe(0);
+  });
+
+  it('communicates device-only scope and refuses duplicates', () => {
+    seed(['noisebot']);
+    render(() => <IgnoredUsersControl />);
+    expect(screen.getByText('This device only')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: /muted names on this device/i })).toBeInTheDocument();
+
+    fireEvent.input(screen.getByTestId('pref-ignore-nick-input'), {
+      target: { value: 'NoiseBot' },
+    });
+    fireEvent.click(screen.getByTestId('pref-ignore-add'));
+    expect(screen.getByTestId('pref-ignore-error')).toHaveTextContent(/already muted on this device/i);
+  });
+
+  it('marks invalid input for assistive technology', () => {
+    render(() => <IgnoredUsersControl />);
+    const input = screen.getByTestId('pref-ignore-nick-input');
+    fireEvent.click(screen.getByTestId('pref-ignore-add'));
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAttribute('aria-describedby', 'pref-ignore-help');
   });
 });

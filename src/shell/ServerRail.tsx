@@ -50,6 +50,15 @@ export function ServerRail(props: ServerRailProps): JSX.Element {
       class="shell-rail"
       aria-label="Server list"
     >
+      <div class="commercial-onyx-brand" aria-label="Onyx">
+        <span class="commercial-onyx-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M16 3.5a12.5 12.5 0 1 0 0 25 12.5 12.5 0 0 0 0-25Zm0 5.2a7.3 7.3 0 1 1 0 14.6 7.3 7.3 0 0 1 0-14.6Z" />
+            <path d="M16 12.1a3.9 3.9 0 1 0 0 7.8 3.9 3.9 0 0 0 0-7.8Z" />
+          </svg>
+        </span>
+        <span class="commercial-onyx-wordmark">Onyx</span>
+      </div>
       {/* Onyx server icon — the active (and only) network. It is a status
           indicator, not an action, so it is a labelled image rather than a
           fake button: an interactive role with no handler misleads AT. */}
@@ -59,10 +68,7 @@ export function ServerRail(props: ServerRailProps): JSX.Element {
         aria-label={`Onyx — active server${unreadTotal() > 0 ? `, ${unreadTotal()} unread` : ''}${mentionTotal() > 0 ? `, ${mentionTotal()} mentions` : ''}`}
         aria-current="true"
       >
-        {/* kin / server mark stands in for a proper server icon */}
-        <span aria-hidden="true" style={{ 'font-family': 'var(--font-display)', 'font-size': '0.7rem', 'line-height': '1' }}>
-          IR
-        </span>
+        <span class="commercial-network-mark" aria-hidden="true">O</span>
         <Show when={unreadTotal() > 0}>
           <span
             class={`shell-rail-badge${mentionTotal() > 0 ? ' shell-rail-badge--mention' : ''}`}

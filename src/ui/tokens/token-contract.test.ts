@@ -112,6 +112,34 @@ describe('raw colour is confined to the Room Current fallback palette', () => {
     const violations = findColorLiteralViolations(layerSource.get('semantic.css')!, []);
     expect(violations).toEqual([]);
   });
+
+  it('keeps the semantic structure and status vocabulary token-based', () => {
+    const semantic = layerSource.get('semantic.css')!;
+    const declarations = parseDeclarations(semantic);
+    for (const token of [
+      '--ui-border-subtle',
+      '--ui-border-default',
+      '--ui-border-strong',
+      '--ui-border-focus',
+      '--ui-status-info',
+      '--ui-status-success',
+      '--ui-status-warning',
+      '--ui-status-danger',
+    ]) {
+      const declaration = declarations.find((candidate) => candidate.property === token);
+      expect(declaration, `${token} is not declared`).toBeDefined();
+      expect(declaration!.value).toMatch(/var\(--ui-|var\(--(?:lapis|ok|warn|danger)/);
+    }
+  });
+
+  it('keeps the typography ladder ascending and the three voices distinct', () => {
+    const typography = layerSource.get('typography.css')!;
+    expect(typography).toMatch(/--ui-font-display:[\s\S]*--font-serif/);
+    expect(typography).toMatch(/--ui-font-interface:[\s\S]*--font-sans/);
+    expect(typography).toMatch(/--ui-font-evidence:[\s\S]*--font-mono/);
+    expect(typography).toMatch(/--ui-type-2xs:[^;]*0\.6875rem/);
+    expect(typography).toMatch(/--ui-type-xs:[^;]*0\.75rem/);
+  });
 });
 
 // ---------------------------------------------------------------------------

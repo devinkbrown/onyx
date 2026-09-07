@@ -9,7 +9,7 @@ export type ModalShellProps = ParentProps<{
   description?: string;
   onOpenChange: (open: boolean) => void;
   closeLabel?: string;
-  returnFocus?: HTMLElement | null;
+  returnFocus?: HTMLElement | null | (() => HTMLElement | null | undefined);
   returnFocusFallback?: HTMLElement | null;
 }>;
 
@@ -28,19 +28,21 @@ export function ModalShell(props: ModalShellProps) {
   const titleId = `${instanceId}-title`;
   const descriptionId = `${instanceId}-description`;
   let dialogRef: HTMLElement | undefined;
+  let rootRef: HTMLDivElement | undefined;
 
   createDialogFocus({
     isOpen: () => local.open,
     getPanel: () => dialogRef,
     onEscape: () => local.onOpenChange(false),
-    getReturnFocus: () => local.returnFocus,
+    getReturnFocus: () => typeof local.returnFocus === 'function' ? local.returnFocus() : local.returnFocus,
     getReturnFocusFallback: () => local.returnFocusFallback,
+    getRoot: () => rootRef,
   });
 
   return (
     <Show when={local.open}>
       <Portal>
-        <div {...rest} class="onyx-modal" role="presentation">
+        <div ref={(element) => { rootRef = element; }} {...rest} class="onyx-modal" role="presentation">
           {/* Decorative click-to-dismiss layer — keyboard users dismiss via Esc /
               the labelled close button, so the backdrop stays out of the a11y tree. */}
           <div class="onyx-modal__backdrop" aria-hidden="true" onClick={() => local.onOpenChange(false)} />

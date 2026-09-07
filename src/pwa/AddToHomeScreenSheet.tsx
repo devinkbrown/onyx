@@ -6,7 +6,7 @@
  * `beforeinstallprompt` only when the user taps Add to Home Screen.
  * iOS gets Share → Add to Home Screen copy, never a fake install button.
  */
-import { createEffect, createMemo, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, Show, type JSX } from 'solid-js';
 
 import { Button } from '@/primitives/Button';
 import { Sheet } from '@/primitives/Sheet';
@@ -32,6 +32,7 @@ import {
 import './add-to-home-screen.css';
 
 export function AddToHomeScreenSheet(): JSX.Element {
+  const [status, setStatus] = createSignal('');
   const platform = createMemo(() => detectA2hsPlatform());
   const surface = createMemo(() => detectClientSurface());
   const standalone = createMemo(() => isStandaloneDisplayMode({
@@ -89,7 +90,16 @@ export function AddToHomeScreenSheet(): JSX.Element {
               variant="primary"
               size="sm"
               data-testid="a2hs-add"
-              onClick={() => void requestHomeScreenAdd()}
+              onClick={() => {
+                setStatus('Opening your browser’s install prompt…');
+                void requestHomeScreenAdd().then((outcome) => setStatus(
+                  outcome === 'accepted'
+                    ? 'Onyx was added to your Home Screen.'
+                    : outcome === 'dismissed'
+                      ? 'No changes made. You can add Onyx later from your browser menu.'
+                      : 'Your browser could not open the install prompt. Use the browser menu to add Onyx.',
+                ));
+              }}
             >
               Add to Home Screen
             </Button>
@@ -104,6 +114,9 @@ export function AddToHomeScreenSheet(): JSX.Element {
             Not now
           </Button>
         </div>
+        <Show when={status()}>
+          <p class="a2hs-sheet__status" role="status" aria-live="polite">{status()}</p>
+        </Show>
       </div>
     </Sheet>
   );

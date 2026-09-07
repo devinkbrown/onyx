@@ -145,6 +145,11 @@ export const REQUIRED_SEMANTIC_TOKENS: readonly string[] = [
   '--ui-surface-overlay',
   '--ui-surface-selected',
   '--ui-surface-hover',
+  // Structure
+  '--ui-border-subtle',
+  '--ui-border-default',
+  '--ui-border-strong',
+  '--ui-border-focus',
   // Text
   '--ui-text-primary',
   '--ui-text-secondary',
@@ -153,6 +158,11 @@ export const REQUIRED_SEMANTIC_TOKENS: readonly string[] = [
   '--ui-text-on-action',
   '--ui-text-on-critical',
   '--ui-text-link',
+  // Present-tense product status; provenance stays in --ui-proof-*.
+  '--ui-status-info',
+  '--ui-status-success',
+  '--ui-status-warning',
+  '--ui-status-danger',
   // Action
   '--ui-action-primary',
   '--ui-action-primary-hover',

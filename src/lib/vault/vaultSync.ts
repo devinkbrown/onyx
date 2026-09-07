@@ -26,9 +26,16 @@ import type { ChatMessage } from '@/lib/irc/types';
 import { preferences } from '@/lib/prefs/preferences';
 import {
   classifyVaultDmSearchPrivacy,
+  beginVaultWriteIntent,
+  cancelVaultWriteIntent,
   deviceMemoryOwnerKey,
   loadRecent,
+  releaseVaultWriteReservation,
+  reserveVaultWrite,
   saveMessages,
+  subscribeVerifiedDeviceHistoryClear,
+  type VaultWriteIntent,
+  type VaultWriteReservation,
 } from './historyVault';
 import {
   loadVaultResumeTarget,
@@ -40,13 +47,20 @@ const FLUSH_MS = 1500;
 /** Maximum live owner/target watermarks retained by one long-lived tab. */
 export const VAULT_SYNC_TARGET_CACHE_CAP = 512;
 
-const _pendingFlush = new Map<string, ReturnType<typeof setTimeout>>();
+type PendingFlush = {
+  timer: ReturnType<typeof setTimeout>;
+  intent: VaultWriteIntent;
+  reservation: Promise<VaultWriteReservation | null>;
+};
+
+const _pendingFlush = new Map<string, PendingFlush>();
 /** Per-target signature of the last set of rows durably written (see
  *  `bufferSignature`). Replaces a plain tail-id watermark so an in-place
  *  edit/redact/delete/reaction on an EXISTING message re-triggers a flush. */
 const _lastPersistedSig = new Map<string, string>();
 const _hydrated = new Set<string>();
 let _unsubscribers: Array<() => void> = [];
+let _eraseGeneration = 0;
 
 function rememberHydratedTarget(key: string): void {
   _hydrated.delete(key);
@@ -156,6 +170,20 @@ function reconcileLiveTargetCaches(context: DeviceMemoryContext): void {
   }
 }
 
+function releasePendingReservation(
+  intent: VaultWriteIntent,
+  reservation: Promise<VaultWriteReservation | null>,
+): void {
+  // Revoke the synchronous authority immediately; the promise may be waiting
+  // for database opening in another module context.
+  cancelVaultWriteIntent(intent);
+  void reservation.then((admitted) => {
+    if (admitted) void releaseVaultWriteReservation(admitted.token).catch(() => {});
+  }).catch(() => {
+    // A rejected admission has no durable reservation to release.
+  });
+}
+
 function isOwnedTargetLive(key: string): boolean {
   const context = captureDeviceMemoryContext();
   return context !== null && liveOwnedTargetKeys(context).has(key);
@@ -188,34 +216,69 @@ function scheduleFlush(
 ): void {
   const targetKey = target.toLowerCase();
   const key = ownedTargetKey(context, targetKey);
+  // Register the opaque intent before deriving the delayed payload admission.
+  // No later async database-open path may invent a replacement token.
+  const intent = beginVaultWriteIntent();
+  if (!intent) return;
   const rows = persistableRows(messages);
   const nextSig = bufferSignature(rows);
-  if (persistedSignature(key) === nextSig) return;
+  const capturedEraseGeneration = _eraseGeneration;
+  if (persistedSignature(key) === nextSig) {
+    cancelVaultWriteIntent(intent);
+    return;
+  }
+  // Admission is a durable metadata transaction, not an epoch observation.
+  // The synchronous intent is created before debounce so a clear can revoke it
+  // even while the reservation's database open is delayed. The reservation then
+  // orders against the clear in IDB; no message payload enters vault_meta.
+  const reservation = Promise.resolve(reserveVaultWrite(intent)).catch(() => null);
   const existing = _pendingFlush.get(key);
-  if (existing) clearTimeout(existing);
-  _pendingFlush.set(
-    key,
-    setTimeout(() => {
-      _pendingFlush.delete(key);
-      const prevSig = persistedSignature(key);
-      if (prevSig === nextSig) {
-        // Already durable — but do not let a now-closed owner/target survive only
-        // because another coalesced timer observed the same watermark.
-        if (!isOwnedTargetLive(key)) _lastPersistedSig.delete(key);
-        return;
-      }
+  if (existing) {
+    clearTimeout(existing.timer);
+    releasePendingReservation(existing.intent, existing.reservation);
+  }
+  const timer = setTimeout(() => {
+      void (async () => {
+        _pendingFlush.delete(key);
+        if (capturedEraseGeneration !== _eraseGeneration || !preferences().localHistory) {
+          releasePendingReservation(intent, reservation);
+          _lastPersistedSig.delete(key);
+          return;
+        }
+        const prevSig = persistedSignature(key);
+        if (prevSig === nextSig) {
+          releasePendingReservation(intent, reservation);
+          // Already durable — but do not let a now-closed owner/target survive only
+          // because another coalesced timer observed the same watermark.
+          if (!isOwnedTargetLive(key)) _lastPersistedSig.delete(key);
+          return;
+        }
 
-      // Claim the watermark OPTIMISTICALLY so a burst of store updates for this
-      // target coalesces onto one in-flight write instead of stampeding the DB.
-      // The watermark is a content SIGNATURE, not just a tail id, so in-place
-      // edits/redactions/reactions re-flush and become durable at rest.
-      // If the write fails (quota / private mode / abort), roll the watermark
-      // back — but only if no newer flush has since advanced it — so the SAME
-      // rows are retried on the next store change instead of being silently and
-      // permanently dropped. System lines (joins/quits) are conversation too;
-      // only optimistic outbox placeholders are held back (persistableRows).
-      rememberPersistedSignature(key, nextSig);
-      void saveMessages(targetKey, rows, context.owner).then((committed) => {
+        const admitted = await reservation;
+        if (!admitted || capturedEraseGeneration !== _eraseGeneration || !preferences().localHistory) {
+          cancelVaultWriteIntent(intent);
+          if (admitted) void releaseVaultWriteReservation(admitted.token).catch(() => {});
+          return;
+        }
+
+        // Claim the watermark OPTIMISTICALLY so a burst of store updates for this
+        // target coalesces onto one in-flight write instead of stampeding the DB.
+        // The watermark is a content SIGNATURE, not just a tail id, so in-place
+        // edits/redactions/reactions re-flush and become durable at rest.
+        // If the write fails (quota / private mode / abort), roll the watermark
+        // back — but only if no newer flush has since advanced it — so the SAME
+        // rows are retried on the next store change instead of being silently and
+        // permanently dropped. System lines (joins/quits) are conversation too;
+        // only optimistic outbox placeholders are held back (persistableRows).
+        rememberPersistedSignature(key, nextSig);
+        const committed = await saveMessages(
+          targetKey,
+          rows,
+          context.owner,
+          admitted.eraseEpoch,
+          admitted,
+        );
+        if (capturedEraseGeneration !== _eraseGeneration) return;
         if (!committed && _lastPersistedSig.get(key) === nextSig) {
           if (prevSig === undefined) _lastPersistedSig.delete(key);
           else rememberPersistedSignature(key, prevSig);
@@ -223,9 +286,9 @@ function scheduleFlush(
         // Owner changes and closed conversations must not leave their private
         // target identifiers resident after this captured write has settled.
         if (!isOwnedTargetLive(key)) _lastPersistedSig.delete(key);
-      });
-    }, FLUSH_MS),
-  );
+      })();
+    }, FLUSH_MS);
+  _pendingFlush.set(key, { timer, intent, reservation });
 }
 
 async function hydrate(
@@ -340,19 +403,19 @@ function syncLiveBuffers(): void {
 
   for (const [key, ch] of state.channels) {
     if (active && !active.dm && key === active.target) {
-      if (ch.messages.length > 0) scheduleFlush(context, key, ch.messages);
+      if (ch.messages.length > 0) void scheduleFlush(context, key, ch.messages);
       continue;
     }
     void hydrate(context, key);
-    if (ch.messages.length > 0) scheduleFlush(context, key, ch.messages);
+    if (ch.messages.length > 0) void scheduleFlush(context, key, ch.messages);
   }
   for (const [key, dm] of state.dms) {
     if (active && active.dm && key === active.target) {
-      if (dm.messages.length > 0) scheduleFlush(context, key, dm.messages);
+      if (dm.messages.length > 0) void scheduleFlush(context, key, dm.messages);
       continue;
     }
     void hydrate(context, key, true);
-    if (dm.messages.length > 0) scheduleFlush(context, key, dm.messages);
+    if (dm.messages.length > 0) void scheduleFlush(context, key, dm.messages);
   }
 }
 
@@ -362,6 +425,16 @@ export function initVaultSync(): void {
   if (_unsubscribers.length > 0) return; // already wired
 
   _unsubscribers = [
+    subscribeVerifiedDeviceHistoryClear(() => {
+      _eraseGeneration += 1;
+      for (const pending of _pendingFlush.values()) {
+        clearTimeout(pending.timer);
+        releasePendingReservation(pending.intent, pending.reservation);
+      }
+      _pendingFlush.clear();
+      _lastPersistedSig.clear();
+      _hydrated.clear();
+    }),
     store.subscribe(
       (s) => s.channels,
       () => {
@@ -413,10 +486,14 @@ export function initVaultSync(): void {
 export function _resetVaultSyncForTests(): void {
   for (const u of _unsubscribers) u();
   _unsubscribers = [];
-  for (const t of _pendingFlush.values()) clearTimeout(t);
+  for (const pending of _pendingFlush.values()) {
+    clearTimeout(pending.timer);
+    releasePendingReservation(pending.intent, pending.reservation);
+  }
   _pendingFlush.clear();
   _lastPersistedSig.clear();
   _hydrated.clear();
+  _eraseGeneration += 1;
 }
 
 /** Test hook: expose counts without leaking retained owner/target identifiers. */

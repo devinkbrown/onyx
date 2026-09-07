@@ -28,6 +28,7 @@ import {
   type WatchSession,
 } from '@/lib/media/watchTogetherController';
 import { ModalShell } from '@/primitives';
+import './watch-together-activity.css';
 
 const WATCH_PROP = 'ocean.watch';
 const TICK_MS = 1000;
@@ -75,7 +76,7 @@ function safeHttpUrl(u: string | null | undefined): string {
   return /^https?:\/\//i.test(s) ? s : '';
 }
 
-export function WatchTogetherActivity(): JSX.Element {
+export function WatchTogetherActivity(props: { onClose?: () => void } = {}): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const channelProps = useStore((s) => s.channelProps);
   const ourNick = useStore((s) => s.ourNick);
@@ -822,6 +823,7 @@ export function WatchTogetherActivity(): JSX.Element {
           ? `Confirming publishes these details to everyone in ${channel() ?? 'this room'}.`
           : `Review before publishing. Confirming makes these details room-wide in ${channel() ?? 'this room'}; this draft is temporary and is never saved.`}
         closeLabel="Close activity editor"
+        returnFocus={() => startActivityTrigger}
         onOpenChange={(open) => {
           if (!open) onCloseStartEditor();
         }}
@@ -969,8 +971,11 @@ export function WatchTogetherActivity(): JSX.Element {
         >
           <div class="shell-watch-together__pulse" aria-hidden="true" />
           <div class="shell-watch-together__main">
-            <span class="shell-watch-together__label">Watch together</span>
+            <span class="shell-watch-together__label">Watch together · shared room activity</span>
             <strong class="shell-watch-together__title">{item().title}</strong>
+            <Show when={props.onClose}>
+              <button type="button" class="shell-watch-together__close" onClick={props.onClose}>Close</button>
+            </Show>
             <span
               class="shell-watch-together__label"
               role="status"
@@ -992,6 +997,7 @@ export function WatchTogetherActivity(): JSX.Element {
               {(hostNick) => <span>Host {hostNick()}</span>}
             </Show>
             <span>{participantLabel()}</span>
+            <span class="shell-watch-together__transparency">Room: {channel()} · host controls playback · activity updates may be unavailable</span>
           </div>
 
           <button

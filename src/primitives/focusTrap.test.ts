@@ -149,4 +149,113 @@ describe('focusTrap pure helpers', () => {
     expect(backward.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(last);
   });
+
+  it('does not focus controls inside aria-hidden subtrees', () => {
+    const panel = document.createElement('section');
+    panel.tabIndex = -1;
+    const hidden = document.createElement('div');
+    hidden.setAttribute('aria-hidden', 'true');
+    const hiddenButton = document.createElement('button');
+    hidden.append(hiddenButton);
+    const visible = document.createElement('button');
+    panel.append(hidden, visible);
+    document.body.append(panel);
+
+    focusFirst(panel);
+
+    expect(document.activeElement).toBe(visible);
+  });
+
+  it('skips a focusable candidate whose ancestor is CSS-hidden', () => {
+    const panel = document.createElement('section');
+    panel.tabIndex = -1;
+    const hiddenGroup = document.createElement('div');
+    hiddenGroup.style.visibility = 'hidden';
+    hiddenGroup.append(document.createElement('button'));
+    const visible = document.createElement('button');
+    panel.append(hiddenGroup, visible);
+    document.body.append(panel);
+
+    focusFirst(panel);
+
+    expect(document.activeElement).toBe(visible);
+  });
+
+  it('skips closed details, disabled fieldsets, and CSS-hidden candidates', () => {
+    const panel = document.createElement('section');
+    panel.tabIndex = -1;
+    const closed = document.createElement('details');
+    closed.append(document.createElement('button'));
+    const fieldset = document.createElement('fieldset');
+    fieldset.disabled = true;
+    fieldset.append(document.createElement('button'));
+    const cssHidden = document.createElement('button');
+    cssHidden.style.display = 'none';
+    const visible = document.createElement('button');
+    panel.append(closed, fieldset, cssHidden, visible);
+    document.body.append(panel);
+
+    focusFirst(panel);
+
+    expect(document.activeElement).toBe(visible);
+  });
+
+  it('lets Tab leave an open details summary for the next control', () => {
+    const panel = document.createElement('section');
+    const details = document.createElement('details');
+    details.open = true;
+    const summary = document.createElement('summary');
+    const next = document.createElement('button');
+    details.append(summary);
+    panel.append(details, next);
+    document.body.append(panel);
+
+    summary.focus();
+    const event = tabEvent();
+    trapFocus(event, panel);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(summary);
+  });
+
+  it('lets Shift+Tab move from the control after an open details summary back to it', () => {
+    const panel = document.createElement('section');
+    const details = document.createElement('details');
+    details.open = true;
+    const summary = document.createElement('summary');
+    const next = document.createElement('button');
+    details.append(summary);
+    panel.append(details, next);
+    document.body.append(panel);
+
+    next.focus();
+    const event = tabEvent(true);
+    trapFocus(event, panel);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(next);
+  });
+
+  it('keeps controls inside closed details out of both traversal boundaries', () => {
+    const panel = document.createElement('section');
+    const closed = document.createElement('details');
+    const summary = document.createElement('summary');
+    const hiddenControl = document.createElement('button');
+    closed.append(summary, hiddenControl);
+    const visible = document.createElement('button');
+    panel.append(closed, visible);
+    document.body.append(panel);
+
+    visible.focus();
+    const forward = tabEvent();
+    trapFocus(forward, panel);
+    expect(forward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(summary);
+
+    summary.focus();
+    const backward = tabEvent(true);
+    trapFocus(backward, panel);
+    expect(backward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(visible);
+  });
 });

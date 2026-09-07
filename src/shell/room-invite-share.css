@@ -14,6 +14,18 @@
   font-size: var(--text-md, 0.9375rem);
   line-height: var(--leading-body, 1.55);
 }
+.room-invite-share__context {
+  margin: -0.45rem 0 0;
+  color: var(--paper-mute);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.room-invite-share__fallback {
+  margin: -0.45rem 0 0;
+  color: var(--paper-mute);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
 
 .room-invite-share__preview {
   display: flex;
@@ -62,6 +74,16 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
+}
+
+@media (max-width: 520px) {
+  .room-invite-share__actions .onyx-button { flex: 1 1 100%; min-height: 44px; }
+}
+
+@media (forced-colors: active) {
+  .room-invite-share__preview { border-color: CanvasText; }
+  .room-invite-share__context,
+  .room-invite-share__fallback { color: CanvasText; }
 }
 
 @media (prefers-reduced-motion: reduce) {

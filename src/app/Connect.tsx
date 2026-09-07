@@ -30,6 +30,7 @@ import {
   createSignal,
   createMemo,
   createEffect,
+  createComponent,
   ErrorBoundary,
   For,
   lazy,
@@ -39,7 +40,6 @@ import {
   Suspense,
   type JSX,
 } from 'solid-js';
-import { lazyRouteFallback } from '@/app/StaleChunkRecovery';
 import { useStore, getState } from '@/lib/store';
 import { parseAtParam, parseJoinParam, parseReaderParam, parseTopicParam } from '@/lib/deeplink';
 import { buildInviteCard, inviteTitle, inviteDescription } from '@/lib/invite/inviteCard';
@@ -64,11 +64,27 @@ import { recordFirstHourHandoff } from '@/lib/firstHour/firstHour';
 import { SceneAtmosphere } from '@/backgrounds/SceneAtmosphere';
 import { initialNode, NODES, selectBestNode, type IrcNode } from './nodes';
 import { installConnectPageLifecycle } from './connectPageLifecycle';
+import { nicknameError } from '@/lib/identity/nickname';
+import { lazyRouteFallback } from './StaleChunkRecovery';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
 
 // The connected shell owns the transcript, roster, preferences, moderation,
 // and activity surfaces. None of that is needed on the first-arrival form, so
 // keep it out of the connection chunk and warm it while the socket handshakes.
-const AppShell = lazy(() => import('@/shell/AppShell').then((module) => ({ default: module.AppShell })));
+type AppShellModule = typeof import('@/shell/AppShell');
+type AppShellLoader = () => Promise<AppShellModule>;
+
+const defaultAppShellLoader: AppShellLoader = () => import('@/shell/AppShell');
+let appShellLoader: AppShellLoader = defaultAppShellLoader;
+
+/** Deterministic cold-chunk seam for the Connect boundary regression test. */
+export function _setAppShellLoaderForTests(loader?: AppShellLoader): void {
+  appShellLoader = loader ?? defaultAppShellLoader;
+}
+
+function createAppShell(): ReturnType<typeof lazy> {
+  return lazy(() => appShellLoader().then((module) => ({ default: module.AppShell })));
+}
 
 // Theme signature scene behind the door. Grain stays as a finishing veil;
 // the old opaque --ink "sea-depth" hid the wallpaper as a flat void.
@@ -117,15 +133,7 @@ const NETWORK_NAME = 'Onyx';
 // ── Validation helpers (pure) ────────────────────────────────────────────────
 
 /** IRC nick rules — start with a letter / special char, no leading digit. */
-export function validateNick(value: string): string | undefined {
-  const v = value.trim();
-  if (!v) return 'Name is required.';
-  if (v.length > 64) return 'Name must be 64 characters or fewer.';
-  if (!/^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/.test(v)) {
-    return 'Name must start with a letter or allowed special character and contain only letters, numbers, or -[]\\`_^{|}.';
-  }
-  return undefined;
-}
+export const validateNick = nicknameError;
 
 /** A light, forgiving email shape check (optional field — empty is valid). */
 export function validateEmail(value: string): string | undefined {
@@ -232,7 +240,11 @@ export function Connect(props: ConnectProps): JSX.Element {
   void props;
 
   // ── Mode ──────────────────────────────────────────────────────────────────
-  const [mode, setMode] = createSignal<Mode>('guest');
+  const initialParams = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams();
+  const [mode, setMode] = createSignal<Mode>(initialParams.get('signin') === '1' ? 'signin' : 'guest');
+  const [appShell, setAppShell] = createSignal(createAppShell());
   /** When passkeys are primary, password fields stay collapsed until the user asks. */
   const [passwordPathOpen, setPasswordPathOpen] = createSignal(false);
   /** Offline recovery-code path under sign-in (RECOVERYCODES LOGIN after 001). */
@@ -242,25 +254,15 @@ export function Connect(props: ConnectProps): JSX.Element {
   // Website → app handoff: /app/?join=%23channel (+ optional &at=<moment> for
   // time travel). Validated before it goes anywhere near a JOIN; a bad link is
   // simply ignored.
-  const deepLinkJoin = parseJoinParam(
-    typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('join')
-      : null,
-  );
+  const deepLinkJoin = parseJoinParam(initialParams.get('join'));
   const deepLinkAt = parseAtParam(
-    typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('at')
-      : null,
+    initialParams.get('at'),
   );
   const deepLinkTopic = parseTopicParam(
-    typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('topic')
-      : null,
+    initialParams.get('topic'),
   );
   const deepLinkReader = parseReaderParam(
-    typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('reader')
-      : null,
+    initialParams.get('reader'),
   );
   if (deepLinkReader) setPreference('readerMode', true);
   if (deepLinkJoin) getState().setPendingDeepLinkJoin(deepLinkJoin, deepLinkAt, deepLinkTopic);
@@ -325,6 +327,14 @@ export function Connect(props: ConnectProps): JSX.Element {
   type RegisterPhase = 'idle' | 'submitting' | 'verifying' | 'completing';
   const [registerPhase, setRegisterPhase] = createSignal<RegisterPhase>('idle');
   const registerSubmitted = createMemo(() => registerPhase() !== 'idle');
+  let releaseUpdateHold: (() => void) | null = null;
+  createEffect(() => {
+    const protectedWork = Boolean(room().trim() || nick().trim() || password() || email().trim() || confirm()
+      || verifyCode() || recoveryCode() || reclaimPassword() || registerSubmitted());
+    if (protectedWork && !releaseUpdateHold) releaseUpdateHold = updateCoordinator.hold('connect-form');
+    if (!protectedWork && releaseUpdateHold) { releaseUpdateHold(); releaseUpdateHold = null; }
+  });
+  onCleanup(() => { releaseUpdateHold?.(); releaseUpdateHold = null; });
 
   // ── GHOST reclaim ──────────────────────────────────────────────────────────
   const [reclaimOpen, setReclaimOpen] = createSignal(false);
@@ -422,7 +432,9 @@ export function Connect(props: ConnectProps): JSX.Element {
       || status === 'reconnecting'
       || status === 'connected'
     ) {
-      void AppShell.preload();
+      void appShell().preload().catch(() => {
+        // Preload is speculative. The boundary below owns the visible retry.
+      });
     }
   });
 
@@ -490,7 +502,7 @@ export function Connect(props: ConnectProps): JSX.Element {
     }
     switch (formPhase()) {
       case 'connecting':
-        return 'Connecting securely.';
+        return 'Connecting to Onyx.';
       case 'error':
         if (registeredNickNeedsSignIn()) {
           return 'That name belongs to an account. Sign in to use it.';
@@ -504,7 +516,7 @@ export function Connect(props: ConnectProps): JSX.Element {
         return 'Couldn’t reach Onyx just now. Try again in a moment.';
       default:
         return routing()
-          ? 'Connecting securely.'
+          ? 'Connecting to Onyx.'
           : modeHint(mode());
     }
   });
@@ -1351,7 +1363,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                           {passkeyBusy()
                             ? 'Waiting for your device…'
                             : passkeySignInAttempt()
-                              ? 'Connecting securely…'
+                              ? 'Connecting to Onyx…'
                               : 'Sign in with a passkey'}
                         </Button>
                         <Show when={passkeyError()}>
@@ -1648,7 +1660,12 @@ export function Connect(props: ConnectProps): JSX.Element {
       {/* Connected shell — reads everything from the store.
           ErrorBoundary: a stale post-deploy AppShell chunk 404 must not leave
           wallpaper-only blank output; offer reload / home, never auto-loop. */}
-      <ErrorBoundary fallback={lazyRouteFallback}>
+      <ErrorBoundary fallback={(error, reset) => lazyRouteFallback(error, () => {
+        // Solid lazy values cache rejected promises. Replace the value before
+        // resetting the boundary, otherwise retry would render the same failure.
+        setAppShell(() => createAppShell());
+        reset();
+      })}>
         <Suspense
           fallback={
             <div class="conn" data-testid="shell-loading">
@@ -1659,10 +1676,10 @@ export function Connect(props: ConnectProps): JSX.Element {
             </div>
           }
         >
-          <AppShell
-            onDisconnect={handleDisconnect}
-            selfNick={ourNick()}
-          />
+          {createComponent(appShell(), {
+            onDisconnect: handleDisconnect,
+            selfNick: ourNick(),
+          })}
         </Suspense>
       </ErrorBoundary>
     </Show>

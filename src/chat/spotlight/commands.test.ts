@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import 'fake-indexeddb/auto';
+import { IDBFactory } from 'fake-indexeddb';
 import { backgroundOptions } from '@/backgrounds';
 import type { Channel } from '@/lib/irc/types';
 import { getState, setState } from '@/lib/store';
@@ -16,6 +18,7 @@ import {
 } from '@/lib/extensions/clientActions';
 import { setVaultMode, vaultSearchMode } from '@/shell/search/useMessageSearch';
 import { setTranslationTarget, translationTarget } from '@/lib/intelligence/translateMessage';
+import { _resetVaultForTests } from '@/lib/vault/historyVault';
 import { loadRecents } from '@/lib/commands/registry';
 import {
   readReviewHistory,
@@ -90,6 +93,9 @@ function review(
 describe('buildCommands', () => {
   beforeEach(() => {
     vi.useRealTimers();
+    globalThis.indexedDB = new IDBFactory();
+    window.indexedDB = globalThis.indexedDB;
+    _resetVaultForTests();
     store.setState(initialState, true);
     resetPreferences();
     closePreferences();
@@ -117,8 +123,8 @@ describe('buildCommands', () => {
   });
 
   it('opens the channel directory with one store-owned LIST request', () => {
-    const sendRaw = vi.fn();
-    setState({ client: { sendRaw } as never });
+    const sendRaw = vi.fn(() => true);
+    setState({ client: { sendRaw } as never, connectionStatus: 'connected' });
 
     buildCommands(getState()).find((entry) => entry.id === 'action-browse-channels')?.run();
 
@@ -1070,11 +1076,13 @@ describe('buildCommands', () => {
     const FIXED_NOW = Date.parse('2026-07-12T12:00:00Z');
 
     beforeEach(() => {
-      vi.useFakeTimers();
+      // Durable IndexedDB callbacks must run on real task queues; only freeze
+      // the wall clock used by the grammar parser.
+      vi.useFakeTimers({ toFake: ['Date'] });
       vi.setSystemTime(FIXED_NOW);
     });
 
-    it('schedules a message to the active channel from a relative future time', () => {
+    it('schedules a message to the active channel from a relative future time', async () => {
       setState({
         channels: new Map([['#forge', channel('#forge')]]),
         activeView: { kind: 'channel', channel: '#forge' },
@@ -1085,7 +1093,7 @@ describe('buildCommands', () => {
         entry.id.startsWith('grammar:schedule:'),
       );
       expect(command).toBeDefined();
-      command?.run();
+      await command?.run();
 
       const queue = store.getState().scheduledMessages;
       expect(queue).toHaveLength(1);
@@ -1097,7 +1105,7 @@ describe('buildCommands', () => {
       });
     });
 
-    it('accepts a leading "in" and an active DM target', () => {
+    it('accepts a leading "in" and an active DM target', async () => {
       setState({
         dms: new Map([['aoi', dm('aoi')]]),
         activeView: { kind: 'dm', nick: 'aoi' },
@@ -1108,7 +1116,7 @@ describe('buildCommands', () => {
         entry.id.startsWith('grammar:schedule:'),
       );
       expect(command).toBeDefined();
-      command?.run();
+      await command?.run();
 
       const queue = store.getState().scheduledMessages;
       expect(queue).toHaveLength(1);

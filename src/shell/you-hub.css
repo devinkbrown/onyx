@@ -22,8 +22,13 @@
   font-size: 0.75rem;
   font-weight: 650;
   letter-spacing: 0.02em;
-  min-height: 2rem;
+  min-height: 44px;
   padding: 0.35rem 0.7rem;
+}
+
+@media (max-width: 30rem) {
+  .acct-hub { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .acct-hub-link { width: 100%; }
 }
 
 .acct-hub-link:hover {

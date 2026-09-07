@@ -103,6 +103,21 @@
   font: 400 clamp(1rem, 1.3vw, 1.1rem)/var(--leading-body, 1.55) var(--font-serif, var(--font-sans));
 }
 
+.shell-calls-truth {
+  display: grid;
+  gap: 4px;
+  max-width: 58ch;
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border-left: 3px solid var(--lapis);
+  color: var(--paper-dim);
+  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 48%, transparent);
+  font-size: .9rem;
+  line-height: 1.45;
+}
+
+.shell-calls-truth strong { color: var(--paper); font-weight: 650; }
+
 .shell-calls-primary {
   min-height: var(--target-min, 44px);
   min-width: var(--target-min, 44px);
@@ -304,6 +319,10 @@
     opacity: 1;
     transform: none;
   }
+}
+
+@media (forced-colors: active) {
+  .shell-calls-truth { border-color: Highlight; background: Canvas; }
 }
 
 @media (forced-colors: active) {

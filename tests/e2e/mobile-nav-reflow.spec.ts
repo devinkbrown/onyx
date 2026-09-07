@@ -97,6 +97,7 @@ test('contains enlarged mobile navigation in a safe-area-aware horizontal rail',
   const finalAction = page.getByRole('button', { name: 'Open You' });
   await finalAction.focus();
   await expect(finalAction).toBeFocused();
+  await expect.poll(() => nav.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
   const focusedGeometry = await nav.evaluate((element) => {
     const last = element.querySelector<HTMLButtonElement>('button:last-child')!;
     const navRect = element.getBoundingClientRect();
@@ -192,7 +193,7 @@ test('keeps the Advanced room control desk reachable at 400% short reflow', asyn
   await youTrigger.focus();
   await youTrigger.click();
   const you = page.getByRole('dialog', { name: 'You' });
-  const appearance = you.getByRole('button', { name: 'Appearance' });
+  const appearance = you.getByRole('button', { name: 'Appearance', exact: true });
   const preferences = you.getByRole('button', { name: 'Preferences' });
   await expect(appearance).toBeVisible();
   await expect(preferences).toBeVisible();
@@ -212,7 +213,7 @@ test('keeps the Advanced room control desk reachable at 400% short reflow', asyn
   await expect(desk.getByTestId('moderation-cockpit')).toBeVisible();
 
   const invite = desk.getByLabel('Invite someone');
-  const ban = desk.getByLabel('Block a matching address');
+  const ban = desk.getByLabel('Block an address in this room');
   await invite.scrollIntoViewIfNeeded();
   await expect(invite).toBeVisible();
   await ban.fill('ada!*@*');
@@ -226,7 +227,11 @@ test('keeps the Advanced room control desk reachable at 400% short reflow', asyn
   await confirmation.focus();
   await expect(confirmation).toBeFocused();
 
-  const geometry = await desk.evaluate((element) => {
+  const geometryDesk = page.getByRole('dialog', {
+    name: 'Room controls for #access',
+    includeHidden: true,
+  });
+  const geometry = await geometryDesk.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     return {
       left: rect.left,

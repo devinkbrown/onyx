@@ -78,6 +78,7 @@ describe('<NotificationCenter>', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(trigger).toHaveAttribute('aria-controls', dialog.id);
     expect(getByText(/Nothing yet/)).toBeInTheDocument();
+    expect(screen.getByText(/This is your notification history/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open public room ledger' })).toHaveAttribute(
       'href',
       '/stats/',

@@ -132,6 +132,18 @@ describe('MessageView consumer transcript chrome', () => {
     expect(screen.getByRole('article', { name: /queued/i })).toBeInTheDocument();
   });
 
+  it('explains offline reading without hiding the local transcript', () => {
+    seed([makeMessage('m-offline', 'bob', 'saved here', 0)]);
+    store.setState({ connectionStatus: 'disconnected' });
+
+    render(() => <MessageView />);
+
+    expect(screen.getByTestId('message-view-connection-status')).toHaveTextContent(
+      'offline',
+    );
+    expect(screen.getByRole('article', { name: /saved here/ })).toBeInTheDocument();
+  });
+
   it('exposes React, Reply, and More on every live row — not Edit/Delete chips', () => {
     seed([
       makeMessage('m-other', 'bob', 'theirs', 0),
@@ -187,7 +199,7 @@ describe('MessageView consumer transcript chrome', () => {
     expect(row?.querySelector('.shell-msg-bubble')).toBeNull();
   });
 
-  it('opens the same overlay actions on a touch long-press', () => {
+  it('opens More with quote while keeping Reply in the action bar on touch long-press', () => {
     vi.useFakeTimers();
     seed([makeMessage('m-hold', 'bob', 'hold me', 0)]);
     render(() => <MessageView />);
@@ -207,7 +219,7 @@ describe('MessageView consumer transcript chrome', () => {
 
     expect(row).toHaveClass('shell-msg-revealed');
     expect(screen.getByRole('menu', { name: 'More actions for message from bob' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Reply to message from bob' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Quote message from bob in composer' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reply to bob' })).toBeInTheDocument();
   });
 

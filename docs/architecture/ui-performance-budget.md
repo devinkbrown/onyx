@@ -62,19 +62,18 @@ hash in a stable role/path order.
 The earlier architecture packet was useful directional evidence: it recorded
 AppShell JS at 432.26 KiB raw / 128.87 KiB gzip, runtime JS at 360.70 / 106.08
 KiB, and AppShell CSS at 257.51 / 37.88 KiB. Those values were not copied into
-the ratchet. The checked-in baseline was derived from one fresh production build
-of the current worktree and measured by the new tool:
+the ratchet. The checked-in baseline below is a reviewed post-commercial-overhaul measurement from a fresh production build. Route-only and app-only work is isolated, eager JS/CSS dropped substantially, optional media remains bounded, and AppShell/runtime values reflect the intentionally expanded commercial surface:
 
 | Boundary | Files | Baseline raw | Baseline gzip | Raw ceiling | Gzip ceiling |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Total eager JS | 4 | 577,381 B | 172,724 B | 606,251 B | 181,361 B |
-| Total eager CSS | 1 | 120,100 B | 24,093 B | 126,105 B | 25,298 B |
-| Eager index JS | 1 | 51,313 B | 18,292 B | 53,879 B | 19,207 B |
-| Eager index CSS | 1 | 120,100 B | 24,093 B | 126,105 B | 25,298 B |
-| Shared runtime JS | 1 | 453,715 B | 131,677 B | 476,401 B | 138,261 B |
-| AppShell JS | 1 | 452,245 B | 134,598 B | 474,858 B | 141,328 B |
-| AppShell CSS | 1 | 294,734 B | 43,121 B | 309,471 B | 45,278 B |
-| Optional/lazy media JS | 2 | 123,675 B | 36,565 B | 129,859 B | 38,394 B |
+| Total eager JS | 3 | 108,813 B | 37,042 B | 114,254 B | 38,895 B |
+| Total eager CSS | 2 | 73,021 B | 15,853 B | 76,673 B | 16,646 B |
+| Eager index JS | 1 | 28,740 B | 11,256 B | 30,177 B | 11,819 B |
+| Eager index CSS | 2 | 73,021 B | 15,853 B | 76,673 B | 16,646 B |
+| Shared runtime JS | 1 | 502,674 B | 143,790 B | 527,808 B | 150,980 B |
+| AppShell JS | 1 | 481,487 B | 144,426 B | 505,562 B | 151,648 B |
+| AppShell CSS | 1 | 349,702 B | 51,962 B | 367,188 B | 54,561 B |
+| Optional/lazy media JS | 2 | 123,704 B | 36,576 B | 129,890 B | 38,405 B |
 
 Every raw and gzip ceiling is exactly `Math.ceil(baseline * 1.05)`. The 5%
 headroom catches meaningful growth without making content-hash or compression

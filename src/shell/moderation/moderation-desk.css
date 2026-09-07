@@ -1,4 +1,23 @@
 /* Room safety desk — compact authority rail and review surfaces. */
+:root {
+  --moderation-danger: color-mix(in oklab, var(--shu) 82%, var(--paper));
+  --moderation-panel: color-mix(in oklab, var(--surface-void) 88%, var(--accent));
+  --moderation-focus: Highlight;
+}
+
+.moderation-desk__boundary {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--moderation-panel);
+  color: var(--paper-mute);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+.moderation-desk__boundary strong { color: var(--paper); }
+.moderation-desk__optional, .moderation-desk__receipt { color: var(--paper-mute); font-size: var(--text-xs); }
+.moderation-desk__receipt { margin: -2px 0 0; }
 
 .moderation-desk__rail {
   display: flex;
@@ -75,6 +94,10 @@
   display: grid;
   gap: var(--space-3);
 }
+.moderation-action-review__facts { display: grid; gap: 8px; margin: 0; padding: 10px; border: 1px solid var(--seam-faint); background: var(--moderation-panel); }
+.moderation-action-review__facts div { display: grid; gap: 2px; }
+.moderation-action-review__facts dt { color: var(--paper-mute); font-size: var(--text-xs); font-weight: 700; }
+.moderation-action-review__facts dd { margin: 0; color: var(--paper); font-size: var(--text-sm); }
 
 .moderation-action-review__summary,
 .moderation-action-review__impact,
@@ -105,7 +128,7 @@
 .moderation-desk__ban-row button,
 .moderation-cockpit__form button,
 .moderation-cockpit__form select {
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .moderation-cockpit__form select {
@@ -118,6 +141,19 @@
   background: var(--surface-void);
   color: var(--paper);
   font: var(--text-sm) var(--font-sans);
+}
+
+.moderation-cockpit button:focus-visible,
+.moderation-cockpit input:focus-visible,
+.moderation-cockpit select:focus-visible,
+.moderation-action-review__body button:focus-visible {
+  outline: 3px solid var(--moderation-focus);
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .moderation-cockpit__form > div { display: grid; grid-template-columns: 1fr; }
+  .moderation-cockpit__form button, .moderation-cockpit__form input, .moderation-cockpit__form select { width: 100%; min-height: 44px; }
 }
 
 @media (max-width: 320px) {

@@ -1,0 +1,24 @@
+.presence-ribbon-surface :is(button, a, [role="button"]) {
+  min-height: 44px;
+}
+
+.presence-ribbon-surface :is(button, a, [role="button"]):focus-visible {
+  outline: 3px solid var(--focus-ring, Highlight);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .presence-ribbon-surface { padding-inline: var(--space-2, 0.5rem); }
+  .presence-ribbon-surface .shell-ribbon-action-label { max-width: 5.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .presence-ribbon-surface *, .presence-ribbon-surface *::before, .presence-ribbon-surface *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .presence-ribbon-surface :is(button, a, [role="button"]):focus-visible { outline: 2px solid Highlight; }
+}

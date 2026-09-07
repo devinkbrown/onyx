@@ -3,6 +3,9 @@
   position: relative;
   isolation: isolate;
   min-height: 100svh;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: clip;
   font-family: var(--font-sans);
   color: var(--text, var(--paper));
 }
@@ -12,6 +15,7 @@
   top: 0;
   z-index: 10;
   display: flex;
+  box-sizing: border-box;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -48,6 +52,7 @@
   position: relative;
   z-index: 1;
   width: 100%;
+  box-sizing: border-box;
   max-width: 1040px;
   margin: 0 auto;
   padding: clamp(36px, 7vw, 88px) clamp(16px, 5vw, 48px) 14vh;
@@ -91,6 +96,22 @@
   color: var(--paper-dim);
 }
 
+.ap-local-note {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 10px 12px;
+  border-inline-start: 2px solid var(--lapis);
+  color: var(--paper-dim);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.ap-local-note span {
+  color: var(--lapis-bright);
+  font-weight: 700;
+}
+
 .ap-group { margin-top: clamp(28px, 4vw, 48px); }
 .ap-glabel {
   display: block;
@@ -125,13 +146,20 @@
 .ap-choice-toggles {
   display: grid;
   gap: 10px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   max-width: 28rem;
 }
 .ap-choice-toggle {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   min-height: 44px;
   padding: 10px 14px;
   border: 1px solid var(--seam-faint);
@@ -141,7 +169,10 @@
   cursor: pointer;
   font: 600 0.95rem var(--font-sans);
 }
+.ap-choice-toggle > * { min-width: 0; }
 .ap-choice-toggle b {
+  justify-self: end;
+  white-space: nowrap;
   font: 650 0.8rem var(--font-sans);
   color: var(--paper-dim);
 }
@@ -261,8 +292,15 @@
   text-transform: uppercase;
 }
 .ap-studio > summary b { font: 600 0.92rem var(--font-sans); }
+.ap-studio > summary small { color: var(--paper-dim); font-size: 0.8rem; line-height: 1.4; }
 .ap-studio[open] > summary { border-bottom: 1px solid var(--seam-faint); }
 .ap-studio__body { min-width: 0; }
+.ap-studio,
+.ap-studio * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 
 .ap-background-stage__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .ap-background-stage__heading > span { color: var(--lapis-bright); font: .66rem var(--font-mono); letter-spacing: .1em; text-transform: uppercase; }
@@ -310,6 +348,15 @@
   .ap-h1 {
     font-size: clamp(1.55rem, 1.2rem + 3vw, 2.1rem);
     line-height: 1.14;
+    overflow-wrap: anywhere;
+  }
+
+  .ap-choice-toggle {
+    align-items: start;
+    gap: 4px 12px;
+  }
+
+  .ap-choice-toggle span {
     overflow-wrap: anywhere;
   }
 
@@ -400,4 +447,11 @@
   .ap-chip {
     transition: none;
   }
+}
+
+@media (forced-colors: active) {
+  .ap-local-note { border-color: Highlight; color: CanvasText; }
+  .ap-local-note span, .ap-studio > summary span { color: CanvasText; }
+  .ap-studio { border-color: CanvasText; background: Canvas; }
+  .ap-studio > summary:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
 }

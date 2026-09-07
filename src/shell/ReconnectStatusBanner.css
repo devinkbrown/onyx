@@ -1,0 +1,43 @@
+/* Local controls for the recovery banner; layout remains owned by shell.css. */
+.shell-disconnected-banner__message {
+  min-width: 0;
+}
+
+.shell-disconnected-banner__action {
+  min-width: 8rem;
+  min-height: 44px;
+  margin-left: auto;
+  padding: 0 var(--space-3, 0.75rem);
+  border: 1px solid currentColor;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: inherit;
+  font: 650 var(--text-xs, 0.75rem)/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.shell-disconnected-banner__action:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 2px;
+}
+
+@media (max-width: 42rem) {
+  .shell-disconnected-banner__action {
+    min-width: 7rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-disconnected-banner__action {
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .shell-disconnected-banner__action {
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+    forced-color-adjust: auto;
+  }
+}

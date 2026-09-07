@@ -100,7 +100,7 @@ export function GroupControlRoomIndicator(props: GroupControlRoomIndicatorProps)
     props.projection,
   );
   const protectionLabel = () => presentation()?.state === 'active'
-    ? 'Message protection: ready'
+    ? 'Message protection: available'
     : 'Message protection: not active';
 
   return (

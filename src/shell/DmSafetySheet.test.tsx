@@ -81,8 +81,8 @@ describe('DmSafetySheet', () => {
     fireEvent.click(trigger);
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(await screen.findByRole('region', { name: /compare this safety number with Trev/i })).toBeInTheDocument();
-    await waitFor(() => expect(loadSafetyNumber).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('region', { name: /review this safety number with Trev/i })).toBeInTheDocument();
+    await waitFor(() => expect(loadSafetyNumber).toHaveBeenCalledTimes(2));
     expect(loadSafetyNumber).toHaveBeenCalledWith('Trev');
 
     const output = await screen.findByLabelText(`Safety number for Trev: ${SAFETY_NUMBER}`);
@@ -90,10 +90,37 @@ describe('DmSafetySheet', () => {
       .map((group) => group.childNodes[group.childNodes.length - 1]?.textContent);
     expect(visibleGroups).toEqual(SAFETY_NUMBER.split(' '));
     expect(output).toHaveAttribute('aria-live', 'off');
-    expect(screen.getByText('Ready to compare')).toBeInTheDocument();
+    expect(screen.getByText('Number available')).toBeInTheDocument();
     expect(screen.getByText('1 device received')).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent('redacted-public-key-material');
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('updates displayed evidence when the trusted safety-number identity changes while open', async () => {
+    const safetyA = '11111 22222 33333 44444 55555 66666 77777 88888 99999 00000 12121 34343';
+    const safetyC = '99999 88888 77777 66666 55555 44444 33333 22222 11111 00000 56565 78787';
+    let resolveA!: (value: string) => void;
+    const loadSafetyNumber = vi.fn((peer: string) => {
+      if (loadSafetyNumber.mock.calls.length === 1) {
+        return new Promise<string>((resolve) => { resolveA = resolve; });
+      }
+      return Promise.resolve(safetyC);
+    });
+    seedDm('Trev', { safetyNumber: safetyA });
+    store.setState({ loadSafetyNumber });
+    render(() => <DmSafetySheet />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^verify$/i }));
+    expect(await screen.findByLabelText(`Safety number for Trev: ${safetyA}`)).toBeInTheDocument();
+
+    store.setState({ peerSafetyNumbers: new Map([['trev', safetyC]]) });
+    expect(await screen.findByLabelText(`Safety number for Trev: ${safetyC}`)).toBeInTheDocument();
+    expect(screen.queryByLabelText(`Safety number for Trev: ${safetyA}`)).toBeNull();
+
+    resolveA(safetyA);
+    await Promise.resolve();
+    expect(screen.getByLabelText(`Safety number for Trev: ${safetyC}`)).toBeInTheDocument();
+    expect(loadSafetyNumber).toHaveBeenCalledTimes(2);
   });
 
   it('shows multi-device count and labels the safety number across all devices', async () => {
@@ -134,7 +161,7 @@ describe('DmSafetySheet', () => {
     fireEvent.click(screen.getByRole('button', { name: /^verify$/i }));
     expect(screen.getByRole('status')).toHaveTextContent(/Loading this device’s safety number/i);
     expect(screen.getByText('Not received')).toBeInTheDocument();
-    expect(screen.getByText('Not ready to compare')).toBeInTheDocument();
+    expect(screen.getByText('Number unavailable')).toBeInTheDocument();
 
     resolveSafety(null);
     await waitFor(() => {
@@ -143,6 +170,22 @@ describe('DmSafetySheet', () => {
     expect(screen.getByText(/treat the identity as unverified/i)).toBeInTheDocument();
     expect(screen.queryByText(/trust on first use|TOFU|MITM/i)).toBeNull();
     expect(screen.queryByText(/verified$/i)).toBeNull();
+  });
+
+  it('retries the loader when an unavailable result is closed and reopened', async () => {
+    const loadSafetyNumber = vi.fn(() => Promise.resolve(null));
+    seedDm('Mika', { peerKey: false });
+    store.setState({ loadSafetyNumber });
+    render(() => <DmSafetySheet />);
+
+    const trigger = screen.getByRole('button', { name: /^verify$/i });
+    fireEvent.click(trigger);
+    await waitFor(() => expect(loadSafetyNumber).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Mika’s device key has not arrived yet/i));
+
+    fireEvent.click(screen.getByRole('button', { name: /close safety number/i }));
+    fireEvent.click(trigger);
+    await waitFor(() => expect(loadSafetyNumber).toHaveBeenCalledTimes(2));
   });
 
   it('closes on its labelled button and restores focus to the opener', async () => {
@@ -158,7 +201,7 @@ describe('DmSafetySheet', () => {
 
     await waitFor(() => expect(document.activeElement).toBe(trigger));
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('region', { name: /compare this safety number with Trev/i })).toBeNull();
+    expect(screen.queryByRole('region', { name: /review this safety number with Trev/i })).toBeNull();
   });
 
   it('closes with Escape, restores focus, and never traps the non-modal panel', async () => {
@@ -174,7 +217,7 @@ describe('DmSafetySheet', () => {
 
     await waitFor(() => expect(document.activeElement).toBe(trigger));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.queryByRole('region', { name: /compare this safety number with Trev/i })).toBeNull();
+    expect(screen.queryByRole('region', { name: /review this safety number with Trev/i })).toBeNull();
   });
 
   it('does not paint a slow peer result after the active DM changes', async () => {
@@ -197,7 +240,7 @@ describe('DmSafetySheet', () => {
     resolveTrev(SAFETY_NUMBER);
     await Promise.resolve();
 
-    expect(screen.queryByRole('region', { name: /compare this safety number with Mika/i })).toBeNull();
+    expect(screen.queryByRole('region', { name: /review this safety number with Mika/i })).toBeNull();
     expect(screen.queryByLabelText(/Safety number for Mika:/i)).toBeNull();
     expect(document.body).not.toHaveTextContent('11111');
   });
@@ -211,7 +254,7 @@ describe('DmSafetySheet', () => {
       peerDmKeys: new Map([['trev', validPeerKey()]]),
     });
     expect(screen.getByTestId('dm-safety-private').getAttribute('aria-label') ?? '').toMatch(
-      /only the two of you can read these messages/i,
+      /encrypted for you and the other person/i,
     );
     expect(screen.getByTestId('dm-safety-private')).toHaveTextContent('Private');
     expect(screen.getByTestId('dm-safety-private')).not.toHaveTextContent(/🔒|lock/i);
@@ -230,7 +273,7 @@ describe('DmSafetySheet', () => {
 
     expect(screen.queryByRole('button', { name: /^verify$/i })).toBeNull();
     openDmSafetySheet();
-    expect(screen.getByRole('region', { name: /compare this safety number with Trev/i })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /review this safety number with Trev/i })).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent('🔒');
   });
 });

@@ -4,6 +4,7 @@
   flex-direction: column;
   gap: 12px;
   min-height: 220px;
+  color: var(--paper);
 }
 
 .chb-toolbar {
@@ -321,6 +322,18 @@
   font-size: 0.9rem;
   text-align: center;
 }
+.chb-state--offline {
+  border: 1px solid var(--line);
+  padding: 1rem;
+  background: color-mix(in oklab, var(--stone) 72%, transparent);
+}
+.chb-state--offline p { margin: 0.35rem 0 0; color: var(--paper-dim); }
+.chb-admission {
+  border: 1px solid var(--line);
+  padding: 0.75rem 1rem;
+  color: var(--paper-dim);
+  background: color-mix(in oklab, var(--stone) 72%, transparent);
+}
 .chb-mono {
   font-family: var(--font-mono);
   color: var(--lapis-bright);
@@ -484,6 +497,20 @@
   outline: var(--focus-ring, 2px solid var(--lapis));
   outline-offset: var(--focus-offset, 3px);
 }
+button:disabled { cursor: not-allowed; }
+
+@media (max-width: 520px) {
+  .chb-toolbar > * { flex: 1 1 100%; }
+  .chb-sort { width: 100%; }
+  .chb-sort-btn { flex: 1; }
+}
+
+@media (forced-colors: active) {
+  .chb-card, .chb-state--offline, .chb-sort, .chb-filter { border: 1px solid CanvasText; }
+  .chb-start, .chb-join:focus-visible, .chb-filter:focus-visible { outline: 2px solid Highlight; }
+}
+
+@media (prefers-reduced-motion: reduce) { .chb * { scroll-behavior: auto; transition: none; } }
 
 @media (min-width: 640px) {
   .chb-list {

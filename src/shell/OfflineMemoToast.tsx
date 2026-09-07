@@ -17,7 +17,9 @@ export function OfflineMemoToast(): null {
     const onMemo = (event: Event) => {
       const detail = (event as CustomEvent<OfflineMemoDetail>).detail;
       if (!detail || typeof detail !== 'object') return;
-      const from = typeof detail.from === 'string' ? detail.from.trim() : '';
+      const from = typeof detail.from === 'string'
+        ? detail.from.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 64)
+        : '';
       const count = typeof detail.count === 'number' && Number.isFinite(detail.count)
         ? Math.max(1, Math.floor(detail.count))
         : 1;

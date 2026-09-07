@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   collectScheduledEvents,
   eventCountdown,
+  isValidScheduledTimestamp,
   parseScheduledEvent,
   scheduledEventVisible,
   scheduledEventsEqual,
@@ -22,6 +23,13 @@ describe('parseScheduledEvent', () => {
     for (const raw of ['', 'notime|', '|title', 'abc|title', '123']) {
       expect(parseScheduledEvent(raw)).toBeNull();
     }
+  });
+
+  test('rejects timestamps outside the JavaScript Date range, including overflow', () => {
+    expect(isValidScheduledTimestamp(8_640_000_000_000)).toBe(true);
+    expect(parseScheduledEvent('8640000000001|too late')).toBeNull();
+    expect(parseScheduledEvent('1e308|overflow')).toBeNull();
+    expect(parseScheduledEvent('Infinity|overflow')).toBeNull();
   });
 });
 
@@ -73,6 +81,13 @@ describe('scheduled event timing', () => {
     expect(eventCountdown({ at: 100, title: 'Imminent' }, 99_999)).toBe('in 1 min');
     // 0 and past deltas remain "happening now".
     expect(eventCountdown({ at: 100, title: 'Imminent' }, 100_000)).toBe('happening now');
+  });
+
+  test('invalid event values fail closed without throwing', () => {
+    const invalid = { at: 1e308, title: 'bad' };
+    expect(() => scheduledEventVisible(invalid, Date.now())).not.toThrow();
+    expect(() => eventCountdown(invalid, Date.now())).not.toThrow();
+    expect(eventCountdown(invalid, Date.now())).toBe('');
   });
 });
 

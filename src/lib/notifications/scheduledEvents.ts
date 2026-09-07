@@ -15,6 +15,15 @@ interface ChannelLike {
 
 const EVENT_PROP = 'ocean.event';
 const EVENT_GRACE_MS = 60 * 60 * 1000;
+const MAX_VALID_DATE_MS = 8_640_000_000_000_000;
+
+export function isValidScheduledTimestamp(at: number): boolean {
+  if (!Number.isFinite(at) || at <= 0) return false;
+  const milliseconds = at * 1000;
+  return Number.isFinite(milliseconds)
+    && Math.abs(milliseconds) <= MAX_VALID_DATE_MS
+    && !Number.isNaN(new Date(milliseconds).getTime());
+}
 
 export function parseScheduledEvent(raw: string | undefined): ScheduledEvent | null {
   if (!raw) return null;
@@ -24,7 +33,7 @@ export function parseScheduledEvent(raw: string | undefined): ScheduledEvent | n
 
   const at = Number(raw.slice(0, sep));
   const title = raw.slice(sep + 1).trim();
-  if (!Number.isFinite(at) || at <= 0 || !title) return null;
+  if (!isValidScheduledTimestamp(at) || !title) return null;
 
   return { at, title };
 }
@@ -47,10 +56,13 @@ export function scheduledEventsEqual(
 }
 
 export function scheduledEventVisible(event: ScheduledEvent, nowMs: number): boolean {
-  return nowMs < event.at * 1000 + EVENT_GRACE_MS;
+  const startMs = event.at * 1000;
+  return isValidScheduledTimestamp(event.at) && Number.isFinite(nowMs)
+    && nowMs < startMs + EVENT_GRACE_MS;
 }
 
 export function eventCountdown(event: ScheduledEvent, nowMs: number): string {
+  if (!isValidScheduledTimestamp(event.at) || !Number.isFinite(nowMs)) return '';
   const delta = event.at * 1000 - nowMs;
   if (delta <= 0) return 'happening now';
 

@@ -13,4 +13,10 @@ describe('CallJoinBanner', () => {
     fireEvent.click(screen.getByTestId('call-join-retry'));
     expect(onRetry).toHaveBeenCalledOnce();
   });
+
+  it('allows a safe state-specific message without exposing protocol errors', () => {
+    render(() => <CallJoinBanner message="Microphone access is unavailable. Check your browser settings and try again." onRetry={() => {}} />);
+    expect(screen.getByTestId('call-join-banner')).toHaveTextContent('Microphone access is unavailable');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
+  });
 });

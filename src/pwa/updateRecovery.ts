@@ -11,6 +11,8 @@ export type PwaUpdateRecoveryResult = {
   state: PwaUpdateRecoveryState;
   detail: string;
 };
+export { createUpdateCoordinator, updateCoordinator, type UpdateAvailability } from './updateCoordinator';
+import { updateCoordinator } from './updateCoordinator';
 
 function reloadCurrentWindow(): void {
   if (typeof window !== 'undefined') window.location.reload();
@@ -38,6 +40,9 @@ export async function refreshInstalledAppShell(
     const updated = await registration.update();
     const waiting = updated.waiting ?? registration.waiting;
     if (waiting) {
+      // Activation is asynchronous; controllerchange will make the safe
+      // transition decision once the new worker actually takes control.
+      updateCoordinator.replace(reload, true, false);
       waiting.postMessage({ type: 'ONYX_SKIP_WAITING' });
       return {
         state: 'activating',
@@ -54,10 +59,13 @@ export async function refreshInstalledAppShell(
     }
 
     if (navigator.serviceWorker.controller) {
-      reload();
+      updateCoordinator.replace(reload, !updateCoordinator.hasActiveWork, true);
+      updateCoordinator.approve();
       return {
-        state: 'reloading',
-        detail: 'Reloading the current stamped app shell.',
+        state: updateCoordinator.hasActiveWork ? 'activating' : 'reloading',
+        detail: updateCoordinator.hasActiveWork
+          ? 'The app shell is update-ready. Reload is queued until current work finishes.'
+          : 'Reloading the current stamped app shell.',
       };
     }
 

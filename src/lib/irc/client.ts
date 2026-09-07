@@ -243,6 +243,20 @@ export interface IRCClientOptions {
 
 const RECONNECT_BASE = 2000;
 
+/** A send raced the socket boundary after bytes may have been handed to it. */
+export class IRCAdmissionUncertain extends Error {
+  constructor(message = 'IRC send admission is uncertain') {
+    super(message);
+    this.name = 'IRCAdmissionUncertain';
+  }
+}
+
+export type IRCSendOptions = { onUncertain?: () => void };
+
+function observe(callback: (() => void) | undefined): void {
+  try { callback?.(); } catch { /* observers cannot affect transport outcome */ }
+}
+
 export class IRCClient {
   private ws: WebSocket | null = null;
   private opts: IRCClientOptions;
@@ -475,10 +489,10 @@ export class IRCClient {
    * the socket was still OPEN; rejected/raced sends are reported and return
    * false, never appearing in the raw log as accepted outbound traffic.
    */
-  send(line: string): boolean {
+  send(line: string, options?: IRCSendOptions): boolean {
     const ws = this.ws;
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      this.opts.onError?.('Message was not sent: the connection is not open.');
+      observe(() => this.opts.onError?.('Message was not sent: the connection is not open.'));
       return false;
     }
 
@@ -487,9 +501,9 @@ export class IRCClient {
     // also multiplexes binary Cadence media on this socket.
     const lineBody = line.endsWith('\r\n') ? line.slice(0, -2) : line;
     if (lineBody.includes('\r') || lineBody.includes('\n')) {
-      this.opts.onError?.(ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL
+      observe(() => this.opts.onError?.(ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL
         ? 'Message was not sent: text.ircv3.net requires exactly one IRC line per frame.'
-        : 'Message was not sent: IRC WebSocket frames require exactly one IRC line.');
+        : 'Message was not sent: IRC WebSocket frames require exactly one IRC line.'));
       return false;
     }
     const payload = ws.protocol === IRC_WEBSOCKET_SUBPROTOCOL ? lineBody : line;
@@ -497,17 +511,17 @@ export class IRCClient {
     // Fast character bound avoids allocating another huge buffer just to learn
     // that a hostile/accidental line cannot be admitted.
     if (payload.length > MAX_OUTBOUND_TEXT_BYTES) {
-      this.opts.onError?.('Message was not sent: the IRC frame is too large.');
+      observe(() => this.opts.onError?.('Message was not sent: the IRC frame is too large.'));
       return false;
     }
     const encodedBytes = new TextEncoder().encode(payload).byteLength;
     if (encodedBytes > MAX_OUTBOUND_TEXT_BYTES) {
-      this.opts.onError?.('Message was not sent: the IRC frame is too large.');
+      observe(() => this.opts.onError?.('Message was not sent: the IRC frame is too large.'));
       return false;
     }
 
     if (!hasWebSocketSendCapacity(ws, encodedBytes)) {
-      this.opts.onError?.('Message was not sent: the connection is congested. Reconnecting…');
+      observe(() => this.opts.onError?.('Message was not sent: the connection is congested. Reconnecting…'));
       try { ws.close(4004, 'Send buffer congested'); } catch { /* already closing */ }
       return false;
     }
@@ -515,23 +529,33 @@ export class IRCClient {
     try {
       ws.send(payload);
     } catch {
-      this.opts.onError?.('Message was not sent: the connection closed during send.');
-      return false;
+      observe(() => this.opts.onError?.('Message delivery could not be confirmed: the connection closed during send.'));
+      observe(options?.onUncertain);
+      throw new IRCAdmissionUncertain();
     }
 
     // Browsers silently discard send() calls made after the socket begins
     // CLOSING. Catch a native state race even when send() did not throw.
     if (ws.readyState !== WebSocket.OPEN) {
-      this.opts.onError?.('Message delivery could not be confirmed: the connection closed during send.');
-      return false;
+      observe(() => this.opts.onError?.('Message delivery could not be confirmed: the connection closed during send.'));
+      observe(options?.onUncertain);
+      throw new IRCAdmissionUncertain();
     }
 
-    this.opts.onRaw?.(redactSensitiveLineForLog(line.replace(/\r\n$/, '')), 'out');
+    observe(() => this.opts.onRaw?.(redactSensitiveLineForLog(line.replace(/\r\n$/, '')), 'out'));
     return true;
   }
 
-  sendRaw(command: string, ...params: string[]): boolean {
-    return this.send(formatIRCLine(command, ...params));
+  sendRaw(command: string, ...params: string[]): boolean;
+  sendRaw(command: string, options: IRCSendOptions, ...params: string[]): boolean;
+  sendRaw(command: string, ...args: (string | IRCSendOptions)[]): boolean {
+    const options = typeof args[0] === 'object' ? args[0] as IRCSendOptions : undefined;
+    const params = (options ? args.slice(1) : args) as string[];
+    return this.send(formatIRCLine(command, ...params), options);
+  }
+
+  sendRawWithOptions(command: string, options: IRCSendOptions, ...params: string[]): boolean {
+    return this.send(formatIRCLine(command, ...params), options);
   }
 
   /**
@@ -613,8 +637,9 @@ export class IRCClient {
 
   // ── Public IRC command helpers ──────────────────────────────────────────
 
-  join(channel: string, key?: string) {
-    this.sendRaw('JOIN', channel, ...(key ? [key] : []));
+  join(channel: string, key?: string, options?: IRCSendOptions): boolean {
+    return options ? this.sendRaw('JOIN', options, channel, ...(key ? [key] : []))
+      : this.sendRaw('JOIN', channel, ...(key ? [key] : []));
   }
 
   activitySubscribe(channel: string): boolean {
@@ -635,8 +660,8 @@ export class IRCClient {
     this.sendRaw('PART', channel, reason);
   }
 
-  privmsg(target: string, text: string) {
-    this.sendRaw('PRIVMSG', target, text);
+  privmsg(target: string, text: string, options?: IRCSendOptions): boolean {
+    return options ? this.sendRaw('PRIVMSG', options, target, text) : this.sendRaw('PRIVMSG', target, text);
   }
 
   notice(target: string, text: string) {
@@ -677,9 +702,11 @@ export class IRCClient {
    * (`_writeChannelProp` in the store). Passing `null` clears the prop (an empty
    * trailing value deletes it server-side). No new wire command is introduced.
    */
-  publishWatchTogether(channel: string, activity: WatchTogetherActivity | null) {
+  publishWatchTogether(channel: string, activity: WatchTogetherActivity | null, options?: IRCSendOptions): boolean {
     const value = activity ? serializeWatchTogetherProp(activity) : '';
-    this.sendRaw('PROP', channel, WATCH_PROP, value);
+    return options
+      ? this.sendRaw('PROP', options, channel, WATCH_PROP, value)
+      : this.sendRaw('PROP', channel, WATCH_PROP, value);
   }
 
   /**

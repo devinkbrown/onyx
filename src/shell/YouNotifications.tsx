@@ -38,6 +38,7 @@ import {
   closeNotifications,
   isNotificationsOpen,
 } from '@/lib/notifications/youNotificationsState';
+import { channelNotifyMode, type NotifyMode } from '@/lib/notifications/channelNotifyMode';
 
 import { ChannelNotifyControl } from './ChannelNotifyControl';
 import { YouHubNav } from './YouHubNav';
@@ -63,6 +64,17 @@ export function YouNotifications(): JSX.Element {
     const view = activeView();
     return view.kind === 'channel' ? view.channel : null;
   });
+  const channelNotify = useStore((s) => s.channelNotify);
+  const roomNotifyCopy = createMemo(() => {
+    const channel = roomChannel();
+    const mode: NotifyMode = channel ? channelNotifyMode(channelNotify(), channel) : 'all';
+    const modeCopy = mode === 'all'
+      ? 'All: room messages may create inbox entries, unread/badge activity, sound, and desktop alerts.'
+      : mode === 'mentions'
+        ? 'Mentions only: this room contributes only messages that mention you to notification decisions. Followed-conversation activity is a separate global Calm-mode tier and may still add a badge or alert when that mode allows it.'
+        : 'Mute: this room is hard-silenced; its messages create no inbox entries, unread counts, highlights, sound, or desktop alerts.';
+    return `${modeCopy} Browser permission is required for desktop alerts; the global Onyx notification mode, DND/quiet hours, and sound setting are separate gates. Closed-tab delivery additionally requires alerts to be armed for this signed-in browser and an available connection.`;
+  });
   const kindsOn = createMemo(() => webPushOn() && permission() === 'granted');
   const status = createMemo(() => closedTabStatusCopy({
     permission: permission(),
@@ -82,6 +94,10 @@ export function YouNotifications(): JSX.Element {
     recoveryEpoch();
     account();
     const operation = ++webPushOperation;
+    // A connection/account change supersedes any in-flight user operation.
+    // Clear the presentation state immediately; stale completions below may
+    // never publish their result, but must not strand the controls disabled.
+    setBusy(false);
     setWebPushOn(false);
     if (!account()) return;
     void (async () => {
@@ -115,30 +131,47 @@ export function YouNotifications(): JSX.Element {
   onCleanup(() => {
     disposed = true;
     webPushOperation += 1;
+    setBusy(false);
   });
 
   async function handleEnable(): Promise<void> {
     if (busy() || hostHonesty().notice) return;
     const operation = ++webPushOperation;
+    const startingAccount = account();
+    const startingClient = getState().client;
+    const startingConnection = connectionStatus();
+    const isCurrent = (): boolean => !disposed
+      && operation === webPushOperation
+      && account() === startingAccount
+      && getState().client === startingClient
+      && connectionStatus() === startingConnection;
     setBusy(true);
     try {
       const result = await armClosedTabNotifications();
-      if (disposed || operation !== webPushOperation) return;
+      if (!isCurrent()) return;
       setPermission(result.permission);
       setWebPushOn(result.webPush.ok);
       getState().addToast(closedTabArmedToast(result));
     } finally {
-      if (!disposed && operation === webPushOperation) setBusy(false);
+      if (isCurrent()) setBusy(false);
     }
   }
 
   async function handleDisable(): Promise<void> {
     if (busy()) return;
     const operation = ++webPushOperation;
+    const startingAccount = account();
+    const startingClient = getState().client;
+    const startingConnection = connectionStatus();
+    const isCurrent = (): boolean => !disposed
+      && operation === webPushOperation
+      && account() === startingAccount
+      && getState().client === startingClient
+      && connectionStatus() === startingConnection;
     setBusy(true);
     try {
       const result = await disableWebPush();
-      if (disposed || operation !== webPushOperation) return;
+      if (!isCurrent()) return;
       if (result.ok) {
         setWebPushOn(false);
         getState().addToast({
@@ -150,7 +183,7 @@ export function YouNotifications(): JSX.Element {
         getState().addToast({ variant: 'warning', title: 'Push unavailable', description: result.reason });
       }
     } finally {
-      if (!disposed && operation === webPushOperation) setBusy(false);
+      if (isCurrent()) setBusy(false);
     }
   }
 
@@ -165,7 +198,7 @@ export function YouNotifications(): JSX.Element {
       <div class="you-notify" data-testid="you-notifications">
         <YouHubNav current="notifications" onLeave={closeNotifications} />
         <p class="you-notify-lede">
-          Mentions, DMs, and calls can reach you after this tab closes. Onyx uses this browser and the network you already joined — not a third-party push service.
+          <strong>Effective alerts have three layers:</strong> this browser must allow desktop notifications, your Onyx mode chooses what is alertable, and each room can narrow its own policy. Inbox and badge activity follow the selected mode; DND/quiet hours and sound are separate alert gates. Closed-tab delivery also requires alerts to be armed for this signed-in browser and an available connection — permission alone is not enough.
         </p>
         <p
           class="you-notify-status"
@@ -221,7 +254,7 @@ export function YouNotifications(): JSX.Element {
             <section class="you-notify-room" aria-labelledby="you-notify-room-title">
               <h3 id="you-notify-room-title" class="you-notify-room-title">This room</h3>
               <p class="you-notify-room-copy">
-                All messages notify, Mentions only still badges @, Mute is hard silence — you will not be tapped.
+                {roomNotifyCopy()}
               </p>
               <ChannelNotifyControl channel={channel()} />
             </section>

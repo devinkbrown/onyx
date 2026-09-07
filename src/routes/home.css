@@ -131,6 +131,19 @@
   text-decoration-color: color-mix(in oklab, var(--mn-signal) 42%, transparent);
   text-underline-offset: 0.22em;
 }
+.r-landing.home .home-local-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--commercial-target);
+  font-family: var(--commercial-font-body);
+  font-size: var(--text-md, 0.9375rem);
+  color: var(--mn-mute);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--commercial-coral) 55%, transparent);
+  text-underline-offset: 0.22em;
+}
+.r-landing.home .home-local-link:hover,
+.r-landing.home .home-local-link:focus-visible { color: var(--commercial-coral); }
 .r-landing.home .home-secondary-link:hover,
 .r-landing.home .home-secondary-link:focus-visible {
   color: var(--mn-signal);

@@ -65,13 +65,12 @@ const FORBIDDEN_CHROME = [
 describe('dmPrivacyChrome copy', () => {
   it('uses the 2026 trust-brief empty-state and list preview', () => {
     expect(DM_EMPTY_TITLE).toBe('A private conversation');
-    expect(DM_EMPTY_BODY).toBe(
-      'Only the two of you can read these messages. They stay on this device.',
-    );
+    expect(DM_EMPTY_BODY).toMatch(/Encrypted DM messages/);
+    expect(DM_EMPTY_BODY).toMatch(/drafts and attachments/);
     expect(DM_SEALED_LIST_PREVIEW).toBe('Encrypted message');
     expect(DM_SEALED_LIST_PREVIEW).not.toMatch(/🔒|lock/i);
     expect(DM_PRIVATE_CHIP).toBe('Private');
-    expect(DM_PRIVATE_CHIP_LABEL).toMatch(/only the two of you/i);
+    expect(DM_PRIVATE_CHIP_LABEL).toMatch(/encrypted for you and the other person/i);
     expect(DM_PRIVATE_CHIP_LABEL).toMatch(/this device/i);
     expect(DM_VERIFY_ACTION).toBe('Verify');
   });
@@ -81,9 +80,8 @@ describe('dmPrivacyChrome copy', () => {
       "Trev's device key changed. Compare the new safety number before you continue.",
     );
     expect(dmKeyChangeTitle('Trev')).toBe("Trev's device key changed");
-    expect(DM_KEY_CHANGE_BODY).toBe(
-      'This usually means they reinstalled Onyx or added a device. Messages stay locked until you review it.',
-    );
+    expect(DM_KEY_CHANGE_BODY).toMatch(/Encrypted messages stay locked/);
+    expect(DM_KEY_CHANGE_BODY).toMatch(/drafts and attachments/);
   });
 
   it('keeps forbidden over-claims out of chrome copy', () => {

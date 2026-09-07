@@ -4,11 +4,15 @@ import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-lib
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PrimaryNavigation } from './PrimaryNavigation';
+import { PrimaryNavigation, revealMobileNavigationFocus } from './PrimaryNavigation';
 
 const shellCss = readFileSync(join(process.cwd(), 'src/shell/shell.css'), 'utf8');
+const commercialNavigationCss = readFileSync(join(process.cwd(), 'src/shell/commercial-navigation.css'), 'utf8');
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe('PrimaryNavigation', () => {
   it('shares the five product destinations and test hooks across desktop and mobile', () => {
@@ -24,11 +28,7 @@ describe('PrimaryNavigation', () => {
 
     const desktopNav = screen.getByRole('navigation', { name: 'Primary' });
     expect(within(desktopNav).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      '⌂Home',
-      '#Rooms',
-      '@Messages',
-      '◉Calls',
-      '◇You',
+      'Home', 'Rooms', 'Messages', 'Calls', 'You',
     ]);
     expect(desktopNav.querySelectorAll('[data-primary-nav-item]')).toHaveLength(5);
     expect(desktopNav).toHaveTextContent('Quick switch');
@@ -48,11 +48,7 @@ describe('PrimaryNavigation', () => {
     ));
     const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
     expect(within(mobileNav).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      '⌂Home',
-      '#Rooms',
-      '@Messages',
-      '◉Calls',
-      '◇You',
+      'Home', 'Rooms', 'Messages', 'Calls', 'You',
     ]);
     expect(mobileNav.querySelector('.shell-mobile-nav-icon')).toBeInTheDocument();
     expect(within(mobileNav).getByRole('button', { name: 'Open Rooms' })).toHaveAttribute('aria-current', 'page');
@@ -60,6 +56,58 @@ describe('PrimaryNavigation', () => {
     expect(mobileNav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
     expect(within(mobileNav).getByRole('button', { name: 'Open Messages' })).toBeInTheDocument();
     expect(within(mobileNav).getByRole('button', { name: 'Open You' })).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(mobileNav.querySelectorAll('svg')).toHaveLength(5);
+  });
+
+  it('keeps labels legible and desktop destinations discoverable', () => {
+    render(() => <PrimaryNavigation variant="desktop" onSelect={vi.fn()} />);
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    expect(within(nav).getByRole('button', { name: 'Messages' })).toHaveAttribute('data-tooltip', 'Quick switch to Messages');
+    expect(nav.querySelectorAll('path')).toHaveLength(5);
+  });
+
+  it('reveals an off-screen mobile destination while respecting rail padding', () => {
+    const rail = document.createElement('nav');
+    const control = document.createElement('button');
+    document.body.append(rail);
+    rail.append(control);
+    Object.defineProperties(rail, {
+      clientWidth: { value: 100 },
+      scrollWidth: { value: 300 },
+      scrollLeft: { value: 0, writable: true },
+    });
+    vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue({ left: 0, right: 100 } as DOMRect);
+    vi.spyOn(control, 'getBoundingClientRect').mockReturnValue({ left: 80, right: 140 } as DOMRect);
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue({ paddingLeft: '8px', paddingRight: '12px' } as CSSStyleDeclaration);
+
+    revealMobileNavigationFocus(rail, control);
+
+    expect(rail.scrollLeft).toBe(52);
+  });
+
+  it('waits for the browser focus scroll before revealing a mobile destination', () => {
+    let reveal: (() => void) | undefined;
+    vi.spyOn(window, 'setTimeout').mockImplementation((callback) => {
+      reveal = callback as () => void;
+      return 1 as unknown as ReturnType<typeof setTimeout>;
+    });
+    render(() => <PrimaryNavigation variant="mobile" onSelect={vi.fn()} />);
+
+    const nav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    const you = screen.getByRole('button', { name: 'Open You' });
+    Object.defineProperties(nav, {
+      clientWidth: { value: 100 },
+      scrollWidth: { value: 300 },
+      scrollLeft: { value: 0, writable: true },
+    });
+    vi.spyOn(nav, 'getBoundingClientRect').mockReturnValue({ left: 0, right: 100 } as DOMRect);
+    vi.spyOn(you, 'getBoundingClientRect').mockReturnValue({ left: 80, right: 140 } as DOMRect);
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue({ paddingLeft: '8px', paddingRight: '12px' } as CSSStyleDeclaration);
+
+    fireEvent.focus(you);
+    expect(nav.scrollLeft).toBe(0);
+    reveal?.();
+    expect(nav.scrollLeft).toBe(52);
   });
 
   it('keeps current location separate from selected and expanded collections', () => {
@@ -119,5 +167,11 @@ describe('PrimaryNavigation', () => {
     expect(shellCss).toContain('.shell-mobile-nav-btn--selected:not(.shell-mobile-nav-btn--active)');
     expect(shellCss).toContain('.shell-mobile-nav-btn--dialog-open');
     expect(shellCss).toContain('@media (forced-colors: active)');
+  });
+
+  it('preserves an intrinsic 44px mobile rail at short high zoom', () => {
+    expect(commercialNavigationCss).toMatch(
+      /@media \(max-width: 42rem\) and \(max-height: 30rem\)[\s\S]*?\.shell-mobile-nav-btn\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?min-width:\s*max\(44px, max-content\);/,
+    );
   });
 });

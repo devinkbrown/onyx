@@ -125,6 +125,13 @@
   padding: var(--space-3);
 }
 
+.dm-safety__scope {
+  margin: var(--space-2) 0 0;
+  color: var(--paper-dim);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
 .dm-safety__header {
   display: flex;
   align-items: flex-start;

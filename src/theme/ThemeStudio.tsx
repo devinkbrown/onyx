@@ -68,6 +68,8 @@ import { useStore, getState } from '@/lib/store';
 import { backgroundOptions } from '@/backgrounds';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { parseThemeExport, type ThemeExportBlob } from './themeImport';
+import { PublicLookPicker } from './PublicLookPicker';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -688,6 +690,8 @@ export function ThemeStudio(props: ThemeStudioProps) {
 
   // Cleanup: remove any locally applied overrides on unmount.
   onCleanup(() => {
+    releaseUpdateHold?.();
+    releaseUpdateHold = null;
     disposed = true;
     eyeDropperEpoch += 1;
     exportCopyEpoch += 1;
@@ -869,6 +873,27 @@ export function ThemeStudio(props: ThemeStudioProps) {
 
   const adjustDirty = createMemo(() => !isAdjustIdentity(adjust()));
 
+  const factoryDirty = createMemo(() => factoryArmed() || adjustDirty() || JSON.stringify(seed()) !== JSON.stringify(DEFAULT_SEED));
+  const editorDirty = createMemo(() => (
+    Object.keys(overrides()).length > 0
+    || factoryDirty()
+    || saving()
+    || saveName().trim().length > 0
+    || exportCopyBusy()
+    || seedCopyBusy()
+    || shareCopyBusy()
+    || eyeDropperBusy()
+  ));
+  let releaseUpdateHold: (() => void) | null = null;
+  createEffect(() => {
+    const protectedWork = editorDirty();
+    if (protectedWork && !releaseUpdateHold) releaseUpdateHold = updateCoordinator.hold('theme-studio-edit');
+    if (!protectedWork && releaseUpdateHold) {
+      releaseUpdateHold();
+      releaseUpdateHold = null;
+    }
+  });
+
   /** Commit the adjusted palette: keep the tokens, zero the knobs. */
   const bakeAdjust = (): void => {
     adjustBaseline = null;
@@ -889,6 +914,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
   const resetFactoryState = (): void => {
     adjustBaseline = null;
     setAdjust({ ...ADJUST_IDENTITY });
+    setSeed({ ...DEFAULT_SEED });
     setFactoryArmed(false);
     setSchemeOverride(null);
     if (regenTimer !== undefined) {
@@ -1145,6 +1171,8 @@ export function ThemeStudio(props: ThemeStudioProps) {
     const merged: TokenMap = { ...baseOverrides, ...overrides() };
     const newId = saveCustom(name, base, merged);
     setSaving(false);
+    setSaveName('');
+    resetFactoryState();
     setTheme(newId); // select it; the base-change effect clears the session overrides
   };
 
@@ -1170,9 +1198,28 @@ export function ThemeStudio(props: ThemeStudioProps) {
         </p>
       </header>
 
+      <section class="ts-section ts-simple-look" aria-labelledby="ts-simple-look-label">
+        <div class="ts-section__heading-row">
+          <div>
+            <h2 class="ts-section__heading" id="ts-simple-look-label">Choose a look</h2>
+            <p class="ts-section__intro">Start with a ready-to-use Onyx look. You can fine-tune it later.</p>
+          </div>
+          <span class="ts-simple-look__hint">Simple controls</span>
+        </div>
+        <PublicLookPicker class="ts-public-look-picker" groupLabel="Choose a look" />
+      </section>
+
       {/* ── Factory — the generative palette engine ── */}
-      <section class="ts-section ts-factory" aria-labelledby="ts-factory-label" data-testid="ts-factory">
-        <h2 class="ts-section__heading" id="ts-factory-label">Factory</h2>
+      <section class="ts-section ts-advanced" data-testid="ts-advanced-editor" aria-labelledby="ts-advanced-label">
+        <div class="ts-advanced__summary">
+          <span>
+            <strong id="ts-advanced-label">Advanced editor</strong>
+            <span>Generate palettes, adjust tokens, and manage backgrounds</span>
+          </span>
+          <span class="ts-advanced__toggle">Theme tools</span>
+        </div>
+        <section class="ts-factory" aria-labelledby="ts-factory-label" data-testid="ts-factory">
+        <h2 class="ts-section__heading" id="ts-factory-label">Palette tools</h2>
         <div class="ts-factory__grid">
 
           {/* Generate: seed → whole palette */}
@@ -1410,6 +1457,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
             </p>
           </div>
         </div>
+        </section>
       </section>
 
       {/* ── Base theme selector ── */}
@@ -1509,7 +1557,8 @@ export function ThemeStudio(props: ThemeStudioProps) {
       {/* ── Main editing area + live preview ── */}
       <div class="ts-body">
         {/* Token editor (tabs by group) */}
-        <div class="ts-editor" aria-label="Token editor">
+        <div class="ts-editor" aria-label="Advanced token editor">
+          <p class="ts-editor__intro">Fine tune individual colors and surfaces. Changes update the preview immediately.</p>
           <Tabs defaultValue={STUDIO_GROUPS[0]?.id ?? 'surfaces'}>
             <Tabs.List aria-label="Token group">
               <For each={STUDIO_GROUPS}>
@@ -1552,7 +1601,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
               variant="ghost"
               size="sm"
               onClick={handleReset}
-              disabled={!hasOverrides()}
+              disabled={!hasOverrides() && !factoryDirty()}
               data-testid="ts-reset-btn"
             >
               [reset]
@@ -1585,13 +1634,13 @@ export function ThemeStudio(props: ThemeStudioProps) {
                 onKeyDown={(e) => {
                   if (keyboardEventIsClaimed(e)) return;
                   if (e.key === 'Enter') { e.preventDefault(); confirmSave(); }
-                  else if (e.key === 'Escape') { e.preventDefault(); setSaving(false); }
+                  else if (e.key === 'Escape') { e.preventDefault(); setSaving(false); setSaveName(''); }
                 }}
               />
               <Button variant="primary" size="sm" onClick={confirmSave} data-testid="ts-save-confirm">
                 save
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSaving(false)}>
+              <Button variant="ghost" size="sm" onClick={() => { setSaving(false); setSaveName(''); }}>
                 cancel
               </Button>
             </div>
@@ -2542,12 +2591,33 @@ const STUDIO_CSS = `
   .ts-studio,
   .ts-studio * {
     min-width: 0;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
   }
 
   .ts-studio {
     width: 100%;
+    inline-size: 100%;
     max-width: 100%;
+    max-inline-size: 100%;
     overflow-x: hidden;
+  }
+
+  .ts-studio button,
+  .ts-studio input,
+  .ts-studio label,
+  .ts-studio code,
+  .ts-studio span,
+  .ts-studio p,
+  .ts-studio h2,
+  .ts-studio h3 {
+    inline-size: auto;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .ts-header,
@@ -2839,6 +2909,125 @@ const STUDIO_CSS = `
     width: 100%;
     font-size: 14px;
   }
+}
+
+/* O-40: make the friendly path unmistakable; advanced tools stay available
+   without competing with the first decision. */
+.ts-section__heading-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.ts-section__intro {
+  margin: -0.35rem 0 0;
+  max-width: 42rem;
+  color: var(--paper-dim);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.ts-simple-look {
+  background: color-mix(in oklab, var(--stone) 18%, var(--ink));
+}
+.ts-simple-look__hint {
+  color: var(--ok);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.ts-public-look-picker {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.6rem !important;
+  margin-top: 0.85rem;
+}
+.ts-public-look-picker .ap-theme-chip {
+  min-height: 4.25rem !important;
+  width: 100%;
+  padding: 0.7rem;
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone) 34%, transparent);
+  color: var(--paper);
+  text-align: left;
+}
+.ts-public-look-picker .ap-theme-chip:focus-visible {
+  outline: 3px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+.ts-public-look-picker .ap-theme-chip--on {
+  box-shadow: inset 0 0 0 2px var(--lapis-bright);
+}
+.ts-advanced {
+  padding: 0;
+}
+.ts-advanced__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.25rem;
+  padding: 0.85rem 1.4rem;
+  color: var(--paper);
+}
+.ts-advanced__summary strong,
+.ts-advanced__summary span span {
+  display: block;
+}
+.ts-advanced__summary strong { font-size: 0.9rem; }
+.ts-advanced__summary span span { margin-top: 0.2rem; color: var(--paper-dim); font-size: 0.76rem; }
+.ts-advanced__toggle {
+  color: var(--lapis-bright);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.ts-editor__intro { margin: 0 0 0.75rem; color: var(--paper-dim); font-size: 0.8rem; line-height: 1.45; }
+
+/* Keep the responsive overrides after the picker skin: its normal desktop
+   min card width is useful at regular scale, but becomes an intrinsic-width
+   overflow source when rems are enlarged for 400% zoom. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .ts-section__heading-row,
+  .ts-advanced__summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ts-section__heading-row > *,
+  .ts-advanced__summary > * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .ts-public-look-picker {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .ts-theme-grid,
+  .ts-factory__grid,
+  .ts-body,
+  .ts-editor,
+  .ts-preview-pane {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ts-editor [role='tablist'] {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 100%;
+    overflow: visible;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ts-studio *, .ts-studio *::before, .ts-studio *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+@media (forced-colors: active) {
+  .ts-public-look-picker .ap-theme-chip,
+  .ts-advanced__summary { border: 1px solid CanvasText; }
+  .ts-public-look-picker .ap-theme-chip--on { outline: 2px solid Highlight; }
 }
 `;
 

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Channel } from '@/lib/irc/types';
 import { store } from '@/lib/store/store';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
 import { AppShell } from './AppShell';
 
 vi.mock('@/media/useCadenceMedia', () => ({ mountMedia: vi.fn() }));
@@ -64,11 +65,29 @@ describe('AppShell room current', () => {
     render(() => <AppShell />);
     const trigger = screen.getByRole('button', { name: 'Context' });
     fireEvent.click(trigger);
-    const close = screen.getByRole('button', { name: 'Close room context' });
+    const close = await screen.findByRole('button', { name: 'Close room context' });
     close.focus();
     fireEvent.click(close);
     await Promise.resolve();
     expect(trigger).toHaveFocus();
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('keeps a stored draft reload hold after conversation and Composer unmount', () => {
+    const reload = vi.fn();
+    render(() => <AppShell />);
+
+    store.getState().setComposerDraft('#root', 'draft held across Calls');
+    expect(store.getState().getComposerDraft('#root')).toBe('draft held across Calls');
+
+    // This is the same navigation boundary that removes Composer. The shell
+    // remains mounted, so its draft-lifetime hold must survive the subtree
+    // replacement and block the already-pending reload.
+    store.setState({ activeView: { kind: 'home' } });
+    expect(updateCoordinator.requestReload(reload)).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
+
+    store.getState().clearComposerDraft('#root');
+    expect(reload).toHaveBeenCalledOnce();
   });
 });

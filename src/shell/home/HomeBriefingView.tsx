@@ -16,6 +16,7 @@ import type { HomeBriefingActions, HomeQueuedSend } from './homeController';
 import type { FormationStrip } from '@/lib/formation/formationLoop';
 import type { CaughtUpPlan } from '@/lib/catchup/markCaughtUp';
 import type { HomeMemoryItem } from '@/lib/notifications/homeMemory';
+import type { ResumePoint } from '@/lib/catchup/resumePoints';
 
 export type HomeBriefingViewProps = {
   nowMs: () => number;
@@ -133,6 +134,35 @@ function InviteRow(props: {
   );
 }
 
+function ContinueRow(props: {
+  point: ResumePoint;
+  nowMs: number;
+  onOpen: (point: ResumePoint) => void;
+}): JSX.Element {
+  return (
+    <li>
+      <button
+        type="button"
+        class="home-inbox-row home-continue-row"
+        onClick={() => props.onOpen(props.point)}
+        aria-label={`Continue reading ${props.point.name}, ${props.point.unread} unread`}
+      >
+        <InboxAvatar kind={props.point.kind} name={props.point.name} />
+        <span class="home-inbox-copy">
+          <span class="home-inbox-name">{kindVisibleName(props.point.kind, props.point.name)}</span>
+          <span class="home-inbox-meta">
+            Continue where you left off
+            <Show when={props.point.lastActivity > 0}>
+              <span class="home-inbox-when">{relTime(Math.floor(props.point.lastActivity / 1000), props.nowMs)}</span>
+            </Show>
+          </span>
+        </span>
+        <span class="home-inbox-join">Read</span>
+      </button>
+    </li>
+  );
+}
+
 function ColdMemoryCard(props: {
   item: HomeMemoryItem;
   nowMs: number;
@@ -243,13 +273,19 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
               <ul class="home-outbox__list" aria-label="Queued messages waiting on this device">
                 <For each={props.queuedSends()}>
                   {(entry) => {
-                    const status = () => outboxEntryStatusLabel(entry.queued_at, props.nowMs());
+                    const status = () => entry.wire_admitted
+                      ? 'admitted · storage prune pending'
+                      : entry.claimed
+                        ? 'admission uncertain · review before retrying'
+                        : outboxEntryStatusLabel(entry.queued_at, props.nowMs());
                     return (
                       <li
                         class="home-outbox__item"
                         classList={{
                           'home-outbox__item--expiring': status().includes('expires soon'),
                           'home-outbox__item--expired': status().startsWith('expired'),
+                          'home-outbox__item--uncertain': entry.claimed === true,
+                          'home-outbox__item--admitted': entry.wire_admitted === true,
                         }}
                       >
                         <span class="home-outbox__target">{entry.target}</span>
@@ -280,6 +316,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                   }}
                 </For>
               </ul>
+              <p class="home-outbox__privacy">Remove deletes this device’s queued record; it cannot cancel a message already admitted to the connection.</p>
             </section>
           )}
         </Show>
@@ -399,6 +436,22 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
                 </ul>
               </div>
             </Show>
+          </section>
+        </Show>
+
+        <Show when={props.briefing().resume.length > 0}>
+          <section class="home-continue" aria-label="Continue reading" data-home-band="continue">
+            <div class="home-catchup-head">
+              <h2 class="home-inbox-label">Continue reading</h2>
+              <span class="home-catchup-summary">Your last stopping points</span>
+            </div>
+            <ul class="home-inbox-list">
+              <For each={props.briefing().resume}>
+                {(point) => (
+                  <ContinueRow point={point} nowMs={props.nowMs()} onOpen={props.actions.resumeAt} />
+                )}
+              </For>
+            </ul>
           </section>
         </Show>
 

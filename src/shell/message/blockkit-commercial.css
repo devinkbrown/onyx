@@ -1,0 +1,27 @@
+/* BlockKit controls: a quiet inspection surface with a deliberate action boundary. */
+.shell-msg-blockkit-inspect { display: grid; gap: 1rem; }
+.shell-msg-blockkit-eyebrow { margin: 0; color: var(--color-text-muted, #667085); font-size: .72rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.shell-msg-blockkit-intro, .shell-msg-blockkit-confirm__intro { margin: -.55rem 0 0; color: var(--color-text-muted, #667085); line-height: 1.5; }
+.shell-msg-blockkit-control, .shell-msg-blockkit-select select, .shell-msg-blockkit-confirm__actions button { min-height: 44px; }
+.shell-msg-blockkit-control { display: inline-flex; align-items: center; justify-content: center; padding: .65rem .9rem; border: 1px solid var(--color-border-strong, #98a2b3); border-radius: .65rem; font: inherit; font-weight: 650; cursor: pointer; }
+.shell-msg-blockkit-control--action { background: var(--color-accent, #2457d6); color: var(--color-on-accent, #fff); border-color: transparent; }
+.shell-msg-blockkit-control--link { color: var(--color-link, #2457d6); }
+.shell-msg-blockkit-select { display: grid; gap: .3rem; }
+.shell-msg-blockkit-select__label { font-weight: 650; }
+.shell-msg-blockkit-select__hint { color: var(--color-text-muted, #667085); font-size: .82rem; }
+.shell-msg-blockkit-select select { width: 100%; padding: .55rem .7rem; border-radius: .55rem; font: inherit; }
+.shell-msg-blockkit-confirm { display: grid; gap: 1rem; }
+.shell-msg-blockkit-confirm__preview { margin: 0; display: grid; gap: .75rem; }
+.shell-msg-blockkit-confirm__preview > div { padding: .85rem; border: 1px solid var(--color-border, #d0d5dd); border-radius: .6rem; }
+.shell-msg-blockkit-confirm__preview dt { color: var(--color-text-muted, #667085); font-size: .8rem; font-weight: 700; }
+.shell-msg-blockkit-confirm__preview dd { margin: .35rem 0 0; overflow-wrap: anywhere; }
+.shell-msg-blockkit-confirm__preview pre { max-height: 12rem; margin: 0; white-space: pre-wrap; overflow: auto; font: inherit; line-height: 1.5; }
+.shell-msg-blockkit-confirm__warning { margin: 0; padding: .8rem; border-inline-start: 4px solid var(--color-warning, #b54708); background: color-mix(in srgb, var(--color-warning, #b54708) 10%, transparent); font-weight: 700; }
+.shell-msg-blockkit-confirm__status { margin: 0; color: var(--color-text-muted, #667085); font-size: .85rem; }
+.shell-msg-blockkit-confirm__actions { display: flex; justify-content: flex-end; gap: .65rem; flex-wrap: wrap; }
+.shell-msg-blockkit-confirm__actions button { padding: .6rem 1rem; border-radius: .6rem; font: inherit; font-weight: 700; cursor: pointer; }
+.shell-msg-blockkit-confirm__send { background: var(--color-accent, #2457d6); color: var(--color-on-accent, #fff); border: 1px solid transparent; }
+.shell-msg-blockkit-control:focus-visible, .shell-msg-blockkit-select select:focus-visible, .shell-msg-blockkit-confirm__actions button:focus-visible { outline: 3px solid var(--color-focus, #84adff); outline-offset: 3px; }
+@media (max-width: 520px) { .shell-msg-blockkit-confirm__actions { display: grid; grid-template-columns: 1fr; } .shell-msg-blockkit-confirm__actions button { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .shell-msg-blockkit-control, .shell-msg-blockkit-confirm__actions button { transition: none !important; } }
+@media (forced-colors: active) { .shell-msg-blockkit-control, .shell-msg-blockkit-confirm__actions button, .shell-msg-blockkit-confirm__preview > div { border: 1px solid ButtonText; } .shell-msg-blockkit-control--action, .shell-msg-blockkit-confirm__send { background: ButtonText; color: ButtonFace; } }

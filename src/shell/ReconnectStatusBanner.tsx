@@ -12,8 +12,9 @@
  */
 import { createEffect, createMemo, createSignal, onCleanup, Show, type JSX } from 'solid-js';
 
-import { useStore } from '@/lib/store';
+import { getState, useStore } from '@/lib/store';
 import { connectionBanner } from '@/lib/net/partitionBanner';
+import './ReconnectStatusBanner.css';
 
 type ReconnectBannerPhase = 'disconnected' | 'reconnecting' | 'connecting' | 'online';
 
@@ -118,10 +119,20 @@ export function ReconnectStatusBanner(): JSX.Element {
           classList={{ 'shell-disconnected-banner--online': phase() === 'online' }}
           data-state={phase() ?? undefined}
           data-testid="reconnect-status-banner"
-          aria-hidden="true"
+          role="region"
+          aria-label="Connection recovery"
         >
-          <span>{phase() === 'online' ? '✓' : '⚠'}</span>
-          <span>{visualLabel()}</span>
+          <span aria-hidden="true">{phase() === 'online' ? '✓' : '⚠'}</span>
+          <span class="shell-disconnected-banner__message">{visualLabel()}</span>
+          <Show when={phase() !== 'online'}>
+            <button
+              type="button"
+              class="shell-disconnected-banner__action"
+              onClick={() => getState().reconnectNow()}
+            >
+              Try again now
+            </button>
+          </Show>
         </div>
       </Show>
       {/* Pre-existing live node: phase text is inserted after mount and seconds

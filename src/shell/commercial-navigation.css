@@ -1,0 +1,129 @@
+/* Commercial navigation layer. Kept beside the components so the consumer
+   identity can evolve without taking ownership of the legacy shell grid. */
+
+.commercial-onyx-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 48px;
+  padding: 7px 6px 9px;
+  color: var(--paper, #f3f6f5);
+  font: 700 0.92rem/1 var(--font-sans, sans-serif);
+  letter-spacing: -0.02em;
+}
+
+.commercial-onyx-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--lapis-bright, #8ac5d5);
+}
+
+.commercial-onyx-mark svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.commercial-onyx-wordmark { white-space: nowrap; }
+
+.commercial-network-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in oklab, var(--lapis-bright, #8ac5d5) 70%, transparent);
+  border-radius: 50%;
+  color: var(--lapis-bright, #8ac5d5);
+  font: 700 0.78rem/1 var(--font-sans, sans-serif);
+}
+
+.shell-primary-nav-context {
+  color: var(--paper, #f3f6f5);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.shell-primary-nav-btn,
+.shell-mobile-nav-btn {
+  min-height: max(44px, var(--target-min, 44px));
+  box-sizing: border-box;
+  position: relative;
+}
+
+.shell-primary-nav-btn { min-width: 0; }
+.shell-primary-nav-btn > :last-child,
+.shell-mobile-nav-btn > :last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-primary-nav-icon,
+.shell-mobile-nav-icon {
+  display: inline-grid;
+  place-items: center;
+}
+
+.shell-primary-nav-icon svg,
+.shell-mobile-nav-icon svg {
+  width: 1.2em;
+  height: 1.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shell-primary-nav-btn:hover,
+.shell-mobile-nav-btn:hover { transform: translateY(-1px); }
+
+@media (max-width: 900px) {
+  .shell-mobile-nav-btn { flex: 1 1 20%; min-width: 0; }
+  .shell-mobile-nav-icon { min-width: 1.5rem; }
+}
+
+/* At short high zoom, keep the five destinations as an intrinsic rail so the
+   final You action can be focus-revealed without shrinking below a thumb
+   target. Ordinary mobile viewports retain equal fifths above. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .shell-mobile-nav-btn {
+    flex: 0 0 auto;
+    min-width: max(44px, max-content);
+  }
+}
+
+.shell-primary-nav-btn:focus-visible,
+.shell-mobile-nav-btn:focus-visible,
+.commercial-onyx-brand:focus-visible {
+  outline: 2px solid var(--lapis-bright, #8ac5d5);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .commercial-onyx-brand { display: none; }
+}
+
+@media (forced-colors: active) {
+  .commercial-onyx-mark,
+  .commercial-network-mark { color: ButtonText; }
+  .commercial-network-mark { border-color: ButtonText; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-primary-nav-btn,
+  .shell-mobile-nav-btn { transition: none; transform: none; }
+}
+
+@media (forced-colors: active) {
+  .shell-primary-nav-btn,
+  .shell-mobile-nav-btn { forced-color-adjust: none; }
+  .shell-primary-nav-btn:hover,
+  .shell-mobile-nav-btn:hover { transform: none; }
+  .shell-primary-nav-btn:focus-visible,
+  .shell-mobile-nav-btn:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+}

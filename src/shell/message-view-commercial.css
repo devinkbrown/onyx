@@ -1,0 +1,94 @@
+/* MessageView owns the reading plane. Keep this layer local so shell chrome
+   can evolve without changing transcript rhythm or state semantics. */
+.shell-messages {
+  --reader-max: 54rem;
+  --reader-gutter: clamp(0.75rem, 3vw, 2.5rem);
+  --reader-ink: var(--paper, #f5f7fb);
+  --reader-muted: var(--paper-dim, #aeb8c7);
+  --reader-line: color-mix(in oklab, var(--paper, #f5f7fb) 12%, transparent);
+  position: relative;
+  isolation: isolate;
+}
+
+.message-view-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 2.5rem;
+  padding: 0.5rem var(--reader-gutter);
+  color: var(--reader-muted);
+  background: color-mix(in oklab, var(--ink, #10141c) 92%, var(--paper, #f5f7fb));
+  border-bottom: 1px solid var(--reader-line);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+.message-view-status-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--warning, #e4ad54);
+}
+.message-view-status-banner[data-status='error'] .message-view-status-dot,
+.message-view-status-banner[data-status='disconnected'] .message-view-status-dot { background: var(--danger, #e47777); }
+
+.shell-feed {
+  padding: clamp(0.75rem, 2vw, 1.5rem) var(--reader-gutter) 4.5rem;
+  scroll-padding-block: 1rem;
+}
+.shell-msg-group,
+.shell-msg-cont,
+.shell-msg-system {
+  max-width: var(--reader-max);
+  width: 100%;
+  box-sizing: border-box;
+}
+.shell-msg-group {
+  margin-top: 1.25rem;
+  padding-inline: 0;
+  border-radius: 0.65rem;
+}
+.shell-msg-cont { padding-inline: 0; border-radius: 0.45rem; }
+.shell-msg-group:hover,
+.shell-msg-group:focus-visible,
+.shell-msg-cont:hover,
+.shell-msg-cont:focus-visible { background: color-mix(in oklab, var(--lapis-deep) 10%, transparent); }
+.shell-msg-text { color: var(--reader-ink); line-height: 1.55; }
+.shell-msg-meta { min-height: 1.75rem; }
+.shell-msg-author { font-weight: 700; }
+.shell-msg-reply {
+  margin-block: 0.35rem 0.45rem;
+  padding: 0.45rem 0.65rem;
+  border-inline-start: 3px solid var(--lapis, #73b8ff);
+  background: color-mix(in oklab, var(--lapis-deep) 12%, transparent);
+}
+.shell-unread-divider { margin-block: 1.25rem; font-weight: 750; }
+.shell-unread-divider-label { padding: 0.35rem 0.8rem; }
+.shell-jump-latest,
+.shell-feed-earlier-btn,
+.shell-msg-action,
+.shell-topic-action,
+.shell-topic-follow { min-height: 2.75rem; }
+.shell-jump-latest { bottom: 1rem; box-shadow: 0 0.5rem 1.5rem color-mix(in oklab, #000 28%, transparent); }
+.shell-feed-empty { min-height: min(48vh, 28rem); }
+
+@media (max-width: 40rem) {
+  .shell-msg-group { grid-template-columns: 2rem minmax(0, 1fr); gap: 0 0.6rem; }
+  .shell-msg-system { padding-inline: 0; }
+  .shell-msg-avatar { transform: scale(0.9); }
+  .shell-jump-latest { max-width: calc(100% - 1.5rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-messages *, .shell-messages *::before, .shell-messages *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (forced-colors: active) {
+  .message-view-status-dot { forced-color-adjust: none; background: CanvasText !important; }
+  .shell-msg-group:focus-visible, .shell-msg-cont:focus-visible,
+  .shell-jump-latest:focus-visible, .shell-feed-earlier-btn:focus-visible { outline: 2px solid Highlight; }
+  .shell-unread-divider::before, .shell-unread-divider::after { background: CanvasText; }
+}

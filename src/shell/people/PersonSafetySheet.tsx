@@ -96,8 +96,21 @@ export function PersonSafetyHost() {
       reason: chosen,
       draft,
     }, selectDeviceMemoryOwner(snapshot) ?? undefined);
+    if (snapshot.connectionStatus !== 'connected' || !snapshot.client) {
+      snapshot.addToast({
+        variant: 'warning',
+        title: 'Could not open #root',
+        description: 'You are offline. Your existing local draft was preserved; reconnect and draft this report in shared #root.',
+      });
+      setNote('');
+      setReason('harassment');
+      closePersonSafety();
+      return;
+    }
     snapshot.joinChannel(PERSON_REPORT_ROOM);
-    snapshot.injectComposerText(PERSON_REPORT_ROOM, draft, 'replace');
+    // Keep anything already written in the shared report room. This is a
+    // local draft handoff only; the user reviews and sends it themselves.
+    snapshot.injectComposerText(PERSON_REPORT_ROOM, draft, 'append');
     snapshot.navigate({ kind: 'channel', channel: PERSON_REPORT_ROOM });
     snapshot.addToast({
       variant: 'info',

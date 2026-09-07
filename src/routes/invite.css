@@ -12,6 +12,9 @@
   padding: clamp(24px, 6vw, 64px) 20px;
   color: var(--paper);
   font-family: var(--font-sans);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .invite-page .r-ground,
@@ -69,6 +72,16 @@
   max-width: 42ch;
   color: var(--paper-dim);
   font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.invite-recovery {
+  margin: -0.35rem 0 0;
+  padding: 0.7rem 0.8rem;
+  border-inline-start: 3px solid var(--public-current, var(--lapis-bright));
+  background: color-mix(in oklab, var(--public-current, var(--lapis)) 10%, transparent);
+  color: var(--paper-dim);
+  font-size: 0.9rem;
   line-height: 1.5;
 }
 
@@ -152,6 +165,16 @@
     max-width: none;
     font-size: 48px;
     line-height: 1;
+  }
+
+  .invite-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .invite-actions .r-btn {
+    width: 100%;
+    max-width: 100%;
   }
 }
 

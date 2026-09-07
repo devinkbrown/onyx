@@ -21,6 +21,7 @@ import { Avatar, Popover } from '@/primitives/index';
 import { buildFacepile, type FacepileMemberInput } from './facepile';
 import { PeopleProfileCard } from './PeopleProfileCard';
 import { ModerationActionReview } from './moderation/ModerationActionReview';
+import './participant-presence.css';
 
 export type FacepileProps = {
   /** Members to consider — reactive accessor so the pile tracks the roster. */
@@ -103,7 +104,7 @@ export function Facepile(props: FacepileProps): JSX.Element {
                       aria-hidden="true"
                     />
                     <span class="sr-only">
-                      Open profile for {entry.nick}{entry.away ? ', away' : ''}
+                      Open profile for {entry.nick}, {entry.away ? 'away' : 'here'}
                     </span>
                   </span>
                 }
@@ -125,7 +126,7 @@ export function Facepile(props: FacepileProps): JSX.Element {
           <span
             class="shell-facepile-overflow"
             title={`${overflow()} more`}
-            aria-hidden="true"
+            aria-label={`${overflow()} more people in this room`}
             style={{
               'margin-left': 'var(--space-1)',
               padding: '0 var(--space-2)',
@@ -141,7 +142,7 @@ export function Facepile(props: FacepileProps): JSX.Element {
               'font-weight': '600',
             }}
           >
-            +{overflow()}
+            <span aria-hidden="true">+{overflow()}</span>
           </span>
         </Show>
         <ModerationActionReview

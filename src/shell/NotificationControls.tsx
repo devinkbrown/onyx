@@ -26,6 +26,7 @@ import {
   webPushIntentDesired,
   webPushSupported,
 } from '@/lib/notifications/webPush';
+import './notification-controls.css';
 
 const CALM_PRESET_LABELS: Record<CalmPreset, string> = {
   calm: 'Calm',
@@ -34,8 +35,8 @@ const CALM_PRESET_LABELS: Record<CalmPreset, string> = {
 };
 
 const CALM_PRESET_HINTS: Record<CalmPreset, string> = {
-  calm: 'only mentions and direct messages notify',
-  regular: 'mentions and followed conversations notify',
+  calm: 'mentions and direct messages notify; followed conversations can add a badge',
+  regular: 'mentions, direct messages, and followed conversations notify',
   power: 'all alertable activity notifies',
 };
 
@@ -115,6 +116,7 @@ export function NotificationControls(): JSX.Element {
   let desktopOperation = 0;
   let webPushOperation = 0;
   let dndDeadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  let quietClockTimer: ReturnType<typeof setTimeout> | undefined;
 
   const isCurrentWebPushOperation = (operation: number): boolean => !disposed && operation === webPushOperation;
   const isCurrentDesktopOperation = (operation: number): boolean => !disposed && operation === desktopOperation;
@@ -123,6 +125,26 @@ export function NotificationControls(): JSX.Element {
     if (dndDeadlineTimer === undefined) return;
     clearTimeout(dndDeadlineTimer);
     dndDeadlineTimer = undefined;
+  }
+
+  function clearQuietClockTimer(): void {
+    if (quietClockTimer === undefined) return;
+    clearTimeout(quietClockTimer);
+    quietClockTimer = undefined;
+  }
+
+  function scheduleQuietClockRefresh(): void {
+    clearQuietClockTimer();
+    // Refresh at least once a minute so the displayed quiet-hours state tracks
+    // local wall-clock transitions (including DST/manual clock changes).
+    const now = Date.now();
+    const nextMinute = now - (now % 60_000) + 60_000;
+    quietClockTimer = setTimeout(() => {
+      quietClockTimer = undefined;
+      if (disposed) return;
+      setDndNowMs(Date.now());
+      scheduleQuietClockRefresh();
+    }, Math.max(1, nextMinute - now));
   }
 
   function scheduleDndDeadline(deadline: number): void {
@@ -158,6 +180,12 @@ export function NotificationControls(): JSX.Element {
     clearDndDeadlineTimer();
     setDndNowMs(Date.now());
     if (deadline !== null) scheduleDndDeadline(deadline);
+  });
+
+  createEffect(() => {
+    dndQuietStart();
+    dndQuietEnd();
+    scheduleQuietClockRefresh();
   });
 
   // A PushSubscription is browser-global. Reconcile it whenever the connected
@@ -227,6 +255,7 @@ export function NotificationControls(): JSX.Element {
     desktopOperation += 1;
     webPushOperation += 1;
     clearDndDeadlineTimer();
+    clearQuietClockTimer();
   });
 
   async function handleWebPushToggle(): Promise<void> {
@@ -235,22 +264,17 @@ export function NotificationControls(): JSX.Element {
     const enable = !webPushOn();
     const startingAccount = account();
     const startingClient = getState().client;
+    const startingOwnerScope = webPushOwnerScope();
+    const isCurrent = (): boolean => isCurrentWebPushOperation(operation)
+      && webPushOwnerScope() === startingOwnerScope
+      && selectAccount(getState()) === startingAccount
+      && getState().client === startingClient;
     setWebPushBusy(true);
     try {
       const result = enable ? await enableWebPush() : await disableWebPush();
-      if (disposed) return;
+      if (!isCurrent()) return;
       const current = getState();
-      if (enable && (selectAccount(current) !== startingAccount || current.client !== startingClient)) {
-        setWebPushOn(false);
-        setWebPushBusy(false);
-        current.addToast({
-          variant: 'warning',
-          title: 'Push setup changed',
-          description: 'Your account or connection changed before push setup finished. Try again.',
-        });
-      } else if (!isCurrentWebPushOperation(operation)) {
-        return;
-      } else if (result.ok) {
+      if (result.ok) {
         setWebPushOn(enable);
         current.addToast(enable
           ? { variant: 'success', title: 'Push on', description: 'Mentions, DMs, and calls can reach this browser when the tab is closed.' }
@@ -259,7 +283,7 @@ export function NotificationControls(): JSX.Element {
         current.addToast({ variant: 'warning', title: 'Push unavailable', description: result.reason });
       }
     } finally {
-      if (isCurrentWebPushOperation(operation)) setWebPushBusy(false);
+      if (isCurrent()) setWebPushBusy(false);
     }
   }
 
@@ -335,6 +359,11 @@ export function NotificationControls(): JSX.Element {
       <span id="notify-controls-state" class="sr-only">
         {desktopStateLabel(desktopActive(), permission())}; notification mode {CALM_PRESET_LABELS[calmPreset()]}; notification sound {soundEnabled() ? 'on' : 'off'}; do not disturb {dndActive() ? 'on' : 'off'}; {quietHoursSummary(dndQuietStart(), dndQuietEnd())}{quietHoursSilencing() ? ', currently active' : ''}; {smartMuteSummary()}.
       </span>
+      <p class="shell-notify-explanation">
+        <strong>Effective alerts:</strong> {CALM_PRESET_LABELS[calmPreset()]} mode decides what Onyx considers alertable;
+        followed conversations have their own tier in Calm mode; browser permission decides whether this device may show desktop alerts;
+        room settings, DND/quiet hours, and sound are separate gates.
+      </p>
       <button
         type="button"
         class={[
@@ -378,7 +407,7 @@ export function NotificationControls(): JSX.Element {
           type="button"
           class={`shell-notify-btn${webPushOn() ? ' shell-notify-btn--on' : ''}`}
           disabled={webPushBusy()}
-          title={webPushOn() ? 'Turn off push (tab-closed DMs)' : 'Push DMs to this browser even when the tab is closed'}
+          title={webPushOn() ? 'Turn off closed-tab alerts' : 'Allow mentions, DMs, and calls to reach this browser when the tab is closed'}
           aria-label={webPushOn() ? 'Disable web push' : 'Enable web push'}
           aria-pressed={webPushOn()}
           onClick={() => void handleWebPushToggle()}
@@ -405,12 +434,9 @@ export function NotificationControls(): JSX.Element {
           placement="bottom"
           panelLabel="Quiet hours"
           trigger={
-            <span
-              class={`shell-notify-btn shell-notify-quiet-trigger${quietHoursSilencing() ? ' shell-notify-quiet-trigger--active' : ''}`}
-              title={`Quiet hours — ${quietHoursSummary(dndQuietStart(), dndQuietEnd())}`}
-            >
+            <span class={`shell-notify-btn shell-notify-quiet-trigger${quietHoursSilencing() ? ' shell-notify-quiet-trigger--active' : ''}`}>
               <span aria-hidden="true">Q</span>
-              <span class="sr-only">Quiet hours</span>
+              <span class="sr-only">Quiet hours — {quietHoursSummary(dndQuietStart(), dndQuietEnd())}</span>
             </span>
           }
         >

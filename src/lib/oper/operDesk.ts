@@ -37,14 +37,24 @@ export const OPER_EVENT_CATEGORIES = [
 
 export type OperEventCategory = (typeof OPER_EVENT_CATEGORIES)[number];
 
-/** OBSERVE action filters (`EVENT OBSERVE <mask> [connect quit nick oper]`). */
-export const OPER_OBSERVE_ACTIONS = ['connect', 'quit', 'nick', 'oper'] as const;
+/** OBSERVE action filters — `observe.zig` Action.token() (connect/quit/nick/join/part/host/oper). */
+export const OPER_OBSERVE_ACTIONS = [
+  'connect',
+  'quit',
+  'nick',
+  'join',
+  'part',
+  'host',
+  'oper',
+] as const;
 
 export type OperObserveAction = (typeof OPER_OBSERVE_ACTIONS)[number];
 
 export const MAX_BROADCAST_LENGTH = 400;
-export const MAX_OBSERVE_MASK_LENGTH = 128;
-export const MAX_KILL_REASON_LENGTH = 200;
+/** `observe.zig` Registry.params.max_mask_bytes — longer masks are rejected there. */
+export const MAX_OBSERVE_MASK_LENGTH = 256;
+/** `kill_relay.max_reason_len` on the daemon — longer reasons are truncated there. */
+export const MAX_KILL_REASON_LENGTH = 400;
 export const MAX_OPER_NICK_LENGTH = 50;
 
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/u;
@@ -111,7 +121,7 @@ export function planOperAction(intent: OperDeskIntent): OperDeskPlan {
         command: {
           command: 'EVENT',
           params: ['BROADCAST', text],
-          summary: `Announce to every connected member on the network: “${text}”.`,
+          summary: `Announce to operators subscribed to ANNOUNCE: “${text}”.`,
           destructive: true,
         },
       };
@@ -155,7 +165,7 @@ export function planOperAction(intent: OperDeskIntent): OperDeskPlan {
       }
       const actions = normalizeObserveActions(intent.actions);
       if (actions === null) {
-        return { ok: false, errors: ['Pick from connect, quit, nick, or oper.'] };
+        return { ok: false, errors: ['Pick from connect, quit, nick, join, part, host, or oper.'] };
       }
       return {
         ok: true,

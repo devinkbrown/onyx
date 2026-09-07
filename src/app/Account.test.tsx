@@ -164,6 +164,8 @@ describe('Account panel — signed in', () => {
 
   it('shows the account name and fetches ACCOUNTINFO on open', () => {
     const { client } = renderPanel({ account: 'alice' });
+    expect(screen.getByRole('heading', { name: 'Account controls' })).toBeInTheDocument();
+    expect(screen.getByText(/choices travel with your account/i)).toBeInTheDocument();
     expect(screen.getAllByText('alice').length).toBeGreaterThan(0);
     expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
   });
@@ -395,10 +397,11 @@ describe('Account panel — signed in', () => {
     });
     render(() => <AccountPanel open={true} onOpenChange={closeSpy} />);
 
-    expect(screen.getByRole('navigation', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'You settings' })).toBeInTheDocument();
     expect(screen.getByTestId('you-settings')).toBeInTheDocument();
     expect(screen.getByTestId('you-advanced')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'You' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open appearance settings' })).toBeInTheDocument();
     expect(screen.queryByTestId('theme-studio')).toBeNull();
     expect(screen.queryByRole('radio', { name: /Vermillion/i })).toBeNull();
 

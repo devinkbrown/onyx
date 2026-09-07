@@ -12,7 +12,7 @@ import {
   saveChannelNavigationMemory,
   type ChannelNavigationMemory,
 } from '@/lib/channelNavigationMemory';
-import { IRCClient } from '@/lib/irc/client';
+import { IRCAdmissionUncertain, IRCClient } from '@/lib/irc/client';
 import type { ReclaimTokenKind } from '@/lib/irc/sessionReclaim';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
@@ -58,6 +58,7 @@ import {
 } from '@/lib/irc/recoveryCodes';
 import type { CadencePeerState, CadenceRoomStats, CallState } from '@/lib/cadence-media/types';
 import { getMountedCadenceMediaEngine } from '@/lib/mediaEngineMount';
+import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import { callJoinFailedToast } from '@/lib/media/callJoinCopy';
 import { parseActivity } from '@/lib/activity';
 import {
@@ -73,7 +74,17 @@ import {
   loadOutbox,
   loadRecent,
   markOutboxWireAdmitted,
+  claimOutboxEntry,
+  releaseOutboxClaim,
+  claimScheduledRow,
+  settleScheduledClaim,
+  reconcileScheduledRows,
+  addScheduledRow,
+  captureScheduledFence,
+  cancelScheduledRow,
+  cancelScheduledRowsForOwner,
   queueOutbox,
+  captureVaultEraseEpoch,
   subscribeVerifiedDeviceHistoryClear,
   type DeviceMemoryOwner,
   type OutboxEntry,
@@ -92,6 +103,7 @@ import {
   cancelScheduled,
   createScheduledSend,
   enqueueScheduled,
+  MAX_SCHEDULED_MESSAGES,
 } from '@/lib/composer/scheduledSend';
 import { deviceKeys, isEnvelope, isValidPeerPublicKey, normalizePeerDeviceKeys } from '@/lib/e2ee/dmCipher';
 import { isGroupEnvelope } from '@/lib/e2ee/groupEnvelope';
@@ -191,8 +203,8 @@ import {
   getComposerDraft as readComposerDraft,
   loadComposerDrafts,
   saveComposerDrafts,
-  setComposerDraft as updateComposerDraft,
   type ComposerDrafts,
+  type ComposerDraftPersistenceStatus,
 } from '@/lib/composer/drafts';
 import { loadDMPins, sanitizeDMPins, saveDMPins } from '@/lib/dmPins';
 import { loadBookmarks, saveBookmarks } from '@/lib/bookmarks';
@@ -1105,6 +1117,12 @@ export interface OnyxState {
   // ── composer/attachments ──
   /** Persisted composer drafts by lowercased target. */
   composerDrafts: ComposerDrafts;
+  /** In-memory write receipts bound to owner, target, and exact live text. */
+  composerDraftReceipts: Record<string, {
+    text: string;
+    status: ComposerDraftPersistenceStatus;
+    revision: number;
+  }>;
   /** Message currently being edited through the composer, if any. */
   editingMessage: ChatMessage | null;
   /**
@@ -1113,7 +1131,8 @@ export interface OnyxState {
    */
   editHistory: EditHistoryMap;
   getComposerDraft(target: string): string;
-  setComposerDraft(target: string, text: string): void;
+  getComposerDraftReceipt(target: string, text?: string): ComposerDraftPersistenceStatus | null;
+  setComposerDraft(target: string, text: string): ComposerDraftPersistenceStatus;
   clearComposerDraft(target: string): void;
   setComposerEditingMessage(msg: ChatMessage | null): void;
   /**
@@ -1160,7 +1179,10 @@ export interface OnyxState {
   /** Browse list vs Start a room formation — same sheet, same LIST store. */
   channelBrowserMode: 'browse' | 'create';
   channelList: ChannelListEntry[];
+  channelListCommitted: ChannelListEntry[];
   channelListLoading: boolean;
+  /** Rows for the currently outstanding LIST, or null when no LIST is active. */
+  channelListRequest: ChannelListEntry[] | null;
   /**
    * After Start a room lands in the new channel, Composer focuses this target
    * once. Cleared after focus so later navigations do not steal the caret.
@@ -1379,7 +1401,7 @@ export interface OnyxState {
   vhostOff(): void;
 
   /** Send a message (PRIVMSG) */
-  sendMessage(target: string, text: string): void | boolean | Promise<boolean>;
+  sendMessage(target: string, text: string, opts?: InternalDeliveryOptions): void | boolean | Promise<boolean>;
 
   /** Send a raw IRC line (full formatted line including CRLF) */
   sendRaw(line: string): void;
@@ -1428,7 +1450,7 @@ export interface OnyxState {
   addReaction(target: string, messageId: string, emoji: string): void;
   /** Remove a specific nick's reaction (used for incoming REACT from others) */
   removeReaction(target: string, messageId: string, emoji: string, nick: string): void;
-  editMessage(target: string, messageId: string, newText: string): void;
+  editMessage(target: string, messageId: string, newText: string): 'admitted' | 'refused' | 'uncertain';
   /** Redact our live message when draft/message-redaction is negotiated. */
   deleteMessage(target: string, messageId: string): void;
   _setTyping(channel: string, nick: string, active: boolean): void;
@@ -1691,11 +1713,12 @@ export interface OnyxState {
 
   // ── Scheduled Messages ──────────────────────────────────────────────
   scheduledMessages: ScheduledMessage[];
+  scheduledProjectionDegraded: boolean;
   showScheduledMessages: boolean;
-  scheduleMessage: (channel: string, text: string, sendAt: number) => boolean;
-  cancelScheduledMessage: (id: string) => void;
+  scheduleMessage: (channel: string, text: string, sendAt: number) => Promise<boolean>;
+  cancelScheduledMessage: (id: string) => Promise<boolean>;
   /** Send every past-due scheduled message (when connected) and drop it. */
-  _dispatchScheduledMessages: () => void;
+  _dispatchScheduledMessages: () => void | Promise<void>;
   openScheduledMessages: () => void;
   closeScheduledMessages: () => void;
 
@@ -2190,7 +2213,7 @@ export interface OnyxState {
    * key (having verified out-of-band), clear the warning, and re-decrypt any
    * messages held locked by the change.
    */
-  acceptPeerKeyChange(peer: string): void;
+  acceptPeerKeyChange(peer: string): Promise<boolean>;
   /** Forget a pending key-change warning WITHOUT accepting the new key (stays fail-closed). */
   dismissPeerKeyChange(peer: string): void;
   /**
@@ -2592,6 +2615,41 @@ const _pendingLabeledSends = new Map<string, PendingLabeledSend>();
 let _serverSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 let _serverSearchGeneration = 0;
 let _pendingServerSearch: PendingServerSearch | null = null;
+type PendingCreateRoom = {
+  channel: string;
+  topic: string;
+  firstLine: string;
+  client: IRCClient;
+  socketGeneration: number;
+  account: string | null;
+  network: string;
+  expiresAt: number;
+};
+let _pendingCreateRoom: PendingCreateRoom | null = null;
+let _pendingCreateRoomTimer: ReturnType<typeof setTimeout> | null = null;
+let _channelListTimer: ReturnType<typeof setTimeout> | null = null;
+let _channelListGeneration = 0;
+// LIST replies have no request id. After a timeout, the only safe policy on
+// the same transport is to quarantine until its old LISTEND is observed; a
+// new request is then allowed to start a clean burst.
+let _channelListQuarantineClient: IRCClient | null = null;
+
+function _resetChannelListTransport(): void {
+  _channelListGeneration += 1;
+  if (_channelListTimer) clearTimeout(_channelListTimer);
+  _channelListTimer = null;
+  _channelListQuarantineClient = null;
+}
+
+function _clearPendingCreateRoom(): void {
+  _pendingCreateRoom = null;
+  if (_pendingCreateRoomTimer) clearTimeout(_pendingCreateRoomTimer);
+  _pendingCreateRoomTimer = null;
+}
+// Handoff identities must outlive the one-shot pending slot. A mounted
+// Composer keeps the last applied identity, so deriving this from the slot
+// would make the second injection look like a replay after consumption.
+let _nextComposerInjectSeq = 0;
 const _staleServerSearches = new Map<string, StaleServerSearch>();
 
 function _clearServerSearchTimeout(): void {
@@ -4424,6 +4482,7 @@ function _resetAccountBoundState(
  * dropped wholesale and a DM view is closed before the new account is exposed.
  */
 function _resetAccountPrivateMessageState(set: SetFn): void {
+  _scheduledAdmissionUncertain.clear();
   if (_pendingServerSearch) _markServerSearchStale(_pendingServerSearch);
   _pendingServerSearch = null;
   _clearServerSearchTimeout();
@@ -4453,7 +4512,14 @@ function _resetAccountPrivateMessageState(set: SetFn): void {
       ? s.scheduledMessages.filter((message) => !_sameScheduledMessageOwner(message.owner, outgoingOwner))
       : s.scheduledMessages;
     const scheduledMessagesChanged = filteredScheduledMessages.length !== s.scheduledMessages.length;
-    if (scheduledMessagesChanged) _persistScheduledMessages(filteredScheduledMessages);
+    if (outgoingOwner) {
+      // Durable cleanup is independent of the current projection: another
+      // tab may own rows that this tab has never hydrated.
+      void cancelScheduledRowsForOwner(outgoingOwner);
+    }
+    if (scheduledMessagesChanged) {
+      _persistScheduledMessages(filteredScheduledMessages);
+    }
     return {
       channels,
       dms: new Map(),
@@ -4472,6 +4538,7 @@ function _resetAccountPrivateMessageState(set: SetFn): void {
       editHistory: {},
       forwardingMessage: null,
       composerDrafts: {},
+      composerDraftReceipts: {},
       showThreadPanel: false,
       threadParentId: null,
       showMessageSearch: false,
@@ -4940,7 +5007,12 @@ let _scheduledDispatchTimer: ReturnType<typeof setInterval> | null = null;
  */
 function _startScheduledDispatch(get: GetFn): void {
   if (_scheduledDispatchTimer) clearInterval(_scheduledDispatchTimer);
-  _scheduledDispatchTimer = setInterval(() => get()._dispatchScheduledMessages(), _SCHED_DISPATCH_MS);
+_scheduledDispatchTimer = setInterval(() => {
+  void Promise.resolve(get()._dispatchScheduledMessages()).catch(() => {
+    // The dispatcher is best-effort background work. Its durable operations
+    // fail closed; never expose a rejected timer promise as an unhandled error.
+  });
+}, _SCHED_DISPATCH_MS);
 }
 
 /** Stop the scheduled-message dispatch tick. */
@@ -5132,13 +5204,76 @@ function _loadPushNotificationsEnabled(): boolean {
 
 function _persistScheduledMessages(
   messages: readonly ScheduledMessage[],
-): void {
-  if (typeof window === 'undefined') return;
+): boolean {
+  if (typeof window === 'undefined') return true;
   try {
     localStorage.setItem('onyx:scheduled', JSON.stringify(messages));
+    return true;
   } catch {
-    // The in-memory queue remains usable when storage is blocked or full.
+    return false;
   }
+}
+
+function _readScheduledMessages(fallback: readonly ScheduledMessage[]): ScheduledMessage[] {
+  if (typeof window === 'undefined') return [...fallback];
+  try {
+    const raw = localStorage.getItem('onyx:scheduled');
+    return raw === null ? [...fallback] : parseScheduledMessages(raw);
+  } catch {
+    return [...fallback];
+  }
+}
+
+// Dispatch may only touch the individual row it owns.  Reading the current
+// storage value immediately before this write preserves rows added/canceled by
+// another tab; this is a compatibility projection, never the claim fence.
+function _patchScheduledLocalRow(id: string, patch: ScheduledMessage | null): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    const current = parseScheduledMessages(localStorage.getItem('onyx:scheduled'));
+    const next = patch === null
+      ? current.filter((row) => row.id !== id)
+      : current.map((row) => row.id === id ? patch : row);
+    localStorage.setItem('onyx:scheduled', JSON.stringify(next));
+    return true;
+  } catch { return false; }
+}
+
+let _scheduledClaimSeq = 0;
+let _scheduledAdmissionTail: Promise<boolean> = Promise.resolve(true);
+const _safetyNumberGenerations = new Map<string, number>();
+const _scheduledTestHooks = import.meta.env.MODE === 'test' ? {
+  beforeAbandonedSettlement: null as (() => Promise<void>) | null,
+  beforeClaimValidation: null as (() => Promise<void>) | null,
+} : null;
+let _peerSafetyNumberForTests: ((peer: string, owner: DeviceMemoryOwner) => Promise<string | null>) | null = null;
+export function _setPeerSafetyNumberTestHookForTests(hook: typeof _peerSafetyNumberForTests): void {
+  _peerSafetyNumberForTests = hook;
+}
+export function _setScheduledDispatchTestHooksForTests(hook: (() => Promise<void>) | null): void {
+  if (_scheduledTestHooks) _scheduledTestHooks.beforeAbandonedSettlement = hook;
+}
+export function _setScheduledClaimValidationTestHookForTests(hook: (() => Promise<void>) | null): void {
+  if (_scheduledTestHooks) _scheduledTestHooks.beforeClaimValidation = hook;
+}
+const _scheduledAdmissionUncertain = new Set<string>();
+// A synchronous public API cannot await IndexedDB admission. Keep newly
+// created rows out of the dispatcher until their add transaction commits.
+const _scheduledDurabilityPending = new Set<string>();
+const _scheduledDurabilityWrites = new Map<string, Promise<boolean>>();
+const _scheduledCancellationPending = new Set<string>();
+
+/** Test hook: isolate scheduled admission state between store test files. */
+export function _resetScheduledDispatchForTests(): void {
+  _scheduledAdmissionUncertain.clear();
+  _scheduledDurabilityPending.clear();
+  _scheduledDurabilityWrites.clear();
+  _scheduledCancellationPending.clear();
+  _scheduledClaimSeq = 0;
+  _scheduledAdmissionTail = Promise.resolve(true);
+}
+function scheduledUncertainKey(owner: ScheduledMessageOwner, id: string): string {
+  return `${owner.serverUrl}\u0000${owner.identity}\u0000${id}`;
 }
 
 function _scheduledMessageOwner(
@@ -5163,7 +5298,7 @@ export function selectOwnedScheduledMessages(
   const owner = _scheduledMessageOwner(state);
   if (!owner) return [];
   return state.scheduledMessages.filter((message) =>
-    _sameScheduledMessageOwner(message.owner, owner),
+    !!message && _sameScheduledMessageOwner(message.owner, owner),
   );
 }
 
@@ -5594,16 +5729,49 @@ function conversationMessage(
  * labeled echo, ACK, or FAIL arrives. Pass `outboxMessageId` when flushing a
  * durable outbox row so the existing placeholder is reused.
  */
+export type InternalDeliveryOptions = {
+  outboxMessageId?: string;
+  onUncertain?: () => void;
+};
+
+type RawAdmission = 'admitted' | 'refused' | 'uncertain';
+
+function admitRaw(
+  send: () => boolean,
+  onUncertain?: () => void,
+): RawAdmission {
+  try {
+    return send() ? 'admitted' : 'refused';
+  } catch (error) {
+    // Transport throws are deliberately not converted into refusal: bytes may
+    // have reached the socket before it closed.
+    if (error instanceof IRCAdmissionUncertain || error instanceof Error) {
+      try { onUncertain?.(); } catch { /* bookkeeping must not change outcome */ }
+      return 'uncertain';
+    }
+    throw error;
+  }
+}
+
 function deliverChatMessage(
   set: SetFn,
   get: GetFn,
   client: IRCClient,
   target: string,
   text: string,
-  opts?: { outboxMessageId?: string },
+  opts?: InternalDeliveryOptions,
 ): boolean | Promise<boolean> {
   const generation = _accountGeneration;
   const { ourNick, replyingTo } = get();
+  // The uncertainty observer is advisory bookkeeping. It must never be able
+  // to replace the transport outcome with a new throw/rejection.
+  let uncertaintyObserved = false;
+  const markUncertain = (): void => {
+    if (uncertaintyObserved) return;
+    uncertaintyObserved = true;
+    try { opts?.onUncertain?.(); } catch { /* observer failures are non-fatal */ }
+  };
+  const rawSendOptions = opts?.onUncertain ? { onUncertain: markUncertain } : undefined;
   // Only tag a reply when the armed parent belongs to THIS target. A reply
   // armed in #ops must never leak +draft/reply onto a send into #general.
   const activeReply = activeReplyForTarget(replyingTo, target);
@@ -5712,7 +5880,9 @@ function deliverChatMessage(
           return false;
         }
         const encryptedTags = { ...outboundTags, ...e2eeMessageTag('mls') };
-        if (!client.send(formatTaggedLine(encryptedTags, 'PRIVMSG', target, outcome.envelope))) return false;
+        try {
+          if (!client.send(formatTaggedLine(encryptedTags, 'PRIVMSG', target, outcome.envelope), { onUncertain: markUncertain })) return false;
+        } catch { markUncertain(); return false; }
         if (label) {
           commitLabeledOptimistic({
             text: outcome.envelope,
@@ -5825,7 +5995,16 @@ function deliverChatMessage(
       }
 
       const envelope = outcome.envelope;
-      if (!client.send(formatTaggedLine(encryptedOutboundTags, 'PRIVMSG', target, envelope))) return false;
+      try {
+        if (!client.send(formatTaggedLine(encryptedOutboundTags, 'PRIVMSG', target, envelope), { onUncertain: markUncertain })) return false;
+      } catch (error) {
+        markUncertain();
+        // Scheduled dispatch owns the uncertainty boundary. Re-throw only
+        // when an observer is present so it can retain the durable claim;
+        // ordinary composer sends keep their historical boolean result.
+        if (opts?.onUncertain) throw error;
+        return false;
+      }
       if (label) {
         commitLabeledOptimistic({
           text: envelope,
@@ -5872,17 +6051,38 @@ function deliverChatMessage(
   let admittedFrames = 0;
   if (multilinePlan) {
     for (const rawLine of buildMultilineLines(target, multilinePlan, undefined, outboundTags).lines) {
-      if (!client.send(rawLine)) return false;
+      try {
+        if (!client.send(rawLine, { onUncertain: markUncertain })) {
+          if (admittedFrames > 0) markUncertain();
+          return false;
+        }
+      } catch { markUncertain(); return false; }
       admittedFrames += 1;
     }
   } else {
     const lines = text.split('\n').filter(l => l.trim());
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!;
-      const admitted = i === 0 && hasOutboundTags
-        ? client.send(formatTaggedLine(outboundTags, 'PRIVMSG', target, line))
-        : client.sendRaw('PRIVMSG', target, line);
-      if (!admitted) return false;
+      let admitted: boolean;
+      try {
+          admitted = i === 0 && hasOutboundTags
+          ? rawSendOptions
+            ? client.send(formatTaggedLine(outboundTags, 'PRIVMSG', target, line), rawSendOptions)
+            : client.send(formatTaggedLine(outboundTags, 'PRIVMSG', target, line))
+          : rawSendOptions
+            ? client.sendRaw('PRIVMSG', rawSendOptions, target, line)
+            : client.sendRaw('PRIVMSG', target, line);
+      } catch (error) {
+        markUncertain();
+        if (opts?.onUncertain) throw error;
+        return false;
+      }
+      if (!admitted) {
+        // A later frame rejected after an earlier frame was admitted is not a
+        // clean rejection of this logical message.
+        if (admittedFrames > 0) markUncertain();
+        return false;
+      }
       admittedFrames += 1;
     }
   }
@@ -6134,6 +6334,7 @@ export const store = createStore<OnyxState>()(
     // Ownerless legacy drafts stay quarantined. The owned journal is loaded as
     // soon as registration establishes a server/account context.
     composerDrafts: {},
+    composerDraftReceipts: {},
     editingMessage: null,
     composerInject: null,
     editHistory: {},
@@ -6160,7 +6361,9 @@ export const store = createStore<OnyxState>()(
     showChannelBrowser: false,
     channelBrowserMode: 'browse',
     channelList: [],
+    channelListCommitted: [],
     channelListLoading: false,
+    channelListRequest: null,
     pendingComposerFocusTarget: null,
     auditLog: [],
     historyLoading: new Map(),
@@ -6283,6 +6486,8 @@ export const store = createStore<OnyxState>()(
     },
 
     connect({ url, nick, password, realname, hasClientCert }) {
+      _clearPendingCreateRoom();
+      _resetChannelListTransport();
       const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
       const prev = get().client;
       if (prev) {
@@ -6342,6 +6547,10 @@ export const store = createStore<OnyxState>()(
         autoReconnect: false,
         server: null,
         channels: new Map(),
+        channelList: [],
+        channelListCommitted: [],
+        channelListRequest: null,
+        channelListLoading: false,
         dms: new Map(),
         composerDrafts: {},
         typingUsers: new Map(),
@@ -6401,6 +6610,10 @@ export const store = createStore<OnyxState>()(
           // captured before destroy() detached its handlers. Only the client
           // currently owned by the store may drive connection state.
           if (get().client !== client) return;
+          // LIST has no request id. A newly connected socket (including a
+          // same-client socket generation) is a new transport, so release any
+          // old timeout quarantine and cancel its timer before accepting LIST.
+          _resetChannelListTransport();
           _clearReconnectCountdown();
           _reconnectAttempts = 0;
           set({ status: 'connected', connectionStatus: 'connected', reconnectIn: 0, autoReconnect: true, connectedAt: new Date() });
@@ -6441,6 +6654,12 @@ export const store = createStore<OnyxState>()(
         },
         onDisconnected(reason) {
           if (get().client !== client) return;
+          _clearPendingCreateRoom();
+          // The old socket can never complete this LIST safely. Clear its
+          // timer/quarantine now; a reconnect must be able to issue a fresh
+          // request, while stale numerics remain harmless because onMessage
+          // is ownership-gated to the current client.
+          _resetChannelListTransport();
           // Detach group-control admission and invalidate directory work before
           // any reconnect countdown can reuse the transport owner.
           _groupControlFor(client)?.onDisconnected();
@@ -6482,6 +6701,11 @@ export const store = createStore<OnyxState>()(
             connectedAt: null,
             activeChannelTopics: new Map(),
             typingUsers: new Map(),
+            // An interrupted LIST must not leave partial rows or a loading
+            // request owned by the dead socket visible during reconnect.
+            channelList: s.channelListCommitted,
+            channelListLoading: false,
+            channelListRequest: null,
             // Every in-flight history request belonged to the dead socket.
             // Clear its loading ownership so TARGETS discovery or a manual
             // fetch can retry the same buffer after reconnect.
@@ -6732,6 +6956,8 @@ export const store = createStore<OnyxState>()(
 
     // ── disconnect ───────────────────────────────────────────────────────
     disconnect() {
+      _clearPendingCreateRoom();
+      _channelListQuarantineClient = null;
       _clearReconnectCountdown();
       _stopNickReclaim();
       _clearSessionReclaimTimer();
@@ -6772,6 +6998,9 @@ export const store = createStore<OnyxState>()(
         client: null,
         status: 'disconnected',
         connectionStatus: 'disconnected',
+        channelList: get().channelListCommitted,
+        channelListLoading: false,
+        channelListRequest: null,
         reconnectIn: 0,
         autoReconnect: false,
         channels: new Map(),
@@ -6823,17 +7052,30 @@ export const store = createStore<OnyxState>()(
         hangLabel: input.hangLabel ?? null,
       });
       if (topic === null) return false;
-      get().joinChannel(channel);
-      if (topic) get().setTopic(channel, topic);
+      const client = get().client;
+      if (!client || get().connectionStatus !== 'connected') return false;
       const firstLine = input.firstLine?.trim() ?? '';
-      if (firstLine) {
-        get().injectComposerText(channel, firstLine, 'replace');
-      } else {
-        set({ pendingComposerFocusTarget: channel });
+      _clearPendingCreateRoom();
+      const expiresAt = Date.now() + 15_000;
+      _pendingCreateRoom = {
+        channel, topic, firstLine, client,
+        socketGeneration: client.socketGeneration,
+        account: _accountKey(get().server?.account),
+        network: get().networkName,
+        expiresAt,
+      };
+      _pendingCreateRoomTimer = setTimeout(() => {
+        if (_pendingCreateRoom?.expiresAt === expiresAt) _clearPendingCreateRoom();
+      }, 15_000);
+      let admitted = false;
+      try {
+        admitted = client.join(channel, undefined);
+      } catch {
+        _clearPendingCreateRoom();
+        return false;
       }
-      get().closeChannelBrowser();
-      get().navigate({ kind: 'channel', channel });
-      return true;
+      if (!admitted) _clearPendingCreateRoom();
+      return admitted;
     },
 
     clearPendingComposerFocus() {
@@ -6936,7 +7178,8 @@ export const store = createStore<OnyxState>()(
           let sent = 0;
           let expired = 0;
           let waiting = 0;
-          let pruneFailed = 0;
+          let expiredPruneFailed = 0;
+          let admittedPruneFailed = 0;
           for (const e of entries) {
             const st = get();
             if (
@@ -6954,7 +7197,7 @@ export const store = createStore<OnyxState>()(
                 expired += 1;
               } else {
                 waiting += 1;
-                pruneFailed += 1;
+                expiredPruneFailed += 1;
               }
               continue;
             }
@@ -6969,7 +7212,7 @@ export const store = createStore<OnyxState>()(
                 }
               } else {
                 waiting += 1;
-                pruneFailed += 1;
+                admittedPruneFailed += 1;
               }
               continue;
             }
@@ -6987,11 +7230,35 @@ export const store = createStore<OnyxState>()(
             // With labeled-response the UI placeholder stays until the labeled
             // echo/ACK; durable outbox still drops on admission so a reconnect
             // cannot double-send a wire-admitted row.
-            const admitted = await deliverChatMessage(set, get, client, e.target, e.text, {
+            const claimToken = `flush-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+            const claimed = await claimOutboxEntry(e.id, claimToken, owner);
+            if (!claimed) {
+              waiting += 1;
+              continue;
+            }
+            // The claim is deliberately acquired before this final boundary
+            // check: account/client replacement must leave it held, never
+            // release it and replay Alice's body through Bob.
+            const afterClaim = get();
+            if (
+              generation !== _accountGeneration
+              || afterClaim.client !== client
+              || !_sameOutboxOwner(_outboxOwner(afterClaim), owner)
+              || afterClaim.connectionStatus !== 'connected'
+            ) {
+              waiting += 1;
+              continue;
+            }
+            let uncertain = false;
+            const admitted = await deliverChatMessage(set, get, client, claimed.target, claimed.text, {
               outboxMessageId: `outbox:${e.id}`,
+              onUncertain: () => { uncertain = true; },
             });
             if (!admitted) {
-              waiting += 1;
+              if (uncertain) {
+                waiting += 1;
+                get().addToast({ variant: 'error', title: 'Admission uncertain / may have sent', description: 'This queued message will not be retried automatically. Review it before taking recovery action.' });
+              } else { await releaseOutboxClaim(e.id, claimToken); waiting += 1; }
               continue;
             }
             // Mark wire-admitted BEFORE the delete attempt — memory first, then
@@ -7013,7 +7280,7 @@ export const store = createStore<OnyxState>()(
               }
               sent += 1;
               waiting += 1;
-              pruneFailed += 1;
+              admittedPruneFailed += 1;
               // Reload double-send guard: retry durable mark if the first put failed.
               if (!durableMarked) await markOutboxWireAdmitted(e.id);
             }
@@ -7022,8 +7289,8 @@ export const store = createStore<OnyxState>()(
           if (sent > 0) {
             get().addToast({
               variant: 'success',
-              title: sent === 1 ? 'Queued message sent' : `${sent} queued messages sent`,
-              description: 'Written while offline, delivered now.',
+              title: sent === 1 ? 'Queued message admitted' : `${sent} queued messages admitted`,
+              description: 'Admitted to this device connection; recipient delivery confirmation pending.',
             });
           }
           if (expired > 0) {
@@ -7033,13 +7300,16 @@ export const store = createStore<OnyxState>()(
               description: 'Older than a day — dropped instead of sent.',
             });
           }
-          if (pruneFailed > 0) {
+          if (expiredPruneFailed > 0) {
+            get().addToast({ variant: 'warning', title: expiredPruneFailed === 1 ? 'Expired queued message needs cleanup' : `${expiredPruneFailed} expired queued messages need cleanup`, description: 'These messages were not sent, but could not be removed from device storage yet.' });
+          }
+          if (admittedPruneFailed > 0) {
             get().addToast({
               variant: 'warning',
-              title: pruneFailed === 1
+              title: admittedPruneFailed === 1
                 ? 'Queued message stuck on this device'
-                : `${pruneFailed} queued messages stuck on this device`,
-              description: 'Already sent, but device storage could not clear the local copy. Retry from Home if it reappears.',
+                : `${admittedPruneFailed} queued messages stuck on this device`,
+              description: 'Admitted to this device connection, but storage prune is pending. Retry from Home if it reappears.',
             });
           }
           // Terminal classification is pure: a mid-flush connection drop must
@@ -7047,7 +7317,7 @@ export const store = createStore<OnyxState>()(
           // auto-retry budget or toast "couldn't send". Reconnect 001 re-arms.
           const terminal = decideOutboxFlushTerminal({
             waiting,
-            pruneFailed,
+            pruneFailed: expiredPruneFailed + admittedPruneFailed,
             retriesUsed: _outboxRetries,
             connected: get().connectionStatus === 'connected',
           });
@@ -7772,7 +8042,7 @@ export const store = createStore<OnyxState>()(
     },
 
     // ── sendMessage ──────────────────────────────────────────────────────
-    sendMessage(target, text) {
+    sendMessage(target, text, deliveryOptions) {
       const { client } = get();
 
       // Offline outbox (Roadmap Phase 2): composing while disconnected queues
@@ -7816,11 +8086,10 @@ export const store = createStore<OnyxState>()(
           get().addToast({ variant: 'error', title: 'Offline', description: 'Reconnect before queueing a message for this identity.' });
           return false;
         }
-        void queueOutbox(target, text, owner).then((entry) => {
-          if (!_sameOutboxOwner(owner, _outboxOwner(get()))) return;
-          if (!entry) {
+        return captureVaultEraseEpoch().then((eraseEpoch) => queueOutbox(target, text, owner, eraseEpoch ?? undefined)).then((entry) => {
+          if (!_sameOutboxOwner(owner, _outboxOwner(get())) || !entry) {
             get().addToast({ variant: 'error', title: 'Offline', description: 'Message could not be queued on this device.' });
-            return;
+            return false;
           }
           const placeholder: ChatMessage = {
             id: `outbox:${entry.id}`,
@@ -7832,12 +8101,13 @@ export const store = createStore<OnyxState>()(
             pending: true,
           };
           set(s => _addMessage(s, target, placeholder));
+          return true;
         }).catch(() => {
           // IndexedDB open/queue paths are fail-soft, but a rejected promise
           // must never swallow the user's send with no chrome.
           get().addToast({ variant: 'error', title: 'Offline', description: 'Message could not be queued on this device.' });
+          return false;
         });
-        return;
       }
       if (!client) return;
 
@@ -8260,7 +8530,7 @@ export const store = createStore<OnyxState>()(
         return;
       }
 
-      return deliverChatMessage(set, get, client, target, text);
+      return deliverChatMessage(set, get, client, target, text, deliveryOptions);
     },
 
     // ── sendRaw ──────────────────────────────────────────────────────────
@@ -8860,12 +9130,38 @@ export const store = createStore<OnyxState>()(
       return readComposerDraft(get().composerDrafts, target);
     },
 
-    setComposerDraft(target, text) {
-      if (!composerDraftKey(target)) return;
-      const next = updateComposerDraft(get().composerDrafts, target, text);
+    getComposerDraftReceipt(target, text) {
+      const key = composerDraftKey(target);
+      if (!key) return null;
       const owner = selectDeviceMemoryOwner(get());
-      if (owner) saveComposerDrafts(next, undefined, owner);
-      set({ composerDrafts: next });
+      const receipt = get().composerDraftReceipts[`${owner ? deviceMemoryOwnerKey(owner) : 'anonymous'}:${key}`];
+      return receipt && (text === undefined || receipt.text === text) ? receipt.status : null;
+    },
+
+    setComposerDraft(target, text) {
+      const key = composerDraftKey(target);
+      if (!key) return 'malformed';
+      // Keep the complete edit in live state. The durable adapter may be
+      // bounded, but truncating here would silently destroy the user's only
+      // unsaved copy when localStorage is limited or unavailable.
+      const next = { ...get().composerDrafts };
+      if (text.length === 0) delete next[key];
+      else next[key] = text;
+      const owner = selectDeviceMemoryOwner(get());
+      const receipt = owner ? saveComposerDrafts(next, undefined, owner) : { status: 'only-in-tab' as const };
+      const receiptKey = `${owner ? deviceMemoryOwnerKey(owner) : 'anonymous'}:${key}`;
+      const previous = get().composerDraftReceipts[receiptKey];
+      const revision = (previous?.revision ?? 0) + 1;
+      set({
+        composerDrafts: next,
+        composerDraftReceipts: text.length === 0
+          ? Object.fromEntries(Object.entries(get().composerDraftReceipts).filter(([entry]) => entry !== receiptKey))
+          : {
+              ...get().composerDraftReceipts,
+              [receiptKey]: { text, status: receipt.status, revision },
+            },
+      });
+      return receipt.status;
     },
 
     clearComposerDraft(target) {
@@ -8880,8 +9176,7 @@ export const store = createStore<OnyxState>()(
       const current = get().getComposerDraft(key);
       const merged = mergeComposerInsert(current, text, mode);
       get().setComposerDraft(key, merged.text);
-      const prev = get().composerInject;
-      const seq = (prev?.seq ?? 0) + 1;
+      const seq = ++_nextComposerInjectSeq;
       set({
         composerInject: {
           seq,
@@ -9068,7 +9363,7 @@ export const store = createStore<OnyxState>()(
 
     editMessage(target, messageId, newText) {
       const { client, ourNick } = get();
-      if (!client?.negotiatedCaps.has('draft/message-editing')) return;
+      if (!client?.negotiatedCaps.has('draft/message-editing')) return 'refused';
       const key = target.toLowerCase();
       const current = conversationMessage(get(), target, messageId);
       if (
@@ -9078,13 +9373,20 @@ export const store = createStore<OnyxState>()(
         || current.deleted
         || current.redacted
         || hasEncryptedMessageBoundary(current)
-      ) return;
+      ) return 'refused';
 
       // Snapshot prior plaintext body for local audit history before we fold.
       const priorBody = current.text;
 
       // Send EDIT command to the server (draft/message-editing cap)
-      client.sendRaw('EDIT', target, messageId, newText);
+      const admission = admitRaw(
+        () => client.sendRaw('EDIT', { onUncertain: () => undefined }, target, messageId, newText),
+        () => get().addToast({ variant: 'error', title: 'Edit admission uncertain', description: 'The edit may have reached the server. Check the conversation before retrying.' }),
+      );
+      if (admission !== 'admitted') {
+        if (admission === 'refused') get().addToast({ variant: 'error', title: 'Edit refused', description: 'The message was not edited. Your replacement text is still recoverable.' });
+        return admission;
+      }
 
       // Optimistic local update — only for our own messages
       const applyEdit = (messages: ChatMessage[]): ChatMessage[] =>
@@ -9111,6 +9413,7 @@ export const store = createStore<OnyxState>()(
         // Still keep the revision even if the row left live memory mid-edit.
         return { editHistory };
       });
+      return 'admitted';
     },
 
     deleteMessage(target, messageId) {
@@ -9789,8 +10092,42 @@ export const store = createStore<OnyxState>()(
       set({ showChannelBrowser: false, channelBrowserMode: 'browse' });
     },
     refreshChannelList() {
-      set({ channelListLoading: true, channelList: [] });
-      get().client?.sendRaw('LIST');
+      const { client, connectionStatus } = get();
+      if (!client || connectionStatus !== 'connected') {
+        // Keep the last truthful directory visible while offline. A refresh
+        // cannot be fulfilled without a usable connection, so do not imply
+        // loading or erase cached rows.
+        set({ channelListLoading: false });
+        return;
+      }
+      if (_channelListQuarantineClient !== null && _channelListQuarantineClient === client) return;
+      if (get().channelListLoading) return;
+      const generation = ++_channelListGeneration;
+      set({ channelListLoading: true, channelListRequest: [] });
+      if (_channelListTimer) clearTimeout(_channelListTimer);
+      _channelListTimer = setTimeout(() => {
+        if (_channelListGeneration !== generation) return;
+        _channelListTimer = null;
+        _channelListQuarantineClient = client;
+        set(s => ({
+          channelList: s.channelListCommitted,
+          channelListLoading: false,
+          channelListRequest: null,
+        }));
+      }, 15_000);
+      try {
+        if (!client.sendRaw('LIST')) {
+          _channelListGeneration += 1;
+          clearTimeout(_channelListTimer);
+          _channelListTimer = null;
+          set(s => ({ channelList: s.channelListCommitted, channelListLoading: false, channelListRequest: null }));
+        }
+        } catch {
+          _channelListGeneration += 1;
+        if (_channelListTimer) clearTimeout(_channelListTimer);
+        _channelListTimer = null;
+        set(s => ({ channelList: s.channelListCommitted, channelListLoading: false, channelListRequest: null }));
+      }
     },
 
     // ── audit log ─────────────────────────────────────────────────────────
@@ -10982,7 +11319,7 @@ export const store = createStore<OnyxState>()(
               // closed or offline — once, promptly, right after the session
               // settles (so channel sends land after the join replay).
               setTimeout(() => {
-                if (registrationStillCurrent()) get()._dispatchScheduledMessages();
+                if (registrationStillCurrent()) void Promise.resolve(get()._dispatchScheduledMessages()).catch(() => {});
               }, 2600);
             }
             {
@@ -11165,6 +11502,20 @@ export const store = createStore<OnyxState>()(
             : undefined;
 
           if (isSelf) {
+            const pendingCandidate = _pendingCreateRoom;
+            const pendingCreate = pendingCandidate
+              && pendingCandidate.channel.toLowerCase() === key
+              && pendingCandidate.client === get().client
+              && pendingCandidate.socketGeneration === get().client?.socketGeneration
+              && pendingCandidate.account === _accountKey(get().server?.account)
+              && pendingCandidate.network === get().networkName
+              && pendingCandidate.expiresAt > Date.now()
+              ? pendingCandidate
+              : null;
+            if (pendingCandidate && !pendingCreate && pendingCandidate.channel.toLowerCase() === key) {
+              _clearPendingCreateRoom();
+            }
+            if (pendingCreate) _clearPendingCreateRoom();
             const currentChannels = get().channels;
             if (!currentChannels.has(key) && currentChannels.size >= MAX_LIVE_CHANNELS) break;
             if (restore) _setRestoreRosterSyncing(set, key, true);
@@ -11186,6 +11537,13 @@ export const store = createStore<OnyxState>()(
             });
             // Track session join history
             get().addJoinHistory(ch);
+            if (pendingCreate) {
+              if (pendingCreate.topic) get().setTopic(ch, pendingCreate.topic);
+              if (pendingCreate.firstLine) get().injectComposerText(ch, pendingCreate.firstLine, 'replace');
+              else set({ pendingComposerFocusTarget: ch });
+              get().closeChannelBrowser();
+              get().navigate({ kind: 'channel', channel: ch });
+            }
             // Kick off initial history fetch (CHATHISTORY LATEST #channel * 50)
             get().loadHistory(ch);
             // Fetch the stored read marker so unread/firstUnreadId can be
@@ -11643,7 +12001,7 @@ export const store = createStore<OnyxState>()(
           if (propTarget && isChan(propTarget)) {
             set(s => ({ channelPropsSynced: new Set(s.channelPropsSynced).add(propTarget.toLowerCase()) }));
             _tryPendingDeepLinkTopicResolution(get, set, propTarget, { registryComplete: true });
-            get()._dispatchScheduledMessages();
+            void Promise.resolve(get()._dispatchScheduledMessages()).catch(() => {});
           }
           break;
         }
@@ -14128,23 +14486,37 @@ export const store = createStore<OnyxState>()(
           // LIST rows are meaningful only while this client has an outstanding
           // directory request. Ignore unsolicited rows instead of letting a
           // hostile server populate retained UI state in the background.
-          if (!get().channelListLoading) break;
+          if (!get().channelListLoading || (_channelListQuarantineClient !== null && _channelListQuarantineClient === get().client)) break;
           const listCh = params[1] ?? '';
           const listCount = parseInt(params[2] ?? '0', 10);
           const listTopic = params[3] ?? '';
           if (!listCh) break;
-          set((s) => ({
-            channelList: mergeChannelListRow(s.channelList, {
+          set((s) => {
+            const nextRows = mergeChannelListRow(s.channelListRequest ?? [], {
               name: listCh,
               count: listCount,
               topic: listTopic,
-            }),
-          }));
+            });
+            return { channelListRequest: nextRows, channelList: nextRows };
+          });
           break;
         }
 
         case '323': // RPL_LISTEND
-          set({ channelListLoading: false });
+          if (_channelListQuarantineClient !== null && _channelListQuarantineClient === get().client) {
+            _channelListQuarantineClient = null;
+            break;
+          }
+          if (!get().channelListLoading) break;
+          if (_channelListTimer) clearTimeout(_channelListTimer);
+          _channelListTimer = null;
+          _channelListGeneration += 1;
+          set((s) => ({
+            channelList: s.channelListRequest ?? s.channelList,
+            channelListCommitted: s.channelListRequest ?? s.channelListCommitted,
+            channelListLoading: false,
+            channelListRequest: null,
+          }));
           break;
 
         // ── RULES numerics (308 RPL_RULES / 309 RPL_ENDOFRULES) ─────────
@@ -14654,12 +15026,15 @@ export const store = createStore<OnyxState>()(
 
         case '471': { // ERR_CHANNELISFULL
           const channel471 = params[1] ?? '';
+          if (_pendingCreateRoom?.channel.toLowerCase() === channel471.toLowerCase()) _clearPendingCreateRoom();
           get().addNotification({ type: 'error', text: `${channel471} is full` });
+          get().setChannelJoinPrompt(channel471, 'This room is full');
           break;
         }
 
         case '473': { // ERR_INVITEONLYCHAN
           const channel473 = params[1] ?? '';
+          if (_pendingCreateRoom?.channel.toLowerCase() === channel473.toLowerCase()) _clearPendingCreateRoom();
           get().addNotification({ type: 'error', text: `${channel473} is invite-only` });
           get().setChannelJoinPrompt(channel473, 'Channel is invite-only');
           break;
@@ -14844,6 +15219,7 @@ export const store = createStore<OnyxState>()(
 
         case '474': { // ERR_BANNEDFROMCHAN
           const channel474 = params[1] ?? '';
+          if (_pendingCreateRoom?.channel.toLowerCase() === channel474.toLowerCase()) _clearPendingCreateRoom();
           get().addNotification({ type: 'error', text: `You are banned from ${channel474}` });
           get().setChannelJoinPrompt(channel474, 'You are banned from this room');
           break;
@@ -14852,6 +15228,7 @@ export const store = createStore<OnyxState>()(
         // ── ERR_BADCHANNELKEY (475) ───────────────────────────────────────
         case '475': {
           const channel475 = params[1] ?? '';
+          if (_pendingCreateRoom?.channel.toLowerCase() === channel475.toLowerCase()) _clearPendingCreateRoom();
           get().setChannelJoinPrompt(channel475, 'Incorrect channel password');
           break;
         }
@@ -15222,15 +15599,13 @@ export const store = createStore<OnyxState>()(
     raiseHand: () => {
       const ch = get().stageChannel;
       if (ch) {
-        get().client?.sendRaw('PRIVMSG', ch, '\x01STAGE RAISE_HAND\x01');
-        set({ stageHandRaised: true });
+        if (admitRaw(() => get().client?.sendRaw('PRIVMSG', ch, '\x01STAGE RAISE_HAND\x01') ?? false, () => get().addToast({ variant: 'error', title: 'Stage action uncertain', description: 'The hand-raise may have reached the server.' })) === 'admitted') set({ stageHandRaised: true });
       }
     },
     lowerHand: () => {
       const ch = get().stageChannel;
       if (ch) {
-        get().client?.sendRaw('PRIVMSG', ch, '\x01STAGE LOWER_HAND\x01');
-        set({ stageHandRaised: false });
+        if (admitRaw(() => get().client?.sendRaw('PRIVMSG', ch, '\x01STAGE LOWER_HAND\x01') ?? false, () => get().addToast({ variant: 'error', title: 'Stage action uncertain', description: 'The hand-lower may have reached the server.' })) === 'admitted') set({ stageHandRaised: false });
       }
     },
     inviteToSpeak: (nick) => {
@@ -15246,8 +15621,7 @@ export const store = createStore<OnyxState>()(
     acceptSpeakInvite: () => {
       const ch = get().stageChannel;
       if (ch) {
-        get().client?.sendRaw('PRIVMSG', ch, '\x01STAGE ACCEPT_SPEAK\x01');
-        set({ isStageSpeaker: true, pendingSpeakInvite: null });
+        if (admitRaw(() => get().client?.sendRaw('PRIVMSG', ch, '\x01STAGE ACCEPT_SPEAK\x01') ?? false, () => get().addToast({ variant: 'error', title: 'Stage action uncertain', description: 'The speak acceptance may have reached the server.' })) === 'admitted') set({ isStageSpeaker: true, pendingSpeakInvite: null });
       }
     },
     declineSpeakInvite: () => {
@@ -15268,8 +15642,9 @@ export const store = createStore<OnyxState>()(
     startStage: (channel) => {
       const target = _normalizeStageChannel(channel);
       const client = get().client;
-      if (!target || !client || !client.sendRaw('MODE', target, '+m')) return;
-      client.sendRaw('PROP', target, 'STAGE', '1');
+      if (!target || !client) return;
+      if (admitRaw(() => client.sendRaw('MODE', target, '+m'), () => get().addToast({ variant: 'error', title: 'Stage admission uncertain', description: 'The stage mode may have reached the server.' })) !== 'admitted') return;
+      if (admitRaw(() => client.sendRaw('PROP', target, 'STAGE', '1'), () => get().addToast({ variant: 'error', title: 'Stage admission uncertain', description: 'The stage property may have reached the server.' })) !== 'admitted') return;
       set({
         stageChannel: target,
         stageRaisedHands: [],
@@ -15371,7 +15746,8 @@ export const store = createStore<OnyxState>()(
         });
         return;
       }
-      client.sendRaw(command, ...args);
+      const admission = admitRaw(() => client.sendRaw(command, ...args), () => get().addToast({ variant: 'error', title: 'Operator action uncertain', description: 'The command may have reached the server. Verify before retrying.' }));
+      if (admission === 'refused') get().addToast({ variant: 'error', title: 'Operator action refused', description: 'The command was not admitted by the connection.' });
     },
 
     // ── Scheduled Messages ──────────────────────────────────────────────
@@ -15380,8 +15756,9 @@ export const store = createStore<OnyxState>()(
       try { return parseScheduledMessages(localStorage.getItem('onyx:scheduled')); }
       catch { return []; }
     })(),
+    scheduledProjectionDegraded: false,
     showScheduledMessages: false,
-    scheduleMessage: (channel, text, sendAt) => {
+    scheduleMessage: async (channel, text, sendAt) => {
       if (selectChannelEncryptionPolicy(channel)(get()) === 'required') {
         get().addToast({
           variant: 'error',
@@ -15412,33 +15789,110 @@ export const store = createStore<OnyxState>()(
       if (!owner) return false;
       const entry = createScheduledSend({ channel, text, sendAt, owner });
       if (!entry) return false;
-      let admitted = false;
-      set(s => {
-        const next = enqueueScheduled(s.scheduledMessages, entry);
-        if (!next) return {};
-        admitted = true;
-        _persistScheduledMessages(next);
-        return { scheduledMessages: next };
+      const capturedAccountGeneration = _accountGeneration;
+      const fence = await captureScheduledFence(owner);
+      if (!fence) return false;
+      const capturedEpoch = fence.clearEpoch;
+      const capturedGeneration = fence.generation;
+      const fencedEntry = { ...entry, clearEpoch: capturedEpoch, generation: capturedGeneration };
+      const key = scheduledUncertainKey(owner, entry.id);
+      _scheduledDurabilityPending.add(key);
+      const write = (_scheduledAdmissionTail = _scheduledAdmissionTail.catch(() => true).then(async () => {
+        const durableRows = await reconcileScheduledRows(_readScheduledMessages(get().scheduledMessages), MAX_SCHEDULED_MESSAGES);
+        if (!durableRows) return false;
+        return addScheduledRow(fencedEntry, capturedEpoch, capturedGeneration, MAX_SCHEDULED_MESSAGES);
+      })).finally(() => {
+        _scheduledDurabilityPending.delete(key);
+        _scheduledDurabilityWrites.delete(key);
       });
-      return admitted;
+      _scheduledDurabilityWrites.set(key, write);
+      const durable = await write;
+      if (!durable) return false;
+      if (_accountGeneration !== capturedAccountGeneration) return false;
+      const currentOwner = _scheduledMessageOwner(get());
+      if (!currentOwner || !_sameScheduledMessageOwner(currentOwner, owner)) return false;
+      const next = enqueueScheduled(get().scheduledMessages, fencedEntry);
+      if (!next) return true;
+      // localStorage is only a projection: a quota/security failure must not
+      // turn an already durable admission into a false failure. Keep the
+      // in-memory compatibility projection unchanged too; the durable row is
+      // still authoritative and will be reconciled on the next hydration.
+      const projected = _persistScheduledMessages(next);
+      set({ scheduledMessages: next, scheduledProjectionDegraded: !projected });
+      return true;
     },
-    cancelScheduledMessage: (id) => {
-      set(s => {
-        const owner = _scheduledMessageOwner(s);
-        const entry = s.scheduledMessages.find((message) => message.id === id);
-        if (!owner || !entry || !_sameScheduledMessageOwner(entry.owner, owner)) return {};
-        const next = cancelScheduled(s.scheduledMessages, id);
-        _persistScheduledMessages(next);
-        return { scheduledMessages: next };
-      });
+    cancelScheduledMessage: async (id) => {
+      const snapshot = get();
+      const owner = _scheduledMessageOwner(snapshot);
+      const entry = snapshot.scheduledMessages.find((message) => message.id === id);
+      if (!owner || !entry || !_sameScheduledMessageOwner(entry.owner, owner)) return false;
+      const key = scheduledUncertainKey(owner, id);
+      const cancelGeneration = _accountGeneration;
+      const cancelOwner = { ...owner };
+      _scheduledCancellationPending.add(key);
+      try {
+        const durable = await cancelScheduledRow(id, owner);
+        const current = get();
+        if (!durable) {
+          if (_accountGeneration === cancelGeneration
+            && _sameScheduledMessageOwner(_scheduledMessageOwner(current), cancelOwner)) {
+            get().addToast({ variant: 'error', title: 'Could not cancel scheduled message', description: 'The saved queue could not be canceled. Retry cancellation; it was not sent.' });
+          }
+          return false;
+        }
+        if (_accountGeneration !== cancelGeneration
+          || !_sameScheduledMessageOwner(_scheduledMessageOwner(current), cancelOwner)
+          || !current.scheduledMessages.some((row) => row.id === id
+            && !!entry.owner
+            && _sameScheduledMessageOwner(row.owner, entry.owner))) return false;
+        _scheduledAdmissionUncertain.delete(key);
+        const next = cancelScheduled(current.scheduledMessages, id);
+        const projected = _persistScheduledMessages(next);
+        set({ scheduledMessages: next, scheduledProjectionDegraded: !projected });
+        return true;
+      } catch {
+        const current = get();
+        if (_accountGeneration === cancelGeneration
+          && _sameScheduledMessageOwner(_scheduledMessageOwner(current), cancelOwner)) {
+          get().addToast({ variant: 'error', title: 'Could not cancel scheduled message', description: 'The saved queue could not be canceled. Retry cancellation; it was not sent.' });
+        }
+        return false;
+      } finally {
+        _scheduledCancellationPending.delete(key);
+      }
     },
-    _dispatchScheduledMessages: () => {
+    _dispatchScheduledMessages: async () => {
       const s = get();
       const connected = s.connectionStatus === 'connected' && !!s.client;
+      const dispatchClient = s.client;
+      const dispatchSocketGeneration = dispatchClient?.socketGeneration;
+      const dispatchAccountGeneration = _accountGeneration;
       const owner = _scheduledMessageOwner(s);
       if (!owner) return;
-      const owned = s.scheduledMessages.filter((message) => _sameScheduledMessageOwner(message.owner, owner));
-      const held = s.scheduledMessages.filter((message) => !_sameScheduledMessageOwner(message.owner, owner));
+      // A sync API may return before IDB commits. Waiting for this owner's
+      // admission makes the public success truthful and keeps the dispatcher
+      // from racing an uncommitted row.
+      const pendingWrites = [..._scheduledDurabilityWrites.entries()]
+        .filter(([key]) => key.startsWith(`${owner.serverUrl}\u0000${owner.identity}\u0000`))
+        .map(([, write]) => write.catch(() => false));
+      if (pendingWrites.length > 0) await Promise.all(pendingWrites);
+      // localStorage remains the compatibility surface, but the durable queue
+      // is reconciled from the current snapshot before any admission attempt.
+      // Migration is add-only: a cancellation/admission tombstone in IDB wins
+      // over a stale row from another tab and can never be recreated here.
+      const localSnapshot = _readScheduledMessages(s.scheduledMessages);
+      const durableRows = await reconcileScheduledRows(localSnapshot, MAX_SCHEDULED_MESSAGES);
+      if (!durableRows) {
+        get().addToast({ variant: 'error', title: 'Scheduled send paused', description: 'This device could not establish a durable claim. The message remains queued and was not sent.' });
+        return;
+      }
+      // IDB is authoritative for cross-tab status. This projection keeps the
+      // legacy localStorage API readable without allowing a stale tab snapshot
+      // to put a canceled/admitted row back into the queue.
+      const projected = _persistScheduledMessages(durableRows);
+      set({ scheduledMessages: durableRows, scheduledProjectionDegraded: !projected });
+      const currentRows = durableRows;
+      const owned = currentRows.filter((message) => _sameScheduledMessageOwner(message.owner, owner));
       // channelPropsSynced (819 RPL_PROPEND) is only ever recorded for CHANNEL
       // targets — a DM nick can never appear in it. Gate the prop-sync wait on
       // channel targets only, or every scheduled DM on an IRCX node (isIRCX is
@@ -15449,73 +15903,271 @@ export const store = createStore<OnyxState>()(
       // Legacy rows may predate the protected-room scheduling guard. Never
       // dispatch their persisted plaintext through an encryption-required
       // room; keep them visible for explicit user cancellation/recovery.
-      const protectedHeld = owned.filter(
-        (message) => (s.isIRCX && isChannelTarget(message.channel) && !s.channelPropsSynced.has(message.channel.toLowerCase()))
-          || selectChannelEncryptionPolicy(message.channel)(s) === 'required',
-      );
       const dispatchable = owned.filter(
         (message) => (!s.isIRCX || !isChannelTarget(message.channel) || s.channelPropsSynced.has(message.channel.toLowerCase()))
           && selectChannelEncryptionPolicy(message.channel)(s) !== 'required',
       );
-      const { due, pending: ownedPending } = selectDueMessages(dispatchable, Date.now(), connected);
-      if (due.length === 0) return;
-      const pending = [...held, ...protectedHeld, ...ownedPending].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
-      // Remove the due entries BEFORE sending (and persist the shrunk queue), so
-      // idempotency never depends on the send succeeding: if sendMessage throws,
-      // or a second tick fires, the entry is already gone and can't double-send.
-      set(() => {
-        _persistScheduledMessages(pending);
-        return { scheduledMessages: pending };
+      const now = Date.now();
+      // A lease is a safety fence, not a retry timer. Once admission has been
+      // attempted, local state cannot know whether the peer accepted it.
+      // Expired claims remain uncertain until the user deliberately cancels
+      // and schedules a fresh row.
+      const uncertainKey = (id: string) => scheduledUncertainKey(owner, id);
+      const claimable = dispatchable.filter((message) => {
+        const key = uncertainKey(message.id);
+        return !_scheduledDurabilityPending.has(key)
+          && !_scheduledCancellationPending.has(key)
+          && !message.claim
+          && !_scheduledAdmissionUncertain.has(key);
       });
-      // Isolate each send: one entry throwing (a racing socket close, a seal
-      // failure) must not swallow its siblings. A throw means the message never
-      // reached the wire, so re-queue it for the next tick rather than lose it.
-      const failed: typeof due = [];
-      const awaiting: Array<{ message: (typeof due)[number]; admission: Promise<boolean> }> = [];
+      const { due } = selectDueMessages(claimable, now, connected);
+      due.sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
+      if (due.length === 0) return;
+      let claims: ScheduledMessage[] = [];
+      for (const message of due) {
+        const token = `claim-${Date.now()}-${++_scheduledClaimSeq}`;
+        const durable = await claimScheduledRow(message.id, owner, token, now);
+        if (durable) claims.push({ ...message, claim: { token, claimedAt: now } });
+      }
+      if (claims.length === 0) return;
+
+      // The owner and local row may have changed while the durable transactions
+      // above were queued. Never send an Alice claim through a newly selected
+      // Bob connection, and never send a row that disappeared or was replaced
+      // while its claim was being acquired.
+      if (import.meta.env.MODE === 'test' && _scheduledTestHooks?.beforeClaimValidation) {
+        await _scheduledTestHooks.beforeClaimValidation();
+      }
+      const currentOwner = _scheduledMessageOwner(get());
+      const latestRows = _readScheduledMessages(get().scheduledMessages);
+      const latestById = new Map(latestRows.map((message) => [message.id, message]));
+      const validClaims = claims.filter((message) => {
+        const latest = latestById.get(message.id);
+        return !!currentOwner
+          && _sameScheduledMessageOwner({ serverUrl: owner.serverUrl, identity: owner.identity }, currentOwner)
+          && !!latest
+          && _sameScheduledMessageOwner(latest.owner, owner)
+          && latest.channel === message.channel
+          && latest.text === message.text
+          && latest.sendAt === message.sendAt;
+      });
+      const abandonedClaims = claims.filter((message) => !validClaims.some((valid) => valid.id === message.id));
+      if (import.meta.env.MODE === 'test' && abandonedClaims.length > 0 && _scheduledTestHooks?.beforeAbandonedSettlement) {
+        await _scheduledTestHooks.beforeAbandonedSettlement();
+      }
+      await Promise.all(abandonedClaims.map((message) => settleScheduledClaim(message.id, owner, message.claim!.token, false)));
+      // Settlement is asynchronous and may cross an account/socket/row switch.
+      // Revalidate all delivery authority immediately before entering the real
+      // send path; an old Alice claim must never use Bob's transport.
+      const postSettlementOwner = _scheduledMessageOwner(get());
+      const postSettlementRows = _readScheduledMessages(get().scheduledMessages);
+      const deliveryFenceIntact = (
+        _accountGeneration !== dispatchAccountGeneration
+        || get().client !== dispatchClient
+        || dispatchClient?.socketGeneration !== dispatchSocketGeneration
+        || get().connectionStatus !== 'connected'
+        || !postSettlementOwner
+        || !_sameScheduledMessageOwner(postSettlementOwner, owner)
+        || validClaims.some((message) => {
+          const latest = postSettlementRows.find((row) => row.id === message.id);
+          return !latest || !_sameScheduledMessageOwner(latest.owner, owner)
+            || latest.channel !== message.channel || latest.text !== message.text
+            || latest.sendAt !== message.sendAt;
+        })
+      );
+      if (deliveryFenceIntact) {
+        // No transport call has happened yet, so these claims are definitely
+        // unsent. Release them; uncertainty claims are handled only after the
+        // real transport admission below.
+        await Promise.all(validClaims.map((message) => settleScheduledClaim(
+          message.id, owner, message.claim!.token, false,
+        )));
+        set(current => ({
+          scheduledMessages: current.scheduledMessages.map((row) => {
+            const released = validClaims.find((message) => message.id === row.id);
+            return released && row.claim?.token === released.claim?.token
+              ? (({ claim: _claim, ...withoutClaim }) => withoutClaim)(row)
+              : row;
+          }),
+        }));
+        for (const message of validClaims) {
+          const released = get().scheduledMessages.find((row) => row.id === message.id);
+          if (released) _patchScheduledLocalRow(message.id, released);
+        }
+        return;
+      }
+      claims = validClaims;
+      if (claims.length === 0) return;
+      const dueById = new Map(claims.map((message) => [message.id, message]));
+      const claimsById = new Map(claims.map((message) => [message.id, message]));
+      const pending = latestRows.map((message) => claimsById.get(message.id) ?? message)
+        .sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
+      // Persist the durable handoff before invoking async admission. A reload
+      // therefore sees a claim instead of a missing row.
+      set(() => ({ scheduledMessages: pending }));
+      for (const message of claims) _patchScheduledLocalRow(message.id, message);
+      const failed: Array<Omit<(typeof claims)[number], 'claim'>> = [];
+      const awaiting: Array<{ message: (typeof claims)[number]; admission: Promise<boolean>; uncertain: { value: boolean } }> = [];
+      const uncertainIds = new Set<string>();
       let sent = 0;
-      for (const m of due) {
+      for (const m of claims) {
+        const uncertainRef = { value: false };
         try {
-          const admission = get().sendMessage(m.channel, m.text);
-          if (admission instanceof Promise) awaiting.push({ message: m, admission });
-          else if (admission === false) failed.push(m);
+          const admission = get().sendMessage(m.channel, m.text, { onUncertain: () => { uncertainRef.value = true; } });
+          if (admission instanceof Promise) awaiting.push({ message: m, admission, uncertain: uncertainRef });
+          else if (admission === false) {
+            // A synchronous false from the live transport is not enough to
+            // prove that no bytes were accepted. Keep the durable claim in
+            // recovery state; only an explicit async rejection is cleanly
+            // removable.
+            uncertainIds.add(m.id);
+            _scheduledAdmissionUncertain.add(uncertainKey(m.id));
+          }
           else sent += 1;
         } catch {
-          failed.push(m);
+          // A thrown send can happen after the transport has accepted bytes.
+          // Keep the claim as an explicit unknown outcome; it is never retried
+          // automatically and remains removable from the UI.
+          uncertainIds.add(m.id);
+          _scheduledAdmissionUncertain.add(uncertainKey(m.id));
+          // Preserve the exact durable claim captured above.  In particular,
+          // do not reconstruct this from a later localStorage read: a sibling
+          // settlement or another tab may have changed the projection while
+          // this transport throw was being classified.
+          set(current => ({ scheduledMessages: current.scheduledMessages.map((row) => row.id === m.id ? { ...row, claim: m.claim } : row) }));
+          _patchScheduledLocalRow(m.id, { ...m, claim: m.claim });
+        }
+        if (uncertainRef.value) { uncertainIds.add(m.id); _scheduledAdmissionUncertain.add(uncertainKey(m.id)); }
+      }
+      // An observer can mark uncertainty while the transport unwinds. Fold
+      // that durable uncertainty marker into this dispatch's outcome set
+      // before the synchronous cleanup can drop the claim.
+      for (const message of claims) {
+        if (_scheduledAdmissionUncertain.has(uncertainKey(message.id))) {
+          uncertainIds.add(message.id);
         }
       }
-      if (failed.length > 0) {
-        set(s => {
-          const next = [...s.scheduledMessages, ...failed].sort((a, b) => a.sendAt - b.sendAt);
-          _persistScheduledMessages(next);
-          return { scheduledMessages: next };
+      // Synchronous admission has settled already; only unresolved promises
+      // keep their durable claims in the queue.
+      const awaitingIds = new Set(awaiting.map(({ message }) => message.id));
+      set(current => {
+        const next = current.scheduledMessages.filter((row) =>
+          !dueById.has(row.id) || awaitingIds.has(row.id) || uncertainIds.has(row.id),
+        ).map((row) => {
+          const claimed = dueById.get(row.id);
+          return claimed && uncertainIds.has(row.id) ? { ...row, claim: claimed.claim } : row;
         });
+        // A transport throw can race the sibling's local projection update;
+        // materialize every uncertain claim from the claim snapshot itself so
+        // the recovery row cannot lose its lease while siblings settle.
+        for (const message of claims) {
+          if (uncertainIds.has(message.id) && !next.some((row) => row.id === message.id)) {
+            next.push(message);
+          }
+        }
+        const withFailed = [...next, ...failed].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
+        for (const message of claims) {
+          if (uncertainIds.has(message.id)) _patchScheduledLocalRow(message.id, { ...message, claim: message.claim });
+          else if (failed.some((row) => row.id === message.id)) _patchScheduledLocalRow(message.id, failed.find((row) => row.id === message.id)!);
+          else if (!awaitingIds.has(message.id) && !uncertainIds.has(message.id)) {
+            _scheduledAdmissionUncertain.delete(uncertainKey(message.id));
+            _patchScheduledLocalRow(message.id, null);
+          }
+        }
+        return { scheduledMessages: withFailed };
+      });
+      // Every synchronous outcome must close the durable claim as well as the
+      // localStorage row. An admitted tombstone prevents a stale tab snapshot
+      // from migrating and replaying the same id later.
+      await Promise.all(claims
+        .filter((message) => !awaitingIds.has(message.id) && !uncertainIds.has(message.id))
+        .map((message) => settleScheduledClaim(
+          message.id,
+          owner,
+          message.claim!.token,
+          !failed.some((row) => row.id === message.id),
+        )));
+      set(current => ({
+        scheduledMessages: current.scheduledMessages.map((row) => {
+          const claimed = claims.find((message) => message.id === row.id);
+          return claimed && uncertainIds.has(row.id) ? { ...row, claim: claimed.claim } : row;
+        }),
+      }));
+      if (failed.length > 0) {
+        // Failure rows were restored above without their claim.
       }
       if (awaiting.length > 0) {
-        void Promise.all(awaiting.map(async ({ message, admission }) => ({
+        let settlementPromises: Promise<boolean>[] = [];
+        void Promise.all(awaiting.map(async ({ message, admission, uncertain }) => ({
           message,
-          admitted: await admission.catch(() => false),
+          outcome: await admission.then((admitted) => uncertain.value ? 'uncertain' as const : admitted ? 'admitted' as const : 'rejected' as const)
+            .catch(() => 'uncertain' as const),
         }))).then((results) => {
-          const rejected = results.filter((result) => !result.admitted).map((result) => result.message);
-          const admitted = results.length - rejected.length;
-          if (rejected.length > 0) {
-            set(current => {
-              const next = [...current.scheduledMessages, ...rejected].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
-              _persistScheduledMessages(next);
-              return { scheduledMessages: next };
+          set(current => {
+            const rejected = results.filter((result) => {
+              if (result.outcome !== 'rejected') return false;
+              const currentRow = current.scheduledMessages.find((row) => row.id === result.message.id);
+              return currentRow?.claim?.token === result.message.claim?.token;
+            }).map((result) => {
+              const { claim: _claim, ...message } = result.message;
+              return message;
             });
-          }
+            const next = current.scheduledMessages.filter((row) => {
+              const claim = dueById.get(row.id);
+              return !claim || row.claim?.token !== claim.claim?.token || results.some((result) =>
+                result.outcome === 'uncertain'
+                && result.message.id === row.id
+                && result.message.claim?.token === row.claim?.token,
+              );
+            });
+            const withRejected = [...next, ...rejected].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
+            for (const result of results) {
+              if (result.outcome === 'rejected') {
+                _scheduledAdmissionUncertain.delete(uncertainKey(result.message.id));
+                _patchScheduledLocalRow(result.message.id, rejected.find((row) => row.id === result.message.id)!);
+              } else if (result.outcome === 'admitted') {
+                _scheduledAdmissionUncertain.delete(uncertainKey(result.message.id));
+                _patchScheduledLocalRow(result.message.id, null);
+              }
+            }
+            settlementPromises = results
+              .filter((result) => result.outcome !== 'uncertain')
+              .map((result) => settleScheduledClaim(
+                result.message.id,
+                owner,
+                result.message.claim!.token,
+                result.outcome === 'admitted',
+              ));
+            return { scheduledMessages: withRejected };
+          });
+          const admitted = results.filter((result) => result.outcome === 'admitted').length;
+          const uncertain = results.filter((result) => result.outcome === 'uncertain').length;
           if (admitted > 0) get().addToast({
             variant: 'success',
             title: admitted === 1 ? 'Scheduled message sent' : `${admitted} scheduled messages sent`,
-            description: 'Delivered at the time you picked.',
+            description: 'Admitted for sending on this device; queue removal is not recipient delivery.',
           });
+          if (uncertain > 0) get().addToast({
+            variant: 'error',
+            title: uncertain === 1 ? 'Scheduled admission uncertain' : `${uncertain} scheduled admissions uncertain`,
+            description: 'The connection outcome is unknown. This row will not be replayed automatically; remove it only if you accept that delivery may have occurred.',
+          });
+        }).catch(() => {
+          // An observer/update failure must not turn an uncertain claim into
+          // an unhandled rejection or trigger an automatic retry.
         });
+        void Promise.all(settlementPromises);
       }
+      if (uncertainIds.size > 0) get().addToast({
+        variant: 'error',
+        title: uncertainIds.size === 1 ? 'Scheduled admission uncertain' : `${uncertainIds.size} scheduled admissions uncertain`,
+        description: 'The connection outcome is unknown. This row will not be replayed automatically; remove it only if you accept that delivery may have occurred.',
+      });
       if (sent === 0) return;
       get().addToast({
         variant: 'success',
         title: sent === 1 ? 'Scheduled message sent' : `${sent} scheduled messages sent`,
-        description: 'Delivered at the time you picked.',
+        description: 'Admitted for sending on this device; queue removal is not recipient delivery.',
       });
     },
     openScheduledMessages: () => set({ showScheduledMessages: true }),
@@ -17060,40 +17712,47 @@ export const store = createStore<OnyxState>()(
       });
     },
 
-    acceptPeerKeyChange(peer) {
+    async acceptPeerKeyChange(peer) {
       const key = peer.toLowerCase();
       const memoryContext = captureDeviceMemoryContext(get());
-      if (!memoryContext) return;
+      if (!memoryContext) return false;
       // Accept only the exact pending key that is still advertised. A stale
       // warning must never re-pin an older key after the directory has advanced.
       const newKey = get().peerKeyChanges.get(key)?.newKey;
-      if (!newKey || get().peerDmKeys.get(key) !== newKey) return;
-      void pinPeerKey(peer, newKey, memoryContext.owner).then((ok) => {
-        // Could not persist the new pin → stay fail-closed, keep the warning.
-        if (!ok) return;
-        // The advertised/pending key can rotate again while IndexedDB persists
-        // the acceptance. Keep that newer warning intact instead of clearing it.
-        if (
-          !isDeviceMemoryContextCurrent(memoryContext, get())
-          || get().peerDmKeys.get(key) !== newKey
-          || get().peerKeyChanges.get(key)?.newKey !== newKey
-        ) return;
-        set(s => {
-          const peerKeyChanges = new Map(s.peerKeyChanges);
-          peerKeyChanges.delete(key);
-          const pendingKeySafetyNumbers = new Map(s.pendingKeySafetyNumbers);
-          pendingKeySafetyNumbers.delete(key);
-          return { peerKeyChanges, pendingKeySafetyNumbers };
-        });
-        // Re-decrypt anything held locked while the key was unverified (messages
-        // sealed to the now-accepted key will open; older ones stay locked).
-        const dm = get().dms.get(key);
-        if (dm) for (const m of dm.messages) {
-          if (m.encrypted && m.plaintext === undefined) get()._decryptDm(key, m.id);
-        }
-        // Refresh the cached safety number — it now binds to the accepted key.
-        void get().loadSafetyNumber(peer);
+      if (!newKey || get().peerDmKeys.get(key) !== newKey) return false;
+      let ok: boolean;
+      try {
+        ok = await pinPeerKey(peer, newKey, memoryContext.owner);
+      } catch {
+        // A persistence rejection is indistinguishable from a failed pin to
+        // callers: stay fail-closed and keep the warning visible.
+        return false;
+      }
+      // Could not persist the new pin → stay fail-closed, keep the warning.
+      if (!ok) return false;
+      // The advertised/pending key can rotate again while IndexedDB persists
+      // the acceptance. Keep that newer warning intact instead of clearing it.
+      if (
+        !isDeviceMemoryContextCurrent(memoryContext, get())
+        || get().peerDmKeys.get(key) !== newKey
+        || get().peerKeyChanges.get(key)?.newKey !== newKey
+      ) return false;
+      set(s => {
+        const peerKeyChanges = new Map(s.peerKeyChanges);
+        peerKeyChanges.delete(key);
+        const pendingKeySafetyNumbers = new Map(s.pendingKeySafetyNumbers);
+        pendingKeySafetyNumbers.delete(key);
+        return { peerKeyChanges, pendingKeySafetyNumbers };
       });
+      // Re-decrypt anything held locked while the key was unverified (messages
+      // sealed to the now-accepted key will open; older ones stay locked).
+      const dm = get().dms.get(key);
+      if (dm) for (const m of dm.messages) {
+        if (m.encrypted && m.plaintext === undefined) get()._decryptDm(key, m.id);
+      }
+      // Refresh the cached safety number — it now binds to the accepted key.
+      void get().loadSafetyNumber(peer);
+      return true;
     },
 
     dismissPeerKeyChange(peer) {
@@ -17112,8 +17771,14 @@ export const store = createStore<OnyxState>()(
       const key = peer.toLowerCase();
       const memoryContext = captureDeviceMemoryContext(get());
       if (!memoryContext) return Promise.resolve(null);
-      return peerSafetyNumber(peer, memoryContext.owner).then((sn) => {
-        if (!isDeviceMemoryContextCurrent(memoryContext, get())) return null;
+      const fenceKey = `${memoryContext.owner.serverUrl}\u0000${memoryContext.owner.identity}\u0000${key}`;
+      const generation = (_safetyNumberGenerations.get(fenceKey) ?? 0) + 1;
+      _safetyNumberGenerations.set(fenceKey, generation);
+      const trustedKey = get().peerDmKeys.get(key) ?? null;
+      return (_peerSafetyNumberForTests?.(peer, memoryContext.owner) ?? peerSafetyNumber(peer, memoryContext.owner)).then((sn) => {
+        if (!isDeviceMemoryContextCurrent(memoryContext, get())
+          || _safetyNumberGenerations.get(fenceKey) !== generation
+          || (get().peerDmKeys.get(key) ?? null) !== trustedKey) return null;
         if (sn == null) return null;
         set(s => {
           const peerSafetyNumbers = new Map(s.peerSafetyNumbers);
@@ -17686,6 +18351,8 @@ export const store = createStore<OnyxState>()(
 // snapshots from live memory immediately, not leave them visible until reload.
 subscribeVerifiedDeviceHistoryClear(() => {
   store.setState({
+    scheduledMessages: [],
+    scheduledProjectionDegraded: false,
     bookmarks: [],
     showBookmarks: false,
     dmPinnedMessages: new Map(),

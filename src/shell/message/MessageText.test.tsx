@@ -5,6 +5,18 @@ import { MessageText, RenderInlineTokens } from './MessageText';
 import type { LinkToken } from '@/lib/format/parseMessage';
 
 describe('MessageText Block-Kit-lite', () => {
+  it('keeps structured controls outside paragraph content', () => {
+    const { container } = render(() => (
+      <MessageText
+        text={'Intro\n[onyx:block] {"title":"Release gate","buttons":[{"label":"Approve","value":"approve"}]}' }
+      />
+    ));
+
+    const group = screen.getByRole('group', { name: 'Release gate' });
+    expect(group.closest('p')).toBeNull();
+    expect(container.querySelector('p')).toBeNull();
+  });
+
   it('renders structured webhook controls and hides the protocol payload line', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {

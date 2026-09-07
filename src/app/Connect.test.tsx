@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor, within } from '@solidjs/testing-library';
-import { Connect } from './Connect';
+import { _setAppShellLoaderForTests, Connect } from './Connect';
 import { NODES, selectBestNode } from './nodes';
 import { store, getState } from '@/lib/store';
 import { preferences, resetPreferences } from '@/lib/prefs/preferences';
@@ -102,6 +102,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  _setAppShellLoaderForTests();
   restorePasskeyEnvironment?.();
   restorePasskeyEnvironment = undefined;
   vi.restoreAllMocks();
@@ -240,6 +241,15 @@ describe('Connect screen rendering', () => {
 // ── Mode switching ─────────────────────────────────────────────────────────────
 
 describe('Mode switching', () => {
+  it('honors only the validated sign-in deep-link flag while retaining invite context', () => {
+    window.history.pushState({}, '', '/app/?join=%23lounge&at=2026-06-30T12%3A00%3A00.000Z&signin=1');
+    render(() => <Connect />);
+    expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'signin');
+    expect(screen.getByLabelText(/account password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/name|account name/i)).toHaveValue('');
+    expect(getState().pendingDeepLinkJoin).toBe('#lounge');
+  });
+
   it('reveals an account password field in Sign in mode', () => {
     render(() => <Connect />);
     clickMode(/sign in/i);
@@ -1118,6 +1128,36 @@ describe('View gating on connectionStatus', () => {
     render(() => <Connect />);
     await waitFor(() => expect(screen.getByTestId('app-shell')).toBeInTheDocument());
     expect(screen.queryByTestId('connect-screen')).not.toBeInTheDocument();
+  });
+
+  it('recovers a rejected AppShell load with a fresh loader and preserves connection state', async () => {
+    store.setState({
+      ...initialState,
+      connectionStatus: 'connected',
+      ourNick: 'kain',
+      networkName: 'Onyx',
+      channels: new Map(),
+      activeView: { kind: 'home' },
+    }, true);
+    let attempts = 0;
+    _setAppShellLoaderForTests(() => {
+      attempts += 1;
+      if (attempts === 1) return Promise.reject(new Error('Failed to fetch dynamically imported module'));
+      return import('@/shell/AppShell');
+    });
+
+    render(() => <Connect />);
+
+    await waitFor(() => expect(screen.getByTestId('stale-chunk-recovery')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /reload the current app/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /continue to home/i })).toHaveAttribute('href', '/');
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+
+    await waitFor(() => expect(screen.getByTestId('app-shell')).toBeInTheDocument());
+    expect(attempts).toBe(2);
+    expect(getState().connectionStatus).toBe('connected');
+    expect(getState().ourNick).toBe('kain');
   });
 
   it('returns to the connect form after disconnect', async () => {

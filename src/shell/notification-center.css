@@ -91,6 +91,12 @@
   font-size: 0.75rem;
   line-height: 1.25;
 }
+.notif-center__explanation {
+  margin: 10px 0 0;
+  color: var(--paper-dim);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
 .notif-center__ledger {
   margin-left: auto;
   font-size: 0.68rem;
@@ -222,6 +228,12 @@
 .notif-center__row[data-unread='true'] {
   border-left-color: var(--lapis);
   background: color-mix(in oklab, var(--lapis) 7%, transparent);
+}
+@media (forced-colors: active) {
+  .notif-center__row[data-unread='true'] { border-left: 3px solid Highlight; }
+  .notif-center__body:focus-visible,
+  .notif-center__dismiss:focus-visible,
+  .notif-center__filter:focus-visible { outline: 2px solid Highlight; }
 }
 .notif-center__row + .notif-center__row { margin-top: 2px; }
 

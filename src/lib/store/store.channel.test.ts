@@ -41,6 +41,7 @@ const memoryServer: Server = {
 function makeClient() {
   return {
     sendRaw: vi.fn((..._args: string[]) => true),
+    destroy: vi.fn(),
     send: vi.fn((_line: string) => true),
     join: vi.fn((_channel: string, _key?: string) => true),
     isupport: { CHANTYPES: '#&', CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'] },
@@ -215,6 +216,7 @@ describe('channel management — raw command dispatch', () => {
       firstLine: 'hey — this is our room',
       sharedInvite: true,
     })).toBe(true);
+    feed(':me JOIN #friends');
     expect(client.join).toHaveBeenCalledWith('#friends', undefined);
     expect(client.sendRaw).toHaveBeenCalledWith(
       'TOPIC',
@@ -258,6 +260,7 @@ describe('channel management — raw command dispatch', () => {
       name: 'quiet',
       sharedInvite: true,
     })).toBe(true);
+    feed(':me JOIN #quiet');
     expect(store.getState().pendingComposerFocusTarget).toBe('#quiet');
     store.getState().clearPendingComposerFocus();
     expect(store.getState().pendingComposerFocusTarget).toBeNull();
@@ -287,6 +290,127 @@ describe('channel management — raw command dispatch', () => {
       { name: '#random', count: 1, topic: 'Off-topic' },
     ]);
     expect(store.getState().channelListLoading).toBe(false);
+  });
+
+  it('retains the committed directory when a refresh disconnects before LISTEND', () => {
+    const client = seed('#general', [makeUser('me')]);
+    store.setState({
+      channelList: [{ name: '#saved', count: 3, topic: 'Saved room' }],
+      channelListCommitted: [{ name: '#saved', count: 3, topic: 'Saved room' }],
+      channelListLoading: false,
+      channelListRequest: null,
+    });
+
+    store.getState().refreshChannelList();
+    feed(':server.test 322 me #new 4 :New room');
+    expect(store.getState().channelList).toEqual([{ name: '#new', count: 4, topic: 'New room' }]);
+    expect(store.getState().channelListRequest).toEqual([{ name: '#new', count: 4, topic: 'New room' }]);
+
+    store.getState().disconnect();
+
+    expect(client.destroy).toHaveBeenCalled();
+    expect(store.getState().channelList).toEqual([{ name: '#saved', count: 3, topic: 'Saved room' }]);
+    expect(store.getState().channelListLoading).toBe(false);
+    expect(store.getState().channelListRequest).toBeNull();
+  });
+
+  it('restores the committed directory when the socket disconnects mid-LIST', () => {
+    class FakeWebSocket {
+      static readonly OPEN = 1;
+      readyState = 1;
+      binaryType = '';
+      onopen: (() => void) | null = null;
+      onmessage: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      close(): void {}
+    }
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+
+    try {
+      store.getState().connect({ url: 'wss://channels.test', nick: 'me' });
+      const committed = [{ name: '#saved', count: 3, topic: 'Saved room' }];
+      store.setState({
+        channelList: committed,
+        channelListCommitted: committed,
+        channelListLoading: true,
+        channelListRequest: [{ name: '#partial', count: 1, topic: 'Partial' }],
+        autoReconnect: false,
+        connectionStatus: 'connected',
+      });
+
+      const client = store.getState().client as unknown as {
+        opts: { onDisconnected?: (reason: string) => void };
+      };
+      client.opts.onDisconnected?.('socket closed');
+
+      expect(store.getState().channelList).toEqual(committed);
+      expect(store.getState().channelListLoading).toBe(false);
+      expect(store.getState().channelListRequest).toBeNull();
+    } finally {
+      store.getState().disconnect();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('clears a timed-out LIST quarantine across reconnect and ignores the old burst', () => {
+    class FakeWebSocket {
+      static readonly OPEN = 1;
+      readyState = 0;
+      binaryType = '';
+      onopen: (() => void) | null = null;
+      onmessage: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      close(): void {}
+    }
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.useFakeTimers();
+
+    try {
+      store.getState().connect({ url: 'wss://channels.test', nick: 'me' });
+      const client = store.getState().client as unknown as {
+        opts: { onConnected?: () => void; onDisconnected?: (reason: string) => void };
+      };
+      store.setState({ connectionStatus: 'connected' });
+      store.getState().refreshChannelList();
+      vi.advanceTimersByTime(15_000);
+      expect(store.getState().channelListLoading).toBe(false);
+
+      client.opts.onDisconnected?.('socket closed');
+      client.opts.onConnected?.();
+      store.setState({ client: makeClient() as never, connectionStatus: 'connected' });
+      store.getState().refreshChannelList();
+      expect(store.getState().channelListLoading).toBe(true);
+      // The current client can start another fresh LIST after the old
+      // quarantine was cleared by reconnect. Old socket callbacks are detached
+      // by IRCClient, so late numerics from that socket never reach the store.
+      store.setState({ channelListLoading: false, channelListRequest: null });
+      store.getState().refreshChannelList();
+      expect(store.getState().channelListLoading).toBe(true);
+    } finally {
+      vi.useRealTimers();
+      store.getState().disconnect();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps a pending create until its matching self-JOIN', () => {
+    const client = seed('#general', [makeUser('me')]);
+
+    expect(store.getState().createRoom({ name: '#new', sharedInvite: true })).toBe(true);
+    feed(':me JOIN #other');
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#other' });
+    feed(':me JOIN #new');
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#new' });
+    expect(client.join).toHaveBeenCalledWith('#new', undefined);
+  });
+
+  it('routes channel-full rejection through the join prompt', () => {
+    seed('#general', [makeUser('me')]);
+    feed(':server.test 471 me #full :Channel is full');
+    expect(store.getState().channelJoinPrompt).toEqual({ channel: '#full', error: 'This room is full' });
   });
 
   it('tags outbound messages with the active named conversation', () => {
@@ -325,7 +449,10 @@ describe('channel management — raw command dispatch', () => {
 
     store.getState().sendMessage('#general', 'line one\nline two');
 
-    expect(client.send).toHaveBeenCalledWith(expect.stringMatching(/^@onyx\/topic=roadmap;\+draft\/reply=parent-1 BATCH \+/));
+    expect(client.send).toHaveBeenCalledWith(
+      expect.stringMatching(/^@onyx\/topic=roadmap;\+draft\/reply=parent-1 BATCH \+/),
+      expect.objectContaining({ onUncertain: expect.any(Function) }),
+    );
   });
 
   it('adds a follow notification for followed channel topics', () => {

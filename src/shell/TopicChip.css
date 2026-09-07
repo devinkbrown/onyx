@@ -36,6 +36,7 @@
     background var(--dur) var(--ease),
     color var(--dur) var(--ease),
     transform var(--dur) var(--ease);
+  isolation: isolate;
 }
 
 button.topic-chip {
@@ -91,6 +92,26 @@ button.topic-chip.is-active:hover {
   white-space: nowrap;
 }
 
+.topic-chip__state {
+  flex: none;
+  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.topic-chip.is-loading {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.topic-chip.is-missing,
+.topic-chip.is-deleted {
+  border-style: dashed;
+  color: var(--paper-mute);
+}
+
 .topic-chip__unread {
   flex: none;
   min-width: 1.25rem;
@@ -106,6 +127,35 @@ button.topic-chip.is-active:hover {
 .topic-chip.is-active .topic-chip__unread {
   background: color-mix(in oklab, var(--ink) 22%, transparent);
   color: var(--ink);
+}
+
+@media (max-width: 34rem) {
+  .topic-filter-bar {
+    gap: var(--space-1);
+  }
+
+  .topic-chip {
+    max-width: min(100%, 14rem);
+    padding-block: 0.42rem;
+  }
+
+  .topic-chip__state {
+    font-size: 0.58rem;
+  }
+}
+
+@media (forced-colors: active) {
+  .topic-chip,
+  .topic-chip.is-active {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+    box-shadow: none;
+  }
+
+  .topic-chip:focus-visible {
+    outline: 2px solid Highlight;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

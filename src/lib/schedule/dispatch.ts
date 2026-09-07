@@ -30,6 +30,11 @@ export interface ScheduledMessage {
   readonly sendAt: number;
   /** Legacy rows have no owner and are preserved but never auto-dispatched. */
   readonly owner: ScheduledMessageOwner | null;
+  /** Durable dispatcher claim; present only while async admission is pending. */
+  readonly claim?: { readonly token: string; readonly claimedAt: number };
+  /** Owner retirement generation captured when this row was created. */
+  readonly generation?: number;
+  readonly clearEpoch?: number;
 }
 
 export const MAX_SCHEDULED_MESSAGES = 256;
@@ -76,7 +81,7 @@ export function parseScheduledMessages(raw: string | null): ScheduledMessage[] {
   for (const value of parsed) {
     if (messages.length >= MAX_SCHEDULED_MESSAGES) break;
     if (!isRecord(value)) continue;
-    const { id, channel, text, sendAt } = value;
+    const { id, channel, text, sendAt, generation, clearEpoch } = value;
     if (
       typeof id !== 'string'
       || id.length === 0
@@ -92,8 +97,20 @@ export function parseScheduledMessages(raw: string | null): ScheduledMessage[] {
       || !Number.isSafeInteger(sendAt)
       || sendAt <= 0
     ) continue;
+    const parsedGeneration = typeof generation === 'number' ? generation : undefined;
+    if (generation !== undefined && (parsedGeneration === undefined || !Number.isSafeInteger(parsedGeneration) || parsedGeneration < 0)) continue;
+    const parsedClearEpoch = typeof clearEpoch === 'number' ? clearEpoch : undefined;
+    if (clearEpoch !== undefined && (parsedClearEpoch === undefined || !Number.isSafeInteger(parsedClearEpoch) || parsedClearEpoch < 0)) continue;
     ids.add(id);
-    messages.push({ id, channel, text, sendAt, owner: parseOwner(value.owner) });
+    const claimValue = value.claim;
+    const claim = isRecord(claimValue)
+      && typeof claimValue.token === 'string' && claimValue.token.length > 0
+      && claimValue.token.length <= MAX_SCHEDULED_ID_LENGTH
+      && typeof claimValue.claimedAt === 'number' && Number.isSafeInteger(claimValue.claimedAt)
+      && claimValue.claimedAt > 0
+      ? { token: claimValue.token, claimedAt: claimValue.claimedAt }
+      : undefined;
+    messages.push({ id, channel, text, sendAt, owner: parseOwner(value.owner), ...(claim ? { claim } : {}), ...(parsedGeneration !== undefined ? { generation: parsedGeneration } : {}), ...(parsedClearEpoch !== undefined ? { clearEpoch: parsedClearEpoch } : {}) });
   }
   return messages.sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
 }

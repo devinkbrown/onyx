@@ -76,6 +76,7 @@ import {
   shouldIgnoreRowGestureClick,
 } from '@/shell/message/rowGesture';
 import '@/shell/message/row-gesture.css';
+import './message-view-commercial.css';
 import { activeMessageSearchResultId, openMessageSearchWithQuery } from './search/useMessageSearch';
 import { TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
@@ -1175,6 +1176,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   // ── scroll state ──
   let feedEl!: HTMLDivElement;
   const [atBottom, setAtBottom] = createSignal(true);
+  const connectionStatus = useStore((s) => s.connectionStatus);
 
   // ── bounded render window ──
   // windowSize is the finite render capacity (never Infinity). pageStart is an
@@ -1772,6 +1774,21 @@ export function MessageView(props: MessageViewProps): JSX.Element {
 
   return (
     <main class="shell-messages" aria-label="Messages">
+      <Show when={connectionStatus() !== 'connected'}>
+        <div
+          class="message-view-status-banner"
+          role="status"
+          data-testid="message-view-connection-status"
+          data-status={connectionStatus()}
+        >
+          <span class="message-view-status-dot" aria-hidden="true" />
+          <span>
+            {connectionStatus() === 'connecting' || connectionStatus() === 'reconnecting'
+              ? 'Connecting — new messages will appear when you’re back.'
+              : 'You’re offline — showing messages already on this device.'}
+          </span>
+        </div>
+      </Show>
       <section
         class="shell-conversation-brief sr-only"
         aria-label={`Current conversation: ${conversationBrief().label}${conversationBrief().topic ? `, topic ${conversationBrief().topic}` : ''}, ${conversationBrief().detail}`}

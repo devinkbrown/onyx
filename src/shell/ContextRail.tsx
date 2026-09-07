@@ -5,22 +5,48 @@
  * It projects the selected room and public aggregate insights only; message,
  * member, and transport state continue to live in their existing surfaces.
  */
-import { createEffect, createMemo, Show, splitProps, type JSX } from 'solid-js';
+import { createComponent, createEffect, createMemo, createResource, createSignal, ErrorBoundary, Show, Suspense, splitProps, type Component, type JSX } from 'solid-js';
 import { useStore } from '@/lib/store';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
-import { RoomInsightsStrip } from './RoomInsightsStrip';
-import { ModerationCockpit } from './ModerationCockpit';
-import { OperDesk } from './OperDesk';
-import { OperEventConsole } from './OperEventConsole';
+type LoadedModule<P extends object = object> = { default: Component<P> };
+
+function RetryableSurface<P extends object>(props: {
+  label: string;
+  loader: () => Promise<LoadedModule<P>>;
+  componentProps: P;
+}): JSX.Element {
+  const [attempt, setAttempt] = createSignal(0);
+  // The loader is intentionally stable; `attempt` is the only reactive input.
+  // eslint-disable-next-line solid/reactivity
+  const [loaded] = createResource(attempt, () => props.loader());
+  return (
+    <ErrorBoundary fallback={(_error, reset) => (
+      <p class="shell-lazy-state" role="alert">
+        {props.label} failed.{' '}
+        <button type="button" onClick={() => { setAttempt((value) => value + 1); reset(); }}>Retry</button>{' '}
+      </p>
+    )}>
+      <Suspense fallback={<p class="shell-lazy-state" role="status">Loading {props.label.toLowerCase()}…</p>}>
+        <Show when={loaded()} keyed>{(module) => createComponent(module.default, props.componentProps)}</Show>
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+const roomInsightsLoader = () => import('./RoomInsightsStrip').then((m) => ({ default: m.RoomInsightsStrip }));
+const moderationLoader = () => import('./ModerationCockpit').then((m) => ({ default: m.ModerationCockpit }));
+const operDeskLoader = () => import('./OperDesk').then((m) => ({ default: m.OperDesk }));
+const operEventConsoleLoader = () => import('./OperEventConsole').then((m) => ({ default: m.OperEventConsole }));
 import { preferences } from '@/lib/prefs/preferences';
 
 export type ContextRailProps = {
   open: boolean;
+  modal?: boolean;
   onClose: () => void;
 };
 
 export function ContextRail(props: ContextRailProps): JSX.Element {
-  const [local] = splitProps(props, ['open', 'onClose']);
+  const [local] = splitProps(props, ['open', 'modal', 'onClose']);
   let railRef: HTMLElement | undefined;
   const activeView = useStore((s) => s.activeView);
   const isOper = useStore((s) => s.isOper);
@@ -60,6 +86,8 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
       id="shell-context-rail"
       aria-label="Room context"
       aria-hidden={local.open ? undefined : 'true'}
+      aria-modal={local.modal && local.open ? 'true' : undefined}
+      role={local.modal ? 'dialog' : 'complementary'}
       data-open={local.open ? 'true' : 'false'}
       onKeyDown={(event) => {
         if (event.key !== 'Escape') return;
@@ -89,19 +117,24 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
         </button>
       </div>
       <Show when={activeView().kind === 'channel'} fallback={<p class="shell-context-rail__empty">Select a room to see its shared context.</p>}>
+        <Show when={local.open}>
         <>
-          <RoomInsightsStrip />
+          <RetryableSurface label="Room insights" loader={roomInsightsLoader} componentProps={{}} />
           <Show when={experienceMode() !== 'standard'}>
             <>
-              <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
+              <Show when={activeView()} keyed>
+                {(view) => view.kind === 'channel' ? (
+                  <RetryableSurface label="Room tools" loader={moderationLoader} componentProps={{ channel: view.channel }} />
+                ) : null}
+              </Show>
               {/* Operator surfaces follow the grant, not the experience mode: an
                   oper who prefers the calmer advanced layout still needs the desk
                   and the event feed, and gating them behind network-ops hid the
                   only UI for the store's operAction. */}
               <Show when={isOper()}>
                 <>
-                  <OperDesk />
-                  <OperEventConsole />
+                  <RetryableSurface label="Operator desk" loader={operDeskLoader} componentProps={{}} />
+                  <RetryableSurface label="Operator events" loader={operEventConsoleLoader} componentProps={{}} />
                 </>
               </Show>
               <Show when={experienceMode() === 'network-ops' && !isOper()}>
@@ -110,6 +143,7 @@ export function ContextRail(props: ContextRailProps): JSX.Element {
             </>
           </Show>
         </>
+        </Show>
       </Show>
     </aside>
   );

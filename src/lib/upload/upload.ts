@@ -15,7 +15,12 @@ export type UploadOptions = {
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
   onProgress?: (progress: UploadProgress) => void;
+  /** Defense-in-depth: ordinary multipart upload is never a protected-DM upload. */
+  protectedMessage?: boolean;
 };
+
+export const PROTECTED_ATTACHMENT_UPLOAD_BLOCKED =
+  'Protected-DM attachments require encrypted upload admission.';
 
 export const UPLOAD_RESPONSE_MAX_BYTES = 64 * 1024;
 export const UPLOAD_URL_MAX_LENGTH = 2048;
@@ -265,6 +270,9 @@ function uploadWithXhr(file: File, endpoint: string, mediaUrl: string, options: 
 }
 
 export async function uploadFile(file: File, options: UploadOptions = {}): Promise<UploadResult> {
+  if (options.protectedMessage === true) {
+    throw new UploadError(PROTECTED_ATTACHMENT_UPLOAD_BLOCKED, 'config');
+  }
   const mediaUrl = options.mediaUrl?.trim();
   const endpoint = buildUploadEndpoint(options.mediaUrl);
   const responseBaseUrl = mediaUrl || endpoint;

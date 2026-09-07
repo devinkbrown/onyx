@@ -14,7 +14,16 @@
   max-width: min(720px, 100%);
   padding: clamp(28px, 6vh, 72px) clamp(18px, 4vw, 32px) 56px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
+.home-masthead { order: 1; }
+.home-inbox { order: 2; }
+.home-continue { order: 3; }
+.home-outbox { order: 4; }
+.home-catchup--cold { order: 5; }
+.home-empty { order: 6; }
+.home-formation { order: 7; }
 @media (min-width: 960px) {
   .home-inner--ledger {
     max-width: min(1080px, 100%);
@@ -243,6 +252,20 @@
   display: grid;
   gap: 22px;
   margin: 8px 0 32px;
+}
+.home-continue {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 32px;
+}
+.home-continue .home-catchup-head {
+  margin-bottom: 0;
+}
+.home-continue-row {
+  background: color-mix(in oklab, var(--stone) 54%, transparent);
+}
+.home-continue-row .home-inbox-join {
+  color: var(--lapis-bright);
 }
 .home-inbox .home-catchup-head {
   display: flex;

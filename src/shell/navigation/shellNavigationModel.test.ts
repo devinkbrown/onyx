@@ -104,11 +104,11 @@ describe('createShellNavigationModel', () => {
     const nav = within(rendered.container).getByRole('navigation', { name: 'Mobile navigation' });
 
     expect(within(nav).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      '⌂Home',
-      '#Rooms',
-      '@Messages',
-      '◉Calls',
-      '◇You',
+      'Home',
+      'Rooms',
+      'Messages',
+      'Calls',
+      'You',
     ]);
     const you = within(nav).getByRole('button', { name: 'Open You' });
     expect(you).toHaveAttribute('aria-haspopup', 'dialog');

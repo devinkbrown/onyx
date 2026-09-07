@@ -60,7 +60,9 @@ describe('slash command registry', () => {
   it('still resolves operator commands by name so /help can describe them', () => {
     expect(findSlashCommand('kill')?.oper).toBe(true);
     expect(findSlashCommand('wallops')?.name).toBe('broadcast');
-    expect(findSlashCommand('observe')?.usage).toContain('/observe');
+    expect(findSlashCommand('broadcast')?.description).toMatch(/operators subscribed to ANNOUNCE/i);
+    expect(findSlashCommand('broadcast')?.description).not.toMatch(/every member/i);
+    expect(findSlashCommand('observe')?.usage).toContain('join part host');
   });
 
   it('leaves ordinary suggestions untouched when oper status is on', () => {

@@ -29,6 +29,8 @@
   line-height: 1;
 }
 
+.time-scrubber__close { min-height: 32px; margin-left: auto; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: transparent; color: var(--paper-dim); cursor: pointer; }
+
 .time-scrubber__label {
   color: var(--lapis-bright);
   font-size: 0.66rem;

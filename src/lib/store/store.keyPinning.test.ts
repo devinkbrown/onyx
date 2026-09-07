@@ -18,7 +18,7 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store } from './store';
+import { store, _setPeerSafetyNumberTestHookForTests } from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import {
   ENVELOPE_PREFIX,
@@ -101,6 +101,7 @@ const feed = (line: string) => store.getState()._handleMessage(parseIRCMessage(l
 const dmMsgs = (nick: string) => store.getState().dms.get(nick.toLowerCase())?.messages ?? [];
 
 beforeEach(() => {
+  _setPeerSafetyNumberTestHookForTests(null);
   globalThis.indexedDB = new IDBFactory(); // fresh onyx-keys AND onyx-key-pins DBs
   _resetDeviceKeysForTests();
   _resetSharedKeysForTests();
@@ -274,6 +275,17 @@ describe('DM key pinning (TOFU) through the store', () => {
     expect(store.getState().peerKeyChanges.has('trev')).toBe(false);
   });
 
+  it('returns false and keeps the warning when the replacement pin cannot persist', async () => {
+    const invalidKey = 'not-a-valid-public-key';
+    store.setState({
+      peerDmKeys: new Map([['trev', invalidKey]]),
+      peerKeyChanges: new Map([['trev', { pinnedKey: 'old-key', newKey: invalidKey }]]),
+    });
+
+    await expect(store.getState().acceptPeerKeyChange('trev')).resolves.toBe(false);
+    expect(store.getState().peerKeyChanges.get('trev')?.newKey).toBe(invalidKey);
+  });
+
   it('exposes a stable safety number for a pinned peer, and null before any pin', async () => {
     const mine = await deviceKeys();
     const peer = await makePeer(mine!.publicB64);
@@ -328,5 +340,33 @@ describe('DM key pinning (TOFU) through the store', () => {
 
     // No pending change → null.
     expect(await store.getState().loadPendingKeySafetyNumber('nobody')).toBeNull();
+  });
+
+  it('rejects stale safety-number completions after trusted-key rotation', async () => {
+    const oldNumber = '00000 00000 00000 00000 00000 00000 00000 00000 00000 00000 00000 00000';
+    const newNumber = '99999 99999 99999 99999 99999 99999 99999 99999 99999 99999 99999 99999';
+    let resolveOld!: (value: string | null) => void;
+    let resolveNew!: (value: string | null) => void;
+    let calls = 0;
+    _setPeerSafetyNumberTestHookForTests(() => {
+      calls += 1;
+      return new Promise<string | null>((resolve) => {
+        if (calls === 1) resolveOld = resolve;
+        else resolveNew = resolve;
+      });
+    });
+    store.setState({
+      server: { ...store.getState().server!, account: 'alice' },
+      ourNick: 'alice',
+      peerDmKeys: new Map([['trev', 'trusted-key-a']]),
+    });
+    const older = store.getState().loadSafetyNumber('trev');
+    store.setState({ peerDmKeys: new Map([['trev', 'trusted-key-b']]) });
+    const newer = store.getState().loadSafetyNumber('trev');
+    resolveNew(newNumber);
+    expect(await newer).toBe(newNumber);
+    resolveOld(oldNumber);
+    expect(await older).toBeNull();
+    expect(store.getState().peerSafetyNumbers.get('trev')).toBe(newNumber);
   });
 });

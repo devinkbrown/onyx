@@ -23,6 +23,7 @@ import {
   normalizeDeviceMemoryOwner,
   type DeviceMemoryOwner,
 } from '@/lib/deviceMemoryOwner';
+import { safeStorage, type SafeStorage } from '@/lib/prefs/preferences';
 import { clearDeviceTopicReads } from '@/lib/topics/topicReadLedger';
 import { clearDeviceTopicHistory } from '@/lib/topics/topicHistory';
 import { clearDeviceDMPins } from '@/lib/dmPins';
@@ -41,10 +42,18 @@ import {
 } from './dmSearchPrivacy';
 
 const DB_NAME = 'onyx-vault';
-const DB_VERSION = 4;
+const DB_VERSION = 6;
 const STORE = 'messages';
 const OUTBOX = 'outbox';
+const SCHEDULED = 'scheduled';
+const VAULT_META = 'vault_meta';
+let cachedEraseEpoch = 0;
+let writeReservationSeq = 0;
 export const VAULT_KEEP = 400;
+
+function noteCachedEraseEpoch(epoch: number): void {
+  if (epoch > cachedEraseEpoch) cachedEraseEpoch = epoch;
+}
 /**
  * Global work cap for one cross-conversation search pass. Per-target retention
  * alone is not a global bound: a device can remember thousands of targets.
@@ -129,6 +138,8 @@ export interface VaultExportSnapshot {
 export { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 export type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 export type OutboxOwner = DeviceMemoryOwner;
+export type ScheduledClaim = { token: string; claimedAt: number };
+export type ScheduledVaultRow = { id: string; channel: string; text: string; sendAt: number; owner: DeviceMemoryOwner | null; claim?: ScheduledClaim; generation?: number; clearEpoch?: number };
 
 function physicalTargetKey(target: string, owner?: DeviceMemoryOwner): string {
   const logical = target.toLowerCase();
@@ -194,12 +205,15 @@ export interface OutboxEntry {
    * Reload must never re-send these — only retry prune.
    */
   wire_admitted?: true;
+  /** Durable same-origin claim fence. Claims are never silently reclaimed. */
+  claim?: { token: string; claimedAt: number };
 }
 
 /** Metadata-only outbox invalidation; message text is deliberately excluded. */
 export type OutboxChange =
   | Readonly<{ kind: 'queued' }>
   | Readonly<{ kind: 'deleted' }>
+  | Readonly<{ kind: 'changed' }>
   | Readonly<{ kind: 'cleared' }>;
 
 export type OutboxListener = (change: OutboxChange) => void;
@@ -277,39 +291,1101 @@ let dbPromise: Promise<IDBDatabase | null> | null = null;
 
 function openVault(): Promise<IDBDatabase | null> {
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve) => {
+  const opening = new Promise<IDBDatabase | null>((resolve) => {
     try {
       if (typeof indexedDB === 'undefined') return resolve(null);
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
-        const db = req.result;
-        let messageStore: IDBObjectStore | null;
-        if (!db.objectStoreNames.contains(STORE)) {
-          messageStore = db.createObjectStore(STORE, { keyPath: ['target_key', 'id'] });
-          messageStore.createIndex('by_target_time', ['target_key', 'time']);
-        } else {
-          messageStore = req.transaction?.objectStore(STORE) ?? null;
-        }
-        if (messageStore && !messageStore.indexNames.contains('by_time')) {
-          messageStore.createIndex('by_time', 'time');
-        }
-        if (messageStore && !messageStore.indexNames.contains('by_owner_time')) {
-          // Legacy rows have no owner_key and therefore do not enter this index.
-          // They remain physically clearable but cannot surface in an owned scan.
-          messageStore.createIndex('by_owner_time', ['owner_key', 'time']);
-        }
-        if (!db.objectStoreNames.contains(OUTBOX)) {
-          db.createObjectStore(OUTBOX, { keyPath: 'id' });
+        try {
+          const db = req.result;
+          let messageStore: IDBObjectStore | null;
+          if (!db.objectStoreNames.contains(STORE)) {
+            messageStore = db.createObjectStore(STORE, { keyPath: ['target_key', 'id'] });
+            messageStore.createIndex('by_target_time', ['target_key', 'time']);
+          } else {
+            messageStore = req.transaction?.objectStore(STORE) ?? null;
+          }
+          if (messageStore && !messageStore.indexNames.contains('by_time')) {
+            messageStore.createIndex('by_time', 'time');
+          }
+          if (messageStore && !messageStore.indexNames.contains('by_owner_time')) {
+            // Legacy rows have no owner_key and therefore do not enter this index.
+            // They remain physically clearable but cannot surface in an owned scan.
+            messageStore.createIndex('by_owner_time', ['owner_key', 'time']);
+          }
+          if (!db.objectStoreNames.contains(OUTBOX)) {
+            db.createObjectStore(OUTBOX, { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains(SCHEDULED)) db.createObjectStore(SCHEDULED, { keyPath: 'id' });
+          if (!db.objectStoreNames.contains(VAULT_META)) db.createObjectStore(VAULT_META, { keyPath: 'id' });
+        } catch {
+          try {
+            req.transaction?.abort();
+          } catch {
+            // The request will report the upgrade failure if it is already inactive.
+          }
         }
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        const invalidate = () => {
+          if (dbPromise === opening) dbPromise = null;
+        };
+        db.onversionchange = () => {
+          try {
+            db.close();
+          } catch {
+            // The browser may have closed it already.
+          }
+          invalidate();
+        };
+        db.onclose = invalidate;
+        resolve(db);
+      };
       req.onerror = () => resolve(null);
-      req.onblocked = () => resolve(null);
+      // Keep this single open request pending while another connection owns
+      // the upgrade. Once that connection closes, IndexedDB delivers
+      // `onsuccess`; resolving null here would poison dbPromise for the rest
+      // of the module lifetime and make the vault permanently unavailable.
+      req.onblocked = () => {};
     } catch {
       resolve(null);
     }
   });
-  return dbPromise;
+  dbPromise = opening;
+  // A failed open is recoverable state, not a permanent capability decision.
+  // Keep concurrent callers on the same attempt, then discard only that failed
+  // attempt so a later operation can retry after the browser unblocks storage.
+  void opening.then((db) => {
+    if (!db && dbPromise === opening) dbPromise = null;
+  }, () => {
+    if (dbPromise === opening) dbPromise = null;
+  });
+  return opening;
+}
+
+function scheduledOwnerKey(owner: DeviceMemoryOwner | null): string { return owner ? (deviceMemoryOwnerKey(owner) ?? 'legacy') : 'legacy'; }
+function scheduledRowKey(row: ScheduledVaultRow): string { return `${scheduledOwnerKey(row.owner)}\u0000${row.id}`; }
+function scheduledCopy(row: ScheduledVaultRow): ScheduledVaultRow { return { ...row, owner: row.owner ? { ...row.owner } : null, ...(row.claim ? { claim: { ...row.claim } } : {}) }; }
+
+type ScheduledStoredRow = {
+  id: string;
+  owner?: DeviceMemoryOwner | null;
+  generation?: number;
+  clearEpoch?: number;
+  claim?: ScheduledClaim;
+  channel?: string;
+  text?: string;
+  sendAt?: number;
+  status?: 'canceled' | 'admitted';
+  statusAt?: number;
+};
+
+function scheduledStoredKey(owner: DeviceMemoryOwner, id: string): string {
+  return `${scheduledOwnerKey(owner)}\u0000${id}`;
+}
+
+function ownerGenerationKey(owner: DeviceMemoryOwner): string { return `owner-generation:${scheduledOwnerKey(owner)}`; }
+
+function scheduledVisibleRow(raw: ScheduledStoredRow): ScheduledVaultRow | null {
+  if (raw.status || typeof raw.channel !== 'string' || typeof raw.text !== 'string' || typeof raw.sendAt !== 'number') return null;
+  const separator = raw.id.indexOf('\u0000');
+  if (separator < 0) return null;
+  return scheduledCopy({ id: raw.id.slice(separator + 1), channel: raw.channel, text: raw.text, sendAt: raw.sendAt, owner: raw.owner ?? null, ...(raw.claim ? { claim: raw.claim } : {}), ...(raw.generation !== undefined ? { generation: raw.generation } : {}), ...(raw.clearEpoch !== undefined ? { clearEpoch: raw.clearEpoch } : {}) });
+}
+
+const CLEAR_EPOCH_KEY = 'clear-epoch';
+const WRITE_RESERVATION_PREFIX = 'message-write:';
+/** Same-origin control metadata only; values never contain vault payloads. */
+const SYNC_CLEAR_EPOCH_KEY = 'onyx:vault:clear-epoch';
+const SYNC_CLEAR_FENCE_KEY = 'onyx:vault:clear-fence';
+const SYNC_CLEAR_PENDING_KEY = 'onyx:vault:clear-pending';
+const SYNC_WRITE_INTENT_PREFIX = 'onyx:vault:write-intent:';
+
+export type VaultWriteIntent = Readonly<{
+  token: string;
+  expectedEraseEpoch: number;
+}>;
+
+export type VaultWriteReservation = Readonly<{
+  token: string;
+  eraseEpoch: number;
+}>;
+
+type StoredWriteReservation = {
+  id: string;
+  kind: 'message-write';
+  epoch: number;
+};
+
+type SynchronousWriteIntentRecord = Readonly<{
+  epoch: number;
+  fence: string;
+}>;
+
+type SynchronousClearPendingRecord = Readonly<{
+  epoch: number;
+  fence: string;
+}>;
+
+function writeReservationKey(token: string): string {
+  return `${WRITE_RESERVATION_PREFIX}${token}`;
+}
+
+function syncWriteIntentKey(token: string): string {
+  return `${SYNC_WRITE_INTENT_PREFIX}${token}`;
+}
+
+function localVaultStorage(): SafeStorage | null {
+  return safeStorage();
+}
+
+function parseSyncEpoch(raw: string | null): number | null {
+  if (raw === null) return 0;
+  const epoch = Number(raw);
+  return Number.isSafeInteger(epoch) && epoch >= 0 ? epoch : null;
+}
+
+function readSynchronousClearEpoch(storage: SafeStorage): number | null {
+  const raw = storage.getItem(SYNC_CLEAR_EPOCH_KEY);
+  return storage.failed ? null : parseSyncEpoch(raw);
+}
+
+function ensureSynchronousClearFence(storage: SafeStorage): string | null {
+  for (let attempt = 0; attempt < SYNCHRONOUS_CONTROL_RETRIES; attempt += 1) {
+    const current = readSynchronousControlVersion(storage);
+    if (!current) return null;
+    if (current.fence) return current.fence;
+    const fence = newWriteReservationToken();
+    const result = mutateSynchronousControlIfCurrent(
+      storage,
+      current,
+      () => {
+        const latest = readSynchronousControlVersion(storage);
+        if (!latest || latest.epoch !== current.epoch || latest.fence !== current.fence) return 'superseded';
+        return storage.setItem(SYNC_CLEAR_FENCE_KEY, fence);
+      },
+      (version) => version.fence === fence && version.epoch >= current.epoch,
+    );
+    if (result === 'applied') return fence;
+    if (result === 'failed') return null;
+  }
+  return null;
+}
+
+function encodeSynchronousWriteIntent(record: SynchronousWriteIntentRecord): string {
+  return JSON.stringify([record.epoch, record.fence]);
+}
+
+function parseSynchronousWriteIntent(raw: string | null): SynchronousWriteIntentRecord | null {
+  if (raw === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      !Array.isArray(parsed)
+      || parsed.length !== 2
+      || !Number.isSafeInteger(parsed[0])
+      || parsed[0] < 0
+      || typeof parsed[1] !== 'string'
+      || parsed[1].length === 0
+    ) return null;
+    return { epoch: parsed[0], fence: parsed[1] };
+  } catch {
+    return null;
+  }
+}
+
+function parseSynchronousClearPending(raw: string | null): SynchronousClearPendingRecord | null {
+  const parsed = parseSynchronousWriteIntent(raw);
+  return parsed ? { epoch: parsed.epoch, fence: parsed.fence } : null;
+}
+
+const SYNCHRONOUS_CONTROL_RETRIES = 4;
+type SynchronousControlVersion = Readonly<{ epoch: number; fence: string | null }>;
+type SynchronousControlMutation = 'applied' | 'superseded' | 'failed';
+type SynchronousControlMutationResult = boolean | 'superseded';
+
+function readSynchronousControlVersion(storage: SafeStorage): SynchronousControlVersion | null {
+  const epoch = readSynchronousClearEpoch(storage);
+  const fence = storage.getItem(SYNC_CLEAR_FENCE_KEY);
+  if (storage.failed || epoch === null) return null;
+  return { epoch, fence };
+}
+
+/** Read twice so a cross-context replacement between reads is observed. */
+function synchronousControlVersionIsCurrent(
+  storage: SafeStorage,
+  expected: SynchronousControlVersion,
+): boolean {
+  const first = readSynchronousControlVersion(storage);
+  if (!first || first.epoch !== expected.epoch || first.fence !== expected.fence) return false;
+  const second = readSynchronousControlVersion(storage);
+  return second !== null
+    && second.epoch === expected.epoch
+    && second.fence === expected.fence;
+}
+
+/**
+ * localStorage has no native compare-and-swap. Revalidate immediately before
+ * each mutation and after it; callers retry from a fresh snapshot when a newer
+ * clear supersedes this operation.
+ */
+function mutateSynchronousControlIfCurrent(
+  storage: SafeStorage,
+  expected: SynchronousControlVersion,
+  mutation: () => SynchronousControlMutationResult,
+  verifyAfter: (version: SynchronousControlVersion) => boolean = (version) =>
+    version.fence === expected.fence && version.epoch >= expected.epoch,
+): SynchronousControlMutation {
+  if (!synchronousControlVersionIsCurrent(storage, expected)) return 'superseded';
+  let result: SynchronousControlMutationResult;
+  try {
+    result = mutation();
+  } catch {
+    return 'failed';
+  }
+  if (result === 'superseded') return result;
+  if (!result || storage.failed) return 'failed';
+  const after = readSynchronousControlVersion(storage);
+  if (!after) return 'failed';
+  return verifyAfter(after) ? 'applied' : 'superseded';
+}
+
+function setSynchronousEpochAtLeast(
+  storage: SafeStorage,
+  expected: SynchronousControlVersion,
+  epoch: number,
+): SynchronousControlMutationResult {
+  const current = readSynchronousControlVersion(storage);
+  if (!current || current.fence !== expected.fence || current.epoch < expected.epoch) return 'superseded';
+  if (current.epoch >= epoch) return true;
+  return storage.setItem(SYNC_CLEAR_EPOCH_KEY, String(epoch));
+}
+
+function removeSynchronousClearPendingIfCurrent(
+  storage: SafeStorage,
+  expected: SynchronousControlVersion,
+  fence: string,
+  maxEpoch: number,
+): SynchronousControlMutation {
+  return mutateSynchronousControlIfCurrent(storage, expected, () => {
+    const pending = parseSynchronousClearPending(storage.getItem(SYNC_CLEAR_PENDING_KEY));
+    if (storage.failed) return false;
+    if (!pending || pending.fence !== fence || pending.epoch > maxEpoch) return true;
+    const current = readSynchronousControlVersion(storage);
+    if (!current || current.fence !== expected.fence || current.epoch < expected.epoch) return 'superseded';
+    return storage.removeItem(SYNC_CLEAR_PENDING_KEY);
+  });
+}
+
+function removeSynchronousWriteIntentsExcept(
+  storage: SafeStorage,
+  epoch: number,
+  fence: string,
+): SynchronousControlMutation {
+  const expected = { epoch, fence } satisfies SynchronousControlVersion;
+  const intentKeys: string[] = [];
+  const length = storage.length;
+  if (storage.failed) return 'failed';
+  if (!synchronousControlVersionIsCurrent(storage, expected)) return 'superseded';
+  for (let index = 0; index < length; index += 1) {
+    const key = storage.key(index);
+    if (storage.failed) return 'failed';
+    if (key?.startsWith(SYNC_WRITE_INTENT_PREFIX)) intentKeys.push(key);
+  }
+  for (const key of intentKeys) {
+    const record = parseSynchronousWriteIntent(storage.getItem(key));
+    if (storage.failed) return 'failed';
+    if (record?.epoch !== epoch || record.fence !== fence) {
+      const removed = mutateSynchronousControlIfCurrent(storage, expected, () => {
+        const current = readSynchronousControlVersion(storage);
+        if (!current || current.fence !== fence || current.epoch < epoch) return 'superseded';
+        const latest = parseSynchronousWriteIntent(storage.getItem(key));
+        if (storage.failed) return false;
+        if (latest?.epoch === epoch && latest.fence === fence) return true;
+        return storage.removeItem(key);
+      });
+      if (removed !== 'applied') return removed;
+    }
+  }
+  return synchronousControlVersionIsCurrent(storage, expected) ? 'applied' : 'superseded';
+}
+
+/**
+ * The synchronous mirror is a control-plane fence, not a second vault. It is
+ * intentionally monotonic when learning a durable epoch so an older async read
+ * cannot roll a newer clear back. Clear completion may set the exact durable
+ * epoch when concurrent clears have compressed multiple provisional values.
+ */
+function recordSynchronousClearEpoch(epoch: number): void {
+  for (let attempt = 0; attempt < SYNCHRONOUS_CONTROL_RETRIES; attempt += 1) {
+    const storage = localVaultStorage();
+    if (!storage) return;
+    const current = readSynchronousControlVersion(storage);
+    if (!current) return;
+    if (current.epoch >= epoch) return;
+    const result = mutateSynchronousControlIfCurrent(
+      storage,
+      current,
+      () => setSynchronousEpochAtLeast(storage, current, epoch),
+    );
+    if (result === 'applied' || result === 'failed') return;
+  }
+}
+
+function synchronousIntentIsCurrent(intent: VaultWriteIntent): boolean {
+  const storage = localVaultStorage();
+  if (!storage) return false;
+  const currentFence = storage.getItem(SYNC_CLEAR_FENCE_KEY);
+  const intentRecord = parseSynchronousWriteIntent(storage.getItem(syncWriteIntentKey(intent.token)));
+  if (storage.failed) return false;
+  return readSynchronousClearEpoch(storage) === intent.expectedEraseEpoch
+    && !storage.failed
+    && intentRecord?.epoch === intent.expectedEraseEpoch
+    && intentRecord.fence === currentFence;
+}
+
+function forgetSynchronousWriteIntent(token: string): boolean {
+  const storage = localVaultStorage();
+  if (!storage || typeof token !== 'string' || token.length === 0) return false;
+  return storage.removeItem(syncWriteIntentKey(token));
+}
+
+/**
+ * Register the payload's admission intent before any asynchronous database
+ * open. The key/value contain only an opaque token and expected epoch. This is
+ * the pre-clear linearization point for a pending snapshot: a clear started by
+ * another module can synchronously revoke this token before a delayed IDB
+ * reservation gets a chance to begin.
+ */
+export function beginVaultWriteIntent(): VaultWriteIntent | null {
+  const storage = localVaultStorage();
+  if (!storage) return null;
+  const expectedEraseEpoch = readSynchronousClearEpoch(storage);
+  const fence = ensureSynchronousClearFence(storage);
+  if (expectedEraseEpoch === null || fence === null) return null;
+  const intent: VaultWriteIntent = {
+    token: newWriteReservationToken(),
+    expectedEraseEpoch,
+  };
+  try {
+    storage.setItem(syncWriteIntentKey(intent.token), encodeSynchronousWriteIntent({ epoch: expectedEraseEpoch, fence }));
+    if (!synchronousIntentIsCurrent(intent)) {
+      forgetSynchronousWriteIntent(intent.token);
+      return null;
+    }
+    return intent;
+  } catch {
+    forgetSynchronousWriteIntent(intent.token);
+    return null;
+  }
+}
+
+/** Cancel a pre-admission intent without waiting for a possibly delayed IDB open. */
+export function cancelVaultWriteIntent(intent: VaultWriteIntent): void {
+  if (!intent || typeof intent.token !== 'string') return;
+  forgetSynchronousWriteIntent(intent.token);
+}
+
+type SynchronousClearFence = Readonly<{
+  provisionalEpoch: number;
+  fence: string;
+}>;
+
+/**
+ * Revoke old intents synchronously, before clear opens/queues its IDB
+ * transaction. The epoch marker is written first; an old intent that races the
+ * key enumeration is still rejected by `synchronousIntentIsCurrent`. New
+ * intents created after this point carry the new opaque fence and provisional
+ * epoch; they are left alone and can survive a successful clear, but an intent
+ * from an older/aborted fence cannot become current when a numeric epoch is
+ * reused.
+ */
+function beginSynchronousClearFence(): SynchronousClearFence | null {
+  const storage = localVaultStorage();
+  if (!storage) return null;
+  for (let attempt = 0; attempt < SYNCHRONOUS_CONTROL_RETRIES; attempt += 1) {
+    const previous = readSynchronousControlVersion(storage);
+    if (!previous || previous.epoch === Number.MAX_SAFE_INTEGER) return null;
+    const provisionalEpoch = previous.epoch + 1;
+    const fence = newWriteReservationToken();
+
+    // Install the opaque fence only if the snapshot that supplied the next
+    // epoch is still current. This is the synchronous pre-admission revocation
+    // point; a superseded attempt retries with a fresh fence/epoch.
+    let result = mutateSynchronousControlIfCurrent(
+      storage,
+      previous,
+      () => {
+        const latest = readSynchronousControlVersion(storage);
+        if (!latest || latest.epoch !== previous.epoch || latest.fence !== previous.fence) return 'superseded';
+        return storage.setItem(SYNC_CLEAR_FENCE_KEY, fence);
+      },
+      (version) => version.fence === fence && version.epoch >= previous.epoch,
+    );
+    if (result === 'superseded') continue;
+    if (result === 'failed') return null;
+
+    const withFence = readSynchronousControlVersion(storage);
+    if (!withFence || withFence.fence !== fence) continue;
+    result = mutateSynchronousControlIfCurrent(
+      storage,
+      withFence,
+      () => setSynchronousEpochAtLeast(storage, withFence, provisionalEpoch),
+    );
+    if (result === 'superseded') continue;
+    if (result === 'failed') return null;
+
+    const withEpoch = readSynchronousControlVersion(storage);
+    if (!withEpoch || withEpoch.fence !== fence || withEpoch.epoch < provisionalEpoch) continue;
+    result = mutateSynchronousControlIfCurrent(
+      storage,
+      withEpoch,
+      () => {
+        const latest = readSynchronousControlVersion(storage);
+        if (!latest || latest.epoch !== withEpoch.epoch || latest.fence !== fence) return 'superseded';
+        return storage.setItem(
+          SYNC_CLEAR_PENDING_KEY,
+          encodeSynchronousWriteIntent({ epoch: provisionalEpoch, fence }),
+        );
+      },
+    );
+    if (result === 'superseded') continue;
+    if (result === 'failed') return null;
+
+    // Keep only intents registered after this fence. Each removal revalidates
+    // the fence so a newer tab's intent cannot be discarded.
+    result = removeSynchronousWriteIntentsExcept(storage, withEpoch.epoch, fence);
+    if (result === 'superseded') continue;
+    if (result === 'failed') return null;
+    const finalVersion = readSynchronousControlVersion(storage);
+    if (finalVersion?.fence === fence && finalVersion.epoch >= provisionalEpoch) {
+      return { provisionalEpoch, fence };
+    }
+  }
+  return null;
+}
+
+/** Set the exact durable epoch only when this clear still owns the marker. */
+async function completeSynchronousClearFence(fence: SynchronousClearFence | null, epoch: number): Promise<void> {
+  if (!fence) return;
+  for (let attempt = 0; attempt < SYNCHRONOUS_CONTROL_RETRIES; attempt += 1) {
+    const storage = localVaultStorage();
+    if (!storage) return;
+    const current = readSynchronousControlVersion(storage);
+    if (!current) return;
+    if (current.fence !== fence.fence) {
+      // Another clear owns the current fence. This commit is still durable and
+      // may advance the numeric mirror, but it must not replace that fence or
+      // delete its intents.
+      recordSynchronousClearEpoch(epoch);
+      return;
+    }
+
+    const targetEpoch = Math.max(current.epoch, epoch);
+    if (targetEpoch > current.epoch) {
+      const updated = mutateSynchronousControlIfCurrent(
+        storage,
+        current,
+        () => setSynchronousEpochAtLeast(storage, current, targetEpoch),
+      );
+      if (updated === 'superseded') continue;
+      if (updated === 'failed') return;
+    }
+
+    const afterEpoch = readSynchronousControlVersion(storage);
+    if (!afterEpoch || afterEpoch.fence !== fence.fence) continue;
+    const cleaned = removeSynchronousWriteIntentsExcept(storage, afterEpoch.epoch, fence.fence);
+    if (cleaned === 'superseded') continue;
+    if (cleaned === 'failed') return;
+    const pending = removeSynchronousClearPendingIfCurrent(
+      storage,
+      afterEpoch,
+      fence.fence,
+      afterEpoch.epoch,
+    );
+    if (pending === 'superseded') continue;
+    if (pending === 'failed') return;
+    if (synchronousControlVersionIsCurrent(storage, afterEpoch)) return;
+  }
+}
+
+/**
+ * A failed clear must not claim a durable new epoch. Reconcile the provisional
+ * epoch from IDB when possible, but keep the new opaque fence nonce. Intents
+ * from the failed fence are deliberately not resurrected; a later genuine
+ * mutation registers a fresh intent after the durable epoch is known. An
+ * already durable reservation remains usable because the clear transaction
+ * never reached its linearization point and therefore did not remove its row.
+ */
+async function reconcileAbortedSynchronousClear(fence: SynchronousClearFence | null): Promise<void> {
+  if (!fence) return;
+  for (let attempt = 0; attempt < SYNCHRONOUS_CONTROL_RETRIES; attempt += 1) {
+    const storage = localVaultStorage();
+    if (!storage) return;
+    const before = readSynchronousControlVersion(storage);
+    if (!before || before.fence !== fence.fence) return;
+    const db = await openVault();
+    const durableEpoch = db ? await readClearEpoch(db) : null;
+    if (durableEpoch === null) return;
+
+    const current = readSynchronousControlVersion(storage);
+    if (!current || current.fence !== fence.fence) continue;
+    const rebased = mutateSynchronousControlIfCurrent(
+      storage,
+      current,
+      () => {
+        const latest = readSynchronousControlVersion(storage);
+        if (!latest || latest.fence !== fence.fence) return 'superseded';
+        // Only the provisional marker owned by this failed clear may be
+        // lowered. A newer epoch is evidence that another control operation
+        // won, so leave it untouched and retry/fail closed.
+        if (latest.epoch > durableEpoch && latest.epoch !== fence.provisionalEpoch) return 'superseded';
+        return storage.setItem(SYNC_CLEAR_EPOCH_KEY, String(durableEpoch));
+      },
+      (version) => version.fence === fence.fence && version.epoch >= durableEpoch,
+    );
+    if (rebased === 'superseded') continue;
+    if (rebased === 'failed') return;
+
+    const after = readSynchronousControlVersion(storage);
+    if (!after || after.fence !== fence.fence) continue;
+    // Intents created under the failed fence are not resurrected. A new
+    // mutation registers a fresh intent after this proven durable epoch.
+    const cleaned = removeSynchronousWriteIntentsExcept(storage, durableEpoch, fence.fence);
+    if (cleaned === 'superseded') continue;
+    if (cleaned === 'failed') return;
+    const pending = removeSynchronousClearPendingIfCurrent(
+      storage,
+      after,
+      fence.fence,
+      Number.MAX_SAFE_INTEGER,
+    );
+    if (pending === 'superseded') continue;
+    if (pending === 'failed') return;
+    if (synchronousControlVersionIsCurrent(storage, after)) return;
+  }
+}
+
+function newWriteReservationToken(): string {
+  writeReservationSeq += 1;
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `${crypto.randomUUID()}-${writeReservationSeq.toString(36)}`;
+    }
+  } catch {
+    // The monotonic/random fallback below is sufficient for an opaque fence id.
+  }
+  return `${Date.now().toString(36)}-${writeReservationSeq.toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+async function readClearEpoch(db: IDBDatabase): Promise<number | null> {
+  try {
+    const tx = db.transaction(VAULT_META, 'readonly');
+    const req = tx.objectStore(VAULT_META).get(CLEAR_EPOCH_KEY);
+    return await new Promise(resolve => {
+      let value: number | null = null;
+      let settled = false;
+      const finish = (next: number | null) => { if (!settled) { settled = true; resolve(next); } };
+      req.onsuccess = () => { value = Number(req.result?.value) || 0; };
+      req.onerror = () => { req.onerror = null; finish(null); };
+      tx.oncomplete = () => finish(value);
+      tx.onerror = () => finish(null);
+      tx.onabort = () => finish(null);
+    });
+  } catch { return null; }
+}
+
+/**
+ * Reconcile the same-origin control plane with the durable epoch before a
+ * writer is admitted. A numeric marker ahead of IDB is safe to lower only when
+ * the matching pending-clear record proves it was provisional; an unmarked
+ * mismatch remains fail closed rather than guessing which clear won.
+ */
+async function reconcileSynchronousControlWithDurable(
+  db: IDBDatabase,
+  requireSynchronousControl: boolean,
+): Promise<number | null> {
+  for (let attempt = 0; attempt < SYNCHRONOUS_CONTROL_RETRIES; attempt += 1) {
+    const durableEpoch = await readClearEpoch(db);
+    if (durableEpoch === null) return null;
+
+    const storage = localVaultStorage();
+    if (!storage) return requireSynchronousControl ? null : durableEpoch;
+
+    const control = readSynchronousControlVersion(storage);
+    const pendingRaw = storage.getItem(SYNC_CLEAR_PENDING_KEY);
+    if (!control || storage.failed) return null;
+    const pending = parseSynchronousClearPending(pendingRaw);
+    // A non-empty malformed pending marker is evidence we cannot classify the
+    // numeric marker. Do not turn corruption into an admission decision.
+    if (pendingRaw !== null && pending === null) return null;
+
+    if (pending && pending.fence === control.fence && pending.epoch > durableEpoch) {
+      if (control.epoch !== pending.epoch) return null;
+      // This is a proven failed/incomplete clear. Rebase to the durable epoch
+      // and revoke every token from the failed fence; none may be resurrected.
+      const rebased = mutateSynchronousControlIfCurrent(
+        storage,
+        control,
+        () => {
+          const latest = readSynchronousControlVersion(storage);
+          if (!latest || latest.fence !== control.fence || latest.epoch !== control.epoch) return 'superseded';
+          if (storage.getItem(SYNC_CLEAR_PENDING_KEY) !== pendingRaw || storage.failed) return 'superseded';
+          return storage.setItem(SYNC_CLEAR_EPOCH_KEY, String(durableEpoch));
+        },
+        (version) => version.fence === control.fence && version.epoch >= durableEpoch,
+      );
+      if (rebased === 'superseded') continue;
+      if (rebased === 'failed') return null;
+
+      const after = readSynchronousControlVersion(storage);
+      if (!after || after.fence !== control.fence) continue;
+      const cleaned = removeSynchronousWriteIntentsExcept(storage, durableEpoch, control.fence);
+      if (cleaned === 'superseded') continue;
+      if (cleaned === 'failed') return null;
+      const removed = removeSynchronousClearPendingIfCurrent(
+        storage,
+        after,
+        control.fence,
+        Number.MAX_SAFE_INTEGER,
+      );
+      if (removed === 'superseded') continue;
+      if (removed === 'failed') return null;
+      if (synchronousControlVersionIsCurrent(storage, after)) return durableEpoch;
+      continue;
+    }
+
+    // A pending clear with no matching current fence, or one that is still
+    // ahead of IDB without the exact proof above, cannot be classified safely.
+    if (pending && pending.fence === control.fence && pending.epoch > durableEpoch) return null;
+    if (control.epoch > durableEpoch) return null;
+
+    if (durableEpoch > control.epoch) {
+      const advanced = mutateSynchronousControlIfCurrent(
+        storage,
+        control,
+        () => {
+          if (storage.getItem(SYNC_CLEAR_PENDING_KEY) !== pendingRaw || storage.failed) return 'superseded';
+          return setSynchronousEpochAtLeast(storage, control, durableEpoch);
+        },
+      );
+      if (advanced === 'superseded') continue;
+      if (advanced === 'failed') return null;
+    }
+
+    const after = readSynchronousControlVersion(storage);
+    if (!after) return null;
+    if (pending && pending.fence === after.fence && pending.epoch <= durableEpoch) {
+      const removed = removeSynchronousClearPendingIfCurrent(
+        storage,
+        after,
+        after.fence,
+        durableEpoch,
+      );
+      if (removed === 'superseded') continue;
+      if (removed === 'failed') return null;
+    }
+    if (synchronousControlVersionIsCurrent(storage, after)) return durableEpoch;
+  }
+  return null;
+}
+
+/** Capture the durable erase fence for a delayed writer. */
+export async function captureVaultEraseEpoch(): Promise<number | null> {
+  const db = await openVault();
+  const epoch = db ? await reconcileSynchronousControlWithDurable(db, false) : null;
+  if (epoch !== null) {
+    noteCachedEraseEpoch(epoch);
+    recordSynchronousClearEpoch(epoch);
+  }
+  return epoch;
+}
+export function currentVaultEraseEpoch(): number { return cachedEraseEpoch; }
+
+/**
+ * Durably admit one delayed message flush without storing its payload. The
+ * caller's synchronous intent is mandatory authority: this function never
+ * creates a replacement token after an async open. The IDB transaction is the
+ * durable admission point. A clear queued first revokes the intent and causes
+ * this transaction to abort; a reservation committed first is still removed
+ * by the later clear. The delayed payload cannot re-admit by observing a newer
+ * epoch alone.
+ */
+export async function reserveVaultWrite(
+  suppliedIntent?: VaultWriteIntent,
+): Promise<VaultWriteReservation | null> {
+  const intent = suppliedIntent ?? beginVaultWriteIntent();
+  if (!intent || !synchronousIntentIsCurrent(intent)) {
+    if (intent) forgetSynchronousWriteIntent(intent.token);
+    return null;
+  }
+  const db = await openVault();
+  if (!db) {
+    forgetSynchronousWriteIntent(intent.token);
+    return null;
+  }
+  const durableControlEpoch = await reconcileSynchronousControlWithDurable(db, true);
+  if (
+    durableControlEpoch === null
+    || !synchronousIntentIsCurrent(intent)
+    || durableControlEpoch !== intent.expectedEraseEpoch
+  ) {
+    forgetSynchronousWriteIntent(intent.token);
+    // A caller that did not supply a token may have observed a provisional
+    // marker before this recovery read rebased it. Retry once with a genuinely
+    // fresh token; supplied tokens are never silently rebased or resurrected.
+    if (suppliedIntent === undefined && durableControlEpoch !== null) {
+      const freshIntent = beginVaultWriteIntent();
+      if (freshIntent) return reserveVaultWrite(freshIntent);
+    }
+    return null;
+  }
+  try {
+    const tx = db.transaction(VAULT_META, 'readwrite');
+    const meta = tx.objectStore(VAULT_META);
+    const epochRequest = meta.get(CLEAR_EPOCH_KEY);
+    let eraseEpoch: number | null = null;
+    const abort = () => {
+      try {
+        tx.abort();
+      } catch {
+        // The transaction may already be inactive; txDone still reports its result.
+      }
+    };
+    epochRequest.onsuccess = () => {
+      try {
+        eraseEpoch = Number(epochRequest.result?.value) || 0;
+        noteCachedEraseEpoch(eraseEpoch);
+        recordSynchronousClearEpoch(eraseEpoch);
+        if (!synchronousIntentIsCurrent(intent) || eraseEpoch !== intent.expectedEraseEpoch) {
+          abort();
+          return;
+        }
+        const row: StoredWriteReservation = {
+          id: writeReservationKey(intent.token),
+          kind: 'message-write',
+          epoch: eraseEpoch,
+        };
+        meta.put(row);
+      } catch {
+        abort();
+      }
+    };
+    epochRequest.onerror = abort;
+    const committed = await txDone(tx);
+    if (!committed || eraseEpoch === null) {
+      forgetSynchronousWriteIntent(intent.token);
+      return null;
+    }
+    if (!synchronousIntentIsCurrent(intent)) {
+      await releaseVaultWriteReservation(intent.token);
+      return null;
+    }
+    noteCachedEraseEpoch(eraseEpoch);
+    return { token: intent.token, eraseEpoch };
+  } catch {
+    forgetSynchronousWriteIntent(intent.token);
+    return null;
+  }
+}
+
+/** Remove an unconsumed opaque admission record after cancellation/failure. */
+export async function releaseVaultWriteReservation(token: string): Promise<boolean> {
+  if (typeof token !== 'string' || token.length === 0) return false;
+  // Remove the synchronous authority first. Even if the database connection
+  // is closed, a later delayed caller cannot reuse this token to admit a row.
+  forgetSynchronousWriteIntent(token);
+  const db = await openVault();
+  if (!db) return false;
+  try {
+    const tx = db.transaction(VAULT_META, 'readwrite');
+    tx.objectStore(VAULT_META).delete(writeReservationKey(token));
+    return txDone(tx);
+  } catch {
+    return false;
+  }
+}
+
+/** Cleanup is best-effort and must never replace the caller's original failure. */
+async function releaseSuppliedReservation(reservation?: VaultWriteReservation): Promise<void> {
+  if (!reservation) return;
+  try {
+    await releaseVaultWriteReservation(reservation.token);
+  } catch {
+    // Preserve the original false result even if cleanup itself is mocked or blocked.
+  }
+}
+
+/** Read the erase and owner-generation fences from one durable snapshot. */
+export async function captureScheduledFence(owner: DeviceMemoryOwner): Promise<{ clearEpoch: number; generation: number } | null> {
+  const db = await openVault(); if (!db) return null;
+  try {
+    const tx = db.transaction(VAULT_META, 'readonly');
+    const meta = tx.objectStore(VAULT_META);
+    const epochReq = meta.get(CLEAR_EPOCH_KEY);
+    const generationReq = meta.get(ownerGenerationKey(owner));
+    return await new Promise(resolve => {
+      // A pristine vault has no fence rows yet; absence is the zero fence,
+      // not a failed admission. The write transaction remains durable and
+      // creates/updates its own row as needed.
+      let epoch: number | null = 0;
+      let generation: number | null = 0;
+      let failed = false;
+      const finish = () => resolve(failed || epoch === null || generation === null ? null : { clearEpoch: epoch, generation });
+      epochReq.onsuccess = () => { epoch = Number(epochReq.result?.value) || 0; };
+      generationReq.onsuccess = () => { generation = Number(generationReq.result?.value) || 0; };
+      epochReq.onerror = generationReq.onerror = () => { failed = true; };
+      tx.oncomplete = finish;
+      tx.onerror = tx.onabort = () => { failed = true; finish(); };
+    });
+  } catch { return null; }
+}
+
+/** Advance the durable fence, invalidating delayed writers in every tab. */
+export async function advanceVaultEraseEpoch(): Promise<boolean> {
+  const db = await openVault(); if (!db) return false;
+  try {
+    const tx = db.transaction(VAULT_META, 'readwrite');
+    const os = tx.objectStore(VAULT_META);
+    const req = os.get(CLEAR_EPOCH_KEY);
+    let nextEpoch: number | null = null;
+    req.onsuccess = () => {
+      nextEpoch = (Number(req.result?.value) || 0) + 1;
+      noteCachedEraseEpoch(nextEpoch);
+      os.put({ id: CLEAR_EPOCH_KEY, value: nextEpoch });
+    };
+    const committed = await txDone(tx);
+    if (committed && nextEpoch !== null) recordSynchronousClearEpoch(nextEpoch);
+    return committed && nextEpoch !== null;
+  } catch { return false; }
+}
+
+/** Durable scheduled queue operations. IDB transactions are the same-origin CAS fence. */
+export async function loadScheduledRows(): Promise<ScheduledVaultRow[]> {
+  const db = await openVault(); if (!db) return [];
+  try {
+    const tx = db.transaction([SCHEDULED, VAULT_META], 'readonly');
+    const req = tx.objectStore(SCHEDULED).getAll();
+    const epochReq = tx.objectStore(VAULT_META).get(CLEAR_EPOCH_KEY);
+    return await new Promise<ScheduledVaultRow[]>(resolve => {
+      let rows: ScheduledStoredRow[] = [];
+      let epoch = 0;
+      let failed = false;
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (failed) { resolve([]); return; }
+        resolve(rows.map(scheduledVisibleRow).filter((row): row is ScheduledVaultRow =>
+          row !== null && (row.clearEpoch === epoch || (row.clearEpoch === undefined && epoch === 0))));
+      };
+      req.onsuccess = () => { rows = req.result ?? []; };
+      req.onerror = () => { failed = true; };
+      epochReq.onsuccess = () => { epoch = Number(epochReq.result?.value) || 0; };
+      epochReq.onerror = () => { failed = true; };
+      tx.oncomplete = finish;
+      tx.onerror = () => { failed = true; finish(); };
+      tx.onabort = () => { failed = true; finish(); };
+    });
+  } catch { return []; }
+}
+
+/**
+ * Reconcile a localStorage snapshot into the durable queue and return the
+ * durable active projection. The whole operation is one read/write
+ * transaction: missing rows are added, existing claims/statuses are never
+ * overwritten, and rows canceled in another tab are omitted from the result.
+ */
+export async function reconcileScheduledRows(rows: readonly ScheduledVaultRow[], maxCapacity = Number.POSITIVE_INFINITY): Promise<ScheduledVaultRow[] | null> {
+  const db = await openVault(); if (!db) return null;
+  try {
+    const tx = db.transaction([SCHEDULED, VAULT_META], 'readwrite');
+    const os = tx.objectStore(SCHEDULED);
+    const meta = tx.objectStore(VAULT_META);
+    let index = 0;
+    let projection: ScheduledStoredRow[] = [];
+    let durableCallerEpoch = 0;
+    return await new Promise<ScheduledVaultRow[] | null>((resolve) => {
+      tx.onerror = () => resolve(null);
+      tx.onabort = () => resolve(null);
+      tx.oncomplete = () => resolve(projection.map(scheduledVisibleRow).filter((candidate): candidate is ScheduledVaultRow => candidate !== null && (candidate.clearEpoch === durableCallerEpoch || (candidate.clearEpoch === undefined && durableCallerEpoch === 0))));
+      const epochReq = meta.get('clear-epoch');
+      epochReq.onerror = () => tx.abort();
+      epochReq.onsuccess = () => {
+        durableCallerEpoch = Number(epochReq.result?.value) || 0;
+        next();
+      };
+      const next = () => {
+        const row = rows[index++];
+        if (!row) {
+          const all = os.getAll();
+          all.onsuccess = () => {
+            projection = all.result ?? [];
+          };
+          all.onerror = () => { tx.abort(); };
+          return;
+        }
+        const get = os.get(scheduledRowKey(row));
+        get.onsuccess = () => {
+          if (get.result === undefined) {
+            if ((row.clearEpoch !== undefined && row.clearEpoch !== durableCallerEpoch)
+              || (row.clearEpoch === undefined && durableCallerEpoch !== 0)) { next(); return; }
+            const generationReq = row.owner ? meta.get(ownerGenerationKey(row.owner)) : null;
+            const addAtGeneration = (generation: number) => {
+              if (row.owner && row.generation !== undefined && row.generation !== generation) { next(); return; }
+              const all = os.getAll();
+              all.onerror = () => tx.abort();
+              all.onsuccess = () => {
+                const activeCount = (all.result as ScheduledStoredRow[]).filter(candidate =>
+                  !candidate.status
+                  && (candidate.clearEpoch === durableCallerEpoch || (candidate.clearEpoch === undefined && durableCallerEpoch === 0)),
+                ).length;
+                if (activeCount >= maxCapacity) { next(); return; }
+                const add = os.add({ ...scheduledCopy(row), id: scheduledRowKey(row), clearEpoch: durableCallerEpoch, generation } satisfies ScheduledStoredRow);
+              // A concurrent add can win between get() and add().  It is an
+              // add-only migration, so ConstraintError is a successful
+              // no-op, not a failed reconciliation.  Stop the error from
+              // bubbling to the transaction as well as preventing the
+              // request's default abort behavior (fake-indexeddb and
+              // browsers differ here).
+              add.onerror = (event) => {
+                if (add.error?.name === 'ConstraintError') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  next();
+                } else {
+                  tx.abort();
+                }
+              };
+              add.onsuccess = next;
+              };
+            };
+            if (!generationReq) addAtGeneration(0);
+            else { generationReq.onerror = () => tx.abort(); generationReq.onsuccess = () => addAtGeneration(Number(generationReq.result?.value) || 0); }
+          } else next();
+        };
+        get.onerror = () => { tx.abort(); };
+      };
+    });
+  } catch { return null; }
+}
+
+/** Add localStorage rows that are not durable yet; never overwrite a durable row. */
+export async function migrateScheduledRows(rows: readonly ScheduledVaultRow[]): Promise<boolean> {
+  return (await reconcileScheduledRows(rows)) !== null;
+}
+
+/** Add one newly scheduled row without replacing a newer durable record. */
+export async function addScheduledRow(
+  row: ScheduledVaultRow,
+  expectedEraseEpoch = row.clearEpoch,
+  expectedGeneration = row.generation,
+  maxCapacity = Number.POSITIVE_INFINITY,
+): Promise<boolean> {
+  const db = await openVault(); if (!db) return false;
+  try {
+    const tx = db.transaction([SCHEDULED, VAULT_META], 'readwrite');
+    const meta = tx.objectStore(VAULT_META);
+    const epochRequest = meta.get(CLEAR_EPOCH_KEY);
+    epochRequest.onsuccess = () => {
+      const epoch = Number(epochRequest.result?.value) || 0;
+      const generationRequest = meta.get(row.owner ? ownerGenerationKey(row.owner) : 'unused');
+      generationRequest.onsuccess = () => {
+        const generation = row.owner ? (Number(generationRequest.result?.value) || 0) : 0;
+        if (expectedEraseEpoch !== undefined && expectedEraseEpoch !== epoch) { tx.abort(); return; }
+        if (expectedEraseEpoch === undefined && epoch !== 0) { tx.abort(); return; }
+        if (row.owner && expectedGeneration !== undefined && expectedGeneration !== generation) { tx.abort(); return; }
+        const os = tx.objectStore(SCHEDULED);
+        const key = scheduledRowKey(row);
+        const existing = os.get(key);
+        existing.onerror = () => tx.abort();
+        existing.onsuccess = () => {
+          // Reconciliation may have admitted this exact row while the
+          // caller's original add was still pending. Treat that race as
+          // success, preserving any durable claim/tombstone already present.
+          if (existing.result !== undefined) return;
+          const all = os.getAll();
+          all.onerror = () => tx.abort();
+          all.onsuccess = () => {
+            const activeCount = (all.result as ScheduledStoredRow[]).filter(candidate =>
+              !candidate.status
+              && (candidate.clearEpoch === epoch || (candidate.clearEpoch === undefined && epoch === 0)),
+            ).length;
+            // This count and the insertion are one IndexedDB read/write
+            // transaction. IndexedDB serializes competing transactions across
+            // tabs, so two independent admissions cannot both pass the fence.
+            if (activeCount >= maxCapacity) { tx.abort(); return; }
+            const add = os.add({ ...scheduledCopy(row), id: key, clearEpoch: epoch, generation } satisfies ScheduledStoredRow);
+            add.onerror = (event) => {
+              if (add.error?.name === 'ConstraintError') {
+                // Another tab can win between get() and add(). Do not abort the
+                // transaction or let the caller's cleanup erase its projection.
+                event.preventDefault();
+                event.stopPropagation();
+              } else {
+                tx.abort();
+              }
+            };
+          };
+        };
+      };
+    };
+    epochRequest.onerror = () => { tx.abort(); };
+    return txDone(tx);
+  } catch { return false; }
+}
+
+/** Mark cancellation in the durable store, including when the row is not there yet. */
+export async function cancelScheduledRow(id: string, owner: DeviceMemoryOwner, canceledAt = Date.now()): Promise<boolean> {
+  const db = await openVault(); if (!db) return false;
+  try {
+    const tx = db.transaction(SCHEDULED, 'readwrite');
+    const os = tx.objectStore(SCHEDULED);
+    const request = os.get(scheduledStoredKey(owner, id));
+    request.onsuccess = () => {
+      // Tombstones intentionally contain no channel/text/sendAt: cancellation
+      // must not preserve plaintext and wins over a racing migration.
+      os.put({ id: scheduledStoredKey(owner, id), owner, status: 'canceled', statusAt: canceledAt });
+    };
+    return txDone(tx);
+  } catch { return false; }
+}
+
+/** Tombstone every scheduled row owned by an account during an owner switch. */
+export async function cancelScheduledRowsForOwner(owner: DeviceMemoryOwner, canceledAt = Date.now()): Promise<boolean> {
+  const db = await openVault(); if (!db) return false;
+  try {
+    const tx = db.transaction([SCHEDULED, VAULT_META], 'readwrite');
+    const os = tx.objectStore(SCHEDULED);
+    const meta = tx.objectStore(VAULT_META);
+    const generationReq = meta.get(ownerGenerationKey(owner));
+    generationReq.onsuccess = () => meta.put({ id: ownerGenerationKey(owner), value: (Number(generationReq.result?.value) || 0) + 1 });
+    const prefix = `${scheduledOwnerKey(owner)}\u0000`;
+    const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`);
+    const cursor = os.openCursor(range);
+    cursor.onsuccess = () => {
+      const current = cursor.result;
+      if (!current) return;
+      const row = current.value as ScheduledStoredRow;
+      if (row.status !== 'canceled') {
+        current.update({ id: row.id, owner, status: 'canceled', statusAt: canceledAt });
+      }
+      current.continue();
+    };
+    return txDone(tx);
+  } catch { return false; }
+}
+
+export async function claimScheduledRow(id: string, owner: DeviceMemoryOwner, token: string, claimedAt: number): Promise<ScheduledVaultRow | null> {
+  const db = await openVault(); if (!db) return null;
+  try { const tx = db.transaction(SCHEDULED, 'readwrite'); const os = tx.objectStore(SCHEDULED); const req = os.get(`${scheduledOwnerKey(owner)}\u0000${id}`);
+    return await new Promise(resolve => { let candidate: ScheduledStoredRow | null = null; const finish = (ok: boolean) => resolve(ok && candidate ? scheduledCopy({ id, channel: candidate.channel!, text: candidate.text!, sendAt: candidate.sendAt!, owner: candidate.owner!, generation: candidate.generation, clearEpoch: candidate.clearEpoch, claim: candidate.claim }) : null); req.onsuccess = () => { const row = req.result as ScheduledStoredRow | undefined; if (!row || row.status || row.claim || !row.owner || typeof row.channel !== 'string' || typeof row.text !== 'string' || typeof row.sendAt !== 'number' || scheduledOwnerKey(row.owner) !== scheduledOwnerKey(owner)) { tx.abort(); return; } candidate = { ...row, claim: { token, claimedAt } }; const put = os.put(candidate); put.onerror = () => { tx.abort(); }; }; req.onerror = () => { tx.abort(); }; tx.oncomplete = () => finish(true); tx.onerror = () => finish(false); tx.onabort = () => finish(false); });
+  } catch { return null; }
+}
+export async function settleScheduledClaim(id: string, owner: DeviceMemoryOwner, token: string, admitted: boolean): Promise<boolean> {
+  const db = await openVault(); if (!db) return false;
+  try { const tx = db.transaction(SCHEDULED, 'readwrite'); const os = tx.objectStore(SCHEDULED); const req = os.get(`${scheduledOwnerKey(owner)}\u0000${id}`); req.onsuccess = () => { const row = req.result as ScheduledStoredRow | undefined; if (!row?.claim || row.claim.token !== token || row.status) { tx.abort(); return; } if (admitted) os.put({ id: row.id, owner: row.owner, generation: row.generation, clearEpoch: row.clearEpoch, status: 'admitted', statusAt: Date.now() }); else { delete row.claim; os.put(row); } }; return txDone(tx); } catch { return false; }
 }
 
 /**
@@ -415,19 +1491,46 @@ export async function saveMessages(
   target: string,
   msgs: readonly ChatMessage[],
   owner?: DeviceMemoryOwner,
+  expectedEraseEpoch?: number,
+  reservation?: VaultWriteReservation,
 ): Promise<boolean> {
-  const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
-  if (owner !== undefined && !safeOwner) return false;
-  if (msgs.length === 0) return true;
-  const physicalTarget = physicalTargetKey(target, safeOwner ?? undefined);
-  const privacyTracked = isVaultDmSearchPrivacyTracked(physicalTarget)
-    || msgs.some((message) => message.encrypted || isEncryptedWireText(message.text));
-  // Invalidate before the first await. SEARCH is synchronous, so even the small
-  // window while a write is opening IndexedDB must not reuse an older `plain`.
-  if (privacyTracked) invalidateVaultDmSearchPrivacy(physicalTarget);
-  const db = await openVault();
-  if (!db) return false;
+  const hasReservation = reservation !== undefined && reservation !== null;
+  let safeOwner: DeviceMemoryOwner | null = null;
+  let physicalTarget: string;
+  let privacyTracked = false;
+  let transactionCommitted = false;
+  if (!Array.isArray(msgs)) {
+    await releaseSuppliedReservation(reservation);
+    return false;
+  }
   try {
+    safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
+    if (owner !== undefined && !safeOwner) {
+      await releaseSuppliedReservation(reservation);
+      return false;
+    }
+    if (msgs.length === 0) {
+      await releaseSuppliedReservation(reservation);
+      return true;
+    }
+    physicalTarget = physicalTargetKey(target, safeOwner ?? undefined);
+    privacyTracked = isVaultDmSearchPrivacyTracked(physicalTarget)
+      || msgs.some((message) => message.encrypted || isEncryptedWireText(message.text));
+    // Invalidate before the first await. SEARCH is synchronous, so even the small
+    // window while a write is opening IndexedDB must not reuse an older `plain`.
+    if (privacyTracked) invalidateVaultDmSearchPrivacy(physicalTarget);
+    const db = await openVault();
+    if (!db) {
+      await releaseSuppliedReservation(reservation);
+      return false;
+    }
+    // A recovered database may be paired with a provisional same-origin
+    // marker left by a failed clear. Reconcile it before accepting a direct
+    // write; reservation-backed writes require the stronger control proof.
+    if (await reconcileSynchronousControlWithDurable(db, hasReservation) === null) {
+      await releaseSuppliedReservation(reservation);
+      return false;
+    }
     // Pre-trim the batch to the target's effective keep. With no policy this is
     // exactly VAULT_KEEP (identical to before); a per-channel override widens or
     // narrows it so a larger override isn't defeated by the batch pre-trim.
@@ -435,57 +1538,179 @@ export async function saveMessages(
     // `slice(-0)` is `slice(0)`, so zero needs an explicit empty tail or a
     // zero-retention policy would briefly write the entire input batch.
     const tail = keep === 0 ? [] : msgs.slice(-keep);
-    const tx = db.transaction(STORE, 'readwrite');
+    const tx = db.transaction([STORE, VAULT_META], 'readwrite');
     const store = tx.objectStore(STORE);
-    for (const m of tail) store.put(serializeMessage(target, m, safeOwner ?? undefined));
+    const meta = tx.objectStore(VAULT_META);
+    const epochReq = meta.get(CLEAR_EPOCH_KEY);
+    const reservationReq = hasReservation
+      ? meta.get(writeReservationKey(reservation.token))
+      : null;
+    let epochRead = false;
+    let reservationRead = !hasReservation;
+    let durableEpoch = 0;
+    let storedReservation: unknown;
+    const abort = () => {
+      try {
+        tx.abort();
+      } catch {
+        // The transaction may already be inactive; txDone still reports its result.
+      }
+    };
+    const admit = () => {
+      if (!epochRead || !reservationRead) return;
+      // With a reservation, the reservation row and message rows are consumed
+      // by this same transaction. This is the write linearization point. A
+      // clear transaction ordered first has deleted the row, so this aborts;
+      // a clear ordered after this transaction removes the committed rows.
+      try {
+        if (hasReservation) {
+          const row = storedReservation as Partial<StoredWriteReservation> | undefined;
+          if (
+            row?.kind !== 'message-write'
+            || row.epoch !== reservation.eraseEpoch
+            || durableEpoch !== reservation.eraseEpoch
+            || (expectedEraseEpoch !== undefined && expectedEraseEpoch !== durableEpoch)
+          ) {
+            abort();
+            return;
+          }
+          meta.delete(writeReservationKey(reservation.token));
+        } else if (expectedEraseEpoch === undefined ? durableEpoch !== 0 : expectedEraseEpoch !== durableEpoch) {
+          // Direct callers retain the old explicit epoch behavior. The sync path
+          // always uses the stronger reservation form above.
+          abort();
+          return;
+        }
+        for (const m of tail) store.put(serializeMessage(target, m, safeOwner ?? undefined));
+      } catch {
+        abort();
+      }
+    };
+    epochReq.onsuccess = () => {
+      try {
+        durableEpoch = Number(epochReq.result?.value) || 0;
+        epochRead = true;
+        admit();
+      } catch {
+        abort();
+      }
+    };
+    if (reservationReq) {
+      reservationReq.onsuccess = () => {
+        try {
+          storedReservation = reservationReq.result;
+          reservationRead = true;
+          admit();
+        } catch {
+          abort();
+        }
+      };
+      reservationReq.onerror = abort;
+    }
+    epochReq.onerror = abort;
     const committed = await txDone(tx);
+    transactionCommitted = committed;
     if (!committed) {
+      await releaseSuppliedReservation(reservation);
       if (privacyTracked) await classifyVaultDmSearchPrivacy(target, safeOwner ?? undefined);
       return false;
     }
+    if (hasReservation) forgetSynchronousWriteIntent(reservation.token);
     await pruneTarget(db, physicalTarget, target.toLowerCase(), _retentionPolicy);
     if (privacyTracked) await classifyVaultDmSearchPrivacy(target, safeOwner ?? undefined);
     return true;
   } catch {
     /* quota / private mode — the vault is best-effort */
-    if (privacyTracked) await classifyVaultDmSearchPrivacy(target, safeOwner ?? undefined);
+    if (!transactionCommitted) await releaseSuppliedReservation(reservation);
+    if (privacyTracked) {
+      try {
+        await classifyVaultDmSearchPrivacy(target, safeOwner ?? undefined);
+      } catch {
+        // Privacy reclassification cannot mask the original failed write.
+      }
+    }
     return false;
   }
 }
 
 /** Load the most recent messages for a target, chronological. */
-export async function loadRecent(
+export type RecentHistoryStatus = 'complete' | 'unavailable' | 'partial';
+
+export interface RecentHistoryResult {
+  messages: ChatMessage[];
+  status: RecentHistoryStatus;
+}
+
+/**
+ * Load recent messages with enough truth for UI callers to distinguish an
+ * empty history from a storage failure. Rows already read remain available on
+ * a cursor/transaction failure.
+ */
+export async function loadRecentWithStatus(
   target: string,
   limit = VAULT_KEEP,
   owner?: DeviceMemoryOwner,
-): Promise<ChatMessage[]> {
+): Promise<RecentHistoryResult> {
   const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
-  if (owner !== undefined && !safeOwner) return [];
+  if (owner !== undefined && !safeOwner) return { messages: [], status: 'unavailable' };
   const db = await openVault();
-  if (!db) return [];
+  if (!db) return { messages: [], status: 'unavailable' };
   try {
     const key = physicalTargetKey(target, safeOwner ?? undefined);
     const tx = db.transaction(STORE, 'readonly');
     const idx = tx.objectStore(STORE).index('by_target_time');
     const range = targetKeyRange(key);
-    return await new Promise<ChatMessage[]>((resolve) => {
+    return await new Promise<RecentHistoryResult>((resolve) => {
       const out: ChatMessage[] = [];
+      let settled = false;
+      let cursorFinished = false;
+      let cursorFailed = false;
+      const finish = (status: RecentHistoryStatus) => {
+        if (settled) return;
+        settled = true;
+        resolve({ messages: out.reverse(), status });
+      };
+      const fail = () => finish(out.length > 0 ? 'partial' : 'unavailable');
+      // Cursor exhaustion/limit only proves that the request has finished. The
+      // readonly transaction still has to commit successfully before an empty
+      // or bounded read can be called complete.
+      tx.oncomplete = () => {
+        if (cursorFailed || !cursorFinished) {
+          fail();
+          return;
+        }
+        finish('complete');
+      };
+      tx.onerror = fail;
+      tx.onabort = fail;
       // Walk newest-first, stop at limit, reverse to chronological.
       const cursorReq = idx.openCursor(range, 'prev');
       cursorReq.onsuccess = () => {
         const cursor = cursorReq.result;
         if (!cursor || out.length >= limit) {
-          resolve(out.reverse());
+          cursorFinished = true;
           return;
         }
         out.push(deserializeMessage(cursor.value as StoredMessage));
         cursor.continue();
       };
-      cursorReq.onerror = () => resolve(out.reverse());
+      cursorReq.onerror = () => {
+        cursorFailed = true;
+        fail();
+      };
     });
   } catch {
-    return [];
+    return { messages: [], status: 'unavailable' };
   }
+}
+
+/** Legacy best-effort API retained for all existing consumers. */
+export async function loadRecent(
+  target: string,
+  limit = VAULT_KEEP,
+  owner?: DeviceMemoryOwner,
+): Promise<ChatMessage[]> {
+  return (await loadRecentWithStatus(target, limit, owner)).messages;
 }
 
 /**
@@ -681,8 +1906,22 @@ export async function importVault(
   snapshot: VaultExportSnapshot,
   owner?: DeviceMemoryOwner,
   options?: VaultImportOptions,
+  expectedEraseEpoch?: number,
 ): Promise<{ targets: number; messages: number }> {
   assertVaultImportCurrent(options);
+  // Establish the fail-closed boundary synchronously before the first await;
+  // callers may inspect privacy while the durable import is pending.
+  if (Array.isArray(snapshot?.targets)) {
+    for (const rawEntry of snapshot.targets.slice(0, MAX_EXPORT_TARGETS)) {
+      if (!isRecord(rawEntry)) continue;
+      const normalizedTarget = normalizeVaultTarget(rawEntry.target, '');
+      if (normalizedTarget !== null) {
+        invalidateVaultDmSearchPrivacy(physicalTargetKey(normalizedTarget, owner));
+      }
+    }
+  }
+  if (expectedEraseEpoch === undefined) expectedEraseEpoch = await captureVaultEraseEpoch() ?? undefined;
+  if (expectedEraseEpoch === undefined) return { targets: 0, messages: 0 };
   const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
   if (owner !== undefined && !safeOwner) return { targets: 0, messages: 0 };
   let targetCount = 0;
@@ -712,7 +1951,11 @@ export async function importVault(
     // would tell the user their history was restored when IndexedDB contains
     // nothing.
     assertVaultImportCurrent(options);
-    const committed = await saveMessages(target, retained, safeOwner ?? undefined);
+    // Import is an asynchronous write boundary. Invalidate any previous
+    // plain proof before the first await so SEARCH remains fail-closed until
+    // the imported rows have committed and been reclassified.
+    invalidateVaultDmSearchPrivacy(physicalTargetKey(target, safeOwner ?? undefined));
+    const committed = await saveMessages(target, retained, safeOwner ?? undefined, expectedEraseEpoch);
     assertVaultImportCurrent(options);
     if (!committed) continue;
     const candidateIds = new Set(retained.map((message) => message.id));
@@ -1137,6 +2380,16 @@ function parseOutboxEntry(raw: unknown): OutboxEntry | null {
     owner: parseOutboxOwner(raw.owner),
     // Only the explicit true flag survives — never invent admission state.
     ...(raw.wire_admitted === true ? { wire_admitted: true as const } : {}),
+    ...(isRecord(raw.claim)
+      && typeof raw.claim.token === 'string'
+      && raw.claim.token.length > 0
+      && raw.claim.token.length <= 256
+      && raw.claim.token === raw.claim.token.trim()
+      && typeof raw.claim.claimedAt === 'number'
+      && Number.isSafeInteger(raw.claim.claimedAt)
+      && raw.claim.claimedAt >= 0
+      ? { claim: { token: raw.claim.token, claimedAt: raw.claim.claimedAt } }
+      : {}),
   };
 }
 
@@ -1165,6 +2418,7 @@ export async function queueOutbox(
   target: string,
   text: string,
   owner?: OutboxOwner,
+  expectedEraseEpoch?: number,
 ): Promise<OutboxEntry | null> {
   if (!isSafeOutboxTarget(target) || typeof text !== 'string' || text.length === 0) return null;
   const safeOwner = owner === undefined ? null : parseOutboxOwner(owner);
@@ -1181,10 +2435,15 @@ export async function queueOutbox(
     owner: safeOwner,
   };
   try {
-    const tx = db.transaction(OUTBOX, 'readwrite');
+    const tx = db.transaction([OUTBOX, VAULT_META], 'readwrite');
     const store = tx.objectStore(OUTBOX);
+    const meta = tx.objectStore(VAULT_META);
     let inserted = false;
-    const count = store.count();
+    const epochReq = meta.get(CLEAR_EPOCH_KEY);
+    epochReq.onsuccess = () => {
+      const epoch = Number(epochReq.result?.value) || 0;
+      if (expectedEraseEpoch === undefined ? epoch !== 0 : expectedEraseEpoch !== epoch) { tx.abort(); return; }
+      const count = store.count();
     count.onsuccess = () => {
       // Count every physical row, including a corrupt one loadOutbox would hide:
       // corruption must not become an escape hatch around the hard bound.
@@ -1197,7 +2456,9 @@ export async function queueOutbox(
       } catch {
         // The transaction will either abort or commit without the entry.
       }
+      };
     };
+    epochReq.onerror = () => tx.abort();
     const committed = await txDone(tx);
     if (!committed || !inserted) return null;
     notifyOutbox({ kind: 'queued' });
@@ -1290,18 +2551,82 @@ export async function markOutboxWireAdmitted(id: string): Promise<boolean> {
       const entry = parseOutboxEntry(lookup.result);
       if (!entry) return;
       if (entry.wire_admitted) {
+        if (entry.claim) {
+          const { claim: _claim, ...settled } = entry;
+          store.put(settled);
+        }
         marked = true;
         return;
       }
       try {
-        store.put({ ...entry, wire_admitted: true as const });
+        const { claim: _claim, ...unclaimed } = entry;
+        store.put({ ...unclaimed, wire_admitted: true as const });
         marked = true;
       } catch {
         // Transaction will abort or commit without the mark.
       }
     };
     const committed = await txDone(tx);
+    if (committed && marked) notifyOutbox({ kind: 'changed' });
     return committed && marked;
+  } catch {
+    return false;
+  }
+}
+
+/** Atomically claim one owned, unadmitted row. Existing claims are never stale-reclaimed. */
+export async function claimOutboxEntry(
+  id: string,
+  token: string,
+  owner: OutboxOwner,
+): Promise<OutboxEntry | null> {
+  if (typeof id !== 'string' || id.length === 0 || id !== id.trim()) return null;
+  if (typeof token !== 'string' || token.length === 0 || token.length > 256 || token !== token.trim()) return null;
+  const safeOwner = parseOutboxOwner(owner);
+  if (!safeOwner) return null;
+  const db = await openVault();
+  if (!db) return null;
+  try {
+    const tx = db.transaction(OUTBOX, 'readwrite');
+    const store = tx.objectStore(OUTBOX);
+    let claimed: OutboxEntry | null = null;
+    const lookup = store.get(id);
+    lookup.onsuccess = () => {
+      const entry = parseOutboxEntry(lookup.result);
+      if (!entry || entry.wire_admitted || !entry.owner
+        || deviceMemoryOwnerKey(entry.owner) !== deviceMemoryOwnerKey(safeOwner)
+        || entry.claim) return;
+      claimed = { ...entry, claim: { token, claimedAt: Date.now() } };
+      store.put(claimed);
+    };
+    if (!await txDone(tx)) return null;
+    if (claimed) notifyOutbox({ kind: 'changed' });
+    return claimed;
+  } catch {
+    return null;
+  }
+}
+
+/** Release only this caller's claim, and only while admission is unproven. */
+export async function releaseOutboxClaim(id: string, token: string): Promise<boolean> {
+  if (typeof id !== 'string' || typeof token !== 'string' || !id || !token) return false;
+  const db = await openVault();
+  if (!db) return false;
+  try {
+    const tx = db.transaction(OUTBOX, 'readwrite');
+    const store = tx.objectStore(OUTBOX);
+    let released = false;
+    const lookup = store.get(id);
+    lookup.onsuccess = () => {
+      const entry = parseOutboxEntry(lookup.result);
+      if (!entry || entry.wire_admitted || entry.claim?.token !== token) return;
+      const { claim: _claim, ...unclaimed } = entry;
+      store.put(unclaimed);
+      released = true;
+    };
+    const committed = await txDone(tx);
+    if (committed && released) notifyOutbox({ kind: 'changed' });
+    return committed && released;
   } catch {
     return false;
   }
@@ -1340,14 +2665,20 @@ export async function clearVault(): Promise<boolean> {
   // SEARCH must fail closed for the entire clear/verification window. Only a
   // physically verified empty store promotes every target back to plain.
   const privacyGeneration = beginVaultDmPrivacyClear();
+  // Revoke pre-admission intents synchronously, before any database-open await.
+  // This closes the cross-context sequence where a delayed reservation would
+  // otherwise read the new epoch and accidentally turn a pre-clear snapshot
+  // into a fresh post-clear write.
+  const synchronousClearFence = beginSynchronousClearFence();
   // Topic cursors, topic text history, pinned DMs, and bookmarks are device-local
   // transcript memory too. Clear
   // them even when IndexedDB is unavailable so "forget this device" has one
   // consistent privacy boundary across the vault and localStorage.
-  const topicReadsCleared = clearDeviceTopicReads();
-  const topicHistoryCleared = clearDeviceTopicHistory();
-  const dmPinsCleared = clearDeviceDMPins();
-  const bookmarksCleared = clearDeviceBookmarks();
+  const topicReadsCleared = tryClearDeviceSurface(clearDeviceTopicReads);
+  const topicHistoryCleared = tryClearDeviceSurface(clearDeviceTopicHistory);
+  const dmPinsCleared = tryClearDeviceSurface(clearDeviceDMPins);
+  const bookmarksCleared = tryClearDeviceSurface(clearDeviceBookmarks);
+  const legacyScheduledCleared = clearLegacyScheduledStorage();
   const indexedDbAvailable = typeof indexedDB !== 'undefined';
   const db = await openVault();
   // An unavailable/blocked IndexedDB handle is not evidence that persisted
@@ -1359,13 +2690,15 @@ export async function clearVault(): Promise<boolean> {
       && topicReadsCleared
       && topicHistoryCleared
       && dmPinsCleared
-      && bookmarksCleared;
+      && bookmarksCleared
+      && legacyScheduledCleared;
+    if (!cleared) await reconcileAbortedSynchronousClear(synchronousClearFence);
     finishVaultDmPrivacyClear(privacyGeneration, cleared);
     if (cleared) notifyVerifiedDeviceHistoryClear();
     return cleared;
   }
   try {
-    const tx = db.transaction([STORE, OUTBOX], 'readwrite');
+    const tx = db.transaction([STORE, OUTBOX, SCHEDULED, VAULT_META], 'readwrite');
     const outbox = tx.objectStore(OUTBOX);
     let outboxHadRows = false;
     const count = outbox.count();
@@ -1374,31 +2707,76 @@ export async function clearVault(): Promise<boolean> {
     };
     tx.objectStore(STORE).clear();
     outbox.clear();
+    tx.objectStore(SCHEDULED).clear();
+    const meta = tx.objectStore(VAULT_META);
+    const epoch = meta.get(CLEAR_EPOCH_KEY);
+    let committedEraseEpoch: number | null = null;
+    epoch.onsuccess = () => {
+      // Read before clear inside the same readwrite transaction. The
+      // transaction's ordering is the clear linearization point: reservations
+      // committed before it are removed, and delayed writes ordered after it
+      // cannot find their reservation.
+      committedEraseEpoch = (Number(epoch.result?.value) || 0) + 1;
+      noteCachedEraseEpoch(committedEraseEpoch);
+      meta.clear();
+      meta.put({ id: CLEAR_EPOCH_KEY, value: committedEraseEpoch });
+    };
+    epoch.onerror = () => tx.abort();
     const committed = await txDone(tx);
-    if (!committed) {
+    if (!committed || committedEraseEpoch === null) {
+      await reconcileAbortedSynchronousClear(synchronousClearFence);
       finishVaultDmPrivacyClear(privacyGeneration, false);
       return false;
     }
-    const [messageCount, outboxCount, sanitizedOutbox] = await Promise.all([
+    // The IDB commit is the durable clear linearization point. Align the
+    // provisional synchronous epoch to the actual epoch (important when two
+    // clears started concurrently and their provisional numbers compressed).
+    await completeSynchronousClearFence(synchronousClearFence, committedEraseEpoch);
+    const [messageCount, outboxCount, scheduledCount, sanitizedOutbox] = await Promise.all([
       physicalStoreCount(db, STORE),
       physicalOutboxCount(db),
+      physicalStoreCount(db, SCHEDULED),
       loadOutbox(),
     ]);
     const outboxVerified = outboxCount === 0 && sanitizedOutbox.length === 0;
+    const scheduledVerified = scheduledCount === 0;
     if (outboxHadRows && outboxVerified) notifyOutbox({ kind: 'cleared' });
     const cleared = messageCount === 0
       && outboxVerified
+      && scheduledVerified
       && topicReadsCleared
       && topicHistoryCleared
       && dmPinsCleared
-      && bookmarksCleared;
+      && bookmarksCleared
+      && legacyScheduledCleared;
     finishVaultDmPrivacyClear(privacyGeneration, cleared);
-    if (cleared) notifyVerifiedDeviceHistoryClear();
+    if (cleared) {
+      notifyVerifiedDeviceHistoryClear();
+    }
     return cleared;
   } catch {
+    await reconcileAbortedSynchronousClear(synchronousClearFence);
     finishVaultDmPrivacyClear(privacyGeneration, false);
     return false;
   }
+}
+
+/** A hostile localStorage getter/operation must degrade the whole wipe. */
+function tryClearDeviceSurface(clear: () => boolean): boolean {
+  try {
+    return clear();
+  } catch {
+    return false;
+  }
+}
+
+/** Clear the legacy scheduled-message mirror without letting storage throw. */
+function clearLegacyScheduledStorage(): boolean {
+  if (typeof window === 'undefined') return true;
+  const storage = localVaultStorage();
+  if (!storage || !storage.removeItem('onyx:scheduled')) return false;
+  storage.getItem('onyx:scheduled');
+  return !storage.failed;
 }
 
 /**
@@ -1417,6 +2795,8 @@ function txDone(tx: IDBTransaction): Promise<boolean> {
 /** Test hook — reset the module's cached connection and retention policy. */
 export function _resetVaultForTests(): void {
   dbPromise = null;
+  cachedEraseEpoch = 0;
+  writeReservationSeq = 0;
   _retentionPolicy = null;
   _outboxSeq = 0;
   _outboxListeners.clear();

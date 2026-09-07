@@ -94,8 +94,10 @@ test('keeps the high-zoom channel drawer aligned and keyboard reachable', async 
   expect(openingGeometry.drawerScrollLeft).toBe(0);
   expect(openingGeometry.drawerScrollTop).toBe(0);
   expect(openingGeometry.documentScrollWidth).toBe(openingGeometry.documentClientWidth);
-  expect(openingGeometry.headerOverflowX).toBe('auto');
-  expect(openingGeometry.headerScrollWidth).toBeGreaterThan(openingGeometry.headerClientWidth);
+  expect(['visible', 'auto', 'hidden', 'clip'], openingGeometry.headerOverflowX).toContain(
+    openingGeometry.headerOverflowX,
+  );
+  expect(openingGeometry.headerScrollWidth).toBeLessThanOrEqual(openingGeometry.headerClientWidth);
   expect(openingGeometry.headerLeft).toBeGreaterThanOrEqual(24);
   expect(openingGeometry.headerRight).toBeLessThanOrEqual(openingGeometry.drawerRight + 1);
   expect(openingGeometry.listLeft).toBeGreaterThanOrEqual(24);

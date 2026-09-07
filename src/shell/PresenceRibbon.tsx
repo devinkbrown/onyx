@@ -17,7 +17,7 @@
  * store reads via useStore; snapshots via getState() in handlers.
  */
 
-import { createEffect, createMemo, createSignal, onCleanup, Show, splitProps, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, lazy, onCleanup, Show, splitProps, Suspense, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPins } from '@/lib/store';
 import { openPreferences, preferences } from '@/lib/prefs/preferences';
 import { channelNotifyMode } from '@/lib/notifications/channelNotifyMode';
@@ -26,7 +26,7 @@ import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { isConsumerStewardshipRoom } from '@/lib/rooms/roomStewardship';
 import { Popover } from '@/primitives/index';
-import { ChannelSettings } from './ChannelSettings';
+const ChannelSettings = lazy(() => import('./ChannelSettings').then((m) => ({ default: m.ChannelSettings })));
 import { RoomMediaIndex } from './RoomMediaIndex';
 import { openRoomInviteShare } from './roomInviteShareState';
 import { openRoomStewardship } from './roomStewardshipState';
@@ -39,7 +39,6 @@ import { Facepile } from './Facepile';
 import { facepileInputsFromUsers } from './facepile';
 import { AiPolicyBadge } from './AiPolicyBadge';
 import { GroupControlRoomIndicator } from './GroupControlRoomIndicator';
-import { classifyCallsHubPresentation, type CallsHubPresentation } from './CallsHub';
 import { selectGroupControlRoom } from '@/lib/e2ee/groupControlSelectors';
 import { isMessageSearchOpen, openMessageSearch } from './search/useMessageSearch';
 import {
@@ -51,6 +50,16 @@ import {
 import type { AiPolicy } from '@/lib/irc/aiPolicyProp';
 import type { Channel } from '@/lib/irc/types';
 import { openDmSafetySheet } from './dmSafetySheetOpen';
+import './PresenceRibbon.css';
+
+type CallsHubPresentation = 'idle' | 'ringing_in' | 'ringing_out' | 'provisional' | 'established';
+
+function classifyCallsHubPresentation(callState: string, callStartedAt: number | null): CallsHubPresentation {
+  if (callState === 'ringing_in') return 'ringing_in';
+  if (callState === 'ringing_out') return 'ringing_out';
+  if (callState !== 'in_call') return 'idle';
+  return callStartedAt == null ? 'provisional' : 'established';
+}
 
 export type PresenceRibbonProps = {
   selfNick?: string;
@@ -559,7 +568,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     <header class="shell-ribbon" role="banner" aria-label="Room information">
       {/* Inner row shares the conversation reading measure so the title and
           place strip stay aligned to the conversation column chrome. */}
-      <div class="shell-ribbon-inner">
+      <div class="shell-ribbon-inner presence-ribbon-surface">
       {/* ── LEFT: conversation identity (what you're looking at) ── */}
       <div class="shell-ribbon-identity">
         <Show when={channelName()} fallback={
@@ -1451,11 +1460,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
       {/* Channel settings panel (topic + modes) — portaled Sheet. */}
       <Show when={settingsChannel()}>
         {(name) => (
-          <ChannelSettings
-            channel={name()}
-            open={settingsOpen()}
-            onOpenChange={setSettingsOpen}
-          />
+          <Suspense fallback={null}>
+            <ChannelSettings
+              channel={name()}
+              open={settingsOpen()}
+              onOpenChange={setSettingsOpen}
+            />
+          </Suspense>
         )}
       </Show>
       <Show when={(activeView().kind === 'channel' || activeView().kind === 'dm') ? channelName() : null}>

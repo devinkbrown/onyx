@@ -3,7 +3,7 @@
  * Consumer Block + Report copy and policy for the people card.
  *
  * Block reuses the device-local ignore list. Report is an honest composer
- * draft to the staffed #root room — there is no Trust & Safety inbox.
+ * draft to the shared #root room — there is no private Trust & Safety inbox.
  */
 
 export const PERSON_REPORT_ROOM = '#root';
@@ -70,9 +70,9 @@ export function personReportTitle(nick: string): string {
   return `Report ${sanitizePersonToken(nick, 128)}`;
 }
 
-/** Honest destination copy. This path drafts a note; it does not open a review inbox. */
+/** Honest destination copy. This path drafts a note; it does not send or file one. */
 export function personReportHonesty(): string {
-  return 'This drafts a note to #root. Send it if you want the people who run this place to see it. It is not a police report.';
+  return 'This creates a draft in the shared #root report room. It is visible to people in that room or operators, not a private inbox or police report. Nothing is sent automatically.';
 }
 
 export function isPersonReportReason(value: string): value is PersonReportReasonId {
@@ -103,6 +103,6 @@ export function formatPersonReportDraft(input: {
 export function personReportDraftToast(): { title: string; description: string } {
   return {
     title: 'Draft is in #root',
-    description: 'Send it from the composer if you want the people who run this place to see it.',
+    description: 'Review the draft in the shared room, then send it yourself if you choose.',
   };
 }

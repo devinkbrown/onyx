@@ -207,6 +207,11 @@
 
 .roadmap-summary,
 .roadmap-note p {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   color: var(--paper-dim);
   font-family: var(--font-sans);
   line-height: 1.58;
@@ -262,6 +267,27 @@
   .roadmap-page .roadmap-note h2,
   .roadmap-page .roadmap-note p {
     overflow-wrap: anywhere;
+  }
+
+  /* One rem is the largest readable heading that fits the <=64px reflow
+   * contract when the document root is enlarged to 64px. */
+  .roadmap-hero h1 {
+    max-width: none;
+    font-size: min(1rem, 64px);
+    line-height: 1.1;
+  }
+
+  .roadmap-hero {
+    max-height: calc(100svh - 1rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .roadmap-summary {
+    width: 100%;
+    font-size: min(1rem, 24px);
   }
 }
 

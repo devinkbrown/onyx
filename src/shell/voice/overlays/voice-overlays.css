@@ -252,6 +252,39 @@
   text-transform: uppercase;
 }
 
+.voice-captions__title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.voice-captions__source,
+.voice-caption-speaker__source {
+  color: var(--paper-dim);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.voice-captions__source[data-state='reconnecting'],
+.voice-captions__source[data-state='disconnected'] {
+  color: var(--shu-bright);
+}
+
+.voice-caption-speaker {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.voice-caption-speaker__source {
+  display: block;
+  font-family: var(--font-serif);
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
 .voice-captions__tools {
   display: inline-flex;
   flex-wrap: wrap;
@@ -478,6 +511,38 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-call-token::before,
+  .voice-call-token::after,
+  .voice-caption-line,
+  .voice-reaction {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .voice-captions,
+  .voice-pip,
+  .voice-reaction__nick {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .voice-call-actions .onyx-button,
+  .voice-captions__copy {
+    border: 2px solid ButtonText;
+    color: ButtonText;
+    background: ButtonFace;
+  }
+}
+
+.voice-call-actions .onyx-button,
+.voice-pip__actions .onyx-button,
+.voice-captions__copy {
+  min-height: 44px;
 }
 
 @media (max-width: 42rem) and (max-height: 30rem) {

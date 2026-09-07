@@ -53,19 +53,22 @@ describe('You settings list', () => {
     renderYou();
 
     const settings = screen.getByTestId('you-settings');
-    expect(settings).toHaveTextContent('Account and devices');
+    expect(settings).toHaveTextContent('Account');
     expect(settings).toHaveTextContent('Notifications');
     expect(settings).toHaveTextContent('Privacy');
     expect(settings).toHaveTextContent('Blocked users');
     expect(settings).toHaveTextContent('Appearance');
-    expect(settings).toHaveTextContent('Text size');
-    expect(settings).toHaveTextContent('Reduced motion');
+    expect(screen.getByRole('button', { name: 'Open appearance settings' })).toHaveTextContent('Appearance');
+    expect(settings).toHaveTextContent('Reading comfort');
+    expect(settings).toHaveTextContent('Motion and data');
     expect(settings).toHaveTextContent('Voice devices');
     expect(settings).toHaveTextContent('Language');
     expect(settings).toHaveTextContent('Download what we store');
     expect(settings).toHaveTextContent("Save this device's history");
     expect(settings).toHaveTextContent('Delete account');
-    expect(settings).toHaveTextContent('Support');
+    expect(settings).toHaveTextContent('Help and status');
+    expect(screen.getByRole('link', { name: 'About Onyx' })).toHaveAttribute('href', '/about/');
+    expect(screen.getByRole('link', { name: 'Network status' })).toHaveAttribute('href', '/status/');
     expect(settings).not.toHaveTextContent('Data export');
     expect(settings).not.toHaveTextContent('Your data');
     expect(settings).toHaveTextContent('Advanced');

@@ -32,6 +32,8 @@ describe('planOperAction — broadcast', () => {
     expect(command.params).toEqual(['BROADCAST', 'Maintenance at 03:00 UTC']);
     expect(command.destructive).toBe(true);
     expect(command.summary).toContain('Maintenance at 03:00 UTC');
+    expect(command.summary).toContain('operators subscribed to ANNOUNCE');
+    expect(command.summary).not.toMatch(/every connected member/iu);
   });
 
   it('refuses an empty broadcast', () => {
@@ -90,8 +92,24 @@ describe('planOperAction — OBSERVE', () => {
     expect(command.params).toEqual(['OBSERVE', 'a!b@c', 'connect', 'nick', 'oper']);
   });
 
+  it('accepts the daemon OBSERVE action tokens including join/part/host', () => {
+    const command = planned({
+      kind: 'observe',
+      mask: 'a!b@c',
+      actions: ['join', 'part', 'host'],
+    });
+    expect(command.params).toEqual(['OBSERVE', 'a!b@c', 'join', 'part', 'host']);
+  });
+
   it('refuses an unknown filter rather than dropping it silently', () => {
-    expect(refused({ kind: 'observe', mask: 'a!b@c', actions: ['part'] })).toHaveLength(1);
+    expect(refused({ kind: 'observe', mask: 'a!b@c', actions: ['spy'] })).toHaveLength(1);
+  });
+
+  it('accepts a mask at the daemon 256-byte ceiling and refuses one byte over', () => {
+    const at_limit = `n!u@${'x'.repeat(252)}`;
+    expect(at_limit.length).toBe(256);
+    expect(planned({ kind: 'observe', mask: at_limit }).params[1]).toBe(at_limit);
+    expect(refused({ kind: 'observe', mask: `${at_limit}y` })).toHaveLength(1);
   });
 
   it('refuses an all-wildcard mask that would observe the whole network', () => {

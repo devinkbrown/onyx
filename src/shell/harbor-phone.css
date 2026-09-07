@@ -616,6 +616,18 @@
   }
 }
 
+/* At short-height text reflow Search remains a primary, reachable action.
+   Keep it in the ribbon even though the normal phone chrome recedes it. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .shell-ribbon-search {
+    display: inline-flex !important;
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 @media (max-width: 480px) {
   .shell-members {
     width: 100vw;

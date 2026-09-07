@@ -838,7 +838,7 @@ describe('<MessageMenu>', () => {
     render(() => (
       <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
     ));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy text from message from alice' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy text from message from alice' }));
 
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith('copy this text');
@@ -866,7 +866,7 @@ describe('<MessageMenu>', () => {
     render(() => (
       <MessageMenu msg={msg} target="alice" selfNick="bob" canEdit={false} menuOpen />
     ));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy text from message from alice' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy text from message from alice' }));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
     expect(writeText).toHaveBeenCalledWith('private hello');
@@ -916,7 +916,7 @@ describe('<MessageMenu>', () => {
 
     expect(screen.queryByRole('menuitem', { name: 'Edit message from alice' })).toBeNull();
     expect(screen.queryByTestId('msg-menu-edit')).toBeNull();
-    expect(screen.getByRole('menuitem', { name: 'Reply to message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reply to alice' })).toBeInTheDocument();
   });
 
   it('reports rejected clipboard writes without a persistence fallback', async () => {
@@ -937,7 +937,7 @@ describe('<MessageMenu>', () => {
     render(() => (
       <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
     ));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy text from message from alice' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy text from message from alice' }));
 
     await waitFor(() => {
       expect(screen.getByRole('status')).toHaveTextContent(
@@ -970,7 +970,7 @@ describe('<MessageMenu>', () => {
       <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
     ));
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy text from message from alice' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy text from message from alice' }));
     expect(writeText).toHaveBeenCalledOnce();
     view.unmount();
     resolveCopy?.();
@@ -1116,14 +1116,12 @@ describe('<MessageMenu>', () => {
       <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit canRedact menuOpen />
     ));
 
-    const firstItem = screen.getByRole('menuitem', { name: 'Copy text from message from alice' });
+    const firstItem = screen.getByRole('menuitem', { name: 'Quote message from alice in composer' });
     // Focus is moved on open (queueMicrotask), so wait for it to settle.
     await waitFor(() => expect(document.activeElement).toBe(firstItem));
     // Roving tabindex: only the focused item is in the Tab sequence.
     expect(firstItem).toHaveAttribute('tabindex', '0');
-    expect(
-      screen.getByRole('menuitem', { name: 'Quote message from alice in composer' }),
-    ).toHaveAttribute('tabindex', '-1');
+    expect(firstItem).toHaveAttribute('tabindex', '0');
   });
 
   it('navigates menu items with Arrow, Home and End keys (roving focus)', async () => {
@@ -1141,8 +1139,8 @@ describe('<MessageMenu>', () => {
     ));
 
     const menu = screen.getByRole('menu', { name: 'More actions for message from alice' });
-    const first = screen.getByRole('menuitem', { name: 'Copy text from message from alice' });
-    const second = screen.getByRole('menuitem', { name: 'Quote message from alice in composer' });
+    const first = screen.getByRole('menuitem', { name: 'Quote message from alice in composer' });
+    const second = screen.getByRole('menuitem', { name: 'Copy moment link for message from alice' });
     const last = screen.getByRole('menuitem', { name: 'Delete message from alice for everyone' });
 
     await waitFor(() => expect(document.activeElement).toBe(first));
@@ -1192,8 +1190,10 @@ describe('<MessageMenu>', () => {
     expect(screen.getByRole('button', { name: 'More actions for message from alice' })).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'More actions for message from alice' })).toBeInTheDocument();
     expect(screen.getByRole('menu', { name: 'More actions for message from alice' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy text from message from alice' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Reply to message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy text from message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reply to alice' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Copy text from message from alice' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Reply to message from alice' })).toBeNull();
     expect(screen.getByRole('menuitem', { name: 'Edit message from alice' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Delete message from alice for everyone' })).toBeInTheDocument();
   });
@@ -1303,9 +1303,9 @@ describe('<MessageMenu>', () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(restoredDelete);
       expect(restoredDelete).toHaveAttribute('tabindex', '0');
-      expect(screen.getByRole('menuitem', {
+      expect(screen.getByRole('button', {
         name: 'Copy text from message from alice',
-      })).toHaveAttribute('tabindex', '-1');
+      })).toBeInTheDocument();
     });
     expect(remove).not.toHaveBeenCalled();
 

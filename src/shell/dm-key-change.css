@@ -111,6 +111,17 @@
     transform var(--dur) var(--ease);
 }
 
+.dm-keychange__accept:focus-visible,
+.dm-keychange__dismiss:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 3px;
+}
+
+.dm-keychange__accept:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 /* Accept is the forward action AFTER verification — the confident primary (azure),
    not tinted red: the alarm is the banner chrome, not the button. */
 .dm-keychange__accept {
@@ -215,5 +226,12 @@
 
   .dm-keychange__col[data-tone='pending'] {
     border-color: Mark;
+  }
+
+  .dm-keychange__accept,
+  .dm-keychange__dismiss {
+    border: 1px solid ButtonText;
+    color: ButtonText;
+    background: ButtonFace;
   }
 }

@@ -50,8 +50,8 @@ export function outboxComposerChrome(input: {
       return {
         kind: 'empty-offline',
         count: 0,
-        label: 'Offline · Messages queue on this device',
-        announcement: 'Offline. Messages you send will queue on this device.',
+        label: 'Offline · Saved on this device',
+      announcement: 'Offline. Messages you send are saved on this device.',
         tone: 'offline',
         canRetry: false,
       };
@@ -65,8 +65,8 @@ export function outboxComposerChrome(input: {
     return {
       kind: 'queued-offline',
       count: queuedCount,
-      label: `Queued (${queuedCount}) · Will send on reconnect`,
-      announcement: `${countPhrase} queued. Will send on reconnect.`,
+      label: `Saved (${queuedCount}) · Sends when you reconnect`,
+      announcement: `${countPhrase} saved on this device. Sends when you reconnect.`,
       tone: 'queued',
       canRetry: false,
     };
@@ -76,8 +76,8 @@ export function outboxComposerChrome(input: {
     return {
       kind: 'failed-online',
       count: queuedCount,
-      label: `Queued (${queuedCount}) · Couldn't send — retry`,
-      announcement: `${countPhrase} still queued. Sending failed. Retry available.`,
+      label: `Retryable (${queuedCount}) · Could not send yet`,
+      announcement: `${countPhrase} could not send yet. Retry available after you review.`,
       tone: 'error',
       canRetry: true,
     };
@@ -86,7 +86,7 @@ export function outboxComposerChrome(input: {
   return {
     kind: 'queued-online',
     count: queuedCount,
-    label: `Queued (${queuedCount}) · Waiting to send`,
+      label: `Awaiting send (${queuedCount}) · Still waiting`,
     announcement: `${countPhrase} still queued. Waiting to send.`,
     tone: 'warning',
     canRetry: true,
@@ -97,17 +97,38 @@ export function outboxComposerChrome(input: {
 export function outboxHomeChrome(input: {
   connected: boolean;
   queuedCount: number;
+  prunePendingCount?: number;
+  uncertainCount?: number;
   deliveryFailed?: boolean;
 }): OutboxHomeChrome | null {
   const queuedCount = Math.max(0, Math.floor(input.queuedCount));
   if (queuedCount <= 0) return null;
 
-  const countPhrase = queuedCount === 1 ? '1 queued send' : `${queuedCount} queued sends`;
+  const countPhrase = queuedCount === 1 ? '1 saved message' : `${queuedCount} saved messages`;
   const deliveryFailed = input.deliveryFailed === true;
+  const prunePendingCount = Math.max(0, Math.floor(input.prunePendingCount ?? 0));
+  const uncertainCount = Math.max(0, Math.floor(input.uncertainCount ?? 0));
+
+  if (prunePendingCount > 0) {
+    return {
+      title: 'Saved messages need review',
+      detail: `${prunePendingCount} sent message${prunePendingCount === 1 ? '' : 's'} remain stored on this device. Review is still pending; this does not cancel delivery.`,
+      tone: 'warning',
+      showRetry: true,
+    };
+  }
+  if (uncertainCount > 0) {
+    return {
+      title: 'Delivery is uncertain',
+      detail: `${uncertainCount} message${uncertainCount === 1 ? '' : 's'} may have reached the connection. They will not be sent again automatically; review before recovering.`,
+      tone: 'error',
+      showRetry: false,
+    };
+  }
 
   if (!input.connected) {
     return {
-      title: 'Queued on this device',
+      title: 'Saved on this device',
       detail: `${countPhrase} will send when you reconnect.`,
       tone: 'queued',
       showRetry: false,
@@ -116,15 +137,15 @@ export function outboxHomeChrome(input: {
 
   if (deliveryFailed) {
     return {
-      title: 'Queued on this device',
-      detail: `${countPhrase} could not be delivered. Try sending now, or open a conversation to review.`,
+      title: 'Retryable messages',
+      detail: `${countPhrase} could not be sent yet. Try again only after reviewing the conversation.`,
       tone: 'error',
       showRetry: true,
     };
   }
 
   return {
-    title: 'Queued on this device',
+    title: 'Awaiting send',
     detail: `${countPhrase} still waiting. Try sending now if the room is ready.`,
     tone: 'warning',
     showRetry: true,

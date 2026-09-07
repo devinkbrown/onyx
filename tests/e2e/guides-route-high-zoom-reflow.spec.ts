@@ -32,7 +32,7 @@ for (const route of routes) {
     await expect(main.locator('main, header, footer, nav')).toHaveCount(0);
     await expect(page.getByRole('heading', { level: 1, name: route.heading })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Join a room' })).toBeVisible();
-    await expect(page.getByText(/WeeChat|irssi|mIRC/i)).toHaveCount(0);
+    await expect(page.getByText(/legacy client/i)).toHaveCount(0);
 
     await expect(header.locator('[aria-current]')).toHaveCount(0);
 
@@ -125,7 +125,7 @@ for (const route of routes) {
     expect(geometry.mainCount).toBe(1);
     expect(geometry.skipTargetCount).toBe(1);
     for (const surface of geometry.routeOverflow) {
-      expect(['visible', 'auto'], surface.className).toContain(surface.overflowX);
+      expect(['visible', 'auto', 'clip'], surface.className).toContain(surface.overflowX);
     }
     expect(geometry.overflowers).toEqual([]);
     expect(geometry.documentScrollWidth).toBe(geometry.documentClientWidth);

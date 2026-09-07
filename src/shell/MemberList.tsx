@@ -50,6 +50,7 @@ import { Avatar, Popover, IconButton } from '@/primitives/index';
 import { ModerationActionReview } from './moderation/ModerationActionReview';
 import { PeopleProfileCard } from './PeopleProfileCard';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
+import './participant-presence.css';
 
 // Role resolution, grouping, and identity-stable reconciliation live in
 // `@/lib/memberGroups` (unit-tested there). See that module for why entry/group
@@ -206,7 +207,7 @@ function MemberRow(props: MemberRowProps): JSX.Element {
               </span>
             </span>
             <span class="sr-only">
-              Open member details for {props.user.nick}, {props.role.label}{props.user.away ? ', away' : ''}
+              Open member details for {props.user.nick}, {props.role.label}, {props.user.away ? 'away' : 'here'}
             </span>
             <Show when={props.role.key !== 'member'}>
               <RoleBadge role={props.role} decorative />

@@ -25,9 +25,11 @@ import {
   createMemo,
   createSignal,
   For,
+  lazy,
   onCleanup,
   Show,
   splitProps,
+  Suspense,
   type JSX,
 } from 'solid-js';
 import {
@@ -78,9 +80,10 @@ import {
   downloadConversationExport,
 } from '@/lib/export/conversationExport';
 import { BridgeStatusBadge } from './BridgeStatusBadge';
-import { RoomInsightsStrip } from './RoomInsightsStrip';
+const RoomInsightsStrip = lazy(() => import('./RoomInsightsStrip').then((m) => ({ default: m.RoomInsightsStrip })));
 import { openLeaveRoomConfirm } from './roomVerbConfirm';
 import { ROOM_VERB_COPY } from '@/lib/roomListVerbs';
+import './ChannelSettings.css';
 
 // Common simple channel flags exposed as toggles. Letters match Onyx Server's
 // CHANMODES group D (flags) — see ISUPPORT `imnstCTNMSgWOA`.
@@ -612,7 +615,14 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
       closeLabel="Close room settings"
       data-testid="channel-settings"
     >
-      <div class="shell-chset">
+      <div class="shell-chset channel-settings-surface">
+        <div class="channel-settings-context" role="status" aria-live="polite">
+          <span class="channel-settings-context-dot" aria-hidden="true" />
+          <span>
+            {isConnected() ? 'Changes apply to this room' : 'Offline — changes wait for reconnect'}
+          </span>
+          <span class="channel-settings-context-state">{isOp() ? 'Host access' : 'Member access'}</span>
+        </div>
         {/* ── Topic ── */}
         <section class="shell-chset-section" aria-labelledby="chset-topic-heading">
           <h3 id="chset-topic-heading" class="shell-chset-heading">Topic</h3>
@@ -1231,7 +1241,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
         {/* ── Public room insights (B10) ── */}
         <section class="shell-chset-section" aria-labelledby="chset-insights-heading">
           <h3 id="chset-insights-heading" class="shell-chset-heading">Public insights</h3>
-          <RoomInsightsStrip />
+          <Suspense fallback={null}><RoomInsightsStrip /></Suspense>
         </section>
 
         {/* ── Integrations ── */}

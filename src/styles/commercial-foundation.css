@@ -1,0 +1,116 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/*
+ * Commercial foundation: additive aliases for product-facing surfaces.
+ * Existing theme variables remain owned by the theme system; these names make
+ * their intent legible to the commercial shell and public front door.
+ */
+:root {
+  /* Astra's product vocabulary: surfaces and states consume these aliases,
+     while the existing theme remains the source of actual color values. */
+  --commercial-ink: var(--ink);
+  --commercial-slate: var(--stone);
+  --commercial-paper: var(--paper);
+  --commercial-mist: var(--paper-dim);
+  --commercial-tide: var(--lapis);
+  --commercial-coral: var(--shu);
+
+  --commercial-surface-overlay: color-mix(in oklab, var(--commercial-slate) 92%, transparent);
+  --commercial-surface-inverse: var(--commercial-paper);
+  --commercial-text-muted: var(--paper-mute);
+  --commercial-text-inverse: var(--commercial-ink);
+  --commercial-action-secondary: var(--commercial-slate);
+  --commercial-action-selected: var(--commercial-tide);
+  --commercial-status-info: var(--commercial-tide);
+  --commercial-status-success: var(--ok);
+  --commercial-status-warning: var(--shu-bright);
+  --commercial-protection-ready: var(--commercial-tide);
+  --commercial-protection-review: var(--shu-bright);
+  --commercial-protection-unavailable: var(--commercial-coral);
+  --commercial-font-body: var(--font-sans);
+  --commercial-font-display: var(--font-serif);
+  --commercial-leading-body: 1.5;
+
+  --commercial-surface-canvas: var(--commercial-ink);
+  --commercial-surface-raised: var(--commercial-slate);
+  --commercial-surface-paper: var(--commercial-paper);
+  --commercial-text-primary: var(--commercial-paper);
+  --commercial-text-secondary: var(--commercial-mist);
+  --commercial-action-primary: var(--commercial-tide);
+  --commercial-status-danger: var(--commercial-coral);
+  --commercial-border-subtle: var(--line);
+  --commercial-border-strong: var(--stone-3);
+  --commercial-border-focus: var(--commercial-tide);
+  --commercial-target: var(--target-min, 44px);
+  --commercial-radius-control: var(--r-md, 8px);
+  --commercial-radius-panel: var(--r-lg, 12px);
+  --commercial-motion-control: 120ms;
+  --commercial-motion-disclosure: 180ms;
+}
+
+/* Reusable contracts are opt-in and therefore cannot restyle legacy surfaces. */
+.ui-commercial .commercial-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ui-commercial .commercial-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2, 0.5rem) var(--space-4, 1rem);
+}
+
+.ui-commercial :where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--commercial-border-focus);
+  outline-offset: 3px;
+}
+
+.ui-commercial :where(a, button, [role='button']) {
+  min-height: var(--commercial-target);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-commercial *,
+  .ui-commercial *::before,
+  .ui-commercial *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ui-commercial :where(.commercial-translucent, [data-commercial-translucent]) {
+    background: var(--commercial-surface-raised) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-reduced-data: reduce) {
+  .ui-commercial [data-commercial-optional-media] {
+    display: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .ui-commercial :where(*, *::before, *::after) {
+    box-shadow: none !important;
+  }
+
+  .ui-commercial :where(a, button, [role='button']) {
+    border: 1px solid ButtonText;
+  }
+
+  .ui-commercial :where(a, button, [role='button']):focus-visible {
+    outline: 2px solid Highlight;
+  }
+}

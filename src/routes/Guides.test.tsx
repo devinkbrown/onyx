@@ -71,10 +71,12 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
     expect(screen.getByText(/official app/)).toBeInTheDocument();
     expect(container.textContent).not.toMatch(FORBIDDEN);
     expect(container.textContent).not.toMatch(/Anton|neon/i);
-    expect(screen.queryByRole('heading', { name: /WeeChat|irssi|mIRC/i })).toBeNull();
     const optional = container.querySelector('.guides-card--optional');
-    expect(optional?.textContent).toMatch(/WeeChat/);
-    expect(optional?.textContent).toMatch(/irssi/);
+    expect(optional).not.toBeNull();
+    expect(optional).toHaveTextContent(/optional/i);
+    expect(optional).toHaveTextContent(/official Onyx app.*usual way/i);
+    expect(optional?.textContent).not.toMatch(/WeeChat|irssi|mIRC|IRCv3|\bIRC\b/i);
+    expect(screen.queryByRole('heading', { name: /WeeChat|irssi|mIRC|IRCv3|\bIRC\b/i })).toBeNull();
   });
 
   it('keeps the how-tos in newcomer order with another client last', () => {

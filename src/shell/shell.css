@@ -51,6 +51,36 @@
   /* Hard product strata sit on opaque chrome; keep only a faint canvas wash so
      the page-layer Background still breathes without softening column planes. */
   background: color-mix(in oklab, var(--ink) 72%, transparent);
+  /* Chat column veil — shared by conversation, ribbon, composer so scenes show through. */
+  --shell-chat-veil: color-mix(in oklab, var(--ink) 38%, transparent);
+  --shell-chat-chrome-veil: color-mix(in oklab, var(--ink) 55%, transparent);
+}
+
+/* Reduce transparency: opt out of the veil (and the canvas wash above) at their
+   single declaration site. a11y-media.css:73-90 already force-solids .shell,
+   .shell-conversation, .shell-ribbon and .shell-composer, but those rules carry
+   the same 0,1,0 specificity as the declarations here and shell.css loads after
+   it (index.tsx imports a11y-media.css; AppShell imports shell.css), so the
+   translucent values win on source order and quietly cancel the guarantee.
+   Overriding the VARIABLE keeps one source of truth for the veil and needs no
+   !important; values match the colours a11y-media.css asks for (stone for the
+   message column, ink for its chrome). `[data-reduce-transparency='false']`
+   stays the in-app override of the OS preference, as in preferences.css. */
+:root[data-reduce-transparency='true'] .shell,
+:root[data-prefers-reduced-transparency='true'] .shell {
+  --shell-chat-veil: var(--stone);
+  --shell-chat-chrome-veil: var(--ink);
+
+  background: var(--ink);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-reduce-transparency='false']) .shell {
+    --shell-chat-veil: var(--stone);
+    --shell-chat-chrome-veil: var(--ink);
+
+    background: var(--ink);
+  }
 }
 
 .shell > * {
@@ -945,11 +975,17 @@
   align-items: center;
   gap: 2px;
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .shell-channel-row .shell-channel-item {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  width: auto;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .shell-channel-star {
@@ -1256,7 +1292,7 @@
   border-left: 1px solid var(--seam);
   border-radius: 0;
   box-shadow: none;
-  background: color-mix(in oklab, var(--ink) 96%, var(--stone));
+  background: var(--shell-chat-veil);
   overflow: hidden;
 }
 
@@ -1335,38 +1371,24 @@
   }
 }
 
-.moderation-cockpit { display: grid; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--seam-faint); }
-.moderation-cockpit__head { display: flex; align-items: start; justify-content: space-between; gap: var(--space-2); }
-.moderation-cockpit__head h3, .moderation-cockpit__eyebrow, .moderation-cockpit__empty, .moderation-cockpit__hint { margin: 0; }
-.moderation-cockpit__head h3 { color: var(--paper); font-size: var(--text-md); }
-.moderation-cockpit__eyebrow { color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
-.moderation-cockpit__state { color: var(--ok); font: 700 var(--text-2xs)/1.2 var(--font-mono); text-align: right; }
-.moderation-cockpit__state--offline { color: var(--warn); }
-.moderation-cockpit__empty, .moderation-cockpit__hint { color: var(--paper-mute); font-size: var(--text-sm); line-height: var(--leading-body); }
-.moderation-cockpit__modes { display: grid; gap: 5px; }
-.moderation-cockpit__mode { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 8px 10px; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: transparent; color: var(--paper); text-align: left; cursor: pointer; }
-.moderation-cockpit__mode small { color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); }
-.moderation-cockpit__mode[aria-pressed='true'] { border-color: color-mix(in oklab, var(--lapis) 55%, var(--seam)); background: color-mix(in oklab, var(--lapis) 16%, transparent); }
-.moderation-cockpit__mode:disabled { cursor: not-allowed; opacity: .55; }
-.moderation-cockpit__form { display: grid; gap: 6px; }
-.moderation-cockpit__form label { color: var(--paper-dim); font-size: var(--text-sm); font-weight: 650; }
-.moderation-cockpit__form > div { display: flex; gap: 6px; }
-.moderation-cockpit__form input { min-width: 0; flex: 1; min-height: 40px; padding: 7px 9px; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: var(--surface-void); color: var(--paper); font: var(--text-sm) var(--font-sans); }
-.moderation-cockpit__form button { min-height: 40px; padding: 7px 10px; border: 1px solid var(--seam); border-radius: var(--r-sm); background: var(--surface-raised); color: var(--paper); font: 650 var(--text-sm)/1 var(--font-sans); cursor: pointer; }
-.moderation-cockpit__form button:disabled { cursor: not-allowed; opacity: .55; }
-.moderation-cockpit__form--danger > div button, .moderation-cockpit__confirm-action { border-color: color-mix(in oklab, var(--shu) 55%, var(--seam)); }
-.moderation-cockpit__confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px; border: 1px solid color-mix(in oklab, var(--shu) 42%, var(--seam)); border-radius: var(--r-sm); background: color-mix(in oklab, var(--shu) 10%, transparent); }
-.moderation-cockpit__confirm p { flex: 1 0 100%; margin: 0; color: var(--paper); font-size: var(--text-sm); }
-.moderation-cockpit__confirm code { overflow-wrap: anywhere; }
-.moderation-cockpit__protocol { color: var(--paper-mute); font-size: var(--text-sm); line-height: var(--leading-body); }
-.moderation-cockpit__protocol summary { min-height: 32px; color: var(--paper-dim); cursor: pointer; font-weight: 650; }
-.moderation-cockpit__protocol p { margin: 6px 0; }
-.moderation-cockpit__protocol code { display: block; padding: 7px 8px; overflow-wrap: anywhere; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: var(--surface-void); color: var(--paper-dim); font: var(--text-2xs) var(--font-mono); }
 
 /* Ribbon is the only visible room header. Keep this strip in the tree for
    AT / tests, but do not stack a second orientation chrome under PresenceRibbon. */
 .shell-room-current {
   display: none;
+}
+
+/* The room-current host is also the desktop Context entry point. Keep it in
+   the ribbon's corner so the control remains discoverable without consuming a
+   fourth grid column before the rail is opened. */
+@media (min-width: 901px) {
+  .shell-room-current {
+    display: block;
+    position: absolute;
+    top: 56px;
+    right: var(--space-3);
+    z-index: 4;
+  }
 }
 .shell-room-current__kicker {
   flex: 0 0 auto;
@@ -1433,401 +1455,6 @@
   }
 }
 
-/* ── Watch-together launcher/editor ───────────────────────────────────── */
-.shell-watch-start {
-  flex: none;
-  width: 100%;
-  padding: 7px clamp(12px, 2vw, 20px);
-  border-bottom: 1px solid var(--seam-faint);
-  box-sizing: border-box;
-  font-family: var(--font-mono);
-}
-
-.shell-watch-start__launcher {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 9px;
-  width: min(100%, 360px);
-  min-height: 42px;
-  padding: 6px 9px;
-  color: var(--paper);
-  border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--stone) 50%, transparent);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color var(--dur) var(--ease),
-    background var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
-}
-
-.shell-watch-start__launcher:hover,
-.shell-watch-start__launcher:focus-visible {
-  border-color: color-mix(in oklab, var(--lapis-bright) 64%, var(--seam));
-  background: color-mix(in oklab, var(--lapis-deep) 18%, var(--stone));
-}
-
-.shell-watch-start__launcher:active {
-  transform: translateY(1px);
-}
-
-.shell-watch-start__cue {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  color: var(--ink);
-  border-radius: 50%;
-  background: var(--lapis-bright);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent);
-  font-size: 9px;
-  line-height: 1;
-}
-
-.shell-watch-start__launcher-copy {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.shell-watch-start__launcher-copy strong {
-  overflow: hidden;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shell-watch-start__launcher-copy span {
-  overflow: hidden;
-  color: var(--paper-mute);
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shell-watch-start__launcher-action {
-  color: var(--lapis-bright);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.shell-watch-start__dialog-content,
-.shell-watch-start__review {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.shell-watch-start__dialog-content {
-  color: var(--paper);
-  font-family: var(--font-mono);
-}
-
-.shell-watch-start__heading {
-  overflow-wrap: anywhere;
-  font-size: 14px;
-  line-height: 1.25;
-}
-
-.shell-watch-start__summary {
-  max-width: 70ch;
-  margin: 0;
-  color: var(--paper-dim);
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-.shell-watch-start__fields {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.38fr);
-  gap: 10px;
-}
-
-.shell-watch-start__field {
-  display: grid;
-  align-content: start;
-  gap: 5px;
-  min-width: 0;
-  color: var(--paper-dim);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.shell-watch-start__field--title {
-  grid-column: 1 / -1;
-}
-
-.shell-watch-start__field input {
-  width: 100%;
-  min-width: 0;
-  min-height: 34px;
-  padding: 6px 8px;
-  color: var(--paper);
-  border: 1px solid var(--seam);
-  border-radius: var(--r-sm);
-  outline: none;
-  background: color-mix(in oklab, var(--ink) 58%, var(--stone-2));
-  box-sizing: border-box;
-  font: inherit;
-  font-size: 11px;
-  text-transform: none;
-}
-
-.shell-watch-start__field input:focus {
-  border-color: var(--lapis-bright);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lapis-bright) 22%, transparent);
-}
-
-.shell-watch-start__feedback {
-  color: var(--paper-dim);
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-.shell-watch-start__feedback[role='alert'] {
-  color: var(--shu-bright);
-}
-
-.shell-watch-start__feedback--launcher {
-  display: block;
-  width: min(100%, 680px);
-  margin-top: 6px;
-}
-
-.shell-watch-start__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 7px;
-}
-
-.shell-watch-start__primary,
-.shell-watch-start__secondary {
-  min-height: 30px;
-  padding: 5px 9px;
-  border: 1px solid var(--seam);
-  border-radius: var(--r-sm);
-  font: inherit;
-  font-size: 10px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.shell-watch-start__primary {
-  color: var(--ink);
-  border-color: var(--lapis-bright);
-  background: var(--lapis-bright);
-}
-
-.shell-watch-start__secondary {
-  color: var(--paper-dim);
-  background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
-}
-
-.shell-watch-start__primary:hover,
-.shell-watch-start__primary:focus-visible {
-  background: var(--lapis);
-  border-color: var(--lapis);
-}
-
-.shell-watch-start__secondary:hover,
-.shell-watch-start__secondary:focus-visible {
-  color: var(--paper);
-  border-color: var(--lapis-bright);
-}
-
-.shell-watch-start__review-details {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
-}
-
-.shell-watch-start__review-details div {
-  min-width: 0;
-  padding: 8px 9px;
-  border: 1px solid var(--seam-faint);
-  border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--ink) 42%, transparent);
-}
-
-.shell-watch-start__review-details dt {
-  color: var(--paper-mute);
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.shell-watch-start__review-details dd {
-  overflow-wrap: anywhere;
-  margin: 3px 0 0;
-  color: var(--paper);
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-/* ── Watch-together room activity ─────────────────────────────────────── */
-.shell-watch-together {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 7px clamp(12px, 2vw, 20px);
-  border-bottom: 1px solid var(--seam-faint);
-  background: color-mix(in oklab, var(--stone) 52%, transparent);
-  font-family: var(--font-mono);
-}
-
-.shell-watch-together__pulse {
-  width: 8px;
-  height: 8px;
-  flex: none;
-  border-radius: 999px;
-  background: var(--lapis-bright);
-  box-shadow: none;
-}
-
-.shell-watch-together[data-state='paused'] .shell-watch-together__pulse {
-  background: var(--gold-bright);
-  box-shadow: none;
-}
-
-.shell-watch-together[data-state='handoff'] .shell-watch-together__pulse,
-.shell-watch-together[data-state='seeking'] .shell-watch-together__pulse {
-  background: var(--shu);
-  box-shadow: none;
-}
-
-.shell-watch-together__main {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.shell-watch-together__label {
-  color: var(--paper-mute);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.shell-watch-together__title {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--paper);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shell-watch-together__meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  color: var(--paper-dim);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.shell-watch-together__meta span {
-  padding: 4px 7px;
-  border: 1px solid var(--seam-faint);
-  border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--ink) 42%, transparent);
-}
-
-.shell-watch-together__controls {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 5px;
-  min-width: 0;
-  flex: none;
-}
-
-.shell-watch-together__ctl,
-.shell-watch-together__join {
-  min-height: 28px;
-  padding: 4px 8px;
-  color: var(--paper);
-  border: 1px solid var(--seam);
-  border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
-  font: inherit;
-  font-size: 10px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.shell-watch-together__ctl:hover,
-.shell-watch-together__ctl:focus-visible,
-.shell-watch-together__join:hover,
-.shell-watch-together__join:focus-visible {
-  color: var(--ink);
-  border-color: var(--lapis-bright);
-  background: var(--lapis-bright);
-}
-
-.shell-watch-together__accept {
-  flex: none;
-  color: var(--ok);
-  border-color: color-mix(in oklab, var(--ok) 44%, var(--seam));
-}
-
-.shell-watch-together__seek {
-  width: clamp(72px, 9vw, 116px);
-  accent-color: var(--lapis-bright);
-}
-
-.shell-watch-together__handoff-label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--paper-dim);
-  font-size: 9px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.shell-watch-together__handoff-select {
-  width: clamp(76px, 8vw, 108px);
-  min-height: 28px;
-  padding: 3px 20px 3px 6px;
-  color: var(--paper);
-  border: 1px solid var(--seam);
-  border-radius: var(--r-sm);
-  background: var(--stone-2);
-  font: inherit;
-  font-size: 10px;
-  text-transform: none;
-}
-
-.shell-watch-together__open {
-  flex: none;
-  color: var(--lapis-bright);
-  font-size: 10px;
-  font-weight: 800;
-  text-decoration: none;
-  text-transform: uppercase;
-}
-
-.shell-watch-together__open:hover,
-.shell-watch-together__open:focus-visible {
-  color: var(--paper);
-}
-
 /* ── Presence ribbon ── */
 .shell-ribbon {
   position: relative;
@@ -1838,7 +1465,7 @@
   padding: 0 clamp(12px, 1.8vw, 20px);
   /* Commercial header budget — 56px desktop, primary Call/People/More ≥40px. */
   height: 56px;
-  background: color-mix(in oklab, var(--surface-void, var(--ink)) 96%, var(--surface-face, var(--stone)));
+  background: var(--shell-chat-chrome-veil);
   border-bottom: 1px solid var(--seam);
   overflow: hidden;
 }
@@ -4682,7 +4309,7 @@
   position: relative;
   flex: none;
   padding: var(--space-2) var(--space-3) var(--space-3);
-  background: color-mix(in oklab, var(--ink) 96%, var(--stone));
+  background: var(--shell-chat-chrome-veil);
   border-top: 1px solid var(--seam);
 }
 
@@ -5319,6 +4946,14 @@
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--seam-faint) transparent;
+}
+
+/* Desktop fields use the compact 42px optical baseline; mobile keeps the
+   44px touch target in the responsive layer below. */
+@media (min-width: 901px) {
+  .shell-composer-textarea {
+    --composer-field-height: 42px;
+  }
 }
 
 .shell-composer-textarea::placeholder { color: var(--paper-mute); }
@@ -6545,6 +6180,7 @@
     z-index: 90;
     width: min(300px, 88vw);
     max-width: 320px;
+    box-sizing: border-box;
     padding-top: env(safe-area-inset-top, 0px);
     padding-left: env(safe-area-inset-left, 0px);
     transform: translateX(-100%);
@@ -6574,16 +6210,20 @@
     align-items: center;
     justify-content: space-between;
     box-sizing: border-box;
-    width: min(300px, 88vw);
-    max-width: 320px;
+    width: min(300px, calc(88vw - env(safe-area-inset-left, 0px)));
+    max-width: min(300px, calc(88vw - env(safe-area-inset-left, 0px)));
+    max-inline-size: 100%;
     gap: 4px;
     min-height: 48px;
     padding: 0 4px 0 max(8px, env(safe-area-inset-left, 0px));
     border-bottom: 1px solid var(--seam-faint);
     background: color-mix(in oklab, var(--ink) 96%, var(--stone));
   }
-  .shell-room-switcher-sheet__bar p { min-width: 0; margin: 0; overflow: hidden; color: var(--paper); font: 650 var(--text-md)/1 var(--font-sans); text-overflow: ellipsis; white-space: nowrap; }
-  .shell-room-switcher-sheet__bar button { display: grid; place-items: center; width: 44px; min-width: 44px; height: 44px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--paper-dim); font-size: 1.3rem; cursor: pointer; }
+  .shell-room-switcher-sheet__bar > div:first-child { flex: 1 1 auto; min-width: 0; min-inline-size: 0; max-width: 100%; overflow: hidden; }
+  .shell-room-switcher-sheet__bar p,
+  .shell-room-switcher-sheet__bar .shell-room-switcher-sheet__hint { min-width: 0; max-width: 100%; margin: 0; overflow: hidden; color: var(--paper); overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
+  .shell-room-switcher-sheet__bar p { font: 650 var(--text-md)/1 var(--font-sans); }
+  .shell-room-switcher-sheet__bar button { flex: 0 0 44px; display: grid; place-items: center; width: 44px; min-width: 44px; height: 44px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--paper-dim); font-size: 1.3rem; cursor: pointer; }
   .shell-room-switcher-sheet__bar button:hover, .shell-room-switcher-sheet__bar button:focus-visible { background: color-mix(in oklab, var(--lapis) 16%, transparent); color: var(--paper); outline: none; }
   /* The open class lives on the wrapper; flip the fixed child's transform.
      (A transform on the wrapper itself would make the fixed child a containing
@@ -7787,7 +7427,12 @@
   }
 
   .shell-sidebar-head button {
+    flex: 0 0 auto;
     scroll-margin-inline: 12px;
+  }
+
+  .shell-sidebar-head > * {
+    flex: 0 0 auto;
   }
 
   .shell-sidebar-head {
@@ -7799,6 +7444,8 @@
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scrollbar-width: thin;
+    box-sizing: border-box;
+    max-inline-size: 100%;
   }
 
   .shell-sidebar .shell-notify-quiet-popover .onyx-popover__trigger {
@@ -7893,6 +7540,91 @@
     min-height: 44px;
     padding: 6px 8px;
     font-size: 14px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .shell-sidebar-head > *,
+  .shell-sidebar-scroll,
+  .shell-sidebar-scroll > *,
+  .shell-sidebar-scroll .shell-sidebar-section,
+  .shell-sidebar-scroll .shell-channel-item {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .shell-sidebar-scroll .shell-channel-item * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .shell-sidebar-scroll .shell-channel-item {
+    inline-size: 100% !important;
+    width: 100% !important;
+    max-inline-size: 100%;
+    max-width: 100%;
+    min-inline-size: 0;
+    min-width: 0;
+    flex: 0 1 auto;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .shell-sidebar-scroll,
+  .shell-sidebar-scroll > .shell-sidebar-section,
+  .shell-sidebar-scroll .shell-channel-list,
+  .shell-sidebar-scroll .shell-dm-list,
+  .shell-sidebar-scroll .shell-channel-row {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .shell-sidebar-scroll .shell-channel-row .shell-channel-item {
+    flex: 1 1 0;
+    width: 0;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* Status and filtered-room entries are direct list children rather than
+     .shell-channel-row wrappers. Give that path the same definite track so a
+     focused button cannot retain its text's min-content width. */
+  .shell-sidebar-scroll .shell-channel-list > li,
+  .shell-sidebar-scroll .shell-channel-list > li > .shell-channel-item,
+  .shell-sidebar-scroll .shell-dm-list > li > .shell-channel-item {
+    inline-size: 100%;
+    width: 100%;
+    max-inline-size: 100%;
+    max-width: 100%;
+    min-inline-size: 0;
+    min-width: 0;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .shell-sidebar-scroll,
+  .shell-sidebar-scroll .shell-conversation-spine,
+  .shell-sidebar-scroll .shell-conversation-spine-content,
+  .shell-sidebar-scroll .shell-sidebar-section,
+  .shell-sidebar-scroll .shell-channel-list {
+    flex: 0 1 auto;
+    inline-size: 100%;
+    width: 100%;
+    max-inline-size: 100%;
+    max-width: 100%;
+    min-inline-size: 0;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .shell-channel-sigil {
@@ -8155,6 +7887,94 @@
 
   .shell-mobile-more-sheet__room-tools .moderation-cockpit__form input {
     flex-basis: 100%;
+  }
+
+  /* Top-layer member cards must become a genuine scroll surface when the
+     enlarged profile exceeds the short viewport. */
+  .onyx-popover:has(.shell-member-card) .onyx-popover__panel,
+  .onyx-popover:has(.shell-people-card) .onyx-popover__panel {
+    max-height: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--mnav-h, 56px) - 28px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Forced-colors replaces the normal focus token with a 1px UA outline;
+     retain the 2px keyboard affordance required by the shell contract. */
+  .shell-sidebar button:focus-visible,
+  .shell-composer button:focus-visible,
+  .shell-members button:focus-visible,
+  .shell-mobile-nav-btn:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+@media (max-width: 42rem) and (max-height: 30rem) and (forced-colors: active) {
+  .shell-channel-item:focus-visible,
+  .shell-composer-tool:focus-visible,
+  .shell-composer-send:focus-visible,
+  .shell-members .onyx-popover__trigger:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .shell-sidebar-slot.shell-sidebar--mobile-open {
+    display: block;
+    position: fixed;
+    inset: 0 auto 0 env(safe-area-inset-left, 0px);
+    z-index: 90;
+    inline-size: min(300px, calc(88vw - env(safe-area-inset-left, 0px)));
+    width: min(300px, calc(88vw - env(safe-area-inset-left, 0px)));
+    max-inline-size: 100%;
+    max-width: 100%;
+    min-inline-size: 0;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .shell-sidebar-slot.shell-sidebar--mobile-open > .shell-sidebar {
+    inline-size: min(300px, calc(88vw - env(safe-area-inset-left, 0px))) !important;
+    width: min(300px, calc(88vw - env(safe-area-inset-left, 0px))) !important;
+    max-inline-size: 100%;
+    max-width: 100%;
+    min-inline-size: 0;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: clip;
+  }
+
+  .shell-sidebar-slot.shell-sidebar--mobile-open > .shell-sidebar,
+  .shell-sidebar-slot.shell-sidebar--mobile-open > .shell-sidebar * {
+    max-inline-size: 100%;
+    max-width: 100%;
+    min-inline-size: 0;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .shell-sidebar .shell-sidebar-head,
+  .shell-sidebar .shell-sidebar-scroll,
+  .shell-sidebar .shell-sidebar-section,
+  .shell-sidebar .shell-channel-item {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .shell-sidebar .shell-channel-item {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    inline-size: 100% !important;
+    width: 100% !important;
+    max-inline-size: 100%;
+    max-width: 100%;
+    min-inline-size: 0;
+    min-width: 0;
+    box-sizing: border-box;
+    flex: 1 1 0;
   }
 }
 

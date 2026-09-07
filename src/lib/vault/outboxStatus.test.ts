@@ -23,8 +23,8 @@ describe('outboxComposerChrome', () => {
       tone: 'offline',
     });
     expect(chrome!.label).toMatch(/Offline/i);
-    expect(chrome!.label).toMatch(/queue/i);
-    expect(chrome!.announcement).toMatch(/queue/i);
+    expect(chrome!.label).toMatch(/Saved on this device/i);
+    expect(chrome!.announcement).toMatch(/saved on this device/i);
   });
 
   it('labels offline queues as will-send-on-reconnect', () => {
@@ -32,8 +32,8 @@ describe('outboxComposerChrome', () => {
     expect(chrome).toEqual({
       kind: 'queued-offline',
       count: 2,
-      label: 'Queued (2) · Will send on reconnect',
-      announcement: '2 messages queued. Will send on reconnect.',
+      label: 'Saved (2) · Sends when you reconnect',
+      announcement: '2 messages saved on this device. Sends when you reconnect.',
       tone: 'queued',
       canRetry: false,
     });
@@ -41,8 +41,8 @@ describe('outboxComposerChrome', () => {
 
   it('uses singular phrasing for one queued message', () => {
     const chrome = outboxComposerChrome({ connected: false, queuedCount: 1 });
-    expect(chrome!.announcement).toBe('1 message queued. Will send on reconnect.');
-    expect(chrome!.label).toBe('Queued (1) · Will send on reconnect');
+    expect(chrome!.announcement).toBe('1 message saved on this device. Sends when you reconnect.');
+    expect(chrome!.label).toBe('Saved (1) · Sends when you reconnect');
   });
 
   it('surfaces a waiting state while connected with remaining queue', () => {
@@ -53,7 +53,7 @@ describe('outboxComposerChrome', () => {
       canRetry: true,
       tone: 'warning',
     });
-    expect(chrome!.label).toMatch(/Waiting to send/i);
+    expect(chrome!.label).toMatch(/Awaiting send/i);
   });
 
   it('surfaces delivery failure with retry when auto-retries are exhausted', () => {
@@ -68,7 +68,7 @@ describe('outboxComposerChrome', () => {
       canRetry: true,
       tone: 'error',
     });
-    expect(chrome!.label).toMatch(/Couldn't send/i);
+    expect(chrome!.label).toMatch(/Retryable/i);
     expect(chrome!.announcement).toMatch(/Retry/i);
   });
 
@@ -85,7 +85,7 @@ describe('outboxComposerChrome', () => {
     expect(chrome).toMatchObject({
       kind: 'queued-offline',
       count: 2,
-      label: 'Queued (2) · Will send on reconnect',
+      label: 'Saved (2) · Sends when you reconnect',
     });
   });
 
@@ -100,8 +100,8 @@ describe('outboxComposerChrome', () => {
     expect(chrome).toEqual({
       kind: 'queued-offline',
       count: 2,
-      label: 'Queued (2) · Will send on reconnect',
-      announcement: '2 messages queued. Will send on reconnect.',
+      label: 'Saved (2) · Sends when you reconnect',
+      announcement: '2 messages saved on this device. Sends when you reconnect.',
       tone: 'queued',
       canRetry: false,
     });
@@ -111,13 +111,13 @@ describe('outboxComposerChrome', () => {
     expect(outboxComposerChrome({ connected: true, queuedCount: 1 })).toEqual({
       kind: 'queued-online',
       count: 1,
-      label: 'Queued (1) · Waiting to send',
+      label: 'Awaiting send (1) · Still waiting',
       announcement: '1 message still queued. Waiting to send.',
       tone: 'warning',
       canRetry: true,
     });
     expect(outboxComposerChrome({ connected: true, queuedCount: 4 })!.label)
-      .toBe('Queued (4) · Waiting to send');
+      .toBe('Awaiting send (4) · Still waiting');
   });
 });
 
@@ -129,7 +129,7 @@ describe('outboxHomeChrome', () => {
   it('describes offline queues without a retry control', () => {
     const chrome = outboxHomeChrome({ connected: false, queuedCount: 1 });
     expect(chrome).toMatchObject({
-      title: 'Queued on this device',
+      title: 'Saved on this device',
       showRetry: false,
       tone: 'queued',
     });
@@ -142,19 +142,19 @@ describe('outboxHomeChrome', () => {
     expect(chrome!.detail).toMatch(/still waiting/i);
   });
 
-  it('marks failed delivery honestly on Home', () => {
+  it('marks failed local admission honestly on Home', () => {
     const chrome = outboxHomeChrome({
       connected: true,
       queuedCount: 2,
       deliveryFailed: true,
     });
     expect(chrome).toMatchObject({ showRetry: true, tone: 'error' });
-    expect(chrome!.detail).toMatch(/could not be delivered/i);
+    expect(chrome!.detail).toBe('2 saved messages could not be sent yet. Try again only after reviewing the conversation.');
   });
 
   it('uses singular phrasing and keeps offline detail when deliveryFailed sticks', () => {
     const singular = outboxHomeChrome({ connected: true, queuedCount: 1 });
-    expect(singular!.detail).toMatch(/^1 queued send /);
+    expect(singular!.detail).toMatch(/^1 saved message /);
 
     const offlineFailed = outboxHomeChrome({
       connected: false,

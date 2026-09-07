@@ -40,12 +40,14 @@ describe('Appearance', () => {
   afterEach(() => { cleanup(); resetSceneMotion(); vi.useRealTimers(); });
 
   it('shows consumer looks instead of Theme Studio on the default path', () => {
-    const { getByRole, queryByRole, getByTestId } = renderAppearance();
+    const { getByRole, getAllByRole, queryByRole, getByTestId } = renderAppearance();
     expect(getByRole('heading', { name: 'Appearance' })).toBeInTheDocument();
-    expect(getByRole('radio', { name: 'Ocean · Dark look' })).toBeInTheDocument();
-    expect(getByRole('radio', { name: 'Pearl · Light look' })).toBeInTheDocument();
+    expect(getAllByRole('radio', { name: 'Ocean · Dark look' })[0]).toBeInTheDocument();
+    expect(getAllByRole('radio', { name: 'Pearl · Light look' })[0]).toBeInTheDocument();
     expect(getByTestId('appearance-advanced')).not.toHaveAttribute('open');
     expect(queryByRole('heading', { name: 'Theme Studio' })).toBeNull();
+    expect(getByRole('note')).toHaveTextContent('Your account and messages are unchanged.');
+    expect(getByTestId('appearance-advanced').querySelector('summary')).toHaveTextContent('Optional tools for people who want finer control.');
   });
 
   it('keeps all background choices staged until Apply', () => {

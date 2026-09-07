@@ -79,6 +79,15 @@ afterEach(() => {
 });
 
 describe('MemberList accessibility', () => {
+  it('names roster presence as here or away without relying on color', () => {
+    seedChannel([makeUser('me'), makeUser('away-user', [], { away: true })]);
+
+    render(() => <MemberList />);
+
+    expect(screen.getByRole('button', { name: /away-user.*away/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /me.*here/i })).toBeInTheDocument();
+  });
+
   it('links to the room ledger for public room channels', () => {
     seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
 

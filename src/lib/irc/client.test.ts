@@ -512,9 +512,19 @@ describe('IRCClient bounded WebSocket sends', () => {
     const { client, errors, raw } = makeSendClient();
     attachSocket(client, { send: () => { throw new Error('socket raced'); } });
 
-    expect(client.sendRaw('PING', 'race')).toBe(false);
+    expect(() => client.sendRaw('PING', 'race')).toThrow('IRC send admission is uncertain');
     expect(raw).toEqual([]);
-    expect(errors).toEqual(['Message was not sent: the connection closed during send.']);
+    expect(errors).toEqual(['Message delivery could not be confirmed: the connection closed during send.']);
+  });
+
+  it('calls onUncertain for a send throw, even when the observer throws', () => {
+    const { client, errors } = makeSendClient();
+    const uncertain = vi.fn(() => { throw new Error('observer failed'); });
+    attachSocket(client, { send: () => { throw new Error('socket raced'); } });
+
+    expect(() => client.sendRaw('PING', { onUncertain: uncertain }, 'race')).toThrow('IRC send admission is uncertain');
+    expect(uncertain).toHaveBeenCalledOnce();
+    expect(errors).toEqual(['Message delivery could not be confirmed: the connection closed during send.']);
   });
 
   it('reports a synchronous OPEN-to-CLOSING race after send', () => {
@@ -525,12 +535,24 @@ describe('IRCClient bounded WebSocket sends', () => {
       socket.readyState = WebSocket.CLOSING;
     };
 
-    expect(client.sendRaw('PING', 'race')).toBe(false);
+    expect(() => client.sendRaw('PING', 'race')).toThrow('IRC send admission is uncertain');
     expect(sent).toEqual(['PING race\r\n']);
     expect(raw).toEqual([]);
     expect(errors).toEqual([
       'Message delivery could not be confirmed: the connection closed during send.',
     ]);
+  });
+
+  it('propagates an uncertain outcome through Watch Together publishing', () => {
+    const { client, errors } = makeSendClient();
+    const uncertain = vi.fn();
+    const { socket } = attachSocket(client);
+    socket.send = () => { socket.readyState = WebSocket.CLOSING; };
+
+    expect(() => client.publishWatchTogether(' #room', null, { onUncertain: uncertain }))
+      .toThrow('IRC send admission is uncertain');
+    expect(uncertain).toHaveBeenCalledOnce();
+    expect(errors.some((error) => error.includes('was not sent'))).toBe(false);
   });
 
   it('closes a congested control socket before adding another text frame', () => {
@@ -826,13 +848,13 @@ describe('IRCClient account-attribution wiring (ACCOUNTRESIDENCE)', () => {
     const client = new IRCClient({ url: 'wss://x/', nick: 'kain', onMessage: () => {} });
     const sent: string[][] = [];
     const origSendRaw = client.sendRaw.bind(client);
-    client.sendRaw = (command: string, ...params: string[]) => {
+    client.sendRaw = ((command: string, ...params: string[]) => {
       if (command === 'IDENTITY') {
         sent.push([command, ...params]);
         return true;
       }
       return origSendRaw(command, ...params);
-    };
+    }) as typeof client.sendRaw;
     for (const line of lines) feed(client, line);
     return sent;
   }

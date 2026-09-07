@@ -6,11 +6,29 @@
   gap: var(--space-3);
 }
 
+.first-run-notify__note {
+  margin: 0;
+  color: var(--paper-mute);
+  font-size: var(--text-sm, 0.8125rem);
+  line-height: 1.45;
+}
+
 .first-run-notify__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
+}
+
+.first-run-notify__actions > * { min-height: 44px; }
+
+@media (max-width: 32rem) {
+  .first-run-notify__actions { align-items: stretch; flex-direction: column; }
+  .first-run-notify__actions > * { width: 100%; }
+}
+
+@media (forced-colors: active) {
+  .first-run-notify__note { color: CanvasText; }
 }
 
 @media (prefers-reduced-motion: reduce) {

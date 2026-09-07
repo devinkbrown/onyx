@@ -5,6 +5,7 @@ import { BackgroundPicker } from '@/backgrounds/picker/BackgroundPicker';
 import { useTheme, THEMES, THEME_IDS } from '@/theme';
 import { PublicLookPicker } from '@/theme/PublicLookPicker';
 import { moveRadioGroup, swatchFromTokens } from '@/theme/publicLooks';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
 import { ThemeStudio } from '@/theme/ThemeStudio';
 import { useStore, getState } from '@/lib/store';
 import {
@@ -37,6 +38,13 @@ export default function Appearance() {
   createEffect(() => setCandidate(storedBackground()));
   const renderedBackground = createMemo(() => resolveBackgroundId(preview() ?? candidate(), theme.themeId()) as BackgroundId);
   const dirty = createMemo(() => candidate() !== storedBackground());
+  let releaseUpdateHold: (() => void) | null = null;
+  createEffect(() => {
+    const protectedWork = dirty() || preview() !== null;
+    if (protectedWork && !releaseUpdateHold) releaseUpdateHold = updateCoordinator.hold('theme-edit');
+    if (!protectedWork && releaseUpdateHold) { releaseUpdateHold(); releaseUpdateHold = null; }
+  });
+  onCleanup(() => { releaseUpdateHold?.(); releaseUpdateHold = null; });
   const previewMotion = createMemo(() => (
     sceneMotion() === 'off' && (preview() !== null || dirty()) ? 'still' : undefined
   ));
@@ -61,6 +69,7 @@ export default function Appearance() {
     <section class="ap-wrap">
       <h1 class="ap-h1">Appearance</h1>
       <p class="ap-lede">Choose a look, text size, and motion. Changes apply on this device.</p>
+      <p class="ap-local-note" role="note"><span aria-hidden="true">This device</span> Your account and messages are unchanged.</p>
       <section class="ap-group">
         <h2 class="ap-glabel">Look</h2>
         <PublicLookPicker class="ap-chips" groupLabel="Look" />
@@ -133,7 +142,7 @@ export default function Appearance() {
         </div>
       </section>
       <details class="ap-studio" data-testid="appearance-advanced">
-        <summary><span>Advanced</span><b>Theme Studio, more looks, and backgrounds</b></summary>
+        <summary><span>Advanced</span><b>More looks, backgrounds, and Theme Studio</b><small>Optional tools for people who want finer control.</small></summary>
         <div class="ap-studio__body">
           <section class="ap-group">
             <h2 class="ap-glabel">All looks</h2>

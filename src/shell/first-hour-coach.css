@@ -1,15 +1,27 @@
 /* Quiet first-hour coach mark — never a modal. */
 .first-hour-coach {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin: 12px 0 0;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--stone-2) 70%, transparent);
+  margin: 10px 0 0;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid color-mix(in oklab, var(--line) 78%, transparent);
+  border-radius: var(--r-md, 10px);
+  background: color-mix(in oklab, var(--stone-2) 52%, transparent);
   color: var(--paper-dim);
+}
+
+.first-hour-coach__eyebrow {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--paper-mute);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 .first-hour-coach__text {
@@ -25,7 +37,7 @@
   margin: -8px -6px -8px 0;
   padding: 0;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-sm, 7px);
   background: transparent;
   color: var(--paper-mute);
   font-size: 1.1rem;
@@ -35,6 +47,7 @@
 
 .first-hour-coach__dismiss:hover {
   color: var(--paper);
+  background: color-mix(in oklab, var(--paper) 8%, transparent);
 }
 
 .first-hour-coach__dismiss:focus-visible {
@@ -44,6 +57,11 @@
 
 .first-hour-coach--composer {
   margin: 8px 0 0;
+}
+
+@media (forced-colors: active) {
+  .first-hour-coach { border-color: CanvasText; background: Canvas; color: CanvasText; }
+  .first-hour-coach__dismiss { color: ButtonText; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -60,5 +78,23 @@
 @media (prefers-reduced-motion: reduce) {
   .first-hour-coach {
     animation: none;
+  }
+}
+
+@media (max-height: 520px) {
+  .first-hour-coach {
+    margin-top: 6px;
+    padding-block: 6px;
+  }
+
+  .first-hour-coach__eyebrow {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .first-hour-coach {
+    gap: 6px;
+    padding-left: 10px;
   }
 }

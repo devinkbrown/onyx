@@ -90,6 +90,21 @@ afterEach(() => {
 });
 
 describe('upload helper', () => {
+  it('refuses protected-message uploads before constructing multipart data', async () => {
+    const fetchMock = vi.fn();
+    const file = new File(['secret'], 'secret.txt', { type: 'text/plain' });
+
+    await expect(uploadFile(file, {
+      fetchImpl: fetchMock,
+      protectedMessage: true,
+    })).rejects.toMatchObject({
+      name: 'UploadError',
+      code: 'config',
+      message: 'Protected-DM attachments require encrypted upload admission.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('builds the POST /upload endpoint from the configured media URL', () => {
     // Arrange / Act / Assert
     expect(buildUploadEndpoint(undefined)).toBe('/upload');

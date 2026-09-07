@@ -207,7 +207,7 @@ describe('OperDesk', () => {
       </>
     ));
 
-    const ids = screen.getAllByLabelText('Announce to the network').map((input) => input.id);
+    const ids = screen.getAllByLabelText('Announce to operators').map((input) => input.id);
     expect(ids).toHaveLength(2);
     expect(new Set(ids).size).toBe(2);
   });

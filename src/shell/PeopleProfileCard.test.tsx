@@ -107,7 +107,7 @@ describe('PeopleProfileCard', () => {
     render(() => <PeopleProfileCard nick="bob" channel="#general" />);
 
     const advanced = screen.getByTestId(PEOPLE_PROFILE_ADVANCED_TESTID);
-    expect(advanced).toHaveTextContent('Advanced');
+    expect(advanced).toHaveTextContent('Room and network details');
     expect(screen.getByRole('button', { name: 'View profile of bob' })).toBeInTheDocument();
     expect(screen.getByTestId('people-profile-ledger')).toHaveAttribute('href', '/stats/?room=%23general');
     expect(screen.getByTestId('people-profile-hostmask')).toHaveTextContent('bobu@user.example.net');

@@ -103,7 +103,7 @@ export function IncomingCallOverlay() {
     <ModalShell
       open={open()}
       title="Incoming call"
-      description="Voice request over the media network."
+      description="A voice call is waiting. Accept to join with your current audio settings, or decline to dismiss it."
       closeLabel="Decline call"
       onOpenChange={(nextOpen) => {
         if (!nextOpen) declineCall(caller());
@@ -114,9 +114,9 @@ export function IncomingCallOverlay() {
           <Avatar name={caller()} />
         </div>
         <div class="voice-call-meta" aria-busy={accepting()}>
-          <p class="voice-call-kicker">calling</p>
+          <p class="voice-call-kicker">Incoming voice call</p>
           <p class="voice-call-name">{caller()}</p>
-          <p class="voice-call-subtext">Answer to join the voice session.</p>
+          <p class="voice-call-subtext">Your microphone stays muted if Join muted is enabled.</p>
           <Show when={accepting()}>
             <p class="voice-call-status" role="status">Accepting call from {caller()}…</p>
           </Show>

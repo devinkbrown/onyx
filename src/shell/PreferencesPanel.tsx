@@ -163,6 +163,7 @@ import { CLOCKS,
   openPreferences,
   parseBlockedHosts,
   preferenceOpenRequest,
+  preferencePersistenceState,
   preferences,
   resetPreferences,
   setPreference,
@@ -3392,6 +3393,7 @@ function AppearanceLauncher(): JSX.Element {
         type="button"
         class="pref-action-card"
         aria-haspopup="dialog"
+        aria-label="Open appearance settings"
         onClick={openAppearanceFromPreferences}
       >
         <span class="pref-action-card__icon" aria-hidden="true">◐</span>
@@ -3471,8 +3473,8 @@ export function PreferencesPanel(): JSX.Element {
   return (
     <Sheet
       open={isPreferencesOpen()}
-      title="Preferences"
-      description="Display & behaviour — applied live."
+      title="Device preferences"
+      description="Local choices for this browser — applied live."
       onOpenChange={(next) => (next ? openPreferences() : closePreferences())}
       closeLabel="Close preferences"
     >
@@ -3484,7 +3486,16 @@ export function PreferencesPanel(): JSX.Element {
       >
         <p class="pref-context-cue" role="note">
           <span>{activeCategoryMeta().label}</span>
-          {activeCategoryMeta().summary} · changes apply on this device immediately.
+          {activeCategoryMeta().summary} ·{' '}
+          <span aria-live="polite">
+            {preferencePersistenceState() === 'unknown'
+              ? 'Storage not yet verified; change a preference to test saving.'
+              : preferencePersistenceState() === 'pending'
+              ? 'Changes pending…'
+              : preferencePersistenceState() === 'saved'
+                ? 'Saved on this device.'
+                : 'Device storage unavailable; changes apply for this session.'}
+          </span>
         </p>
         <PreferenceCategoryNavigation active={activeCategory} onSelect={selectCategory} />
 
@@ -3498,7 +3509,7 @@ export function PreferencesPanel(): JSX.Element {
           >
             <PreferenceSection
               title="Display"
-              description="Reading rhythm, type scale, and transcript behavior."
+              description="Reading rhythm and transcript behavior. For look, text size, and motion, open Appearance."
             />
             <AppearanceLauncher />
             <Segmented
@@ -3709,7 +3720,7 @@ export function PreferencesPanel(): JSX.Element {
           >
             <PreferenceSection
               title="Accessibility"
-              description="Motion, transparency, contrast, and verified access surfaces."
+              description="Motion, transparency, contrast, and verified access surfaces on this device."
             />
             <Segmented
               legend="Background motion"

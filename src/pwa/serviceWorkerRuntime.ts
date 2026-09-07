@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { updateCoordinator } from './updateCoordinator';
+
 type OnyxServiceWorkerContainer = {
   readonly controller: unknown;
   register: ServiceWorkerContainer['register'];
@@ -24,6 +26,8 @@ function reloadCurrentWindow(): void {
 export function startServiceWorkerRuntime(
   serviceWorker: OnyxServiceWorkerContainer,
   reload: () => void = reloadCurrentWindow,
+  isSafeToReload: (() => boolean) | undefined = undefined,
+  coordinator = updateCoordinator,
 ): void {
   let hasControlledShell = Boolean(serviceWorker.controller);
   let reloaded = false;
@@ -36,7 +40,18 @@ export function startServiceWorkerRuntime(
       return;
     }
     if (!controlledNow || reloaded) return;
-    reloaded = true;
-    reload();
+    if (reloaded) return;
+    // Active work is a temporary coordinator hold; an independently unsafe
+    // host decision remains an explicit-approval gate.
+    // A host may add extra safety policy, but local protected work always
+    // wins.  Never turn a stuck hold into permission to reload.
+    coordinator.replace(
+      () => { reloaded = true; reload(); },
+      // `replace` records host approval; its own attempt gate separately
+      // blocks while protected work is active and retries on release.
+      isSafeToReload?.() ?? true,
+      true,
+    );
+    coordinator.markControllerReady();
   });
 }

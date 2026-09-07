@@ -1212,7 +1212,7 @@ export function MessageText(props: MessageTextProps): JSX.Element {
   });
 
   return (
-    <p class={local.class ?? 'shell-msg-text'}>
+    <div class={local.class ?? 'shell-msg-text'}>
       <RenderTokenList
         tokens={tokens()}
         selfNick={local.selfNick ?? ''}
@@ -1236,6 +1236,6 @@ export function MessageText(props: MessageTextProps): JSX.Element {
           {(block) => <BlockKitLiteView block={block} origin={local.origin ?? ''} />}
         </For>
       </Show>
-    </p>
+    </div>
   );
 }

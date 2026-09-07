@@ -304,7 +304,7 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
       </div>
 
       <Show when={!isSelf()}>
-        <div class="shell-member-card-actions shell-people-card-actions">
+        <div class="shell-member-card-actions shell-people-card-actions" role="group" aria-label={`Actions for ${local.nick}`}>
           <Button
             variant="primary"
             size="sm"
@@ -352,7 +352,7 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
           class="shell-people-card-advanced-toggle"
           data-testid={PEOPLE_PROFILE_ADVANCED_TESTID}
         >
-          Advanced
+          Room and network details
         </summary>
         <div class="shell-people-card-advanced-body">
           <Show when={account()}>
@@ -377,7 +377,7 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
               </p>
             )}
           </Show>
-          <div class="shell-people-card-advanced-actions">
+          <div class="shell-people-card-advanced-actions" role="group" aria-label={`Details actions for ${local.nick}`}>
             <Button
               variant="ghost"
               size="sm"

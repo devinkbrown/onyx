@@ -15,6 +15,7 @@ describe('RoomSwitcherSheet', () => {
     ));
 
     expect(screen.getByRole('dialog', { name: 'Messages switcher' })).toBeInTheDocument();
+    expect(screen.getByText('Switch conversations')).toBeInTheDocument();
     expect(screen.getByText('Choose a conversation')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close switcher' })).toHaveAttribute('title', 'Close switcher');
     fireEvent.click(document.querySelector('.shell-sidebar-backdrop')!);

@@ -66,11 +66,12 @@ afterEach(() => {
 
 describe('DmKeyChangeBanner', () => {
   it('appears when the active DM peer has a pending key-change', () => {
-    seed({ peer: 'Trev' });
-    const region = screen.getByRole('region', { name: /device key changed/i });
+    seed({ peer: 'Trev', pinnedSn: PINNED_SN, pendingSn: PENDING_SN });
+    const region = screen.getByRole('region', { name: /device identity changed/i });
     expect(region).toBeInTheDocument();
     expect(region).toHaveTextContent(/Trev/);
-    expect(region).toHaveTextContent(/Device key changed/i);
+    expect(region).toHaveTextContent(/Review needed/i);
+    expect(region).toHaveTextContent(/device identity changed/i);
     expect(region).toHaveTextContent(/reinstalled Onyx or added a device/i);
     expect(region).toHaveTextContent(/Messages stay locked until you review it/i);
     expect(region).not.toHaveTextContent(/intercept/i);
@@ -132,11 +133,11 @@ describe('DmKeyChangeBanner', () => {
   });
 
   it('Accept dispatches acceptPeerKeyChange for the active peer', () => {
-    const accept = vi.fn();
-    seed({ peer: 'Trev' });
+    const accept = vi.fn().mockResolvedValue(true);
+    seed({ peer: 'Trev', pinnedSn: PINNED_SN, pendingSn: PENDING_SN });
     store.setState({ acceptPeerKeyChange: accept });
 
-    fireEvent.click(screen.getByRole('button', { name: /accept new key/i }));
+    fireEvent.click(screen.getByRole('button', { name: /accept new device key/i }));
     expect(accept).toHaveBeenCalledWith('Trev');
   });
 
@@ -145,7 +146,7 @@ describe('DmKeyChangeBanner', () => {
     seed({ peer: 'Trev' });
     store.setState({ dismissPeerKeyChange: dismiss });
 
-    fireEvent.click(screen.getByRole('button', { name: /^dismiss$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /keep messages locked/i }));
     expect(dismiss).toHaveBeenCalledWith('Trev');
   });
 });

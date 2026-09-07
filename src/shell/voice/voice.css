@@ -77,6 +77,25 @@
   font-size: 14px;
 }
 
+.voice-stage__state {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  left: 14px;
+  max-width: min(34rem, calc(100% - 7rem));
+  margin: 0;
+  color: var(--paper-mute);
+  font: 600 12px/1.35 var(--font-sans);
+}
+
+.voice-stage[data-call-state='active'] .voice-stage__state {
+  color: var(--ok, #68d391);
+}
+
+.voice-stage[data-call-state='media-unavailable'] .voice-stage__state {
+  color: var(--gold-bright, #f6c85f);
+}
+
 .call-join-banner {
   display: flex;
   align-items: center;
@@ -114,6 +133,20 @@
 .call-join-banner__retry:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 2px;
+}
+
+.call-join-banner__retry:hover { background: color-mix(in oklab, var(--lapis) 34%, var(--stone)); }
+.call-join-banner__retry:active { transform: translateY(1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .call-join-banner__retry { transition: none; }
+  .call-join-banner__retry:active { transform: none; }
+}
+
+@media (forced-colors: active) {
+  .voice-stage__state,
+  .call-join-banner__copy { color: CanvasText; }
+  .call-join-banner__retry { border: 1px solid ButtonText; background: ButtonFace; color: ButtonText; }
 }
 
 /* Compact (default): small tray — video is a 16:9 box, NOT a full-width banner. */

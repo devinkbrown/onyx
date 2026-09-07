@@ -14,6 +14,22 @@
   gap: var(--gap-section);
 }
 
+.acct-surface-intro {
+  padding: 2px 4px 0;
+}
+.acct-surface-intro__title {
+  margin: 0;
+  color: var(--paper);
+  font: 650 1rem/1.3 var(--font-sans);
+}
+.acct-surface-intro__body {
+  max-width: 58ch;
+  margin: 4px 0 0;
+  color: var(--paper-dim);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 /* The account surface is intentionally long: keep a quiet map in reach while
    the modal body scrolls. It behaves like a section index, not a second
    navigation destination, so every item points at an existing named region. */
@@ -148,6 +164,14 @@
   gap: 8px;
 }
 
+.you-settings .acct-context-cue {
+  margin: 2px 4px 6px;
+  max-width: 52ch;
+  color: var(--paper-dim);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .you-settings-item,
 .you-settings-link {
   border: 1px solid var(--seam-faint);
@@ -190,6 +214,29 @@
 .you-settings-link:hover,
 .you-settings-item > summary:hover {
   background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .you-settings *, .you-settings *::before, .you-settings *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .you-settings-item, .you-settings-link, .you-settings-switch, .you-settings-choice {
+    border: 1px solid ButtonText;
+    background: Canvas;
+    color: CanvasText;
+  }
+  .you-settings-item > summary:focus-visible,
+  .you-settings-link:focus-visible,
+  .you-settings-switch:focus-visible,
+  .you-settings-choice:focus-visible,
+  .you-settings-select:focus-visible {
+    outline: 2px solid Highlight;
+  }
 }
 
 .you-settings-item > summary:focus-visible,
@@ -795,6 +842,78 @@
   gap: 0;
 }
 
+/* Storage and identity surfaces: the color is an information signal, not
+   decoration. Keep the boundary visible when cards stack on small screens. */
+.acct-data-verbs .acct-section,
+.acct-passkeys,
+.acct-sessions,
+.acct-recovery {
+  container-type: inline-size;
+}
+
+.acct-data-verbs .acct-section-body,
+.acct-passkeys .acct-section-body,
+.acct-sessions .acct-section-body,
+.acct-recovery .acct-section-body {
+  min-width: 0;
+}
+
+.acct-section[data-state='error'] .acct-section-hint,
+.acct-section[data-state='unavailable'] .acct-section-hint {
+  color: var(--paper);
+}
+
+.acct-section[data-state='unavailable'] .acct-section-body,
+.acct-passkeys-disabled,
+.acct-session-placeholder {
+  border-color: var(--line);
+}
+
+.acct-data-verbs .acct-section-head::after,
+.acct-passkeys .acct-section-head::after,
+.acct-sessions .acct-section-head::after,
+.acct-recovery .acct-section-head::after {
+  content: 'No passwords, tokens, or private keys are shown here.';
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--paper-mute);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.acct-data-verbs .acct-section:nth-child(2) .acct-section-head::after {
+  content: 'This is a device copy. It is not account sync.';
+}
+
+.acct-data-verbs .acct-danger .acct-section-head::after {
+  content: 'This is permanent for the account. Review the scope before continuing.';
+  color: var(--shu-bright);
+}
+
+.acct-section .onyx-button,
+.acct-section input,
+.acct-section textarea {
+  min-height: 44px;
+}
+
+.acct-section textarea { min-height: 7rem; resize: vertical; }
+
+@container (max-width:  30rem) {
+  .acct-session-toolbar,
+  .acct-cert-actions,
+  .acct-danger-actions,
+  .acct-passkey-actions {
+    justify-content: stretch;
+  }
+  .acct-session-toolbar .onyx-button,
+  .acct-cert-actions .onyx-button,
+  .acct-danger-actions .onyx-button {
+    flex: 1 1 12rem;
+  }
+  .acct-passkey-row { align-items: flex-start; flex-wrap: wrap; }
+  .acct-passkey-actions { width: 100%; }
+}
+
 [data-acct-sheet='delete'] .onyx-sheet__kicker {
   display: none;
 }
@@ -841,6 +960,18 @@
   .acct-section-nav__item:focus-visible {
     outline-color: Highlight;
   }
+
+  .acct-section,
+  .acct-passkeys-disabled,
+  .acct-session-placeholder,
+  .acct-passkey-row,
+  .acct-session-row {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+
+  .acct-danger { border-top-color: LinkText; }
+  .acct-error { border-color: LinkText; color: CanvasText; }
 }
 
 /* ── Two-factor authentication ─────────────────────────────────────────── */

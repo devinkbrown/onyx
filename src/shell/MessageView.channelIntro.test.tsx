@@ -160,7 +160,7 @@ describe('MessageView empty room and channel intro', () => {
     expect(screen.queryByRole('link', { name: /Room ledger/i })).toBeNull();
     expect(screen.getByTestId('feed-empty')).toHaveTextContent('A private conversation');
     expect(screen.getByTestId('feed-empty')).toHaveTextContent(
-      'Only the two of you can read these messages. They stay on this device.',
+      'Plaintext drafts and attachments can remain on this device and are not covered by the message encryption claim.',
     );
     expect(screen.getByTestId('feed-empty')).not.toHaveTextContent(/fully encrypted|cloud sync|TOFU|🔒/i);
     expect(screen.getByTestId('feed-empty')).not.toHaveTextContent('/search');

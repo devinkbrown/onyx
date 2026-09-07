@@ -570,7 +570,7 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
           : known ? `Go to ${known.name}` : `Join ${channel}`,
         hint: at ? 'time grammar' : known ? channelHint(known) : 'room',
         keywords: [query.trim(), 'goto', 'join', 'open', 'go to', channel, timed?.after ?? ''],
-        run: () => {
+        run: async () => {
           const current = getState();
           current.joinChannel(known?.name ?? channel);
           current.navigate({ kind: 'channel', channel: known?.name ?? channel });
@@ -616,7 +616,7 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
         title: `Hide ${active}`,
         hint: 'stay joined; drop from Rooms',
         keywords: [query.trim(), 'hide', 'hide room', 'close room', 'exit room', active],
-        run: () => {
+        run: async () => {
           const view = getState().activeView;
           if (view.kind === 'channel') getState().hideRoom(view.channel);
         },
@@ -803,13 +803,13 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
         title: `Schedule message to ${activeTargetLabel(state)} · ${parsed.label}`,
         hint: 'send later',
         keywords: [query.trim(), 'schedule', 'send later', 'remind', 'queue', 'later', target],
-        run: () => {
+        run: async () => {
           const current = getState();
           const dest = activeTarget(current);
           // Re-validate against the wall clock at run time so a stale relative
           // time (typed, then left sitting) can never queue a past instant.
           if (!dest || !isSchedulable(parsed.epoch, Date.now())) return;
-          current.scheduleMessage(dest, parsed.text, parsed.epoch);
+          await current.scheduleMessage(dest, parsed.text, parsed.epoch);
         },
       });
     }

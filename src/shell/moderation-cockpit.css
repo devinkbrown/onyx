@@ -1,0 +1,28 @@
+/* Room moderation cockpit — optional feature surface, kept out of shell frame CSS. */
+.moderation-cockpit { display: grid; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--seam-faint); }
+.moderation-cockpit__head { display: flex; align-items: start; justify-content: space-between; gap: var(--space-2); }
+.moderation-cockpit__head h3, .moderation-cockpit__eyebrow, .moderation-cockpit__empty, .moderation-cockpit__hint { margin: 0; }
+.moderation-cockpit__head h3 { color: var(--paper); font-size: var(--text-md); }
+.moderation-cockpit__eyebrow { color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+.moderation-cockpit__state { color: var(--ok); font: 700 var(--text-2xs)/1.2 var(--font-mono); text-align: right; }
+.moderation-cockpit__state--offline { color: var(--warn); }
+.moderation-cockpit__empty, .moderation-cockpit__hint { color: var(--paper-mute); font-size: var(--text-sm); line-height: var(--leading-body); }
+.moderation-cockpit__modes { display: grid; gap: 5px; }
+.moderation-cockpit__mode { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 8px 10px; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: transparent; color: var(--paper); text-align: left; cursor: pointer; }
+.moderation-cockpit__mode small { color: var(--paper-mute); font: 700 var(--text-2xs)/1 var(--font-mono); }
+.moderation-cockpit__mode[aria-pressed='true'] { border-color: color-mix(in oklab, var(--lapis) 55%, var(--seam)); background: color-mix(in oklab, var(--lapis) 16%, transparent); }
+.moderation-cockpit__mode:disabled { cursor: not-allowed; opacity: .55; }
+.moderation-cockpit__form { display: grid; gap: 6px; }
+.moderation-cockpit__form label { color: var(--paper-dim); font-size: var(--text-sm); font-weight: 650; }
+.moderation-cockpit__form > div { display: flex; gap: 6px; }
+.moderation-cockpit__form input { min-width: 0; flex: 1; min-height: 40px; padding: 7px 9px; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: var(--surface-void); color: var(--paper); font: var(--text-sm) var(--font-sans); }
+.moderation-cockpit__form button { min-height: 40px; padding: 7px 10px; border: 1px solid var(--seam); border-radius: var(--r-sm); background: var(--surface-raised); color: var(--paper); font: 650 var(--text-sm)/1 var(--font-sans); cursor: pointer; }
+.moderation-cockpit__form button:disabled { cursor: not-allowed; opacity: .55; }
+.moderation-cockpit__form--danger > div button, .moderation-cockpit__confirm-action { border-color: color-mix(in oklab, var(--shu) 55%, var(--seam)); }
+.moderation-cockpit__confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px; border: 1px solid color-mix(in oklab, var(--shu) 42%, var(--seam)); border-radius: var(--r-sm); background: color-mix(in oklab, var(--shu) 10%, transparent); }
+.moderation-cockpit__confirm p { flex: 1 0 100%; margin: 0; color: var(--paper); font-size: var(--text-sm); }
+.moderation-cockpit__confirm code { overflow-wrap: anywhere; }
+.moderation-cockpit__protocol { color: var(--paper-mute); font-size: var(--text-sm); line-height: var(--leading-body); }
+.moderation-cockpit__protocol summary { min-height: 32px; color: var(--paper-dim); cursor: pointer; font-weight: 650; }
+.moderation-cockpit__protocol p { margin: 6px 0; }
+.moderation-cockpit__protocol code { display: block; padding: 7px 8px; overflow-wrap: anywhere; border: 1px solid var(--seam-faint); border-radius: var(--r-sm); background: var(--surface-void); color: var(--paper-dim); font: var(--text-2xs) var(--font-mono); }

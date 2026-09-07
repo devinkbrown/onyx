@@ -52,6 +52,7 @@ export type ChannelSidebarProps = {
   onOpenHome?: () => void;
   onOpenCalls?: () => void;
   onOpenYou?: () => void;
+  onOpenNewConversation?: () => void;
   /** Primary product navigation callbacks are owned by AppShell. */
   onModeChange?: (mode: 'rooms' | 'messages') => void;
   onConversationOpen?: () => void;
@@ -148,6 +149,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     'onOpenHome',
     'onOpenCalls',
     'onOpenYou',
+    'onOpenNewConversation',
     'onConversationOpen',
     'activeSection',
     'youDialogOpen',
@@ -846,9 +848,15 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         {/* DMs section */}
         <Show when={showMessages()}>
           <div class="shell-sidebar-section">
-            <p class="shell-sidebar-section-label" id="sidebar-dms-label">
-              Messages
-            </p>
+            <div class="shell-sidebar-section-heading">
+              <p class="shell-sidebar-section-label" id="sidebar-dms-label">Messages</p>
+              <Show when={local.onOpenNewConversation}>
+                <button type="button" class="shell-new-conversation-button" data-testid="new-conversation"
+                  aria-label="New conversation" onClick={() => local.onOpenNewConversation?.()}>
+                  <span aria-hidden="true">+</span> New
+                </button>
+              </Show>
+            </div>
             <Show
               when={sortedDms().length > 0}
               fallback={<p class="shell-sidebar-empty">No messages yet. Open a person to start one.</p>}

@@ -226,7 +226,7 @@ describe('AppearancePanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Import theme Shared Theme' }));
 
     expect(screen.queryByTestId('theme-import-dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Shared Theme theme' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(screen.getByTestId('appearance-panel')).getByRole('radio', { name: 'Shared Theme look', hidden: true })).toHaveAttribute('aria-checked', 'true');
     expect(JSON.parse(localStorage.getItem('onyx:custom-themes') ?? '[]')).toEqual([
       expect.objectContaining({
         id: 'custom:shared-theme',

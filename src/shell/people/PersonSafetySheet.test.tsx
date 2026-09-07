@@ -63,13 +63,15 @@ describe('PersonSafetyHost', () => {
     expect(screen.queryByTestId('person-safety')).toBeNull();
   });
 
-  it('drafts a report to #root without claiming a review inbox', () => {
+  it('drafts a report to the shared #root room without claiming a private inbox', () => {
     const sendMessage = vi.spyOn(store.getState(), 'sendMessage');
     openPersonReport('eve', true);
     render(() => <PersonSafetyHost />);
 
     expect(screen.getByRole('heading', { name: 'Report eve' })).toBeInTheDocument();
-    expect(screen.getByText(/This drafts a note to #root/)).toBeInTheDocument();
+    expect(screen.getByText(/shared #root report room/)).toBeInTheDocument();
+    expect(screen.getByText(/visible to people in that room or operators/)).toBeInTheDocument();
+    expect(screen.getByText(/not a private inbox or police report/)).toBeInTheDocument();
     expect(screen.getByText('Guest')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/24 hours|Trust & Safety|we will review/i);
 
@@ -86,6 +88,43 @@ describe('PersonSafetyHost', () => {
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
     expect(loadPersonReportReceipts(owner)[0]?.nick).toBe('eve');
     sendMessage.mockRestore();
+  });
+
+  it('preserves an existing report-room draft when adding the new draft', () => {
+    const existing = 'unfinished report\nplease keep this exactly';
+    store.setState({ composerDrafts: { '#root': existing } });
+    openPersonReport('eve');
+    render(() => <PersonSafetyHost />);
+
+    fireEvent.click(screen.getByTestId('person-report-submit'));
+
+    const merged = store.getState().getComposerDraft('#root');
+    expect(merged.startsWith(existing)).toBe(true);
+    expect(merged).toContain('Report\nAbout: eve\nWhat: harassment');
+    expect(merged.slice(0, existing.length)).toBe(existing);
+  });
+
+  it('uses only the report draft when the report room composer is empty', () => {
+    openPersonReport('eve');
+    render(() => <PersonSafetyHost />);
+
+    fireEvent.click(screen.getByTestId('person-report-submit'));
+
+    expect(store.getState().getComposerDraft('#root')).toBe(
+      'Report\nAbout: eve\nWhat: harassment\nFrom: alice',
+    );
+  });
+
+  it('cancels without mutating an existing report-room draft', () => {
+    const existing = 'keep this draft';
+    store.setState({ composerDrafts: { '#root': existing } });
+    openPersonReport('eve');
+    render(() => <PersonSafetyHost />);
+
+    fireEvent.click(screen.getByTestId('person-safety-cancel'));
+
+    expect(store.getState().getComposerDraft('#root')).toBe(existing);
+    expect(store.getState().activeView).not.toEqual({ kind: 'channel', channel: '#root' });
   });
 
   it('Never mind dismisses block without ignoring', () => {

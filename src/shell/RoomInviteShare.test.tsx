@@ -65,6 +65,23 @@ describe('RoomInviteShare', () => {
     expect(screen.getByText(`${window.location.origin}/invite/`)).toBeInTheDocument();
   });
 
+  it('explains the copy fallback when native sharing is unavailable', () => {
+    openRoomInviteShare('#lounge');
+    render(() => <RoomInviteShare />);
+
+    expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
+    expect(screen.getByText('Sharing is not available here. Copy the link instead.')).toBeInTheDocument();
+  });
+
+  it('keeps copying available while disconnected', () => {
+    store.setState({ connectionStatus: 'disconnected' });
+    openRoomInviteShare('#lounge');
+    render(() => <RoomInviteShare />);
+
+    expect(screen.getByText('You’re offline. You can still copy this link and share it.')).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeEnabled();
+  });
+
   it('copies the existing invite link', async () => {
     const writeClipboardText = vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(true);
     openRoomInviteShare('#lounge');

@@ -129,6 +129,8 @@ export function JumpToDateSheet(): JSX.Element {
   const open = useStore((s) => s.showJumpToDate);
   const activeView = useStore((s) => s.activeView);
   const travelTo = useStore((s) => s.travelTo);
+  const connectionStatus = useStore((s) => s.connectionStatus);
+  const historyLoading = useStore((s) => s.historyLoading);
 
   const target = createMemo(() => activeTravelTarget(activeView()));
   const label = createMemo(() => targetLabel(target(), activeView().kind));
@@ -141,6 +143,7 @@ export function JumpToDateSheet(): JSX.Element {
   let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
   let copyEpoch = 0;
   let disposed = false;
+  let returnFocus: HTMLElement | null = null;
 
   const clearCopyReset = (): void => {
     if (copyResetTimer) clearTimeout(copyResetTimer);
@@ -155,6 +158,10 @@ export function JumpToDateSheet(): JSX.Element {
       setCopyState('idle');
       setError(null);
       return;
+    }
+    if (typeof document !== 'undefined') {
+      const focused = document.activeElement;
+      returnFocus = focused instanceof HTMLElement && !focused.closest('[role="dialog"]') ? focused : null;
     }
     const now = new Date();
     setDateValue(formatUtcDate(now));
@@ -180,6 +187,7 @@ export function JumpToDateSheet(): JSX.Element {
   });
 
   const resolvedAt = createMemo(() => dateTimeAtUtc(dateValue(), timeValue()));
+  const validationMessage = createMemo(() => !resolvedAt() ? 'Enter a valid UTC date and time.' : null);
 
   function applyPreset(preset: JumpPreset): void {
     setDateValue(utcDateDaysAgo(preset.daysAgo));
@@ -202,6 +210,9 @@ export function JumpToDateSheet(): JSX.Element {
     travelTo()(channel, at);
     getState().closeJumpToDate();
   }
+
+  const isLoading = createMemo(() => Boolean(target() && historyLoading().get(target()!.toLowerCase())));
+  const unavailable = createMemo(() => connectionStatus() !== 'connected');
 
   async function copyMoment(): Promise<void> {
     const channel = target();
@@ -232,8 +243,9 @@ export function JumpToDateSheet(): JSX.Element {
     <Sheet
       open={open()}
       title="Jump to date"
-      description={`Travel to a moment in ${label()}. Same path as ?at= links and the time scrubber.`}
+      description={`Choose a date and time to view messages in ${label()}. Times are entered in UTC.`}
       closeLabel="Close jump to date"
+      returnFocus={returnFocus}
       onOpenChange={(next) => (next ? getState().openJumpToDate() : getState().closeJumpToDate())}
     >
       <div class="jump-to-date" data-testid="jump-to-date-sheet">
@@ -241,12 +253,18 @@ export function JumpToDateSheet(): JSX.Element {
           when={target()}
           fallback={
             <p class="jump-to-date__empty" role="status">
-              Open a room or DM to jump through its history.
+              Open a room or direct message first, then choose when to view its messages.
             </p>
           }
         >
           {(channel) => (
             <>
+              <Show when={unavailable()}>
+                <p class="jump-to-date__notice" role="status">History is unavailable while you are offline. Reconnect to continue.</p>
+              </Show>
+              <Show when={isLoading()}>
+                <p class="jump-to-date__notice" role="status" aria-live="polite">Loading messages around this moment…</p>
+              </Show>
               <div class="jump-to-date__presets" role="group" aria-label="Quick dates">
                 <For each={[...JUMP_DATE_PRESETS]}>
                   {(preset) => (
@@ -264,12 +282,12 @@ export function JumpToDateSheet(): JSX.Element {
               <div class="jump-to-date__fields">
                 <FormField
                   id="jump-to-date-date"
-                  label="Date (UTC)"
+                  label="Date"
                   type="date"
                   value={dateValue()}
                   data-jump-to-date-input=""
-                  description={`Jump inside ${channel()}`}
-                  error={error() && !resolvedAt() ? error()! : undefined}
+                  description={`View messages in ${channel()}. Date uses UTC.`}
+                  error={validationMessage() ?? (error() && !resolvedAt() ? error()! : undefined)}
                   onInput={(event) => {
                     setDateValue(event.currentTarget.value);
                     setError(null);
@@ -277,10 +295,10 @@ export function JumpToDateSheet(): JSX.Element {
                 />
                 <FormField
                   id="jump-to-date-time"
-                  label="Time (UTC)"
+                  label="Time"
                   type="time"
                   value={timeValue()}
-                  description="Defaults to 12:00 UTC when you pick a date from the scrubber."
+                  description="Uses UTC. Defaults to noon when you choose a quick date."
                   onInput={(event) => {
                     setTimeValue(event.currentTarget.value);
                     setError(null);
@@ -296,15 +314,16 @@ export function JumpToDateSheet(): JSX.Element {
                 <Button
                   type="button"
                   variant="primary"
-                  disabled={!resolvedAt()}
+                  aria-busy={isLoading()}
+                  disabled={!resolvedAt() || unavailable() || isLoading()}
                   onClick={jump}
                 >
-                  Jump
+                  View messages
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
-                  disabled={!resolvedAt()}
+                  disabled={!resolvedAt() || unavailable() || isLoading()}
                   aria-label={`Copy moment link for ${channel()}`}
                   onClick={() => void copyMoment()}
                 >

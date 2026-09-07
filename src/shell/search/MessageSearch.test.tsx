@@ -392,7 +392,7 @@ describe('MessageSearch', () => {
 
     expect(screen.getByRole('searchbox', { name: 'Search messages' })).toHaveAttribute(
       'placeholder',
-      'Search all remembered messages',
+      'Search messages saved on this device',
     );
     expect(screen.queryByTestId('server-search')).not.toBeInTheDocument();
     const vaultList = await screen.findByRole('list', { name: 'Device-memory message results' });
@@ -424,7 +424,7 @@ describe('MessageSearch', () => {
     expect(screen.getByTestId('server-search-status')).toHaveTextContent(
       'Full-history search failed. Disconnected before the server search completed',
     );
-    expect(screen.getByRole('button', { name: 'Search full history ↵' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Search full server history' })).toBeDisabled();
   });
 
   it('announces server loading and completion through one stable atomic live region', async () => {

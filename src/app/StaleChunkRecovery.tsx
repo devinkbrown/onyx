@@ -8,7 +8,26 @@
  * cached old entry. The user chooses Reload (fresh entry + new hashes) or
  * return home (eager Landing, no lazy shell).
  */
-import { type JSX } from 'solid-js';
+import { ErrorBoundary, lazy, type Component, type JSX } from 'solid-js';
+import { Dynamic } from 'solid-js/web';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
+import recoveryStylesheet from './stale-chunk-recovery.css?url';
+
+function RecoveryStylesheet(): JSX.Element {
+  return <link rel="stylesheet" href={recoveryStylesheet} />;
+}
+
+export function DeferredLoading(props: { label?: string }): JSX.Element {
+  return (
+    <>
+      <RecoveryStylesheet />
+      <div class="deferred-loading" role="status" aria-live="polite" data-testid="deferred-loading">
+        <span class="deferred-loading__spinner" aria-hidden="true" />
+        <span>{props.label ?? 'Loading…'}</span>
+      </div>
+    </>
+  );
+}
 
 export type StaleChunkRecoveryProps = {
   /** Short product-facing title. */
@@ -22,14 +41,29 @@ export type StaleChunkRecoveryProps = {
   /** Optional secondary action (e.g. ErrorBoundary reset / close). */
   secondaryLabel?: string;
   onSecondary?: () => void;
+  updateFailure?: boolean;
 };
 
 const DEFAULT_TITLE = 'This view needs a fresh load';
 const DEFAULT_DETAIL =
   'Onyx was updated while this tab stayed open, so a piece of the interface could not load. Reload once for the current release, or return home.';
+const GENERIC_TITLE = 'This view could not load';
+const GENERIC_DETAIL = 'Something went wrong while loading this view. Try again, reload the app, or return home.';
+let recoveryInstance = 0;
 
 function reloadWindow(): void {
   if (typeof window !== 'undefined') window.location.reload();
+}
+
+function requestGuardedReload(): void {
+  try {
+    // Keep this coordinator in the eager recovery path. It queues behind active
+    // work and remains the single authority for deciding whether reload is safe.
+    updateCoordinator.requestReload(reloadWindow);
+  } catch {
+    // A partially available recovery module must not turn this action into an
+    // unconditional reload or an unhandled rejection.
+  }
 }
 
 /**
@@ -37,41 +71,50 @@ function reloadWindow(): void {
  * reachable controls, no automatic navigation.
  */
 export function StaleChunkRecovery(props: StaleChunkRecoveryProps): JSX.Element {
+  const instanceId = ++recoveryInstance;
+  const titleId = `stale-chunk-recovery-title-${instanceId}`;
+  const detailId = `stale-chunk-recovery-detail-${instanceId}`;
   const homeHref = () => props.homeHref ?? '/';
-  const title = () => props.title ?? DEFAULT_TITLE;
-  const detail = () => props.detail ?? DEFAULT_DETAIL;
+  const updateFailure = () => props.updateFailure ?? true;
+  const title = () => props.title ?? (updateFailure() ? DEFAULT_TITLE : GENERIC_TITLE);
+  const detail = () => props.detail ?? (updateFailure() ? DEFAULT_DETAIL : GENERIC_DETAIL);
 
   return (
-    <main
-      class="stale-chunk-recovery"
-      data-testid="stale-chunk-recovery"
-      role="alert"
-      aria-labelledby="stale-chunk-recovery-title"
-      aria-describedby="stale-chunk-recovery-detail"
-    >
-      <div class="stale-chunk-recovery__card">
-        <p class="stale-chunk-recovery__kicker">Update</p>
-        <h1 id="stale-chunk-recovery-title" class="stale-chunk-recovery__title">
-          {title()}
-        </h1>
-        <p id="stale-chunk-recovery-detail" class="stale-chunk-recovery__detail">
-          {detail()}
-        </p>
-        <div class="stale-chunk-recovery__actions">
+    <>
+      <RecoveryStylesheet />
+      <main
+        class="stale-chunk-recovery"
+        data-testid="stale-chunk-recovery"
+        role="alert"
+        aria-labelledby={titleId}
+        aria-describedby={detailId}
+      >
+        <div class="stale-chunk-recovery__card">
+          <p class="stale-chunk-recovery__kicker">{updateFailure() ? 'Update' : 'Unable to load'}</p>
+          <h1 id={titleId} class="stale-chunk-recovery__title">
+            {title()}
+          </h1>
+          <p id={detailId} class="stale-chunk-recovery__detail">
+            {detail()}
+          </p>
+          <div class="stale-chunk-recovery__actions">
           <button
             type="button"
             class="stale-chunk-recovery__primary"
             data-testid="stale-chunk-reload"
-            onClick={() => (props.onReload ?? reloadWindow)()}
+            onClick={() => {
+              if (props.onReload) props.onReload();
+              else requestGuardedReload();
+            }}
           >
-            Reload Onyx
+            Reload the current app
           </button>
           <a
             class="stale-chunk-recovery__secondary"
             data-testid="stale-chunk-home"
             href={homeHref()}
           >
-            Back to home
+            Continue to home
           </a>
           {props.onSecondary && props.secondaryLabel ? (
             <button
@@ -83,10 +126,10 @@ export function StaleChunkRecovery(props: StaleChunkRecoveryProps): JSX.Element 
               {props.secondaryLabel}
             </button>
           ) : null}
+          </div>
         </div>
-      </div>
-      <style>{STALE_CHUNK_RECOVERY_CSS}</style>
-    </main>
+      </main>
+    </>
   );
 }
 
@@ -100,96 +143,53 @@ export function lazyRouteFallback(
 ): JSX.Element {
   // reset is available for tests / rare same-bundle recoveries but is not
   // auto-invoked; primary path is a full reload to pick up new asset hashes.
-  void err;
+  const message = err instanceof Error ? err.message : String(err);
+  const updateFailure = /chunk|dynamic(?:ally)? imported|imported module|module script/i.test(message);
   return (
     <StaleChunkRecovery
+      updateFailure={updateFailure}
       secondaryLabel="Try again"
       onSecondary={reset}
     />
   );
 }
 
-const STALE_CHUNK_RECOVERY_CSS = `
-.stale-chunk-recovery {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: clamp(1.25rem, 4vw, 2.5rem);
-  box-sizing: border-box;
-  background:
-    radial-gradient(120% 120% at 50% 0%, color-mix(in oklab, var(--lapis, #3d6cf5) 22%, var(--ink, #0b1020)) 0%, var(--ink, #0b1020) 60%);
-  color: var(--paper, #f4f1ea);
-  font-family: var(--font-sans, system-ui, sans-serif);
+/**
+ * A lazy component whose retry creates a new Solid lazy value. Solid caches a
+ * rejected lazy promise, so resetting an ErrorBoundary alone cannot recover.
+ */
+export function retryableLazy<T extends Record<string, any>>(
+  loader: () => Promise<{ default: Component<T> }>,
+  label: string,
+): Component<T> {
+  return function RetryableLazy(props: T): JSX.Element {
+    let attempt = 0;
+    const load = () => {
+      const currentAttempt = attempt;
+      return lazy(async () => {
+        if (currentAttempt !== attempt) return loader();
+        return loader();
+      });
+    };
+    let current = load();
+    return (
+      <ErrorBoundary fallback={(_error, reset) => (
+        <StaleChunkRecovery
+          updateFailure={false}
+          title={`Could not load ${label}`}
+          detail={`The ${label} surface did not load. Try again, reload the app, or return home.`}
+          secondaryLabel="Try again"
+          onSecondary={() => {
+            attempt += 1;
+            current = load();
+            reset();
+          }}
+        />
+      )}>
+        <Dynamic component={current as Component<any>} {...props} />
+      </ErrorBoundary>
+    );
+  };
 }
-.stale-chunk-recovery__card {
-  width: min(28rem, 100%);
-  padding: 1.5rem 1.35rem 1.35rem;
-  border-radius: 1rem;
-  border: 1px solid color-mix(in oklab, var(--paper, #f4f1ea) 14%, transparent);
-  background: color-mix(in oklab, var(--ink, #0b1020) 72%, var(--stone, #1a2238));
-  box-shadow: 0 24px 60px color-mix(in oklab, #000 45%, transparent);
-}
-.stale-chunk-recovery__kicker {
-  margin: 0 0 0.4rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--gold, #d4a017) 85%, var(--paper, #f4f1ea));
-}
-.stale-chunk-recovery__title {
-  margin: 0 0 0.65rem;
-  font-family: var(--font-display, var(--font-sans, system-ui, sans-serif));
-  font-size: clamp(1.35rem, 2.4vw, 1.7rem);
-  line-height: 1.2;
-  font-weight: 600;
-}
-.stale-chunk-recovery__detail {
-  margin: 0 0 1.25rem;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: color-mix(in oklab, var(--paper, #f4f1ea) 82%, transparent);
-}
-.stale-chunk-recovery__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem 0.85rem;
-  align-items: center;
-}
-.stale-chunk-recovery__primary {
-  appearance: none;
-  border: 0;
-  border-radius: 999px;
-  padding: 0.65rem 1.15rem;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  color: var(--ink, #0b1020);
-  background: var(--gold, #d4a017);
-}
-.stale-chunk-recovery__primary:focus-visible,
-.stale-chunk-recovery__secondary:focus-visible,
-.stale-chunk-recovery__tertiary:focus-visible {
-  outline: 2px solid var(--lapis, #3d6cf5);
-  outline-offset: 2px;
-}
-.stale-chunk-recovery__secondary,
-.stale-chunk-recovery__tertiary {
-  color: color-mix(in oklab, var(--paper, #f4f1ea) 90%, transparent);
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
-  font: inherit;
-  background: transparent;
-  border: 0;
-  padding: 0.4rem 0.2rem;
-  cursor: pointer;
-}
-@media (prefers-reduced-motion: reduce) {
-  .stale-chunk-recovery,
-  .stale-chunk-recovery * {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-`;
 
 export default StaleChunkRecovery;

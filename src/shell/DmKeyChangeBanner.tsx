@@ -24,9 +24,9 @@
  *     loads whenever the banner becomes active for a peer, and the display
  *     reads the cached values reactively.
  */
-import { createEffect, createMemo, For, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
-import { DM_KEY_CHANGE_BODY, dmKeyChangeAlert } from '@/lib/e2ee/dmPrivacyChrome';
+import { DM_KEY_CHANGE_BODY, DM_PRIVACY_SCOPE, dmKeyChangeAlert } from '@/lib/e2ee/dmPrivacyChrome';
 import './dm-key-change.css';
 
 /** The active DM peer nick, or null when the active view is not a DM. */
@@ -55,14 +55,20 @@ export function DmKeyChangeBanner(): JSX.Element {
     return key ? peerKeyChanges().get(key) ?? null : null;
   });
   const active = createMemo(() => change() !== null);
+  const changeIdentity = createMemo(() => {
+    const key = peerKey();
+    const current = change();
+    return key && current ? `${key}:${current.newKey}` : null;
+  });
 
   // Kick off the two async safety-number computations whenever the banner
   // becomes active for a peer. Both are cached in the store; re-running is
   // cheap (the store guards against redundant writes) and keeps the display in
   // sync if the pending key changes underneath us.
   createEffect(() => {
+    const identity = changeIdentity();
     const p = peer();
-    if (!p || !active()) return;
+    if (!identity || !p || !active()) return;
     void getState().loadSafetyNumber(p);
     void getState().loadPendingKeySafetyNumber(p);
   });
@@ -78,9 +84,46 @@ export function DmKeyChangeBanner(): JSX.Element {
     return key ? pendingKeySafetyNumbers().get(key) ?? null : null;
   });
 
+  const evidenceReady = createMemo(() => Boolean(pinnedSn() && pendingSn()));
+  const [accepting, setAccepting] = createSignal(false);
+  const [persistFailed, setPersistFailed] = createSignal(false);
+  let attemptIdentity = 0;
+
+  createEffect(() => {
+    // Every peer/pending-key snapshot is a distinct acceptance attempt. A
+    // replacement rotation must disarm the old attempt before its timer can
+    // report failure or otherwise mutate the new one.
+    changeIdentity();
+    attemptIdentity += 1;
+    setAccepting(false);
+    setPersistFailed(false);
+  });
+
   const onAccept = (): void => {
     const p = peer();
-    if (p) getState().acceptPeerKeyChange(p);
+    const snapshot = change();
+    if (!p || !snapshot || !evidenceReady()) return;
+    const identity = changeIdentity();
+    const attempt = ++attemptIdentity;
+    if (!identity) return;
+    setAccepting(true);
+    setPersistFailed(false);
+    // The store removes this exact warning only after the pin is persisted.
+    // Some test/adapter implementations also return the persistence outcome;
+    // consume it when available, but never infer failure from elapsed time.
+    void getState().acceptPeerKeyChange(p).then((ok) => {
+      if (attemptIdentity !== attempt || changeIdentity() !== identity) return;
+      if (ok) {
+        setAccepting(false);
+      } else {
+        setAccepting(false);
+        setPersistFailed(true);
+      }
+    }, () => {
+      if (attemptIdentity !== attempt || changeIdentity() !== identity) return;
+      setAccepting(false);
+      setPersistFailed(true);
+    });
   };
   const onDismiss = (): void => {
     const p = peer();
@@ -110,22 +153,30 @@ export function DmKeyChangeBanner(): JSX.Element {
             <div class="dm-keychange__lede">
               <span class="dm-keychange__kicker">
                 <span class="dm-keychange__glyph" aria-hidden="true">⚠</span>
-                Device key changed
+                Review needed
               </span>
               <h2 id="dm-keychange-title" class="dm-keychange__title">
-                <span class="dm-keychange__peer">{name()}</span>'s device key changed
+                <span class="dm-keychange__peer">{name()}</span>'s device identity changed
               </h2>
               <p class="dm-keychange__sub">
-                {DM_KEY_CHANGE_BODY}
+                {DM_KEY_CHANGE_BODY} Compare the current and new safety numbers with {name()}
+                through a trusted channel before accepting. Messages remain locked until you decide.
               </p>
+              <p class="dm-keychange__scope">{DM_PRIVACY_SCOPE}</p>
+              <Show when={!evidenceReady()}>
+                <p class="dm-keychange__state" role="status">{pinnedSn() || pendingSn() ? 'Waiting for both exact safety numbers before acceptance.' : 'Safety numbers are unavailable. Try again to calculate them.'}</p>
+              </Show>
+              <Show when={persistFailed()}>
+                <p class="dm-keychange__state" role="alert">The new key was not saved. Messages remain locked. Try accepting again.</p>
+              </Show>
             </div>
 
             <div class="dm-keychange__actions">
-              <button type="button" class="dm-keychange__accept" onClick={onAccept}>
-                Accept new key
+              <button type="button" class="dm-keychange__accept" onClick={onAccept} disabled={!evidenceReady() || accepting()}>
+                {accepting() ? 'Saving trusted key…' : persistFailed() ? 'Retry saving trusted key' : 'Accept new device key'}
               </button>
               <button type="button" class="dm-keychange__dismiss" onClick={onDismiss}>
-                Dismiss
+                Keep messages locked
               </button>
             </div>
           </div>

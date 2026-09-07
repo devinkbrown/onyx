@@ -53,12 +53,12 @@ export function CapabilityMatrixSection(): JSX.Element {
           Session capabilities
         </h3>
         <p class="acct-section-hint" id="acct-caps-hint">
-          What this connection negotiated with Onyx Server. Active means in use now.
+          These are browser and server connection capabilities, not native-app features. Active means this connection is using it now.
         </p>
       </div>
       <div class="acct-section-body">
         <p class="acct-section-hint" role="status" data-testid="capability-matrix-summary">
-          {connectionStatus() === 'connected' ? summary() : 'Connect to see negotiated capabilities.'}
+          {connectionStatus() === 'connected' ? summary() : 'Connect to see what this browser connection supports.'}
         </p>
         <Show when={connectionStatus() === 'connected'}>
           <ul class="acct-cert-list" aria-label="Product capabilities" data-testid="capability-matrix-list">

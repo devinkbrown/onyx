@@ -537,7 +537,9 @@ describe('WatchTogetherActivity accessibility', () => {
     const title = screen.getByRole('textbox', { name: 'Activity title' });
     fireEvent.input(title, { target: { value: 'Temporary draft' } });
 
-    screen.getByRole('button', { name: 'Background action' }).focus();
+    const backgroundAction = screen.getByRole('button', { name: 'Background action', hidden: true });
+    expect(backgroundAction.closest('[inert]')).toHaveAttribute('inert', '');
+    expect(backgroundAction.closest('[aria-hidden="true"]')).toBeTruthy();
     fireEvent.keyDown(document, { key: 'Tab' });
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
 

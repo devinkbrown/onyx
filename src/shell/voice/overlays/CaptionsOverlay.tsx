@@ -58,6 +58,8 @@ export function CaptionsOverlay() {
   const [copying, setCopying] = createSignal(false);
   let copyEpoch = 0;
   let disposed = false;
+  const localNick = useStore((state) => state.ourNick);
+  const connectionStatus = useStore((state) => state.connectionStatus);
   const lines = useStore((state) => {
     // Captions are opt-in: the VoiceBar toggle drives state.voice.captionsEnabled
     // (default off). Honour it so toggling actually shows/hides the overlay.
@@ -70,6 +72,7 @@ export function CaptionsOverlay() {
   });
 
   const visibleLines = createMemo(() => lines().slice(-3));
+  const captionSource = createMemo(() => connectionStatus() === 'connected' ? 'Live from this call' : 'Captions unavailable while reconnecting');
   const transcriptText = createMemo(() => lines().map(transcriptLine).join('\n'));
   const copyTranscript = async (): Promise<void> => {
     if (copying()) return;
@@ -168,9 +171,14 @@ export function CaptionsOverlay() {
 
   return (
     <Show when={visibleLines().length > 0}>
-      <section class="voice-captions" data-testid="captions-overlay">
+      <section class="voice-captions" data-testid="captions-overlay" aria-label="Live captions">
         <div class="voice-captions__head">
-          <span>Live captions</span>
+          <div class="voice-captions__title">
+            <span>Live captions</span>
+            <span class="voice-captions__source" data-state={connectionStatus()}>
+              {captionSource()}
+            </span>
+          </div>
           <div class="voice-captions__tools">
             <ProvenanceBadge scope="server" subject="Live captions" />
             <button
@@ -218,7 +226,12 @@ export function CaptionsOverlay() {
                   '--voice-caption-opacity': String(opacity()),
                 }}
               >
-                <span class="voice-caption-speaker">{line.nick}</span>
+                <span class="voice-caption-speaker">
+                  {line.nick}
+                  <span class="voice-caption-speaker__source">
+                    {line.nick.toLowerCase() === localNick().toLowerCase() ? 'You · local' : 'Remote'}
+                  </span>
+                </span>
                 <span class="voice-caption-text">{line.text}</span>
                 <Show when={canTranslate()}>
                   <button

@@ -139,7 +139,7 @@ export function ThemeImportDialog(props: {
             Theme code or link
           </label>
           <p class="theme-import-dialog__hint" id="theme-import-help">
-            Paste a shared Onyx theme code or a link that contains one.
+            Paste a shared Onyx theme code or link. It is checked locally before import; no code is run.
           </p>
           <textarea
             id="theme-import-code"

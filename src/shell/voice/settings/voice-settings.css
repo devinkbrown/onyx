@@ -5,6 +5,11 @@
 }
 
 .voice-settings__section {
+  --voice-control-border: var(--seam-faint);
+  --voice-control-focus: var(--lapis-bright);
+}
+
+.voice-settings__section {
   position: relative;
   display: grid;
   gap: var(--space-3);
@@ -244,6 +249,37 @@
 .voice-settings .onyx-button:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-settings__select,
+  .voice-settings__toggle,
+  .voice-settings__toggle input,
+  .voice-settings__toggle input::before {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .voice-settings__section,
+  .voice-settings__toggle,
+  .voice-settings__select,
+  .voice-settings__key-value {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .voice-settings__toggle input {
+    border-color: ButtonText;
+    background: ButtonFace;
+  }
+}
+
+.voice-settings .onyx-button,
+.voice-settings__select,
+.voice-settings__toggle {
+  min-height: 44px;
 }
 
 .voice-settings .onyx-field__label {

@@ -269,6 +269,17 @@
     box-shadow: none;
   }
 
+  /* Shell ribbon controls have authored focus rings with equal or greater
+     specificity than the generic rule above. Keep their high-contrast ring
+     explicit so every keyboard-accessible ribbon action remains visible. */
+  .shell .shell-ribbon button:focus-visible,
+  .shell .shell-ribbon [role='button']:focus-visible,
+  .shell .shell-ribbon [tabindex]:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
   .onyx-button--primary,
   .onyx-icon-button--primary,
   .onyx-tabs__trigger[aria-selected='true'],

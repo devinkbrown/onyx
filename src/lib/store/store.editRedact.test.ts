@@ -83,6 +83,7 @@ describe('outbound EDIT', () => {
 
     expect(store.getState().client!.sendRaw).toHaveBeenCalledWith(
       'EDIT',
+      { onUncertain: expect.any(Function) },
       '#room',
       'm1',
       'new body',
@@ -208,4 +209,3 @@ describe('outbound REDACT', () => {
     expect(store.getState().channels.get('#room')!.messages).toEqual([peer, pending]);
   });
 });
-

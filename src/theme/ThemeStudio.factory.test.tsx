@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ThemeProvider } from './ThemeProvider';
 import { ThemeStudio, seedSwatches } from './ThemeStudio';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
 import { THEMES, type TokenMap } from './themes';
 import {
   AA_PAIRS,
@@ -63,6 +64,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  expect(updateCoordinator.hasActiveWork).toBe(false);
 });
 
 // ---------------------------------------------------------------------------
@@ -129,6 +131,37 @@ describe('Generate', () => {
 
     fireEvent.click(screen.getByTestId('ts-generate'));
     expect(resetBtn.disabled).toBe(false);
+  });
+
+  it('resets a changed seed and releases the update hold', () => {
+    mountStudio();
+
+    const seed = screen.getByTestId('ts-seed-primary') as HTMLInputElement;
+    const initialValue = seed.value;
+    fireEvent.input(seed, { target: { value: '#d65a4a' } });
+    expect(seed.value).not.toBe(initialValue);
+    expect((screen.getByTestId('ts-reset-btn') as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByTestId('ts-reset-btn'));
+
+    expect(seed.value).toBe(initialValue);
+    expect((screen.getByTestId('ts-reset-btn') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('saving a generated theme resets factory state and releases the hold', async () => {
+    mountStudio();
+    const seed = screen.getByTestId('ts-seed-primary') as HTMLInputElement;
+    const initialValue = seed.value;
+    fireEvent.input(seed, { target: { value: '#d65a4a' } });
+    fireEvent.click(screen.getByTestId('ts-generate'));
+    fireEvent.click(screen.getByTestId('ts-save-btn'));
+    const name = screen.getByRole('textbox', { name: 'Theme name' });
+    fireEvent.input(name, { target: { value: 'Factory save' } });
+    fireEvent.click(screen.getByTestId('ts-save-confirm'));
+    await Promise.resolve();
+
+    expect(seed.value).toBe(initialValue);
+    expect((screen.getByTestId('ts-reset-btn') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('generating a light-scheme palette flips color-scheme for the preview', () => {

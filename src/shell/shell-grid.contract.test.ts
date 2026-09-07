@@ -22,6 +22,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { DESKTOP_MIN_WIDTH_PX, MOBILE_MAX_WIDTH_PX } from '@/lib/mobile/breakpoints';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const shellCss = readFileSync(join(here, 'shell.css'), 'utf8');
 
@@ -97,6 +99,61 @@ describe('shell grid contract (column-4 single-occupant slot)', () => {
 
     const query = enclosingMediaQuery(shellCss, match!.index);
     expect(query).toBe('(min-width: 901px)');
+  });
+
+  it('keeps the CSS mobile boundary in step with the matchMedia constants', () => {
+    // A custom property is invalid in a media feature, so the boundary is
+    // written in both CSS and TS. This is the guard that keeps the two copies
+    // from drifting — the substitute for the single source CSS cannot give.
+    expect(shellCss).toContain(`max-width: ${MOBILE_MAX_WIDTH_PX}px`);
+    expect(shellCss).toContain(`min-width: ${DESKTOP_MIN_WIDTH_PX}px`);
+    expect(DESKTOP_MIN_WIDTH_PX).toBe(MOBILE_MAX_WIDTH_PX + 1);
+
+    // No stale neighbouring boundary: a rule at 899/902 would leave a viewport
+    // tier that matches neither the phone nor the desktop layout.
+    expect(shellCss).not.toMatch(/max-width: (?:899|901)px/);
+    expect(shellCss).not.toMatch(/min-width: (?:900|902)px/);
+  });
+
+  it('keeps the reduced-transparency veil override after the translucent default', () => {
+    // The chat veil is deliberately translucent so the page-layer Background
+    // scene shows through the message column. a11y-media.css force-solids the
+    // same surfaces under prefers-reduced-transparency, but at equal 0,1,0
+    // specificity — and shell.css loads AFTER it, so without an override in
+    // THIS file the translucent value wins on source order and silently
+    // cancels the accessibility guarantee. That regression is invisible in
+    // jsdom (no layout, no var() resolution) and invisible on a machine that
+    // does not set the preference, so it is pinned here as source order.
+    const declarations = [...shellCss.matchAll(/--shell-chat-veil:\s*([^;]+);/g)];
+    expect(declarations.length).toBeGreaterThanOrEqual(2);
+
+    const base = declarations.find((m) => enclosingMediaQuery(shellCss, m.index) === null);
+    expect(base, 'unconditional --shell-chat-veil default').toBeDefined();
+    expect(base![1]).toContain('transparent');
+
+    const reduced = declarations.find(
+      (m) => enclosingMediaQuery(shellCss, m.index) === '(prefers-reduced-transparency: reduce)',
+    );
+    expect(reduced, 'reduced-transparency --shell-chat-veil override').toBeDefined();
+    expect(reduced![1]).not.toContain('transparent');
+
+    // Source order is the entire mechanism: an override declared before the
+    // default would lose to it and the guarantee would be dead again.
+    expect(reduced!.index).toBeGreaterThan(base!.index);
+  });
+
+  it('opts the chrome veil and canvas wash out of transparency under the same query', () => {
+    const reduceBlockRe =
+      /@media\s*\(\s*prefers-reduced-transparency:\s*reduce\s*\)\s*\{([\s\S]*?)\n\}/;
+    const block = reduceBlockRe.exec(shellCss);
+    expect(block, 'prefers-reduced-transparency block in shell.css').not.toBeNull();
+
+    // The ribbon/composer chrome shares the veil system, and `.shell` itself
+    // carries a translucent canvas wash — both are declared in this file and
+    // so both need the same source-order override, not just the message column.
+    expect(block![1]).toContain('--shell-chat-chrome-veil:');
+    expect(block![1]).toMatch(/background:\s*var\(--ink\)/);
+    expect(block![1]).not.toContain('transparent');
   });
 
   it('keeps the single-occupant attribute selectors free of a literal track-list re-declaration', () => {

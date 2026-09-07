@@ -49,7 +49,7 @@ export function OutgoingCallOverlay() {
     <ModalShell
       open={open()}
       title="Calling"
-      description="Waiting for a voice response."
+      description="The call request is being sent. You can cancel before they answer."
       closeLabel="Cancel call"
       onOpenChange={(nextOpen) => {
         if (!nextOpen) cancelCall(callee());
@@ -60,7 +60,7 @@ export function OutgoingCallOverlay() {
           <Avatar name={callee()} />
         </div>
         <div class="voice-call-meta" aria-live="polite">
-          <p class="voice-call-kicker">dialing</p>
+          <p class="voice-call-kicker">Outgoing voice call</p>
           <p class="voice-call-name">{callee()}</p>
           <p class="voice-call-subtext">
             <PhoneOutgoingIcon />

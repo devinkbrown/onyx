@@ -15,11 +15,14 @@ import {
   parseBlockedHosts,
   parsePreferencesSnapshot,
   preferenceOpenRequest,
+  preferencePersistenceState,
   preferences,
   resetPreferences,
+  safeStorage,
   sanitizeBlockedHost,
   setPreference,
   type Preferences,
+  _resetPreferencePersistenceStateForTests,
 } from './preferences';
 
 const STORAGE_KEY = 'onyx:preferences';
@@ -254,6 +257,80 @@ describe('preferences store', () => {
       expect(loadPreferences().experienceMode).toBe('network-ops');
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ experienceMode: 'network-ops' }));
       expect(loadPreferences().experienceMode).toBe('network-ops');
+    });
+  });
+
+  describe('safe storage boundary', () => {
+    it('treats a throwing localStorage getter as unavailable without breaking the store', () => {
+      const getter = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      });
+
+      try {
+        expect(safeStorage()).toBeNull();
+        expect(loadPreferences()).toEqual(DEFAULT_PREFERENCES);
+        _resetPreferencePersistenceStateForTests();
+        expect(preferencePersistenceState()).toBe('unavailable');
+        setPreference('density', 'roomy');
+        expect(preferences().density).toBe('roomy');
+        expect(preferencePersistenceState()).toBe('unavailable');
+      } finally {
+        getter.mockRestore();
+      }
+    });
+
+    it('catches throwing get, set, remove, and clear operations', () => {
+      // vitest.setup.ts installs a plain Storage instance on window, so spy on
+      // that actual object rather than the browser Storage prototype.
+      const storage = window.localStorage;
+      const getItem = vi.spyOn(storage, 'getItem').mockImplementation(() => {
+        throw new DOMException('blocked read', 'SecurityError');
+      });
+      try {
+        const getBlocked = safeStorage();
+        expect(getBlocked?.getItem(STORAGE_KEY)).toBeNull();
+        expect(getBlocked?.failed).toBe(true);
+        expect(loadPreferences()).toEqual(DEFAULT_PREFERENCES);
+        _resetPreferencePersistenceStateForTests();
+        expect(preferencePersistenceState()).toBe('unavailable');
+      } finally {
+        getItem.mockRestore();
+      }
+
+      const setItem = vi.spyOn(storage, 'setItem').mockImplementation(() => {
+        throw new DOMException('blocked write', 'QuotaExceededError');
+      });
+      try {
+        expect(() => setPreference('density', 'roomy')).not.toThrow();
+        expect(preferencePersistenceState()).toBe('unavailable');
+        const setBlocked = safeStorage();
+        expect(setBlocked?.setItem(STORAGE_KEY, '{}')).toBe(false);
+        expect(setBlocked?.failed).toBe(true);
+      } finally {
+        setItem.mockRestore();
+      }
+
+      const removeItem = vi.spyOn(storage, 'removeItem').mockImplementation(() => {
+        throw new DOMException('blocked remove', 'SecurityError');
+      });
+      try {
+        const removeBlocked = safeStorage();
+        expect(removeBlocked?.removeItem(STORAGE_KEY)).toBe(false);
+        expect(removeBlocked?.failed).toBe(true);
+      } finally {
+        removeItem.mockRestore();
+      }
+
+      const clear = vi.spyOn(storage, 'clear').mockImplementation(() => {
+        throw new DOMException('blocked clear', 'SecurityError');
+      });
+      try {
+        const clearBlocked = safeStorage();
+        expect(clearBlocked?.clear()).toBe(false);
+        expect(clearBlocked?.failed).toBe(true);
+      } finally {
+        clear.mockRestore();
+      }
     });
   });
 

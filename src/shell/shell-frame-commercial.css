@@ -1,0 +1,68 @@
+/* O-14/O-15 frame layer: owns responsive shell affordances without rewriting
+   the legacy conversation surfaces. Tokens are semantic and component-local. */
+.shell {
+  --frame-control-size: 44px;
+  --frame-sheet-max: 420px;
+  --frame-scrim: color-mix(in oklab, var(--ink) 62%, transparent);
+  --frame-focus: 2px solid var(--lapis-bright);
+}
+
+.shell-room-current__context,
+.shell-context-rail__close { min-width: var(--frame-control-size); min-height: var(--frame-control-size); }
+.shell-context-rail__close:focus-visible,
+.shell-room-current__context:focus-visible { outline: var(--frame-focus); outline-offset: 2px; }
+
+.shell-context-rail-backdrop { display: none; }
+
+@media (min-width: 901px) {
+  /* Keep the complementary rail opt-in, but keep its entry point in the
+     desktop frame instead of hiding it with the legacy room-current note. */
+  .shell-room-current {
+    display: block;
+    position: absolute;
+    top: 12px;
+    right: max(12px, env(safe-area-inset-right, 0px));
+    z-index: 4;
+  }
+  .shell-room-current__context {
+    display: grid;
+    place-items: center;
+    padding: 0 12px;
+    border: 1px solid var(--seam);
+    border-radius: 999px;
+    background: var(--shell-chat-chrome-veil);
+    color: var(--paper);
+    font: 650 var(--text-xs)/1 var(--font-sans);
+  }
+  .shell-room-current__context { display: grid; }
+}
+
+@media (max-width: 900px) {
+  .shell-room-current { display: block; position: absolute; top: 56px; right: 8px; z-index: 4; }
+  .shell-room-current__context { display: grid; place-items: center; padding: 0 12px; border: 1px solid var(--seam); border-radius: 999px; background: var(--shell-chat-chrome-veil); color: var(--paper); font: 650 var(--text-xs)/1 var(--font-sans); }
+  .shell-context-rail-backdrop { display: block; position: fixed; inset: 0; z-index: 89; background: var(--frame-scrim); }
+  .shell-context-rail { display: flex; flex-direction: column; position: fixed; inset: 0 0 calc(var(--mnav-h) + env(safe-area-inset-bottom, 0px) + var(--shell-virtual-keyboard-inset, 0px)) auto; z-index: 90; width: min(var(--frame-sheet-max), 92vw); max-width: 100%; padding: calc(env(safe-area-inset-top, 0px) + 12px) max(16px, env(safe-area-inset-right, 0px)) 20px 20px; border-left: 1px solid var(--seam); border-radius: var(--r-lg) 0 0 var(--r-lg); background: var(--surface-face); box-shadow: -12px 0 32px color-mix(in oklab, var(--ink) 32%, transparent); }
+  .shell:not([data-shell-aside='context']) .shell-context-rail { display: none; }
+}
+
+/* At 400% text zoom the guest chip follows the ribbon in the conversation
+   column. Keep Context in the same flow at short heights so its 44px target
+   cannot cover the claim CTA; the rail itself remains available when opened. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .shell-room-current {
+    position: relative;
+    inset: auto;
+    z-index: auto;
+    align-self: flex-end;
+    margin: 0 max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-context-rail, .shell-context-rail-backdrop { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .shell-room-current__context, .shell-context-rail { border-color: ButtonText; background: Canvas; color: CanvasText; }
+  .shell-context-rail-backdrop { background: Canvas; opacity: .85; }
+}

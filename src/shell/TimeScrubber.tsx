@@ -89,7 +89,7 @@ function barLabel(bar: TimeScrubberBar, dateValue: string): string {
 
 export { buildMomentLink };
 
-export function TimeScrubber(): JSX.Element {
+export function TimeScrubber(props: { onClose?: () => void } = {}): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const travelTo = useStore((s) => s.travelTo);
   const initialNowMs = Date.now();
@@ -267,6 +267,9 @@ export function TimeScrubber(): JSX.Element {
                 >
                   Ledger
                 </a>
+                <Show when={props.onClose}>
+                  <button type="button" class="time-scrubber__close" onClick={props.onClose}>Close</button>
+                </Show>
               </div>
               <div
                 class="time-scrubber__track"

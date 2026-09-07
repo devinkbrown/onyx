@@ -167,9 +167,105 @@ const LEGACY_HIGH_CONTRAST_KEY = 'onyx:high-contrast';
 /** Fixed-schema preferences are tiny; reject quota-sized storage before parsing. */
 export const MAX_PREFERENCES_STORAGE_CHARS = 16 * 1024;
 
-function hasStorage(): boolean {
-  return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+/**
+ * A localStorage boundary for browser privacy modes and hostile storage
+ * implementations. The getter can throw before a Storage object exists, and
+ * individual operations can throw later (quota, policy, or an extension). The
+ * wrapper keeps those failures out of UI code and exposes `failed` so callers
+ * never confuse a blocked read with an empty store.
+ */
+export interface SafeStorage {
+  readonly failed: boolean;
+  readonly length: number;
+  key(index: number): string | null;
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): boolean;
+  removeItem(key: string): boolean;
+  clear(): boolean;
 }
+
+export function safeStorage(): SafeStorage | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const storage = window.localStorage;
+    if (!storage) return null;
+    const getItem = storage.getItem;
+    const setItem = storage.setItem;
+    const removeItem = storage.removeItem;
+    const clear = storage.clear;
+    const key = storage.key;
+    if (
+      typeof getItem !== 'function'
+      || typeof setItem !== 'function'
+      || typeof removeItem !== 'function'
+      || typeof clear !== 'function'
+      || typeof key !== 'function'
+    ) return null;
+
+    let failed = false;
+    return {
+      get failed() {
+        return failed;
+      },
+      get length() {
+        try {
+          return storage.length;
+        } catch {
+          failed = true;
+          return 0;
+        }
+      },
+      key(index: number) {
+        try {
+          return key.call(storage, index);
+        } catch {
+          failed = true;
+          return null;
+        }
+      },
+      getItem(itemKey: string) {
+        try {
+          return getItem.call(storage, itemKey);
+        } catch {
+          failed = true;
+          return null;
+        }
+      },
+      setItem(itemKey: string, value: string) {
+        try {
+          setItem.call(storage, itemKey, value);
+          return true;
+        } catch {
+          failed = true;
+          return false;
+        }
+      },
+      removeItem(itemKey: string) {
+        try {
+          removeItem.call(storage, itemKey);
+          return true;
+        } catch {
+          failed = true;
+          return false;
+        }
+      },
+      clear() {
+        try {
+          clear.call(storage);
+          return true;
+        } catch {
+          failed = true;
+          return false;
+        }
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+export type PreferencePersistenceState = 'unknown' | 'pending' | 'saved' | 'unavailable';
+let initialPreferencePersistenceState: PreferencePersistenceState = 'unknown';
 
 function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
   return typeof value === 'string' && (allowed as readonly string[]).includes(value);
@@ -220,12 +316,20 @@ export function parsePreferencesSnapshot(value: unknown): Preferences | null {
 
 /** Read + validate persisted prefs, falling back to defaults for any bad field. */
 export function loadPreferences(): Preferences {
-  if (!hasStorage()) return { ...DEFAULT_PREFERENCES };
+  const storage = safeStorage();
+  if (!storage) {
+    initialPreferencePersistenceState = 'unavailable';
+    return { ...DEFAULT_PREFERENCES };
+  }
 
   let parsed: unknown;
   try {
     // Current onyx preferences key
-    const serialized = localStorage.getItem(STORAGE_KEY);
+    const serialized = storage.getItem(STORAGE_KEY);
+    if (storage.failed) {
+      initialPreferencePersistenceState = 'unavailable';
+      return { ...DEFAULT_PREFERENCES };
+    }
     if (serialized && serialized.length > MAX_PREFERENCES_STORAGE_CHARS) {
       return { ...DEFAULT_PREFERENCES };
     }
@@ -237,20 +341,26 @@ export function loadPreferences(): Preferences {
   const raw = (typeof parsed === 'object' && parsed !== null ? parsed : {}) as Record<string, unknown>;
 
   const parsedPrefs = preferencesFromRecord(raw);
+  const legacyHighContrast = storage.getItem(LEGACY_HIGH_CONTRAST_KEY);
+  if (storage.failed) {
+    initialPreferencePersistenceState = 'unavailable';
+    return parsedPrefs;
+  }
   return {
     ...parsedPrefs,
     highContrast: typeof raw.highContrast === 'boolean'
       ? parsedPrefs.highContrast
-      : localStorage.getItem(LEGACY_HIGH_CONTRAST_KEY) === '1',
+      : legacyHighContrast === '1',
   };
 }
 
-function persist(prefs: Preferences): void {
-  if (!hasStorage()) return;
+function persist(prefs: Preferences): PreferencePersistenceState {
+  const storage = safeStorage();
+  if (!storage) return 'unavailable';
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    return storage.setItem(STORAGE_KEY, JSON.stringify(prefs)) ? 'saved' : 'unavailable';
   } catch {
-    /* storage unavailable / quota — non-fatal */
+    return 'unavailable';
   }
 }
 
@@ -278,6 +388,9 @@ export function applyPreferences(prefs: Preferences = preferences()): void {
 // ── reactive store ──────────────────────────────────────────────────────────
 
 const [preferences, setPreferencesSignal] = createSignal<Preferences>(loadPreferences());
+const [preferencePersistenceState, setPreferencePersistenceState] = createSignal<PreferencePersistenceState>(
+  initialPreferencePersistenceState,
+);
 const [open, setOpen] = createSignal(false);
 export type PreferenceOpenRequest = Readonly<{
   category: PreferenceCategory | null;
@@ -290,6 +403,20 @@ const [openRequest, setOpenRequest] = createSignal<PreferenceOpenRequest>({
 
 /** Accessor for the whole preferences object. */
 export { preferences };
+
+/** Current local preference persistence state for truthful UI feedback. */
+export { preferencePersistenceState };
+
+/** Test hook for verifying the honest pre-write UI state without writing storage. */
+export function _resetPreferencePersistenceStateForTests(): void {
+  const storage = safeStorage();
+  if (!storage) {
+    setPreferencePersistenceState('unavailable');
+    return;
+  }
+  storage.getItem(STORAGE_KEY);
+  setPreferencePersistenceState(storage.failed ? 'unavailable' : 'unknown');
+}
 
 /** Panel open-state accessor (gates `<PreferencesPanel/>`). */
 export const isPreferencesOpen: Accessor<boolean> = open;
@@ -312,22 +439,25 @@ export function closePreferences(): void {
 /** Immutable field update: persists + re-applies to the DOM. */
 export function setPreference<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
   const next: Preferences = { ...preferences(), [key]: value };
+  setPreferencePersistenceState('pending');
   setPreferencesSignal(next);
-  persist(next);
+  setPreferencePersistenceState(persist(next));
   applyPreferences(next);
 }
 
 export function applyPreferencesSnapshot(snapshot: Preferences): void {
   const next: Preferences = { ...snapshot };
+  setPreferencePersistenceState('pending');
   setPreferencesSignal(next);
-  persist(next);
+  setPreferencePersistenceState(persist(next));
   applyPreferences(next);
 }
 
 /** Restore every setting to its default. */
 export function resetPreferences(): void {
   const next: Preferences = { ...DEFAULT_PREFERENCES };
+  setPreferencePersistenceState('pending');
   setPreferencesSignal(next);
-  persist(next);
+  setPreferencePersistenceState(persist(next));
   applyPreferences(next);
 }

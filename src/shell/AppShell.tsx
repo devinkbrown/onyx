@@ -26,14 +26,17 @@
  */
 
 import './shell.css';
+import './shell-frame-commercial.css';
 import './harbor-phone.css';
 // Eager voice stage styles: the call tray can paint (provisional loading) before
 // the lazy VoiceStage chunk arrives — without this, the panel looks unstyled/missing.
 import './voice/voice.css';
 
-import { lazy, createEffect, createMemo, createSignal, ErrorBoundary, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, Suspense, untrack, type JSX } from 'solid-js';
+import { createComponent, createEffect, createMemo, createResource, createSignal, ErrorBoundary, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, Suspense, untrack, type Component, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { AddToHomeScreenSheet } from '@/pwa/AddToHomeScreenSheet';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
+import { retryableLazy } from '@/app/StaleChunkRecovery';
 import { useThemeOptional } from '@/theme';
 import { Background } from '@/backgrounds/index';
 import { resolveBackgroundId } from './themeBackground';
@@ -42,8 +45,8 @@ import { TopicReadRuntime } from '@/lib/topics/TopicReadRuntime';
 import { ServerRail } from './ServerRail';
 import { ChannelSidebar } from './ChannelSidebar';
 import { HomeView } from './HomeView';
-const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
-const WhoisSheet = lazy(() => import('./WhoisSheet').then((m) => ({ default: m.WhoisSheet })));
+const ChannelBrowser = retryableLazy<any>(() => import('./ChannelBrowser'), 'channel browser');
+const WhoisSheet = retryableLazy<any>(() => import('./WhoisSheet').then((m) => ({ default: m.WhoisSheet })), 'whois');
 import { PresenceRibbon } from './PresenceRibbon';
 import { RoomInviteShareHost } from './RoomInviteShare';
 import { HarborConfirmHost } from './HarborConfirmSheet';
@@ -58,17 +61,16 @@ import { ReconnectStatusBanner } from './ReconnectStatusBanner';
 import { SessionReclaimBanner } from './SessionReclaimBanner';
 import { OfflineMemoToast } from './OfflineMemoToast';
 import { CapabilityMatrixSection } from './CapabilityMatrixSection';
-import { TimeScrubber } from './TimeScrubber';
-import { WatchTogetherActivity } from './WatchTogetherActivity';
 import { MessageView } from './MessageView';
 import { TypingIndicator } from './TypingIndicator';
 import { Composer } from './Composer';
 import { ContextRail } from './ContextRail';
-import { ModerationCockpit } from './ModerationCockpit';
-import { OperDesk } from './OperDesk';
-import { OperEventConsole } from './OperEventConsole';
-import { RoomInsightsStrip } from './RoomInsightsStrip';
+const ModerationCockpit = retryableLazy<any>(() => import('./ModerationCockpit').then((m) => ({ default: m.ModerationCockpit })), 'moderation desk');
+const OperDesk = retryableLazy<any>(() => import('./OperDesk').then((m) => ({ default: m.OperDesk })), 'operator desk');
+const OperEventConsole = retryableLazy<any>(() => import('./OperEventConsole').then((m) => ({ default: m.OperEventConsole })), 'operator events');
+const RoomInsightsStrip = retryableLazy<any>(() => import('./RoomInsightsStrip').then((m) => ({ default: m.RoomInsightsStrip })), 'room insights');
 import { RoomSwitcherSheet } from './RoomSwitcherSheet';
+import { NewMessageSheet } from './NewMessageSheet';
 type MediaModule = Pick<typeof import('@/media/useCadenceMedia'), 'mountMedia'>;
 const defaultMediaModuleLoader = (): Promise<MediaModule> => import('@/media/useCadenceMedia');
 let mediaModuleLoader = defaultMediaModuleLoader;
@@ -79,44 +81,49 @@ export function _setMediaModuleLoaderForTests(loader?: () => Promise<MediaModule
 // Voice/video UI is lazy: it (plus its ~76kB CADENCE media/worker/wasm graph)
 // is only rendered once a call is signalled, so it stays out of the initial
 // /app payload and loads on first voice activity. Gated below by voiceUiActive.
-const VoiceStage = lazy(() => import('./voice/VoiceStage').then((m) => ({ default: m.VoiceStage })));
-const VoiceBar = lazy(() => import('./voice/VoiceBar').then((m) => ({ default: m.VoiceBar })));
-const VoicePip = lazy(() => import('./voice/VoicePip').then((m) => ({ default: m.VoicePip })));
-const VoiceSettings = lazy(() =>
+const VoiceStage = retryableLazy<any>(() => import('./voice/VoiceStage').then((m) => ({ default: m.VoiceStage })), 'voice stage');
+const VoiceBar = retryableLazy<any>(() => import('./voice/VoiceBar').then((m) => ({ default: m.VoiceBar })), 'voice bar');
+const VoicePip = retryableLazy<any>(() => import('./voice/VoicePip').then((m) => ({ default: m.VoicePip })), 'voice controls');
+const VoiceSettings = retryableLazy<any>(() =>
   import('./voice/settings/VoiceSettings').then((m) => ({ default: m.VoiceSettings })),
+  'voice settings',
 );
-const IncomingCallOverlay = lazy(() =>
+const IncomingCallOverlay = retryableLazy<any>(() =>
   import('./voice/overlays/IncomingCallOverlay').then((m) => ({ default: m.IncomingCallOverlay })),
+  'incoming call controls',
 );
-const OutgoingCallOverlay = lazy(() =>
+const OutgoingCallOverlay = retryableLazy<any>(() =>
   import('./voice/overlays/OutgoingCallOverlay').then((m) => ({ default: m.OutgoingCallOverlay })),
+  'outgoing call controls',
 );
-const CaptionsOverlay = lazy(() =>
+const CaptionsOverlay = retryableLazy<any>(() =>
   import('./voice/overlays/CaptionsOverlay').then((m) => ({ default: m.CaptionsOverlay })),
+  'captions controls',
 );
-const ReactionsOverlay = lazy(() =>
+const ReactionsOverlay = retryableLazy<any>(() =>
   import('./voice/overlays/ReactionsOverlay').then((m) => ({ default: m.ReactionsOverlay })),
+  'reaction controls',
 );
 import { MemberList } from './MemberList';
 import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
-import { CallsHub } from './CallsHub';
+const CallsHub = retryableLazy<any>(() => import('./CallsHub').then((m) => ({ default: m.CallsHub })), 'calls');
 // Panels are entered from explicit controls and should not inflate the initial
 // connected-shell bundle. Each preserves its existing Suspense boundary below.
-const AccountPanel = lazy(() => import('@/app/Account').then((m) => ({ default: m.AccountPanel })));
-const AppearancePanel = lazy(() => import('./AppearancePanel').then((m) => ({ default: m.AppearancePanel })));
-const PreferencesPanel = lazy(() => import('./PreferencesPanel').then((m) => ({ default: m.PreferencesPanel })));
-const YouNotifications = lazy(() => import('./YouNotifications').then((m) => ({ default: m.YouNotifications })));
-const PinnedMessages = lazy(() => import('./PinnedMessages').then((m) => ({ default: m.PinnedMessages })));
-const ScheduledMessagesSheet = lazy(() => import('./ScheduledMessagesSheet').then((m) => ({ default: m.ScheduledMessagesSheet })));
-const JumpToDateSheet = lazy(() => import('./JumpToDateSheet').then((m) => ({ default: m.JumpToDateSheet })));
-import { applyPreferences, closePreferences, isPreferencesOpen, preferences } from '@/lib/prefs/preferences';
+const AccountPanel = retryableLazy<any>(() => import('@/app/Account').then((m) => ({ default: m.AccountPanel })), 'account settings');
+const AppearancePanel = retryableLazy<any>(() => import('./AppearancePanel').then((m) => ({ default: m.AppearancePanel })), 'appearance settings');
+const PreferencesPanel = retryableLazy<any>(() => import('./PreferencesPanel').then((m) => ({ default: m.PreferencesPanel })), 'preferences');
+const YouNotifications = retryableLazy<any>(() => import('./YouNotifications').then((m) => ({ default: m.YouNotifications })), 'notifications');
+const PinnedMessages = retryableLazy<any>(() => import('./PinnedMessages').then((m) => ({ default: m.PinnedMessages })), 'pinned messages');
+const ScheduledMessagesSheet = retryableLazy<any>(() => import('./ScheduledMessagesSheet').then((m) => ({ default: m.ScheduledMessagesSheet })), 'scheduled messages');
+const JumpToDateSheet = retryableLazy<any>(() => import('./JumpToDateSheet').then((m) => ({ default: m.JumpToDateSheet })), 'jump to date');
+import { applyPreferences, closePreferences, isPreferencesOpen, preferences, setPreference as writePreference } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
 import { closeNotifications, isNotificationsOpen } from '@/lib/notifications/youNotificationsState';
-const ShortcutsOverlay = lazy(() => import('./ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })));
+const ShortcutsOverlay = retryableLazy<any>(() => import('./ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })), 'keyboard shortcuts');
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
-import { MessageSearch } from './search/MessageSearch';
-import { closeMessageSearch, openMessageSearch } from './search/useMessageSearch';
+const MessageSearch = retryableLazy<any>(() => import('./search/MessageSearch').then((m) => ({ default: m.MessageSearch })), 'message search');
+import { closeMessageSearch, isMessageSearchOpen, openMessageSearch } from './search/useMessageSearch';
 import { channelIdentityTarget, roomIdentityForTarget, type RoomIdentity } from './roomIdentity';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import {
@@ -165,15 +172,33 @@ function focusableIn(root: HTMLElement | null | undefined): HTMLElement[] {
 function LazySurface(props: {
   label: string;
   onClose: () => void;
-  children: JSX.Element;
+  load?: () => Promise<{ default: Component<{ onClose?: () => void }> }>;
+  children?: JSX.Element;
 }): JSX.Element {
+  const [attempt, setAttempt] = createSignal(0);
+  const MAX_RETRIES = 2;
+  const [loaded] = createResource(attempt, () => props.load ? props.load() : Promise.resolve(null));
   return (
     <ErrorBoundary
-      fallback={() => (
+      fallback={(_error, reset) => (
         <div class="shell-lazy-state" role="alert">
           <span>{`Could not load ${props.label}.`}</span>
+          <button
+            type="button"
+            disabled={attempt() >= MAX_RETRIES}
+            onClick={() => {
+              if (attempt() >= MAX_RETRIES) return;
+              // Change the resource key first: this starts one genuinely new
+              // loader invocation. Boundary reset alone only re-renders the
+              // failed Solid lazy/resource value.
+              setAttempt((value) => value + 1);
+              reset();
+            }}
+          >
+            {attempt() >= MAX_RETRIES ? 'Retries exhausted' : `Retry${attempt() ? ` (${attempt()}/${MAX_RETRIES})` : ''}`}
+          </button>
+          <button type="button" onClick={() => updateCoordinator.requestReload()}>Reload app</button>
           <button type="button" onClick={() => props.onClose()}>Close</button>
-          <button type="button" onClick={() => window.location.reload()}>Reload app</button>
         </div>
       )}
     >
@@ -184,7 +209,9 @@ function LazySurface(props: {
           </div>
         )}
       >
-        {props.children}
+        <Show when={props.load} fallback={props.children}>
+          <Show when={loaded()} keyed>{(module) => createComponent(module.default, { onClose: props.onClose })}</Show>
+        </Show>
       </Suspense>
     </ErrorBoundary>
   );
@@ -268,6 +295,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const reducedData = makeReducedDataSignal();
   const [primarySurface, setPrimarySurface] = createSignal<'conversation' | 'calls'>('conversation');
   const [contextRailOpen, setContextRailOpen] = createSignal(false);
+  const [newConversationOpen, setNewConversationOpen] = createSignal(false);
+  let newConversationTrigger: HTMLElement | null = null;
   const [sidebarMode, setSidebarMode] = createSignal<'rooms' | 'messages'>(
     activeView().kind === 'dm' ? 'messages' : 'rooms',
   );
@@ -359,6 +388,41 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const [callSurfaceChannel, setCallSurfaceChannel] = createSignal<string | null>(null);
   const [joinFailedChannel, setJoinFailedChannel] = createSignal<string | null>(null);
   const [rejoinChannel, setRejoinChannel] = createSignal<string | null>(null);
+  // Update continuity is shell-scoped: navigation can remove VoiceBar (and
+  // ringing states may never mount it), but the call itself remains live.
+  let releaseVoiceUpdateHold: (() => void) | null = null;
+  createEffect(() => {
+    const active = voice().callState !== 'idle';
+    if (active && !releaseVoiceUpdateHold) {
+      releaseVoiceUpdateHold = updateCoordinator.hold('voice-call');
+    } else if (!active && releaseVoiceUpdateHold) {
+      releaseVoiceUpdateHold();
+      releaseVoiceUpdateHold = null;
+    }
+  });
+  onCleanup(() => {
+    releaseVoiceUpdateHold?.();
+    releaseVoiceUpdateHold = null;
+  });
+  // Draft protection belongs to the shell, not the conversation subtree:
+  // navigation to Calls unmounts Composer while the store draft remains live.
+  // Keep the coordinator held for any non-empty stored draft and release it
+  // only after the last draft has been cleared.
+  const composerDrafts = useStore((s) => s.composerDrafts);
+  let releaseDraftUpdateHold: (() => void) | null = null;
+  createEffect(() => {
+    const hasDraft = Object.values(composerDrafts()).some((text) => text.trim().length > 0);
+    if (hasDraft && !releaseDraftUpdateHold) {
+      releaseDraftUpdateHold = updateCoordinator.hold('composer-draft');
+    } else if (!hasDraft && releaseDraftUpdateHold) {
+      releaseDraftUpdateHold();
+      releaseDraftUpdateHold = null;
+    }
+  });
+  onCleanup(() => {
+    releaseDraftUpdateHold?.();
+    releaseDraftUpdateHold = null;
+  });
   const inCall = createMemo(() => {
     const cs = voice().callState;
     return cs !== 'idle' && cs !== 'ringing_in' && cs !== 'ringing_out';
@@ -668,6 +732,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
     if (mobileSidebarOpen()) return sidebarDrawerRef ?? null;
     if (mobileMembersOpen()) return membersDrawerElement();
     if (mobileMoreOpen()) return mobileMoreRef ?? null;
+    if (contextRailOpen()) return document.querySelector<HTMLElement>('#shell-context-rail');
     return null;
   }
 
@@ -748,6 +813,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
     if (mobileSidebarOpen()) getState().closeMobileSidebar();
     if (mobileMembersOpen()) setMobileMembersOpen(false);
     if (mobileMoreOpen()) setMobileMoreOpen(false);
+    if (contextRailOpen()) setContextRailOpen(false);
     if (restoreFocus) restoreMobileDrawerFocus();
   }
 
@@ -867,6 +933,14 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
   // that silently reappears with a stale roster on the next channel view.
   createEffect(() => {
     const view = activeView();
+    if (view.kind !== 'channel' && view.kind !== 'dm') {
+      if (contextRailOpen()) closeContextRail();
+    }
+    if (!hasConversation() && contextRailOpen()) setContextRailOpen(false);
+  });
+
+  createEffect(() => {
+    const view = activeView();
     if (!mobileMembersOpen()) {
       mobileMembersTarget = null;
       return;
@@ -955,6 +1029,16 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
     queueMicrotask(() => {
       if (contextTriggerRef?.isConnected) contextTriggerRef.focus({ preventScroll: true });
     });
+  }
+
+  function toggleContextRail(): void {
+    if (!contextRailOpen()) {
+      rememberMobileDrawerTrigger();
+      mobileDrawerRestoreTarget ||= contextTriggerRef ?? null;
+      closeActiveMobileDrawer(false);
+      setMobileMembersOpen(false);
+    }
+    setContextRailOpen((open) => !open);
   }
 
   function mobileMoreDialogLabel(): string {
@@ -1077,6 +1161,34 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
     });
   }
 
+  function openNewConversation(trigger?: HTMLElement): void {
+    newConversationTrigger = trigger ?? document.activeElement as HTMLElement | null;
+    setNewConversationOpen(true);
+  }
+
+  function closeNewConversation(restoreFocus = true): void {
+    setNewConversationOpen(false);
+    if (restoreFocus) {
+      queueMicrotask(() => newConversationTrigger?.focus({ preventScroll: true }));
+    } else {
+      newConversationTrigger = null;
+    }
+  }
+
+  function startNewConversation(nick: string): void {
+    // The sheet is portaled above every shell surface. On success, remove all
+    // transient collection ownership before navigation so the new DM cannot
+    // remain behind an inert mobile drawer or stale Context/More surface.
+    closeActiveMobileDrawer(false);
+    setMobileMoreView('destinations');
+    mobileRoomControlsTarget = null;
+    setPrimarySurface('conversation');
+    setSidebarMode('messages');
+    getState().navigate({ kind: 'dm', nick });
+    closeNewConversation(false);
+    queueMicrotask(() => document.querySelector<HTMLTextAreaElement>('[data-composer-input]')?.focus({ preventScroll: true }));
+  }
+
   function openMemberWhois(nick: string, returnFocus: HTMLElement): void {
     setWhoisReturnFocus(returnFocus);
     setWhoisReturnFocusFallback(
@@ -1088,8 +1200,15 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
   }
 
   function clearMemberWhoisReturnFocus(): void {
+    const returnTarget = whoisReturnFocus();
+    const roster = whoisReturnFocusFallback();
     setWhoisReturnFocus(null);
-    setWhoisReturnFocusFallback(null);
+    // Keep the stable roster fallback alive through the Sheet's focus-trap
+    // cleanup. The close callback runs before the portal unmounts; clearing it
+    // here races restoration and strands a removed member trigger on the
+    // drawer's close button instead of returning focus to the drawer itself.
+    const focusTarget = returnTarget?.isConnected ? returnTarget : roster;
+    if (focusTarget) setTimeout(() => focusTarget.focus({ preventScroll: true }), 0);
   }
 
   // ── is the member surface visible (column on desktop, drawer on mobile)? ──
@@ -1109,7 +1228,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
   // member drawer/column state.
   type ShellAside = 'members' | 'context' | 'none';
   const asideOccupant = createMemo<ShellAside>(() => {
-    if (!isMobile() && contextRailOpen()) return 'context';
+    if (contextRailOpen()) return 'context';
     if (membersVisible()) return 'members';
     return 'none';
   });
@@ -1243,6 +1362,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
             onConversationOpen={() => {
               setPrimarySurface('conversation');
             }}
+            onOpenNewConversation={() => openNewConversation()}
             onMobileClose={closeMobileSidebar}
             hideOperatorChips={isMobile()}
           />
@@ -1288,7 +1408,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
               class="shell-room-current__context"
               aria-expanded={contextRailOpen()}
               aria-controls="shell-context-rail"
-              onClick={() => setContextRailOpen((open) => !open)}
+              onClick={toggleContextRail}
             >
               Context
             </button>
@@ -1333,10 +1453,10 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                 <AddToHomeScreenSheet />
                 <DmKeyChangeBanner />
                 <Show when={preferences().timeScrubber && !inCall()}>
-                  <TimeScrubber />
+                  <LazySurface label="time scrubber" onClose={() => writePreference('timeScrubber', false)} load={() => import('./TimeScrubber').then((m) => ({ default: m.TimeScrubber }))} />
                 </Show>
                 <Show when={preferences().watchTogether && !inCall()}>
-                  <WatchTogetherActivity />
+                  <LazySurface label="Watch Together" onClose={() => writePreference('watchTogether', false)} load={() => import('./WatchTogetherActivity').then((m) => ({ default: m.WatchTogetherActivity }))} />
                 </Show>
 
                 {/* Content: read-only status buffer, conversation, or home */}
@@ -1363,18 +1483,24 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                   </div>
                 </Show>
                 {/* Message search is global on every conversation surface. */}
-                <MessageSearch />
+                <Show when={isMessageSearchOpen()}>
+                  <LazySurface label="message search" onClose={closeMessageSearch}>
+                    <MessageSearch />
+                  </LazySurface>
+                </Show>
               </>
             )}
           >
-            <CallsHub
-              callState={voice().callState}
-              callChannel={voice().callChannel}
-              callWith={voice().callWith}
-              callStartedAt={voice().callStartedAt}
-              onOpenRooms={openRoomsFromCalls}
-              onReturnToCall={returnToCall}
-            />
+            <LazySurface label="Calls" onClose={() => setPrimarySurface('conversation')}>
+              <CallsHub
+                callState={voice().callState}
+                callChannel={voice().callChannel}
+                callWith={voice().callWith}
+                callStartedAt={voice().callStartedAt}
+                onOpenRooms={openRoomsFromCalls}
+                onReturnToCall={returnToCall}
+              />
+            </LazySurface>
           </Show>
         </div>
 
@@ -1386,6 +1512,9 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
             onClick={closeMobileMembers}
           />
         </Show>
+        <Show when={isMobile() && asideOccupant() === 'context'}>
+          <div class="shell-context-rail-backdrop" aria-hidden="true" onClick={closeContextRail} />
+        </Show>
         <MemberList
           hidden={asideOccupant() !== 'members'}
           modal={isMobile()}
@@ -1393,7 +1522,12 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
           onOpenDm={openMemberDm}
           onOpenWhois={openMemberWhois}
         />
-        <ContextRail open={asideOccupant() === 'context'} onClose={closeContextRail} />
+        {/* Keep one stable DOM identity for aria-controls and breakpoint
+            transitions. ContextRail owns the desktop slot only while open;
+            on mobile the same node becomes the modal edge sheet. */}
+        <Show when={hasConversation()}>
+          <ContextRail open={contextRailOpen()} modal={isMobile()} onClose={closeContextRail} />
+        </Show>
       </div>
 
       {/* Mobile bottom tab bar — the same product-frame navigation as the
@@ -1411,6 +1545,13 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
       />
       <Show when={mobileMoreOpen()}>
         <div class="shell-mobile-more-backdrop" aria-hidden="true" onClick={closeMobileMore} />
+      </Show>
+      <Show when={newConversationOpen()}>
+        <NewMessageSheet
+          connectionStatus={connectionStatus()}
+          onClose={closeNewConversation}
+          onStart={startNewConversation}
+        />
       </Show>
       <Show when={mobileMoreOpen() && mobileMoreView() === 'room-controls' && activeView().kind === 'channel'}>
         <div
@@ -1447,8 +1588,9 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
               </div>
               <button type="button" class="shell-mobile-more-sheet__close" onClick={closeMobileMore}>Close</button>
             </header>
-            <RoomInsightsStrip />
-            <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
+            <Suspense fallback={null}>
+              <RoomInsightsStrip />
+              <ModerationCockpit channel={(activeView() as { channel: string }).channel} />
             {/* Mobile parity with ContextRail: the desk follows the grant, not
                 the experience mode. */}
             <Show when={isOper()}>
@@ -1460,6 +1602,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
             <Show when={preferences().experienceMode === 'network-ops' && !isOper()}>
               <p class="shell-context-rail__empty" role="status">Operator tools appear here after this account is granted access.</p>
             </Show>
+            </Suspense>
           </section>
         </div>
       </Show>
@@ -1469,7 +1612,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
         <LazySurface label="account settings" onClose={() => getState().closeAccount()}>
           <AccountPanel
             open
-            onOpenChange={(open) => (open ? getState().openAccount() : getState().closeAccount())}
+            onOpenChange={(open: boolean) => (open ? getState().openAccount() : getState().closeAccount())}
           />
         </LazySurface>
       </Show>
@@ -1530,10 +1673,16 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
           otherwise its first Edge load suspends the outer connected shell and
           removes both the conversation and the provisional in-flow stage. */}
       <Show when={voiceUiActive()}>
-        <Suspense fallback={null}>
+        <ErrorBoundary fallback={(_error, reset) => (
+          <div role="alert" data-testid="voice-overlay-error" class="voice-overlay-state">
+            <p>Call controls could not load.</p>
+            <button type="button" onClick={reset}>Retry call controls</button>
+          </div>
+        )}>
+        <Suspense fallback={<div role="status" data-testid="voice-overlay-loading" class="voice-overlay-state">Loading call controls…</div>}>
           <VoiceSettings
             open={showVoiceSettings()}
-            onOpenChange={(open) => (open ? getState().openVoiceSettings() : getState().closeVoiceSettings())}
+            onOpenChange={(open: boolean) => (open ? getState().openVoiceSettings() : getState().closeVoiceSettings())}
           />
           <VoicePip />
           <IncomingCallOverlay />
@@ -1541,6 +1690,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
           <CaptionsOverlay />
           <ReactionsOverlay />
         </Suspense>
+        </ErrorBoundary>
       </Show>
 
       <RoomInviteShareHost />

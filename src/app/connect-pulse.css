@@ -70,6 +70,11 @@
   text-decoration: none;
 }
 
+@media (forced-colors: active) {
+  .cpulse-deeplink, .cpulse-room { border-color: CanvasText; background: Canvas; }
+  .cpulse-wire-ledger, .cpulse-room-name, .cpulse-deeplink-chan { color: LinkText; }
+}
+
 .cpulse-wire-ledger:hover,
 .cpulse-wire-ledger:focus-visible {
   color: var(--paper);

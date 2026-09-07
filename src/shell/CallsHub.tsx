@@ -120,7 +120,7 @@ export function CallsHub(props: CallsHubProps): JSX.Element {
       case 'established':
         return 'In call';
       default:
-        return 'Idle';
+        return 'Idle · Pre-join';
     }
   });
 
@@ -146,6 +146,17 @@ export function CallsHub(props: CallsHubProps): JSX.Element {
       <h1 id="shell-calls-title">{title()}</h1>
       <p class="shell-calls-intro">{intro()}</p>
 
+      <p class="shell-calls-truth" role="note">
+        <strong>What happens next</strong>
+        <span>
+          {presentation() === 'established'
+            ? ' Your call is active; use the room controls for microphone, camera, and captions.'
+            : presentation() === 'provisional'
+              ? ' The session is connecting. Media controls appear when the room confirms a connection.'
+              : ' This page is a starting point. Choosing a room does not join or start a call.'}
+        </span>
+      </p>
+
       <Show
         when={canReturn()}
         fallback={(
@@ -170,16 +181,16 @@ export function CallsHub(props: CallsHubProps): JSX.Element {
         </button>
       </Show>
 
-      <div class="shell-calls-proof" aria-label="Call capabilities">
+      <div class="shell-calls-proof" aria-label="Call details">
         <article>
           <span aria-hidden="true">Media</span>
           <h2>Voice and video</h2>
-          <p>Join from the room ribbon when your people are ready.</p>
+          <p>Controls belong to the room, where joining is explicit.</p>
         </article>
         <article>
           <span aria-hidden="true">Access</span>
           <h2>Live captions</h2>
-          <p>Keep the conversation easier to follow in the moment.</p>
+          <p>Use captions when the live room makes them available.</p>
         </article>
         <article>
           <span aria-hidden="true">Status</span>

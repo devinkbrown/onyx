@@ -8,6 +8,7 @@
 import { createMemo, createResource, createSignal, Index, onCleanup, Show, type JSX } from 'solid-js';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { fetchChannelPulse } from '@/lib/stats/channelStats';
+import './participant-presence.css';
 
 type PresenceHeatlineProps = {
   /** Active channel name, or null for non-channel views. */
@@ -59,7 +60,7 @@ export function PresenceHeatline(props: PresenceHeatlineProps): JSX.Element {
           class="shell-ribbon-heatline"
           role="img"
           aria-label={`24-hour activity: ${pulse.latest?.total ?? 0} messages${pulse.latest && pulse.latest.present > 0 ? `, ${pulse.latest.present} present` : ''}, busiest around ${busiestHour(hours())}:00 UTC`}
-          title="Activity by hour (UTC) — the current hour is marked"
+          title="Message activity by hour (UTC); the current hour is marked. This is room activity, not a live presence signal."
         >
           <Index each={hours()!}>
             {(count, h) => (

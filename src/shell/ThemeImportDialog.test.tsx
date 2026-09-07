@@ -58,7 +58,7 @@ describe('ThemeImportDialog accessibility', () => {
 
     const input = screen.getByLabelText('Theme code or link');
     expect(screen.getByRole('dialog', { name: 'Share & import a theme' })).toBeInTheDocument();
-    expect(input).toHaveAccessibleDescription('Paste a shared Onyx theme code or a link that contains one.');
+    expect(input).toHaveAccessibleDescription('Paste a shared Onyx theme code or link. It is checked locally before import; no code is run.');
 
     fireEvent.input(input, { target: { value: encodeTheme(sharedTheme) } });
 
@@ -78,7 +78,7 @@ describe('ThemeImportDialog accessibility', () => {
     fireEvent.input(input, { target: { value: 'not-a-theme' } });
 
     expect(input).toHaveAccessibleDescription(
-      "Paste a shared Onyx theme code or a link that contains one. That doesn't look like a valid theme code.",
+      "Paste a shared Onyx theme code or link. It is checked locally before import; no code is run. That doesn't look like a valid theme code.",
     );
   });
 

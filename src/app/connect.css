@@ -915,11 +915,10 @@
     align-items: stretch;
     justify-content: flex-end;
     overflow-y: auto;
-    padding:
+    padding-block:
       max(12px, env(safe-area-inset-top, 0px))
-      max(12px, env(safe-area-inset-right, 0px))
-      max(12px, env(safe-area-inset-bottom, 0px))
-      max(12px, env(safe-area-inset-left, 0px));
+      max(12px, env(safe-area-inset-bottom, 0px));
+    padding-inline: 0;
     background: transparent;
   }
 
@@ -941,8 +940,8 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    min-height: calc(100svh - 24px);
-    min-height: calc(100dvh - 24px);
+    min-height: 100svh;
+    min-height: 100dvh;
     border-radius: 0;
     border: 0;
     background: transparent;
@@ -957,7 +956,7 @@
     padding:
       max(28px, calc(env(safe-area-inset-top, 0px) + 20px))
       max(20px, env(safe-area-inset-right, 0px))
-      12px
+      max(14px, env(safe-area-inset-bottom, 0px))
       max(20px, env(safe-area-inset-left, 0px));
   }
 

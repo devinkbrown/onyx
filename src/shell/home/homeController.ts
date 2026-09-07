@@ -136,6 +136,8 @@ export type HomeQueuedSend = {
   id: string;
   target: string;
   queued_at: number;
+  wire_admitted?: true;
+  claimed?: true;
 };
 
 export type HomeMoreActivityView = {
@@ -334,9 +336,13 @@ export function createHomeController(): HomeController {
       id: entry.id,
       target: entry.target,
       queued_at: entry.queued_at,
+      wire_admitted: entry.wire_admitted,
+      claimed: entry.claim ? true : undefined,
     })),
   );
   const queuedSendCount = createMemo(() => queuedEntries().length);
+  const prunePendingCount = createMemo(() => queuedEntries().filter((entry) => entry.wire_admitted).length);
+  const uncertainCount = createMemo(() => queuedEntries().filter((entry) => Boolean(entry.claim) && !entry.wire_admitted).length);
   const roomDraftCount = createMemo(() => channelDraftCount(composerDrafts()));
   const ownedTopicDrafts = createMemo(() => {
     const owner = memoryOwner();
@@ -347,6 +353,8 @@ export function createHomeController(): HomeController {
   const homeOutboxChrome = createMemo(() => outboxHomeChrome({
     connected: connectionStatus() === 'connected',
     queuedCount: queuedSendCount(),
+    prunePendingCount: prunePendingCount(),
+    uncertainCount: uncertainCount(),
     deliveryFailed: outboxDeliveryFailed(),
   }));
   const localMemoryStatus = createMemo(() => {

@@ -27,6 +27,7 @@ export function RoomInviteShare(props: RoomInviteShareProps) {
   const [local] = splitProps(props, ['channel', 'open', 'onOpenChange']);
   const networkName = useStore((s) => s.networkName);
   const channels = useStore((s) => s.channels);
+  const connectionStatus = useStore((s) => s.connectionStatus);
 
   const [copyStatus, setCopyStatus] = createSignal('');
   const [shareBusy, setShareBusy] = createSignal(false);
@@ -58,6 +59,16 @@ export function RoomInviteShare(props: RoomInviteShareProps) {
   );
   const shareData = createMemo(() => payload().shareData);
   const canShare = createMemo(() => canNativeShare(shareData()));
+  let lastPayload = '';
+  createEffect(() => {
+    const current = payload().shareUrl;
+    if (lastPayload && current !== lastPayload) {
+      setCopyStatus('Invite changed. Share or copy the current link again.');
+      shareEpoch += 1;
+      copyEpoch += 1;
+    }
+    lastPayload = current;
+  });
 
   createEffect(() => {
     void isOpen();
@@ -130,6 +141,11 @@ export function RoomInviteShare(props: RoomInviteShareProps) {
         <p class="room-invite-share__copy">
           Send this link. Friends choose a name and join.
         </p>
+        <p class="room-invite-share__context" role="status">
+          {connectionStatus() === 'connected'
+            ? 'Anyone with the link can choose to join this room.'
+            : 'You’re offline. You can still copy this link and share it.'}
+        </p>
         <div class="room-invite-share__preview" role="group" aria-label="Invite preview">
           <p class="room-invite-share__label">Room</p>
           <p class="room-invite-share__room">{payload().link.card.channel ?? networkName()}</p>
@@ -165,6 +181,9 @@ export function RoomInviteShare(props: RoomInviteShareProps) {
             {copyBusy() ? 'Copying link…' : 'Copy link'}
           </Button>
         </div>
+        <Show when={!canShare()}>
+          <p class="room-invite-share__fallback">Sharing is not available here. Copy the link instead.</p>
+        </Show>
         <span
           class="sr-only"
           role="status"

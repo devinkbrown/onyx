@@ -9,12 +9,38 @@
   gap: var(--space-2);
 }
 
+.ignored-users-heading {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  min-width: 0;
+}
+
+.ignored-users-local-badge {
+  color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--line));
+  border-radius: 999px;
+  padding: .2rem .55rem;
+  font-size: .72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .ignored-users-add {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
 }
+
+.ignored-users-input-label,
+.ignored-users-help {
+  color: var(--paper-dim);
+  font-size: .78rem;
+}
+
+.ignored-users-input-label { flex-basis: 100%; }
+.ignored-users-help { margin: -.35rem 0 0; }
 
 .ignored-users-add .pref-text-input {
   flex: 1 1 12rem;
@@ -33,13 +59,16 @@
   font-size: 0.85rem;
   font-weight: 600;
   padding: 0.4rem 0.75rem;
-  min-height: 2.25rem;
+  min-height: 2.75rem;
 }
 
 .ignored-users-add-btn:hover,
 .ignored-users-unignore:hover {
   background: color-mix(in oklab, var(--ink) 55%, transparent);
 }
+
+.ignored-users-add-btn:active,
+.ignored-users-unignore:active { transform: translateY(1px); }
 
 .ignored-users-add-btn:focus-visible,
 .ignored-users-unignore:focus-visible {
@@ -48,10 +77,17 @@
 }
 
 .ignored-users-empty {
-  margin: 0;
+  display: grid;
+  gap: .2rem;
+  margin: .25rem 0 0;
+  padding: 1rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
   font-size: 0.9rem;
   color: var(--paper-dim);
 }
+
+.ignored-users-empty strong { color: var(--paper); font-size: .95rem; }
 
 .ignored-users-list {
   list-style: none;
@@ -85,11 +121,33 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+}
+
+@media (max-width: 30rem) {
+  .ignored-users-heading { align-items: flex-start; flex-direction: column; gap: .35rem; }
+  .ignored-users-add-btn { flex: 1 1 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ignored-users-add-btn:active,
+  .ignored-users-unignore:active { transform: none; }
+}
+
+@media (forced-colors: active) {
+  .ignored-users-local-badge,
+  .ignored-users-list,
+  .ignored-users-empty { border-color: ButtonText; }
+  .ignored-users-add-btn,
+  .ignored-users-unignore { border-color: ButtonText; color: ButtonText; background: ButtonFace; }
+  .ignored-users-add-btn:focus-visible,
+  .ignored-users-unignore:focus-visible { outline: 2px solid Highlight; }
 }
 
 .ignored-users-unignore {
   flex-shrink: 0;
   font-size: 0.8rem;
   padding: 0.3rem 0.6rem;
-  min-height: 2rem;
+  min-height: 2.75rem;
 }

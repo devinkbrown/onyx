@@ -27,7 +27,9 @@
   background: var(--ink);
   color: var(--paper);
   box-shadow: 0 18px 40px color-mix(in oklab, black 35%, transparent);
+  outline: none;
 }
+.person-safety__panel:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 3px; }
 
 .person-safety__title {
   margin: 0;
@@ -115,4 +117,9 @@
   .person-safety__panel {
     transition: none;
   }
+}
+
+@media (forced-colors: active) {
+  .person-safety__panel, .person-safety__note { border-color: CanvasText; }
+  .person-safety__panel:focus-visible { outline-color: Highlight; }
 }

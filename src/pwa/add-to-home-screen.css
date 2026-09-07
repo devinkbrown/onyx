@@ -20,3 +20,9 @@
   gap: var(--space-2);
   align-items: center;
 }
+
+.a2hs-sheet__actions :where(button) { min-height: 2.75rem; }
+.a2hs-sheet__status { margin: 0; font-size: .875rem; line-height: 1.4; color: var(--paper-mute); }
+.a2hs-sheet :where(button, a):focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+@media (max-width: 30rem) { .a2hs-sheet__actions { align-items: stretch; flex-direction: column; } .a2hs-sheet__actions :where(button) { width: 100%; } }
+@media (forced-colors: active) { .a2hs-sheet :where(button, a):focus-visible { outline: 2px solid Highlight; } }

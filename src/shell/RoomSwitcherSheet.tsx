@@ -29,7 +29,12 @@ export function RoomSwitcherSheet(props: RoomSwitcherSheetProps): JSX.Element {
     >
       <Show when={local.open}>
         <div class="shell-room-switcher-sheet__bar">
-          <p>{local.mode === 'rooms' ? 'Choose a room' : 'Choose a conversation'}</p>
+          <div>
+            <p>{local.mode === 'rooms' ? 'Switch rooms' : 'Switch conversations'}</p>
+            <span class="shell-room-switcher-sheet__hint">
+              {local.mode === 'rooms' ? 'Browse or open a room' : 'Choose a conversation'}
+            </span>
+          </div>
           <button type="button" onClick={() => local.onDismiss()} aria-label="Close switcher" title="Close switcher">
             <span aria-hidden="true">×</span>
           </button>

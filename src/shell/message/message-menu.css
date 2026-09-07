@@ -86,6 +86,11 @@
   background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
 }
 
+.msg-menu-btn:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
 .msg-menu-icon {
   width: 16px;
   height: 16px;
@@ -377,6 +382,36 @@ a.msg-menu-item {
   border-color: var(--seam-faint);
   background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
   transform: scale(1.08);
+}
+
+@media (forced-colors: active) {
+  .msg-menu-bar,
+  .msg-menu .onyx-popover__panel,
+  .msg-menu-delete-confirm {
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+
+  .msg-menu-btn,
+  .msg-menu-item,
+  .msg-menu-delete-confirm__cancel,
+  .msg-menu-delete-confirm__delete {
+    color: ButtonText;
+    forced-color-adjust: none;
+  }
+
+  .msg-menu-btn:focus-visible,
+  .msg-menu-item:focus-visible,
+  .msg-menu-delete-confirm__cancel:focus-visible,
+  .msg-menu-delete-confirm__delete:focus-visible {
+    outline: 2px solid Highlight;
+  }
+
+  .msg-menu-btn:focus-visible,
+  .msg-menu .onyx-popover__trigger:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
 }
 
 .msg-menu-emoji-empty {

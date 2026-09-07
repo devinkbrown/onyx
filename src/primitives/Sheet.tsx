@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { Show, splitProps, type ParentProps } from 'solid-js';
+import { Show, createUniqueId, splitProps, type ParentProps } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { createDialogFocus } from './focusTrap';
 
@@ -10,29 +10,32 @@ export type SheetProps = ParentProps<{
   onOpenChange: (open: boolean) => void;
   closeLabel?: string;
   /** Durable focus target for handoffs whose visible opener is being removed. */
-  returnFocus?: HTMLElement | null;
+  returnFocus?: HTMLElement | null | (() => HTMLElement | null | undefined);
   /** Stable surface to focus if returnFocus is removed while the sheet is open. */
   returnFocusFallback?: HTMLElement | null;
 }>;
 
 export function Sheet(props: SheetProps) {
   const [local, rest] = splitProps(props, ['open', 'title', 'description', 'onOpenChange', 'closeLabel', 'returnFocus', 'returnFocusFallback', 'children']);
-  const titleId = () => `${local.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'sheet'}-title`;
+  const instanceId = createUniqueId();
+  const titleId = () => `${instanceId}-title`;
   const descriptionId = () => local.description ? `${titleId()}-description` : undefined;
   let panelRef: HTMLElement | undefined;
+  let rootRef: HTMLDivElement | undefined;
 
   createDialogFocus({
     isOpen: () => local.open,
     getPanel: () => panelRef,
     onEscape: () => local.onOpenChange(false),
-    getReturnFocus: () => local.returnFocus,
+    getReturnFocus: () => typeof local.returnFocus === 'function' ? local.returnFocus() : local.returnFocus,
     getReturnFocusFallback: () => local.returnFocusFallback,
+    getRoot: () => rootRef,
   });
 
   return (
     <Show when={local.open}>
       <Portal>
-        <div {...rest} class="onyx-sheet" role="presentation">
+        <div ref={(element) => { rootRef = element; }} {...rest} class="onyx-sheet" role="presentation">
           {/* Decorative click-to-dismiss layer — keyboard users dismiss via Esc /
               the labelled close button, so the backdrop stays out of the a11y tree. */}
           <div class="onyx-sheet__backdrop" aria-hidden="true" onClick={() => local.onOpenChange(false)} />

@@ -113,6 +113,12 @@ function channel(name: string): Channel {
   };
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise; });
+  return { promise, resolve };
+}
+
 describe('YouNotifications', () => {
   beforeEach(() => {
     store.setState(initialState, true);
@@ -154,10 +160,12 @@ describe('YouNotifications', () => {
     render(() => <YouNotifications />);
 
     expect(screen.getByTestId('you-notifications')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Notifications' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: /Notifications, current page/i })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText('Mentions')).toBeInTheDocument();
     expect(screen.getByText('DMs')).toBeInTheDocument();
     expect(screen.getByText('Calls')).toBeInTheDocument();
+    expect(screen.getByText(/effective alerts have three layers/i)).toBeInTheDocument();
+    expect(screen.getByText(/All: room messages may create inbox entries, unread\/badge activity/i)).toBeInTheDocument();
     expect(screen.getByText(/starts a call in a room you are in/i)).toBeInTheDocument();
     expect(screen.getByTestId('you-notifications')).not.toHaveTextContent(/e2ee|end-to-end|onesignal/i);
     expect(screen.getByRole('radiogroup', { name: /Notifications for #general/i })).toBeInTheDocument();
@@ -166,6 +174,32 @@ describe('YouNotifications', () => {
     await waitFor(() => expect(armMocks.arm).toHaveBeenCalledOnce());
     await waitFor(() => expect(screen.getByTestId('you-notifications-disable')).toBeInTheDocument());
     expect(store.getState().toasts.at(-1)?.description).toMatch(/mentions, DMs, and calls/i);
+  });
+
+  it.each([
+    ['all', /All: room messages may create inbox entries, unread\/badge activity, sound, and desktop alerts\./i],
+    ['mentions', /Mentions only: this room contributes only messages that mention you to notification decisions\. Followed-conversation activity is a separate global Calm-mode tier and may still add a badge or alert/i],
+    ['mute', /Mute: this room is hard-silenced; its messages create no inbox entries, unread counts, highlights, sound, or desktop alerts\./i],
+  ] as const)('derives truthful room copy for the %s policy', (mode, expected) => {
+    store.setState({
+      server: server('alice'),
+      connectionStatus: 'connected',
+      activeView: { kind: 'channel', channel: '#general' },
+      channels: new Map([['#general', channel('#general')]]),
+      channelNotify: new Map([['#general', mode === 'mute' ? 'none' : mode]]),
+    });
+    openNotifications();
+    render(() => <YouNotifications />);
+
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    if (mode === 'mute') {
+      expect(screen.getByText(/hard-silenced/i)).toBeInTheDocument();
+      expect(screen.getByText(/permission alone is not enough/i)).toBeInTheDocument();
+    }
+    if (mode === 'mentions') {
+      expect(screen.getByText(/separate global Calm-mode tier/i)).toBeInTheDocument();
+      expect(screen.getByText(/closed-tab delivery additionally requires alerts to be armed/i)).toBeInTheDocument();
+    }
   });
 
   it('tells the truth when the Zig host cannot notify', () => {
@@ -177,5 +211,26 @@ describe('YouNotifications', () => {
 
     expect(screen.getByTestId('you-notifications-status')).toHaveTextContent(/cannot show system notifications/i);
     expect(screen.queryByTestId('you-notifications-enable')).not.toBeInTheDocument();
+  });
+
+  it('settles enable controls when an account change supersedes a pending arm', async () => {
+    const pending = deferred<ArmClosedTabResult>();
+    armMocks.arm.mockReturnValue(pending.promise);
+    store.setState({ server: server('alice'), connectionStatus: 'connected' });
+    openNotifications();
+    render(() => <YouNotifications />);
+
+    const enable = screen.getByTestId('you-notifications-enable');
+    fireEvent.click(enable);
+    expect(enable).toBeDisabled();
+    store.setState({ server: server('bob') });
+
+    await waitFor(() => expect(screen.getByTestId('you-notifications-enable')).toBeEnabled());
+    pending.resolve({ permission: 'granted', desktopEnabled: true, webPush: { ok: true } });
+    await pending.promise;
+    await Promise.resolve();
+
+    expect(screen.getByTestId('you-notifications-enable')).toBeEnabled();
+    expect(store.getState().toasts).toEqual([]);
   });
 });

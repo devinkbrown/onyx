@@ -21,6 +21,7 @@ import { ThemeStudio } from './ThemeStudio';
 import { ALL_STUDIO_TOKENS, EDITABLE_PROPERTIES } from './tokens';
 import { auditPalette, hexToOklch, generatePalette, enforceAA, type PaletteSeed } from './paletteFactory';
 import { setPreference } from '@/lib/prefs/preferences';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -443,6 +444,8 @@ describe('Export / import round-trip', () => {
 // ---------------------------------------------------------------------------
 
 describe('ThemeStudio', () => {
+  afterEach(() => { expect(updateCoordinator.hasActiveWork).toBe(false); });
+
   it('renders the studio inside a provider', () => {
     render(() => (
       <ThemeProvider>
@@ -499,6 +502,28 @@ describe('ThemeStudio', () => {
 
     const resetBtn = screen.getByTestId('ts-reset-btn') as HTMLButtonElement;
     expect(resetBtn.disabled).toBe(true);
+  });
+
+  it('holds updates while editing and releases the hold after reset', () => {
+    render(() => <ThemeProvider><ThemeStudio /></ThemeProvider>);
+    expect(updateCoordinator.hasActiveWork).toBe(false);
+
+    fireEvent.input(document.getElementById('ts-control-paper') as HTMLInputElement, { target: { value: '#232a33' } });
+    expect(updateCoordinator.hasActiveWork).toBe(true);
+
+    fireEvent.click(screen.getByTestId('ts-reset-btn'));
+    expect(updateCoordinator.hasActiveWork).toBe(false);
+  });
+
+  it('releases the update hold after saving a named theme', async () => {
+    render(() => <ThemeProvider><ThemeStudio /></ThemeProvider>);
+    fireEvent.input(document.getElementById('ts-control-paper') as HTMLInputElement, { target: { value: '#232a33' } });
+    fireEvent.click(screen.getByTestId('ts-save-btn'));
+    expect(updateCoordinator.hasActiveWork).toBe(true);
+    fireEvent.input(document.querySelector('.ts-save-input') as HTMLInputElement, { target: { value: 'Saved theme' } });
+    fireEvent.click(screen.getByTestId('ts-save-confirm'));
+    await Promise.resolve();
+    expect(updateCoordinator.hasActiveWork).toBe(false);
   });
 
   it('the import button is present', () => {

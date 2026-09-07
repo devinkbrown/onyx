@@ -107,6 +107,23 @@ describe('buildInviteCard', () => {
     expect(card.url).toBe(`${ORIGIN}?join=%23general&as=Yuki_42`);
   });
 
+  it('uses the shared nickname contract for special and boundary-length suggestions', () => {
+    const special = buildInviteCard(new URLSearchParams({ join: '#general', as: '  [alice  ' }), {
+      network: NETWORK,
+      origin: ORIGIN,
+    });
+    expect(special.guestName).toBe('[alice');
+    expect(special.url).toContain('as=%5Balice');
+
+    const boundaryName = 'a'.repeat(64);
+    const boundary = buildInviteCard(new URLSearchParams({ join: '#general', as: boundaryName }), {
+      network: NETWORK,
+      origin: ORIGIN,
+    });
+    expect(boundary.guestName).toBe(boundaryName);
+    expect(boundary.url).toContain(`as=${boundaryName}`);
+  });
+
   it('drops a suggested guest name that is not a valid IRC nick', () => {
     // A space is invalid in a nick — the value is seated downstream as one.
     const card = buildInviteCard(new URLSearchParams({ join: '#general', as: 'guest nick' }), {

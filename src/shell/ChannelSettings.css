@@ -1,0 +1,18 @@
+.channel-settings-surface { container-type: inline-size; }
+
+.channel-settings-context {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-3, 0.75rem);
+  border: 1px solid var(--seam-faint, currentColor);
+  border-radius: var(--r-md, 0.75rem);
+  color: var(--ink-muted, inherit);
+  background: var(--stone-2, transparent);
+  font-size: 0.85rem;
+}
+.channel-settings-context-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--signal-good, #4ade80); flex: 0 0 auto; }
+.channel-settings-context-state { margin-inline-start: auto; color: var(--paper, inherit); font-weight: 650; }
+.channel-settings-surface :is(button, a, input, select, textarea, summary):focus-visible { outline: 3px solid var(--focus-ring, Highlight); outline-offset: 2px; }
+@media (max-width: 520px) { .channel-settings-context { align-items: flex-start; flex-wrap: wrap; } .channel-settings-context-state { margin-inline-start: 1rem; } }
+@media (forced-colors: active) { .channel-settings-surface :is(button, a, input, select, textarea, summary):focus-visible { outline-color: Highlight; } }

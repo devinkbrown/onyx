@@ -64,6 +64,7 @@ export function YouHubNav(props: YouHubNavProps): JSX.Element {
               type="button"
               class={current() ? 'acct-hub-link acct-hub-link--current' : 'acct-hub-link'}
               aria-current={current() ? 'page' : undefined}
+              aria-label={`${link.label}${current() ? ', current page' : ''}`}
               data-testid={link.testId}
               onClick={() => go(link.id, link.open)}
             >

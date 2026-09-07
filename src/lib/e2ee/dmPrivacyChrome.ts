@@ -14,17 +14,23 @@ import { hasEncryptedMessageBoundary, isEncryptedWireText } from './replyPrivacy
 
 export const DM_EMPTY_TITLE = 'A private conversation';
 export const DM_EMPTY_BODY =
-  'Only the two of you can read these messages. They stay on this device.';
+  'Encrypted DM messages are intended for you and the other person. Plaintext drafts and attachments can remain on this device and are not covered by the message encryption claim.';
 
 export const DM_SEALED_LIST_PREVIEW = 'Encrypted message';
 
 export const DM_PRIVATE_CHIP = 'Private';
 export const DM_PRIVATE_CHIP_LABEL =
-  'Private — only the two of you can read these messages. They stay on this device.';
+  'Private — DM message text is encrypted for you and the other person. Plaintext drafts and attachments may remain on this device and are not covered.';
 export const DM_VERIFY_ACTION = 'Verify';
 
 export const DM_KEY_CHANGE_BODY =
-  'This usually means they reinstalled Onyx or added a device. Messages stay locked until you review it.';
+  'This usually means they reinstalled Onyx or added a device. Encrypted messages stay locked until you review it; plaintext drafts and attachments are separate local-device data.';
+
+export const DM_PRIVACY_SCOPE =
+  'Encrypted messages and their wire payloads are covered by the DM key check. Plaintext local drafts and attachments are not encrypted by this check and may remain on this device.';
+
+export const DM_ATTACHMENT_BLOCKED =
+  'Attachments are disabled in protected DMs until encrypted uploads are available. Your message draft stays here.';
 
 const SYSTEM_TYPES = new Set([
   'join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error',

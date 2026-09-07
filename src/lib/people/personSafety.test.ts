@@ -11,6 +11,7 @@ import {
   personReportHonesty,
   PERSON_REPORT_ROOM,
 } from './personSafety';
+import { store } from '@/lib/store/store';
 
 describe('person safety policy', () => {
   it('blocks DMs to ignored nicks and leaves rooms alone', () => {
@@ -50,8 +51,11 @@ describe('person safety policy', () => {
     ].join('\n'));
 
     const honesty = personReportHonesty();
-    expect(honesty).toMatch(/drafts a note to #root/i);
-    expect(honesty).toMatch(/not a police report/i);
+    expect(honesty).toMatch(/draft in the shared #root report room/i);
+    expect(honesty).toMatch(/visible to people in that room or operators/i);
+    expect(honesty).toMatch(/not a private inbox/i);
+    expect(honesty).toMatch(/not a private inbox or police report/i);
+    expect(honesty).toMatch(/nothing is sent automatically/i);
     expect(honesty).not.toMatch(/24 hours|Trust & Safety|we will review/i);
   });
 
@@ -64,5 +68,23 @@ describe('person safety policy', () => {
     expect(draft).not.toMatch(/\u0000/);
     expect(draft).toContain('About: badname');
     expect(draft).toContain('Note: linebreak');
+  });
+
+  it('keeps consecutive composer handoffs unique after the pending slot is consumed', () => {
+    const initial = store.getState();
+    try {
+      store.setState({ composerDrafts: {}, composerInject: null });
+      store.getState().injectComposerText('#root', 'first', 'replace');
+      const first = store.getState().composerInject;
+      store.setState({ composerInject: null });
+      store.getState().injectComposerText('#root', 'second', 'append');
+      const second = store.getState().composerInject;
+
+      expect(first?.seq).toBeDefined();
+      expect(second?.seq).toBeGreaterThan(first?.seq ?? 0);
+      expect(store.getState().getComposerDraft('#root')).toBe('first second');
+    } finally {
+      store.setState(initial, true);
+    }
   });
 });

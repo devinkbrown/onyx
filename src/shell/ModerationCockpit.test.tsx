@@ -59,7 +59,7 @@ describe('ModerationCockpit', () => {
   it('requires a confirmation before sending a server-side ban', () => {
     const client = seed();
     render(() => <ModerationCockpit channel="#garden" />);
-    fireEvent.input(screen.getByLabelText('Block a matching address'), { target: { value: 'ada!*@*' } });
+    fireEvent.input(screen.getByLabelText('Block an address in this room'), { target: { value: 'ada!*@*' } });
     fireEvent.click(screen.getByRole('button', { name: 'Review block' }));
     expect(client.sendRaw).not.toHaveBeenCalledWith('MODE', '#garden', '+b', 'ada!*@*');
     fireEvent.click(screen.getByTestId('moderation-review-confirm'));
@@ -85,7 +85,7 @@ describe('ModerationCockpit', () => {
     const cockpits = screen.getAllByTestId('moderation-cockpit');
     expect(cockpits).toHaveLength(2);
     const inviteIds = cockpits.map((cockpit) => within(cockpit).getByLabelText('Invite someone').id);
-    const banIds = cockpits.map((cockpit) => within(cockpit).getByLabelText('Block a matching address').id);
+    const banIds = cockpits.map((cockpit) => within(cockpit).getByLabelText('Block an address in this room').id);
     expect(new Set(inviteIds).size).toBe(2);
     expect(new Set(banIds).size).toBe(2);
     expect(cockpits.map((cockpit) => cockpit.getAttribute('aria-labelledby'))[0]).not.toBe(
@@ -101,7 +101,7 @@ describe('ModerationCockpit', () => {
     expect(screen.queryByText(/temporary|temp ban/i)).toBeNull();
 
     store.setState({ connectionStatus: 'disconnected' });
-    fireEvent.input(screen.getByLabelText('Block a matching address'), { target: { value: 'ada!*@*' } });
+    fireEvent.input(screen.getByLabelText('Block an address in this room'), { target: { value: 'ada!*@*' } });
     fireEvent.input(screen.getByLabelText('Invite someone'), { target: { value: 'ada' } });
     expect(screen.getByText(/Drafts stay on this device/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Review block' })).toBeDisabled();
@@ -109,10 +109,10 @@ describe('ModerationCockpit', () => {
     expect(client.sendRaw).not.toHaveBeenCalledWith('MODE', '#garden', '+b', 'ada!*@*');
 
     store.setState({ connectionStatus: 'connected' });
-    expect(screen.getByLabelText('Block a matching address')).toHaveValue('ada!*@*');
+    expect(screen.getByLabelText('Block an address in this room')).toHaveValue('ada!*@*');
     expect(screen.getByLabelText('Invite someone')).toHaveValue('ada');
 
-    fireEvent.change(screen.getByLabelText('Reviewed member action'), { target: { value: 'ada' } });
+    fireEvent.change(screen.getByLabelText('Room member action'), { target: { value: 'ada' } });
     fireEvent.click(screen.getByRole('button', { name: 'Review action' }));
     expect(client.sendRaw).not.toHaveBeenCalledWith('KICK', '#garden', 'ada');
     fireEvent.click(screen.getByTestId('moderation-review-confirm'));
@@ -122,7 +122,7 @@ describe('ModerationCockpit', () => {
   it('rejects a dangerous wildcard block during review', () => {
     const client = seed();
     render(() => <ModerationCockpit channel="#garden" />);
-    fireEvent.input(screen.getByLabelText('Block a matching address'), { target: { value: '*!*@*' } });
+    fireEvent.input(screen.getByLabelText('Block an address in this room'), { target: { value: '*!*@*' } });
     fireEvent.click(screen.getByRole('button', { name: 'Review block' }));
     expect(screen.getByRole('alert')).toHaveTextContent(/match everyone/);
     expect(screen.getByTestId('moderation-review-confirm')).toBeDisabled();

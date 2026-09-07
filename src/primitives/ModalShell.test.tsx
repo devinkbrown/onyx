@@ -22,7 +22,7 @@ describe('ModalShell', () => {
       </>
     ));
 
-    const dialogs = screen.getAllByRole('dialog', { name: 'Review room action' });
+    const dialogs = screen.getAllByRole('dialog', { name: 'Review room action', hidden: true });
     expect(dialogs).toHaveLength(2);
     const ids = dialogs.map((dialog) => dialog.getAttribute('aria-labelledby'));
     expect(ids[0]).toBeTruthy();
@@ -115,7 +115,7 @@ describe('ModalShell', () => {
     trigger.focus();
     fireEvent.click(trigger);
     await tick();
-    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    expect(screen.getAllByRole('dialog', { hidden: true })).toHaveLength(2);
 
     fireEvent.keyDown(document.body, { key: 'Escape' });
     await tick();
@@ -123,6 +123,12 @@ describe('ModalShell', () => {
     expect(screen.queryByRole('dialog', { name: 'Import theme' })).toBeNull();
     expect(screen.getByRole('dialog', { name: 'Appearance' })).toBeInTheDocument();
     expect(trigger).toHaveFocus();
+
+    // The first Escape belongs exclusively to the nested dialog. Once it is
+    // gone, the next Escape may be owned by the underlying sheet.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await tick();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('closes from the inert backdrop click target', async () => {

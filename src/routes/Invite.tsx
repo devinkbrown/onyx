@@ -13,6 +13,7 @@ import {
   parseGuestName,
 } from '@/lib/invite/inviteCard';
 import { buildInviteLink } from '@/lib/invite/inviteLink';
+import { updateCoordinator } from '@/pwa/updateCoordinator';
 import { FormField } from '@/primitives/index';
 import { PublicFrame } from '@/ui/public';
 import { setPageMeta } from './pageMeta';
@@ -34,6 +35,13 @@ export default function InviteRoute() {
   const [copyBusy, setCopyBusy] = createSignal(false);
   const [displayName, setDisplayName] = createSignal('');
   const [nameError, setNameError] = createSignal<string | undefined>(undefined);
+  let releaseUpdateHold: (() => void) | null = null;
+  createEffect(() => {
+    const protectedWork = displayName().trim().length > 0;
+    if (protectedWork && !releaseUpdateHold) releaseUpdateHold = updateCoordinator.hold('invite-form');
+    if (!protectedWork && releaseUpdateHold) { releaseUpdateHold(); releaseUpdateHold = null; }
+  });
+  onCleanup(() => { releaseUpdateHold?.(); releaseUpdateHold = null; });
   let copyEpoch = 0;
   let disposed = false;
   const card = createMemo(() => buildInviteCard(currentParams(), {
@@ -44,6 +52,7 @@ export default function InviteRoute() {
   const headline = createMemo(() => inviteHeadline(card()));
   const description = createMemo(() => inviteDescription(card()));
   const welcome = createMemo(() => inviteWelcome(card()));
+  const hasRoom = createMemo(() => card().channel !== null);
 
   createEffect(() => {
     const suggested = card().guestName;
@@ -62,6 +71,11 @@ export default function InviteRoute() {
       },
       { network: NETWORK_NAME, origin: currentOrigin(), appOrigin: '/app/' },
     ).appHref;
+  });
+  const signInHref = createMemo(() => {
+    const url = new URL(joinHref(), window.location.origin);
+    url.searchParams.set('signin', '1');
+    return `${url.pathname}${url.search}`;
   });
 
   createEffect(() => {
@@ -100,6 +114,16 @@ export default function InviteRoute() {
     setNameError(guestNameError(value));
   }
 
+  function validateJoin(event?: MouseEvent | SubmitEvent): boolean {
+    const error = guestNameError(displayName());
+    if (!error) return true;
+
+    event?.preventDefault();
+    setNameError(error);
+    document.getElementById('invite-display-name')?.focus();
+    return false;
+  }
+
   return (
     <PublicFrame
       currentPath="/invite/"
@@ -132,8 +156,15 @@ export default function InviteRoute() {
           decoding="async"
         />
         <p class="invite-eyebrow">A friend invited you</p>
-        <h1 id="invite-heading">{headline()}</h1>
+        <h1 id="invite-heading">
+          {card().channel === '#root' ? `Join ${card().channel}` : headline()}
+        </h1>
         <p class="invite-lede">{welcome()}</p>
+        <Show when={!hasRoom()}>
+          <p class="invite-recovery" role="note">
+            This link does not name a room. Open Onyx and choose one there, or ask your friend for a new room invite.
+          </p>
+        </Show>
 
         <div class="invite-preview" role="note" aria-label="Invite preview">
           <span class="invite-preview-eyebrow">Invite</span>
@@ -151,12 +182,8 @@ export default function InviteRoute() {
         <form
           class="invite-join"
           onSubmit={(event) => {
+            if (!validateJoin(event)) return;
             event.preventDefault();
-            const error = guestNameError(displayName());
-            if (error) {
-              setNameError(error);
-              return;
-            }
             window.location.assign(joinHref());
           }}
         >
@@ -172,7 +199,7 @@ export default function InviteRoute() {
             onInput={(event) => onNameInput(event.currentTarget.value)}
           />
           <div class="invite-actions">
-            <a class="r-btn primary" href={joinHref()}>
+            <a class="r-btn primary" href={guestNameError(displayName()) ? undefined : joinHref()} onClick={validateJoin} data-testid="invite-join">
               Join
             </a>
             <button
@@ -190,7 +217,7 @@ export default function InviteRoute() {
         <p class="invite-alt">
           Already have an account?
           {' '}
-          <a href={joinHref()}>Sign in</a>
+          <a href={signInHref()}>Sign in</a>
         </p>
         <p class="invite-alt">
           <a href="/about/">How Onyx works</a>

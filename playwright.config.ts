@@ -19,16 +19,25 @@ export default defineConfig({
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
-    launchOptions: {
-      args: [
-        '--use-fake-device-for-media-stream',
-        '--use-fake-ui-for-media-stream',
-        '--autoplay-policy=no-user-gesture-required',
-        '--mute-audio',
-      ],
-    },
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: [
+            '--use-fake-device-for-media-stream',
+            '--use-fake-ui-for-media-stream',
+            '--autoplay-policy=no-user-gesture-required',
+            '--mute-audio',
+          ],
+        },
+      },
+    },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  ],
   // Test the real production build via Vite preview (instant serve — avoids dev
   // cold-start). Never reuse another process: that could test a different checkout.
   webServer: {

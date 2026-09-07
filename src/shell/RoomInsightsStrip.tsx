@@ -15,6 +15,7 @@ import {
 } from '@/lib/stats/channelDetail';
 import { relTime } from '@/lib/stats/networkIndex';
 import './stage-panel.css';
+import './participant-presence.css';
 
 function formatCount(n: number): string {
   if (!Number.isFinite(n) || n < 0) return '0';
@@ -166,8 +167,8 @@ export function RoomInsightsStrip(): JSX.Element {
                 <RoomRhythm hours={d().hours} peakHour={d().peakHour} />
                 <ul class="room-insights__metrics" data-testid="room-insights-metrics">
                   <li>
-                    <span>Present</span>
-                    <strong>{formatCount(d().present)}</strong>
+                  <span>Observed present</span>
+                  <strong title="Aggregate room observation; not a live online count">{formatCount(d().present)}</strong>
                   </li>
                   <li>
                     <span>Messages</span>

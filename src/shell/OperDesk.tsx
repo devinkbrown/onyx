@@ -147,7 +147,7 @@ export function OperDesk(): JSX.Element {
             submit({ kind: 'broadcast', text: broadcast() });
           }}
         >
-          <label for={broadcastId}>Announce to the network</label>
+          <label for={broadcastId}>Announce to operators</label>
           <div>
             <input
               id={broadcastId}
@@ -163,7 +163,8 @@ export function OperDesk(): JSX.Element {
             </button>
           </div>
           <p class="oper-desk__hint">
-            Every connected member sees this. {broadcastRemaining()} characters left.
+            EVENT BROADCAST reaches operators subscribed to ANNOUNCE, not every
+            member. {broadcastRemaining()} characters left.
           </p>
         </form>
 

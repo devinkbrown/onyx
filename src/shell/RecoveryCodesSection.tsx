@@ -68,7 +68,7 @@ export function RecoveryCodesSection(props: RecoveryCodesSectionProps): JSX.Elem
           </div>
 
           <div class="acct-section-body">
-            <p class="acct-section-hint" role="status" data-testid="recovery-remaining">
+            <p class="acct-section-hint" role="status" aria-live="polite" data-testid="recovery-remaining">
               <Show
                 when={state().remaining !== null}
                 fallback="Ask the server how many codes remain…"

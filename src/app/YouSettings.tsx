@@ -49,29 +49,29 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
   const languageValue = () => translationTarget() || preferredTranslationTarget();
 
   return (
-    <nav class="you-settings" aria-label="Settings" data-testid="you-settings">
+    <nav class="you-settings" aria-label="You settings" data-testid="you-settings">
       <p class="acct-context-cue" role="note">
-        <Show when={props.guest} fallback="Account, appearance, notifications, and privacy on this device.">
+        <Show when={props.guest} fallback="Your account travels with you. Everything else here changes this device only.">
           Keep this name if you want to protect it without disconnecting.
         </Show>
       </p>
 
       <details class="you-settings-item" open data-testid="you-account">
-        <summary>Account and devices</summary>
+        <summary>Account</summary>
         <div class="you-settings-item__body">{props.account}</div>
       </details>
 
       <details class="you-settings-item" data-testid="you-notifications">
         <summary>Notifications</summary>
         <div class="you-settings-item__body">
-          <p class="you-settings-hint">How loudly this device tells you about mentions and messages.</p>
+          <p class="you-settings-hint">How this device tells you about mentions and messages.</p>
           <CalmModeControl />
           <KeywordListControl />
         </div>
       </details>
 
       <details class="you-settings-item" data-testid="you-privacy">
-        <summary>Privacy</summary>
+        <summary>Privacy on this device</summary>
         <div class="you-settings-item__body">
           <button
             type="button"
@@ -103,7 +103,7 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       </details>
 
       <details class="you-settings-item" data-testid="you-blocked">
-        <summary>Blocked users</summary>
+        <summary>Blocked users on this device</summary>
         <div class="you-settings-item__body">
           <p class="you-settings-hint">You will not see them on this device. They are not told.</p>
           <IgnoredUsersControl />
@@ -114,6 +114,7 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
         type="button"
         class="you-settings-link"
         data-testid="you-settings-open-appearance"
+        aria-label="Open appearance settings"
         aria-haspopup="dialog"
         onClick={() => leaveThen(props.onClose, () => getState().openAppearance())}
       >
@@ -124,7 +125,7 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       </button>
 
       <details class="you-settings-item" data-testid="you-text-size">
-        <summary>Text size</summary>
+        <summary>Reading comfort</summary>
         <div class="you-settings-item__body">
           <div class="you-settings-choices" role="radiogroup" aria-label="Text size">
             <For each={FONT_SCALES}>
@@ -166,7 +167,7 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       </details>
 
       <details class="you-settings-item" data-testid="you-motion">
-        <summary>Reduced motion</summary>
+        <summary>Motion and data</summary>
         <div class="you-settings-item__body">
           <button
             type="button"
@@ -211,9 +212,9 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       </button>
 
       <details class="you-settings-item" data-testid="you-language">
-        <summary>Language</summary>
+        <summary>Language tools</summary>
         <div class="you-settings-item__body">
-          <label class="you-settings-hint" for="you-language-select">Language for on-device captions and translation</label>
+          <label class="you-settings-hint" for="you-language-select">Language used by on-device captions and translation.</label>
           <select
             id="you-language-select"
             class="you-settings-select"
@@ -228,7 +229,7 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       </details>
 
       <details class="you-settings-item" data-testid="you-support">
-        <summary>Support</summary>
+        <summary>Help and status</summary>
         <div class="you-settings-item__body you-settings-support">
           <a href="/about/">About Onyx</a>
           <a href="/status/">Network status</a>

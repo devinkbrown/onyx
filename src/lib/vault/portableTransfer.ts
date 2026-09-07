@@ -2,6 +2,7 @@
 import {
   applyRetentionPolicy,
   clearVault,
+  captureVaultEraseEpoch,
   exportVault,
   getRetentionPolicy,
   importVault,
@@ -253,7 +254,9 @@ export async function importPortableTransfer(
   let vault: { targets: number; messages: number };
   assertPortableTransferCurrent(options);
   if (preferences().localHistory) {
-    vault = await importVault(snapshot, owner, { isCurrent: options?.isCurrent });
+    const importEpoch = await captureVaultEraseEpoch();
+    if (importEpoch === null) throw new Error('Could not capture device history fence');
+    vault = await importVault(snapshot, owner, { isCurrent: options?.isCurrent }, importEpoch);
     assertPortableTransferCurrent(options);
   } else {
     const cleared = await clearVault();

@@ -84,7 +84,7 @@ describe('Facepile', () => {
     }, true);
 
     render(() => <Facepile members={() => [member('ada')]} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open profile for ada' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open profile for ada, here' }));
 
     expect(screen.getByRole('dialog', { name: 'Profile for ada' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'ada' })).toBeInTheDocument();

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TopicFilterBar } from './TopicChip';
+import { TopicChip } from './TopicChip';
 
 afterEach(cleanup);
 
@@ -40,5 +41,32 @@ describe('TopicFilterBar', () => {
     ));
 
     expect(screen.getByRole('button', { name: /RoadMap/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('names split controls with the topic they affect', () => {
+    const onSplit = vi.fn();
+    render(() => <TopicChip label="release" onSplit={onSplit} />);
+    const split = screen.getByRole('button', { name: 'Split into topic release' });
+    expect(split).toHaveAttribute('title', 'Split into topic release');
+    fireEvent.click(split);
+    expect(onSplit).toHaveBeenCalledWith('release');
+  });
+
+  it('renders unavailable topics as clearly named, non-actionable states', () => {
+    const onClick = vi.fn();
+    render(() => <TopicChip label="archive" state="deleted" onClick={onClick} />);
+
+    expect(screen.getByLabelText('archive, deleted')).toHaveTextContent('Deleted');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('marks loading topics busy and keeps long labels discoverable', () => {
+    const label = 'a-topic-with-a-deliberately-long-label-for-small-screens';
+    render(() => <TopicChip label={label} state="loading" />);
+    const chip = screen.getByLabelText(`${label}, loading`);
+
+    expect(chip).toHaveAttribute('aria-busy', 'true');
+    expect(chip).toHaveAttribute('title', label);
   });
 });

@@ -277,11 +277,12 @@ describe('vaultSync', () => {
     expect(_vaultSyncCacheSizesForTests()).toEqual({ hydrated: 1, persisted: 0, pending: 1 });
 
     await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+    await until(() => _vaultSyncCacheSizesForTests().persisted === 1);
     expect(_vaultSyncCacheSizesForTests()).toEqual({ hydrated: 1, persisted: 1, pending: 0 });
 
     store.setState({ channels: new Map() });
     expect(_vaultSyncCacheSizesForTests()).toEqual({ hydrated: 0, persisted: 0, pending: 0 });
-    vi.useRealTimers();
     expect((await loadOwnedRecent('#closed')).map((message) => message.id)).toEqual(['remembered']);
   });
 
@@ -302,6 +303,8 @@ describe('vaultSync', () => {
     expect(_vaultSyncCacheSizesForTests().hydrated).toBe(VAULT_SYNC_TARGET_CACHE_CAP);
 
     await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+    await until(() => _vaultSyncCacheSizesForTests().persisted === VAULT_SYNC_TARGET_CACHE_CAP, 20_000);
     expect(_vaultSyncCacheSizesForTests().persisted).toBe(VAULT_SYNC_TARGET_CACHE_CAP);
     expect(_vaultSyncCacheSizesForTests().pending).toBe(0);
   }, 20_000);
@@ -330,16 +333,140 @@ describe('vaultSync', () => {
     expect((await loadOwnedRecent('#room')).map((m) => m.id)).toEqual(['m1', 'm2']);
   });
 
+  it('rejects a pre-clear intent when durable admission is delayed until after clear', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    // Disable the in-module callback so the independent clear must invalidate
+    // the intent through the same-origin control plane.
+    vi.spyOn(vault, 'subscribeVerifiedDeviceHistoryClear').mockReturnValue(() => {});
+    let releaseAdmission!: () => void;
+    const admissionRelease = new Promise<void>((resolve) => {
+      releaseAdmission = resolve;
+    });
+    let admissionStarted!: () => void;
+    const admissionStartedSignal = new Promise<void>((resolve) => {
+      admissionStarted = resolve;
+    });
+    let capturedIntent: vault.VaultWriteIntent | undefined;
+    const realReserve = vault.reserveVaultWrite;
+    vi.spyOn(vault, 'reserveVaultWrite').mockImplementation(async (intent) => {
+      // scheduleFlush has already registered this opaque token before calling
+      // us. Hold the IDB open/admission entirely, preserving the exact token
+      // and expected epoch across the clear.
+      capturedIntent = intent;
+      admissionStarted();
+      await admissionRelease;
+      return realReserve(intent);
+    });
+
+    initVaultSync();
+    setChannel('#race-before-admission', [msg('before-clear', 1000, '#race-before-admission')]);
+    await admissionStartedSignal;
+    expect(capturedIntent).toMatchObject({
+      token: expect.any(String),
+      expectedEraseEpoch: 0,
+    });
+
+    // Exact adversarial interleaving: rows and their pre-clear token are
+    // captured, durable admission is delayed, then an independent clear
+    // commits before reservation/DB admission is released.
+    expect(await vault.clearVault()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1600);
+    releaseAdmission();
+    await vi.advanceTimersByTimeAsync(0);
+    vi.useRealTimers();
+
+    // reserveVaultWrite receives the original token; it cannot manufacture a
+    // fresh post-clear reservation after the clear removed that token.
+    await until(async () => (await loadOwnedRecent('#race-before-admission')).length === 0);
+    expect(await loadOwnedRecent('#race-before-admission')).toEqual([]);
+    expect(Object.keys(localStorage).filter((key) => key.startsWith('onyx:vault:write-intent:'))).toEqual([]);
+
+    // Clear-before-intent: a genuine new mutation registers at epoch one and
+    // persists normally, proving the fence does not disable post-clear writes.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    setChannel('#race-before-admission', [msg('after-clear', 2000, '#race-before-admission')]);
+    await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+    await until(() => loadOwnedRecent('#race-before-admission').then((messages) => messages.length === 1));
+    expect((await loadOwnedRecent('#race-before-admission')).map((message) => message.id)).toEqual(['after-clear']);
+  });
+
+  it('cannot resurrect a pre-clear scheduled flush from another module context', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    // Disable the in-module callback so this exercises the durable cross-context
+    // epoch fence rather than the local generation shortcut.
+    vi.spyOn(vault, 'subscribeVerifiedDeviceHistoryClear').mockReturnValue(() => {});
+    let releaseAdmission!: () => void;
+    const admissionRelease = new Promise<void>((resolve) => {
+      releaseAdmission = resolve;
+    });
+    let admissionCommitted!: () => void;
+    const admissionCommittedSignal = new Promise<void>((resolve) => {
+      admissionCommitted = resolve;
+    });
+    const realReserve = vault.reserveVaultWrite;
+    vi.spyOn(vault, 'reserveVaultWrite').mockImplementation(async (intent) => {
+      const reservation = await realReserve(intent);
+      admissionCommitted();
+      if (reservation) await admissionRelease;
+      return reservation;
+    });
+    initVaultSync();
+    setChannel('#race', [msg('before-clear', 1000, '#race')]);
+
+    // The reservation has committed, but its result is delayed as if the
+    // admitting module/tab has not yet returned from IndexedDB. The clear is
+    // independent and therefore removes the opaque reservation before the
+    // delayed message transaction can consume it.
+    await admissionCommittedSignal;
+    expect(await vault.clearVault()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1600);
+    releaseAdmission();
+    await vi.advanceTimersByTimeAsync(0);
+    vi.useRealTimers();
+    expect(await loadOwnedRecent('#race')).toEqual([]);
+
+    // A genuine post-clear mutation creates a new reservation at the new epoch
+    // and remains valid; it is not rescued by the stale reservation.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    setChannel('#race', [msg('after-clear', 2000, '#race')]);
+    await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+    await until(() => loadOwnedRecent('#race').then((messages) => messages.length === 1));
+    expect((await loadOwnedRecent('#race')).map((message) => message.id)).toEqual(['after-clear']);
+  });
+
+  it('flushes after reload when the cached erase epoch is stale at one', async () => {
+    await vault.clearVault();
+    // Simulate a module reload: the durable epoch remains one while the new
+    // module instance starts with its in-memory cache at zero.
+    _resetVaultForTests();
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    initVaultSync();
+    setChannel('#reload-epoch', [msg('first-after-reload', 1000)]);
+    await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+
+    await until(async () => (await loadOwnedRecent('#reload-epoch')).length === 1);
+    expect((await loadOwnedRecent('#reload-epoch')).map((message) => message.id))
+      .toEqual(['first-after-reload']);
+  });
+
   it('persists each account buffer only inside its captured owner namespace', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     initVaultSync();
     setChannel('#room', [msg('alice-row', 1000)]);
     await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+    await until(() => (loadRecent('#room', undefined, ALICE_OWNER)).then((rows) => rows.length === 1));
 
     store.setState({ ourNick: 'bob', server: server('bob') });
     setChannel('#room', [msg('bob-row', 2000)]);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await vi.advanceTimersByTimeAsync(1600);
     vi.useRealTimers();
+    await until(async () => (await loadRecent('#room', undefined, BOB_OWNER)).length === 1);
 
     expect((await loadRecent('#room', undefined, ALICE_OWNER)).map((message) => message.id))
       .toEqual(['alice-row']);
@@ -358,15 +485,19 @@ describe('vaultSync', () => {
     initVaultSync();
     setChannel('#room', [msg('m1', 1000)]);
     await vi.advanceTimersByTimeAsync(1600); // first flush → forced failure
+    vi.useRealTimers();
+    await until(() => spy.mock.calls.length === 1);
 
     expect(spy).toHaveBeenCalledTimes(1);
     expect(await loadOwnedRecent('#room')).toEqual([]); // nothing landed
 
     // A later store update with the SAME tail id must re-attempt the write.
     setChannel('#room', [msg('m1', 1000)]);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await vi.advanceTimersByTimeAsync(1600); // second flush → real write
     vi.useRealTimers();
 
+    await until(() => spy.mock.calls.length >= 2);
     await until(async () => (await loadOwnedRecent('#room')).length === 1);
     expect((await loadOwnedRecent('#room')).map((m) => m.id)).toEqual(['m1']);
     expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -379,11 +510,15 @@ describe('vaultSync', () => {
     initVaultSync();
     setChannel('#room', [msg('m1', 1000)]);
     await vi.advanceTimersByTimeAsync(1600); // one durable write
+    vi.useRealTimers();
+    await until(() => spy.mock.calls.length === 1);
     // Same tail arrives again (e.g. an unrelated buffer field changed).
     setChannel('#room', [msg('m1', 1000)]);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await vi.advanceTimersByTimeAsync(1600);
     vi.useRealTimers();
 
+    await until(() => spy.mock.calls.length === 1);
     await until(async () => (await loadOwnedRecent('#room')).length === 1);
     expect(spy).toHaveBeenCalledTimes(1); // the second, redundant flush is skipped
   });
@@ -448,6 +583,8 @@ describe('vaultSync', () => {
     original.text = 'secret plans at dawn';
     setChannel('#room', [original]);
     await vi.advanceTimersByTimeAsync(1600); // durable un-redacted row
+    vi.useRealTimers();
+    await until(async () => (await searchOwnedVault('secret plans')).length === 1);
 
     // The un-redacted content is searchable at this point.
     expect((await searchOwnedVault('secret plans')).length).toBe(1);
@@ -455,6 +592,7 @@ describe('vaultSync', () => {
     // Redact IN PLACE: same id, new object, redacted text — the tail id is
     // unchanged, so only a content-signature watermark re-flushes it.
     const redacted: ChatMessage = { ...original, text: '[Message deleted]', redacted: true };
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     setChannel('#room', [redacted]);
     await vi.advanceTimersByTimeAsync(1600);
     vi.useRealTimers();

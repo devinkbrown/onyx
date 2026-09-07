@@ -1,0 +1,67 @@
+.update-available {
+  position: fixed;
+  z-index: var(--ui-z-toast, 600);
+  inset-inline: max(var(--ui-space-3, .75rem), env(safe-area-inset-left, 0px))
+    max(var(--ui-space-3, .75rem), env(safe-area-inset-right, 0px));
+  bottom: calc(
+    var(--mnav-h, 56px) + var(--shell-virtual-keyboard-inset, 0px) +
+    var(--composer-field-height, 0px) + env(safe-area-inset-bottom, 0px) +
+    var(--ui-space-3, .75rem)
+  );
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-gap-row, .75rem) var(--ui-gap-group, 1rem);
+  align-items: center;
+  justify-content: space-between;
+  max-inline-size: 42rem;
+  margin-inline: auto;
+  padding: var(--ui-space-3, .75rem) var(--ui-pad-panel, 1rem);
+  color: var(--commercial-text-primary);
+  background: var(--commercial-surface-overlay);
+  border: var(--ui-border-hairline, 1px) solid var(--commercial-border-strong);
+  border-radius: var(--commercial-radius-panel);
+  box-shadow: var(--ui-elev-3, 0 1rem 2rem color-mix(in oklab, var(--commercial-ink) 30%, transparent));
+  font: var(--text-md, 0.9375rem)/var(--commercial-leading-body) var(--commercial-font-body);
+}
+
+.update-available__message {
+  flex: 1 1 16rem;
+  min-inline-size: 0;
+  margin: 0;
+}
+
+.update-available button {
+  min-block-size: var(--commercial-target, 44px);
+  min-inline-size: var(--commercial-target, 44px);
+  flex: 0 1 auto;
+  padding: var(--ui-space-2, .5rem) var(--ui-space-3, .75rem);
+  color: var(--commercial-text-inverse);
+  background: var(--commercial-action-primary);
+  border: var(--ui-border-hairline, 1px) solid var(--commercial-border-strong);
+  border-radius: var(--commercial-radius-control);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.update-available :where(button):focus-visible {
+  outline: var(--ui-border-emphasis, 2px) solid var(--commercial-border-focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px color-mix(in oklab, var(--commercial-border-focus) 24%, transparent);
+}
+
+@media (max-width: 28rem) {
+  .update-available { align-items: stretch; }
+  .update-available button { flex-basis: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-available,
+  .update-available button { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .update-available { color: CanvasText; background: Canvas; border-color: CanvasText; box-shadow: none; }
+  .update-available button { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
+  .update-available :where(button):focus-visible { outline-color: Highlight; box-shadow: none; }
+}

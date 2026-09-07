@@ -117,6 +117,11 @@ export function TrustPage(props: { page: TrustPageId }) {
                 unreadable to the operator.
               </p>
               <p>
+                DM encryption covers encrypted message text and its wire payload.
+                Plaintext local drafts and attachments are separate device data and
+                are not covered by that message-encryption claim.
+              </p>
+              <p>
                 This browser keeps about 400 recent messages per room on this
                 device. Older lines are pruned here.
               </p>

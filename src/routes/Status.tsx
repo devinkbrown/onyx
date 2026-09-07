@@ -86,7 +86,12 @@ export default function StatusRoute() {
       )}
     >
       <div class="ui-root r status-route">
-        <section class="r-wrap status-hero" aria-labelledby="status-heading">
+        <section
+          class="r-wrap r-section status-hero status-scroll-surface"
+          aria-labelledby="status-heading"
+          role="region"
+          tabindex="0"
+        >
           <p class="status-kicker">for people in the rooms</p>
           <h1 id="status-heading">Are the rooms up tonight?</h1>
           <p class="status-lede">

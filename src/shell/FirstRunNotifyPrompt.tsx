@@ -94,6 +94,9 @@ export function FirstRunNotifyPrompt(): JSX.Element {
       closeLabel="Not now"
     >
       <div class="first-run-notify">
+        <p class="first-run-notify__note">
+          You can change this later in notification settings. Your browser may ask for permission.
+        </p>
         <div class="first-run-notify__actions">
           <Button
             type="button"

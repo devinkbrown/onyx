@@ -40,12 +40,12 @@ function stubDesktopViewport(): void {
   })));
 }
 
-function mountCallsHub(voice: {
+async function mountCallsHub(voice: {
   callState: CallState;
   callChannel: string | null;
   callWith: string;
   callStartedAt: number | null;
-}): HTMLElement {
+}): Promise<HTMLElement> {
   store.setState({
     activeView: { kind: 'home' },
     connectionStatus: 'connected',
@@ -55,6 +55,7 @@ function mountCallsHub(voice: {
   render(() => <AppShell />);
   const desktopNav = screen.getByRole('navigation', { name: 'Primary' });
   fireEvent.click(within(desktopNav).getByRole('button', { name: 'Calls' }));
+  await screen.findByTestId('calls-hub-status');
   return screen.getByRole('main');
 }
 
@@ -78,17 +79,20 @@ describe('AppShell standalone CallsHub integration', () => {
       'utf8',
     );
 
-    expect(source).toMatch(/import\s+\{\s*CallsHub\s*\}\s+from\s+'\.\/CallsHub';/u);
+    expect(source).toMatch(/import\('\.\/CallsHub'\)/u);
     expect(source).not.toMatch(/function\s+CallsHub\s*\(/u);
-    expect(source).not.toMatch(/(?:const|let|var)\s+CallsHub\s*=/u);
+    expect(source).toContain("import { retryableLazy } from '@/app/StaleChunkRecovery';");
+    expect(source).toMatch(
+      /const CallsHub = retryableLazy<any>\(\(\) => import\('\.\/CallsHub'\)\.then\(\(m\) => \(\{ default: m\.CallsHub \}\)\), 'calls'\);/u,
+    );
     expect(source).toContain('callState={voice().callState}');
     expect(source).toContain('callChannel={voice().callChannel}');
     expect(source).toContain('callWith={voice().callWith}');
     expect(source).toContain('callStartedAt={voice().callStartedAt}');
   });
 
-  it('mounts provisional in-call truth without promoting it to established', () => {
-    const hub = mountCallsHub({
+  it('mounts provisional in-call truth without promoting it to established', async () => {
+    const hub = await mountCallsHub({
       callState: 'in_call',
       callChannel: '#lounge',
       callWith: '',
@@ -102,8 +106,8 @@ describe('AppShell standalone CallsHub integration', () => {
     expect(within(hub).queryByRole('heading', { name: 'Your call is still here.' })).toBeNull();
   });
 
-  it('mounts ringing truth even when a stale start timestamp is present', () => {
-    const hub = mountCallsHub({
+  it('mounts ringing truth even when a stale start timestamp is present', async () => {
+    const hub = await mountCallsHub({
       callState: 'ringing_in',
       callChannel: null,
       callWith: 'alice',
@@ -118,8 +122,8 @@ describe('AppShell standalone CallsHub integration', () => {
     expect(within(hub).queryByText('Your call is still here.')).toBeNull();
   });
 
-  it('does not turn an established call into a media-protection claim', () => {
-    const hub = mountCallsHub({
+  it('does not turn an established call into a media-protection claim', async () => {
+    const hub = await mountCallsHub({
       callState: 'in_call',
       callChannel: '#lounge',
       callWith: '',

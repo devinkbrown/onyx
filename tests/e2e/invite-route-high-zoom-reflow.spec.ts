@@ -27,7 +27,7 @@ test('keeps the PublicFrame Invite route usable at 400% zoom', async ({ page }) 
     '/app/?join=%23root',
   );
   await expect(main.getByRole('button', { name: 'Copy link' })).toBeVisible();
-  await expect(main.getByLabelText('Display name')).toBeVisible();
+  await expect(main.getByLabel('Display name')).toBeVisible();
 
   await page.keyboard.press('Tab');
   await expect(skip).toBeFocused();

@@ -74,10 +74,10 @@ describe('Home Search Center integration', () => {
     const homeTrigger = screen.getByTestId('ribbon-search');
     homeTrigger.focus();
     fireEvent.click(homeTrigger);
-    const input = screen.getByRole('searchbox', { name: 'Search messages' });
+    const input = await screen.findByRole('searchbox', { name: 'Search messages' });
     expect(input).toHaveAttribute(
       'placeholder',
-      'Search all remembered messages',
+      'Search messages saved on this device',
     );
     await waitFor(() => expect(document.activeElement).toBe(input));
     expect(screen.queryByTestId('server-search')).not.toBeInTheDocument();
@@ -90,7 +90,7 @@ describe('Home Search Center integration', () => {
       .getByRole('button', { name: 'Browse rooms' });
     browse.focus();
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
-    const reopenedInput = screen.getByRole('searchbox', { name: 'Search messages' });
+    const reopenedInput = await screen.findByRole('searchbox', { name: 'Search messages' });
     await waitFor(() => expect(document.activeElement).toBe(reopenedInput));
 
     screen.getByRole('button', { name: 'Close search' }).focus();
@@ -104,7 +104,7 @@ describe('Home Search Center integration', () => {
   it('does not move focus behind an open modal when Cmd/Ctrl-F is pressed', async () => {
     render(() => <AppShell />);
     openPreferences();
-    expect(await screen.findByRole('dialog', { name: 'Preferences' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: /Preferences/i })).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
 
@@ -163,8 +163,8 @@ describe('Room header message search', () => {
     headerSearch.focus();
     fireEvent.click(headerSearch);
 
-    const input = screen.getByRole('searchbox', { name: 'Search messages' });
-    expect(input).toHaveAttribute('placeholder', 'Find in conversation');
+    const input = await screen.findByRole('searchbox', { name: 'Search messages' });
+    expect(input).toHaveAttribute('placeholder', 'Find messages in #general');
     await waitFor(() => expect(document.activeElement).toBe(input));
     expect(headerSearch).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('button', { name: 'Advanced' })).not.toBeInTheDocument();

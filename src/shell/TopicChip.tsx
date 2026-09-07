@@ -14,6 +14,7 @@ export type TopicChipProps = {
   label: string;
   unread?: number;
   active?: boolean;
+  state?: 'ready' | 'loading' | 'missing' | 'deleted';
   onClick?: (label: string) => void;
   onSplit?: (label: string) => void;
   splitAriaLabel?: string;
@@ -26,11 +27,16 @@ export type TopicFilterBarProps = {
   onSelect: (label: string | null) => void;
 };
 
-function TopicChipContent(props: { label: string; unread?: number }): JSX.Element {
+function TopicChipContent(props: { label: string; unread?: number; state?: TopicChipProps['state'] }): JSX.Element {
   return (
     <>
       <span class="topic-chip__hash" aria-hidden="true">#</span>
       <span class="topic-chip__label">{props.label}</span>
+      <Show when={props.state && props.state !== 'ready'}>
+        <span class="topic-chip__state" aria-hidden="true">
+          {props.state === 'loading' ? 'Loading' : props.state === 'missing' ? 'Missing' : 'Deleted'}
+        </span>
+      </Show>
       <Show when={(props.unread ?? 0) > 0}>
         <span class="topic-chip__unread" aria-label={`${props.unread} unread`}>
           {props.unread}
@@ -41,7 +47,21 @@ function TopicChipContent(props: { label: string; unread?: number }): JSX.Elemen
 }
 
 export function TopicChip(props: TopicChipProps): JSX.Element {
+  const state = () => props.state ?? 'ready';
+  const isUnavailable = () => state() !== 'ready';
+  const accessibleLabel = () => `${props.label}${state() === 'ready' ? '' : `, ${state()}`}${(props.unread ?? 0) > 0 ? `, ${props.unread} unread` : ''}`;
   return (
+    <Show when={!isUnavailable()} fallback={
+      <span
+        class="topic-chip"
+        classList={{ 'is-active': props.active === true, [`is-${state()}`]: true }}
+        aria-label={accessibleLabel()}
+        aria-busy={state() === 'loading' ? 'true' : undefined}
+        title={props.label}
+      >
+        <TopicChipContent label={props.label} unread={props.unread} state={state()} />
+      </span>
+    }>
     <Show
       when={props.onSplit}
       keyed
@@ -50,8 +70,8 @@ export function TopicChip(props: TopicChipProps): JSX.Element {
           when={props.onClick}
           keyed
           fallback={
-            <span class="topic-chip" classList={{ 'is-active': props.active === true }}>
-              <TopicChipContent label={props.label} unread={props.unread} />
+            <span class="topic-chip" classList={{ 'is-active': props.active === true }} aria-label={accessibleLabel()} title={props.label}>
+              <TopicChipContent label={props.label} unread={props.unread} state={state()} />
             </span>
           }
         >
@@ -61,6 +81,8 @@ export function TopicChip(props: TopicChipProps): JSX.Element {
               class="topic-chip"
               classList={{ 'is-active': props.active === true }}
               aria-pressed={props.active}
+              aria-label={accessibleLabel()}
+              title={props.label}
               onClick={() => handleClick(props.label)}
             >
               <TopicChipContent label={props.label} unread={props.unread} />
@@ -71,7 +93,7 @@ export function TopicChip(props: TopicChipProps): JSX.Element {
     >
       {(handleSplit) => (
         <span class="topic-chip" classList={{ 'is-active': props.active === true }}>
-          <TopicChipContent label={props.label} unread={props.unread} />
+          <TopicChipContent label={props.label} unread={props.unread} state={state()} />
           <button
             type="button"
             class="topic-chip__split"
@@ -88,12 +110,14 @@ export function TopicChip(props: TopicChipProps): JSX.Element {
               'text-underline-offset': '0.12rem',
             }}
             aria-label={props.splitAriaLabel ?? `Split into topic ${props.label}`}
+            title={`Split into topic ${props.label}`}
             onClick={() => handleSplit(props.label)}
           >
             Split
           </button>
         </span>
       )}
+    </Show>
     </Show>
   );
 }

@@ -67,7 +67,7 @@ describe('GroupControlRoomIndicator', () => {
     />);
     const indicator = screen.getByTestId('group-control-room-indicator');
     expect(indicator).toHaveAttribute('data-state', 'active');
-    expect(indicator).toHaveTextContent('Message protection: ready');
+    expect(indicator).toHaveTextContent('Message protection: available');
     expect(indicator).toHaveTextContent('Protection session ready on this device; room policy is reported separately');
     expect(indicator).not.toHaveTextContent('Room messages are protected');
   });

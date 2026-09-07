@@ -83,14 +83,14 @@ describe('JumpToDateSheet', () => {
     render(() => <JumpToDateSheet />);
 
     expect(screen.getByRole('heading', { name: 'Jump to date' })).toBeInTheDocument();
-    expect(screen.getByText(/Same path as \?at= links/i)).toBeInTheDocument();
+    expect(screen.getByText(/choose a date and time/i)).toBeInTheDocument();
     expect(screen.getByTestId('jump-to-date-sheet')).toBeInTheDocument();
 
-    const dateInput = screen.getByLabelText('Date (UTC)');
-    const timeInput = screen.getByLabelText('Time (UTC)');
+    const dateInput = screen.getByLabelText('Date');
+    const timeInput = screen.getByLabelText('Time');
     fireEvent.input(dateInput, { target: { value: '2026-06-30' } });
     fireEvent.input(timeInput, { target: { value: '09:15' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Jump' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View messages' }));
 
     expect(travelToSpy).toHaveBeenCalledWith('#general', new Date('2026-06-30T09:15:00.000Z'));
     expect(store.getState().showJumpToDate).toBe(false);
@@ -137,9 +137,9 @@ describe('JumpToDateSheet', () => {
     seedChannel();
 
     render(() => <JumpToDateSheet />);
-    const dateInput = screen.getByLabelText('Date (UTC)') as HTMLInputElement;
+    const dateInput = screen.getByLabelText('Date') as HTMLInputElement;
 
-    fireEvent.click(screen.getByRole('button', { name: 'Yesterday' }));
+    fireEvent.click(screen.getByText('Yesterday'));
     expect(dateInput.value).toBe('2026-07-18');
 
     fireEvent.click(screen.getByRole('button', { name: '7 days ago' }));
@@ -160,8 +160,38 @@ describe('JumpToDateSheet', () => {
 
     render(() => <JumpToDateSheet />);
 
-    expect(screen.getByRole('status')).toHaveTextContent(/Open a room or DM/i);
-    expect(screen.queryByLabelText('Date (UTC)')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/Open a room or direct message/i);
+    expect(screen.queryByLabelText('Date')).not.toBeInTheDocument();
+  });
+
+  it('keeps invalid input actionable and recovers as soon as it is corrected', () => {
+    seedChannel('#general');
+    render(() => <JumpToDateSheet />);
+
+    const dateInput = screen.getByLabelText('Date');
+    const jumpButton = screen.getByRole('button', { name: 'View messages' });
+    fireEvent.input(dateInput, { target: { value: '2026-02-31' } });
+    expect(jumpButton).toBeDisabled();
+    expect(screen.getByText('Enter a valid UTC date and time.')).toBeInTheDocument();
+
+    fireEvent.input(dateInput, { target: { value: '2026-02-28' } });
+    expect(jumpButton).not.toBeDisabled();
+    expect(screen.queryByText('Enter a valid UTC date and time.')).not.toBeInTheDocument();
+  });
+
+  it('communicates offline and loading states without allowing duplicate jumps', () => {
+    seedChannel('#general');
+    store.setState({ connectionStatus: 'disconnected' });
+    render(() => <JumpToDateSheet />);
+    expect(screen.getByText(/unavailable while you are offline/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View messages' })).toBeDisabled();
+
+    cleanup();
+    seedChannel('#general');
+    store.setState({ historyLoading: new Map([['#general', true]]) });
+    render(() => <JumpToDateSheet />);
+    expect(screen.getByText(/Loading messages around this moment/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View messages' })).toBeDisabled();
   });
 
   it('closes through the sheet close control', () => {

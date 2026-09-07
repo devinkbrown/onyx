@@ -23,6 +23,7 @@ import { preferences } from '@/lib/prefs/preferences';
 import type { ChannelUser } from '@/lib/irc/types';
 import { BanListPanel } from './moderation/BanListPanel';
 import { ModerationActionReview } from './moderation/ModerationActionReview';
+import './moderation-cockpit.css';
 import './moderation/moderation-desk.css';
 
 export type ModerationCockpitProps = { channel: string };
@@ -152,6 +153,11 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
         </div>
       </div>
 
+      <div class="moderation-desk__boundary" role="note">
+        <strong>Room moderation</strong>
+        <span>These controls affect this room on the server. Personal mute/block lives in Preferences and only affects your device.</span>
+      </div>
+
       <dl class="moderation-desk__rail" aria-label="Room authority">
         <div>
           <dt>Connected</dt>
@@ -214,7 +220,7 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
                 : { kind, channel: local.channel, target });
             }}
           >
-            <label for={memberId}>Reviewed member action</label>
+            <label for={memberId}>Room member action</label>
             <div>
               <select
                 id={memberId}
@@ -238,8 +244,9 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
               </select>
             </div>
             <Show when={memberAction() === 'kick' || memberAction() === 'ban'}>
-              <label for={reasonId}>Optional note</label>
+              <label for={reasonId}>Reason <span class="moderation-desk__optional">optional</span></label>
               <input id={reasonId} value={memberReason()} onInput={(event) => setMemberReason(event.currentTarget.value)} autocomplete="off" />
+              <p class="moderation-cockpit__hint">No expiry is available for this room action; a moderator can lift a block later.</p>
             </Show>
             <button type="submit" disabled={!connected() || !memberNick().trim()}>Review action</button>
           </form>
@@ -249,18 +256,19 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
           class="moderation-cockpit__form moderation-cockpit__form--danger"
           onSubmit={(event) => prepareDraft(event, { kind: 'ban', channel: local.channel, mask: banMask() })}
         >
-          <label for={banId}>Block a matching address</label>
+          <label for={banId}>Block an address in this room</label>
           <div>
             <input id={banId} value={banMask()} onInput={(event) => setBanMask(event.currentTarget.value)} placeholder="name!*@*" autocomplete="off" />
             <button type="submit" disabled={!connected() || !banMask().trim()}>Review block</button>
           </div>
-          <p class="moderation-cockpit__hint">This sends a server-side block after you review it.</p>
+          <p class="moderation-cockpit__hint">Server-side, persistent until lifted. Review the target and reason before sending.</p>
         </form>
 
         <BanListPanel channel={local.channel} />
 
         <section class="moderation-desk__log" aria-label="Recent room activity">
-          <h4>Recent activity</h4>
+          <h4>Server activity</h4>
+          <p class="moderation-desk__receipt">Only server-echoed changes appear here. A review is a local draft until confirmed.</p>
           <Show
             when={activity().length > 0}
             fallback={<p class="moderation-cockpit__hint">No recent server-echoed moderation activity in this room.</p>}

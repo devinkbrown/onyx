@@ -174,7 +174,7 @@ export function SessionsDevicesSection(props: SessionsDevicesSectionProps): JSX.
               </ul>
             </Show>
 
-            <p class="acct-section-hint" data-testid="sessions-passkeys-hint">
+            <p class="acct-section-hint" role="note" data-testid="sessions-passkeys-hint">
               Device credentials (Face ID, fingerprint, security keys) are
               managed under <strong>Passkeys</strong> below.
             </p>

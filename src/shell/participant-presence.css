@@ -1,0 +1,54 @@
+/* Shared quality layer for the participant/presence surfaces only. Keep
+   presence understandable without making color or motion carry meaning. */
+.shell-facepile-face .onyx-popover__trigger {
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+.shell-facepile-overflow {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  justify-content: center;
+}
+
+.shell-member-presence {
+  background: var(--ok, #4caf82);
+}
+
+.shell-member-presence--away {
+  background: var(--paper-mute, #89919a);
+}
+
+.shell-members-refresh[role='status'] {
+  color: var(--paper-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-member-nick,
+  .shell-role-badge,
+  .shell-member-row,
+  .shell-facepile-face,
+  .room-insights__rhythm-fill {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .shell-facepile-face .onyx-popover__trigger:focus-visible,
+  .shell-members-scroll .onyx-popover__trigger:focus-visible,
+  .shell-facepile-overflow {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    forced-color-adjust: none;
+  }
+
+  .shell-member-presence,
+  .shell-member-presence--away {
+    forced-color-adjust: none;
+    background: ButtonText;
+    border: 1px solid ButtonText;
+  }
+}

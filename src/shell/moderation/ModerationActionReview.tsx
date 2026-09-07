@@ -97,6 +97,11 @@ export function ModerationActionReview(props: ModerationActionReviewProps): JSX.
         >
           {(copy) => (
             <>
+              <dl class="moderation-action-review__facts">
+                <div><dt>Permission</dt><dd>{local.canModerate ? 'Room moderator' : 'Not available'}</dd></div>
+                <div><dt>Target scope</dt><dd>{local.draft?.channel ?? 'This room'}</dd></div>
+                <div><dt>Receipt</dt><dd>Local draft until confirmed; server echo is the source of truth.</dd></div>
+              </dl>
               <p class="moderation-action-review__summary">{copy().summary}</p>
               <p class="moderation-action-review__impact">{copy().impact}</p>
             </>

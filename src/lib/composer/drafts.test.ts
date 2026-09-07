@@ -13,6 +13,7 @@ import {
   composerDraftKey,
   getComposerDraft,
   loadComposerDrafts,
+  loadComposerDraftsWithStatus,
   saveComposerDrafts,
   setComposerDraft,
 } from './drafts';
@@ -73,6 +74,55 @@ describe('composer draft logic', () => {
       alice: 'two',
     });
     expect(loadComposerDrafts(storage)).toEqual({ '#root': 'one', alice: 'two' });
+  });
+
+  it('reports a durable save and limit reached without hiding truncation or target dropping', () => {
+    const storage = makeStorage();
+    const input: Record<string, string> = { '#exact': 'ok', '#long': 'x'.repeat(MAX_DRAFT_LEN + 1) };
+    for (let i = 0; i < MAX_COMPOSER_DRAFTS; i += 1) input[`#extra${i}`] = 'draft';
+
+    const result = saveComposerDrafts(input, storage);
+
+    expect(result.status).toBe('limit-reached');
+    expect(result.drafts['#long']).toHaveLength(MAX_DRAFT_LEN);
+    expect(Object.keys(result.drafts)).toHaveLength(MAX_COMPOSER_DRAFTS);
+    expect(loadComposerDraftsWithStatus(storage).status).toBe('saved');
+  });
+
+  it('accepts drafts exactly at both persistence limits', () => {
+    const storage = makeStorage();
+    const exact: Record<string, string> = {};
+    for (let i = 0; i < MAX_COMPOSER_DRAFTS; i += 1) {
+      exact[`#chan${i}`] = 'x'.repeat(MAX_DRAFT_LEN);
+    }
+
+    const result = saveComposerDrafts(exact, storage);
+
+    expect(result.status).toBe('saved');
+    expect(Object.keys(loadComposerDrafts(storage))).toHaveLength(MAX_COMPOSER_DRAFTS);
+    expect(loadComposerDrafts(storage)['#chan0']).toHaveLength(MAX_DRAFT_LEN);
+  });
+
+  it('reports only-in-tab when storage quota/write verification fails', () => {
+    const storage = makeStorage();
+    const blocked = {
+      getItem: storage.getItem.bind(storage),
+      setItem: () => { throw new DOMException('quota', 'QuotaExceededError'); },
+      removeItem: storage.removeItem.bind(storage),
+    };
+
+    const result = saveComposerDrafts({ '#room': 'draft' }, blocked);
+
+    expect(result.status).toBe('only-in-tab');
+    expect(result.drafts).toEqual({ '#room': 'draft' });
+  });
+
+  it('reports malformed persisted data explicitly', () => {
+    const storage = makeStorage();
+    storage.setItem(COMPOSER_DRAFTS_KEY, '{broken');
+
+    expect(loadComposerDraftsWithStatus(storage)).toEqual({ status: 'malformed', drafts: {} });
+    expect(loadComposerDrafts(storage)).toEqual({});
   });
 
   it('removes the storage key when all drafts are empty', () => {

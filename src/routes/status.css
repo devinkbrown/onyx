@@ -42,6 +42,11 @@
 }
 
 .status-lede {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   margin: 22px 0 0;
   max-width: 28ch;
   font-family: var(--font-serif);
@@ -191,9 +196,27 @@
 @media (max-width: 42rem) and (max-height: 30rem) {
   .status-route .status-hero h1 {
     max-width: none;
-    font-size: 48px;
-    line-height: 1;
+    font-size: min(1rem, 64px);
+    line-height: 1.1;
     overflow-wrap: anywhere;
+  }
+
+  .status-scroll-surface:focus-visible {
+    outline: var(--focus-ring, 2px solid var(--public-current, var(--lapis-bright)));
+    outline-offset: 3px;
+  }
+
+  .status-scroll-surface {
+    max-height: calc(100svh - 1rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .status-lede {
+    width: 100%;
+    font-size: min(1rem, 24px);
   }
 
   .status-observation {

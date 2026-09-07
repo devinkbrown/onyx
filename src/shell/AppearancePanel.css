@@ -96,3 +96,25 @@
   gap: 18px;
   padding: 12px;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .ap-panel *, .ap-panel *::before, .ap-panel *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .ap-panel-switch, .ap-panel-advanced, .ap-panel-background-browser,
+  .ap-motion-option, .ap-theme-chip {
+    border-color: ButtonText;
+    background: Canvas;
+    color: CanvasText;
+  }
+  .ap-panel-switch:focus-visible, .ap-motion-option:focus-visible,
+  .ap-theme-chip:focus-visible, .ap-panel-advanced > summary:focus-visible,
+  .ap-panel-background-browser > summary:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

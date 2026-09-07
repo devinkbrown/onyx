@@ -67,6 +67,15 @@
   --ui-surface-selected: color-mix(in oklab, var(--ui-action-primary) 16%, transparent);
   --ui-surface-hover: color-mix(in oklab, var(--ui-text-primary) 6%, transparent);
 
+  /* ── Structure ───────────────────────────────────────────────────────────
+     Border roles stay neutral until a surface explicitly asks for emphasis.
+     The aliases keep existing theme variables authoritative while giving new
+     surfaces a small, legible vocabulary. */
+  --ui-border-subtle: var(--ui-surface-line-faint);
+  --ui-border-default: var(--ui-surface-line);
+  --ui-border-strong: var(--ui-border-heavy, var(--ui-surface-seam));
+  --ui-border-focus: var(--ui-focus-color, var(--ui-action-primary-hover));
+
   /* ── Text ──────────────────────────────────────────────────────────────────
      primary → secondary → muted descends in emphasis, not in legibility below
      the AA floor. `on-*` inks are for text sitting ON a filled action. */
@@ -77,6 +86,14 @@
   --ui-text-on-action: var(--on-accent, var(--ui-fallback-on-fill));
   --ui-text-on-critical: var(--on-danger, var(--ui-fallback-on-fill));
   --ui-text-link: var(--lapis-bright, var(--ui-fallback-signal-bright));
+
+  /* ── Status ─────────────────────────────────────────────────────────────
+     Status is for present-tense product state; proof remains reserved for
+     provenance and confidence. Every status has a text label in the UI. */
+  --ui-status-info: var(--lapis-bright, var(--ui-fallback-signal-bright));
+  --ui-status-success: var(--ok, var(--ui-fallback-signal-bright));
+  --ui-status-warning: var(--warn, var(--ui-fallback-ember-bright));
+  --ui-status-danger: var(--danger, var(--ui-fallback-ember));
 
   /* ── Action ────────────────────────────────────────────────────────────────
      One primary, one secondary, one critical, one quiet. A fifth interactive
@@ -192,4 +209,19 @@
   --ui-fallback-on-fill: var(--room-current-void);
 
   color-scheme: dark;
+}
+
+/* Forced-colors is a semantic remap, not a decorative theme. Keep structure,
+   focus, and status legible when authored hues are intentionally discarded. */
+@media (forced-colors: active) {
+  :root {
+    --ui-border-subtle: CanvasText;
+    --ui-border-default: CanvasText;
+    --ui-border-strong: CanvasText;
+    --ui-border-focus: Highlight;
+    --ui-status-info: LinkText;
+    --ui-status-success: Highlight;
+    --ui-status-warning: MarkText;
+    --ui-status-danger: MarkText;
+  }
 }

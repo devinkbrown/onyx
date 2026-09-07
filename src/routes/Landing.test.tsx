@@ -42,12 +42,12 @@ describe('Landing', () => {
     expect(openOnyx).toHaveLength(1);
     expect(openOnyx[0]).toHaveAttribute('href', '/app/');
     expect(openOnyx[0]).toHaveClass('public-frame__open');
-    expect(getByRole('heading', { level: 1 })).toHaveTextContent('Find your people. Keep the room.');
-    expect(container.querySelector('a.home-cta-primary')).toHaveAttribute('href', '/app/');
-    expect(container.querySelector('a.home-cta-primary')).toHaveTextContent('Join free');
-    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/download/');
-    expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('Download');
-    expect(container.textContent).toMatch(/A calm place to begin a conversation/);
+    expect(getByRole('heading', { level: 1 })).toHaveTextContent('Come for the conversation. Return to the room.');
+    expect(container.querySelector('a.home-cta-primary')).toHaveAttribute('href', '/invite/?join=%23root');
+    expect(container.querySelector('a.home-cta-primary')).toHaveTextContent('Start in the public room');
+    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/app/');
+    expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('Open the app');
+    expect(container.textContent).toMatch(/calm place for rooms, private conversations, and calls/);
     expect(container.querySelector('.home-desktop-note')?.textContent).toMatch(
       /Supporting browsers can put Onyx on the Home Screen or in its own window\. No store\./,
     );
@@ -55,9 +55,16 @@ describe('Landing', () => {
     expect(container.textContent).not.toMatch(/app store|play store|beforeinstallprompt|iOS push/i);
   });
 
+  it('opts into the commercial foundation without changing the public frame contract', () => {
+    const { container } = render(() => <Landing />);
+    expect(container.querySelector('.ui-root.ui-commercial')).toBeTruthy();
+    expect(container.querySelector('.commercial-visually-hidden')).toBeNull();
+  });
+
   it('derives public destination links from manifest hrefs', () => {
     const { container, getByRole } = render(() => <Landing />);
-    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/download/');
+    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/app/');
+    expect(container.querySelector('a.home-local-link')).toHaveAttribute('href', '/download/');
     expect(getByRole('link', { name: /keep it here/i })).toHaveAttribute('href', '/download/');
     expect(getByRole('link', { name: /how the rooms work/i })).toHaveAttribute('href', '/about/');
   });

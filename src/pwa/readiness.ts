@@ -91,15 +91,15 @@ export function pwaReadiness(): PwaReadinessItem[] {
       label: 'App window',
       state: standalone ? 'ready' : 'attention',
       detail: standalone
-        ? 'Onyx is running in an installed standalone window.'
-        : 'Onyx is running in a browser tab; install it for the wrapper-like window path.',
+        ? 'Onyx is running in a standalone browser window. This does not indicate a native app.'
+        : 'Onyx is running in a browser tab. You can install the browser version if your browser offers it.',
     },
     {
       key: 'worker',
       label: 'Service worker',
       state: controlled ? 'ready' : hasServiceWorker ? 'attention' : 'unavailable',
       detail: controlled
-        ? 'The stamped service worker controls this page.'
+        ? 'The current service worker controls this page and can provide its cached app shell.'
         : hasServiceWorker
           ? 'Service workers are supported; reload after install or update so the stamped worker controls this page.'
           : 'This browser does not support the service-worker update path.',
@@ -110,7 +110,7 @@ export function pwaReadiness(): PwaReadinessItem[] {
       label: 'Local state',
       state: hasDurableStorage ? 'attention' : 'unavailable',
       detail: hasDurableStorage
-        ? 'IndexedDB and localStorage are available, but API availability alone does not protect the vault from browser eviction. Check persistence below.'
+        ? 'IndexedDB and localStorage are available. The browser may still evict data; this check does not promise permanent storage.'
         : 'Local storage is unavailable; vault recall, drafts, and portable transfer cannot be stored on this device.',
     },
   ];

@@ -7,6 +7,9 @@
   --ab-ember: var(--public-ember);
   min-width: 0;
   color: var(--public-text, var(--paper));
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .ab-ocean .r-wrap,
@@ -303,6 +306,8 @@
   .ab-quiet-links a {
     width: 100%;
     min-height: 44px;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 }
 

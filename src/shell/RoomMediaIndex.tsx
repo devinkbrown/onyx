@@ -13,7 +13,7 @@ import {
   useStore,
 } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
-import { loadRecent, VAULT_KEEP } from '@/lib/vault/historyVault';
+import { loadRecentWithStatus, VAULT_KEEP, type RecentHistoryStatus } from '@/lib/vault/historyVault';
 import {
   ROOM_MEDIA_EMPTY,
   indexRoomMedia,
@@ -64,22 +64,34 @@ export function RoomMediaIndex(props: RoomMediaIndexProps): JSX.Element {
 
   const memoryOwner = useStore(selectDeviceMemoryOwner, sameOwner);
 
-  const [vaultMessages] = createResource(
+  const [vaultResult, { refetch: retryVault }] = createResource(
     () => ({
       open: local.open,
       target: local.target,
       owner: memoryOwner(),
     }),
     async (source) => {
-      if (!source.open || !source.target) return [] as ChatMessage[];
-      return loadRecent(source.target, VAULT_KEEP, source.owner ?? undefined);
+      if (!source.open || !source.target) return { messages: [], status: 'complete' as const };
+      try {
+        return await loadRecentWithStatus(source.target, VAULT_KEEP, source.owner ?? undefined);
+      } catch {
+        return { messages: [], status: 'unavailable' as const };
+      }
     },
-    { initialValue: [] as ChatMessage[] },
+    { initialValue: { messages: [], status: 'complete' as RecentHistoryStatus } },
   );
 
-  const index = createMemo(() => (
-    indexRoomMedia(mergeRoomHistory(liveMessages(), vaultMessages() ?? []))
-  ));
+  const index = createMemo(() => {
+    const target = local.target.toLowerCase();
+    const live = liveMessages().filter((message) => message.target.toLowerCase() === target);
+    // createResource retains its previous value while a new scope is loading.
+    // Do not let that value cross an account/room boundary.
+    const vault = vaultResult.loading ? EMPTY_MESSAGES : (vaultResult()?.messages ?? EMPTY_MESSAGES);
+    return indexRoomMedia(mergeRoomHistory(
+      live,
+      vault,
+    ));
+  });
 
   function jumpTo(messageId: string): void {
     getState().focusMessage(messageId);
@@ -90,7 +102,7 @@ export function RoomMediaIndex(props: RoomMediaIndexProps): JSX.Element {
     <Sheet
       open={local.open}
       title="Pictures, files, and links"
-      description="On this device"
+      description="From this conversation, indexed on this device. Selecting an item returns you to its message; links open the destination in a new tab."
       onOpenChange={local.onOpenChange}
       closeLabel="Close pictures, files, and links"
     >
@@ -105,33 +117,47 @@ export function RoomMediaIndex(props: RoomMediaIndexProps): JSX.Element {
               )}
             </For>
           </Tabs.List>
+          <Show when={vaultResult.loading}>
+            <div class="room-media-index-status room-media-index-status--loading" role="status" aria-live="polite">
+              <span>Loading media from this device…</span>
+              <span class="room-media-index-skeleton" aria-hidden="true" />
+            </div>
+          </Show>
+          <Show when={!vaultResult.loading && (vaultResult.error || vaultResult()?.status !== 'complete')}>
+            <div class="room-media-index-status room-media-index-status--error" role="alert" aria-live="assertive">
+              <p>{vaultResult.error || vaultResult()?.status === 'unavailable'
+                ? 'Device history is unavailable. Showing media from the live conversation and any history recovered.'
+                : 'Device history is incomplete. Showing live media and the history recovered so far; more history may exist.'}</p>
+              <button type="button" class="room-media-index-retry" onClick={() => retryVault()}>
+                Retry
+              </button>
+            </div>
+          </Show>
           <For each={FILTERS}>
             {(filter) => (
               <Tabs.Content class="room-media-index-panel" value={filter.id}>
-                <Show
-                  when={itemsForFilter(index(), filter.id).length > 0}
-                  fallback={<p class="room-media-index-empty">{ROOM_MEDIA_EMPTY[filter.id]}</p>}
-                >
-                  <ul class="room-media-index-list">
-                    <For each={itemsForFilter(index(), filter.id)}>
-                      {(item) => (
-                        <li class="room-media-index-item">
-                          <Show when={item.kind === 'picture'}>
-                            <PictureRow
-                              item={item as RoomMediaPicture}
-                              onJump={jumpTo}
-                            />
-                          </Show>
-                          <Show when={item.kind === 'file'}>
-                            <FileRow item={item as RoomMediaFile} onJump={jumpTo} />
-                          </Show>
-                          <Show when={item.kind === 'link'}>
-                            <LinkRow item={item as RoomMediaLink} onJump={jumpTo} />
-                          </Show>
-                        </li>
-                      )}
-                    </For>
+                  <ul class="room-media-index-list" aria-label={`${filter.label} in this conversation`}>
+                      <For each={itemsForFilter(index(), filter.id)}>
+                        {(item) => (
+                          <li class="room-media-index-item">
+                            <Show when={item.kind === 'picture'}>
+                              <PictureRow
+                                item={item as RoomMediaPicture}
+                                onJump={jumpTo}
+                              />
+                            </Show>
+                            <Show when={item.kind === 'file'}>
+                              <FileRow item={item as RoomMediaFile} onJump={jumpTo} />
+                            </Show>
+                            <Show when={item.kind === 'link'}>
+                              <LinkRow item={item as RoomMediaLink} onJump={jumpTo} />
+                            </Show>
+                          </li>
+                        )}
+                      </For>
                   </ul>
+                <Show when={!vaultResult.loading && itemsForFilter(index(), filter.id).length === 0}>
+                  <p class="room-media-index-empty">{ROOM_MEDIA_EMPTY[filter.id]}</p>
                 </Show>
               </Tabs.Content>
             )}
@@ -158,7 +184,7 @@ function PictureRow(props: {
     >
       <span class="room-media-index-squircle" aria-hidden="true" />
       <span class="room-media-index-copy">
-        <span class="room-media-index-title">{label()}</span>
+        <span class="room-media-index-title" title={label()}>{label()}</span>
         <span class="room-media-index-meta">{local.item.from}</span>
       </span>
     </button>
@@ -181,7 +207,7 @@ function FileRow(props: {
     >
       <span class="room-media-index-filemark" aria-hidden="true">file</span>
       <span class="room-media-index-copy">
-        <span class="room-media-index-title">{label()}</span>
+        <span class="room-media-index-title" title={label()}>{label()}</span>
         <span class="room-media-index-meta">
           {local.item.sizeLabel ?? local.item.from}
         </span>
@@ -201,12 +227,14 @@ function LinkRow(props: {
       <a
         class="room-media-index-row room-media-index-row--link"
         href={local.item.href}
+        aria-label={`Open link to ${local.item.domain}`}
+        title={local.item.href}
         target="_blank"
         rel="noopener noreferrer"
       >
         <span class="room-media-index-copy">
           <span class="room-media-index-title">{local.item.domain}</span>
-          <span class="room-media-index-meta">{local.item.href}</span>
+          <span class="room-media-index-meta" dir="auto">{local.item.href}</span>
         </span>
       </a>
       <button
